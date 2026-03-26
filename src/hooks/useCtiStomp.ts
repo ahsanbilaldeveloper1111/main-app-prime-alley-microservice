@@ -14,6 +14,16 @@ import {
   pickMostRecentCall,
   mergeRemoteEventLogWithPrevious,
 } from "./ctiStompHelpers";
+import { fetchCtiConnectToken, waitForConcurrentCtiToken } from "./ctiStompAuth";
+import { runCtiMasterTabInitGate } from "./ctiStompMasterInitGate";
+import {
+  dispatchPrimaryCtiSsePayload,
+  type PrimarySseDispatchCtx,
+} from "./ctiStompSsePrimaryDispatch";
+import {
+  dispatchCrossTabCtiBroadcastEvent,
+  type CrossTabBroadcastCtx,
+} from "./ctiStompCrossTabBroadcastDispatch";
 
 interface CtiDevice {
   dn: string;
@@ -141,12 +151,9 @@ export default function useCtiStomp(
       : instanceId || generateInstanceId()
   );
 
-  const globalExcludedPaths = getGlobalExcludedPaths();
-
   // Cross-tab manager for sharing connection across tabs
   const crossTabManagerRef = useRef(getCrossTabCtiManager());
   const [isMasterTab, setIsMasterTab] = useState(false);
-  const [_eventSource, setEventSource] = useState<EventSource | null>(null);
 
   // Router for checking current page
   const router = useRouter();
@@ -496,116 +503,65 @@ export default function useCtiStomp(
   ]);
 
 
-  // Shared getBearerToken function - defined outside useEffect so it can be reused
-  // Uses isGettingTokenRef to prevent duplicate calls
+  // Shared getBearerToken function - uses isGettingTokenRef to prevent duplicate calls
   const getBearerToken = useCallback(async (): Promise<{
     token: string;
     userAddress: string;
   } | null> => {
-    // ATOMIC CHECK: If already getting token, wait for it to complete
     if (isGettingTokenRef.current) {
-      console.log(`[${instanceIdRef.current}] Token request already in progress, waiting for completion...`);
-      // Wait with retries until token is available or timeout (max 10 seconds)
-      const maxWaitTime = 10000; // 10 seconds
-      const checkInterval = 100; // Check every 100ms
-      const startTime = Date.now();
-      
-      while (isGettingTokenRef.current && (Date.now() - startTime) < maxWaitTime) {
-        await new Promise((resolve) => setTimeout(resolve, checkInterval));
-        // If token became available, return it
-        if (tokenRef.current && userAddressRef.current) {
-          console.log(`[${instanceIdRef.current}] Token became available from concurrent request`);
-          return { token: tokenRef.current, userAddress: userAddressRef.current };
-        }
-      }
-      
-      // If we exited the loop but flag is still set, something went wrong
-      if (isGettingTokenRef.current) {
-        console.error(`[${instanceIdRef.current}] Token request timed out after ${maxWaitTime}ms`);
-        return null;
-      }
-      
-      // If flag was cleared but no token, check one more time
-      if (tokenRef.current && userAddressRef.current) {
-        return { token: tokenRef.current, userAddress: userAddressRef.current };
-      }
-      
-      // No token available
-      console.log(`[${instanceIdRef.current}] No token available after waiting`);
-      return null;
+      return waitForConcurrentCtiToken(
+        isGettingTokenRef,
+        tokenRef,
+        userAddressRef,
+        instanceIdRef.current,
+        10000,
+        100,
+      );
     }
 
-    // Set flag IMMEDIATELY before async operation
     isGettingTokenRef.current = true;
 
     try {
-      if (
-        globalThis.window !== undefined &&
-        globalExcludedPaths.some((path) =>
-          globalThis.window?.location.pathname?.includes(path),
-        ) &&
-        !isAuthenticated
-      ) {
-        throw new Error("User not authenticated");
-      }
-      // Wait for token to be in sessionStorage so axios interceptor can send Authorization header.
-      // After login, TokenServiceProvider/useAuth may not have synced yet when this runs.
-      const tokenWaitMs = 4000;
-      const tokenCheckInterval = 100;
-      const start = Date.now();
-      while (!tokenService.getAccessToken() && Date.now() - start < tokenWaitMs) {
-        await new Promise((r) => setTimeout(r, tokenCheckInterval));
-      }
-      if (!tokenService.getAccessToken()) {
-        console.warn(`[${instanceIdRef.current}] No access token in sessionStorage after ${tokenWaitMs}ms, /cti/connect may return 401`);
-      }
-      const response = await axiosInstance.get("/cti/connect", {
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache, no-store",
-          "Pragma": "no-cache",
-        },
+      const result = await fetchCtiConnectToken({
+        axiosInstance,
+        getAccessToken: () => tokenService.getAccessToken() ?? null,
+        globalExcludedPaths: getGlobalExcludedPaths(),
+        isAuthenticated,
+        tokenWaitMs: 4000,
+        tokenCheckInterval: 100,
+        logPrefix: instanceIdRef.current,
       });
 
-      if (response.status === 200) {
-        const data = response.data;
-        const token = data.token || data.accessToken || data.bearerToken;
-        const userAddress = data.userAddress || data.user_address;
-
-        const userTeams = data?.teams;
-        const userDataExtensions = data?.extensions;
-
-        if (token && userAddress) {
-          // Store token, userAddress, userTeams, and userDataExtensions in refs
-          tokenRef.current = token;
-          userAddressRef.current = userAddress;
-          userTeamsRef.current = userTeams;
-          userDataExtensionsRef.current = userDataExtensions;
-          
-          // Broadcast userDataExtensions to other tabs via cross-tab communication
-          if (isGlobalInstance && crossTabManagerRef.current.isMasterTab() && crossTabManagerRef.current.isCrossTabSupported()) {
-            crossTabManagerRef.current.broadcastCtiEvent({
-              type: 'user_data_extensions',
-              data: userDataExtensions
-            });
-          }
-          
-          isGettingTokenRef.current = false;
-          return { token, userAddress };
-        } else {
-          isGettingTokenRef.current = false;
-          return null;
-        }
-      } else {
+      if (!result) {
         isGettingTokenRef.current = false;
         return null;
       }
+
+      const { token, userAddress, userTeams, userDataExtensions } = result;
+      tokenRef.current = token;
+      userAddressRef.current = userAddress;
+      userTeamsRef.current = userTeams;
+      userDataExtensionsRef.current = userDataExtensions;
+
+      if (
+        isGlobalInstance &&
+        crossTabManagerRef.current.isMasterTab() &&
+        crossTabManagerRef.current.isCrossTabSupported()
+      ) {
+        crossTabManagerRef.current.broadcastCtiEvent({
+          type: "user_data_extensions",
+          data: userDataExtensions,
+        });
+      }
+
+      isGettingTokenRef.current = false;
+      return { token, userAddress };
     } catch (error) {
       console.warn("[useCtiStomp] getBearerToken failed", error);
       isGettingTokenRef.current = false;
       return null;
     }
-  }, []);
+  }, [isAuthenticated, isGlobalInstance]);
 
   useEffect(() => {
     // Wait for authentication to be initialized before attempting connection
@@ -966,8 +922,6 @@ export default function useCtiStomp(
       // CRITICAL: Immediately store the EventSource to prevent duplicate creation
       // This must happen synchronously before any other code can run
       eventSourceRef.current = eventSource;
-      // Also update state for consistency
-      setEventSource(eventSource);
 
       eventSource.onopen = () => {
         const currentInstanceId = instanceIdRef.current;
@@ -1082,146 +1036,29 @@ export default function useCtiStomp(
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-
-          // Update last message time for health check - but only for real messages, not pings
-          // This ensures health check can detect when CTI events stop even if SSE pings continue
-          if (data.type !== "ping" && data.type !== "test") {
-            lastMessageTimeRef.current = Date.now();
-          }
-
-          switch (data.type) {
-            case "complete_state":
-              try {
-                if (
-                  groupDevicesByDnAndDeviceNameRef.current &&
-                  updateSummaryDataRef.current
-                ) {
-                  const grouped = groupDevicesByDnAndDeviceNameRef.current(
-                    data.data
-                  );
-                  setDnsMap(grouped);
-                  updateSummaryDataRef.current(grouped);
-                  setEventLog((prev) => [
-                    ...prev,
-                    {
-                      type: "initial-state",
-                      data: grouped,
-                      timestamp: new Date().toISOString(),
-                    },
-                  ]);
-                  
-                  // CRITICAL: Broadcast complete_state to non-master tabs
-                  // This ensures non-master tabs receive the initial data for live-calls page
-                  if (isGlobalInstance && crossTabManagerRef.current.isMasterTab() && crossTabManagerRef.current.isCrossTabSupported()) {
-                    crossTabManagerRef.current.broadcastCtiEvent({
-                      type: 'complete_state',
-                      data: data.data
-                    });
-                  }
-                }
-              } catch (err) {
-                console.error(`[${currentInstanceId}] ❌ Failed to process initial state`, err);
-              }
-              break;
-
-            case "dns_states": {
-              try {
-                const s = data.data;
-                setDnsMap((prev) => {
-                  const updated = { ...prev };
-                  const { dn, deviceName } = s;
-                  if (!updated[dn]) {
-                    updated[dn] = { dn, devices: {} };
-                  }
-                  const existing = updated[dn].devices[deviceName];
-                  updated[dn].devices[deviceName] = { ...existing, ...s };
-                  if (updateSummaryDataRef.current) {
-                    updateSummaryDataRef.current(updated);
-                  }
-                  return updated;
-                });
-              } catch (err) {
-                console.error(`[${currentInstanceId}] ❌ Failed to process update`, err);
-              }
-              break;
-            }
-
-            case "call_events":
-              try {
-                if (handleCallEventRef.current) {
-                  handleCallEventRef.current(data.data);
-                }
-                if (data.data?.eventType === "DROPPED" || data.data?.eventType === "DISCONNECTED") {
-                  scheduleRefreshAfterCallEndRef.current?.();
-                }
-              } catch (err) {
-                console.error(`[${currentInstanceId}] ❌ Failed to process call event`, err);
-              }
-              break;
-
-            case "stomp_connected": {
-              setIsInitialized(true);
-              setError(null);
-              const publishInitial = publishStompMessageRef.current;
-              if (!hasRequestedInitialStateRef.current && publishInitial) {
-                hasRequestedInitialStateRef.current = true;
-                publishInitial("/app/request/initial-state", "");
-              }
-              break;
-            }
-
-            case "stomp_error":
-              setError("STOMP error: " + (data.message || "unknown"));
-              setIsInitialized(false);
-              break;
-
-            case "connection":
-              console.log(
-                `[${instanceIdRef.current}] 📨 Received connection message:`,
-                data
-              );
-              if (data.status === "disconnected") {
-                // Only set initialized to false if we're not preserving state
-                // This allows UI to keep showing existing data during reconnection
-                if (!data.preserveState) {
-                  setIsInitialized(false);
-                }
-              } else if (data.status === "reconnecting") {
-                console.log(
-                  `[${instanceIdRef.current}] 🔄 Received reconnecting status from server`
-                );
-                if (isReconnectingRef.current) {
-                  console.log(
-                    `[${instanceIdRef.current}] ⚠️ Reconnection already in progress, ignoring duplicate message`
-                  );
-                } else {
-                  const currentInstanceId = instanceIdRef.current;
-                  isReconnectingRef.current = true;
-                  setIsReconnecting(true);
-                  console.log(
-                    `[${currentInstanceId}] 🔄 Server reconnecting, starting reconnection with retry logic...`
-                  );
-                  attemptReconnection();
-                }
-              }
-              break;
-
-            case "error":
-              setError(data.message || "Connection error");
-              setIsInitialized(false);
-              break;
-
-            case "ping":
-              // Ignore ping messages (don't update health check timer)
-              break;
-
-            case "test":
-              // Ignore test messages (don't update health check timer)
-              break;
-
-            default:
-              break;
-          }
+          const sseCtx = {
+            currentInstanceId,
+            getInstanceId: () => instanceIdRef.current,
+            isGlobalInstance,
+            crossTabManagerRef,
+            lastMessageTimeRef,
+            setDnsMap,
+            setEventLog,
+            setError,
+            setIsInitialized,
+            isReconnectingRef,
+            setIsReconnecting,
+            attemptReconnection: () => {
+              void attemptReconnection();
+            },
+            scheduleRefreshAfterCallEndRef,
+            hasRequestedInitialStateRef,
+            publishStompMessageRef,
+            handleCallEventRef,
+            groupDevicesByDnAndDeviceNameRef,
+            updateSummaryDataRef,
+          };
+          dispatchPrimaryCtiSsePayload(data, sseCtx as PrimarySseDispatchCtx);
         } catch (error) {
           console.warn("[useCtiStomp] SSE message parse/handle failed", error);
         }
@@ -1339,114 +1176,21 @@ export default function useCtiStomp(
       // Set connecting flag BEFORE any async operations to prevent race conditions
       isConnectingRef.current = true;
 
-      // For global instance with cross-tab support, check if we should be the master
-      if (isGlobalInstance && manager.isCrossTabSupported()) {
-        // Master election happens synchronously in constructor, but check immediately
-        // If not master yet, the useEffect will handle initialization when we become master
-        let isMaster = manager.isMasterTab();
-        
-        if (!isMaster) {
-          console.log(
-            `[${currentInstanceId}] Not master tab, checking for stale master entry...`
-          );
-          
-          // FIX: If we're the only tab (no other master exists), force master election
-          // This handles the case where stale localStorage prevents master election
-          const masterTabId = safeLocalStorage.getItem(MASTER_TAB_KEY);
-          const lastHeartbeat = safeLocalStorage.getItem(MASTER_TAB_HEARTBEAT_KEY);
-          
-          if (masterTabId && lastHeartbeat) {
-            const heartbeatTime = Number.parseInt(lastHeartbeat, 10);
-            const timeSinceHeartbeat = Date.now() - heartbeatTime;
-            // If heartbeat is stale, clear it and retry master election
-            if (timeSinceHeartbeat > MASTER_TAB_TIMEOUT) {
-              console.log(
-                `[${currentInstanceId}] Stale master detected (${Math.round(timeSinceHeartbeat / 1000)}s old), clearing and retrying master election...`
-              );
-              safeLocalStorage.removeItem(MASTER_TAB_KEY);
-              safeLocalStorage.removeItem(MASTER_TAB_HEARTBEAT_KEY);
-              // Retry master election - this should make us master now
-              isMaster = manager.isMasterTab();
-              if (isMaster) {
-                console.log(
-                  `[${currentInstanceId}] Successfully became master after clearing stale entry, proceeding with initialization...`
-                );
-                // Continue with initialization below
-              } else {
-                // Still not master, return early
-                console.log(
-                  `[${currentInstanceId}] Still not master after clearing stale entry, waiting for state from master tab...`
-                );
-                // If on live-calls page, demand first subscription data
-                const isLiveCallsPage = router.pathname?.includes('live-calls') || 
-                                        (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname?.includes('live-calls'));
-                
-                if (isLiveCallsPage && manager.isCrossTabSupported()) {
-                  // Request initial state from master tab via cross-tab manager
-                  manager.requestAction('requestInitialState', {}).catch((error) => {
-                    console.log(`[${currentInstanceId}] Failed to request initial state from master:`, error);
-                  });
-                  console.log(`[${currentInstanceId}] Requested initial state for live-calls page from master tab`);
-                }
-                
-                isConnectingRef.current = false;
-                isGettingTokenRef.current = false;
-                setIsInitialized(true);
-                setError(null);
-                return null;
-              }
-            } else {
-              // Master is still active, return early
-              console.log(
-                `[${currentInstanceId}] Active master tab exists, waiting for state from master tab...`
-              );
-              // If on live-calls page, demand first subscription data
-              const isLiveCallsPage = router.pathname?.includes('live-calls') || 
-                                      (typeof globalThis !== 'undefined' && globalThis.window?.location.pathname?.includes('live-calls'));
-              
-              if (isLiveCallsPage && manager.isCrossTabSupported()) {
-                // Request initial state from master tab via cross-tab manager
-                manager.requestAction('requestInitialState', {}).catch((error) => {
-                  console.log(`[${currentInstanceId}] Failed to request initial state from master:`, error);
-                });
-                console.log(`[${currentInstanceId}] Requested initial state for live-calls page from master tab`);
-              }
-              
-              isConnectingRef.current = false;
-              isGettingTokenRef.current = false;
-              setIsInitialized(true);
-              setError(null);
-              return null;
-            }
-          } else {
-            // No master exists, we should become master
-            // Force master election by calling isMasterTab() again
-            console.log(
-              `[${currentInstanceId}] No master exists, forcing master election...`
-            );
-            isMaster = manager.isMasterTab();
-            if (isMaster) {
-              console.log(
-                `[${currentInstanceId}] No master exists, became master, proceeding with initialization...`
-              );
-              // Continue with initialization below
-            } else {
-              // Still not master (shouldn't happen), return early
-              console.log(
-                `[${currentInstanceId}] Failed to become master when none exists, waiting...`
-              );
-              isConnectingRef.current = false;
-              isGettingTokenRef.current = false;
-              setIsInitialized(true);
-              setError(null);
-              return null;
-            }
-          }
-        }
-        
-        console.log(
-          `[${currentInstanceId}] This tab is master, initializing connection...`
-        );
+      const gate = runCtiMasterTabInitGate({
+        currentInstanceId,
+        isGlobalInstance,
+        manager,
+        storage: safeLocalStorage,
+        routerPathname: router.pathname,
+        isConnectingRef,
+        isGettingTokenRef,
+        setFollowerUiReady: () => {
+          setIsInitialized(true);
+          setError(null);
+        },
+      });
+      if (gate === "abort") {
+        return null;
       }
 
       console.log(`[${currentInstanceId}] Initializing new connection...`);
@@ -1919,7 +1663,7 @@ export default function useCtiStomp(
             try {
               eventSourceRef.current.close();
             } catch (err) {
-              // Ignore errors
+              console.warn("[useCtiStomp] EventSource.close failed (master pre-connect)", err);
             }
             eventSourceRef.current = null;
           }
@@ -1972,7 +1716,7 @@ export default function useCtiStomp(
               try {
                 existingEventSource.close();
               } catch (err) {
-                // Ignore errors
+                console.warn("[useCtiStomp] EventSource.close failed (master duplicate guard)", err);
               }
               eventSourceRef.current = null;
               // Wait a bit to ensure it's fully closed
@@ -1986,7 +1730,6 @@ export default function useCtiStomp(
           // CRITICAL: Immediately store the EventSource to prevent duplicate creation
           // This must happen synchronously before any other code can run
           eventSourceRef.current = eventSource;
-          setEventSource(eventSource);
           eventSource.onopen = () => {
             isConnectingRef.current = false;
             isInitializedRef.current = true;
@@ -2224,80 +1967,19 @@ export default function useCtiStomp(
 
     // Listen to CTI events from master tab
     const unsubscribeCtiEvents = manager.onCtiEvent((event) => {
-      // Handle different event types from master tab
-      if (event.data?.type === "call_event" && event.data?.event) {
-        // Process the event as if we received it directly
-        handleCallEvent(event.data.event);
-      } else if (event.data?.event) {
-        // Direct event object
-        handleCallEvent(event.data.event);
-      } else if (event.data?.type === "request_user_data_extensions") {
-        // Another tab is requesting userDataExtensions - send it if we have it
-        if (isGlobalInstance && manager.isMasterTab() && userDataExtensionsRef.current) {
-          manager.broadcastCtiEvent({
-            type: 'user_data_extensions',
-            data: userDataExtensionsRef.current
-          });
-        }
-      } else if (event.data?.type === "complete_state" && event.data?.data) {
-        // CRITICAL: Handle complete_state from master tab
-        // This provides the initial data needed for live-calls page
-        try {
-          if (
-            groupDevicesByDnAndDeviceNameRef.current &&
-            updateSummaryDataRef.current
-          ) {
-            console.log("complete_state 3", event);
-            const grouped = groupDevicesByDnAndDeviceNameRef.current(
-              event.data.data
-            );
-            setDnsMap(grouped);
-            updateSummaryDataRef.current(grouped);
-            setEventLog((prev) => [
-              ...prev,
-              {
-                type: "initial-state",
-                data: grouped,
-                timestamp: new Date().toISOString(),
-              },
-            ]);
-            console.log(`[${instanceIdRef.current}] Received complete_state from master tab`);
-          }
-        } catch (err) {
-          console.error(`[${instanceIdRef.current}] Failed to process complete_state from master:`, err);
-        }
-      } else if (event.data?.type === "user_data_extensions" && event.data?.data) {
-        // Handle userDataExtensions from master tab
-        try {
-          const extensions = event.data.data;
-          if (extensions) {
-            userDataExtensionsRef.current = extensions;
-            console.log(`[${instanceIdRef.current}] Received userDataExtensions from master tab`);
-          }
-        } catch (err) {
-          console.error(`[${instanceIdRef.current}] Failed to process userDataExtensions from master:`, err);
-        }
-      } else if (event.data?.type === "dns_states" && event.data?.data) {
-        // Handle dns_states from master tab
-        try {
-          const s = event.data.data;
-          setDnsMap((prev) => {
-            const updated = { ...prev };
-            const { dn, deviceName } = s;
-            if (!updated[dn]) {
-              updated[dn] = { dn, devices: {} };
-            }
-            const existing = updated[dn].devices[deviceName];
-            updated[dn].devices[deviceName] = { ...existing, ...s };
-            if (updateSummaryDataRef.current) {
-              updateSummaryDataRef.current(updated);
-            }
-            return updated;
-          });
-        } catch (err) {
-          console.error(`[${instanceIdRef.current}] Failed to process dns_states from master:`, err);
-        }
-      }
+      dispatchCrossTabCtiBroadcastEvent(event, {
+        instanceIdRef,
+        isGlobalInstance,
+        manager,
+        userDataExtensionsRef,
+        handleCallEvent: handleCallEvent as (evt: unknown) => void,
+        groupDevicesByDnAndDeviceNameRef:
+          groupDevicesByDnAndDeviceNameRef as CrossTabBroadcastCtx["groupDevicesByDnAndDeviceNameRef"],
+        updateSummaryDataRef:
+          updateSummaryDataRef as CrossTabBroadcastCtx["updateSummaryDataRef"],
+        setDnsMap: setDnsMap as unknown as CrossTabBroadcastCtx["setDnsMap"],
+        setEventLog,
+      });
     });
 
     // Listen to state updates from master tab
