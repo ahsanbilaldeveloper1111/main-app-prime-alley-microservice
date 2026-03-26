@@ -6172,6 +6172,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         await createTask({
           name: taskData.title.trim() || "Task",
           user_extension: extension,
+          assigned_to: taskData.assignedTo || undefined,
           created_by: extension,
           urgency,
           due_date,

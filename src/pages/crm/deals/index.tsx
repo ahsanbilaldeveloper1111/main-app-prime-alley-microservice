@@ -568,8 +568,7 @@ const applyDealsFilters = (params: AnyRecord, filters: AnyRecord): void => {
   addIfNumberLikeParam(params, "probability_min", filters.probability_min);
   addIfNumberLikeParam(params, "probability_max", filters.probability_max);
 
-  addIfTruthyParam(params, "deal_type", filters.deal_type);
-  addIfTruthyParam(params, "industry", filters.industry);
+  addIfTruthyParam(params, "business_type_id", filters.business_type_id);
 
   addIfTruthyParam(params, "expected_close_date_from", filters.expected_close_date_from);
   addIfTruthyParam(params, "expected_close_date_to", filters.expected_close_date_to);
@@ -643,6 +642,9 @@ const CrmDeals = () => {
   const [showAllIndustries, setShowAllIndustries] = useState(false);
   const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [filterBusinessTypes, setFilterBusinessTypes] = useState<
+    BusinessTypeData[]
+  >([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [dealsData, setDealsData] = useState<any[]>([]);
@@ -823,8 +825,7 @@ const CrmDeals = () => {
     followUpDateTo: null as string | null,
     probabilityMin: null as string | null,
     probabilityMax: null as string | null,
-    dealType: null as string | null,
-    industry: null as string | null,
+    businessType: null as string | null,
     expectedCloseDateFrom: null as string | null,
     expectedCloseDateTo: null as string | null,
     includeConverted: false as boolean,
@@ -842,6 +843,7 @@ const CrmDeals = () => {
     fetchStages();
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_DEALS);
+    fetchFilterBusinessTypes();
   }, []);
 
   // Handle click outside for Add Deals dropdown
@@ -913,23 +915,85 @@ const CrmDeals = () => {
         toast.info("No deals match the selected filters.");
         return;
       }
-      const headers = Array.from(
+      const preferredExportFields: Array<{ label: string; key: string }> = [
+        { label: "Deal ID", key: "id" },
+        { label: "Deal Name", key: "name" },
+        { label: "Company", key: "company_name" },
+        { label: "Stage", key: "stage_name" },
+        { label: "Approval Status", key: "approval_status" },
+        { label: "Value", key: "net_value" },
+        { label: "Currency", key: "currency" },
+        { label: "Probability (%)", key: "probability" },
+        { label: "Expected Close Date", key: "expected_close_date" },
+        { label: "Follow-up Date", key: "follow_up_date" },
+        { label: "Owner", key: "assigned_to" },
+        { label: "Source Ticket ID", key: "ticket_id" },
+        { label: "Decision Maker Name", key: "decision_maker_name" },
+        { label: "Decision Maker Title", key: "decision_maker_title" },
+        { label: "Decision Maker Phone", key: "decision_maker_phone" },
+        { label: "Decision Maker Email", key: "decision_maker_email" },
+        { label: "Created At", key: "created_at" },
+        { label: "Updated At", key: "updated_at" },
+      ];
+
+      const optionalHiddenKeys = new Set(["business_type_id", "deal_template_id"]);
+      const usedPreferredKeys = new Set(preferredExportFields.map((f) => f.key));
+
+      const getRowValue = (row: Record<string, any>, key: string): unknown => {
+        switch (key) {
+          case "stage_name":
+            return row.stage?.name ?? row.stage_name ?? "";
+          case "decision_maker_phone": {
+            const code = row.decision_maker_phone_country_code || "";
+            const phone = row.decision_maker_phone || "";
+            return `${code} ${phone}`.trim() || "";
+          }
+          default:
+            return row[key];
+        }
+      };
+
+      const availablePreferredFields = preferredExportFields.filter(({ key }) =>
+        allData.some((row) => {
+          if (typeof row !== "object" || row === null) return false;
+          const value = getRowValue(row as Record<string, any>, key);
+          return value != null && value !== "";
+        }),
+      );
+
+      const remainingScalarKeys = Array.from(
         new Set(
           allData.flatMap((row) =>
             typeof row === "object" && row !== null
-              ? Object.keys(row).filter(
-                  (k) => typeof (row as any)[k] !== "object",
-                )
+              ? Object.keys(row).filter((k) => {
+                  const value = (row as any)[k];
+                  return (
+                    typeof value !== "object" &&
+                    !usedPreferredKeys.has(k) &&
+                    !optionalHiddenKeys.has(k)
+                  );
+                })
               : [],
           ),
         ),
       ).sort();
+
+      const exportFields = [
+        ...availablePreferredFields,
+        ...remainingScalarKeys.map((key) => ({
+          label: key,
+          key,
+        })),
+      ];
       const csvRows = [
-        headers.join(","),
+        exportFields.map((f) => f.label).join(","),
         ...allData.map((row) =>
-          headers
-            .map((h) => {
-              const val = (row as any)[h];
+          exportFields
+            .map(({ key }) => {
+              const val =
+                typeof row === "object" && row !== null
+                  ? getRowValue(row as Record<string, any>, key)
+                  : "";
               if (val == null) return "";
               if (typeof val === "object") return "";
               const s = String(val).replace(/"/g, '""');
@@ -1366,15 +1430,6 @@ const CrmDeals = () => {
         }
       }
 
-      // Handle deal_type filter
-      if ("deal_type" in filters) {
-        if (filters.deal_type) {
-          newFilters.deal_type = filters.deal_type;
-        } else {
-          delete newFilters.deal_type;
-        }
-      }
-
       // Handle approval_status filter
       if ("approval_status" in filters) {
         if (filters.approval_status) {
@@ -1383,12 +1438,12 @@ const CrmDeals = () => {
           delete newFilters.approval_status;
         }
       }
-      // Handle industry filter
-      if ("industry" in filters) {
-        if (filters.industry) {
-          newFilters.industry = filters.industry;
+      // Handle business_type_id filter
+      if ("business_type_id" in filters) {
+        if (filters.business_type_id) {
+          newFilters.business_type_id = filters.business_type_id;
         } else {
-          delete newFilters.industry;
+          delete newFilters.business_type_id;
         }
       }
 
@@ -1499,6 +1554,15 @@ const CrmDeals = () => {
       }
     } catch (error) {
       console.error("Failed to fetch extensions:", error);
+    }
+  };
+
+  const fetchFilterBusinessTypes = async () => {
+    try {
+      const res = await getBusinessTypes({ per_page: 1000 });
+      setFilterBusinessTypes(res?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch business types:", error);
     }
   };
 
@@ -2319,6 +2383,7 @@ const CrmDeals = () => {
     return {
       id: deal.id,
       name: deal.name || "",
+      ticketId: deal.ticket_id || "",
       company: deal.company_name || "",
       industry: deal.industry || "",
       stage: deal.stage?.name || "No Stage",
@@ -2655,6 +2720,13 @@ const CrmDeals = () => {
           secondaryClass: "text-muted small",
         },
         emptyValue: "No Company",
+      },
+      {
+        key: "ticketId",
+        label: "Ticket ID",
+        sortable: true,
+        type: "text",
+        emptyValue: "-",
       },
       {
         key: "stage",
@@ -3375,6 +3447,20 @@ const CrmDeals = () => {
                     show: !!(
                       selectedDeal?.company_name || selectedDeal?.company
                     ),
+                  },
+                  {
+                    label: "Ticket ID",
+                    value:
+                      selectedDeal?.ticketId ||
+                      selectedDeal?.ticket_id ||
+                      selectedDeal?.rawData?.ticket_id ||
+                      "N/A",
+                    show: !!(
+                      selectedDeal?.ticketId ||
+                      selectedDeal?.ticket_id ||
+                      selectedDeal?.rawData?.ticket_id
+                    ),
+                    copyable: true,
                   },
                   {
                     label: "Stage",
@@ -7309,6 +7395,141 @@ const CrmDeals = () => {
               />
             </Form.Group>
           </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Stage</Form.Label>
+              <Select
+                options={[
+                  { value: "", label: "All stages" },
+                  ...stages.map((st: any) => ({
+                    value: String(st.id),
+                    label: st.name || `Stage ${st.id}`,
+                  })),
+                ]}
+                value={
+                  exportFilters.stage_id
+                    ? (() => {
+                        const id = String(exportFilters.stage_id);
+                        const stage = stages.find((s: any) => String(s.id) === id);
+                        return { value: id, label: stage?.name || id };
+                      })()
+                    : null
+                }
+                onChange={(selected: { value: string; label: string } | null) => {
+                  const v = selected?.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.stage_id = v;
+                    else delete next.stage_id;
+                    return next;
+                  });
+                }}
+                placeholder="Select stage..."
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+              />
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Approval Status</Form.Label>
+              <Select
+                options={[
+                  { value: "", label: "All statuses" },
+                  { value: "pending", label: "Pending" },
+                  { value: "approved", label: "Approved" },
+                  { value: "rejected", label: "Rejected" },
+                ]}
+                value={
+                  exportFilters.approval_status
+                    ? (() => {
+                        const value = String(exportFilters.approval_status);
+                        const labelMap: Record<string, string> = {
+                          pending: "Pending",
+                          approved: "Approved",
+                          rejected: "Rejected",
+                        };
+                        return {
+                          value,
+                          label: labelMap[value] || value,
+                        };
+                      })()
+                    : null
+                }
+                onChange={(selected: { value: string; label: string } | null) => {
+                  const v = selected?.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.approval_status = v;
+                    else delete next.approval_status;
+                    return next;
+                  });
+                }}
+                placeholder="Select approval status..."
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+              />
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Business Type</Form.Label>
+              <Select
+                options={[
+                  { value: "", label: "All business types" },
+                  ...filterBusinessTypes.map((bt: BusinessTypeData) => ({
+                    value: bt.id.toString(),
+                    label: bt.name,
+                  })),
+                ]}
+                value={
+                  exportFilters.business_type_id
+                    ? (() => {
+                        const id = String(exportFilters.business_type_id);
+                        const bt = filterBusinessTypes.find(
+                          (b: BusinessTypeData) => b.id.toString() === id,
+                        );
+                        return { value: id, label: bt?.name || id };
+                      })()
+                    : null
+                }
+                onChange={(selected: { value: string; label: string } | null) => {
+                  const v = selected?.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.business_type_id = v;
+                    else delete next.business_type_id;
+                    return next;
+                  });
+                }}
+                placeholder="Select business type..."
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+              />
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Ticket ID (source)</Form.Label>
+              <Form.Control
+                type="text"
+                value={exportFilters.ticket_id || ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (value) next.ticket_id = value;
+                    else delete next.ticket_id;
+                    return next;
+                  });
+                }}
+                placeholder="Filter by source ticket ID"
+              />
+            </Form.Group>
+          </Col>
         </Row>
       </CrmExportModal>
 
@@ -7424,21 +7645,6 @@ const CrmDeals = () => {
             placeholder: "100",
           },
           {
-            id: "dealType",
-            label: "Deal Type",
-            type: "dropdown" as const,
-            value: dealsFilters.dealType || "",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({ ...prev, dealType: value })),
-            options: [
-              { value: "", label: "Select Deal Type" },
-              { value: "new_sale", label: "New Sale" },
-              { value: "renewal", label: "Renewal" },
-              { value: "migration", label: "Migration" },
-              { value: "upsell", label: "Upsell" },
-            ],
-          },
-          {
             id: "approvalStatus",
             label: "Approval Status",
             type: "dropdown" as const,
@@ -7453,28 +7659,18 @@ const CrmDeals = () => {
             ],
           },
           {
-            id: "industry",
-            label: "Industry",
+            id: "businessType",
+            label: "Business Type",
             type: "dropdown" as const,
-            value: dealsFilters.industry || "",
+            value: dealsFilters.businessType || "",
             onChange: (value) =>
-              setDealsFilters((prev) => ({ ...prev, industry: value })),
+              setDealsFilters((prev) => ({ ...prev, businessType: value })),
             options: [
-              { value: "", label: "Select Industry" },
-              { value: "Technology", label: "Technology" },
-              { value: "Healthcare", label: "Healthcare" },
-              { value: "Finance", label: "Finance" },
-              {
-                value: "Banking & Financial Services",
-                label: "Banking & Financial Services",
-              },
-              { value: "Manufacturing", label: "Manufacturing" },
-              { value: "Retail", label: "Retail" },
-              { value: "Education", label: "Education" },
-              { value: "Real Estate", label: "Real Estate" },
-              { value: "Telecommunications", label: "Telecommunications" },
-              { value: "Construction", label: "Construction" },
-              { value: "Other", label: "Other" },
+              { value: "", label: "Select Business Type" },
+              ...filterBusinessTypes.map((bt: BusinessTypeData) => ({
+                value: bt.id.toString(),
+                label: bt.name,
+              })),
             ],
           },
           {
@@ -7531,7 +7727,7 @@ const CrmDeals = () => {
           },
           {
             id: "includeArchived",
-            label: "Include archived",
+            label: "Include deleted records",
             type: "dropdown" as const,
             value: dealsFilters.includeArchived ? "true" : "false",
             onChange: (value) =>
@@ -7541,7 +7737,7 @@ const CrmDeals = () => {
               })),
             options: [
               { value: "false", label: "No" },
-              { value: "true", label: "Yes (show only archived/trashed)" },
+              { value: "true", label: "Yes (show only deleted records)" },
             ],
           },
           {
@@ -7619,14 +7815,11 @@ const CrmDeals = () => {
           if (dealsFilters.probabilityMax) {
             filtersToApply.probability_max = dealsFilters.probabilityMax;
           }
-          if (dealsFilters.dealType) {
-            filtersToApply.deal_type = dealsFilters.dealType;
-          }
           if (dealsFilters.approvalStatus) {
             filtersToApply.approval_status = dealsFilters.approvalStatus;
           }
-          if (dealsFilters.industry) {
-            filtersToApply.industry = dealsFilters.industry;
+          if (dealsFilters.businessType) {
+            filtersToApply.business_type_id = dealsFilters.businessType;
           }
           if (dealsFilters.expectedCloseDateFrom) {
             filtersToApply.expected_close_date_from =
@@ -7668,8 +7861,7 @@ const CrmDeals = () => {
             followUpDateTo: null,
             probabilityMin: null,
             probabilityMax: null,
-            dealType: null,
-            industry: null,
+            businessType: null,
             expectedCloseDateFrom: null,
             expectedCloseDateTo: null,
             approvalStatus: null,

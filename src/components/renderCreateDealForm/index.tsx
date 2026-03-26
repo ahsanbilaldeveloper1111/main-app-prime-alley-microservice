@@ -1868,6 +1868,128 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                   </div>
                 ))}
 
+                {isEditMode && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 70px 70px 70px auto",
+                      gap: "8px",
+                      alignItems: "center",
+                      marginTop: "8px",
+                    }}
+                  >
+                    <Dropdown>
+                      <Dropdown.Toggle
+                        variant="outline-secondary"
+                        disabled={loadingLineItemProducts}
+                        style={{
+                          ...dropdownToggleStyle(!!lineItemInput),
+                          color: lineItemInput ? "#141414" : "#a0aec0",
+                        }}
+                      >
+                        {loadingLineItemProducts
+                          ? "Loading products..."
+                          : lineItemInput || "Add a line item"}
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu
+                        style={{
+                          width: "100%",
+                          maxHeight: "260px",
+                          overflowY: "auto",
+                        }}
+                      >
+                        {lineItemProducts.length === 0 && !loadingLineItemProducts ? (
+                          <Dropdown.Item disabled>No products available</Dropdown.Item>
+                        ) : (
+                          lineItemProducts.map((p) => (
+                            <Dropdown.Item
+                              key={p.id}
+                              onClick={() => {
+                                setLineItemInput(p.name);
+                                setLineItemProductId(p.id);
+                                setLineItemUnitPrice(
+                                  Number.parseFloat(String(p.price || "0")) || 0,
+                                );
+                              }}
+                              style={{ display: "flex", alignItems: "center" }}
+                            >
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  maxWidth: "100%",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                                title={`${p.name} – ${dealForm.currency || "AED"} ${p.price || "0"}`}
+                              >
+                                {p.name} – {dealForm.currency || "AED"} {p.price || "0"}
+                              </span>
+                            </Dropdown.Item>
+                          ))
+                        )}
+                      </Dropdown.Menu>
+                    </Dropdown>
+                    <input
+                      type="number"
+                      min={1}
+                      value={lineItemQty || ""}
+                      placeholder="0"
+                      onChange={(e) =>
+                        setLineItemQty(
+                          Number(e.target.value) ? Number(e.target.value) : 0,
+                        )
+                      }
+                      style={{ ...inputStyle, width: "70px" }}
+                      onFocus={focusStyle}
+                      onBlur={blurStyle}
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={1}
+                      value={lineItemTax || ""}
+                      placeholder="0"
+                      onChange={(e) => setLineItemTax(Number(e.target.value) || 0)}
+                      style={{ ...inputStyle, width: "70px" }}
+                      onFocus={focusStyle}
+                      onBlur={blurStyle}
+                    />
+                    <Form.Select
+                      value={lineItemDiscount ? String(lineItemDiscount) : ""}
+                      onChange={(e) =>
+                        setLineItemDiscount(
+                          e.target.value ? Number(e.target.value) : 0,
+                        )
+                      }
+                      style={{ ...inputStyle, width: "70px" }}
+                    >
+                      <option value="">Select</option>
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="15">15</option>
+                    </Form.Select>
+                    <button
+                      type="button"
+                      onClick={addLineItem}
+                      disabled={!lineItemInput}
+                      style={{
+                        background: lineItemInput ? "#0091ae" : "#cbd5e0",
+                        border: "none",
+                        borderRadius: "4px",
+                        padding: "10px",
+                        cursor: lineItemInput ? "pointer" : "not-allowed",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                )}
+
                 {/* Add extra field + Save revision (edit mode only) */}
                 {isEditMode && Boolean(dealId) && (
                   <div
