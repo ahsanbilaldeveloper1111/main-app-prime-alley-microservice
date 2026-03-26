@@ -4,7 +4,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import { postReportsCalls, getCampaigns, getReportsCallsBySession } from "@utils/voicebot/outbound";
-import { getCompanies } from "@utils/voicebot/inbound";
+import { GetCompanies } from "@utils/users";
 import { Row, Col, Button, Form, Spinner, Modal, Tabs, Tab } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
@@ -186,7 +186,7 @@ const OutboundReportsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await getCompanies();
+      const res = await GetCompanies();
       const list = Array.isArray(res)
         ? res
         : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ??
@@ -198,7 +198,7 @@ const OutboundReportsPage = () => {
       });
       setCompanies(opts);
     } catch (err) {
-      console.error("getCompanies error:", err);
+      console.error("GetCompanies error:", err);
       setCompanies([]);
     }
   }, []);
