@@ -15,7 +15,7 @@ import {
   type ListCampaignsParams,
 } from "@utils/voicebot/outbound";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
-import { getCompanies } from "@utils/voicebot/inbound";
+import { GetCompanies } from "@utils/users";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -57,6 +57,154 @@ function getCampaignStatusBadgeVariant(status: string): "success" | "warning" | 
   return "secondary";
 }
 
+interface CampaignRowActionsCellProps {
+  row: CampaignRow;
+  campaignRowId: string;
+  status: string;
+  effectiveCompanyId: string;
+  loadingKey: string | null;
+  onOpenDispatch: (row: CampaignRow, campaignRowId: string) => void;
+  onPause: (row: CampaignRow) => void;
+  onResume: (row: CampaignRow) => void;
+  onStop: (row: CampaignRow) => void;
+  onLoadStatus: (row: CampaignRow) => void;
+  onDelete: (row: CampaignRow) => void;
+}
+
+function campaignDraftDispatchControl(
+  row: CampaignRow,
+  id: string,
+  status: string,
+  loadingKey: string | null,
+  onOpenDispatch: (r: CampaignRow, campaignRowId: string) => void
+): React.ReactElement | null {
+  if (status !== "draft") {
+    return null;
+  }
+  return (
+    <Button
+      size="sm"
+      variant="outline-success"
+      onClick={() => onOpenDispatch(row, id)}
+      disabled={!!loadingKey}
+      title="Dispatch campaign"
+    >
+      {loadingKey === `dispatch-${id}` ? <Spinner animation="border" size="sm" /> : <Play size={14} />}
+    </Button>
+  );
+}
+
+function campaignActiveControls(
+  row: CampaignRow,
+  id: string,
+  status: string,
+  loadingKey: string | null,
+  onPause: (r: CampaignRow) => void,
+  onStop: (r: CampaignRow) => void
+): React.ReactElement | null {
+  if (status !== "active") {
+    return null;
+  }
+  return (
+    <>
+      <Button size="sm" title="Pause campaign" variant="outline-warning" onClick={() => onPause(row)} disabled={!!loadingKey}>
+        {loadingKey === `pause-${id}` ? <Spinner animation="border" size="sm" /> : <Pause size={14} />}
+      </Button>
+      <Button title="Stop campaign" size="sm" variant="outline-danger" onClick={() => onStop(row)} disabled={!!loadingKey}>
+        {loadingKey === `stop-${id}` ? <Spinner animation="border" size="sm" /> : <Square size={14} />}
+      </Button>
+    </>
+  );
+}
+
+function campaignPausedResumeControl(
+  row: CampaignRow,
+  id: string,
+  status: string,
+  loadingKey: string | null,
+  onResume: (r: CampaignRow) => void
+): React.ReactElement | null {
+  if (status !== "paused") {
+    return null;
+  }
+  return (
+    <Button size="sm" title="Resume campaign" variant="outline-info" onClick={() => onResume(row)} disabled={!!loadingKey}>
+      {loadingKey === `resume-${id}` ? <Spinner animation="border" size="sm" /> : <RotateCw size={14} />}
+    </Button>
+  );
+}
+
+type CampaignLifecycleContext = Readonly<{
+  isCompleted: boolean;
+  row: CampaignRow;
+  id: string;
+  status: string;
+  loadingKey: string | null;
+  onOpenDispatch: (r: CampaignRow, campaignRowId: string) => void;
+  onPause: (r: CampaignRow) => void;
+  onResume: (r: CampaignRow) => void;
+  onStop: (r: CampaignRow) => void;
+}>;
+
+function campaignRowLifecycleActions(ctx: CampaignLifecycleContext): React.ReactElement | null {
+  if (ctx.isCompleted) {
+    return null;
+  }
+  const { row, id, status, loadingKey, onOpenDispatch, onPause, onResume, onStop } = ctx;
+  return (
+    <>
+      {campaignDraftDispatchControl(row, id, status, loadingKey, onOpenDispatch)}
+      {campaignActiveControls(row, id, status, loadingKey, onPause, onStop)}
+      {campaignPausedResumeControl(row, id, status, loadingKey, onResume)}
+    </>
+  );
+}
+
+function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
+  const {
+    row,
+    campaignRowId: id,
+    status,
+    effectiveCompanyId,
+    loadingKey,
+    onOpenDispatch,
+    onPause,
+    onResume,
+    onStop,
+    onLoadStatus,
+    onDelete,
+  } = props;
+  const isCompleted = status === "completed";
+  const editCompanyParam = encodeURIComponent(String(row.company_id ?? effectiveCompanyId ?? ""));
+
+  return (
+    <div className="d-flex flex-wrap gap-1 align-items-center">
+      <Link href={`/voicebot/outbound/campaigns/edit/${id}?company_id=${editCompanyParam}`}>
+        <Button size="sm" variant="outline-primary" title="Edit campaign">
+          <Pencil size={14} />
+        </Button>
+      </Link>
+      {campaignRowLifecycleActions({
+        isCompleted,
+        row,
+        id,
+        status,
+        loadingKey,
+        onOpenDispatch,
+        onPause,
+        onResume,
+        onStop,
+      })}
+      <Button size="sm" variant="outline-secondary" onClick={() => onLoadStatus(row)} title="Campaign status">
+        <Activity size={14} />
+      </Button>
+      <Button title="Delete campaign" size="sm" variant="outline-danger" onClick={() => onDelete(row)}>
+        <Trash2 size={14} />
+      </Button>
+    </div>
+  );
+}
+
 const CampaignsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
@@ -82,7 +230,7 @@ const CampaignsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await getCompanies();
+      const res = await GetCompanies();
       setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
     } catch {
       setCompanies([]);
@@ -163,6 +311,32 @@ const CampaignsPage = () => {
     }
   };
 
+  const openDispatchModal = useCallback(
+    (row: CampaignRow, id: string) => {
+      setRowToDispatch(row);
+      setShowDispatchModal(true);
+      setDispatchSummaryData(null);
+      setDispatchSummaryLoading(true);
+      const cid = String(row.company_id ?? effectiveCompanyId ?? "");
+      if (cid) {
+        getCampaign(id, { company_id: cid })
+          .then((res: Record<string, unknown>) => {
+            const detail = (res?.data ?? res) as Record<string, unknown>;
+            setDispatchSummaryData(detail);
+          })
+          .catch(() => {
+            toast.error("Failed to load campaign summary");
+            setShowDispatchModal(false);
+            setRowToDispatch(null);
+          })
+          .finally(() => setDispatchSummaryLoading(false));
+      } else {
+        setDispatchSummaryLoading(false);
+      }
+    },
+    [effectiveCompanyId]
+  );
+
   const loadStatus = useCallback(
     async (row: CampaignRow) => {
       const id = campaignId(row);
@@ -220,90 +394,24 @@ const CampaignsPage = () => {
     {
       key: "actions",
       label: "Actions",
-      render: (row) => {
-        const id = campaignId(row);
-        const loadingKey = opLoading;
-        const status = String(row.status ?? "");
-        const isCompleted = status === "completed";
-        return (
-          <div className="d-flex flex-wrap gap-1 align-items-center">
-            {isCompleted ? null : (
-              <>
-                <Link href={`/voicebot/outbound/campaigns/edit/${id}?company_id=${encodeURIComponent(String(row.company_id ?? effectiveCompanyId ?? ""))}`}>
-                  <Button size="sm" variant="outline-primary" title="Edit campaign">
-                    <Pencil size={14} />
-                  </Button>
-                </Link>
-                <Button
-                  size="sm"
-                  variant="outline-success"
-                  onClick={() => {
-                    setRowToDispatch(row);
-                    setShowDispatchModal(true);
-                    setDispatchSummaryData(null);
-                    setDispatchSummaryLoading(true);
-                    const cid = String(row.company_id ?? effectiveCompanyId ?? "");
-                    if (cid) {
-                      getCampaign(id, { company_id: cid })
-                      .then((res: Record<string, unknown>) => {
-                        const detail = (res?.data ?? res) as Record<string, unknown>;
-                        setDispatchSummaryData(detail);
-                      })
-                      .catch(() => {
-                        toast.error("Failed to load campaign summary");
-                        setShowDispatchModal(false);
-                        setRowToDispatch(null);
-                      })
-                      .finally(() => setDispatchSummaryLoading(false));
-                    } else {
-                      setDispatchSummaryLoading(false);
-                    }
-                  }}
-                  disabled={!!loadingKey}
-                  title="Dispatch campaign"
-                >
-                  {loadingKey === `dispatch-${id}` ? <Spinner animation="border" size="sm" /> : <Play size={14} />}
-                </Button>
-                <Button
-                  size="sm"
-                  title="Pause campaign"
-                  variant="outline-warning"
-                  onClick={() => handleOp("pause", row)}
-                  disabled={!!loadingKey || (status !== "active" && status !== "running")}
-                >
-                  {loadingKey === `pause-${id}` ? <Spinner animation="border" size="sm" /> : <Pause size={14} />}
-                </Button>
-                <Button
-                  size="sm"
-                  title="Resume campaign"
-                  variant="outline-info"
-                  onClick={() => handleOp("resume", row)}
-                  disabled={!!loadingKey || status !== "paused"}
-                >
-                  {loadingKey === `resume-${id}` ? <Spinner animation="border" size="sm" /> : <RotateCw size={14} />}
-                </Button>
-                <Button title="Stop campaign" size="sm" variant="outline-danger" onClick={() => handleOp("stop", row)} disabled={!!loadingKey}>
-                  {loadingKey === `stop-${id}` ? <Spinner animation="border" size="sm" /> : <Square size={14} />}
-                </Button>
-              </>
-            )}
-            <Button size="sm" variant="outline-secondary" onClick={() => loadStatus(row)} title="Campaign status">
-              <Activity size={14} />
-            </Button>
-            <Button
-              title="Delete campaign"
-              size="sm"
-              variant="outline-danger"
-              onClick={() => {
-                setSelectedRow(row);
-                setShowDeleteModal(true);
-              }}
-            >
-              <Trash2 size={14} />
-            </Button>
-          </div>
-        );
-      },
+      render: (row) => (
+        <CampaignRowActionsCell
+          row={row}
+          campaignRowId={campaignId(row)}
+          status={String(row.status ?? "")}
+          effectiveCompanyId={effectiveCompanyId}
+          loadingKey={opLoading}
+          onOpenDispatch={openDispatchModal}
+          onPause={(r) => handleOp("pause", r)}
+          onResume={(r) => handleOp("resume", r)}
+          onStop={(r) => handleOp("stop", r)}
+          onLoadStatus={loadStatus}
+          onDelete={(r) => {
+            setSelectedRow(r);
+            setShowDeleteModal(true);
+          }}
+        />
+      ),
     },
   ];
 

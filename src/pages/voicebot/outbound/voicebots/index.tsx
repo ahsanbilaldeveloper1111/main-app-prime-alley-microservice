@@ -9,7 +9,7 @@ import {
   deleteVoicebot,
   type ListVoicebotsParams,
 } from "@utils/voicebot/outbound";
-import { getCompanies } from "@utils/voicebot/inbound";
+import { GetCompanies } from "@utils/users";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -84,7 +84,7 @@ const VoicebotsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const res = await getCompanies();
+      const res = await GetCompanies();
       setCompanies(normalizeCompaniesResponse(res));
     } catch {
       setCompanies([]);

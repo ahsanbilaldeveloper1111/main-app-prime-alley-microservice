@@ -8,7 +8,7 @@ import { getAnalyticsCosts, getAnalyticsDashboard, getAnalyticsTrends, getCampai
 import moment from "moment";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { BarChart3 } from "lucide-react";
-import { getCompanies } from "@utils/voicebot/inbound";
+import { GetCompanies } from "@utils/users";
 import { formatFixed, formatPercent, toYmd } from "@utils/voicebot/outbound/formatters";
 
 import "@assets/scss/common.scss";
@@ -894,7 +894,7 @@ const OutboundAnalytics = () => {
     let cancelled = false;
     async function fetchCompanies() {
       try {
-        const res = await getCompanies();
+        const res = await GetCompanies();
         const list =
           Array.isArray(res)
             ? res
@@ -906,7 +906,7 @@ const OutboundAnalytics = () => {
         }).filter((c) => Boolean(c.id));
         if (!cancelled) setCompanies(opts);
       } catch (err) {
-        console.error("getCompanies error:", err);
+        console.error("GetCompanies error:", err);
         if (!cancelled) setCompanies([]);
       }
     }
