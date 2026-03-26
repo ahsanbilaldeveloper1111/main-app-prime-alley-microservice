@@ -2,12 +2,21 @@
 // The added config here will be used whenever a users loads a page in their browser.
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
+import type { ErrorEvent, EventHint } from "@sentry/core";
 import * as Sentry from "@sentry/nextjs";
+import { isBenignNetworkFailure } from "./utils/benignNetworkFailure";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   environment: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT || process.env.SENTRY_ENVIRONMENT || process.env.SENTRY_ENV || process.env.NODE_ENV,
+
+  beforeSend(event: ErrorEvent, hint: EventHint) {
+    if (isBenignNetworkFailure(hint.originalException)) {
+      return null;
+    }
+    return event;
+  },
 
   // Add optional integrations for additional features
   integrations: [Sentry.replayIntegration()],
@@ -23,7 +32,7 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
 
   // Define how likely Replay events are sampled when an error occurs.
-  replaysOnErrorSampleRate: 1.0,
+  replaysOnErrorSampleRate: 1,
 
   // Enable sending user PII (Personally Identifiable Information)
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
