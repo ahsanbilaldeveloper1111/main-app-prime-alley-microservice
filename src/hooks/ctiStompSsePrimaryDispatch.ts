@@ -3,6 +3,30 @@ import type { CrossTabCtiManager } from "../utils/crossTabCtiManager";
 
 type UnknownRecord = Record<string, unknown>;
 
+function unknownToDisplayString(value: unknown, fallback: string): string {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  if (value instanceof Error) {
+    return value.message;
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return fallback;
+  }
+}
+
 /** Mirrors CtiDevice in useCtiStomp (kept local to avoid circular imports). */
 interface CtiDeviceShape {
   dn: string;
@@ -145,7 +169,9 @@ function handleStompConnected(ctx: PrimarySseDispatchCtx): void {
 }
 
 function handleStompError(data: UnknownRecord, ctx: PrimarySseDispatchCtx): void {
-  ctx.setError(`STOMP error: ${String(data.message ?? "unknown")}`);
+  ctx.setError(
+    `STOMP error: ${unknownToDisplayString(data.message, "unknown")}`,
+  );
   ctx.setIsInitialized(false);
 }
 
@@ -185,7 +211,7 @@ function handleConnectionMessage(
 }
 
 function handleErrorPayload(data: UnknownRecord, ctx: PrimarySseDispatchCtx): void {
-  ctx.setError(String(data.message ?? "Connection error"));
+  ctx.setError(unknownToDisplayString(data.message, "Connection error"));
   ctx.setIsInitialized(false);
 }
 
