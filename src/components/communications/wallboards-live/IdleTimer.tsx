@@ -6,16 +6,20 @@ interface IdleTimerProps {
   startTime?: Date | string | null
 }
 
+function relativeTimeAgo(count: number, singular: string, plural: string): string {
+  const unit = count === 1 ? singular : plural
+  return `${count} ${unit} ago`
+}
+
 const IdleTimer: React.FC<IdleTimerProps> = ({ dn: _dn, isActive, startTime }) => {
   const [relativeTime, setRelativeTime] = useState('')
 
-  // Format time difference as human-readable relative time
   const formatRelativeTime = (startMs: number): string => {
     const now = Date.now()
     const diffMs = now - startMs
-    
+
     if (diffMs < 0) return 'just now'
-    
+
     const diffSeconds = Math.floor(diffMs / 1000)
     const diffMinutes = Math.floor(diffSeconds / 60)
     const diffHours = Math.floor(diffMinutes / 60)
@@ -23,21 +27,11 @@ const IdleTimer: React.FC<IdleTimerProps> = ({ dn: _dn, isActive, startTime }) =
     const diffMonths = Math.floor(diffDays / 30)
     const diffYears = Math.floor(diffDays / 365)
 
-    if (diffYears > 0) {
-      return `${diffYears} ${diffYears === 1 ? 'year' : 'years'} ago`
-    }
-    if (diffMonths > 0) {
-      return `${diffMonths} ${diffMonths === 1 ? 'month' : 'months'} ago`
-    }
-    if (diffDays > 0) {
-      return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`
-    }
-    if (diffHours > 0) {
-      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`
-    }
-    if (diffMinutes > 0) {
-      return `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'} ago`
-    }
+    if (diffYears > 0) return relativeTimeAgo(diffYears, 'year', 'years')
+    if (diffMonths > 0) return relativeTimeAgo(diffMonths, 'month', 'months')
+    if (diffDays > 0) return relativeTimeAgo(diffDays, 'day', 'days')
+    if (diffHours > 0) return relativeTimeAgo(diffHours, 'hour', 'hours')
+    if (diffMinutes > 0) return relativeTimeAgo(diffMinutes, 'minute', 'minutes')
     return 'just now'
   }
 
