@@ -573,7 +573,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
         }
       }
 
-      const createdDeal = await createDeal(payload).then((res) => res?.data);
+      const createdDeal = await createDeal(payload, false).then((res) => res?.data);
       
       if (estimationItems.length > 0 && createdDeal?.id) {
         try {
@@ -604,7 +604,6 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
         }
       }
       
-      toast.success("Deal created successfully!");
       onHide();
       if (onSuccess) {
         onSuccess();

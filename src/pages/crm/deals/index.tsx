@@ -390,6 +390,75 @@ const KPICard: React.FC<KPICardData> = ({
   );
 };
 
+const detailSectionTitleStyle: React.CSSProperties = {
+  fontSize: "15px",
+  fontWeight: 700,
+  color: "#1f2937",
+  marginBottom: "16px",
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+};
+
+const detailSectionCardStyle: React.CSSProperties = {
+  background: "#f9fafb",
+  border: "1px solid #e5e7eb",
+  borderRadius: "12px",
+  padding: "20px",
+};
+
+const detailFieldLabelStyle: React.CSSProperties = {
+  fontSize: "12px",
+  fontWeight: 700,
+  color: "#6b7280",
+  textTransform: "uppercase",
+  letterSpacing: "0.5px",
+  marginBottom: "6px",
+};
+
+const detailFieldValueStyle: React.CSSProperties = {
+  fontSize: "14px",
+  color: "#1f2937",
+  fontWeight: 500,
+  wordBreak: "break-word",
+};
+
+const DetailSection = ({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) => (
+  <div style={{ marginBottom: "28px" }}>
+    <h5 style={detailSectionTitleStyle}>
+      <div
+        style={{
+          width: "4px",
+          height: "18px",
+          background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+          borderRadius: "2px",
+        }}
+      />
+      {title}
+    </h5>
+    {children}
+  </div>
+);
+
+const DetailField = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) => (
+  <div>
+    <div style={detailFieldLabelStyle}>{label}</div>
+    <div style={detailFieldValueStyle}>{value}</div>
+  </div>
+);
+
 // Filter Bar Component
 interface FilterBarProps {
   quickFilters: {
@@ -568,8 +637,7 @@ const applyDealsFilters = (params: AnyRecord, filters: AnyRecord): void => {
   addIfNumberLikeParam(params, "probability_min", filters.probability_min);
   addIfNumberLikeParam(params, "probability_max", filters.probability_max);
 
-  addIfTruthyParam(params, "deal_type", filters.deal_type);
-  addIfTruthyParam(params, "industry", filters.industry);
+  addIfTruthyParam(params, "business_type_id", filters.business_type_id);
 
   addIfTruthyParam(params, "expected_close_date_from", filters.expected_close_date_from);
   addIfTruthyParam(params, "expected_close_date_to", filters.expected_close_date_to);
@@ -643,6 +711,9 @@ const CrmDeals = () => {
   const [showAllIndustries, setShowAllIndustries] = useState(false);
   const [lostReasons, setLostReasons] = useState<any[]>([]);
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [filterBusinessTypes, setFilterBusinessTypes] = useState<
+    BusinessTypeData[]
+  >([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const [dealsData, setDealsData] = useState<any[]>([]);
@@ -823,8 +894,7 @@ const CrmDeals = () => {
     followUpDateTo: null as string | null,
     probabilityMin: null as string | null,
     probabilityMax: null as string | null,
-    dealType: null as string | null,
-    industry: null as string | null,
+    businessType: null as string | null,
     expectedCloseDateFrom: null as string | null,
     expectedCloseDateTo: null as string | null,
     includeConverted: false as boolean,
@@ -842,6 +912,7 @@ const CrmDeals = () => {
     fetchStages();
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_DEALS);
+    fetchFilterBusinessTypes();
   }, []);
 
   // Handle click outside for Add Deals dropdown
@@ -913,26 +984,98 @@ const CrmDeals = () => {
         toast.info("No deals match the selected filters.");
         return;
       }
-      const headers = Array.from(
+      const preferredExportFields: Array<{ label: string; key: string }> = [
+        { label: "Deal ID", key: "id" },
+        { label: "Deal Name", key: "name" },
+        { label: "Company", key: "company_name" },
+        { label: "Stage", key: "stage_name" },
+        { label: "Approval Status", key: "approval_status" },
+        { label: "Value", key: "net_value" },
+        { label: "Currency", key: "currency" },
+        { label: "Probability (%)", key: "probability" },
+        { label: "Expected Close Date", key: "expected_close_date" },
+        { label: "Follow-up Date", key: "follow_up_date" },
+        { label: "Owner", key: "assigned_to" },
+        { label: "Source Ticket ID", key: "ticket_id" },
+        { label: "Decision Maker Name", key: "decision_maker_name" },
+        { label: "Decision Maker Title", key: "decision_maker_title" },
+        { label: "Decision Maker Phone", key: "decision_maker_phone" },
+        { label: "Decision Maker Email", key: "decision_maker_email" },
+        { label: "Created At", key: "created_at" },
+        { label: "Updated At", key: "updated_at" },
+      ];
+
+      const optionalHiddenKeys = new Set(["business_type_id", "deal_template_id"]);
+      const usedPreferredKeys = new Set(preferredExportFields.map((f) => f.key));
+
+      const getRowValue = (row: Record<string, any>, key: string): unknown => {
+        switch (key) {
+          case "stage_name":
+            return row.stage?.name ?? row.stage_name ?? "";
+          case "decision_maker_phone": {
+            const code = row.decision_maker_phone_country_code || "";
+            const phone = row.decision_maker_phone || "";
+            return `${code} ${phone}`.trim() || "";
+          }
+          default:
+            return row[key];
+        }
+      };
+
+      const availablePreferredFields = preferredExportFields.filter(({ key }) =>
+        allData.some((row) => {
+          if (typeof row !== "object" || row === null) return false;
+          const value = getRowValue(row as Record<string, any>, key);
+          return value != null && value !== "";
+        }),
+      );
+
+      const remainingScalarKeys = Array.from(
         new Set(
           allData.flatMap((row) =>
             typeof row === "object" && row !== null
-              ? Object.keys(row).filter(
-                  (k) => typeof (row as any)[k] !== "object",
-                )
+              ? Object.keys(row).filter((k) => {
+                  const value = row[k];
+                  return (
+                    typeof value !== "object" &&
+                    !usedPreferredKeys.has(k) &&
+                    !optionalHiddenKeys.has(k)
+                  );
+                })
               : [],
           ),
         ),
       ).sort();
+
+      const exportFields = [
+        ...availablePreferredFields,
+        ...remainingScalarKeys.map((key) => ({
+          label: key,
+          key,
+        })),
+      ];
       const csvRows = [
-        headers.join(","),
+        exportFields.map((f) => f.label).join(","),
         ...allData.map((row) =>
-          headers
-            .map((h) => {
-              const val = (row as any)[h];
+          exportFields
+            .map(({ key }) => {
+              const val =
+                typeof row === "object" && row !== null
+                  ? getRowValue(row as Record<string, any>, key)
+                  : "";
               if (val == null) return "";
-              if (typeof val === "object") return "";
-              const s = String(val).replace(/"/g, '""');
+              let serialized = "";
+              switch (typeof val) {
+                case "string":
+                case "number":
+                case "boolean":
+                case "bigint":
+                  serialized = `${val}`;
+                  break;
+                default:
+                  return "";
+              }
+              const s = serialized.replaceAll('"', '""');
               return s.includes(",") || s.includes('"') ? `"${s}"` : s;
             })
             .join(","),
@@ -1366,15 +1509,6 @@ const CrmDeals = () => {
         }
       }
 
-      // Handle deal_type filter
-      if ("deal_type" in filters) {
-        if (filters.deal_type) {
-          newFilters.deal_type = filters.deal_type;
-        } else {
-          delete newFilters.deal_type;
-        }
-      }
-
       // Handle approval_status filter
       if ("approval_status" in filters) {
         if (filters.approval_status) {
@@ -1383,12 +1517,12 @@ const CrmDeals = () => {
           delete newFilters.approval_status;
         }
       }
-      // Handle industry filter
-      if ("industry" in filters) {
-        if (filters.industry) {
-          newFilters.industry = filters.industry;
+      // Handle business_type_id filter
+      if ("business_type_id" in filters) {
+        if (filters.business_type_id) {
+          newFilters.business_type_id = filters.business_type_id;
         } else {
-          delete newFilters.industry;
+          delete newFilters.business_type_id;
         }
       }
 
@@ -1499,6 +1633,15 @@ const CrmDeals = () => {
       }
     } catch (error) {
       console.error("Failed to fetch extensions:", error);
+    }
+  };
+
+  const fetchFilterBusinessTypes = async () => {
+    try {
+      const res = await getBusinessTypes({ per_page: 1000 });
+      setFilterBusinessTypes(res?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch business types:", error);
     }
   };
 
@@ -2319,6 +2462,7 @@ const CrmDeals = () => {
     return {
       id: deal.id,
       name: deal.name || "",
+      ticketId: deal.ticket_id || "",
       company: deal.company_name || "",
       industry: deal.industry || "",
       stage: deal.stage?.name || "No Stage",
@@ -2655,6 +2799,13 @@ const CrmDeals = () => {
           secondaryClass: "text-muted small",
         },
         emptyValue: "No Company",
+      },
+      {
+        key: "ticketId",
+        label: "Ticket ID",
+        sortable: true,
+        type: "text",
+        emptyValue: "-",
       },
       {
         key: "stage",
@@ -3375,6 +3526,20 @@ const CrmDeals = () => {
                     show: !!(
                       selectedDeal?.company_name || selectedDeal?.company
                     ),
+                  },
+                  {
+                    label: "Ticket ID",
+                    value:
+                      selectedDeal?.ticketId ||
+                      selectedDeal?.ticket_id ||
+                      selectedDeal?.rawData?.ticket_id ||
+                      "N/A",
+                    show: !!(
+                      selectedDeal?.ticketId ||
+                      selectedDeal?.ticket_id ||
+                      selectedDeal?.rawData?.ticket_id
+                    ),
+                    copyable: true,
                   },
                   {
                     label: "Stage",
@@ -4457,37 +4622,8 @@ const CrmDeals = () => {
 
                         {/* Client Information Section */}
                         {viewingDeal.company_name && (
-                          <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
-                              Client Information
-                            </h5>
-                            <div
-                              style={{
-                                background: "#f9fafb",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "20px",
-                              }}
-                            >
+                          <DetailSection title="Client Information">
+                            <div style={detailSectionCardStyle}>
                               <div
                                 style={{
                                   display: "grid",
@@ -4495,102 +4631,37 @@ const CrmDeals = () => {
                                   gap: "16px 24px",
                                 }}
                               >
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Client Name
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    <Building2
-                                      size={14}
-                                      style={{
-                                        color: "#10b981",
-                                        marginRight: "6px",
-                                        display: "inline",
-                                      }}
-                                    />
-                                    {viewingDeal.company_name}
-                                  </div>
-                                </div>
+                                <DetailField
+                                  label="Client Name"
+                                  value={
+                                    <>
+                                      <Building2
+                                        size={14}
+                                        style={{
+                                          color: "#10b981",
+                                          marginRight: "6px",
+                                          display: "inline",
+                                        }}
+                                      />
+                                      {viewingDeal.company_name}
+                                    </>
+                                  }
+                                />
                                 {viewingDeal.industry && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Industry
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {viewingDeal.industry}
-                                    </div>
-                                  </div>
+                                  <DetailField
+                                    label="Industry"
+                                    value={viewingDeal.industry}
+                                  />
                                 )}
                               </div>
                             </div>
-                          </div>
+                          </DetailSection>
                         )}
 
                         {/* Lead Information Section */}
                         {relatedLead && (
-                          <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
-                              Lead Information
-                            </h5>
-                            <div
-                              style={{
-                                background: "#f9fafb",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "20px",
-                              }}
-                            >
+                          <DetailSection title="Lead Information">
+                            <div style={detailSectionCardStyle}>
                               <div
                                 style={{
                                   display: "grid",
@@ -4598,52 +4669,14 @@ const CrmDeals = () => {
                                   gap: "16px 24px",
                                 }}
                               >
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Lead Name
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {relatedLead.name}
-                                  </div>
-                                </div>
+                                <DetailField
+                                  label="Lead Name"
+                                  value={relatedLead.name}
+                                />
                                 {relatedLead.lead_potential && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Lead Potential
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
+                                  <DetailField
+                                    label="Lead Potential"
+                                    value={
                                       <Badge
                                         bg={
                                           relatedLead.lead_potential === "Hot"
@@ -4662,99 +4695,67 @@ const CrmDeals = () => {
                                       >
                                         {relatedLead.lead_potential || "N/A"}
                                       </Badge>
-                                    </div>
-                                  </div>
+                                    }
+                                  />
                                 )}
                                 {relatedLead.user_extension && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Owner
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <User
-                                        size={14}
-                                        style={{
-                                          color: "#10b981",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {extensions.find(
-                                        (ext: any) =>
-                                          ext?.id ==
-                                            relatedLead?.user_extension ||
-                                          ext?.extension ==
-                                            relatedLead?.user_extension,
-                                      )?.display_name ||
-                                        extensions.find(
+                                  <DetailField
+                                    label="Owner"
+                                    value={
+                                      <>
+                                        <User
+                                          size={14}
+                                          style={{
+                                            color: "#10b981",
+                                            marginRight: "6px",
+                                            display: "inline",
+                                          }}
+                                        />
+                                        {extensions.find(
                                           (ext: any) =>
                                             ext?.id ==
                                               relatedLead?.user_extension ||
                                             ext?.extension ==
                                               relatedLead?.user_extension,
-                                        )?.name ||
-                                        relatedLead.user_extension ||
-                                        "Not assigned"}
-                                    </div>
-                                  </div>
+                                        )?.display_name ||
+                                          extensions.find(
+                                            (ext: any) =>
+                                              ext?.id ==
+                                                relatedLead?.user_extension ||
+                                              ext?.extension ==
+                                                relatedLead?.user_extension,
+                                          )?.name ||
+                                          relatedLead.user_extension ||
+                                          "Not assigned"}
+                                      </>
+                                    }
+                                  />
                                 )}
                                 {relatedLead.created_at && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Created Date
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <Calendar
-                                        size={14}
-                                        style={{
-                                          color: "#10b981",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {relatedLead.created_at
-                                        ? formatDateForTable(
-                                            relatedLead.created_at,
-                                          )
-                                        : "N/A"}
-                                    </div>
-                                  </div>
+                                  <DetailField
+                                    label="Created Date"
+                                    value={
+                                      <>
+                                        <Calendar
+                                          size={14}
+                                          style={{
+                                            color: "#10b981",
+                                            marginRight: "6px",
+                                            display: "inline",
+                                          }}
+                                        />
+                                        {relatedLead.created_at
+                                          ? formatDateForTable(
+                                              relatedLead.created_at,
+                                            )
+                                          : "N/A"}
+                                      </>
+                                    }
+                                  />
                                 )}
                               </div>
                             </div>
-                          </div>
+                          </DetailSection>
                         )}
                       </div>
                     )}
@@ -4762,38 +4763,9 @@ const CrmDeals = () => {
                     {activeTab === "campaign-prospect" && (
                       <div>
                         {/* Campaign Information Section */}
-                        <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
-                            Campaign Information
-                          </h5>
+                        <DetailSection title="Campaign Information">
                           {relatedLead?.campaign ? (
-                            <div
-                              style={{
-                                background: "#f9fafb",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "20px",
-                              }}
-                            >
+                            <div style={detailSectionCardStyle}>
                               <div
                                 style={{
                                   display: "grid",
@@ -4801,60 +4773,21 @@ const CrmDeals = () => {
                                   gap: "16px 24px",
                                 }}
                               >
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Campaign Name
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {relatedLead.campaign.name}
-                                  </div>
-                                </div>
+                                <DetailField
+                                  label="Campaign Name"
+                                  value={relatedLead.campaign.name}
+                                />
                                 {relatedLead.campaign_field_values &&
                                   Object.keys(relatedLead.campaign_field_values)
                                     .length > 0 &&
                                   Object.entries(
                                     relatedLead.campaign_field_values,
                                   ).map(([key, value]: [string, any]) => (
-                                    <div key={key}>
-                                      <div
-                                        style={{
-                                          fontSize: "12px",
-                                          fontWeight: 700,
-                                          color: "#6b7280",
-                                          textTransform: "uppercase",
-                                          letterSpacing: "0.5px",
-                                          marginBottom: "6px",
-                                        }}
-                                      >
-                                        {key}
-                                      </div>
-                                      <div
-                                        style={{
-                                          fontSize: "14px",
-                                          color: "#1f2937",
-                                          fontWeight: 500,
-                                          wordBreak: "break-word",
-                                        }}
-                                      >
-                                        {String(value)}
-                                      </div>
-                                    </div>
+                                    <DetailField
+                                      key={key}
+                                      label={key}
+                                      value={String(value)}
+                                    />
                                   ))}
                               </div>
                             </div>
@@ -4872,41 +4805,12 @@ const CrmDeals = () => {
                               No campaign information available
                             </div>
                           )}
-                        </div>
+                        </DetailSection>
 
                         {/* Prospect Information Section */}
-                        <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
-                            Prospect Information
-                          </h5>
+                        <DetailSection title="Prospect Information">
                           {relatedLead?.crm_data ? (
-                            <div
-                              style={{
-                                background: "#f9fafb",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "20px",
-                              }}
-                            >
+                            <div style={detailSectionCardStyle}>
                               <div
                                 style={{
                                   display: "grid",
@@ -4915,86 +4819,30 @@ const CrmDeals = () => {
                                 }}
                               >
                                 {relatedLead.crm_data.id && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      CRM Data ID
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      #{relatedLead.crm_data.id}
-                                    </div>
-                                  </div>
+                                  <DetailField
+                                    label="CRM Data ID"
+                                    value={`#${relatedLead.crm_data.id}`}
+                                  />
                                 )}
                                 {(relatedLead.crm_data.name ||
                                   (relatedLead.crm_data.data &&
                                     relatedLead.crm_data.data.name)) && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Name
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {relatedLead.crm_data.name ||
-                                        (relatedLead.crm_data.data &&
-                                          relatedLead.crm_data.data.name) ||
-                                        "N/A"}
-                                    </div>
-                                  </div>
+                                  <DetailField
+                                    label="Name"
+                                    value={
+                                      relatedLead.crm_data.name ||
+                                      (relatedLead.crm_data.data &&
+                                        relatedLead.crm_data.data.name) ||
+                                      "N/A"
+                                    }
+                                  />
                                 )}
                                 {(relatedLead.crm_data.phone ||
                                   (relatedLead.crm_data.data &&
                                     relatedLead.crm_data.data.phone)) && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Phone
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
+                                  <DetailField
+                                    label="Phone"
+                                    value={
                                       <PhoneDisplay
                                         phone={
                                           relatedLead.crm_data.phone ||
@@ -5003,104 +4851,52 @@ const CrmDeals = () => {
                                           ""
                                         }
                                       />
-                                    </div>
-                                  </div>
+                                    }
+                                  />
                                 )}
                                 {relatedLead.crm_data.source_file && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Source File
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {relatedLead.crm_data.source_file}
-                                    </div>
-                                  </div>
+                                  <DetailField
+                                    label="Source File"
+                                    value={relatedLead.crm_data.source_file}
+                                  />
                                 )}
                                 {relatedLead.crm_data.uploaded_by && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Uploaded By
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <User
-                                        size={14}
-                                        style={{
-                                          color: "#10b981",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {relatedLead.crm_data.uploaded_by}
-                                    </div>
-                                  </div>
+                                  <DetailField
+                                    label="Uploaded By"
+                                    value={
+                                      <>
+                                        <User
+                                          size={14}
+                                          style={{
+                                            color: "#10b981",
+                                            marginRight: "6px",
+                                            display: "inline",
+                                          }}
+                                        />
+                                        {relatedLead.crm_data.uploaded_by}
+                                      </>
+                                    }
+                                  />
                                 )}
                                 {relatedLead.crm_data.created_at && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Created At
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <Calendar
-                                        size={14}
-                                        style={{
-                                          color: "#10b981",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {formatDateForTable(
-                                        relatedLead.crm_data.created_at,
-                                      )}
-                                    </div>
-                                  </div>
+                                  <DetailField
+                                    label="Created At"
+                                    value={
+                                      <>
+                                        <Calendar
+                                          size={14}
+                                          style={{
+                                            color: "#10b981",
+                                            marginRight: "6px",
+                                            display: "inline",
+                                          }}
+                                        />
+                                        {formatDateForTable(
+                                          relatedLead.crm_data.created_at,
+                                        )}
+                                      </>
+                                    }
+                                  />
                                 )}
                               </div>
                             </div>
@@ -5118,43 +4914,14 @@ const CrmDeals = () => {
                               No prospect information available
                             </div>
                           )}
-                        </div>
+                        </DetailSection>
 
                         {/* Prospect Fields Section */}
                         {relatedLead?.crm_data?.data &&
                           typeof relatedLead.crm_data.data === "object" &&
                           Object.keys(relatedLead.crm_data.data).length > 0 && (
-                            <div style={{ marginBottom: "28px" }}>
-                              <h5
-                                style={{
-                                  fontSize: "15px",
-                                  fontWeight: 700,
-                                  color: "#1f2937",
-                                  marginBottom: "16px",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: "4px",
-                                    height: "18px",
-                                    background:
-                                      "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                                    borderRadius: "2px",
-                                  }}
-                                />
-                                Prospect Fields
-                              </h5>
-                              <div
-                                style={{
-                                  background: "#f9fafb",
-                                  border: "1px solid #e5e7eb",
-                                  borderRadius: "12px",
-                                  padding: "20px",
-                                }}
-                              >
+                            <DetailSection title="Prospect Fields">
+                              <div style={detailSectionCardStyle}>
                                 <div
                                   style={{
                                     display: "grid",
@@ -5169,34 +4936,15 @@ const CrmDeals = () => {
                                         key.toLowerCase() !== "phone",
                                     )
                                     .map(([key, value]: [string, any]) => (
-                                      <div key={key}>
-                                        <div
-                                          style={{
-                                            fontSize: "12px",
-                                            fontWeight: 700,
-                                            color: "#6b7280",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
-                                            marginBottom: "6px",
-                                          }}
-                                        >
-                                          {key.replace(/_/g, " ")}
-                                        </div>
-                                        <div
-                                          style={{
-                                            fontSize: "14px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                            wordBreak: "break-word",
-                                          }}
-                                        >
-                                          {String(value || "N/A")}
-                                        </div>
-                                      </div>
+                                      <DetailField
+                                        key={key}
+                                        label={key.replaceAll("_", " ")}
+                                        value={String(value || "N/A")}
+                                      />
                                     ))}
                                 </div>
                               </div>
-                            </div>
+                            </DetailSection>
                           )}
                       </div>
                     )}
@@ -7309,6 +7057,141 @@ const CrmDeals = () => {
               />
             </Form.Group>
           </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Stage</Form.Label>
+              <Select
+                options={[
+                  { value: "", label: "All stages" },
+                  ...stages.map((st: any) => ({
+                    value: String(st.id),
+                    label: st.name || `Stage ${st.id}`,
+                  })),
+                ]}
+                value={
+                  exportFilters.stage_id
+                    ? (() => {
+                        const id = String(exportFilters.stage_id);
+                        const stage = stages.find((s: any) => String(s.id) === id);
+                        return { value: id, label: stage?.name || id };
+                      })()
+                    : null
+                }
+                onChange={(selected: { value: string; label: string } | null) => {
+                  const v = selected?.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.stage_id = v;
+                    else delete next.stage_id;
+                    return next;
+                  });
+                }}
+                placeholder="Select stage..."
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+              />
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Approval Status</Form.Label>
+              <Select
+                options={[
+                  { value: "", label: "All statuses" },
+                  { value: "pending", label: "Pending" },
+                  { value: "approved", label: "Approved" },
+                  { value: "rejected", label: "Rejected" },
+                ]}
+                value={
+                  exportFilters.approval_status
+                    ? (() => {
+                        const value = String(exportFilters.approval_status);
+                        const labelMap: Record<string, string> = {
+                          pending: "Pending",
+                          approved: "Approved",
+                          rejected: "Rejected",
+                        };
+                        return {
+                          value,
+                          label: labelMap[value] || value,
+                        };
+                      })()
+                    : null
+                }
+                onChange={(selected: { value: string; label: string } | null) => {
+                  const v = selected?.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.approval_status = v;
+                    else delete next.approval_status;
+                    return next;
+                  });
+                }}
+                placeholder="Select approval status..."
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+              />
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Business Type</Form.Label>
+              <Select
+                options={[
+                  { value: "", label: "All business types" },
+                  ...filterBusinessTypes.map((bt: BusinessTypeData) => ({
+                    value: bt.id.toString(),
+                    label: bt.name,
+                  })),
+                ]}
+                value={
+                  exportFilters.business_type_id
+                    ? (() => {
+                        const id = String(exportFilters.business_type_id);
+                        const bt = filterBusinessTypes.find(
+                          (b: BusinessTypeData) => b.id.toString() === id,
+                        );
+                        return { value: id, label: bt?.name || id };
+                      })()
+                    : null
+                }
+                onChange={(selected: { value: string; label: string } | null) => {
+                  const v = selected?.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (v) next.business_type_id = v;
+                    else delete next.business_type_id;
+                    return next;
+                  });
+                }}
+                placeholder="Select business type..."
+                isClearable
+                isSearchable
+                styles={customSelectStyles}
+              />
+            </Form.Group>
+          </Col>
+          <Col md={6}>
+            <Form.Group className="mb-3">
+              <Form.Label>Ticket ID (source)</Form.Label>
+              <Form.Control
+                type="text"
+                value={exportFilters.ticket_id || ""}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setExportFilters((prev) => {
+                    const next = { ...prev };
+                    if (value) next.ticket_id = value;
+                    else delete next.ticket_id;
+                    return next;
+                  });
+                }}
+                placeholder="Filter by source ticket ID"
+              />
+            </Form.Group>
+          </Col>
         </Row>
       </CrmExportModal>
 
@@ -7424,21 +7307,6 @@ const CrmDeals = () => {
             placeholder: "100",
           },
           {
-            id: "dealType",
-            label: "Deal Type",
-            type: "dropdown" as const,
-            value: dealsFilters.dealType || "",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({ ...prev, dealType: value })),
-            options: [
-              { value: "", label: "Select Deal Type" },
-              { value: "new_sale", label: "New Sale" },
-              { value: "renewal", label: "Renewal" },
-              { value: "migration", label: "Migration" },
-              { value: "upsell", label: "Upsell" },
-            ],
-          },
-          {
             id: "approvalStatus",
             label: "Approval Status",
             type: "dropdown" as const,
@@ -7453,28 +7321,18 @@ const CrmDeals = () => {
             ],
           },
           {
-            id: "industry",
-            label: "Industry",
+            id: "businessType",
+            label: "Business Type",
             type: "dropdown" as const,
-            value: dealsFilters.industry || "",
+            value: dealsFilters.businessType || "",
             onChange: (value) =>
-              setDealsFilters((prev) => ({ ...prev, industry: value })),
+              setDealsFilters((prev) => ({ ...prev, businessType: value })),
             options: [
-              { value: "", label: "Select Industry" },
-              { value: "Technology", label: "Technology" },
-              { value: "Healthcare", label: "Healthcare" },
-              { value: "Finance", label: "Finance" },
-              {
-                value: "Banking & Financial Services",
-                label: "Banking & Financial Services",
-              },
-              { value: "Manufacturing", label: "Manufacturing" },
-              { value: "Retail", label: "Retail" },
-              { value: "Education", label: "Education" },
-              { value: "Real Estate", label: "Real Estate" },
-              { value: "Telecommunications", label: "Telecommunications" },
-              { value: "Construction", label: "Construction" },
-              { value: "Other", label: "Other" },
+              { value: "", label: "Select Business Type" },
+              ...filterBusinessTypes.map((bt: BusinessTypeData) => ({
+                value: bt.id.toString(),
+                label: bt.name,
+              })),
             ],
           },
           {
@@ -7531,7 +7389,7 @@ const CrmDeals = () => {
           },
           {
             id: "includeArchived",
-            label: "Include archived",
+            label: "Include deleted records",
             type: "dropdown" as const,
             value: dealsFilters.includeArchived ? "true" : "false",
             onChange: (value) =>
@@ -7541,7 +7399,7 @@ const CrmDeals = () => {
               })),
             options: [
               { value: "false", label: "No" },
-              { value: "true", label: "Yes (show only archived/trashed)" },
+              { value: "true", label: "Yes (show only deleted records)" },
             ],
           },
           {
@@ -7619,14 +7477,11 @@ const CrmDeals = () => {
           if (dealsFilters.probabilityMax) {
             filtersToApply.probability_max = dealsFilters.probabilityMax;
           }
-          if (dealsFilters.dealType) {
-            filtersToApply.deal_type = dealsFilters.dealType;
-          }
           if (dealsFilters.approvalStatus) {
             filtersToApply.approval_status = dealsFilters.approvalStatus;
           }
-          if (dealsFilters.industry) {
-            filtersToApply.industry = dealsFilters.industry;
+          if (dealsFilters.businessType) {
+            filtersToApply.business_type_id = dealsFilters.businessType;
           }
           if (dealsFilters.expectedCloseDateFrom) {
             filtersToApply.expected_close_date_from =
@@ -7668,8 +7523,7 @@ const CrmDeals = () => {
             followUpDateTo: null,
             probabilityMin: null,
             probabilityMax: null,
-            dealType: null,
-            industry: null,
+            businessType: null,
             expectedCloseDateFrom: null,
             expectedCloseDateTo: null,
             approvalStatus: null,

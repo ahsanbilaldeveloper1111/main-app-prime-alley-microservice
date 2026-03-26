@@ -365,6 +365,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     time: "",
     status: "pending" as "pending" | "completed" | "failed",
     urgency: "med" as "low" | "med" | "high",
+    assigned_to: "",
     notes: "",
   });
   const [showMeetingModal, setShowMeetingModal] = useState(false);
@@ -457,6 +458,33 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       return acc;
     }, {});
   }, [hierarchyDataExtensions]);
+
+  const taskAssigneeOptions = useMemo(() => {
+    const source =
+      (extensionsProp ??
+        (hierarchyDataExtensions as AuditTrailExtension[] | undefined) ??
+        []) as AuditTrailExtension[];
+    const seen = new Set<string>();
+    return source
+      .map((ext) => {
+        let value = "";
+        if (ext.id != null) {
+          value = String(ext.id);
+        } else if (ext.extension != null) {
+          value = String(ext.extension);
+        }
+        const label =
+          ext.display_name ??
+          ext.name ??
+          (value ? `Extension ${value}` : "Unknown user");
+        return { value, label };
+      })
+      .filter((opt) => {
+        if (!opt.value || seen.has(opt.value)) return false;
+        seen.add(opt.value);
+        return true;
+      });
+  }, [extensionsProp, hierarchyDataExtensions]);
 
   const fetchNotes = useCallback(() => {
     if (recordId == null || Number.isNaN(recordId)) return;
@@ -1008,6 +1036,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
         await createTask({
           name: taskData.title.trim() || "Task",
           user_extension: extension,
+          assigned_to: taskData.assignedTo || undefined,
           created_by: extension,
           urgency,
           due_date,
@@ -2443,7 +2472,33 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                 <option value="med">Medium</option>
                                 <option value="high">High</option>
                               </select>
+
+                              <select
+                                id="edit-task-assigned-to"
+                                value={editingTaskForm.assigned_to}
+                                onChange={(e) =>
+                                  setEditingTaskForm((p) => ({
+                                    ...p,
+                                    assigned_to: e.target.value,
+                                  }))
+                                }
+                                style={{
+                                
+                                  padding: "8px 12px",
+                                  border: "1px solid #cbd5e0",
+                                  borderRadius: "5px",
+                                  fontSize: "14px",
+                                }}
+                              >
+                                <option value="">Select user</option>
+                                {taskAssigneeOptions.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
+                            
                             <div style={{ marginBottom: "8px" }}>
                               <RichTextEditor
                                 value={editingTaskForm.notes}
@@ -2472,6 +2527,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                       time: editingTaskForm.time || undefined,
                                       status: editingTaskForm.status,
                                       urgency: editingTaskForm.urgency,
+                                      user_extension:
+                                        editingTaskForm.assigned_to || undefined,
+                                      assigned_to:
+                                        editingTaskForm.assigned_to || undefined,
                                       notes:
                                         editingTaskForm.notes.trim() !== ""
                                           ? [{ note: editingTaskForm.notes.trim() }]
@@ -2604,6 +2663,13 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                 urgency:
                                   (task.urgency as "low" | "med" | "high") ||
                                   "med",
+                                assigned_to:
+                                  String(
+                                    (task as TaskData & { assigned_to?: string | null })
+                                      .assigned_to ??
+                                      task.user_extension ??
+                                      "",
+                                  ) || "",
                                 notes:
                                   task.notes?.length && task.notes[0]?.note
                                     ? task.notes[0].note

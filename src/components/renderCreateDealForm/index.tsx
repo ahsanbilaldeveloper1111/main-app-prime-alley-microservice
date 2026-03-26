@@ -113,6 +113,30 @@ interface CreateDealSidebarProps {
   onSuccess?: () => void;
 }
 
+interface EstimateChartItem {
+  id?: number;
+  product_id?: number;
+  product_service?: string;
+  qty?: number;
+  unit_price?: number | string;
+  tax_percentage?: number | string;
+  standard_discount_percentage?: number | string;
+  special_discount_percentage?: number | string;
+}
+
+interface RevisionProductRow {
+  product_id: number;
+  product_service: string;
+  description: string;
+  qty: number;
+  unit_price: number;
+  original_currency: string;
+  original_price: number;
+  tax_percentage: string;
+  standard_discount_percentage: string;
+  special_discount_percentage: string;
+}
+
 // ─── Initial State ────────────────────────────────────────────────────────────
 const initialDealForm: DealFormData = {
   // Deal Information
@@ -223,18 +247,25 @@ const ASSOCIATION_LABEL_OPTIONS = [
 ];
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+const FIELD_LABEL_STYLE: React.CSSProperties = {
+  display: "block",
+  fontSize: "14px",
+  fontWeight: "600",
+  color: "#141414",
+  marginBottom: "8px",
+};
+
+const REQUIRED_MARK_STYLE: React.CSSProperties = {
+  color: "#f2545b",
+  marginLeft: "2px",
+};
+
 const fieldLabel = (text: string, required: boolean = false) => (
   <label
-    style={{
-      display: "block",
-      fontSize: "14px",
-      fontWeight: "600",
-      color: "#141414",
-      marginBottom: "8px",
-    }}
+    style={FIELD_LABEL_STYLE}
   >
     {text}
-    {required && <span style={{ color: "#f2545b", marginLeft: "2px" }}>*</span>}
+    {required && <span style={REQUIRED_MARK_STYLE}>*</span>}
   </label>
 );
 
@@ -267,6 +298,19 @@ const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
   color: hasValue ? "#141414" : "#a0aec0",
 });
 
+const hoverBackgroundHandlers = (
+  enabled: boolean,
+  hoverColor: string,
+  defaultColor: string,
+) => ({
+  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (enabled) e.currentTarget.style.backgroundColor = hoverColor;
+  },
+  onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (enabled) e.currentTarget.style.backgroundColor = defaultColor;
+  },
+});
+
 // Simple reusable single-select dropdown
 const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   value,
@@ -292,6 +336,146 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
     </Dropdown.Menu>
   </Dropdown>
 );
+
+const parsePercent = (value: unknown): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+};
+
+const mapEstimateChartToLineItems = (
+  chart: EstimateChartItem[],
+  fallbackTaxPct: number,
+  fallbackStdDiscPct: number,
+  fallbackSpecDiscPct: number,
+  getId: (idx: number, item: EstimateChartItem) => number,
+): LineItem[] => {
+  const fallbackDiscount = fallbackStdDiscPct + fallbackSpecDiscPct;
+  return chart.map((item, idx) => ({
+    id: getId(idx, item),
+    name: item.product_service || "",
+    quantity: item.qty ?? 1,
+    tax: parsePercent(item.tax_percentage ?? fallbackTaxPct),
+    discount:
+      item.standard_discount_percentage != null ||
+      item.special_discount_percentage != null
+        ? parsePercent(item.standard_discount_percentage) +
+          parsePercent(item.special_discount_percentage)
+        : fallbackDiscount,
+    product_id: item.product_id,
+    unit_price:
+      item.unit_price == null
+        ? undefined
+        : Number.parseFloat(String(item.unit_price)),
+    standard_discount_percentage:
+      item.standard_discount_percentage != null
+        ? parsePercent(item.standard_discount_percentage)
+        : undefined,
+    special_discount_percentage:
+      item.special_discount_percentage != null
+        ? parsePercent(item.special_discount_percentage)
+        : undefined,
+  }));
+};
+
+const getRevisionProductLineTotal = (
+  item: Pick<
+    RevisionProductRow,
+    | "qty"
+    | "unit_price"
+    | "tax_percentage"
+    | "standard_discount_percentage"
+    | "special_discount_percentage"
+  >,
+) => {
+  const subtotal = (item.qty || 0) * (item.unit_price || 0);
+  const stdPct = parsePercent(item.standard_discount_percentage);
+  const specPct = parsePercent(item.special_discount_percentage);
+  const taxPct = parsePercent(item.tax_percentage);
+  const discount = (subtotal * (stdPct + specPct)) / 100;
+  const afterDiscount = subtotal - discount;
+  const tax = (afterDiscount * taxPct) / 100;
+  return {
+    subtotal,
+    discount,
+    tax,
+    lineTotal: afterDiscount + tax,
+  };
+};
+
+const getRevisionProductsTotals = (items: RevisionProductRow[]) =>
+  items.reduce(
+    (acc, item) => {
+      const { subtotal, discount, tax } = getRevisionProductLineTotal(item);
+      return {
+        subtotalAll: acc.subtotalAll + subtotal,
+        totalDiscount: acc.totalDiscount + discount,
+        totalTax: acc.totalTax + tax,
+      };
+    },
+    { subtotalAll: 0, totalDiscount: 0, totalTax: 0 },
+  );
+
+const getProgressFlags = (deal: Record<string, unknown>) => ({
+  quotation_sent: Boolean(deal.quotation_sent),
+  contract_sent: Boolean(deal.contract_sent),
+  contract_received: Boolean(deal.contract_received),
+});
+
+const OVERLAY_STYLE: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 1000,
+  background: "transparent",
+};
+
+const SIDEBAR_STYLE: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  right: 0,
+  width: "600px",
+  height: "100vh",
+  backgroundColor: "#ffffff",
+  boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
+  zIndex: 1001,
+  display: "flex",
+  flexDirection: "column",
+};
+
+const SIDEBAR_HEADER_STYLE: React.CSSProperties = {
+  padding: "20px 24px",
+  borderBottom: "1px solid #eaf0f6",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+const SIDEBAR_TITLE_STYLE: React.CSSProperties = {
+  fontSize: "20px",
+  fontWeight: "600",
+  color: "#141414",
+  margin: 0,
+};
+
+const SIDEBAR_CLOSE_BUTTON_STYLE: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  padding: "4px",
+  cursor: "pointer",
+  color: "#718096",
+  display: "flex",
+  alignItems: "center",
+};
 
 // ─── Main renderCreateDeal ────────────────────────────────────────────────────
 
@@ -345,18 +529,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
     number | null
   >(null);
   const [editRevisionProducts, setEditRevisionProducts] = useState<
-    Array<{
-      product_id: number;
-      product_service: string;
-      description: string;
-      qty: number;
-      unit_price: number;
-      original_currency: string;
-      original_price: number;
-      tax_percentage: string;
-      standard_discount_percentage: string;
-      special_discount_percentage: string;
-    }>
+    RevisionProductRow[]
   >([]);
   const [editRevisionFormData, setEditRevisionFormData] = useState({
     tax_percentage: "0",
@@ -417,6 +590,8 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
           };
 
           const dealAny = deal as any;
+          const progressFlags = getProgressFlags(dealAny);
+
           setDealForm({
             ...initialDealForm,
             name: deal.name || "",
@@ -461,9 +636,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
             payment_terms_custom: deal.payment_terms_custom || "",
             risk_level: deal.risk_level || "",
             competitors: deal.competitors || "",
-            quotation_sent: deal.quotation_sent || false,
-            contract_sent: deal.contract_sent || false,
-            contract_received: deal.contract_received || false,
+            ...progressFlags,
             follow_up_date: formatDate(deal.follow_up_date),
             currency: deal.currency || "AED",
           });
@@ -524,37 +697,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               : parseFloat(
                   String(dealAny.special_discount_percentage ?? "0"),
                 ) || 0;
-          const discountPct = stdDisc + specDisc;
-          const lineItemsFromApi: LineItem[] = chart.map(
-            (item: any, idx: number) => ({
-              id: item.id ?? Date.now() + idx,
-              name: item.product_service || "",
-              quantity: item.qty ?? 1,
-              tax: parseFloat(String(item.tax_percentage ?? taxPct)) || 0,
-              discount:
-                item.standard_discount_percentage != null ||
-                item.special_discount_percentage != null
-                  ? (parseFloat(
-                      String(item.standard_discount_percentage ?? "0"),
-                    ) || 0) +
-                    (parseFloat(
-                      String(item.special_discount_percentage ?? "0"),
-                    ) || 0)
-                  : discountPct,
-              product_id: item.product_id,
-              unit_price:
-                item.unit_price != null
-                  ? parseFloat(String(item.unit_price))
-                  : undefined,
-              standard_discount_percentage:
-                item.standard_discount_percentage != null
-                  ? parseFloat(String(item.standard_discount_percentage)) || 0
-                  : undefined,
-              special_discount_percentage:
-                item.special_discount_percentage != null
-                  ? parseFloat(String(item.special_discount_percentage)) || 0
-                  : undefined,
-            }),
+          const lineItemsFromApi = mapEstimateChartToLineItems(
+            chart,
+            taxPct,
+            stdDisc,
+            specDisc,
+            (idx, item) => item.id ?? Date.now() + idx,
           );
           setDealForm((prev) => ({
             ...prev,
@@ -676,33 +824,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
       parseFloat(String(estimate.standard_discount_percentage ?? "0")) || 0;
     const specDisc =
       parseFloat(String(estimate.special_discount_percentage ?? "0")) || 0;
-    const lineItemsFromRevision: LineItem[] = chart.map(
-      (item: any, idx: number) => ({
-        id: Date.now() + idx,
-        name: item.product_service || "",
-        quantity: item.qty ?? 1,
-        tax: parseFloat(String(item.tax_percentage ?? taxPct)) || 0,
-        discount:
-          item.standard_discount_percentage != null ||
-          item.special_discount_percentage != null
-            ? (parseFloat(String(item.standard_discount_percentage ?? "0")) ||
-                0) +
-              (parseFloat(String(item.special_discount_percentage ?? "0")) || 0)
-            : stdDisc + specDisc,
-        product_id: item.product_id,
-        unit_price:
-          item.unit_price != null
-            ? parseFloat(String(item.unit_price))
-            : undefined,
-        standard_discount_percentage:
-          item.standard_discount_percentage != null
-            ? parseFloat(String(item.standard_discount_percentage)) || 0
-            : undefined,
-        special_discount_percentage:
-          item.special_discount_percentage != null
-            ? parseFloat(String(item.special_discount_percentage)) || 0
-            : undefined,
-      }),
+    const lineItemsFromRevision = mapEstimateChartToLineItems(
+      chart,
+      taxPct,
+      stdDisc,
+      specDisc,
+      (idx) => Date.now() + idx,
     );
     setDealForm((prev) => ({
       ...prev,
@@ -784,66 +911,21 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
   return (
     <>
       {/* Overlay */}
-      <div
+      <button
+        type="button"
         onClick={onClose}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1000,
-          background: "transparent",
-        }}
+        aria-label="Close create deal form"
+        style={OVERLAY_STYLE}
       />
 
       {/* Sidebar */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: "600px",
-          height: "100vh",
-          backgroundColor: "#ffffff",
-          boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
-          zIndex: 1001,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      <div style={SIDEBAR_STYLE}>
         {/* ── Header ── */}
-        <div
-          style={{
-            padding: "20px 24px",
-            borderBottom: "1px solid #eaf0f6",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "20px",
-              fontWeight: "600",
-              color: "#141414",
-              margin: 0,
-            }}
-          >
+        <div style={SIDEBAR_HEADER_STYLE}>
+          <h2 style={SIDEBAR_TITLE_STYLE}>
             {isEditMode ? "Edit Deal" : "Create Deal"}
           </h2>
-          <button
-            onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "4px",
-              cursor: "pointer",
-              color: "#718096",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
+          <button onClick={onClose} style={SIDEBAR_CLOSE_BUTTON_STYLE}>
             <X size={24} />
           </button>
         </div>
@@ -1868,6 +1950,147 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                   </div>
                 ))}
 
+                {isEditMode && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 70px 70px 70px auto",
+                      gap: "8px",
+                      alignItems: "center",
+                      marginTop: "8px",
+                    }}
+                  >
+                    <Dropdown>
+                      <Dropdown.Toggle
+                        variant="outline-secondary"
+                        disabled={loadingLineItemProducts}
+                        style={{
+                          ...dropdownToggleStyle(!!lineItemInput),
+                          color: lineItemInput ? "#141414" : "#a0aec0",
+                        }}
+                      >
+                        {loadingLineItemProducts
+                          ? "Loading products..."
+                          : lineItemInput || "Add a line item"}
+                      </Dropdown.Toggle>
+                      <Dropdown.Menu
+                        style={{
+                          width: "100%",
+                          maxHeight: "260px",
+                          overflowY: "auto",
+                        }}
+                      >
+                        {lineItemProducts.length === 0 && !loadingLineItemProducts ? (
+                          <Dropdown.Item disabled>No products available</Dropdown.Item>
+                        ) : (
+                          lineItemProducts.map((p) => (
+                            <Dropdown.Item
+                              key={p.id}
+                              onClick={() => {
+                                setLineItemInput(p.name);
+                                setLineItemProductId(p.id);
+                                setLineItemUnitPrice(
+                                  Number.parseFloat(String(p.price || "0")) || 0,
+                                );
+                              }}
+                              style={{ display: "flex", alignItems: "center" }}
+                            >
+                              <span
+                                style={{
+                                  display: "inline-block",
+                                  maxWidth: "100%",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                                title={`${p.name} – ${dealForm.currency || "AED"} ${p.price || "0"}`}
+                              >
+                                {p.name} – {dealForm.currency || "AED"} {p.price || "0"}
+                              </span>
+                            </Dropdown.Item>
+                          ))
+                        )}
+                      </Dropdown.Menu>
+                    </Dropdown>
+                    {[
+                      {
+                        key: "qty",
+                        node: (
+                          <input
+                            type="number"
+                            min={1}
+                            value={lineItemQty || ""}
+                            placeholder="0"
+                            onChange={(e) =>
+                              setLineItemQty(
+                                Number(e.target.value) ? Number(e.target.value) : 0,
+                              )
+                            }
+                            style={{ ...inputStyle, width: "70px" }}
+                            onFocus={focusStyle}
+                            onBlur={blurStyle}
+                          />
+                        ),
+                      },
+                      {
+                        key: "tax",
+                        node: (
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={lineItemTax || ""}
+                            placeholder="0"
+                            onChange={(e) => setLineItemTax(Number(e.target.value) || 0)}
+                            style={{ ...inputStyle, width: "70px" }}
+                            onFocus={focusStyle}
+                            onBlur={blurStyle}
+                          />
+                        ),
+                      },
+                      {
+                        key: "discount",
+                        node: (
+                          <Form.Select
+                            value={lineItemDiscount ? String(lineItemDiscount) : ""}
+                            onChange={(e) =>
+                              setLineItemDiscount(
+                                e.target.value ? Number(e.target.value) : 0,
+                              )
+                            }
+                            style={{ ...inputStyle, width: "70px" }}
+                          >
+                            <option value="">Select</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                          </Form.Select>
+                        ),
+                      },
+                    ].map((field) => (
+                      <React.Fragment key={field.key}>{field.node}</React.Fragment>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={addLineItem}
+                      disabled={!lineItemInput}
+                      style={{
+                        background: lineItemInput ? "#0091ae" : "#cbd5e0",
+                        border: "none",
+                        borderRadius: "4px",
+                        padding: "10px",
+                        cursor: lineItemInput ? "pointer" : "not-allowed",
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                )}
+
                 {/* Add extra field + Save revision (edit mode only) */}
                 {isEditMode && Boolean(dealId) && (
                   <div
@@ -2043,14 +2266,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               fontWeight: "500",
               cursor: isFormValid && !loading ? "pointer" : "not-allowed",
             }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-              if (isFormValid && !loading)
-                e.currentTarget.style.backgroundColor = "#007a94";
-            }}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-              if (isFormValid && !loading)
-                e.currentTarget.style.backgroundColor = "#0091ae";
-            }}
+            {...hoverBackgroundHandlers(
+              isFormValid && !loading,
+              "#007a94",
+              "#0091ae",
+            )}
           >
             {loading ? "Saving..." : isEditMode ? "Update Deal" : "Create"}
           </button>
@@ -2069,14 +2289,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                 fontWeight: "500",
                 cursor: isFormValid && !loading ? "pointer" : "not-allowed",
               }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                if (isFormValid && !loading)
-                  e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                if (isFormValid && !loading)
-                  e.currentTarget.style.backgroundColor = "transparent";
-              }}
+              {...hoverBackgroundHandlers(
+                isFormValid && !loading,
+                "#f7fafc",
+                "transparent",
+              )}
             >
               Create and add another
             </button>
@@ -2096,13 +2313,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               fontWeight: "500",
               cursor: loading ? "not-allowed" : "pointer",
             }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-              if (!loading) e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-              if (!loading)
-                e.currentTarget.style.backgroundColor = "transparent";
-            }}
+            {...hoverBackgroundHandlers(!loading, "#f7fafc", "transparent")}
           >
             Cancel
           </button>
@@ -2236,22 +2447,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                 </thead>
                 <tbody>
                   {editRevisionProducts.map((item, idx) => {
-                    const subtotal = (item.qty || 0) * (item.unit_price || 0);
-                    const taxPct =
-                      parseFloat(String(item.tax_percentage ?? "0")) || 0;
-                    const stdPct =
-                      parseFloat(
-                        String(item.standard_discount_percentage ?? "0"),
-                      ) || 0;
-                    const specPct =
-                      parseFloat(
-                        String(item.special_discount_percentage ?? "0"),
-                      ) || 0;
-                    const discPct = stdPct + specPct;
-                    const disc = (subtotal * discPct) / 100;
-                    const afterDisc = subtotal - disc;
-                    const tax = (afterDisc * taxPct) / 100;
-                    const lineTotal = afterDisc + tax;
+                    const { lineTotal } = getRevisionProductLineTotal(item);
                     return (
                       <tr key={idx}>
                         <td>
@@ -2399,27 +2595,8 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
 
             {editRevisionProducts.length > 0 &&
               (() => {
-                const subtotalAll = editRevisionProducts.reduce(
-                  (s, i) => s + (i.qty || 0) * (i.unit_price || 0),
-                  0,
-                );
-                let totalDiscount = 0;
-                let totalTax = 0;
-                editRevisionProducts.forEach((i) => {
-                  const st = (i.qty || 0) * (i.unit_price || 0);
-                  const stdPct =
-                    parseFloat(String(i.standard_discount_percentage ?? "0")) ||
-                    0;
-                  const specPct =
-                    parseFloat(String(i.special_discount_percentage ?? "0")) ||
-                    0;
-                  const taxPct =
-                    parseFloat(String(i.tax_percentage ?? "0")) || 0;
-                  const disc = (st * (stdPct + specPct)) / 100;
-                  const afterDisc = st - disc;
-                  totalDiscount += disc;
-                  totalTax += (afterDisc * taxPct) / 100;
-                });
+                const { subtotalAll, totalDiscount, totalTax } =
+                  getRevisionProductsTotals(editRevisionProducts);
                 const grandTotal = subtotalAll - totalDiscount + totalTax;
                 return (
                   <Card className="bg-light border-0">

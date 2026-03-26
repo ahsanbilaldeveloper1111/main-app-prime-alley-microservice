@@ -2240,11 +2240,14 @@ export const getDeal = async (id: number): Promise<DealData> => {
 
 export const createDeal = async (
   data: Partial<DealData>,
+  showToast: boolean = true,
 ): Promise<{ data: DealData }> => {
   try {
     const response = await axiosInstance.post("/crm/create-deal", data);
     const responseData: any = response.data?.data;
-    toast.success("Deal created successfully");
+    if (showToast) {
+      toast.success("Deal created successfully");
+    }
     return responseData || response.data;
   } catch (error: any) {
     toast.error(
@@ -3271,6 +3274,7 @@ export interface TaskData {
   id?: number;
   name: string;
   user_extension: string;
+  assigned_to?: string | null;
   created_by: string;
   urgency: "low" | "med" | "high";
   phone?: string;
@@ -3325,6 +3329,7 @@ export const getTask = async (taskId: number): Promise<TaskData> => {
 export const createTask = async (data: {
   name: string;
   user_extension: string;
+  assigned_to?: string;
   created_by: string;
   urgency: "low" | "med" | "high";
   phone?: string;
@@ -3357,6 +3362,7 @@ export const updateTask = async (
   data: {
     name?: string;
     user_extension?: string;
+    assigned_to?: string;
     created_by?: string;
     urgency?: "low" | "med" | "high";
     phone?: string;
