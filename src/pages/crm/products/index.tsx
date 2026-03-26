@@ -2,6 +2,11 @@ import "@assets/scss/datatable-style.scss";
 import React, { useState, useEffect, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericTable, {
+  FilterPill,
+  TableColumn,
+  ToolbarConfig,
+} from "@components/GenericTable";
 import {
   getCrmProducts,
   createProduct,
@@ -9,8 +14,6 @@ import {
   deleteProduct,
   getIndustries,
   CrmProduct,
-  CreateProductPayload,
-  UpdateProductPayload,
   IndustryData,
 } from "@utils/crm";
 import {
@@ -18,11 +21,7 @@ import {
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
-  Card,
-  Table,
-  InputGroup,
   Modal,
 } from "react-bootstrap";
 import Select from "react-select";
@@ -32,148 +31,18 @@ import {
   Eye,
   Edit,
   Trash2,
-  Search,
-  Filter,
-  Layers,
   Package,
   X,
   Tag,
   FileText,
   Building2,
   Calendar,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   CheckCircle,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
-
-// Filter Bar Component
-interface FilterBarProps {
-  quickFilters: {
-    id: string;
-    label: string;
-    variant?: string;
-    color?: string;
-    icon?: React.ReactNode;
-  }[];
-  activeFilter: string;
-  onFilterChange: (filterId: string) => void;
-  searchValue: string;
-  onSearchChange: (value: string) => void;
-  onSearch: () => void;
-  searchPlaceholder?: string;
-  showAdvancedFilters: boolean;
-  onToggleAdvancedFilters: () => void;
-  advancedFilterCount?: number;
-}
-
-const FilterBar: React.FC<FilterBarProps> = ({
-  quickFilters,
-  activeFilter,
-  onFilterChange,
-  searchValue,
-  onSearchChange,
-  onSearch,
-  searchPlaceholder = "Search...",
-  showAdvancedFilters,
-  onToggleAdvancedFilters,
-  advancedFilterCount = 0,
-}) => {
-  return (
-    <Card className="border-0 shadow-sm mb-3">
-      <Card.Body className="p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          {/* Left Side: Quick Filter Buttons */}
-          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color;
-
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor) {
-                if (isActive) {
-                  const bgColor = filter.color;
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
-
-              return (
-                <Button
-                  key={filter.id}
-                  variant={
-                    hasCustomColor
-                      ? undefined
-                      : isActive
-                        ? filter.variant || "primary"
-                        : "outline-secondary"
-                  }
-                  onClick={() => onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2"
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  {filter.icon && (
-                    <span className="d-flex align-items-center">
-                      {filter.icon}
-                    </span>
-                  )}
-                  {filter.label}
-                </Button>
-              );
-            })}
-          </div>
-
-          {/* Right Side: Search and Filters */}
-          <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-            <InputGroup
-              style={{ width: "300px", minWidth: "200px" }}
-              className="flex-shrink-0"
-            >
-              <Form.Control
-                style={{ height: "41px" }}
-                type="text"
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    onSearch();
-                  }
-                }}
-              />
-              <Button variant="outline-secondary" onClick={onSearch}>
-                <Search size={16} />
-              </Button>
-            </InputGroup>
-            <Button
-              variant={showAdvancedFilters ? "primary" : "outline-secondary"}
-              onClick={onToggleAdvancedFilters}
-              className="d-flex align-items-center flex-shrink-0"
-            >
-              <Filter size={16} className="me-2" />
-              Filters
-              {advancedFilterCount > 0 && (
-                <Badge bg="light" text="dark" className="ms-2">
-                  {advancedFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </div>
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
 
 // Product interface matching UI expectations
 interface ProductDisplayData {
@@ -194,6 +63,45 @@ interface ProductDisplayData {
 const ProductsPage = () => {
   const { data: session } = useSession();
 
+  const getErrorMessageFromUnknown = (error: unknown, fallback: string): string => {
+    if (error && typeof error === "object") {
+      const ax = error as { response?: { data?: { message?: string } }; message?: string };
+      const msg = ax.response?.data?.message;
+      if (typeof msg === "string" && msg.length > 0) return msg;
+      if (typeof ax.message === "string" && ax.message.length > 0) return ax.message;
+    }
+    if (error instanceof Error && error.message) return error.message;
+    return fallback;
+  };
+
+  const handleHoverEnter = (
+    e: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>,
+  ) => {
+    e.currentTarget.style.background = "#e5e7eb";
+    e.currentTarget.style.transform = "translateY(-2px)";
+  };
+
+  const handleHoverLeave = (
+    e: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>,
+  ) => {
+    e.currentTarget.style.background = "#f8f9fa";
+    e.currentTarget.style.transform = "translateY(0)";
+  };
+
+  const handleCloseButtonEnter = (
+    e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+  ) => {
+    e.currentTarget.style.background = "rgba(255,255,255,0.3)";
+    e.currentTarget.style.transform = "rotate(90deg)";
+  };
+
+  const handleCloseButtonLeave = (
+    e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+  ) => {
+    e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+    e.currentTarget.style.transform = "rotate(0deg)";
+  };
+
   // State
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -201,8 +109,6 @@ const ProductsPage = () => {
   const [productsPagination, setProductsPagination] = useState({
     currentPage: 1,
     rowsPerPage: 10,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
   });
   const [productsSearch, setProductsSearch] = useState("");
   const [productsFilters, setProductsFilters] = useState({
@@ -238,7 +144,6 @@ const ProductsPage = () => {
   const [showProductViewModal, setShowProductViewModal] = useState(false);
   const [viewingProduct, setViewingProduct] =
     useState<ProductDisplayData | null>(null);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
 
@@ -281,174 +186,6 @@ const ProductsPage = () => {
     }),
   };
 
-  // Helper functions
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
-  ): T[] => {
-    if (!sortColumn) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    // pagination handled by backend
-    return data;
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderPaginationControls = (
-    dataLength: number,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-    label: string,
-  ) => {
-    const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
-    const { currentPage, rowsPerPage } = paginationState;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, dataLength);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPaginationState({
-                ...paginationState,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {dataLength} {label}
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPaginationState({ ...paginationState, currentPage: 1 })
-            }
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: currentPage - 1,
-              })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...new Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPaginationState({
-                      ...paginationState,
-                      currentPage: pageNum,
-                    })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: currentPage + 1,
-              })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: totalPages,
-              })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
 
   // Fetch industries
   const fetchIndustries = async () => {
@@ -457,7 +194,7 @@ const ProductsPage = () => {
       const response = await getIndustries({ per_page: 1000 });
       setIndustries(response.data);
     } catch (error: any) {
-      // Error toast is handled in the API function
+      toast.error(getErrorMessageFromUnknown(error, "Failed to load industries"));
     } finally {
       setLoadingIndustries(false);
     }
@@ -472,12 +209,15 @@ const ProductsPage = () => {
     // Normalize industry_id: convert string to number if needed
     const rawIndustryId =
       (product as any).industry_id || (product as any).industry?.id || null;
-    const normalizedIndustryId =
-      rawIndustryId !== null
-        ? typeof rawIndustryId === "string"
-          ? Number.parseInt(rawIndustryId, 10)
-          : rawIndustryId
-        : null;
+    let normalizedIndustryId: number | null = null;
+    if (rawIndustryId !== null) {
+      if (typeof rawIndustryId === "string") {
+        const parsed = Number.parseInt(rawIndustryId, 10);
+        normalizedIndustryId = Number.isNaN(parsed) ? null : parsed;
+      } else {
+        normalizedIndustryId = rawIndustryId;
+      }
+    }
 
     return {
       id: product.id,
@@ -570,37 +310,187 @@ const ProductsPage = () => {
     return Array.from(categories).sort((a, b) => a.localeCompare(b));
   }, [products]);
 
-  const uniqueBrands = useMemo(() => {
-    const brands = new Set<string>();
-    products.forEach((p) => {
-      if (p.brand) brands.add(p.brand);
-    });
-    return Array.from(brands).sort((a, b) => a.localeCompare(b));
-  }, [products]);
+  const industryFilterDropdownContent = useMemo(
+    () => (
+      <Form
+        style={{ minWidth: "240px" }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <Select
+          options={industries.map((ind) => ({
+            value: ind.id,
+            label: ind.name,
+          }))}
+          value={
+            productsFilters.industry_id
+              ? {
+                  value: productsFilters.industry_id,
+                  label:
+                    industries.find(
+                      (ind) => ind.id === productsFilters.industry_id,
+                    )?.name || "",
+                }
+              : null
+          }
+          onChange={(selected) => {
+            setProductsFilters((prev) => ({
+              ...prev,
+              industry_id: selected ? Number(selected.value) : null,
+            }));
+            setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+          }}
+          placeholder="Select industry..."
+          styles={customSelectStyles}
+          isLoading={loadingIndustries}
+          isDisabled={loadingIndustries}
+          isClearable
+        />
+      </Form>
+    ),
+    [customSelectStyles, industries, loadingIndustries, productsFilters.industry_id],
+  );
 
-  // Quick filters
-  const productQuickFilters = useMemo(() => {
-    return [
+  const categoryFilterDropdownContent = useMemo(
+    () => (
+      <Form
+        style={{ minWidth: "240px" }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <CreatableSelect
+          options={uniqueCategories.map((cat) => ({
+            value: cat,
+            label: cat,
+          }))}
+          value={
+            productsFilters.category
+              ? {
+                  value: productsFilters.category,
+                  label: productsFilters.category,
+                }
+              : null
+          }
+          onChange={(selected) => {
+            setProductsFilters((prev) => ({
+              ...prev,
+              category: selected ? selected.value : null,
+            }));
+            setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+          }}
+          placeholder="Select or create category..."
+          styles={customSelectStyles}
+          isClearable
+        />
+      </Form>
+    ),
+    [customSelectStyles, productsFilters.category, uniqueCategories],
+  );
+
+  const statusFilterDropdownContent = useMemo(
+    () => (
+      <Form
+        style={{ minWidth: "220px" }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <Select
+          options={[
+            { value: "Active", label: "Active" },
+            { value: "Inactive", label: "Inactive" },
+          ]}
+          value={
+            productsFilters.status
+              ? {
+                  value: productsFilters.status,
+                  label: productsFilters.status,
+                }
+              : null
+          }
+          onChange={(selected) => {
+            const statusValue = selected ? selected.value : null;
+            setProductsFilters((prev) => ({
+              ...prev,
+              status: statusValue,
+            }));
+            if (statusValue === "Active") {
+              setActiveFilter("active");
+            } else if (statusValue === "Inactive") {
+              setActiveFilter("inactive");
+            } else {
+              setActiveFilter("all");
+            }
+            setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+          }}
+          placeholder="Select status..."
+          styles={customSelectStyles}
+          isClearable
+        />
+      </Form>
+    ),
+    [customSelectStyles, productsFilters.status],
+  );
+
+  const productFilterPills = useMemo<FilterPill[]>(
+    () => [
       {
-        id: "all",
-        label: "All Products",
-        color: "#6c757d",
-        icon: <Package size={16} />,
+        id: "products-industry",
+        label: "Industry",
+        showDropdown: true,
+        active: Boolean(productsFilters.industry_id),
+        activeLabel:
+          productsFilters.industry_id === null
+            ? undefined
+            : industries.find((ind) => ind.id === productsFilters.industry_id)?.name ||
+              String(productsFilters.industry_id),
+        onClear:
+          productsFilters.industry_id === null
+            ? undefined
+            : () => {
+                setProductsFilters((prev) => ({ ...prev, industry_id: null }));
+                setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+              },
+        dropdownContent: industryFilterDropdownContent,
       },
       {
-        id: "active",
-        label: "Active",
-        color: "#198754",
-        icon: <CheckCircle size={16} />,
+        id: "products-category",
+        label: "Category",
+        showDropdown: true,
+        active: Boolean(productsFilters.category),
+        activeLabel: productsFilters.category || undefined,
+        onClear:
+          productsFilters.category
+            ? () => {
+                setProductsFilters((prev) => ({ ...prev, category: null }));
+                setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+              }
+            : undefined,
+        dropdownContent: categoryFilterDropdownContent,
       },
       {
-        id: "inactive",
-        label: "Inactive",
-        color: "#6c757d",
-        icon: <X size={16} />,
+        id: "products-status",
+        label: "Status",
+        showDropdown: true,
+        active: Boolean(productsFilters.status),
+        activeLabel: productsFilters.status || undefined,
+        onClear:
+          productsFilters.status
+            ? () => {
+                setProductsFilters((prev) => ({ ...prev, status: null }));
+                setActiveFilter("all");
+                setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+              }
+            : undefined,
+        dropdownContent: statusFilterDropdownContent,
       },
-    ];
-  }, []);
+    ],
+    [
+      categoryFilterDropdownContent,
+      industries,
+      industryFilterDropdownContent,
+      productsFilters.category,
+      productsFilters.industry_id,
+      productsFilters.status,
+      statusFilterDropdownContent,
+    ],
+  );
 
   // Available columns
   const availableColumns = [
@@ -615,17 +505,247 @@ const ProductsPage = () => {
     { key: "created", label: "Created Date" },
   ];
 
+  const productsTableColumns = useMemo<TableColumn<ProductDisplayData>[]>(() => {
+    const cols: TableColumn<ProductDisplayData>[] = [];
+
+    if (selectedProductsColumns.includes("productName")) {
+      cols.push({
+        key: "productName",
+        label: "Product Name",
+        sortable: true,
+        type: "custom",
+        render: (product) => <span className="fw-semibold">{product.productName}</span>,
+      });
+    }
+
+    if (selectedProductsColumns.includes("sku")) {
+      cols.push({
+        key: "sku",
+        label: "SKU",
+        sortable: true,
+        type: "custom",
+        render: (product) => (
+          <Badge bg="light" text="dark" className="font-monospace">
+            {product.sku}
+          </Badge>
+        ),
+      });
+    }
+
+    if (selectedProductsColumns.includes("price")) {
+      cols.push({
+        key: "price",
+        label: "Price",
+        sortable: true,
+        type: "custom",
+        render: (product) => (
+          <span className="fw-semibold text-success">
+            {product.currency} {product.price.toFixed(2)}
+          </span>
+        ),
+      });
+    }
+
+    if (selectedProductsColumns.includes("currency")) {
+      cols.push({
+        key: "currency",
+        label: "Currency",
+        sortable: true,
+      });
+    }
+
+    if (selectedProductsColumns.includes("category")) {
+      cols.push({
+        key: "category",
+        label: "Category",
+        sortable: true,
+        type: "custom",
+        render: (product) => (
+          <Badge bg="info" className="bg-opacity-10 text-dark">
+            {product.category || "N/A"}
+          </Badge>
+        ),
+      });
+    }
+
+    if (selectedProductsColumns.includes("brand")) {
+      cols.push({
+        key: "brand",
+        label: "Brand",
+        sortable: true,
+        type: "custom",
+        render: (product) => <span>{product.brand || "N/A"}</span>,
+      });
+    }
+
+    if (selectedProductsColumns.includes("status")) {
+      cols.push({
+        key: "status",
+        label: "Status",
+        sortable: true,
+        type: "custom",
+        render: (product) => (
+          <Badge bg={product.status === "Active" ? "success" : "secondary"}>
+            {product.status}
+          </Badge>
+        ),
+      });
+    }
+
+    if (selectedProductsColumns.includes("description")) {
+      cols.push({
+        key: "description",
+        label: "Description",
+        sortable: false,
+        type: "custom",
+        render: (product) => (
+          <span className="text-muted small" style={{ maxWidth: "220px" }}>
+            {product.description || "N/A"}
+          </span>
+        ),
+      });
+    }
+
+    if (selectedProductsColumns.includes("created")) {
+      cols.push({
+        key: "created",
+        label: "Created",
+        sortable: true,
+        type: "custom",
+        render: (product) => <span className="text-muted">{product.created}</span>,
+      });
+    }
+
+    cols.push({
+      key: "actions",
+      label: "Actions",
+      sortable: false,
+      type: "custom",
+      render: (product) => (
+        <div className="d-flex gap-1">
+          <Button
+            variant="link"
+            size="sm"
+            className="p-1"
+            title="View"
+            onClick={() => {
+              setViewingProduct(product);
+              setShowProductViewModal(true);
+            }}
+          >
+            <Eye size={16} />
+          </Button>
+          {session?.user?.permissions?.includes("edit-crm-products") && (
+            <Button
+              variant="link"
+              size="sm"
+              className="p-1"
+              title="Edit"
+              onClick={() => handleOpenProductModal(product)}
+            >
+              <Edit size={16} />
+            </Button>
+          )}
+          {session?.user?.permissions?.includes("delete-crm-products") && (
+            <Button
+              variant="link"
+              size="sm"
+              className="p-1 text-danger"
+              title="Delete"
+              onClick={() => {
+                setDeletingProduct(product);
+                setShowProductDeleteModal(true);
+              }}
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
+        </div>
+      ),
+    });
+
+    return cols;
+  }, [selectedProductsColumns, session?.user?.permissions]);
+
+  const productsToolbarConfig = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: productsSearch,
+      searchPlaceholder: "Search by product name or SKU...",
+      onSearchChange: setProductsSearch,
+      onSearch: () => {
+        setCurrentFilters({ ...currentFilters, search: productsSearch });
+        setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+      },
+      showTabs: true,
+      showFilterPills: true,
+      filterPills: productFilterPills,
+      showMoreFiltersButton: false,
+      tabs: [
+        { id: "all", label: "All Products", icon: <Package size={14} />, removable: false },
+        { id: "active", label: "Active", icon: <CheckCircle size={14} />, removable: false },
+        { id: "inactive", label: "Inactive", icon: <X size={14} />, removable: false },
+      ],
+      activeTab: activeFilter,
+      onTabChange: (filterId) => {
+        setActiveFilter(filterId);
+        if (filterId === "active") {
+          setProductsFilters((prev) => ({ ...prev, status: "Active" }));
+        } else if (filterId === "inactive") {
+          setProductsFilters((prev) => ({ ...prev, status: "Inactive" }));
+        } else {
+          setProductsFilters((prev) => ({ ...prev, status: null }));
+        }
+        setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+      },
+      rightActions: (
+        <div className="d-flex gap-2">
+          {session?.user?.permissions?.includes("add-crm-products") && (
+            <Button
+              onClick={() => handleOpenProductModal()}
+              style={{
+                backgroundColor: "#4f46e5",
+                border: "none",
+                borderRadius: "8px",
+                color: "#ffffff",
+                height: "33px",
+                fontSize: "0.875rem",
+                padding: "0 12px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <PlusCircle size={15} />
+              Add Product
+            </Button>
+          )}
+        </div>
+      ),
+    }),
+    [
+      productFilterPills,
+      productsSearch,
+      activeFilter,
+      currentFilters,
+      session?.user?.permissions,
+    ],
+  );
+
   const handleOpenProductModal = (product?: ProductDisplayData) => {
     if (product) {
       setEditingProduct(product);
       // Convert industry_id to number if it's a string (API sometimes returns string)
       const industryId = product.industry_id || product.industry?.id || null;
-      const normalizedIndustryId =
-        industryId !== null
-          ? typeof industryId === "string"
-            ? Number.parseInt(industryId, 10)
-            : industryId
-          : null;
+      let normalizedIndustryId: number | null = null;
+      if (industryId !== null) {
+        if (typeof industryId === "string") {
+          const parsed = Number.parseInt(industryId, 10);
+          normalizedIndustryId = Number.isNaN(parsed) ? null : parsed;
+        } else {
+          normalizedIndustryId = industryId;
+        }
+      }
 
       setProductFormData({
         productName: product.productName,
@@ -699,7 +819,7 @@ const ProductsPage = () => {
       // Refresh products after create/update
       await fetchProducts();
     } catch (error: any) {
-      // Error toast is handled in the API function
+      toast.error(getErrorMessageFromUnknown(error, "Failed to save product"));
     }
   };
 
@@ -712,7 +832,7 @@ const ProductsPage = () => {
       // Refresh products after delete
       await fetchProducts();
     } catch (error: any) {
-      // Error toast is handled in the API function
+      toast.error(getErrorMessageFromUnknown(error, "Failed to delete product"));
     }
   };
 
@@ -897,9 +1017,18 @@ const ProductsPage = () => {
                         setProductFormData({
                           ...productFormData,
                           industry_id: selected
-                            ? typeof selected.value === "string"
-                              ? Number.parseInt(selected.value, 10)
-                              : selected.value
+                            ? (() => {
+                                if (typeof selected.value === "string") {
+                                  const parsed = Number.parseInt(
+                                    selected.value,
+                                    10,
+                                  );
+                                  return Number.isNaN(parsed)
+                                    ? null
+                                    : parsed;
+                                }
+                                return selected.value;
+                              })()
                             : null,
                         })
                       }
@@ -1069,14 +1198,10 @@ const ProductsPage = () => {
                   alignItems: "center",
                   justifyContent: "center",
                 }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.3)";
-                  e.currentTarget.style.transform = "rotate(90deg)";
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.2)";
-                  e.currentTarget.style.transform = "rotate(0deg)";
-                }}
+                onMouseOver={handleCloseButtonEnter}
+                onMouseOut={handleCloseButtonLeave}
+                onFocus={handleCloseButtonEnter}
+                onBlur={handleCloseButtonLeave}
               >
                 <X size={20} />
               </button>
@@ -1123,14 +1248,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1162,14 +1283,10 @@ const ProductsPage = () => {
                       borderRadius: "10px",
                       transition: "all 0.3s",
                     }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = "#e5e7eb";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = "#f8f9fa";
-                      e.currentTarget.style.transform = "translateY(0)";
-                    }}
+                    onMouseOver={handleHoverEnter}
+                    onMouseOut={handleHoverLeave}
+                    onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                   >
                     <div
                       style={{
@@ -1212,14 +1329,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1257,14 +1370,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1295,14 +1404,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1333,14 +1438,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1385,14 +1486,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1454,14 +1551,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1498,14 +1591,10 @@ const ProductsPage = () => {
                     borderRadius: "10px",
                     transition: "all 0.3s",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "#e5e7eb";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "#f8f9fa";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={handleHoverEnter}
+                  onMouseOut={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
                 >
                   <div
                     style={{
@@ -1599,484 +1688,53 @@ const ProductsPage = () => {
           </Modal>
         )}
 
-        {/* Page Header */}
-        <div className="d-flex justify-content-between align-items-center mb-4">
-          <div>
-            {/* <h3 className="fw-bold mb-1">Products</h3>
-            <p className="text-muted mb-0">Manage your product catalog</p> */}
-          </div>
-          {session?.user?.permissions?.includes("add-crm-products") && (
-            <Button
-              variant="primary"
-              onClick={() => handleOpenProductModal()}
-              className="d-flex align-items-center gap-2"
-            >
-              <PlusCircle size={18} />
-              Add Product
-            </Button>
-          )}
+        <div className="products-table-wrapper mb-4">
+          <GenericTable<ProductDisplayData>
+            data={displayProducts}
+            columns={productsTableColumns}
+            actions={[]}
+            showActions={false}
+            loading={loading}
+            loadingMessage="Loading products..."
+            emptyMessage="No products found matching your criteria"
+            pagination={{
+              currentPage: productsPagination.currentPage,
+              rowsPerPage: productsPagination.rowsPerPage,
+              totalRows: totalProducts,
+              pageSizeOptions: [10, 25, 50, 100],
+            }}
+            onPaginationChange={(page, rowsPerPage) => {
+              setProductsPagination((prev) => ({
+                ...prev,
+                currentPage: page,
+                rowsPerPage,
+              }));
+            }}
+            sortable
+            customizableColumns
+            selectedColumns={selectedProductsColumns}
+            defaultSelectedColumns={[
+              "productName",
+              "sku",
+              "price",
+              "category",
+              "brand",
+              "status",
+              "actions",
+            ]}
+            onColumnChange={(cols) => {
+              const allowed = new Set(availableColumns.map((c) => c.key));
+              const filtered = cols.filter((c) => allowed.has(c));
+              setSelectedProductsColumns(filtered);
+              localStorage.setItem("productsSelectedColumns", JSON.stringify(filtered));
+            }}
+            columnStorageKey="productsSelectedColumns"
+            showToolbar
+            toolbar={productsToolbarConfig}
+            showToolbarActions={false}
+            uniqueKey="id"
+          />
         </div>
-
-        {/* Filter Bar */}
-        <FilterBar
-          quickFilters={productQuickFilters}
-          activeFilter={activeFilter}
-          onFilterChange={(filterId) => {
-            setActiveFilter(filterId);
-            // Sync status filter dropdown with activeFilter
-            if (filterId === "active") {
-              setProductsFilters((prev) => ({ ...prev, status: "Active" }));
-            } else if (filterId === "inactive") {
-              setProductsFilters((prev) => ({ ...prev, status: "Inactive" }));
-            } else {
-              setProductsFilters((prev) => ({ ...prev, status: null }));
-            }
-            setProductsPagination({ ...productsPagination, currentPage: 1 });
-          }}
-          searchValue={productsSearch}
-          onSearchChange={(value) => setProductsSearch(value)}
-          onSearch={() => {
-            setCurrentFilters({ ...currentFilters, search: productsSearch });
-            setProductsPagination({ ...productsPagination, currentPage: 1 });
-          }}
-          searchPlaceholder="Search by product name or SKU..."
-          showAdvancedFilters={showAdvancedFilters}
-          onToggleAdvancedFilters={() =>
-            setShowAdvancedFilters(!showAdvancedFilters)
-          }
-          advancedFilterCount={
-            (productsFilters.industry_id ? 1 : 0) +
-            (productsFilters.category ? 1 : 0) +
-            productsFilters.brand.length +
-            (productsFilters.status ? 1 : 0)
-          }
-        />
-
-        {/* Advanced Filters */}
-        {showAdvancedFilters && (
-          <Card className="border-0 shadow-sm mb-4">
-            <Card.Body>
-              <Row className="g-3 align-items-end">
-                <Col sm={6} md={4} xl={4}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Industry
-                  </Form.Label>
-                  <Select
-                    options={industries.map((ind) => ({
-                      value: ind.id,
-                      label: ind.name,
-                    }))}
-                    value={
-                      productsFilters.industry_id
-                        ? {
-                            value: productsFilters.industry_id,
-                            label:
-                              industries.find(
-                                (ind) => ind.id === productsFilters.industry_id,
-                              )?.name || "",
-                          }
-                        : null
-                    }
-                    onChange={(selected) => {
-                      setProductsFilters((prev) => ({
-                        ...prev,
-                        industry_id: selected ? selected.value : null,
-                      }));
-                      setProductsPagination({
-                        ...productsPagination,
-                        currentPage: 1,
-                      });
-                    }}
-                    placeholder="Select industry..."
-                    styles={customSelectStyles}
-                    isLoading={loadingIndustries}
-                    isDisabled={loadingIndustries}
-                    isClearable
-                  />
-                </Col>
-                <Col sm={6} md={4} xl={4}>
-                  <Form.Label className="small fw-bold mb-2">
-                    Category
-                  </Form.Label>
-                  <CreatableSelect
-                    options={uniqueCategories.map((cat) => ({
-                      value: cat,
-                      label: cat,
-                    }))}
-                    value={
-                      productsFilters.category
-                        ? {
-                            value: productsFilters.category,
-                            label: productsFilters.category,
-                          }
-                        : null
-                    }
-                    onChange={(selected) => {
-                      setProductsFilters((prev) => ({
-                        ...prev,
-                        category: selected ? selected.value : null,
-                      }));
-                      setProductsPagination({
-                        ...productsPagination,
-                        currentPage: 1,
-                      });
-                    }}
-                    placeholder="Select or create category..."
-                    styles={customSelectStyles}
-                    isClearable
-                  />
-                </Col>
-
-                <Col sm={6} md={4} xl={4}>
-                  <Form.Label className="small fw-bold mb-2">Status</Form.Label>
-                  <Select
-                    options={[
-                      { value: "Active", label: "Active" },
-                      { value: "Inactive", label: "Inactive" },
-                    ]}
-                    value={
-                      productsFilters.status
-                        ? {
-                            value: productsFilters.status,
-                            label: productsFilters.status,
-                          }
-                        : null
-                    }
-                    onChange={(selected) => {
-                      const statusValue = selected ? selected.value : null;
-                      setProductsFilters((prev) => ({
-                        ...prev,
-                        status: statusValue,
-                      }));
-                      // Sync activeFilter buttons with status dropdown
-                      if (statusValue === "Active") {
-                        setActiveFilter("active");
-                      } else if (statusValue === "Inactive") {
-                        setActiveFilter("inactive");
-                      } else {
-                        setActiveFilter("all");
-                      }
-                      setProductsPagination({
-                        ...productsPagination,
-                        currentPage: 1,
-                      });
-                    }}
-                    placeholder="Select status..."
-                    styles={customSelectStyles}
-                    isClearable
-                  />
-                </Col>
-                <Col sm={6} md={4} xl={4}>
-                  <div className="d-flex gap-2">
-                    {/* <Button
-                      variant="primary"
-                      className="flex-grow-1 d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        setProductsPagination({ ...productsPagination, currentPage: 1 });
-                        // Filters are applied automatically via useEffect
-                      }}
-                    >
-                      Apply
-                    </Button> */}
-                    <Button
-                      variant="outline-secondary"
-                      className="d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        setProductsFilters({
-                          industry_id: null,
-                          category: null,
-                          brand: [],
-                          status: null,
-                          priceMin: "",
-                          priceMax: "",
-                        });
-                        setActiveFilter("all");
-                        setProductsPagination({
-                          ...productsPagination,
-                          currentPage: 1,
-                        });
-                      }}
-                    >
-                      Reset All Filters
-                    </Button>
-                  </div>
-                </Col>
-              </Row>
-            </Card.Body>
-          </Card>
-        )}
-
-        {/* Column Customization */}
-        <div className="d-flex justify-content-end gap-2 mb-3">
-          <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" size="sm">
-              <Layers size={16} className="me-2" />
-              Customize Table
-            </Dropdown.Toggle>
-            <Dropdown.Menu
-              align="end"
-              style={{ maxHeight: "300px", overflowY: "auto" }}
-            >
-              {availableColumns.map((col) => (
-                <Dropdown.Item key={col.key} as="div">
-                  <Form.Check
-                    type="checkbox"
-                    label={col.label}
-                    checked={selectedProductsColumns.includes(col.key)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedProductsColumns([
-                          ...selectedProductsColumns,
-                          col.key,
-                        ]);
-                      } else {
-                        setSelectedProductsColumns(
-                          selectedProductsColumns.filter((c) => c !== col.key),
-                        );
-                      }
-                    }}
-                  />
-                </Dropdown.Item>
-              ))}
-              <Dropdown.Divider />
-              <Dropdown.Item
-                onClick={() =>
-                  setSelectedProductsColumns([
-                    "productName",
-                    "sku",
-                    "price",
-                    "currency",
-                    "category",
-                    "brand",
-                    "status",
-                    "description",
-                    "created",
-                  ])
-                }
-              >
-                Select All
-              </Dropdown.Item>
-              <Dropdown.Item
-                onClick={() =>
-                  setSelectedProductsColumns([
-                    "productName",
-                    "sku",
-                    "price",
-                    "category",
-                    "brand",
-                    "status",
-                  ])
-                }
-              >
-                Reset to Default
-              </Dropdown.Item>
-            </Dropdown.Menu>
-          </Dropdown>
-        </div>
-
-        {/* Products Table */}
-        <Card
-          className="border-0 shadow-sm products-table-wrapper"
-          style={{ width: "100%" }}
-        >
-          <Card.Body className="p-0" style={{ width: "100%" }}>
-            <div className="table-responsive">
-              <Table
-                hover
-                className="mb-0"
-                style={{ width: "100%", margin: 0, tableLayout: "auto" }}
-              >
-                <thead className="bg-light">
-                  <tr>
-                    {selectedProductsColumns.includes("productName") && (
-                      <th>Product Name</th>
-                    )}
-                    {selectedProductsColumns.includes("sku") && <th>SKU</th>}
-                    {selectedProductsColumns.includes("price") && (
-                      <th>Price</th>
-                    )}
-                    {selectedProductsColumns.includes("currency") && (
-                      <th>Currency</th>
-                    )}
-                    {selectedProductsColumns.includes("category") && (
-                      <th>Category</th>
-                    )}
-                    {selectedProductsColumns.includes("brand") && (
-                      <th>Brand</th>
-                    )}
-                    {selectedProductsColumns.includes("status") && (
-                      <th>Status</th>
-                    )}
-                    {selectedProductsColumns.includes("description") && (
-                      <th>Description</th>
-                    )}
-                    {selectedProductsColumns.includes("created") && (
-                      <th>Created</th>
-                    )}
-                    <th style={{ width: "120px", minWidth: "120px" }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={selectedProductsColumns.length + 1}
-                        className="text-center py-4"
-                      >
-                        Loading...
-                      </td>
-                    </tr>
-                  ) : displayProducts.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={selectedProductsColumns.length + 1}
-                        className="text-center py-4 text-muted"
-                      >
-                        No products found matching your criteria
-                      </td>
-                    </tr>
-                  ) : (
-                    (() => {
-                      const sorted = sortData(
-                        displayProducts,
-                        productsPagination.sortColumn,
-                        productsPagination.sortDirection,
-                      );
-                      const paginated = paginateData(
-                        sorted,
-                        productsPagination.currentPage,
-                        productsPagination.rowsPerPage,
-                      );
-
-                      return paginated.map((product) => (
-                        <tr key={product.id}>
-                          {selectedProductsColumns.includes("productName") && (
-                            <td className="fw-semibold">
-                              {product.productName}
-                            </td>
-                          )}
-                          {selectedProductsColumns.includes("sku") && (
-                            <td>
-                              <Badge
-                                bg="light"
-                                text="dark"
-                                className="font-monospace"
-                              >
-                                {product.sku}
-                              </Badge>
-                            </td>
-                          )}
-                          {selectedProductsColumns.includes("price") && (
-                            <td className="fw-semibold text-success">
-                              {product.currency} {product.price.toFixed(2)}
-                            </td>
-                          )}
-                          {selectedProductsColumns.includes("currency") && (
-                            <td>{product.currency}</td>
-                          )}
-                          {selectedProductsColumns.includes("category") && (
-                            <td>
-                              <Badge
-                                bg="info"
-                                className="bg-opacity-10 text-dark"
-                              >
-                                {product.category || "N/A"}
-                              </Badge>
-                            </td>
-                          )}
-                          {selectedProductsColumns.includes("brand") && (
-                            <td>{product.brand || "N/A"}</td>
-                          )}
-                          {selectedProductsColumns.includes("status") && (
-                            <td>
-                              <Badge
-                                bg={
-                                  product.status === "Active"
-                                    ? "success"
-                                    : "secondary"
-                                }
-                              >
-                                {product.status}
-                              </Badge>
-                            </td>
-                          )}
-                          {selectedProductsColumns.includes("description") && (
-                            <td
-                              className="text-muted small"
-                              style={{ maxWidth: "200px" }}
-                            >
-                              {product.description || "N/A"}
-                            </td>
-                          )}
-                          {selectedProductsColumns.includes("created") && (
-                            <td className="text-muted">{product.created}</td>
-                          )}
-                          <td style={{ width: "120px", minWidth: "120px" }}>
-                            <div className="d-flex gap-1">
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="p-1"
-                                title="View"
-                                onClick={() => {
-                                  setViewingProduct(product);
-                                  setShowProductViewModal(true);
-                                }}
-                              >
-                                <Eye size={16} />
-                              </Button>
-                              {session?.user?.permissions?.includes(
-                                "edit-crm-products",
-                              ) && (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  title="Edit"
-                                  onClick={() =>
-                                    handleOpenProductModal(product)
-                                  }
-                                >
-                                  <Edit size={16} />
-                                </Button>
-                              )}
-                              {session?.user?.permissions?.includes(
-                                "delete-crm-products",
-                              ) && (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1 text-danger"
-                                  title="Delete"
-                                  onClick={() => {
-                                    setDeletingProduct(product);
-                                    setShowProductDeleteModal(true);
-                                  }}
-                                >
-                                  <Trash2 size={16} />
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ));
-                    })()
-                  )}
-                </tbody>
-              </Table>
-            </div>
-            <div className="p-3">
-              {renderPaginationControls(
-                totalProducts,
-                productsPagination,
-                setProductsPagination,
-                "products",
-              )}
-            </div>
-          </Card.Body>
-        </Card>
       </div>
     </React.Fragment>
   );
