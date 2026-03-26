@@ -29,7 +29,6 @@ import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
-// ─── Styles (inline via style tag approach using className strings) ───────────
 
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 
