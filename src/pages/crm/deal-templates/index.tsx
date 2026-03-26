@@ -64,6 +64,7 @@ function templateIsDefault(template: DealTemplateData): boolean {
   return false;
 }
 
+let localFieldIdCounter = 0;
 
 
 function newLocalFieldId(): string {
@@ -79,7 +80,8 @@ function newLocalFieldId(): string {
     }
   }
 
-  return "field-" + String(Date.now()) + "-" + Math.random().toString(36).slice(2, 11);
+  localFieldIdCounter += 1;
+  return `field-${Date.now()}-${localFieldIdCounter}`;
 }
 
 function consumeHandledApiError(error: unknown, source: string): void {
