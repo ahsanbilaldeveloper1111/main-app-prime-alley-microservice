@@ -29,7 +29,7 @@ import {
   monitoringPayloadDiffersFromActive,
   registeredEntriesFromDevices,
   type RegisteredDeviceEntry,
-} from './_wallboardEventParsing'
+} from '@components/communications/wallboards-live/wallboardEventParsing'
 import {
   categorizeDns as categorizeDnsHelper,
   isDnInActiveCall as isDnInActiveCallHelper,
