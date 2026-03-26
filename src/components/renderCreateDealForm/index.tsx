@@ -113,6 +113,30 @@ interface CreateDealSidebarProps {
   onSuccess?: () => void;
 }
 
+interface EstimateChartItem {
+  id?: number;
+  product_id?: number;
+  product_service?: string;
+  qty?: number;
+  unit_price?: number | string;
+  tax_percentage?: number | string;
+  standard_discount_percentage?: number | string;
+  special_discount_percentage?: number | string;
+}
+
+interface RevisionProductRow {
+  product_id: number;
+  product_service: string;
+  description: string;
+  qty: number;
+  unit_price: number;
+  original_currency: string;
+  original_price: number;
+  tax_percentage: string;
+  standard_discount_percentage: string;
+  special_discount_percentage: string;
+}
+
 // ─── Initial State ────────────────────────────────────────────────────────────
 const initialDealForm: DealFormData = {
   // Deal Information
@@ -293,6 +317,80 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   </Dropdown>
 );
 
+const parsePercent = (value: unknown): number =>
+  parseFloat(String(value ?? "0")) || 0;
+
+const mapEstimateChartToLineItems = (
+  chart: EstimateChartItem[],
+  fallbackTaxPct: number,
+  fallbackStdDiscPct: number,
+  fallbackSpecDiscPct: number,
+  getId: (idx: number, item: EstimateChartItem) => number,
+): LineItem[] => {
+  const fallbackDiscount = fallbackStdDiscPct + fallbackSpecDiscPct;
+  return chart.map((item, idx) => ({
+    id: getId(idx, item),
+    name: item.product_service || "",
+    quantity: item.qty ?? 1,
+    tax: parsePercent(item.tax_percentage ?? fallbackTaxPct),
+    discount:
+      item.standard_discount_percentage != null ||
+      item.special_discount_percentage != null
+        ? parsePercent(item.standard_discount_percentage) +
+          parsePercent(item.special_discount_percentage)
+        : fallbackDiscount,
+    product_id: item.product_id,
+    unit_price:
+      item.unit_price != null ? parseFloat(String(item.unit_price)) : undefined,
+    standard_discount_percentage:
+      item.standard_discount_percentage != null
+        ? parsePercent(item.standard_discount_percentage)
+        : undefined,
+    special_discount_percentage:
+      item.special_discount_percentage != null
+        ? parsePercent(item.special_discount_percentage)
+        : undefined,
+  }));
+};
+
+const getRevisionProductLineTotal = (
+  item: Pick<
+    RevisionProductRow,
+    | "qty"
+    | "unit_price"
+    | "tax_percentage"
+    | "standard_discount_percentage"
+    | "special_discount_percentage"
+  >,
+) => {
+  const subtotal = (item.qty || 0) * (item.unit_price || 0);
+  const stdPct = parsePercent(item.standard_discount_percentage);
+  const specPct = parsePercent(item.special_discount_percentage);
+  const taxPct = parsePercent(item.tax_percentage);
+  const discount = (subtotal * (stdPct + specPct)) / 100;
+  const afterDiscount = subtotal - discount;
+  const tax = (afterDiscount * taxPct) / 100;
+  return {
+    subtotal,
+    discount,
+    tax,
+    lineTotal: afterDiscount + tax,
+  };
+};
+
+const getRevisionProductsTotals = (items: RevisionProductRow[]) =>
+  items.reduce(
+    (acc, item) => {
+      const { subtotal, discount, tax } = getRevisionProductLineTotal(item);
+      return {
+        subtotalAll: acc.subtotalAll + subtotal,
+        totalDiscount: acc.totalDiscount + discount,
+        totalTax: acc.totalTax + tax,
+      };
+    },
+    { subtotalAll: 0, totalDiscount: 0, totalTax: 0 },
+  );
+
 // ─── Main renderCreateDeal ────────────────────────────────────────────────────
 
 const renderCreateDeal = (
@@ -345,18 +443,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
     number | null
   >(null);
   const [editRevisionProducts, setEditRevisionProducts] = useState<
-    Array<{
-      product_id: number;
-      product_service: string;
-      description: string;
-      qty: number;
-      unit_price: number;
-      original_currency: string;
-      original_price: number;
-      tax_percentage: string;
-      standard_discount_percentage: string;
-      special_discount_percentage: string;
-    }>
+    RevisionProductRow[]
   >([]);
   const [editRevisionFormData, setEditRevisionFormData] = useState({
     tax_percentage: "0",
@@ -524,37 +611,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               : parseFloat(
                   String(dealAny.special_discount_percentage ?? "0"),
                 ) || 0;
-          const discountPct = stdDisc + specDisc;
-          const lineItemsFromApi: LineItem[] = chart.map(
-            (item: any, idx: number) => ({
-              id: item.id ?? Date.now() + idx,
-              name: item.product_service || "",
-              quantity: item.qty ?? 1,
-              tax: parseFloat(String(item.tax_percentage ?? taxPct)) || 0,
-              discount:
-                item.standard_discount_percentage != null ||
-                item.special_discount_percentage != null
-                  ? (parseFloat(
-                      String(item.standard_discount_percentage ?? "0"),
-                    ) || 0) +
-                    (parseFloat(
-                      String(item.special_discount_percentage ?? "0"),
-                    ) || 0)
-                  : discountPct,
-              product_id: item.product_id,
-              unit_price:
-                item.unit_price != null
-                  ? parseFloat(String(item.unit_price))
-                  : undefined,
-              standard_discount_percentage:
-                item.standard_discount_percentage != null
-                  ? parseFloat(String(item.standard_discount_percentage)) || 0
-                  : undefined,
-              special_discount_percentage:
-                item.special_discount_percentage != null
-                  ? parseFloat(String(item.special_discount_percentage)) || 0
-                  : undefined,
-            }),
+          const lineItemsFromApi = mapEstimateChartToLineItems(
+            chart,
+            taxPct,
+            stdDisc,
+            specDisc,
+            (idx, item) => item.id ?? Date.now() + idx,
           );
           setDealForm((prev) => ({
             ...prev,
@@ -676,33 +738,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
       parseFloat(String(estimate.standard_discount_percentage ?? "0")) || 0;
     const specDisc =
       parseFloat(String(estimate.special_discount_percentage ?? "0")) || 0;
-    const lineItemsFromRevision: LineItem[] = chart.map(
-      (item: any, idx: number) => ({
-        id: Date.now() + idx,
-        name: item.product_service || "",
-        quantity: item.qty ?? 1,
-        tax: parseFloat(String(item.tax_percentage ?? taxPct)) || 0,
-        discount:
-          item.standard_discount_percentage != null ||
-          item.special_discount_percentage != null
-            ? (parseFloat(String(item.standard_discount_percentage ?? "0")) ||
-                0) +
-              (parseFloat(String(item.special_discount_percentage ?? "0")) || 0)
-            : stdDisc + specDisc,
-        product_id: item.product_id,
-        unit_price:
-          item.unit_price != null
-            ? parseFloat(String(item.unit_price))
-            : undefined,
-        standard_discount_percentage:
-          item.standard_discount_percentage != null
-            ? parseFloat(String(item.standard_discount_percentage)) || 0
-            : undefined,
-        special_discount_percentage:
-          item.special_discount_percentage != null
-            ? parseFloat(String(item.special_discount_percentage)) || 0
-            : undefined,
-      }),
+    const lineItemsFromRevision = mapEstimateChartToLineItems(
+      chart,
+      taxPct,
+      stdDisc,
+      specDisc,
+      (idx) => Date.now() + idx,
     );
     setDealForm((prev) => ({
       ...prev,
@@ -2358,22 +2399,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                 </thead>
                 <tbody>
                   {editRevisionProducts.map((item, idx) => {
-                    const subtotal = (item.qty || 0) * (item.unit_price || 0);
-                    const taxPct =
-                      parseFloat(String(item.tax_percentage ?? "0")) || 0;
-                    const stdPct =
-                      parseFloat(
-                        String(item.standard_discount_percentage ?? "0"),
-                      ) || 0;
-                    const specPct =
-                      parseFloat(
-                        String(item.special_discount_percentage ?? "0"),
-                      ) || 0;
-                    const discPct = stdPct + specPct;
-                    const disc = (subtotal * discPct) / 100;
-                    const afterDisc = subtotal - disc;
-                    const tax = (afterDisc * taxPct) / 100;
-                    const lineTotal = afterDisc + tax;
+                    const { lineTotal } = getRevisionProductLineTotal(item);
                     return (
                       <tr key={idx}>
                         <td>
@@ -2521,27 +2547,8 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
 
             {editRevisionProducts.length > 0 &&
               (() => {
-                const subtotalAll = editRevisionProducts.reduce(
-                  (s, i) => s + (i.qty || 0) * (i.unit_price || 0),
-                  0,
-                );
-                let totalDiscount = 0;
-                let totalTax = 0;
-                editRevisionProducts.forEach((i) => {
-                  const st = (i.qty || 0) * (i.unit_price || 0);
-                  const stdPct =
-                    parseFloat(String(i.standard_discount_percentage ?? "0")) ||
-                    0;
-                  const specPct =
-                    parseFloat(String(i.special_discount_percentage ?? "0")) ||
-                    0;
-                  const taxPct =
-                    parseFloat(String(i.tax_percentage ?? "0")) || 0;
-                  const disc = (st * (stdPct + specPct)) / 100;
-                  const afterDisc = st - disc;
-                  totalDiscount += disc;
-                  totalTax += (afterDisc * taxPct) / 100;
-                });
+                const { subtotalAll, totalDiscount, totalTax } =
+                  getRevisionProductsTotals(editRevisionProducts);
                 const grandTotal = subtotalAll - totalDiscount + totalTax;
                 return (
                   <Card className="bg-light border-0">
