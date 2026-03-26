@@ -1181,7 +1181,9 @@ const StagesManagement = () => {
         submitButtonText="Create Stage"
         cancelButtonText="Cancel"
         onSubmit={() => {
-          void handleSubmit(scaffoldFormEvent());
+          handleSubmit(scaffoldFormEvent()).catch((error: unknown) => {
+            consumeHandledApiError(error, "StagesManagement.createStageSubmit");
+          });
         }}
         onCancel={() => setShowCreateModal(false)}
         submitButtonVariant="primary"
@@ -1305,7 +1307,9 @@ const StagesManagement = () => {
         submitButtonText="Update Stage"
         cancelButtonText="Cancel"
         onSubmit={() => {
-          void handleUpdateStage(scaffoldFormEvent());
+          handleUpdateStage(scaffoldFormEvent()).catch((error: unknown) => {
+            consumeHandledApiError(error, "StagesManagement.updateStageSubmit");
+          });
         }}
         onCancel={handleCloseUpdateModal}
         submitButtonVariant="primary"
@@ -1354,7 +1358,15 @@ const StagesManagement = () => {
           >
             Cancel
           </Button>
-          <Button variant="success" onClick={() => void handleConfirmRestore()} disabled={restoring}>
+          <Button
+            variant="success"
+            onClick={() => {
+              handleConfirmRestore().catch((error: unknown) => {
+                consumeHandledApiError(error, "StagesManagement.restoreStageSubmit");
+              });
+            }}
+            disabled={restoring}
+          >
             {restoring ? "Restoring…" : "Restore"}
           </Button>
         </Modal.Footer>

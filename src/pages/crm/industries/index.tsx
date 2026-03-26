@@ -24,7 +24,6 @@ import GenericTable, {
 import {
   Button,
   Form,
-  Card,
   Modal,
   Badge,
   Spinner,
@@ -118,12 +117,6 @@ const IndustriesPage = () => {
   useEffect(() => {
     fetchIndustries();
   }, [pagination.currentPage, pagination.perPage, search]);
-
-  // Handle search
-  const handleSearch = () => {
-    setPagination({ ...pagination, currentPage: 1 });
-    fetchIndustries();
-  };
 
   // Handle open modal
   const handleOpenModal = (industry?: IndustryData) => {

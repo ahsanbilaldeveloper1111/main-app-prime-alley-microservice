@@ -312,7 +312,7 @@ const ProductsPage = () => {
 
   const industryFilterDropdownContent = useMemo(
     () => (
-      <div
+      <Form
         style={{ minWidth: "240px" }}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -345,14 +345,14 @@ const ProductsPage = () => {
           isDisabled={loadingIndustries}
           isClearable
         />
-      </div>
+      </Form>
     ),
     [customSelectStyles, industries, loadingIndustries, productsFilters.industry_id],
   );
 
   const categoryFilterDropdownContent = useMemo(
     () => (
-      <div
+      <Form
         style={{ minWidth: "240px" }}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -380,7 +380,7 @@ const ProductsPage = () => {
           styles={customSelectStyles}
           isClearable
         />
-      </div>
+      </Form>
     ),
     [customSelectStyles, productsFilters.category, uniqueCategories],
   );
@@ -1333,11 +1333,6 @@ const ProductsPage = () => {
                   onMouseOut={handleHoverLeave}
                   onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") e.preventDefault();
-                  }}
                 >
                   <div
                     style={{

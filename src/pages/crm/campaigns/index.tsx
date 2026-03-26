@@ -232,7 +232,10 @@ function campaignFieldRowKey(
   index: number,
 ): string {
   if (field.id != null && field.id !== "") {
-    const idStr = typeof field.id !== "object" ? String(field.id as string | number | boolean | bigint) : JSON.stringify(field.id);
+    const idStr =
+      typeof field.id === "object"
+        ? JSON.stringify(field.id)
+        : String(field.id as string | number | boolean | bigint);
     return `campaign-field-${idStr}`;
   }
   return `campaign-field-new-${field.field_name ?? "unnamed"}-${field.field_type ?? "na"}-${field.sort_order ?? index}-${index}`;
