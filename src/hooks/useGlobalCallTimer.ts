@@ -7,6 +7,8 @@ interface CallTimerData {
   isActive: boolean
 }
 
+type TimerProvidedStartTime = Date | string | null | undefined
+
 class GlobalCallTimerManager {
   private static instance: GlobalCallTimerManager
   private readonly timers: Map<string, CallTimerData> = new Map()
@@ -20,7 +22,7 @@ class GlobalCallTimerManager {
     return GlobalCallTimerManager.instance
   }
 
-  startTimer(dn: string, callback: (time: string) => void, providedStartTime?: Date | string | null, forceNew?: boolean) {
+  startTimer(dn: string, callback: (time: string) => void, providedStartTime?: TimerProvidedStartTime, forceNew?: boolean) {
     let startTime: Date
     const existingTimer = this.timers.get(dn)
     

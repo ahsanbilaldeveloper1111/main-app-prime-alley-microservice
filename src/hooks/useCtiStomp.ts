@@ -100,6 +100,27 @@ const generateInstanceId = () => {
     .substring(2, 11)}`;
 };
 
+type PrimarySseDispatchCtxFactoryArgs = Omit<
+  PrimarySseDispatchCtx,
+  "getInstanceId" | "attemptReconnection"
+> & {
+  instanceIdRef: { current: string };
+  runAttemptReconnection: () => void | Promise<void>;
+};
+
+function buildPrimarySseDispatchCtx(
+  args: PrimarySseDispatchCtxFactoryArgs,
+): PrimarySseDispatchCtx {
+  const { instanceIdRef, runAttemptReconnection, ...ctxBase } = args;
+  return {
+    ...ctxBase,
+    getInstanceId: () => instanceIdRef.current,
+    attemptReconnection: () => {
+      void runAttemptReconnection();
+    },
+  } as PrimarySseDispatchCtx;
+}
+
 // Shared connection refs for global instance (singleton pattern)
 // All hook instances with 'global-cti-instance' share these refs
 const globalConnectionRefs = {
@@ -1036,29 +1057,29 @@ export default function useCtiStomp(
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          const sseCtx = {
-            currentInstanceId,
-            getInstanceId: () => instanceIdRef.current,
-            isGlobalInstance,
-            crossTabManagerRef,
-            lastMessageTimeRef,
-            setDnsMap,
-            setEventLog,
-            setError,
-            setIsInitialized,
-            isReconnectingRef,
-            setIsReconnecting,
-            attemptReconnection: () => {
-              void attemptReconnection();
-            },
-            scheduleRefreshAfterCallEndRef,
-            hasRequestedInitialStateRef,
-            publishStompMessageRef,
-            handleCallEventRef,
-            groupDevicesByDnAndDeviceNameRef,
-            updateSummaryDataRef,
-          };
-          dispatchPrimaryCtiSsePayload(data, sseCtx as PrimarySseDispatchCtx);
+          dispatchPrimaryCtiSsePayload(
+            data,
+            buildPrimarySseDispatchCtx({
+              currentInstanceId,
+              instanceIdRef,
+              isGlobalInstance,
+              crossTabManagerRef,
+              lastMessageTimeRef,
+              setDnsMap,
+              setEventLog,
+              setError,
+              setIsInitialized,
+              isReconnectingRef,
+              setIsReconnecting,
+              runAttemptReconnection: attemptReconnection,
+              scheduleRefreshAfterCallEndRef,
+              hasRequestedInitialStateRef,
+              publishStompMessageRef,
+              handleCallEventRef,
+              groupDevicesByDnAndDeviceNameRef,
+              updateSummaryDataRef,
+            } as PrimarySseDispatchCtxFactoryArgs),
+          );
         } catch (error) {
           console.warn("[useCtiStomp] SSE message parse/handle failed", error);
         }
