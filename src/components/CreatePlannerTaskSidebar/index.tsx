@@ -183,6 +183,37 @@ function formatDateForInput(dateString: string | null | undefined): string {
   }
 }
 
+/** Local calendar today as YYYY-MM-DD for `<input type="date" min>`. */
+function todayLocalIsoDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Earliest allowed due date: not before today, and not before start date when set.
+ * ISO date strings compare lexicographically.
+ */
+function minDueDateFromTodayAndStart(startDate: string): string {
+  const today = todayLocalIsoDate();
+  const start = startDate?.trim() ?? "";
+  if (!start) return today;
+  const later = [today, start].sort((a, b) => a.localeCompare(b));
+  return later.at(-1) ?? today;
+}
+
+function clampDueDateToMin(dueDate: string, minStr: string): string {
+  if (!dueDate.trim()) return dueDate;
+  return dueDate < minStr ? minStr : dueDate;
+}
+
+function mergeFormDataWithDueDateClamp(data: CreateTaskFormData): CreateTaskFormData {
+  const min = minDueDateFromTodayAndStart(data.startDate);
+  return { ...data, dueDate: clampDueDateToMin(data.dueDate, min) };
+}
+
 function resolveExtensionUserId(extensions: Extension[], extRef: string | undefined): number {
   if (extRef == null || extRef === "") return Number.NaN;
   const extension = extensions.find(
@@ -642,7 +673,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       ) {
         return;
       }
-      setFormData(getInitialFormData());
+      setFormData(mergeFormDataWithDueDateClamp(getInitialFormData()));
     } else {
       setSearchQuery("");
       setFormData({
@@ -836,6 +867,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         return false;
       }
     }
+    if (formData.dueDate.trim()) {
+      const minDue = minDueDateFromTodayAndStart(formData.startDate);
+      if (formData.dueDate < minDue) {
+        toast.error("Due date cannot be before today or before the start date");
+        return false;
+      }
+    }
     return true;
   };
 
@@ -985,6 +1023,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     marginBottom: 8,
   };
   const groupClass = "mb-3";
+  const dueDateMin = minDueDateFromTodayAndStart(formData.startDate);
 
   return (
     <>
@@ -1516,9 +1555,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   <Form.Control
                     type="date"
                     value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startDate: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setFormData((prev) => {
+                        const minDue = minDueDateFromTodayAndStart(newStart);
+                        const nextDue = clampDueDateToMin(prev.dueDate, minDue);
+                        return { ...prev, startDate: newStart, dueDate: nextDue };
+                      });
+                    }}
                     className="py-2"
                     style={{ fontSize: "14px" }}
                   />
@@ -1528,14 +1572,19 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
                     <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    End Date
+                    Due Date
                   </Form.Label>
                   <Form.Control
                     type="date"
+                    min={dueDateMin}
                     value={formData.dueDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dueDate: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFormData((prev) => ({
+                        ...prev,
+                        dueDate: v ? clampDueDateToMin(v, minDueDateFromTodayAndStart(prev.startDate)) : "",
+                      }));
+                    }}
                     className="py-2"
                     style={{ fontSize: "14px" }}
                   />

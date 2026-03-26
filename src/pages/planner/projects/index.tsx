@@ -5,19 +5,17 @@
  * 1. Added expandable project rows that show tasks when clicked (chevron arrow)
  * 2. Tasks can also be expanded to show their subtasks
  * 3. Hovering on a task row shows a "Preview" button that opens a task detail sidebar
- * 4. Added DUMMY DATA section (search for "// === DUMMY DATA ===" to find it)
- *    - Replace `getDummyTasksForProject()` with your real API call (e.g. getTasks(projectId))
- *    - The `TaskRow` and `SubtaskRow` components render the expandable rows
- * 5. A new `<TaskDetailPanel>` Offcanvas sidebar shows task details on Preview/click
- * 
- * HOW TO INTEGRATE WITH REAL DATA:
- * - Search for "NOTE: REPLACE WITH REAL API" comments
- * - The `expandedProjects` state tracks which project rows are open
- * - The `projectTasks` state is a map of { [projectId]: Task[] }
- * - When a project row is expanded, call your real tasks API and store in `projectTasks`
+ * 4. Expanding a project row loads tasks via `getProject` (same relations as project detail).
+ * 5. A `<TaskDetailPanel>` Offcanvas sidebar shows task details on Preview/click
  */
 
-import React, { ReactElement, useCallback, useEffect, useState } from "react";
+import React, {
+  ReactElement,
+  useCallback,
+  useEffect,
+  useState,
+  type ComponentProps,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
@@ -29,9 +27,14 @@ import {
   updateProject,
   deleteProject,
   getProject,
+  getTask,
   getRecentActivity,
   getOverdueTasks,
 } from "@utils/tasks";
+import {
+  WORK_PLANNER_PROJECT_DETAIL_RELATIONS,
+  WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS,
+} from "./workPlannerProjectRelations";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { ModuleSlug } from "@utils/Helper";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
@@ -50,6 +53,7 @@ import {
   Button,
   Col,
   Container,
+  Dropdown,
   Form,
   Nav,
   Modal,
@@ -84,7 +88,7 @@ import {
   Clock,
   Eye,
 } from "lucide-react";
-
+import { usePermissions } from '@utils/permissionUtils';
 // ============================================================
 // TYPE DEFINITIONS
 // ============================================================
@@ -145,13 +149,6 @@ const coerceProjectStatusFilter = (value: unknown): ProjectStatusFilter => {
   return "active";
 };
 
-// ============================================================
-// === DUMMY DATA ===
-// NOTE: REPLACE WITH REAL API - Remove this section when integrating real tasks
-// Replace calls to `getDummyTasksForProject(projectId)` with your actual API
-// e.g., const tasks = await getTasks(projectId, { with: ['subtasks', 'assignees'] })
-// ============================================================
-
 export interface SubTask {
   id: string;
   title: string;
@@ -176,100 +173,95 @@ export interface Task {
   totalSubtasks?: number;
 }
 
-const DUMMY_TASKS: Record<string, Task[]> = {
-  // Key is project ID (string). Add tasks for any project ID here.
-  // When integrating real data, this entire object can be removed.
-  default: [
-    {
-      id: "task-1",
-      projectId: "default",
-      title: "Project kickoff meeting",
-      status: "done",
-      priority: "high",
-      assignee: "John D.",
-      dueDate: "2025-01-10",
-      description: "Initial meeting to align all stakeholders on project goals and timeline.",
-      labels: ["meeting", "planning"],
-      subtasks: [
-        { id: "sub-1-1", title: "Prepare agenda", status: "done", assignee: "John D.", dueDate: "2025-01-08" },
-        { id: "sub-1-2", title: "Send invites to stakeholders", status: "done", assignee: "Jane S.", dueDate: "2025-01-09" },
-        { id: "sub-1-3", title: "Book conference room", status: "done", assignee: "John D.", dueDate: "2025-01-09" },
-      ],
-    },
-    {
-      id: "task-2",
-      projectId: "default",
-      title: "Design system setup",
-      status: "in_progress",
-      priority: "high",
-      assignee: "Alice M.",
-      dueDate: "2025-02-15",
-      description: "Establish the design tokens, component library, and documentation.",
-      labels: ["design", "frontend"],
-      subtasks: [
-        { id: "sub-2-1", title: "Define color palette", status: "done", assignee: "Alice M.", dueDate: "2025-02-01" },
-        { id: "sub-2-2", title: "Create typography scale", status: "in_progress", assignee: "Alice M.", dueDate: "2025-02-10" },
-        { id: "sub-2-3", title: "Build button components", status: "todo", assignee: "Bob K.", dueDate: "2025-02-14" },
-        { id: "sub-2-4", title: "Document component usage", status: "todo", assignee: "Bob K.", dueDate: "2025-02-15" },
-      ],
-    },
-    {
-      id: "task-3",
-      projectId: "default",
-      title: "Backend API development",
-      status: "in_progress",
-      priority: "urgent",
-      assignee: "Carlos R.",
-      dueDate: "2025-03-01",
-      description: "Develop RESTful API endpoints for the core product features.",
-      labels: ["backend", "api"],
-      subtasks: [
-        { id: "sub-3-1", title: "Auth endpoints (login, register)", status: "done", assignee: "Carlos R.", dueDate: "2025-02-05" },
-        { id: "sub-3-2", title: "User CRUD endpoints", status: "done", assignee: "Carlos R.", dueDate: "2025-02-10" },
-        { id: "sub-3-3", title: "Projects endpoints", status: "in_progress", assignee: "Diana L.", dueDate: "2025-02-20" },
-        { id: "sub-3-4", title: "Tasks endpoints", status: "todo", assignee: "Diana L.", dueDate: "2025-02-28" },
-      ],
-    },
-    {
-      id: "task-4",
-      projectId: "default",
-      title: "QA testing phase",
-      status: "overdue",
-      priority: "high",
-      assignee: "Eva P.",
-      dueDate: "2025-01-30",
-      description: "Comprehensive testing of all implemented features before release.",
-      labels: ["qa", "testing"],
-      subtasks: [],
-    },
-    {
-      id: "task-5",
-      projectId: "default",
-      title: "Deploy to staging",
-      status: "todo",
-      priority: "medium",
-      assignee: "Frank W.",
-      dueDate: "2025-03-10",
-      description: "Deploy the application to staging environment for final review.",
-      labels: ["devops"],
-      subtasks: [
-        { id: "sub-5-1", title: "Configure CI/CD pipeline", status: "todo", assignee: "Frank W.", dueDate: "2025-03-05" },
-        { id: "sub-5-2", title: "Set up environment variables", status: "todo", assignee: "Frank W.", dueDate: "2025-03-08" },
-      ],
-    },
-  ],
-};
+function mapApiPriorityToTaskPriority(raw: unknown): Task["priority"] {
+  const p = String(raw ?? "medium").toLowerCase();
+  if (p === "urgent") return "urgent";
+  if (p === "high") return "high";
+  if (p === "low") return "low";
+  if (p === "normal" || p === "medium") return "medium";
+  return "medium";
+}
 
-/**
- * NOTE: REPLACE WITH REAL API
- * Currently returns dummy tasks. Replace with:
- *   const response = await getTasks(projectId, { with: ['subtasks', 'assignees', 'labels'] })
- *   return response.data
- */
-const getDummyTasksForProject = (projectId: string): Task[] => {
-  // Return tasks specific to a projectId if defined, otherwise return defaults
-  return DUMMY_TASKS[projectId] || DUMMY_TASKS["default"];
-};
+function mapApiTaskToPlannerTask(
+  api: Record<string, unknown>,
+  projectId: string,
+  statuses: Array<Record<string, unknown>>,
+): Task {
+  const id = String(api.id ?? "");
+  const statusMap: Record<string, string> = {};
+  statuses.forEach((s) => {
+    if (s?.id != null && s.name != null) statusMap[String(s.id)] = String(s.name);
+  });
+
+  const statusNameFromApi = (): string => {
+    const st = api.status as { name?: string } | undefined;
+    if (st?.name) return String(st.name);
+    const sid = api.status_id != null ? String(api.status_id) : "";
+    return statusMap[sid] ?? "";
+  };
+
+  const statusName = statusNameFromApi().toLowerCase();
+  const isCompleted = Boolean(api.is_completed);
+  let dueRaw: string | undefined;
+  if (typeof api.due_date === "string") {
+    dueRaw = api.due_date;
+  } else if (api.due_date != null) {
+    dueRaw = String(api.due_date);
+  }
+
+  let rowStatus: Task["status"];
+  if (isCompleted) {
+    rowStatus = "done";
+  } else if (dueRaw) {
+    const due = new Date(dueRaw);
+    const dueValid = Number.isFinite(due.getTime());
+    const isPastDue = dueValid && due < new Date();
+    if (isPastDue) {
+      rowStatus = "overdue";
+    } else if (statusName.includes("progress")) {
+      rowStatus = "in_progress";
+    } else {
+      rowStatus = "todo";
+    }
+  } else if (statusName.includes("progress")) {
+    rowStatus = "in_progress";
+  } else {
+    rowStatus = "todo";
+  }
+
+  const assignees = (api.assignees as Array<Record<string, unknown>> | undefined) ?? [];
+  const first = assignees[0];
+  const user = first?.user as { name?: string; display_name?: string } | undefined;
+  const assignee =
+    user?.name || user?.display_name || (first?.extension_number as string | undefined);
+
+  const labelObjs = (api.labels as Array<{ name?: string }> | undefined) ?? [];
+  const labels = labelObjs.map((l) => l.name).filter((n): n is string => Boolean(n));
+
+  return {
+    id,
+    projectId,
+    title: String(api.title ?? ""),
+    description: typeof api.description === "string" ? api.description : "",
+    status: rowStatus,
+    priority: mapApiPriorityToTaskPriority(api.priority),
+    assignee,
+    dueDate: dueRaw,
+    labels: labels.length > 0 ? labels : undefined,
+    subtasks: undefined,
+  };
+}
+
+async function fetchTasksForExpandedProject(projectId: string): Promise<Task[]> {
+  const data = await getProject(projectId, Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS));
+  if (!data || typeof data !== "object") return [];
+  const payload = data as { tasks?: unknown[]; statuses?: Array<Record<string, unknown>> };
+  const rawTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
+  const statuses = Array.isArray(payload.statuses) ? payload.statuses : [];
+  return rawTasks
+    .filter((t): t is Record<string, unknown> => t !== null && typeof t === "object")
+    .map((t) => mapApiTaskToPlannerTask(t, projectId, statuses));
+}
 
 // ============================================================
 // HELPER COMPONENTS
@@ -292,9 +284,10 @@ const priorityConfig = {
 interface TaskRowProps {
   task: Task;
   depth?: number;
-  onPreview: (task: Task) => void;
+  onPreview: (task: Task) => void | Promise<void>;
   expandedTasks: Set<string>;
   onToggleTask: (taskId: string) => void;
+  canPreviewEditTask: boolean;
 }
 
 /** Renders a single task row inside an expanded project, with optional subtask expansion */
@@ -304,6 +297,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
   onPreview,
   expandedTasks,
   onToggleTask,
+  canPreviewEditTask,
 }) => {
   const [hovered, setHovered] = useState(false);
   const isExpanded = expandedTasks.has(task.id);
@@ -311,6 +305,8 @@ const TaskRow: React.FC<TaskRowProps> = ({
   const status = statusConfig[task.status];
   const StatusIcon = status.icon;
   const indentLeft = depth * 24;
+
+  console.log("task", task);
 
   return (
     <>
@@ -358,12 +354,14 @@ const TaskRow: React.FC<TaskRowProps> = ({
             {/* Task title */}
             <button
               type="button"
-              onClick={() => onPreview(task)}
+              onClick={() => {
+                if (canPreviewEditTask) void onPreview(task);
+              }}
               style={{
                 fontSize: "0.875rem",
                 color: "#334155",
                 fontWeight: 500,
-                cursor: "pointer",
+                cursor: canPreviewEditTask ? "pointer" : "default",
                 textDecoration: task.status === "done" ? "line-through" : "none",
                 opacity: task.status === "done" ? 0.6 : 1,
                 background: "none",
@@ -413,7 +411,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
             )}
 
             {/* Preview button on hover */}
-            {hovered && (
+            {hovered && canPreviewEditTask && (
               <button
                 onClick={(e) => { e.stopPropagation(); onPreview(task); }}
                 style={{
@@ -435,7 +433,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
                 }}
               >
                 <Eye size={12} />
-                Preview
+                Preview/Edit
               </button>
             )}
           </div>
@@ -496,22 +494,26 @@ const TaskRow: React.FC<TaskRowProps> = ({
       {isExpanded &&
         hasSubtasks &&
         task.subtasks!.map((sub) => (
-          <SubtaskRow key={sub.id} subtask={sub} depth={depth + 1} onPreview={() => {
-            // NOTE: REPLACE WITH REAL API - open subtask preview
-            // For now, cast subtask to Task shape for the preview panel
-            onPreview({
-              id: sub.id,
-              projectId: task.projectId,
-              title: sub.title,
-              status: sub.status,
-              priority: "medium",
-              assignee: sub.assignee,
-              dueDate: sub.dueDate,
-              description: sub.title,
-              subtasks: [],
-              labels: [],
-            });
-          }} />
+          <SubtaskRow
+            key={sub.id}
+            subtask={sub}
+            depth={depth + 1}
+            canPreviewEditTask={canPreviewEditTask}
+            onPreview={() => {
+              onPreview({
+                id: sub.id,
+                projectId: task.projectId,
+                title: sub.title,
+                status: sub.status,
+                priority: "medium",
+                assignee: sub.assignee,
+                dueDate: sub.dueDate,
+                description: sub.title,
+                subtasks: [],
+                labels: [],
+              });
+            }}
+          />
         ))}
     </>
   );
@@ -521,14 +523,21 @@ interface SubtaskRowProps {
   subtask: SubTask;
   depth: number;
   onPreview: () => void;
+  canPreviewEditTask: boolean;
 }
 
 /** Renders a subtask row (leaf node, no further expansion) */
-const SubtaskRow: React.FC<SubtaskRowProps> = ({ subtask, depth, onPreview }) => {
+const SubtaskRow: React.FC<SubtaskRowProps> = ({
+  subtask,
+  depth,
+  onPreview,
+  canPreviewEditTask,
+}) => {
   const [hovered, setHovered] = useState(false);
   const status = statusConfig[subtask.status];
   const StatusIcon = status.icon;
   const indentLeft = depth * 24;
+  console.log("subtask", subtask);
 
   return (
     <tr
@@ -548,13 +557,15 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({ subtask, depth, onPreview }) =>
           <StatusIcon size={13} style={{ color: status.color, flexShrink: 0 }} />
           <button
             type="button"
-            onClick={onPreview}
+            onClick={() => {
+              if (canPreviewEditTask) onPreview();
+            }}
             style={{
               fontSize: "0.825rem",
               color: "#475569",
               textDecoration: subtask.status === "done" ? "line-through" : "none",
               opacity: subtask.status === "done" ? 0.55 : 1,
-              cursor: "pointer",
+              cursor: canPreviewEditTask ? "pointer" : "default",
               background: "none",
               border: "none",
               padding: 0,
@@ -565,7 +576,7 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({ subtask, depth, onPreview }) =>
           </button>
 
           {/* Preview button on hover */}
-          {hovered && (
+          {hovered && canPreviewEditTask && (
             <button
               onClick={(e) => { e.stopPropagation(); onPreview(); }}
               style={{
@@ -861,18 +872,61 @@ interface ExpandableProjectTableProps {
   actions: TableAction<Project>[];
 }
 
-type PlannerSidebarTaskAssignee = { extension_number: string };
-type PlannerSidebarTaskPriority = "low" | "normal" | "high" | "urgent";
-type PlannerSidebarTask = {
-  id: string;
-  title: string;
-  description: string;
-  priority: PlannerSidebarTaskPriority;
-  due_date: string;
-  type: "regular";
-  project_id?: number;
-  assignees: PlannerSidebarTaskAssignee[];
-};
+type CreatePlannerSidebarTaskProp = NonNullable<
+  ComponentProps<typeof CreateTaskSidebar>["task"]
+>;
+
+/** `project` prop shape for `CreatePlannerTaskSidebar` (numeric API project id). */
+function mapTableProjectToPlannerSidebarProject(row: Project): {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+  statuses?: ApiProject["statuses"];
+  labels?: ApiProject["labels"];
+} {
+  if (row.apiData) {
+    return {
+      id: row.apiData.id,
+      name: row.apiData.name,
+      icon: "",
+      color: row.apiData.color || "#3b82f6",
+      statuses: row.apiData.statuses,
+      labels: row.apiData.labels,
+    };
+  }
+  const id = Number(row.id);
+  return {
+    id: Number.isFinite(id) ? id : 0,
+    name: row.name,
+    icon: "",
+    color: row.iconColor || "#3b82f6",
+  };
+}
+
+function mapGetTaskResponseToSidebarEditTask(
+  api: Record<string, unknown>,
+): CreatePlannerSidebarTaskProp {
+  const id = api.id;
+  return {
+    ...api,
+    rawData: { id: id ?? undefined },
+  } as CreatePlannerSidebarTaskProp;
+}
+
+function projectIdFromSidebarEditTask(
+  task: CreatePlannerSidebarTaskProp | null | undefined,
+): number | null {
+  if (task == null || typeof task !== "object") return null;
+  const t = task as Record<string, unknown>;
+  const pid = t.project_id;
+  if (typeof pid === "number" && Number.isFinite(pid)) return pid;
+  const proj = t.project as { id?: unknown } | undefined;
+  if (proj != null && typeof proj === "object" && typeof proj.id === "number") {
+    return proj.id;
+  }
+  return null;
+}
 
 /**
  * ExpandableProjectTable
@@ -884,10 +938,7 @@ type PlannerSidebarTask = {
  * NOTE: Since GenericTable doesn't natively support tree/nested rows, we render
  * a custom table body and pass it as `customBody` to GenericTable's card wrapper.
  * The toolbar and pagination are still handled by GenericTable.
- *
- * NOTE: REPLACE WITH REAL API
- * In `handleToggleProject`, replace `getDummyTasksForProject(project.id)`
- * with your real API: `const tasks = await getTasks(project.id, { with: ['subtasks'] })`
+ * Expanding a row loads tasks via `getProject` + `WORK_PLANNER_PROJECT_DETAIL_RELATIONS`.
  */
 const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   projects,
@@ -905,6 +956,8 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   columns,
   actions,
 }) => {
+  const { hasPermission } = usePermissions();
+  const canPreviewEditTask = hasPermission("edit-tasks-work-planner");
   // Track which project rows are expanded
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   // Cache of loaded tasks per project { [projectId]: Task[] }
@@ -913,9 +966,14 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   // Loading state per project
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
-  // Selected task for CreateTaskSidebar
-  const [editingTask, setEditingTask] = useState<PlannerSidebarTask | null>(null);
+  /** Task payload for edit mode — always loaded via `getTask`, never from the table row cache. */
+  const [fetchedEditTask, setFetchedEditTask] = useState<CreatePlannerSidebarTaskProp | null>(null);
+  const [loadingSidebarEditTask, setLoadingSidebarEditTask] = useState(false);
+  /** When set, sidebar opens in create mode for this table row’s project. */
+  const [createTaskForProject, setCreateTaskForProject] = useState<Project | null>(null);
   const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
+  /** Only one project row actions menu open at a time (controlled Dropdown). */
+  const [openProjectActionsId, setOpenProjectActionsId] = useState<string | null>(null);
 
   const buildSelectedProjectsFromIds = (selectedIds: Set<string>): Project[] => {
     const selected: Project[] = [];
@@ -936,6 +994,23 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
     onSelectionChange(checked ? projects : []);
   };
 
+  const fetchAndStoreProjectTasks = async (projectId: string) => {
+    setLoadingTasks((prev) => new Set(prev).add(projectId));
+    try {
+      const tasks = await fetchTasksForExpandedProject(projectId);
+      setProjectTasks((prev) => ({ ...prev, [projectId]: tasks }));
+    } catch (err) {
+      console.error("[WorkPlannerProjects] Failed to load tasks for project", projectId, err);
+      setProjectTasks((prev) => ({ ...prev, [projectId]: [] }));
+    } finally {
+      setLoadingTasks((prev) => {
+        const next = new Set(prev);
+        next.delete(projectId);
+        return next;
+      });
+    }
+  };
+
   const handleToggleProject = async (project: Project, e: React.MouseEvent) => {
     e.stopPropagation();
     const projectId = project.id;
@@ -946,26 +1021,11 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       newSet.delete(projectId);
       setExpandedProjects(newSet);
     } else {
-      // Expand — load tasks if not already cached
+      // Expand — always refetch so reopening a row shows up-to-date tasks
       const newSet = new Set(expandedProjects);
       newSet.add(projectId);
       setExpandedProjects(newSet);
-
-      if (!projectTasks[projectId]) {
-        setLoadingTasks((prev) => new Set(prev).add(projectId));
-
-        // NOTE: REPLACE WITH REAL API
-        // const response = await getTasks(projectId, { with: ['subtasks', 'assignees', 'labels'] });
-        // const tasks = response.data;
-        const tasks = getDummyTasksForProject(projectId);
-
-        setProjectTasks((prev) => ({ ...prev, [projectId]: tasks }));
-        setLoadingTasks((prev) => {
-          const next = new Set(prev);
-          next.delete(projectId);
-          return next;
-        });
-      }
+      await fetchAndStoreProjectTasks(projectId);
     }
   };
 
@@ -979,18 +1039,30 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
     setExpandedTasks(newSet);
   };
 
-  const handlePreviewTask = (task: Task) => {
-    const sidebarTask: PlannerSidebarTask = {
-      id: task.id,
-      title: task.title,
-      description: task.description || "",
-      priority: task.priority === "medium" ? "normal" : task.priority,
-      due_date: task.dueDate || "",
-      type: "regular",
-      project_id: Number(task.projectId) || undefined,
-      assignees: task.assignee ? [{ extension_number: task.assignee }] : [],
-    };
-    setEditingTask(sidebarTask);
+  const handlePreviewTask = async (task: Task) => {
+    if (loadingSidebarEditTask) return;
+    setCreateTaskForProject(null);
+    setFetchedEditTask(null);
+    setLoadingSidebarEditTask(true);
+    try {
+      const raw = await getTask(task.id, Array.from(WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS));
+      if (raw == null || typeof raw !== "object") {
+        return;
+      }
+      setFetchedEditTask(
+        mapGetTaskResponseToSidebarEditTask(raw as Record<string, unknown>),
+      );
+      setShowCreateTaskSidebar(true);
+    } catch (err) {
+      console.error("[WorkPlannerProjects] getTask failed for sidebar edit", task.id, err);
+    } finally {
+      setLoadingSidebarEditTask(false);
+    }
+  };
+
+  const handleOpenCreateTaskForExpandedProject = (projectRow: Project) => {
+    setFetchedEditTask(null);
+    setCreateTaskForProject(projectRow);
     setShowCreateTaskSidebar(true);
   };
 
@@ -1116,38 +1188,52 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           <td className="generic-table-actions-cell" onClick={(e) => e.stopPropagation()}>
             <div className="generic-table-actions">
               <div>
-                <div className="dropdown">
-                  <button
-                    className="btn btn-link btn-sm p-1 dropdown-toggle"
-                    type="button"
-                    data-bs-toggle="dropdown"
-                    aria-expanded="false"
+                <Dropdown
+                  show={openProjectActionsId === project.id}
+                  onToggle={(nextShow) => {
+                    setOpenProjectActionsId((prev) => {
+                      if (nextShow) return project.id;
+                      return prev === project.id ? null : prev;
+                    });
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Dropdown.Toggle
+                    variant="link"
+                    size="sm"
+                    className="p-1 text-decoration-none shadow-none"
                     style={{ color: "#6b7280" }}
+                    id={`project-row-actions-${project.id}`}
                   >
                     <MoreVertical size={16} />
-                  </button>
-                  <ul className="dropdown-menu dropdown-menu-end">
-                    <li>
-                      <button
-                        className="dropdown-item"
-                        onClick={() => onEditProject(project)}
-                      >
-                        <Settings size={14} className="me-2" />
-                        Edit Project
-                      </button>
-                    </li>
-                    <li><hr className="dropdown-divider" /></li>
-                    <li>
-                      <button
-                        className="dropdown-item text-danger"
-                        onClick={() => onDeleteProject(project)}
-                      >
-                        <Trash2 size={14} className="me-2" />
-                        Delete Project
-                      </button>
-                    </li>
-                  </ul>
-                </div>
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu align="end">
+                    <Dropdown.Item
+                      as="button"
+                      type="button"
+                      onClick={() => {
+                        setOpenProjectActionsId(null);
+                        onEditProject(project);
+                      }}
+                    >
+                      <Settings size={14} className="me-2" />
+                      Edit Project
+                    </Dropdown.Item>
+                    <Dropdown.Divider />
+                    <Dropdown.Item
+                      as="button"
+                      type="button"
+                      className="text-danger"
+                      onClick={() => {
+                        setOpenProjectActionsId(null);
+                        onDeleteProject(project);
+                      }}
+                    >
+                      <Trash2 size={14} className="me-2" />
+                      Delete Project
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
               </div>
             </div>
           </td>
@@ -1183,6 +1269,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                 onPreview={handlePreviewTask}
                 expandedTasks={expandedTasks}
                 onToggleTask={handleToggleTask}
+                canPreviewEditTask={canPreviewEditTask}
               />
             );
           });
@@ -1204,8 +1291,10 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                   gap: 4,
                   padding: "4px 0",
                 }}
-                // NOTE: wire to create task flow for this project
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenCreateTaskForExpandedProject(project);
+                }}
               >
                 <Plus size={14} />
                 Add task
@@ -1225,16 +1314,32 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         isOpen={showCreateTaskSidebar}
         onClose={() => {
           setShowCreateTaskSidebar(false);
-          setEditingTask(null);
+          setFetchedEditTask(null);
+          setCreateTaskForProject(null);
         }}
-        onCreate={async () => {
+        onCreate={async (data) => {
+          const projectIdNum =
+            data.projectId ??
+            projectIdFromSidebarEditTask(fetchedEditTask) ??
+            createTaskForProject?.apiData?.id ??
+            null;
+          if (projectIdNum != null) {
+            const projectIdStr = String(projectIdNum);
+            if (expandedProjects.has(projectIdStr)) {
+              await fetchAndStoreProjectTasks(projectIdStr);
+            }
+          }
           setShowCreateTaskSidebar(false);
-          setEditingTask(null);
+          setFetchedEditTask(null);
+          setCreateTaskForProject(null);
         }}
         extensions={extensions}
-        labels={[]}
-        task={editingTask}
-        isEdit={!!editingTask}
+        labels={createTaskForProject?.apiData?.labels ?? []}
+        project={
+          createTaskForProject ? mapTableProjectToPlannerSidebarProject(createTaskForProject) : undefined
+        }
+        task={fetchedEditTask ?? undefined}
+        isEdit={!!fetchedEditTask}
         taskType="regular"
       />
 

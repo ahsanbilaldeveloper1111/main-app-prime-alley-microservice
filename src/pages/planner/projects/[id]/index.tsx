@@ -12,6 +12,7 @@ import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import { Container, Spinner, Button } from "react-bootstrap";
 import { getProject } from "@utils/tasks";
+import { WORK_PLANNER_PROJECT_DETAIL_RELATIONS } from "../workPlannerProjectRelations";
 import ProjectTabsContent, { ProjectTabsContentRef } from "../partials/ProjectTabsContent";
 import { useRouter } from "next/router";
 import { ModuleSlug } from "@utils/Helper";
@@ -38,18 +39,10 @@ const WorkPlannerProjectsDetails = () => {
   const fetchProjectData = async () => {
     try {
       setLoading(true);
-      const withRelations = [
-        'statuses',
-        'statuses.tasks',
-        'members.user',
-        'tasks',
-        'tasks.assignees',
-        'tasks.labels',
-        'tasks.status',
-        'owner'
-      ];
-      
-      const projectData = await getProject(id as string, withRelations);
+      const projectData = await getProject(
+        id as string,
+        Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS),
+      );
 
       if (projectData) {
         setProject(projectData);
