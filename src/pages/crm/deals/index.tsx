@@ -966,7 +966,7 @@ const CrmDeals = () => {
           allData.flatMap((row) =>
             typeof row === "object" && row !== null
               ? Object.keys(row).filter((k) => {
-                  const value = (row as any)[k];
+                  const value = row[k];
                   return (
                     typeof value !== "object" &&
                     !usedPreferredKeys.has(k) &&
@@ -995,8 +995,18 @@ const CrmDeals = () => {
                   ? getRowValue(row as Record<string, any>, key)
                   : "";
               if (val == null) return "";
-              if (typeof val === "object") return "";
-              const s = String(val).replace(/"/g, '""');
+              let serialized = "";
+              switch (typeof val) {
+                case "string":
+                case "number":
+                case "boolean":
+                case "bigint":
+                  serialized = `${val}`;
+                  break;
+                default:
+                  return "";
+              }
+              const s = serialized.replaceAll('"', '""');
               return s.includes(",") || s.includes('"') ? `"${s}"` : s;
             })
             .join(","),
