@@ -4,7 +4,7 @@ import type { CtiDevice } from '@components/live-calls/utils/types'
 import { getDeviceTypeLabel } from '@components/live-calls/utils/helpers'
 import CallTimer from './CallTimer'
 import IdleTimer from './IdleTimer'
-import { hasUsableCallTimerStart } from '../../../../hooks/useGlobalCallTimer'
+import { hasUsableCallTimerStart } from '@hooks/useGlobalCallTimer'
 import {
   getCallStatusBadgeTheme,
   getMonitoringOrbColors,

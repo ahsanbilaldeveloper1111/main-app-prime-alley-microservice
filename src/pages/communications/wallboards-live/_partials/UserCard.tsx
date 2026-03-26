@@ -13,16 +13,16 @@ import {
   applyUserCardDeviceClick,
   computeUserCardMonitoringDerived,
   type MonitoringWithSessions,
-} from './userCardHelpers'
+} from '@components/communications/wallboards-live/userCardHelpers'
 import {
   UserCardSupervisionBadge,
   UserCardAgentStatusBadge,
   UserCardLiveCallBadgeColumn,
   UserCardDeviceOrbRow,
   UserCardCallDetailsSection,
-} from './UserCardParts'
-import { UserCardMonitoringToolbar } from './UserCardMonitoringToolbar'
-import { useUserCardExtensionData } from './useUserCardExtensionData'
+} from '@components/communications/wallboards-live/UserCardParts'
+import { UserCardMonitoringToolbar } from '@components/communications/wallboards-live/UserCardMonitoringToolbar'
+import { useUserCardExtensionData } from '@components/communications/wallboards-live/useUserCardExtensionData'
 
 type WallboardUserExtension = {
   team_name?: string[]
