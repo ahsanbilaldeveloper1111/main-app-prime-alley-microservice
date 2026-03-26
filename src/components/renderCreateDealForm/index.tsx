@@ -298,6 +298,19 @@ const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
   color: hasValue ? "#141414" : "#a0aec0",
 });
 
+const hoverBackgroundHandlers = (
+  enabled: boolean,
+  hoverColor: string,
+  defaultColor: string,
+) => ({
+  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (enabled) e.currentTarget.style.backgroundColor = hoverColor;
+  },
+  onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (enabled) e.currentTarget.style.backgroundColor = defaultColor;
+  },
+});
+
 // Simple reusable single-select dropdown
 const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   value,
@@ -324,8 +337,18 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
   </Dropdown>
 );
 
-const parsePercent = (value: unknown): number =>
-  Number.parseFloat(String(value ?? "0")) || 0;
+const parsePercent = (value: unknown): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+};
 
 const mapEstimateChartToLineItems = (
   chart: EstimateChartItem[],
@@ -888,7 +911,12 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
   return (
     <>
       {/* Overlay */}
-      <div onClick={onClose} style={OVERLAY_STYLE} />
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close create deal form"
+        style={OVERLAY_STYLE}
+      />
 
       {/* Sidebar */}
       <div style={SIDEBAR_STYLE}>
@@ -1984,46 +2012,65 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                         )}
                       </Dropdown.Menu>
                     </Dropdown>
-                    <input
-                      type="number"
-                      min={1}
-                      value={lineItemQty || ""}
-                      placeholder="0"
-                      onChange={(e) =>
-                        setLineItemQty(
-                          Number(e.target.value) ? Number(e.target.value) : 0,
-                        )
-                      }
-                      style={{ ...inputStyle, width: "70px" }}
-                      onFocus={focusStyle}
-                      onBlur={blurStyle}
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={lineItemTax || ""}
-                      placeholder="0"
-                      onChange={(e) => setLineItemTax(Number(e.target.value) || 0)}
-                      style={{ ...inputStyle, width: "70px" }}
-                      onFocus={focusStyle}
-                      onBlur={blurStyle}
-                    />
-                    <Form.Select
-                      value={lineItemDiscount ? String(lineItemDiscount) : ""}
-                      onChange={(e) =>
-                        setLineItemDiscount(
-                          e.target.value ? Number(e.target.value) : 0,
-                        )
-                      }
-                      style={{ ...inputStyle, width: "70px" }}
-                    >
-                      <option value="">Select</option>
-                      <option value="5">5</option>
-                      <option value="10">10</option>
-                      <option value="15">15</option>
-                    </Form.Select>
+                    {[
+                      {
+                        key: "qty",
+                        node: (
+                          <input
+                            type="number"
+                            min={1}
+                            value={lineItemQty || ""}
+                            placeholder="0"
+                            onChange={(e) =>
+                              setLineItemQty(
+                                Number(e.target.value) ? Number(e.target.value) : 0,
+                              )
+                            }
+                            style={{ ...inputStyle, width: "70px" }}
+                            onFocus={focusStyle}
+                            onBlur={blurStyle}
+                          />
+                        ),
+                      },
+                      {
+                        key: "tax",
+                        node: (
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={lineItemTax || ""}
+                            placeholder="0"
+                            onChange={(e) => setLineItemTax(Number(e.target.value) || 0)}
+                            style={{ ...inputStyle, width: "70px" }}
+                            onFocus={focusStyle}
+                            onBlur={blurStyle}
+                          />
+                        ),
+                      },
+                      {
+                        key: "discount",
+                        node: (
+                          <Form.Select
+                            value={lineItemDiscount ? String(lineItemDiscount) : ""}
+                            onChange={(e) =>
+                              setLineItemDiscount(
+                                e.target.value ? Number(e.target.value) : 0,
+                              )
+                            }
+                            style={{ ...inputStyle, width: "70px" }}
+                          >
+                            <option value="">Select</option>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                          </Form.Select>
+                        ),
+                      },
+                    ].map((field) => (
+                      <React.Fragment key={field.key}>{field.node}</React.Fragment>
+                    ))}
                     <button
                       type="button"
                       onClick={addLineItem}
@@ -2219,14 +2266,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               fontWeight: "500",
               cursor: isFormValid && !loading ? "pointer" : "not-allowed",
             }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-              if (isFormValid && !loading)
-                e.currentTarget.style.backgroundColor = "#007a94";
-            }}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-              if (isFormValid && !loading)
-                e.currentTarget.style.backgroundColor = "#0091ae";
-            }}
+            {...hoverBackgroundHandlers(
+              isFormValid && !loading,
+              "#007a94",
+              "#0091ae",
+            )}
           >
             {loading ? "Saving..." : isEditMode ? "Update Deal" : "Create"}
           </button>
@@ -2245,14 +2289,11 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                 fontWeight: "500",
                 cursor: isFormValid && !loading ? "pointer" : "not-allowed",
               }}
-              onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-                if (isFormValid && !loading)
-                  e.currentTarget.style.backgroundColor = "#f7fafc";
-              }}
-              onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-                if (isFormValid && !loading)
-                  e.currentTarget.style.backgroundColor = "transparent";
-              }}
+              {...hoverBackgroundHandlers(
+                isFormValid && !loading,
+                "#f7fafc",
+                "transparent",
+              )}
             >
               Create and add another
             </button>
@@ -2272,13 +2313,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               fontWeight: "500",
               cursor: loading ? "not-allowed" : "pointer",
             }}
-            onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
-              if (!loading) e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
-              if (!loading)
-                e.currentTarget.style.backgroundColor = "transparent";
-            }}
+            {...hoverBackgroundHandlers(!loading, "#f7fafc", "transparent")}
           >
             Cancel
           </button>
