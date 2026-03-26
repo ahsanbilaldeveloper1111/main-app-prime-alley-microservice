@@ -247,18 +247,25 @@ const ASSOCIATION_LABEL_OPTIONS = [
 ];
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+const FIELD_LABEL_STYLE: React.CSSProperties = {
+  display: "block",
+  fontSize: "14px",
+  fontWeight: "600",
+  color: "#141414",
+  marginBottom: "8px",
+};
+
+const REQUIRED_MARK_STYLE: React.CSSProperties = {
+  color: "#f2545b",
+  marginLeft: "2px",
+};
+
 const fieldLabel = (text: string, required: boolean = false) => (
   <label
-    style={{
-      display: "block",
-      fontSize: "14px",
-      fontWeight: "600",
-      color: "#141414",
-      marginBottom: "8px",
-    }}
+    style={FIELD_LABEL_STYLE}
   >
     {text}
-    {required && <span style={{ color: "#f2545b", marginLeft: "2px" }}>*</span>}
+    {required && <span style={REQUIRED_MARK_STYLE}>*</span>}
   </label>
 );
 
@@ -318,7 +325,7 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
 );
 
 const parsePercent = (value: unknown): number =>
-  parseFloat(String(value ?? "0")) || 0;
+  Number.parseFloat(String(value ?? "0")) || 0;
 
 const mapEstimateChartToLineItems = (
   chart: EstimateChartItem[],
@@ -341,7 +348,9 @@ const mapEstimateChartToLineItems = (
         : fallbackDiscount,
     product_id: item.product_id,
     unit_price:
-      item.unit_price != null ? parseFloat(String(item.unit_price)) : undefined,
+      item.unit_price == null
+        ? undefined
+        : Number.parseFloat(String(item.unit_price)),
     standard_discount_percentage:
       item.standard_discount_percentage != null
         ? parsePercent(item.standard_discount_percentage)
@@ -390,6 +399,60 @@ const getRevisionProductsTotals = (items: RevisionProductRow[]) =>
     },
     { subtotalAll: 0, totalDiscount: 0, totalTax: 0 },
   );
+
+const getProgressFlags = (deal: Record<string, unknown>) => ({
+  quotation_sent: Boolean(deal.quotation_sent),
+  contract_sent: Boolean(deal.contract_sent),
+  contract_received: Boolean(deal.contract_received),
+});
+
+const OVERLAY_STYLE: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 1000,
+  background: "transparent",
+};
+
+const SIDEBAR_STYLE: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  right: 0,
+  width: "600px",
+  height: "100vh",
+  backgroundColor: "#ffffff",
+  boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
+  zIndex: 1001,
+  display: "flex",
+  flexDirection: "column",
+};
+
+const SIDEBAR_HEADER_STYLE: React.CSSProperties = {
+  padding: "20px 24px",
+  borderBottom: "1px solid #eaf0f6",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+const SIDEBAR_TITLE_STYLE: React.CSSProperties = {
+  fontSize: "20px",
+  fontWeight: "600",
+  color: "#141414",
+  margin: 0,
+};
+
+const SIDEBAR_CLOSE_BUTTON_STYLE: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  padding: "4px",
+  cursor: "pointer",
+  color: "#718096",
+  display: "flex",
+  alignItems: "center",
+};
 
 // ─── Main renderCreateDeal ────────────────────────────────────────────────────
 
@@ -504,6 +567,8 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
           };
 
           const dealAny = deal as any;
+          const progressFlags = getProgressFlags(dealAny);
+
           setDealForm({
             ...initialDealForm,
             name: deal.name || "",
@@ -548,9 +613,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
             payment_terms_custom: deal.payment_terms_custom || "",
             risk_level: deal.risk_level || "",
             competitors: deal.competitors || "",
-            quotation_sent: deal.quotation_sent || false,
-            contract_sent: deal.contract_sent || false,
-            contract_received: deal.contract_received || false,
+            ...progressFlags,
             follow_up_date: formatDate(deal.follow_up_date),
             currency: deal.currency || "AED",
           });
@@ -825,66 +888,16 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
   return (
     <>
       {/* Overlay */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1000,
-          background: "transparent",
-        }}
-      />
+      <div onClick={onClose} style={OVERLAY_STYLE} />
 
       {/* Sidebar */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: "600px",
-          height: "100vh",
-          backgroundColor: "#ffffff",
-          boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
-          zIndex: 1001,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      <div style={SIDEBAR_STYLE}>
         {/* ── Header ── */}
-        <div
-          style={{
-            padding: "20px 24px",
-            borderBottom: "1px solid #eaf0f6",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "20px",
-              fontWeight: "600",
-              color: "#141414",
-              margin: 0,
-            }}
-          >
+        <div style={SIDEBAR_HEADER_STYLE}>
+          <h2 style={SIDEBAR_TITLE_STYLE}>
             {isEditMode ? "Edit Deal" : "Create Deal"}
           </h2>
-          <button
-            onClick={onClose}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "4px",
-              cursor: "pointer",
-              color: "#718096",
-              display: "flex",
-              alignItems: "center",
-            }}
-          >
+          <button onClick={onClose} style={SIDEBAR_CLOSE_BUTTON_STYLE}>
             <X size={24} />
           </button>
         </div>

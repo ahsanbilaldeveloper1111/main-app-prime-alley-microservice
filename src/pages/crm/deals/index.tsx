@@ -4938,7 +4938,7 @@ const CrmDeals = () => {
                                     .map(([key, value]: [string, any]) => (
                                       <DetailField
                                         key={key}
-                                        label={key.replace(/_/g, " ")}
+                                        label={key.replaceAll("_", " ")}
                                         value={String(value || "N/A")}
                                       />
                                     ))}
