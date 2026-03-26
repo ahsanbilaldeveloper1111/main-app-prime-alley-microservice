@@ -1,10 +1,47 @@
 import React, { useEffect, useRef } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import {
+  AlertCircle,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Eye,
+  HelpCircle,
+  Phone,
+  PhoneCall
+} from 'lucide-react'
 import { Card, Button, Badge } from 'react-bootstrap'
-import { ChevronRight, ChevronDown } from 'lucide-react'
 import { CtiDevice } from '@components/live-calls/utils/types'
 import UserCard from './UserCard'
-import { getSectionColor, getSectionIcon, getSectionTitle } from '@components/live-calls/utils/helpers'
-import { Eye, Phone, CheckCircle, AlertCircle, PhoneCall, Maximize2, ExternalLink, Volume2, Mic, Users, Headset, User, Bell, ChevronLeft, Menu, Search, Filter, ChevronUp, UserCheck, Clock, Timer, UserX, PhoneIncoming, Hourglass } from 'lucide-react';
+import { getSectionIcon, getSectionTitle } from '@components/live-calls/utils/helpers'
+
+const SECTION_HEADER_ACCENT: Record<string, string> = {
+  supervision: '#f59e0b',
+  onCall: '#22c55e',
+  activeIdle: '#6b7280',
+  downOffline: '#ef4444'
+}
+
+function sectionHeaderAccentColor(sectionKey: string): string {
+  return SECTION_HEADER_ACCENT[sectionKey] ?? '#6b7280'
+}
+
+const SECTION_ICONS_BY_NAME: Record<string, LucideIcon> = {
+  Eye,
+  Phone,
+  CheckCircle,
+  AlertCircle,
+  PhoneCall,
+  help: HelpCircle
+}
+
+function SectionHeaderGlyph({ iconName }: Readonly<{ iconName: string }>) {
+  const Icon = SECTION_ICONS_BY_NAME[iconName]
+  if (!Icon) {
+    return null
+  }
+  return <Icon size={20} />
+}
 
 interface SectionContainerProps {
   sectionKey: string
@@ -33,10 +70,26 @@ interface SectionContainerProps {
   onToggle: () => void
 }
 
-const SectionContainer: React.FC<SectionContainerProps> = ({
+function syncCollapseWithContent(
+  prevHasContent: boolean,
+  hasContent: boolean,
+  isCollapsed: boolean,
+  onToggle: () => void
+): void {
+  if (prevHasContent === hasContent) {
+    return
+  }
+  const shouldCollapse = !hasContent && !isCollapsed
+  const shouldExpand = hasContent && isCollapsed
+  if (shouldCollapse || shouldExpand) {
+    onToggle()
+  }
+}
+
+const SectionContainer: React.FC<Readonly<SectionContainerProps>> = ({
   sectionKey,
   sectionDns,
-  summaryData,
+  summaryData: _summaryData,
   animatingCards,
   cardAnimations,
   activeMonitoring,
@@ -63,35 +116,18 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
   const prevHasContentRef = useRef(hasContent)
 
   const sectionTitle = getSectionTitle(sectionKey)
-  const sectionIcon = getSectionIcon(sectionKey)
-  const sectionColor = getSectionColor(sectionKey)
+  const sectionIconName = getSectionIcon(sectionKey)
+  const headerAccent = sectionHeaderAccentColor(sectionKey)
+  const CollapseChevron = !hasContent || isCollapsed ? ChevronRight : ChevronDown
 
-  // Get icon color based on section
-  const iconColor = sectionKey === 'supervision' ? '#f59e0b' : 
-                    sectionKey === 'onCall' ? '#22c55e' : 
-                    sectionKey === 'activeIdle' ? '#6b7280' : 
-                    sectionKey === 'offline' ? '#ef4444' : '#ef4444'
-
-  // Auto-collapse section if no agents available, and auto-expand when content appears
   useEffect(() => {
     const prevHasContent = prevHasContentRef.current
     prevHasContentRef.current = hasContent
-
-    // Only trigger when hasContent changes
-    if (prevHasContent !== hasContent) {
-      if (!hasContent && !isCollapsed) {
-        // Collapse if content is removed
-        onToggle()
-      } else if (hasContent && isCollapsed) {
-        // Auto-expand when content appears
-        onToggle()
-      }
-    }
+    syncCollapseWithContent(prevHasContent, hasContent, isCollapsed, onToggle)
   }, [hasContent, isCollapsed, onToggle])
 
   return (
     <div className="mb-4" data-section={sectionKey}>
-      {/* Section Header */}
       <Card className="border-0 shadow-sm mb-0">
         <Card.Body className="p-3">
           <div className="d-flex justify-content-between align-items-center">
@@ -101,21 +137,16 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
               onClick={onToggle}
               style={{ fontSize: '1.1rem', fontWeight: '600' }}
             >
-              {(!hasContent || isCollapsed) ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
-              
-              <div style={{ 
-                      color: sectionKey === 'supervision' ? '#f59e0b' : 
-                             sectionKey === 'onCall' ? '#22c55e' : 
-                             sectionKey === 'activeIdle' ? '#6b7280' : 
-                             sectionKey === 'downOffline' ? '#ef4444' : '#6b7280'
-                    }}>
-                      {sectionIcon === 'Eye' ? <Eye size={20} /> : sectionIcon === 'Phone' ? <Phone size={20} /> : sectionIcon === 'CheckCircle' ? <CheckCircle size={20} /> : sectionIcon === 'AlertCircle' ? <AlertCircle size={20} /> : sectionIcon === 'PhoneCall' ? <PhoneCall size={20} /> : null}
-                    </div>
+              <CollapseChevron size={20} />
+
+              <div style={{ color: headerAccent }}>
+                <SectionHeaderGlyph iconName={sectionIconName} />
+              </div>
               <span>{sectionTitle}</span>
             </Button>
-            <Badge 
-              bg="light" 
-              text="dark" 
+            <Badge
+              bg="light"
+              text="dark"
               className="px-3 py-2 border"
               style={{ fontSize: '0.85rem', fontWeight: '600' }}
             >
@@ -125,27 +156,6 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
         </Card.Body>
       </Card>
 
-      {/* Progress Bar */}
-      {/* {!isCollapsed && sectionDns.length > 0 && (
-        <div className="progress-container mb-3">
-          <div className="progress" style={{ height: '6px', backgroundColor: '#e9ecef' }}>
-            <div 
-              className="progress-bar" 
-              role="progressbar" 
-              style={{ 
-                width: `${summaryData.extensions > 0 ? (sectionDns.length / summaryData.extensions) * 100 : 0}%`,
-                backgroundColor: sectionColor,
-                transition: 'width 0.3s ease'
-              }}
-              aria-valuenow={sectionDns.length}
-              aria-valuemin={0}
-              aria-valuemax={summaryData.extensions}
-            />
-          </div>
-        </div>
-      )} */}
-
-      {/* Section Content */}
       {hasContent && !isCollapsed && (
         <div className="row g-3 justify-content-left align-items-left m-0">
           {sectionDns.map(({ dn, devices: deviceList, call, active }) => (
@@ -184,4 +194,3 @@ const SectionContainer: React.FC<SectionContainerProps> = ({
 }
 
 export default SectionContainer
-
