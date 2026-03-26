@@ -82,6 +82,8 @@ function consumeHandledApiError(error: unknown, source: string): void {
 function sameExtensionId(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a === null || a === undefined || b === null || b === undefined) return false;
+  if (typeof a !== "string" && typeof a !== "number") return false;
+  if (typeof b !== "string" && typeof b !== "number") return false;
   return String(a) === String(b);
 }
 
@@ -230,7 +232,8 @@ function campaignFieldRowKey(
   index: number,
 ): string {
   if (field.id != null && field.id !== "") {
-    return `campaign-field-${String(field.id)}`;
+    const idStr = typeof field.id !== "object" ? String(field.id as string | number | boolean | bigint) : JSON.stringify(field.id);
+    return `campaign-field-${idStr}`;
   }
   return `campaign-field-new-${field.field_name ?? "unnamed"}-${field.field_type ?? "na"}-${field.sort_order ?? index}-${index}`;
 }
@@ -1047,11 +1050,10 @@ function useCrmCampaignBootstrapData(
   }, [setDealTemplates]);
 }
 
-function useCrmCampaignListQueryEffect(
-  listPermission: boolean,
-  refreshKey: number,
-  campaignsPagination: { currentPage: number; rowsPerPage: number; sortColumn: string; sortDirection: "asc" | "desc" },
-  memoizedFilters: Record<string, any>,
+type CrmCampaignListQueryParams = {
+  refreshKey: number;
+  campaignsPagination: { currentPage: number; rowsPerPage: number; sortColumn: string; sortDirection: "asc" | "desc" };
+  memoizedFilters: Record<string, any>;
   campaignFilters: {
     status: string[];
     dateFrom: string | null;
@@ -1059,14 +1061,25 @@ function useCrmCampaignListQueryEffect(
     userExtensions: string[] | null;
     hasUnassignedProspects: boolean | null;
     tags: string[] | null;
-  },
-  activeFilter: string,
-  campaignsSearch: string,
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>,
-  setCampaignsData: React.Dispatch<React.SetStateAction<any[]>>,
-  setMetrics: React.Dispatch<React.SetStateAction<CampaignMetrics>>,
-  setTotalCampaigns: React.Dispatch<React.SetStateAction<number>>,
+  };
+  activeFilter: string;
+  campaignsSearch: string;
+};
+
+type CrmCampaignListSetters = {
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setCampaignsData: React.Dispatch<React.SetStateAction<any[]>>;
+  setMetrics: React.Dispatch<React.SetStateAction<CampaignMetrics>>;
+  setTotalCampaigns: React.Dispatch<React.SetStateAction<number>>;
+};
+
+function useCrmCampaignListQueryEffect(
+  listPermission: boolean,
+  query: CrmCampaignListQueryParams,
+  setters: CrmCampaignListSetters,
 ) {
+  const { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch } = query;
+  const { setLoading, setCampaignsData, setMetrics, setTotalCampaigns } = setters;
   useEffect(() => {
     const loadCampaigns = async () => {
       try {
@@ -1279,16 +1292,8 @@ const CrmCampaigns = () => {
   const listCampaignsPermission = Boolean(session?.user?.permissions?.includes("list-crm-campaigns"));
   useCrmCampaignListQueryEffect(
     listCampaignsPermission,
-    refreshKey,
-    campaignsPagination,
-    memoizedFilters,
-    campaignFilters,
-    activeFilter,
-    campaignsSearch,
-    setLoading,
-    setCampaignsData,
-    setMetrics,
-    setTotalCampaigns,
+    { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch },
+    { setLoading, setCampaignsData, setMetrics, setTotalCampaigns },
   );
 
   // Modal handlers

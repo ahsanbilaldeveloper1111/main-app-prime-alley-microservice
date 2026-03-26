@@ -305,6 +305,17 @@ export interface GenericTableProps<T = any> {
   customBody?: React.ReactNode;
 }
 
+function safeStringifyValue(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean" || typeof val === "bigint") return String(val);
+  try {
+    return JSON.stringify(val);
+  } catch {
+    return "";
+  }
+}
+
 function truncateGtText(text: string | number, maxLength = 20): string {
   const str = String(text ?? "");
   if (str.length <= maxLength) return str;
@@ -398,7 +409,7 @@ function renderGenericTableCellContent<T extends Record<string, any>>(
 
   switch (column.type) {
     case "avatar": {
-      const name = String(value);
+      const name = safeStringifyValue(value);
       const displayName = truncateGtText(name, 20);
       const initials =
         column.avatar?.getInitials?.(row) ||
@@ -414,7 +425,7 @@ function renderGenericTableCellContent<T extends Record<string, any>>(
       );
     }
     case "badge": {
-      const badgeText = String(value);
+      const badgeText = safeStringifyValue(value);
       const truncatedBadgeText = truncateGtText(badgeText, 20);
       const badgeVariant = column.badge?.getVariant?.(row) || "secondary";
       const badgeColor = column.badge?.getColor?.(row);
@@ -435,7 +446,7 @@ function renderGenericTableCellContent<T extends Record<string, any>>(
     }
     case "multi-field": {
       if (!column.fields) {
-        return <span className="gt-text">{String(value)}</span>;
+        return <span className="gt-text">{safeStringifyValue(value)}</span>;
       }
       const primaryValue = String(row[column.fields.primary as keyof T] || "");
       const secondaryValue = column.fields.secondary
@@ -468,7 +479,7 @@ function renderGenericTableCellContent<T extends Record<string, any>>(
     case "phone":
       return value as React.ReactNode;
     case "date": {
-      const dateText = String(value);
+      const dateText = safeStringifyValue(value);
       const truncatedDate = truncateGtText(dateText, 20);
       return (
         <span className="gt-text" title={dateText}>
@@ -478,7 +489,7 @@ function renderGenericTableCellContent<T extends Record<string, any>>(
     }
     case "text":
     default: {
-      const textValue = String(value);
+      const textValue = safeStringifyValue(value);
       const truncatedText = truncateGtText(textValue, 20);
       return (
         <span className="gt-text" title={textValue}>

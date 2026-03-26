@@ -64,11 +64,21 @@ function templateIsDefault(template: DealTemplateData): boolean {
   return false;
 }
 
+
+
 function newLocalFieldId(): string {
-  const c = globalThis.crypto;
-  if (c !== undefined && "randomUUID" in c) {
-    return c.randomUUID();
+  const c = globalThis.crypto as Crypto | undefined;
+
+  if (c !== undefined) {
+    if ("randomUUID" in c) {
+      return c.randomUUID();
+    }
+    if ("getRandomValues" in c) {
+      const bytes = (c as Crypto).getRandomValues(new Uint8Array(16));
+      return "field-" + Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+    }
   }
+
   return "field-" + String(Date.now()) + "-" + Math.random().toString(36).slice(2, 11);
 }
 

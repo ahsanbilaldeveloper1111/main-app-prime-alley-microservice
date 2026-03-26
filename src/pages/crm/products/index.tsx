@@ -315,11 +315,6 @@ const ProductsPage = () => {
       <div
         style={{ minWidth: "240px" }}
         onMouseDown={(e) => e.stopPropagation()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
-        }}
       >
         <Select
           options={industries.map((ind) => ({
@@ -360,11 +355,6 @@ const ProductsPage = () => {
       <div
         style={{ minWidth: "240px" }}
         onMouseDown={(e) => e.stopPropagation()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
-        }}
       >
         <CreatableSelect
           options={uniqueCategories.map((cat) => ({
@@ -400,11 +390,6 @@ const ProductsPage = () => {
       <div
         style={{ minWidth: "220px" }}
         onMouseDown={(e) => e.stopPropagation()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") e.stopPropagation();
-        }}
       >
         <Select
           options={[
@@ -1267,11 +1252,6 @@ const ProductsPage = () => {
                   onMouseOut={handleHoverLeave}
                   onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") e.preventDefault();
-                  }}
                 >
                   <div
                     style={{
@@ -1307,11 +1287,6 @@ const ProductsPage = () => {
                     onMouseOut={handleHoverLeave}
                     onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") e.preventDefault();
-                  }}
                   >
                     <div
                       style={{

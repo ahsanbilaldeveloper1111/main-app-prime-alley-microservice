@@ -101,8 +101,11 @@ const BusinessTypes = () => {
   }, [pagination.currentPage, pagination.perPage, search]);
 
   useEffect(() => {
-    void fetchBusinessTypes();
+    fetchBusinessTypes().catch((error: unknown) => {
+      consumeHandledApiError(error, "BusinessTypes.useEffect");
+    });
   }, [fetchBusinessTypes]);
+  
 
   const handleOpenModal = useCallback((businessType?: BusinessTypeData) => {
     if (businessType) {
