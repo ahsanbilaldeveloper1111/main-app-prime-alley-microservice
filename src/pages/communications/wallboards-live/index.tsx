@@ -16,10 +16,10 @@ import '@assets/scss/common.scss'
 import '@assets/scss/live-calls.scss'
 import { useCti } from '@hooks/useCti'
 import { CtiDevice } from '@components/live-calls/utils/types'
-import SummaryCards from './partials/SummaryCards'
-import FilterBar from './partials/FilterBar'
-import PageHeader from './partials/PageHeader'
-import SectionsRenderer from './partials/SectionsRenderer'
+import SummaryCards from './_partials/SummaryCards'
+import FilterBar from './_partials/FilterBar'
+import PageHeader from './_partials/PageHeader'
+import SectionsRenderer from './_partials/SectionsRenderer'
 import {
   buildMonitoringPayloadFromEvent,
   computeNextIdleSinceMap,
@@ -29,7 +29,7 @@ import {
   monitoringPayloadDiffersFromActive,
   registeredEntriesFromDevices,
   type RegisteredDeviceEntry,
-} from './wallboardEventParsing'
+} from './_wallboardEventParsing'
 import {
   categorizeDns as categorizeDnsHelper,
   isDnInActiveCall as isDnInActiveCallHelper,
