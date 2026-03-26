@@ -237,6 +237,7 @@ export function useCrmActivityModals({
       activityDate: string;
       activityTime: string;
       priority: string;
+      assignedTo: string;
       notes: string;
     }) => {
       const due_date = parseTaskDueDate(
@@ -253,6 +254,7 @@ export function useCrmActivityModals({
         await createTask({
           name: taskForm.title.trim(),
           user_extension: extension,
+          assigned_to: taskForm.assignedTo || undefined,
           created_by: extension,
           urgency,
           due_date,
