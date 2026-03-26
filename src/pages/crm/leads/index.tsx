@@ -1538,6 +1538,7 @@ const CrmLeads = () => {
       created: formatDateForTable(lead.created_at),
       lastActivity: formatDateForTable(lead.last_activity_at),
       followUps: lead.follow_ups || [],
+      followUpDate: lead.follow_up_date || null,
       meetings: lead.meetings || [],
       source: lead.source || "",
       campaign: lead.campaign?.name || "",
@@ -2812,19 +2813,26 @@ const CrmLeads = () => {
         type: "text",
         accessor: (lead: LeadData) => {
           const followUps = lead.followUps || [];
-          if (followUps.length === 0) return null;
-          const sortedFollowUps = [...followUps].sort((a, b) => {
-            const dateA = a.follow_up_date
-              ? new Date(a.follow_up_date).getTime()
-              : Infinity;
-            const dateB = b.follow_up_date
-              ? new Date(b.follow_up_date).getTime()
-              : Infinity;
-            return dateA - dateB;
-          });
-          const earliestFollowUp = sortedFollowUps[0];
-          return earliestFollowUp?.follow_up_date
-            ? moment(earliestFollowUp.follow_up_date).format(GlobalDateFormat)
+          if (followUps.length > 0) {
+            const sortedFollowUps = [...followUps].sort((a, b) => {
+              const dateA = a.follow_up_date
+                ? new Date(a.follow_up_date).getTime()
+                : Infinity;
+              const dateB = b.follow_up_date
+                ? new Date(b.follow_up_date).getTime()
+                : Infinity;
+              return dateA - dateB;
+            });
+            const earliestFollowUp = sortedFollowUps[0];
+            if (earliestFollowUp?.follow_up_date) {
+              return moment(earliestFollowUp.follow_up_date).format(GlobalDateFormat);
+            }
+          }
+
+          const leadFollowUpDate =
+            lead.followUpDate || lead.rawData?.follow_up_date || null;
+          return leadFollowUpDate
+            ? moment(leadFollowUpDate).format(GlobalDateFormat)
             : null;
         },
       },
@@ -3992,8 +4000,8 @@ const CrmLeads = () => {
                     value:
                       getNameByExtension(selectedLead?.user_extension) ||                     
                       "Unassigned",
-                    hasDetails: true,
-                    onDetailsClick: () => console.log("Show user details"),
+                    hasDetails: false,
+                    onDetailsClick: () => {},
                   },
                   {
                     label: "Lead Score",
@@ -4087,6 +4095,192 @@ const CrmLeads = () => {
                     onClick: () => console.log("Add note"),
                   },
                 },
+              },
+              {
+                id: "follow-ups",
+                title: "Follow-ups",
+                icon: History,
+                collapsible: true,
+                defaultExpanded: true,
+                badge: {
+                  value: leadFollowUps?.length || 0,
+                  variant: "secondary",
+                },
+                ...(leadFollowUps?.length
+                  ? {
+                      customContent: (
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "12px",
+                          }}
+                        >
+                          {(leadFollowUps || []).map((fu: any) => (
+                            <div
+                              key={fu.id}
+                              style={{
+                                padding: "12px",
+                                backgroundColor: "#f8fafc",
+                                borderRadius: "8px",
+                                border: "1px solid #e2e8f0",
+                                fontSize: "13px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  marginBottom: "6px",
+                                }}
+                              >
+                                <span style={{ fontWeight: 600, color: "#1e293b" }}>
+                                  {fu.follow_up_date
+                                    ? moment(fu.follow_up_date).format(
+                                        GlobalDateFormat,
+                                      )
+                                    : "-"}
+                                </span>
+                                <span style={{ color: "#64748b", fontSize: "12px" }}>
+                                  {fu.communication_channel === "Other"
+                                    ? fu.communication_channel_other || "-"
+                                    : fu.communication_channel ||
+                                      fu.communication_channel_other ||
+                                      "-"}
+                                </span>
+                              </div>
+                              {fu.follow_up_status && (
+                                <div style={{ marginBottom: "4px", color: "#475569" }}>
+                                  <span style={{ color: "#94a3b8" }}>Status: </span>
+                                  {fu.follow_up_status}
+                                </div>
+                              )}
+                              {fu.notes && (
+                                <div style={{ color: "#475569", lineHeight: 1.4 }}>
+                                  {fu.notes.length > 120
+                                    ? `${fu.notes.slice(0, 120)}...`
+                                    : fu.notes}
+                                </div>
+                              )}
+                              <div
+                                style={{
+                                  marginTop: "8px",
+                                  display: "flex",
+                                  gap: "8px",
+                                  justifyContent: "flex-end",
+                                }}
+                              >
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0"
+                                  title="Edit"
+                                  onClick={() => {
+                                    const leadId =
+                                      selectedLead?.id || selectedLead?.rawData?.id;
+                                    if (!leadId) return;
+                                    const followUpDate = fu.follow_up_date
+                                      ? new Date(fu.follow_up_date)
+                                          .toISOString()
+                                          .split("T")[0]
+                                      : "";
+                                    setFollowUpIdToEdit(fu.id);
+                                    setFollowupData({
+                                      leadId: Number(leadId),
+                                      leadName: selectedLead?.name || "",
+                                      followUpDate,
+                                      followUpStatus:
+                                        fu.follow_up_status || "Pending",
+                                      communicationChannel:
+                                        fu.communication_channel || "Phone Call",
+                                      communicationChannelOther:
+                                        fu.communication_channel_other || "",
+                                      notes: fu.notes || "",
+                                      userExtension:
+                                        (session?.user as any)?.extension || "",
+                                    });
+                                    setShowAddFollowupModal(true);
+                                  }}
+                                >
+                                  <Edit size={14} className="me-1" />
+                                </Button>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-0 text-danger"
+                                  title="Delete"
+                                  onClick={() => {
+                                    const leadId =
+                                      selectedLead?.id || selectedLead?.rawData?.id;
+                                    if (!leadId) return;
+                                    handleDeleteFollowUp(
+                                      Number(leadId),
+                                      fu.id,
+                                      selectedLead?.name,
+                                    );
+                                  }}
+                                >
+                                  <Trash2 size={14} className="me-1" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline-primary"
+                            size="sm"
+                            style={{ alignSelf: "flex-start", marginTop: "4px" }}
+                            onClick={() => {
+                              const leadId =
+                                selectedLead?.id || selectedLead?.rawData?.id;
+                              if (!leadId) return;
+                              setFollowUpIdToEdit(null);
+                              setFollowupData({
+                                leadId: Number(leadId),
+                                leadName: selectedLead?.name || "",
+                                followUpDate: "",
+                                followUpStatus: "Pending",
+                                communicationChannel: "Phone Call",
+                                communicationChannelOther: "",
+                                notes: "",
+                                userExtension:
+                                  (session?.user as any)?.extension || "admin",
+                              });
+                              setShowAddFollowupModal(true);
+                            }}
+                          >
+                            <Plus size={14} className="me-1" /> Add Follow Up
+                          </Button>
+                        </div>
+                      ),
+                    }
+                  : {
+                      emptyState: {
+                        icon: History,
+                        message: "No follow-ups yet",
+                        action: {
+                          label: "Add Follow Up",
+                          onClick: () => {
+                            const leadId =
+                              selectedLead?.id || selectedLead?.rawData?.id;
+                            if (!leadId) return;
+                            setFollowUpIdToEdit(null);
+                            setFollowupData({
+                              leadId: Number(leadId),
+                              leadName: selectedLead?.name || "",
+                              followUpDate: "",
+                              followUpStatus: "Pending",
+                              communicationChannel: "Phone Call",
+                              communicationChannelOther: "",
+                              notes: "",
+                              userExtension:
+                                (session?.user as any)?.extension || "admin",
+                            });
+                            setShowAddFollowupModal(true);
+                          },
+                        },
+                      },
+                    }),
               },
             ]}
           />

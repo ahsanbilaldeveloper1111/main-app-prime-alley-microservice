@@ -100,6 +100,8 @@ import GenericTable, {
   FilterPill,
   TabConfig,
 } from "@components/GenericTable";
+import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
+import { useCompanyFilterPills } from "@hooks/useCompanyFilterPills";
 
 import GenericSidebar, {
   QuickAction,
@@ -1120,6 +1122,9 @@ const CrmCompanyManagement = () => {
   );
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [companySearch, setCompanySearch] = useState("");
+  const [companiesViewMode, setCompaniesViewMode] = useState<"table" | "board">(
+    "table",
+  );
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -1390,16 +1395,30 @@ const CrmCompanyManagement = () => {
       if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
       if (memoizedFilters.assignment_status)
         params.assignment_status = memoizedFilters.assignment_status;
-      if (memoizedFilters.user_extension?.length)
-        params.user_extensions = memoizedFilters.user_extension;
+      if (memoizedFilters.user_extension?.length) {
+        const ownerValues = Array.isArray(memoizedFilters.user_extension)
+          ? memoizedFilters.user_extension
+          : [memoizedFilters.user_extension];
+        params.user_extensions = ownerValues;
+        // Companies endpoint can use a single owner filter in some environments.
+        if (ownerValues[0]) {
+          params.assigned_to = ownerValues[0];
+        }
+      }
       if (
         memoizedFilters.is_viewed !== undefined &&
         memoizedFilters.is_viewed !== ""
       )
         params.is_viewed = memoizedFilters.is_viewed;
-      if (memoizedFilters.start_date)
-        params.date_from = memoizedFilters.start_date;
-      if (memoizedFilters.end_date) params.date_to = memoizedFilters.end_date;
+      // Create date filter: backend expects date_from / date_to
+      if (memoizedFilters.created_at_from)
+        params.date_from = memoizedFilters.created_at_from;
+      if (memoizedFilters.created_at_to)
+        params.date_to = memoizedFilters.created_at_to;
+      if (memoizedFilters.last_called_at_from)
+        params.last_called_at_from = memoizedFilters.last_called_at_from;
+      if (memoizedFilters.last_called_at_to)
+        params.last_called_at_to = memoizedFilters.last_called_at_to;
       if (memoizedFilters.has_scheduled_calls !== undefined)
         params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
       if (memoizedFilters.has_tickets !== undefined)
@@ -1414,10 +1433,22 @@ const CrmCompanyManagement = () => {
         params.source_file = memoizedFilters.source_file;
       if (memoizedFilters.tag_ids?.length)
         params.tag_ids = memoizedFilters.tag_ids;
+      if (memoizedFilters.disposition)
+        params.disposition = memoizedFilters.disposition;
+      if (pagination.sortColumn) {
+        params.sort_column = pagination.sortColumn;
+        params.sort_direction = pagination.sortDirection;
+      }
       params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
       return params;
     },
-    [memoizedFilters, pagination.currentPage, pagination.rowsPerPage],
+    [
+      memoizedFilters,
+      pagination.currentPage,
+      pagination.rowsPerPage,
+      pagination.sortColumn,
+      pagination.sortDirection,
+    ],
   );
 
   // Extract unique source_file values from dataList for creatable select
@@ -1528,6 +1559,12 @@ const CrmCompanyManagement = () => {
     setCurrentFilters(filters);
     setRefreshKey((prev) => prev + 1);
   }, []);
+  const companyFilterPills = useCompanyFilterPills({
+    currentFilters,
+    handleFiltersChange,
+    refresh: () => setRefreshKey((prev) => prev + 1),
+    extensions,
+  });
 
   // Handle activeFilter changes to update currentFilters
   useEffect(() => {
@@ -1768,27 +1805,7 @@ const CrmCompanyManagement = () => {
     const currentRequestId = requestIdRef.current;
     setLoading(true);
     try {
-      const params: {
-        page: number;
-        per_page: number;
-        search?: string;
-        industry?: string;
-        country?: string;
-        sort_column?: string;
-        sort_direction?: "asc" | "desc";
-      } = {
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-      };
-      if (currentFilters.search) params.search = currentFilters.search;
-      if (currentFilters.industry) params.industry = currentFilters.industry;
-      if (currentFilters.country) params.country = currentFilters.country;
-      if (pagination.sortColumn) {
-        params.sort_column = pagination.sortColumn;
-        params.sort_direction = pagination.sortDirection;
-      }
-
-      const response = await getCompanies(params);
+      const response = await getCompanies(buildCrmDataParams());
       if (currentRequestId !== requestIdRef.current) return;
 
       const rows = (response.data || []).map(mapCompanyToRow);
@@ -1811,13 +1828,7 @@ const CrmCompanyManagement = () => {
       }
     }
   }, [
-    pagination.currentPage,
-    pagination.rowsPerPage,
-    pagination.sortColumn,
-    pagination.sortDirection,
-    currentFilters.search,
-    currentFilters.industry,
-    currentFilters.country,
+    buildCrmDataParams,
     mapCompanyToRow,
   ]);
 
@@ -2006,7 +2017,9 @@ const CrmCompanyManagement = () => {
   // Handle view data item
   const handleViewData = useCallback((item: CrmDataItem) => {
     setSelectedDataItem(item);
-    setShowViewModal(true);
+    setSelectedCompany(item);
+    setShowCompanySidebar(true);
+    setShowViewModal(false);
   }, []);
 
   // Fetch call recordings (not call logs) for the selected company
@@ -2665,35 +2678,65 @@ const CrmCompanyManagement = () => {
 
   // Stats cards data for metrics
   const companyStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "Companies missing Owner",
-        value: dataList.filter(
-          (p: any) => !p.user_extension || p.user_extension === "",
-        ).length,
-      },
-      {
-        title: "Companies missing Lead Status",
-        value: dataList.filter(
-          (p: any) => !p.disposition || p.disposition === "",
-        ).length,
-      },
-      {
-        title: "Companies never called",
-        value: dataList.filter((p: any) => !p.last_called_at).length,
-      },
-      {
-        title: "Companies with no recent activity",
-        value: dataList.filter((p: any) => {
-          if (!p.last_called_at) return true;
-          const daysSinceActivity = moment().diff(
-            moment(p.last_called_at),
-            "days",
-          );
-          return daysSinceActivity > 30;
-        }).length,
-      },
-    ],
+    () => {
+      const missingOwnerCount = dataList.filter(
+        (p: any) => !p.user_extension || p.user_extension === "",
+      ).length;
+      const missingLeadStatusCount = dataList.filter(
+        (p: any) => !p.disposition || p.disposition === "",
+      ).length;
+      const neverCalledCount = dataList.filter((p: any) => !p.last_called_at)
+        .length;
+      const noRecentActivityCount = dataList.filter((p: any) => {
+        if (!p.last_called_at) return true;
+        const daysSinceActivity = moment().diff(
+          moment(p.last_called_at),
+          "days",
+        );
+        return daysSinceActivity > 30;
+      }).length;
+
+      return [
+        {
+          title: "Companies missing Owner",
+          value: missingOwnerCount,
+          icon: User,
+          iconColor: "#1D4ED8",
+          iconBgColor: "#DBEAFE",
+          subtitle: "No company owner is assigned",
+        },
+        {
+          title: "Companies missing Lead Status",
+          value: missingLeadStatusCount,
+          icon: ClipboardList,
+          iconColor: "#7C3AED",
+          iconBgColor: "#EDE9FE",
+          subtitle: "Disposition/status is empty",
+        },
+        {
+          title: "Companies never called",
+          value: neverCalledCount,
+          icon: PhoneIcon,
+          iconColor: "#D97706",
+          iconBgColor: "#FEF3C7",
+          metric: {
+            text: "No call activity recorded yet",
+            dotColor: "#D97706",
+          },
+        },
+        {
+          title: "Companies with no recent activity",
+          value: noRecentActivityCount,
+          icon: ClockIcon,
+          iconColor: "#BE123C",
+          iconBgColor: "#FFE4E6",
+          metric: {
+            text: "Last activity over 30 days",
+            dotColor: "#BE123C",
+          },
+        },
+      ];
+    },
     [dataList],
   );
 
@@ -2870,6 +2913,7 @@ const CrmCompanyManagement = () => {
                       setConvertingCompanyId(row.id);
                       setShowConvertToLeadModal(true);
                     },
+                    show: () => false,
                   },
                   {
                     label: "Send Email",
@@ -3202,17 +3246,49 @@ const CrmCompanyManagement = () => {
     ],
   );
 
-  // Render Add Contacts Button with Dropdown
+  // Render Add Companies Button with bulk delete action
   const renderAddContactsButton = () => (
     <div
       style={{
         position: "absolute",
         right: "19px",
         top: "18px",
-        width: "146px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
       }}
       ref={addContactsRef}
     >
+      {session?.user?.permissions?.includes("delete-crm-data-management") &&
+        selectedItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowBulkDeleteModal(true)}
+            style={{
+              padding: "9px 13px",
+              backgroundColor: "#dc3545",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "4px",
+              fontSize: "12px",
+              fontWeight: "500",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "#c82333";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "#dc3545";
+            }}
+          >
+            <Trash2 size={16} />
+            Delete ({selectedItems.length})
+          </button>
+        )}
+      <div style={{ width: "146px" }}>
       <button
         onClick={() => {
           setShowCreateCompanySidebar(false);
@@ -3241,6 +3317,7 @@ const CrmCompanyManagement = () => {
       >
         Add companies
       </button>
+      </div>
     </div>
   );
 
@@ -5186,7 +5263,7 @@ const CrmCompanyManagement = () => {
                   ],
                   activeTab: activeFilter,
                   onTabChange: handleFilterChange,
-                  onTabAdd: () => setShowTabModal(true),
+                  onTabAdd: () => undefined,
                   onTabRemove: (tabId) => {
                     setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
                     if (activeFilter === tabId) {
@@ -5220,7 +5297,8 @@ const CrmCompanyManagement = () => {
 
                   // Actions
                   showTableViewDropdown: true,
-                  tableViewLabel: "Table view",
+                  currentTableView: companiesViewMode,
+                  onTableViewChange: setCompaniesViewMode,
                   showViewSwitcher: true,
                   showEditColumns: true,
                   onEditColumnsClick: () => setShowColumnEditor(true),
@@ -5235,234 +5313,7 @@ const CrmCompanyManagement = () => {
                   onSaveClick: () => console.log("Save view"),
 
                   // Filter Pills
-                  filterPills: [
-                    {
-                      id: "company_owner",
-                      label: "Company owner",
-                      showDropdown: true,
-                      dropdownOptions: [
-                        {
-                          label: "All Owners",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.user_extension;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        ...extensions.map((ext) => ({
-                          label: ext.name || ext.extension,
-                          value: ext.extension,
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              user_extension: ext.extension,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        })),
-                      ],
-                    },
-                    {
-                      id: "create_date",
-                      label: "Create date",
-                      showDropdown: true,
-                      dropdownOptions: [
-                        {
-                          label: "All Time",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.created_at_from;
-                            delete newFilters.created_at_to;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Today",
-                          value: "today",
-                          onClick: () => {
-                            const today = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              created_at_from: today,
-                              created_at_to: today,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Last 7 Days",
-                          value: "week",
-                          onClick: () => {
-                            const from = moment()
-                              .subtract(7, "days")
-                              .format("YYYY-MM-DD");
-                            const to = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              created_at_from: from,
-                              created_at_to: to,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Last 30 Days",
-                          value: "month",
-                          onClick: () => {
-                            const from = moment()
-                              .subtract(30, "days")
-                              .format("YYYY-MM-DD");
-                            const to = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              created_at_from: from,
-                              created_at_to: to,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                      ],
-                    },
-                    {
-                      id: "last_activity",
-                      label: "Last activity date",
-                      showDropdown: true,
-                      dropdownOptions: [
-                        {
-                          label: "All Time",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.last_called_at_from;
-                            delete newFilters.last_called_at_to;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Today",
-                          value: "today",
-                          onClick: () => {
-                            const today = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              last_called_at_from: today,
-                              last_called_at_to: today,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Last 7 Days",
-                          value: "week",
-                          onClick: () => {
-                            const from = moment()
-                              .subtract(7, "days")
-                              .format("YYYY-MM-DD");
-                            const to = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              last_called_at_from: from,
-                              last_called_at_to: to,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Last 30 Days",
-                          value: "month",
-                          onClick: () => {
-                            const from = moment()
-                              .subtract(30, "days")
-                              .format("YYYY-MM-DD");
-                            const to = moment().format("YYYY-MM-DD");
-                            handleFiltersChange({
-                              ...currentFilters,
-                              last_called_at_from: from,
-                              last_called_at_to: to,
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                      ],
-                    },
-                    {
-                      id: "lead_status",
-                      label: "Lead Status",
-                      showDropdown: true,
-                      dropdownOptions: [
-                        {
-                          label: "All Status",
-                          value: "all",
-                          onClick: () => {
-                            const newFilters = { ...currentFilters };
-                            delete newFilters.disposition;
-                            handleFiltersChange(newFilters);
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Hot Lead",
-                          value: "hot_lead",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "hot_lead",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Warm Lead",
-                          value: "warm_lead",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "warm_lead",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Cold Lead",
-                          value: "cold_lead",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "cold_lead",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Qualified",
-                          value: "qualified",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "qualified",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                        {
-                          label: "Not Interested",
-                          value: "not_interested",
-                          onClick: () => {
-                            handleFiltersChange({
-                              ...currentFilters,
-                              disposition: "not_interested",
-                            });
-                            setRefreshKey((prev) => prev + 1);
-                          },
-                        },
-                      ],
-                    },
-                  ],
+                  filterPills: companyFilterPills,
                   showAdvancedFilters: true,
                   onAdvancedFiltersClick: handleOpenFiltersSidebar,
 
@@ -5471,6 +5322,36 @@ const CrmCompanyManagement = () => {
                 }}
                 // Stats cards for metrics
                 statsCards={companyStatsCards}
+                customBody={
+                  companiesViewMode === "board" ? (
+                    <KanbanBoard
+                      columns={prospectsToKanbanColumns(
+                        dataList,
+                        getInitials,
+                        getRandomColor,
+                      )}
+                      onCardClick={(card) => handleViewData(card.raw)}
+                      onCardMove={(cardId, _fromCol, toCol) => {
+                        const company = dataList.find((entry) => entry.id === cardId);
+                        if (!company) return;
+
+                        updateCrmData(Number(cardId), {
+                          name: company.name || "",
+                          phone: company.phone || "",
+                          campaign_id: company.campaign_id,
+                          data: { ...company.data, lifecycle_stage: toCol },
+                          scheduled_call_at:
+                            company.scheduled_call_at || undefined,
+                          company_domain:
+                            company.data?.company_domain || undefined,
+                          company_name: company.data?.company_name || undefined,
+                          source: company.data?.source || undefined,
+                        });
+                      }}
+                      searchValue={companySearch}
+                    />
+                  ) : undefined
+                }
               />
             </div>
           </div>
@@ -5596,7 +5477,7 @@ const CrmCompanyManagement = () => {
           )}
 
           {/* View Data Modal - Redesigned */}
-          {selectedDataItem && (
+          {selectedDataItem && showViewModal && (
             <Modal
               show={showViewModal}
               onHide={() => setShowViewModal(false)}
@@ -7695,61 +7576,6 @@ const CrmCompanyManagement = () => {
               },
               placeholder: "To date",
             },
-            {
-              id: "sourceFile",
-              label: "Source Name",
-              type: "select",
-              value: companyFilters.sourceFile
-                ? {
-                    value: companyFilters.sourceFile,
-                    label: companyFilters.sourceFile,
-                  }
-                : null,
-              onChange: (selected) => {
-                const sourceValue = selected ? selected.value : null;
-                setCompanyFilters((prev) => ({
-                  ...prev,
-                  sourceFile: sourceValue,
-                }));
-                setActiveFilter("all");
-              },
-              options: uniqueSources,
-              placeholder: "Select source...",
-              isClearable: true,
-              styles: customSelectStyles,
-            },
-            {
-              id: "tags",
-              label: "Tags",
-              type: "multi-select",
-              value: companyFilters.tags
-                ? companyFilters.tags.map((tagValue: string) => {
-                    const tag = availableTags.find(
-                      (t: any) => t.value === tagValue,
-                    );
-                    return tag
-                      ? { value: tagValue, label: tag.label }
-                      : { value: tagValue, label: tagValue };
-                  })
-                : [],
-              onChange: (selected) => {
-                const tagValues = selected
-                  ? selected.map((s: any) => s.value)
-                  : null;
-                setCompanyFilters((prev) => ({
-                  ...prev,
-                  tags: tagValues,
-                }));
-                setActiveFilter("all");
-              },
-              options: availableTags.map((tag) => ({
-                value: tag.value,
-                label: tag.label,
-              })),
-              placeholder: "Select tags...",
-              isClearable: true,
-              styles: customSelectStyles,
-            },
           ]}
           onApply={() => {
             const filtersToApply: Record<string, any> = {};
@@ -7953,13 +7779,9 @@ const CrmCompanyManagement = () => {
                 const allData: CrmDataItem[] = [];
                 let page = 1;
                 for (;;) {
-                  const response = await getCompanies({
-                    page,
-                    per_page: PER_PAGE,
-                    search: currentFilters.search,
-                    industry: currentFilters.industry,
-                    country: currentFilters.country,
-                  });
+                  const response = await getCompanies(
+                    buildCrmDataParams({ page, per_page: PER_PAGE }),
+                  );
                   const chunk = (response?.data || []).map(mapCompanyToRow);
                   allData.push(...chunk);
                   if (

@@ -189,9 +189,11 @@ const Icon = ({ name, size = 14, color = "#141414" }: { name: string; size?: num
 const Dropdown = ({
   trigger,
   items,
+  menuPlacement = "bottom",
 }: {
   trigger: React.ReactNode;
   items: { label: string; onClick?: () => void }[];
+  menuPlacement?: "bottom" | "top";
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -207,9 +209,16 @@ const Dropdown = ({
       <div onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>{trigger}</div>
       {open && (
         <div style={{
-          position: "absolute", top: "100%", left: 0, zIndex: 1000, background: "#fff",
+          position: "absolute",
+          top: menuPlacement === "bottom" ? "100%" : "auto",
+          bottom: menuPlacement === "top" ? "100%" : "auto",
+          left: 0,
+          zIndex: 1000,
+          background: "#fff",
           border: "1px solid #e2e8f0", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-          minWidth: 160, marginTop: 4,
+          minWidth: 160,
+          marginTop: menuPlacement === "bottom" ? 4 : 0,
+          marginBottom: menuPlacement === "top" ? 4 : 0,
         }}>
           {items.map((item, i) => (
             <div key={i} onClick={() => { item.onClick?.(); setOpen(false); }} style={{
@@ -301,6 +310,7 @@ const LeftSidebar = ({ onNewChat }: { onNewChat: () => void }) => {
               Actions <Icon name="chevronDown" size={10} color="#141414" />
             </button>
           }
+          menuPlacement="top"
           items={[
             { label: "Mark all as read" },
             { label: "Sort by oldest" },
@@ -684,7 +694,7 @@ const MessageThread = ({
     try {
       await sendWhatsApp({ number: selectedChat.phone_number, message: text });
       setMessage("");
-      // Optimistic append; socket may deliver the real message later (we dedupe in onMessageReceived)
+      // Optimistic append only after successful API call (socket may deliver the real message later; we dedupe in onMessageReceived)
       setMessages((prev) => [
         ...prev,
         {

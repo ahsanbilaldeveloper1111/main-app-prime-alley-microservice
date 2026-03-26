@@ -79,6 +79,9 @@ const EmailModal: React.FC<EmailModalProps> = ({
   const [currentBccInput, setCurrentBccInput] = useState("");
   const [createTask, setCreateTask] = useState(false);
   const [sendLoading, setSendLoading] = useState(false);
+  const [sendValidationMessage, setSendValidationMessage] = useState("");
+  const [confirmSendWithoutSubject, setConfirmSendWithoutSubject] =
+    useState(false);
   const [activityDate, setActivityDate] = useState(
     "In 3 business days (Friday)",
   );
@@ -451,7 +454,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
     if (!trimmedEmail) return;
 
     if (!emailRegex.test(trimmedEmail)) {
-      alert("Please enter a valid email address");
+      setSendValidationMessage("Please enter a valid email address.");
       return;
     }
 
@@ -461,6 +464,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
       prev.includes(trimmedEmail) ? prev : [...prev, trimmedEmail],
     );
     setCurrentInput("");
+    setSendValidationMessage("");
   };
 
   const removeEmail = (email: string, type: "to" | "cc" | "bcc") => {
@@ -545,15 +549,21 @@ const EmailModal: React.FC<EmailModalProps> = ({
   };
 
   const handleSend = async () => {
+    setSendValidationMessage("");
+
     if (toEmails.length === 0) {
-      alert("Please add at least one recipient");
+      setSendValidationMessage("Please add at least one recipient.");
       return;
     }
 
-    if (!subject.trim()) {
-      const confirmSend = window.confirm("Send email without a subject?");
-      if (!confirmSend) return;
+    if (!subject.trim() && !confirmSendWithoutSubject) {
+      setConfirmSendWithoutSubject(true);
+      setSendValidationMessage(
+        "Subject is empty. Click Send again to continue without a subject.",
+      );
+      return;
     }
+    setConfirmSendWithoutSubject(false);
     const bodyToSend = bodyEditorRef.current?.innerHTML?.trim() ?? emailBody;
     const dateToSend =
       activityDate === "Custom..." ? customDate : activityDate;
@@ -590,6 +600,8 @@ const EmailModal: React.FC<EmailModalProps> = ({
       setCustomTime(timeStr);
       setShowDatePicker(false);
       setAttachments([]);
+      setSendValidationMessage("");
+      setConfirmSendWithoutSubject(false);
       onClose();
     } finally {
       setSendLoading(false);
@@ -1008,7 +1020,14 @@ const EmailModal: React.FC<EmailModalProps> = ({
             <input
               type="text"
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={(e) => {
+                const nextSubject = e.target.value;
+                setSubject(nextSubject);
+                if (nextSubject.trim()) {
+                  setConfirmSendWithoutSubject(false);
+                  setSendValidationMessage("");
+                }
+              }}
               placeholder=""
               style={{
                 flex: 1,
@@ -1845,23 +1864,30 @@ const EmailModal: React.FC<EmailModalProps> = ({
             alignSelf: "flex-start",
           }}
         >
+          {sendValidationMessage && (
+            <span
+              style={{
+                fontSize: "12px",
+                color: "#B91C1C",
+                maxWidth: "320px",
+              }}
+            >
+              {sendValidationMessage}
+            </span>
+          )}
           <div style={{ position: "relative" }}>
             <button
               onClick={handleSend}
-              disabled={toEmails.length === 0 || sendLoading}
+              disabled={sendLoading}
               style={{
                 padding: "8px 16px",
-                backgroundColor:
-                  toEmails.length > 0 && !sendLoading ? "#cbd5e0" : "#e2e8f0",
+                backgroundColor: sendLoading ? "#e2e8f0" : "#cbd5e0",
                 color: "#141414",
                 border: "none",
                 borderRadius: "4px",
                 fontSize: "14px",
                 fontWeight: "500",
-                cursor:
-                  toEmails.length > 0 && !sendLoading
-                    ? "pointer"
-                    : "not-allowed",
+                cursor: sendLoading ? "not-allowed" : "pointer",
                 transition: "background-color 0.2s",
                 display: "flex",
                 alignItems: "center",
@@ -1869,12 +1895,12 @@ const EmailModal: React.FC<EmailModalProps> = ({
                 whiteSpace: "nowrap",
               }}
               onMouseEnter={(e) => {
-                if (toEmails.length > 0 && !sendLoading) {
+                if (!sendLoading) {
                   e.currentTarget.style.backgroundColor = "#b8c5d0";
                 }
               }}
               onMouseLeave={(e) => {
-                if (toEmails.length > 0 && !sendLoading) {
+                if (!sendLoading) {
                   e.currentTarget.style.backgroundColor = "#cbd5e0";
                 }
               }}

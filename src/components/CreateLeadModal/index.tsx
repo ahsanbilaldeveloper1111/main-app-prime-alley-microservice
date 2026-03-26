@@ -66,6 +66,11 @@ interface CreateLeadModalProps {
   onSuccess?: () => void;
   type?: "lead" | "opportunity";
   crmDataId?: number;
+  /**
+   * Controls whether this modal shows its own success toast(s).
+   * Useful when a parent page wants to show a more specific message.
+   */
+  showSuccessToast?: boolean;
   /** When set, opens in edit mode: fetches lead, prefills form, and submits as update */
   editLeadId?: number | null;
 }
@@ -76,6 +81,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
   onSuccess,
   type = "lead",
   crmDataId,
+  showSuccessToast = true,
   editLeadId,
 }) => {
   const router = useRouter();
@@ -105,6 +111,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
     campaign_id: undefined as number | undefined,
     crm_data_id: undefined as number | undefined,
     lead_potential: "",
+    follow_up_date: "",
     other_information: {} as Record<string, any>,
     campaign_field_values: {} as Record<string, any>,
     contact_persons: [
@@ -559,6 +566,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           campaign_id: campaignId,
           crm_data_id: crmDataIdNum,
           lead_potential: leadData.lead_potential || "",
+          follow_up_date: leadData.follow_up_date || "",
           other_information: leadData.other_information || {},
           campaign_field_values: leadData.campaign_field_values || {},
           contact_persons: contactPersonsArray,
@@ -897,6 +905,9 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         ...(formData.lead_potential && {
           lead_potential: formData.lead_potential,
         }),
+        ...(formData.follow_up_date && {
+          follow_up_date: formData.follow_up_date,
+        }),
         ...(formData.other_information &&
           Object.keys(formData.other_information).length > 0 && {
             other_information: formData.other_information,
@@ -919,12 +930,12 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
       if (editLeadId) {
         await updateLead(editLeadId, payload);
-        toast.success("Lead updated successfully!");
+        if (showSuccessToast) toast.success("Lead updated successfully!");
         if (onSuccess) onSuccess();
         onHide();
       } else {
         await createLead(payload);
-        toast.success("Lead created successfully!");
+        if (showSuccessToast) toast.success("Lead created successfully!");
         if (onSuccess) onSuccess();
         if (createAndAddAnotherRef.current) {
         createAndAddAnotherRef.current = false;
@@ -954,6 +965,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           campaign_id: undefined,
           crm_data_id: undefined,
           lead_potential: "",
+          follow_up_date: "",
           other_information: {},
           campaign_field_values: {},
           contact_persons: [
@@ -1459,6 +1471,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         campaign_id: undefined,
         crm_data_id: undefined,
         lead_potential: "",
+        follow_up_date: "",
         other_information: {},
         campaign_field_values: {},
         contact_persons: [
@@ -2123,6 +2136,20 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
               {/* Other Information Section */}
               <div className="contact-form-section" style={{ marginTop: "24px", paddingTop: "24px" }}>
+                <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <label className="contact-form-label" htmlFor="create-lead-follow-up-date" style={labelStyle}>
+                    Follow up date
+                  </label>
+                  <input
+                    id="create-lead-follow-up-date"
+                    type="date"
+                    value={formData.follow_up_date}
+                    onChange={(e) => handleInputChange("follow_up_date", e.target.value)}
+                    style={inputStyle}
+                    onFocus={(e) => (e.currentTarget.style.borderColor = "#0091ae")}
+                    onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
+                  />
+                </div>
                 <div className="contact-form-field" style={{ marginBottom: "20px" }}>
                   <label className="contact-form-label" style={labelStyle}>Lead Potential</label>
                   <Select
