@@ -8,7 +8,6 @@ import {
   List,
   Phone,
   Mail,
-  Linkedin,
   ExternalLink,
   Plus,
   Play,
@@ -479,7 +478,7 @@ type NextPageWithLayout = React.FC & {
 };
 
 const SalesDashboard: NextPageWithLayout = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const router = useRouter();
 
   const navTabs = React.useMemo(() => {
@@ -625,7 +624,7 @@ const SalesDashboard: NextPageWithLayout = () => {
               { label: "To-dos", value: selectedTaskStats.toDos, icon: <List size={16} color="#666" /> },
               { label: "Calls", value: selectedTaskStats.calls, icon: <Phone size={16} color="#666" /> },
               { label: "Emails", value: selectedTaskStats.emails, icon: <Mail size={16} color="#666" /> },
-              { label: "LinkedIn", value: selectedTaskStats.linkedin, icon: <Linkedin size={16} color="#22c55e" />, done: true },
+              { label: "LinkedIn", value: selectedTaskStats.linkedin, icon: <ExternalLink size={16} color="#22c55e" />, done: true },
             ].map((stat) => (
               <div
                 key={stat.label}
