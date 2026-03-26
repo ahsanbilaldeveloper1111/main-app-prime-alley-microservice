@@ -467,12 +467,12 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     const seen = new Set<string>();
     return source
       .map((ext) => {
-        const value =
-          ext.id != null
-            ? String(ext.id)
-            : ext.extension != null
-              ? String(ext.extension)
-              : "";
+        let value = "";
+        if (ext.id != null) {
+          value = String(ext.id);
+        } else if (ext.extension != null) {
+          value = String(ext.extension);
+        }
         const label =
           ext.display_name ??
           ext.name ??
