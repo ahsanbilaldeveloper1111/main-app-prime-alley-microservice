@@ -141,7 +141,7 @@ const DealTemplatesPage = () => {
   }, [pagination.currentPage, pagination.perPage, search]);
 
   useEffect(() => {
-    void fetchTemplates();
+    fetchTemplates();
   }, [fetchTemplates]);
 
   const handleOpenModal = useCallback((template?: DealTemplateData) => {

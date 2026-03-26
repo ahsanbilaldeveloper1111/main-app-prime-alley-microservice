@@ -67,12 +67,18 @@ function formatTrackingLabel(row: UserRequestCategory): string {
 
 function formatDescriptionPreview(description: unknown): string {
   if (description == null || description === "") return "—";
-  const s =
-    typeof description === "string"
-      ? description
-      : typeof description === "number" || typeof description === "boolean" || typeof description === "bigint"
-        ? String(description)
-        : (JSON.stringify(description) ?? "");
+  let s = "";
+  if (typeof description === "string") {
+    s = description;
+  } else if (
+    typeof description === "number" ||
+    typeof description === "boolean" ||
+    typeof description === "bigint"
+  ) {
+    s = String(description);
+  } else {
+    s = JSON.stringify(description) ?? "";
+  }
   return s.length > 50 ? s.slice(0, 50) + "…" : s;
 }
 

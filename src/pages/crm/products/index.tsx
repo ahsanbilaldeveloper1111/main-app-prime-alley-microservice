@@ -387,7 +387,7 @@ const ProductsPage = () => {
 
   const statusFilterDropdownContent = useMemo(
     () => (
-      <div
+      <Form
         style={{ minWidth: "220px" }}
         onMouseDown={(e) => e.stopPropagation()}
       >
@@ -423,7 +423,7 @@ const ProductsPage = () => {
           styles={customSelectStyles}
           isClearable
         />
-      </div>
+      </Form>
     ),
     [customSelectStyles, productsFilters.status],
   );
