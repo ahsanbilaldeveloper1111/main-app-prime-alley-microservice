@@ -7,6 +7,7 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -501,7 +502,18 @@ const CrmOrders = () => {
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
+  const [tabTotals, setTabTotals] = useState<{
+    all: number | null;
+    lost: number | null;
+    deleted: number | null;
+  }>({
+    all: null,
+    lost: null,
+    deleted: null,
+  });
+  const activeFilterRef = useRef<string>("all");
 
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -577,9 +589,22 @@ const CrmOrders = () => {
     orderApprovalStatus: null as string | null,
     fulfillmentStatus: null as string | null,
     paymentStatus: null as string | null,
+    ticketId: null as string | null,
+    dealId: null as string | null,
     dateFrom: null as string | null,
     dateTo: null as string | null,
   });
+
+  const filterableOrderStages = useMemo(
+    () =>
+      stages.filter(
+        (stage: any) =>
+          !String(stage?.name || "")
+            .toLowerCase()
+            .includes("withdraw"),
+      ),
+    [stages],
+  );
 
   // Fetch stages and extensions on component mount
   useEffect(() => {
@@ -768,6 +793,30 @@ const CrmOrders = () => {
         setTotalOrders(pagination?.total || 0);
         setSummaryTiles(summary);
         setOrdersMetrics(metricsFromApi);
+        setTabTotals((prev) => ({
+          all:
+            typeof summary?.total_orders === "number"
+              ? summary.total_orders
+              : prev.all,
+          lost:
+            typeof summary?.lost_orders === "number" ? summary.lost_orders : prev.lost,
+          deleted:
+            typeof summary?.deleted_orders === "number"
+              ? summary.deleted_orders
+              : prev.deleted,
+        }));
+
+        const activeTabAtResponse = activeFilterRef.current;
+        if (
+          activeTabAtResponse === "all" ||
+          activeTabAtResponse === "lost" ||
+          activeTabAtResponse === "deleted"
+        ) {
+          setTabTotals((prev) => ({
+            ...prev,
+            [activeTabAtResponse]: pagination?.total || 0,
+          }));
+        }
 
         return response;
       } finally {
@@ -878,15 +927,38 @@ const CrmOrders = () => {
         tabFromUrl === "deleted" ||
         (stages.length > 0 &&
           stages.some((s: any) => s.id.toString() === tabFromUrl));
-      if (isValidFilter && tabFromUrl !== activeFilter) {
-        setActiveFilter(tabFromUrl);
+      if (isValidFilter) {
+        setActiveFilter((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
       }
     }
-  }, [router.isReady, router.query.tab, stages, activeFilter]);
+  }, [router.isReady, router.query.tab, stages]);
+
+  useEffect(() => {
+    activeFilterRef.current = activeFilter;
+  }, [activeFilter]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
     (filterId: string) => {
+      let nextTotalFromTab: number | undefined;
+      if (filterId === "all") {
+        if (typeof summaryTiles?.total_orders === "number") {
+          nextTotalFromTab = summaryTiles.total_orders;
+        }
+      } else if (filterId === "lost") {
+        if (typeof tabTotals.lost === "number") {
+          nextTotalFromTab = tabTotals.lost;
+        }
+      } else if (filterId === "deleted") {
+        if (typeof tabTotals.deleted === "number") {
+          nextTotalFromTab = tabTotals.deleted;
+        }
+      }
+
+      if (typeof nextTotalFromTab === "number") {
+        setTotalOrders(nextTotalFromTab);
+      }
+
       setActiveFilter(filterId);
       setOrdersPagination((prev) => ({ ...prev, currentPage: 1 }));
 
@@ -900,7 +972,7 @@ const CrmOrders = () => {
         { shallow: true },
       );
     },
-    [router],
+    [router, summaryTiles, tabTotals],
   );
 
   useEffect(() => {
@@ -1828,11 +1900,16 @@ const CrmOrders = () => {
   const filterCounts = useMemo(() => {
     const transformed = ordersData.map(transformOrderData);
     const counts: Record<string, number> = {
-      all: summaryTiles?.total_orders || totalOrders || transformed.length,
+      all: tabTotals.all ?? summaryTiles?.total_orders ?? transformed.length,
       lost:
-        summaryTiles?.lost_orders ||
+        tabTotals.lost ??
+        summaryTiles?.lost_orders ??
         transformed.filter((o) => o.rawData?.is_lost).length,
-      deleted: summaryTiles?.deleted_orders || 0,
+      deleted:
+        tabTotals.deleted ??
+        summaryTiles?.deleted_orders ??
+        transformed.filter((o) => o.rawData?.is_archived || o.rawData?.deleted_at)
+          .length,
     };
 
     // Add counts for all stages (not just first 5, for custom tabs)
@@ -1844,7 +1921,7 @@ const CrmOrders = () => {
     });
 
     return counts;
-  }, [ordersData, extensions, stages, summaryTiles, totalOrders]);
+  }, [ordersData, extensions, stages, summaryTiles, tabTotals]);
 
   // Update custom tabs counts when filterCounts change
   useEffect(() => {
@@ -2282,6 +2359,7 @@ const CrmOrders = () => {
       { id: "all", label: "All orders", count: filterCounts.all, removable: false },
       ...customTabs,
     ],
+    onTabAdd: () => setShowTabModal(true),
     onTabRemove: (tabId) => {
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
       if (activeFilter === tabId) handleFilterChange("all");
@@ -2905,6 +2983,8 @@ const CrmOrders = () => {
                               orderApprovalStatus: null,
                               fulfillmentStatus: null,
                               paymentStatus: null,
+                              ticketId: null,
+                              dealId: null,
                               dateFrom: null,
                               dateTo: null,
                             });
@@ -3792,6 +3872,8 @@ const CrmOrders = () => {
             orderApprovalStatus: null,
             fulfillmentStatus: null,
             paymentStatus: null,
+            ticketId: null,
+            dealId: null,
             dateFrom: null,
             dateTo: null,
           });
@@ -7160,6 +7242,83 @@ const CrmOrders = () => {
           onSuccess={() => setRefreshKey((prev) => prev + 1)}
         />
       )}
+
+      {/* Add New Tab Modal */}
+      <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Add New Tab</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3">Select a filter to add as a new tab</p>
+          <div className="d-grid gap-2">
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.some((t) => t.id === "lost")) {
+                  const nextTabs = [
+                    ...customTabs,
+                    {
+                      id: "lost",
+                      label: "Mark order as lost",
+                      count: filterCounts.lost || 0,
+                      removable: true,
+                    },
+                  ];
+                  setCustomTabs(nextTabs);
+                  setShowTabModal(false);
+                  toast.success("Tab added successfully!");
+                }
+              }}
+              disabled={customTabs.some((t) => t.id === "lost")}
+              className="d-flex align-items-center justify-content-start"
+              style={{ textAlign: "left" }}
+            >
+              <X size={16} className="me-2" />
+              Mark order as lost
+              {(filterCounts.lost || 0) > 0 && (
+                <Badge bg="secondary" className="ms-auto">
+                  {filterCounts.lost || 0}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.some((t) => t.id === "deleted")) {
+                  const nextTabs = [
+                    ...customTabs,
+                    {
+                      id: "deleted",
+                      label: "Deleted",
+                      count: filterCounts.deleted || 0,
+                      removable: true,
+                    },
+                  ];
+                  setCustomTabs(nextTabs);
+                  setShowTabModal(false);
+                  toast.success("Tab added successfully!");
+                }
+              }}
+              disabled={customTabs.some((t) => t.id === "deleted")}
+              className="d-flex align-items-center justify-content-start"
+              style={{ textAlign: "left" }}
+            >
+              <Trash2 size={16} className="me-2" />
+              Deleted
+              {(filterCounts.deleted || 0) > 0 && (
+                <Badge bg="secondary" className="ms-auto">
+                  {filterCounts.deleted || 0}
+                </Badge>
+              )}
+            </Button>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowTabModal(false)}>
+            Cancel
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </React.Fragment>
   );
 };

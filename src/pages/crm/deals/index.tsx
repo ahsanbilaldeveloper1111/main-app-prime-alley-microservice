@@ -727,6 +727,7 @@ const CrmDeals = () => {
     all: 0,
     lost: 0,
     deleted: 0,
+    rejected: 0,
   });
 
   const [showConvertToOrderModal, setShowConvertToOrderModal] = useState(false);
@@ -1169,8 +1170,11 @@ const CrmDeals = () => {
     delete baseFilters.stage_id;
     delete baseFilters.include_lost;
     delete baseFilters.include_archived;
+    if (activeFilter === "rejected") {
+      delete baseFilters.approval_status;
+    }
     return baseFilters;
-  }, [currentFilters]);
+  }, [activeFilter, currentFilters]);
 
   const tabTotalsRequestKey = useMemo(
     () =>
@@ -1184,19 +1188,22 @@ const CrmDeals = () => {
 
   const fetchTabTotals = useCallback(async (baseFilters: Record<string, any>) => {
     try {
-      const [allResp, lostResp, deletedResp, ...stageResponses] = await Promise.all([
-        getDeals(buildDealsParams(baseFilters, 1, 1, false)),
-        getDeals(buildDealsParams({ ...baseFilters, include_lost: true }, 1, 1, false)),
-        getDeals(buildDealsParams({ ...baseFilters, include_archived: true }, 1, 1, false)),
+      const [allResp, lostResp, deletedResp, rejectedResp, ...stageResponses] =
+        await Promise.all([
+          getDeals(buildDealsParams(baseFilters, 1, 1, false)),
+          getDeals(buildDealsParams({ ...baseFilters, include_lost: true }, 1, 1, false)),
+          getDeals(buildDealsParams({ ...baseFilters, include_archived: true }, 1, 1, false)),
+          getDeals(buildDealsParams({ ...baseFilters, approval_status: "rejected" }, 1, 1, false)),
         ...stages.map((stage: any) =>
           getDeals(buildDealsParams({ ...baseFilters, stage_id: stage.id }, 1, 1, false)),
         ),
-      ]);
+        ]);
 
       const nextTotals: Record<string, number> = {
         all: allResp?.meta?.total ?? 0,
         lost: lostResp?.meta?.total ?? 0,
         deleted: deletedResp?.meta?.total ?? 0,
+        rejected: rejectedResp?.meta?.total ?? 0,
       };
 
       stages.forEach((stage: any, index) => {
@@ -1251,6 +1258,20 @@ const CrmDeals = () => {
         ...prev,
         stage: null,
       }));
+    } else if (activeFilter === "rejected") {
+      setCurrentFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters.stage_id;
+        delete newFilters.include_lost;
+        delete newFilters.include_archived;
+        newFilters.approval_status = "rejected";
+        return newFilters;
+      });
+      // Clear stage dropdown
+      setDealsFilters((prev) => ({
+        ...prev,
+        stage: null,
+      }));
     } else if (activeFilter && stages.length > 0) {
       // Find stage by id (activeFilter should be stage id as string)
       const selectedStage = stages.find(
@@ -1277,11 +1298,12 @@ const CrmDeals = () => {
   useEffect(() => {
     if (router.isReady && router.query.tab) {
       const tabFromUrl = String(router.query.tab);
-      // Allow "all", "lost", "deleted", or any stage ID
+      // Allow "all", "lost", "deleted", "rejected", or any stage ID
       const isValidFilter =
         tabFromUrl === "all" ||
         tabFromUrl === "lost" ||
         tabFromUrl === "deleted" ||
+        tabFromUrl === "rejected" ||
         (stages.length > 0 &&
           stages.some((s: any) => s.id.toString() === tabFromUrl));
       if (isValidFilter) {
@@ -2641,6 +2663,9 @@ const CrmDeals = () => {
         summaryTiles?.lost_deals ??
         transformed.filter((d) => d.isLost).length,
       deleted: tabTotals.deleted ?? summaryTiles?.deleted_deals ?? 0,
+      rejected:
+        tabTotals.rejected ??
+        transformed.filter((d) => d.approvalStatus === "rejected").length,
     };
 
     // Add counts for all stages (not just first 5, for custom tabs)
@@ -7610,7 +7635,7 @@ const CrmDeals = () => {
                 </Button>
               );
             })}
-            {/* Lost and Deleted tabs */}
+            {/* Lost, Deleted and Rejected tabs */}
             <Button
               variant="outline-primary"
               onClick={() => {
@@ -7666,6 +7691,35 @@ const CrmDeals = () => {
               {(filterCounts.deleted || 0) > 0 && (
                 <Badge bg="secondary" className="ms-auto">
                   {filterCounts.deleted || 0}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="outline-primary"
+              onClick={() => {
+                if (!customTabs.find((t) => t.id === "rejected")) {
+                  setCustomTabs([
+                    ...customTabs,
+                    {
+                      id: "rejected",
+                      label: "Rejected",
+                      count: filterCounts.rejected || 0,
+                      removable: true,
+                    },
+                  ]);
+                  setShowTabModal(false);
+                  toast.success("Tab added successfully!");
+                }
+              }}
+              disabled={customTabs.some((t) => t.id === "rejected")}
+              className="d-flex align-items-center justify-content-start"
+              style={{ textAlign: "left" }}
+            >
+              <X size={16} className="me-2" />
+              Rejected
+              {(filterCounts.rejected || 0) > 0 && (
+                <Badge bg="secondary" className="ms-auto">
+                  {filterCounts.rejected || 0}
                 </Badge>
               )}
             </Button>
