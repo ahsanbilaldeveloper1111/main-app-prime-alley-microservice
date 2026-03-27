@@ -7697,7 +7697,7 @@ const CrmDeals = () => {
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find((t) => t.id === "rejected")) {
+                if (!customTabs.some((t) => t.id === "rejected")) {
                   setCustomTabs([
                     ...customTabs,
                     {

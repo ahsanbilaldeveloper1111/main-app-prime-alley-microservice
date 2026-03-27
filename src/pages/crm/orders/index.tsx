@@ -594,18 +594,6 @@ const CrmOrders = () => {
     dateFrom: null as string | null,
     dateTo: null as string | null,
   });
-
-  const filterableOrderStages = useMemo(
-    () =>
-      stages.filter(
-        (stage: any) =>
-          !String(stage?.name || "")
-            .toLowerCase()
-            .includes("withdraw"),
-      ),
-    [stages],
-  );
-
   // Fetch stages and extensions on component mount
   useEffect(() => {
     fetchStages();
