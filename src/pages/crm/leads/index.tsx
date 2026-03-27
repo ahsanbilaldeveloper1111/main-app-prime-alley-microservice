@@ -2193,7 +2193,8 @@ const CrmLeads = () => {
   const submitFollowUp = useCallback(
     async (mode: "create" | "update") => {
       if (!validateFollowUpForm()) return;
-      if (mode === "update" && !followUpIdToEdit) return;
+      const followUpId = followUpIdToEdit;
+      if (mode === "update" && !followUpId) return;
       if (!followupData.leadId) return;
 
       setLoadingFollowUp(true);
@@ -2202,7 +2203,8 @@ const CrmLeads = () => {
         if (mode === "create") {
           await createLeadFollowUp(followupData.leadId, payload);
         } else {
-          await updateLeadFollowUp(followupData.leadId, followUpIdToEdit!, payload);
+          if (!followUpId) return;
+          await updateLeadFollowUp(followupData.leadId, followUpId, payload);
         }
         await handleRowClicked(followupData.leadId);
         resetFollowupForm();
@@ -2314,17 +2316,21 @@ const CrmLeads = () => {
 
   const buildMeetingPayload = useCallback(
     (mode: "create" | "update") => {
+      const extensions =
+        meetingAttendees.length > 0
+          ? meetingAttendees.map((user: any) => user.value)
+          : [];
+
+      if (extensions.length === 0 && mode === "create") {
+        extensions.push((session?.user as any)?.extension || "admin");
+      }
+
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
         meeting_date: meetingData.meetingDate,
         meeting_time: meetingData.meetingTime,
-        extensions:
-          meetingAttendees.length > 0
-            ? meetingAttendees.map((user: any) => user.value)
-            : mode === "create"
-              ? [(session?.user as any)?.extension || "admin"]
-              : [],
+        extensions,
       };
 
       if (mode === "create") {
