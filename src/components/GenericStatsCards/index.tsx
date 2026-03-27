@@ -46,14 +46,15 @@ const StatsCards: React.FC<StatsCardsProps> = ({
       borderRadius: '10px',
       border: '1px solid #cccccc'
     }}>
-      {data.map((card, index) => {
+      {data.map((card) => {
         const IconComponent = card.icon;
         const iconColor = card.iconColor || '#6366F1';
         const iconBgColor = card.iconBgColor || '#EEF2FF';
+        const cardKey = card.title + '|' + String(card.value) + '|' + (card.subtitle || '') + '|' + (card.additionalText || '');
 
         return (
           <div 
-            key={index}
+            key={cardKey}
             style={{
               
               
@@ -61,6 +62,25 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               
             }}
           >
+            {/* Icon */}
+            {IconComponent && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
+                <span
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '999px',
+                    background: iconBgColor,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <IconComponent size={16} color={iconColor} />
+                </span>
+              </div>
+            )}
+
             {/* Title */}
             <div style={{
               fontSize: '14px',
@@ -104,9 +124,12 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
                 gap: '6px',
                 fontSize: '13px',
                 color: '#374151',
+                textAlign: 'center',
                 marginTop: card.badge ? '8px' : '0'
               }}>
                 <Circle size={8} fill={card.metric.dotColor} color={card.metric.dotColor} />
@@ -130,9 +153,12 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
                 gap: '6px',
                 fontSize: '13px',
                 color: '#374151',
+                textAlign: 'center',
                 marginTop: card.badge || card.metric ? '8px' : '0'
               }}>
                 <Circle size={8} fill="#6366F1" color="#6366F1" />
