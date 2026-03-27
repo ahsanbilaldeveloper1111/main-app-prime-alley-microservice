@@ -104,10 +104,13 @@ function outboundToSessionDetail(call: OutboundCallItem): SessionDetail {
       ? transcriptSnippets
       : [{ id: `${call.session_id}-snippet-empty`, speaker: "-", text: "No transcript" }],
     sentiment: "Unknown",
-    audioWaveform: Array.from({ length: 100 }, (_, idx) => ({
-      id: `${call.session_id}-wave-${idx}`,
-      height: Math.random() * 100,
-    })),
+    audioWaveform: Array.from({ length: 100 }, (_, idx) => {
+      const randomByte = crypto.getRandomValues(new Uint8Array(1))[0];
+      return {
+        id: `${call.session_id}-wave-${idx}`,
+        height: (randomByte / 255) * 100,
+      };
+    }),
   };
 }
 

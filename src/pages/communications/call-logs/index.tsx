@@ -137,7 +137,6 @@ const CallLogs = () => {
     });
 
     const {
-        hierarchyDataUsers,
         hierarchyDataExtensions,
         hierarchyDataDepartments,
     } = useHierarchyData(ModuleSlug.CALL_LOGS);

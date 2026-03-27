@@ -70,11 +70,11 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const [showPageLoader, setShowPageLoader] = useState(false);
 
-  const [showDateRange, setShowDateRange] = useState(true);
-  const [startDateTime, setStartDateTime] = useState<string>(() =>
+  const [showDateRange] = useState(true);
+  const [startDateTime] = useState<string>(() =>
     moment().clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z'
   );
-  const [endDateTime, setEndDateTime] = useState<string>(() =>
+  const [endDateTime] = useState<string>(() =>
     moment().clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z'
   );
   // Initialize filters with default values immediately to prevent first API call without dates
