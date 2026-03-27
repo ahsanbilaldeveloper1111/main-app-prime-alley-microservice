@@ -1,11 +1,11 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useCallback, useEffect } from "react";
+import React, { ReactElement, useState, useCallback, useEffect, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericTable, { TableColumn } from "@components/GenericTable";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 import {
   getFaqsInboundPaginated,
   type OutboundCallItem,
@@ -22,7 +22,6 @@ import {
   X,
   Filter,
   ArrowUpDown,
-  ThumbsUp,
   ThumbsDown,
   FileText,
   Timer,
@@ -42,7 +41,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend
 } from 'recharts';
 
 interface Session {
@@ -61,11 +59,15 @@ interface SessionDetail {
   bot: string;
   statusDuration: string;
   transcriptSnippets: {
+    id: string;
     speaker: string;
     text: string;
   }[];
   sentiment: string;
-  audioWaveform: number[];
+  audioWaveform: {
+    id: string;
+    height: number;
+  }[];
 }
 
 
@@ -85,19 +87,30 @@ function outboundToSession(call: OutboundCallItem): Session {
 }
 
 function outboundToSessionDetail(call: OutboundCallItem): SessionDetail {
-  const transcriptSnippets = (call.conversation ?? []).slice(0, 5).map((m) => ({
-    speaker: m.role === "assistant" ? "Bot" : "User",
-    text: m.content,
-  }));
+  const conversation: Array<{ role?: string; content?: string }> =
+    Array.isArray(call.conversation) ? call.conversation : [];
+  const transcriptSnippets = conversation.slice(0, 5).map((m, idx) => ({
+      id: `${call.session_id}-snippet-${idx}-${m.role ?? "unknown"}`,
+      speaker: m.role === "assistant" ? "Bot" : "User",
+      text: m.content ?? "",
+    }));
   const durationSec = Math.round(call.stt_duration ?? 0);
   return {
     id: call.session_id,
     status: "Connected",
     bot: call.voice_agent_name ?? "Gandalf Support Bot",
     statusDuration: `${durationSec} secs`,
-    transcriptSnippets: transcriptSnippets.length ? transcriptSnippets : [{ speaker: "-", text: "No transcript" }],
+    transcriptSnippets: transcriptSnippets.length
+      ? transcriptSnippets
+      : [{ id: `${call.session_id}-snippet-empty`, speaker: "-", text: "No transcript" }],
     sentiment: "Unknown",
-    audioWaveform: Array.from({ length: 100 }, () => Math.random() * 100),
+    audioWaveform: Array.from({ length: 100 }, (_, idx) => {
+      const randomByte = crypto.getRandomValues(new Uint8Array(1))[0];
+      return {
+        id: `${call.session_id}-wave-${idx}`,
+        height: (randomByte / 255) * 100,
+      };
+    }),
   };
 }
 
@@ -145,15 +158,85 @@ const AIMLCampaignReports = () => {
     loadPage(1);
   }, [loadPage]);
 
-  const handleNext = () => {
-    if (currentPage < totalPages) loadPage(currentPage + 1);
-  };
-
-  const handlePrevious = () => {
-    if (currentPage > 1) loadPage(currentPage - 1);
-  };
-
   const [activeTab, setActiveTab] = useState<string>("outcomes");
+
+  const sessionColumns = useMemo<TableColumn<Session>[]>(() => [
+    {
+      key: "id",
+      label: "Session ID",
+      type: "custom",
+      render: (session) => <span className="font-monospace small">{session.id}</span>,
+    },
+    {
+      key: "contact",
+      label: "Contact",
+      type: "custom",
+      render: (session) => <span className="font-monospace small">{session.contact}</span>,
+    },
+    {
+      key: "status",
+      label: "Status",
+      sortable: false,
+      type: "custom",
+      render: (session) => {
+        const color = getStatusBadgeColor(session.status);
+        return (
+          <span className={`badge bg-${color} bg-opacity-10 text-${color} fw-normal px-3`}>
+            {session.status}
+          </span>
+        );
+      },
+    },
+    {
+      key: "attempts",
+      label: "Attempts",
+      type: "custom",
+      render: (session) => <span>{session.attempts}</span>,
+    },
+    {
+      key: "duration",
+      label: "Duration",
+      type: "custom",
+      render: (session) => <span>{session.duration}</span>,
+    },
+    {
+      key: "sentiment",
+      label: "Sentiment",
+      sortable: false,
+      type: "custom",
+      render: (session) => {
+        const color = getSentimentBadgeColor(session.sentiment);
+        return (
+          <span className={`badge bg-${color} bg-opacity-10 text-${color} fw-normal px-3`}>
+            {session.sentiment}
+          </span>
+        );
+      },
+    },
+    {
+      key: "intent",
+      label: "Intent",
+      sortable: false,
+      type: "custom",
+      render: (session) => (
+        <button className="btn btn-sm btn-primary rounded-pill px-3" onClick={(e) => e.stopPropagation()}>
+          <Play size={12} className="me-1" fill="currentColor" />
+          {session.intent}
+        </button>
+      ),
+    },
+    {
+      key: "dismiss",
+      label: "",
+      sortable: false,
+      type: "custom",
+      render: () => (
+        <button className="btn btn-sm btn-light rounded-circle" onClick={(e) => e.stopPropagation()}>
+          <X size={16} />
+        </button>
+      ),
+    },
+  ], []);
 
   // Pie Chart Data
   const pieData = [
@@ -192,6 +275,13 @@ const AIMLCampaignReports = () => {
   };
   return (
     <React.Fragment>
+      <style jsx global>{`
+        .generic-table-responsive {
+          margin: 0 !important;
+          width: 100% !important;
+          border-radius: 0px !important;
+        }
+      `}</style>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Campaign Reports" />
 
       <div className="bg-light min-vh-100 ">
@@ -272,8 +362,8 @@ const AIMLCampaignReports = () => {
                                 startAngle={90}
                                 endAngle={-270}
                               >
-                                {pieData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.color} />
+                                {pieData.map((entry) => (
+                                  <Cell key={`cell-${entry.name}-${entry.color}`} fill={entry.color} />
                                 ))}
                               </Pie>
                             </PieChart>
@@ -542,97 +632,42 @@ const AIMLCampaignReports = () => {
                 </div>
               )}
 
-              {/* Sessions Table */}
-              {/* <div className="table-responsive"> */}
-                <table className="table table-hover align-middle">
-                  <thead className="table-light">
-                    <tr>
-                      <th className="fw-semibold text-muted small">Session ID</th>
-                      <th className="fw-semibold text-muted small">
-                        Contact <ArrowUpDown size={14} className="ms-1" />
-                      </th>
-                      <th className="fw-semibold text-muted small">Status</th>
-                      <th className="fw-semibold text-muted small">Attempts</th>
-                      <th className="fw-semibold text-muted small">Duration</th>
-                      <th className="fw-semibold text-muted small">Sentiment</th>
-                      <th className="fw-semibold text-muted small">Intent</th>
-                      <th style={{ minWidth: 'auto' }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading ? (
-                      <tr>
-                        <td colSpan={8} className="text-center py-4 text-muted">
-                          Loading...
-                        </td>
-                      </tr>
-                    ) : (
-                      sessions.map((session, index) => (
-                        <tr
-                          key={session.id + index}
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => {
-                            const call = outboundCalls[index];
-                            if (call) setSelectedSession(outboundToSessionDetail(call));
-                            else setSelectedSession({ ...selectedSession, id: session.id, statusDuration: session.duration });
-                          }}
-                        >
-                          <td className="font-monospace small">{session.id}</td>
-                          <td className="font-monospace small">{session.contact}</td>
-                          <td>
-                            <span className={`badge bg-${getStatusBadgeColor(session.status)} bg-opacity-10 text-${getStatusBadgeColor(session.status)} fw-normal px-3`}>
-                              {session.status}
-                            </span>
-                          </td>
-                          <td>{session.attempts}</td>
-                          <td>{session.duration}</td>
-                          <td>
-                            <span className={`badge bg-${getSentimentBadgeColor(session.sentiment)} bg-opacity-10 text-${getSentimentBadgeColor(session.sentiment)} fw-normal px-3`}>
-                              {session.sentiment}
-                            </span>
-                          </td>
-                          <td>
-                            <button className="btn btn-sm btn-primary rounded-pill px-3">
-                              <Play size={12} className="me-1" fill="currentColor" />
-                              {session.intent}
-                            </button>
-                          </td>
-                          <td style={{ minWidth: 'auto' }}>
-                            <button className="btn btn-sm btn-light rounded-circle">
-                              <X size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              {/* </div> */}
-
-              {/* Pagination */}
-              <div className="d-flex justify-content-between align-items-center mt-3">
-                <button
-                  className="btn btn-light border d-flex align-items-center gap-2"
-                  onClick={handlePrevious}
-                  disabled={loading || currentPage <= 1}
-                >
-                  <ChevronLeft size={16} />
-                  Previous
-                </button>
-                <div className="d-flex gap-2 align-items-center">
-                  <span className="text-muted">
-                    Page {currentPage} of {totalPages}
-                    {totalCount > 0 && ` (${totalCount} total)`}
-                  </span>
-                </div>
-                <button
-                  className="btn btn-light border"
-                  onClick={handleNext}
-                  disabled={loading || currentPage >= totalPages}
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
+              <GenericTable<Session>
+                data={sessions}
+                columns={sessionColumns}
+                loading={loading}
+                loadingMessage="Loading..."
+                emptyMessage="No sessions found"
+                sortable={false}
+                showToolbar={false}
+                showToolbarActions={false}
+                rowClassName={() => "cursor-pointer"}
+                onRowClick={(session, index) => {
+                  const call = outboundCalls[index];
+                  if (call) {
+                    setSelectedSession(outboundToSessionDetail(call));
+                    return;
+                  }
+                  setSelectedSession((prev) => ({
+                    ...prev,
+                    id: session.id,
+                    statusDuration: session.duration,
+                  }));
+                }}
+                pagination={{
+                  currentPage,
+                  rowsPerPage: PAGE_SIZE,
+                  totalRows: totalCount,
+                  pageSizeOptions: [PAGE_SIZE],
+                }}
+                onPaginationChange={(page) => {
+                  if (page !== currentPage && page >= 1 && page <= totalPages) {
+                    loadPage(page);
+                  }
+                }}
+                uniqueKey="id"
+                noBorder
+              />
             </div>
           </div>
         </div>
@@ -687,8 +722,8 @@ const AIMLCampaignReports = () => {
               {/* Transcript Snippets */}
               <div className="mb-4">
                 <h4 className="fs-6 fw-semibold mb-3">Transcript Snippets</h4>
-                {selectedSession.transcriptSnippets.map((snippet, index) => (
-                  <div key={index} className="mb-3">
+                {selectedSession.transcriptSnippets.map((snippet) => (
+                  <div key={snippet.id} className="mb-3">
                     <div className="fw-semibold text-primary small mb-1">{snippet.speaker}:</div>
                     <p className="text-muted mb-0" style={{ lineHeight: '1.6' }}>{snippet.text}</p>
                   </div>
@@ -714,13 +749,13 @@ const AIMLCampaignReports = () => {
               <div className="mb-4">
                 <div className="bg-primary bg-opacity-10 rounded p-3">
                   <div className="d-flex align-items-center gap-1" style={{ height: '60px' }}>
-                    {selectedSession.audioWaveform.slice(0, 80).map((height, index) => (
+                    {selectedSession.audioWaveform.slice(0, 80).map((wave) => (
                       <div
-                        key={index}
+                        key={wave.id}
                         className="bg-primary"
                         style={{
                           width: '2px',
-                          height: `${height}%`,
+                          height: `${wave.height}%`,
                           opacity: 0.7
                         }}
                       />

@@ -1,29 +1,21 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
+import React, { ReactElement, useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
-import { ListCallLogs, ExportCallLogs, DownloadStreamingExport, DownloadCallsExport } from '@utils/calls';
-import { GetHierarchyData } from '@utils/users';
+import { ListCallLogs, DownloadCallsExport } from '@utils/calls';
 import { Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import StatsCards from '@components/GenericStatsCards';
-import { Phone, Hash, PhoneIncoming, PhoneOutgoing, Filter, Calendar } from 'lucide-react';
-import imgStatus1 from '@assets/images/widget/img-status-1.svg'
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
+import { Phone, Hash, PhoneIncoming, PhoneOutgoing, Calendar } from 'lucide-react';
 import moment from 'moment';
-import PageLoader from '@components/PageLoader';
 
 
 import '@assets/scss/common.scss';
 
 import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat, formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
-import GenericFilterSidebar, { FilterFieldType } from '@components/GenericFilterSidebar';
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -50,10 +42,9 @@ interface Summary {
 }
 
 const CallLogs = () => {
-    const { data:session, status } = useSession();
+    const { data:session } = useSession();
     const [showPageLoader, setShowPageLoader] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
-    const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
 
     const [showDateRange, setShowDateRange] = useState(false);
     const [startDateTime, setStartDateTime] = useState<string>('');
@@ -99,7 +90,7 @@ const CallLogs = () => {
             key: 'Duration',
             label: 'Duration',
             sortable: true,
-            render: (row) => formatDuration(parseInt(String(row.duration)) || 0),
+            render: (row) => formatDuration(Number.parseInt(String(row.duration), 10) || 0),
         },
         { key: 'extension', label: 'Extension', sortable: true },
         { key: 'phone_number', label: 'Phone Number', sortable: true },
@@ -128,7 +119,6 @@ const CallLogs = () => {
     
     const defaultFilters = getDefaultFilters();
     const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
-    const [pendingFilters, setPendingFilters] = useState<Record<string, any>>(defaultFilters.pending);
     const [searchValue, setSearchValue] = useState<string>('');
     
     // Refs to prevent duplicate API calls
@@ -147,15 +137,9 @@ const CallLogs = () => {
     });
 
     const {
-        hierarchyDataUsers,
         hierarchyDataExtensions,
         hierarchyDataDepartments,
-        loading: hierarchyLoading
     } = useHierarchyData(ModuleSlug.CALL_LOGS);
-    const [totalUsers, setTotalUsers] = useState(0);
-    useEffect(() => {
-        setTotalUsers(hierarchyDataUsers.length);
-    }, [hierarchyDataUsers]);
 
     const [totalCalls, setTotalCalls] = useState(0);
     // Stats cards data for StatsCards component
@@ -241,7 +225,7 @@ const CallLogs = () => {
                 rawData?.recordsTotal ??
                 rawData?.total ??
                 paginationData?.total ??
-                (rowsArray.length > 0 ? rowsArray.length : 0);
+                Math.max(rowsArray.length, 0);
             const currentPage = response?.current_page ?? paginationData?.current_page ?? page;
             const perPageVal = response?.per_page ?? paginationData?.per_page ?? perPage;
 
@@ -347,6 +331,155 @@ const CallLogs = () => {
         }
     };
 
+    const applyFilters = (nextFilters: Record<string, any>) => {
+        handleFiltersChange(nextFilters);
+    };
+
+    const callDirectionLabel = (value: string): string => {
+        if (value === 'OUTGOING') return 'Outgoing';
+        if (value === 'INCOMING') return 'Incoming';
+        if (value === 'Both') return 'Both';
+        return '';
+    };
+
+    const callStatusLabel = (value: string): string => {
+        if (value === 'Answered') return 'Answered';
+        if (value === 'Not Answered') return 'Not Answered';
+        if (value === 'Both') return 'Both';
+        return '';
+    };
+
+    const tableToolbar = useMemo(() => ({
+        showSearch: true,
+        searchValue,
+        searchPlaceholder: 'Search by username, extension, phone...',
+        onSearchChange: (value: string) => setSearchValue(value),
+        onSearch: () => {
+            setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
+            fetchCallLogs(1, tablePagination.rowsPerPage, searchValue.trim());
+        },
+        showFiltersButton: true,
+        showFilterPills: true,
+        showMoreFiltersButton: false,
+        filterPills: [
+            {
+                id: 'call_direction',
+                label: 'Call Direction',
+                showDropdown: true,
+                active: Boolean(currentFilters.call_direction),
+                activeLabel: callDirectionLabel(currentFilters.call_direction ?? ''),
+                onClear: () => applyFilters({ ...currentFilters, call_direction: '' }),
+                dropdownOptions: [
+                    { label: 'Outgoing', value: 'OUTGOING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'OUTGOING' }) },
+                    { label: 'Incoming', value: 'INCOMING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'INCOMING' }) },
+                    { label: 'Both', value: 'Both', onClick: () => applyFilters({ ...currentFilters, call_direction: 'Both' }) },
+                ],
+            },
+            {
+                id: 'call_status',
+                label: 'Call Status',
+                showDropdown: true,
+                active: Boolean(currentFilters.call_status),
+                activeLabel: callStatusLabel(currentFilters.call_status ?? ''),
+                onClear: () => applyFilters({ ...currentFilters, call_status: '' }),
+                dropdownOptions: [
+                    { label: 'Answered', value: 'Answered', onClick: () => applyFilters({ ...currentFilters, call_status: 'Answered' }) },
+                    { label: 'Not Answered', value: 'Not Answered', onClick: () => applyFilters({ ...currentFilters, call_status: 'Not Answered' }) },
+                    { label: 'Both', value: 'Both', onClick: () => applyFilters({ ...currentFilters, call_status: 'Both' }) },
+                ],
+            },
+            {
+                id: 'traffic_type',
+                label: 'Traffic Type',
+                showDropdown: true,
+                active: Boolean(currentFilters.traffic_type),
+                activeLabel: currentFilters.traffic_type || undefined,
+                onClear: () => applyFilters({ ...currentFilters, traffic_type: '' }),
+                dropdownOptions: [
+                    { label: 'Internal', value: 'internal', onClick: () => applyFilters({ ...currentFilters, traffic_type: 'internal' }) },
+                    { label: 'External', value: 'external', onClick: () => applyFilters({ ...currentFilters, traffic_type: 'external' }) },
+                    { label: 'All', value: '', onClick: () => applyFilters({ ...currentFilters, traffic_type: '' }) },
+                ],
+            },
+            {
+                id: 'destination_type',
+                label: 'Destination Type',
+                showDropdown: true,
+                active: Boolean(currentFilters.destination_type),
+                activeLabel: currentFilters.destination_type || undefined,
+                onClear: () => applyFilters({ ...currentFilters, destination_type: '' }),
+                dropdownOptions: [
+                    { label: 'Local', value: 'local', onClick: () => applyFilters({ ...currentFilters, destination_type: 'local' }) },
+                    { label: 'National', value: 'national', onClick: () => applyFilters({ ...currentFilters, destination_type: 'national' }) },
+                    { label: 'International', value: 'international', onClick: () => applyFilters({ ...currentFilters, destination_type: 'international' }) },
+                    { label: 'All', value: '', onClick: () => applyFilters({ ...currentFilters, destination_type: '' }) },
+                ],
+            },
+            {
+                id: 'extension_number',
+                label: 'Extension',
+                showDropdown: true,
+                searchable: true,
+                active: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0,
+                activeLabel: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0
+                    ? `${currentFilters.extension_number.length} selected`
+                    : undefined,
+                onClear: () => applyFilters({ ...currentFilters, extension_number: [] }),
+                dropdownOptions: hierarchyDataExtensions.map((ext: any) => ({
+                    label: String(ext.name ?? ext.id),
+                    value: String(ext.id),
+                    onClick: () => applyFilters({
+                        ...currentFilters,
+                        extension_number: [String(ext.id)],
+                    }),
+                })),
+            },
+            {
+                id: 'department',
+                label: 'Department',
+                showDropdown: true,
+                searchable: true,
+                active: Array.isArray(currentFilters.department) && currentFilters.department.length > 0,
+                activeLabel: Array.isArray(currentFilters.department) && currentFilters.department.length > 0
+                    ? `${currentFilters.department.length} selected`
+                    : undefined,
+                onClear: () => applyFilters({ ...currentFilters, department: [] }),
+                dropdownOptions: hierarchyDataDepartments.map((dept: any) => ({
+                    label: String(dept.name ?? dept.id),
+                    value: String(dept.id),
+                    onClick: () => applyFilters({
+                        ...currentFilters,
+                        department: [String(dept.id)],
+                    }),
+                })),
+            },
+        ],
+        rightActions: (
+            <div className="d-flex align-items-center gap-2">
+                {session?.user?.permissions?.includes('export-call-logs') && (
+                    <button
+                        type="button"
+                        className="btn btn-outline-secondary btn-sm"
+                        onClick={() => handleExport()}
+                        disabled={isExporting}
+                    >
+                        {isExporting ? 'Exporting...' : 'Export'}
+                    </button>
+                )}
+            </div>
+        ),
+    }), [
+        searchValue,
+        tablePagination.rowsPerPage,
+        fetchCallLogs,
+        currentFilters,
+        hierarchyDataExtensions,
+        hierarchyDataDepartments,
+        session?.user?.permissions,
+        isExporting,
+        applyFilters,
+    ]);
+
     
     return (
         <React.Fragment>
@@ -363,42 +496,7 @@ const CallLogs = () => {
                     </Col>
 
 
-                    <Col md={8} className="d-flex justify-content-end">
-                      
-
-                    
-
-                    <div className="action-buttons d-flex align-items-center gap-2">
-                        <button
-                            type="button"
-                            className="btn btn-outline-secondary"
-                            onClick={() => setShowFiltersSidebar(true)}
-                        >
-                            <Filter size={16} className="me-2" />
-                            Filters
-                        </button>
-                        {session?.user?.permissions?.includes('export-call-logs') && (
-                            <button
-                                type="button"
-                                className="btn btn-outline-secondary"
-                                onClick={() => handleExport()}
-                                disabled={isExporting}
-                            >
-                                {isExporting ? (
-                                    <>
-                                        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                        Exporting...
-                                    </>
-                                ) : (
-                                    'Export'
-                                )}
-                            </button>
-                        )}
-                    </div>
-
-
-
-                    </Col>
+                    <Col md={8} className="d-flex justify-content-end" />
                   </Row>
                
                 
@@ -459,6 +557,9 @@ const CallLogs = () => {
                     loading={tableLoading}
                     emptyMessage="No call logs found."
                     loadingMessage="Loading call logs..."
+                    showToolbar={true}
+                    toolbar={tableToolbar}
+                    showToolbarActions={false}
                     pagination={{
                         currentPage: tablePagination.currentPage,
                         rowsPerPage: tablePagination.rowsPerPage,
@@ -467,7 +568,7 @@ const CallLogs = () => {
                     }}
                     onPaginationChange={(page, rowsPerPage) => {
                         setTablePagination((prev) => ({ ...prev, currentPage: page, rowsPerPage }));
-                        fetchCallLogs(page, rowsPerPage, '');
+                        fetchCallLogs(page, rowsPerPage, searchValue.trim());
                     }}
                     sortable={true}
                     hover={true}
@@ -475,169 +576,6 @@ const CallLogs = () => {
                     uniqueKey="id"
                 />
             )}
-
-<GenericFilterSidebar
-                isOpen={showFiltersSidebar}
-                onClose={() => setShowFiltersSidebar(false)}
-                title="Filters"
-                subtitle="Filter and refine call logs"
-                width="400px"
-                filters={[
-                    {
-                        id: 'call_direction',
-                        label: 'Call Direction',
-                        type: 'select',
-                        value: (pendingFilters as any)?.call_direction
-                            ? { value: (pendingFilters as any).call_direction, label: (pendingFilters as any).call_direction === 'OUTGOING' ? 'Outgoing' : (pendingFilters as any).call_direction === 'INCOMING' ? 'Incoming' : 'Both' }
-                            : null,
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, call_direction: selected?.value ?? '' }),
-                        options: [
-                            { value: 'OUTGOING', label: 'Outgoing' },
-                            { value: 'INCOMING', label: 'Incoming' },
-                            { value: 'Both', label: 'Both' },
-                        ],
-                        placeholder: 'Select call direction',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'call_status',
-                        label: 'Call Status',
-                        type: 'select',
-                        value: (pendingFilters as any)?.call_status
-                            ? { value: (pendingFilters as any).call_status, label: (pendingFilters as any).call_status === 'Answered' ? 'Answered' : (pendingFilters as any).call_status === 'Not Answered' ? 'Not Answered' : 'Both' }
-                            : null,
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, call_status: selected?.value ?? '' }),
-                        options: [
-                            { value: 'Answered', label: 'Answered' },
-                            { value: 'Not Answered', label: 'Not Answered' },
-                            { value: 'Both', label: 'Both' },
-                        ],
-                        placeholder: 'Select call status',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'called_numbers',
-                        label: 'Called Numbers',
-                        type: 'text',
-                        value: ((pendingFilters as any)?.called_numbers || []).join(', '),
-                        onChange: (v: string) => {
-                            const values = v.split(',').map((s) => s.trim()).filter(Boolean);
-                            setPendingFilters({ ...pendingFilters, called_numbers: values });
-                        },
-                        placeholder: 'Enter called numbers (comma separated)',
-                    },
-                    {
-                        id: 'extension_number',
-                        label: 'Extension',
-                        type: 'multi-select',
-                        value: ((pendingFilters as any)?.extension_number || []).map((id: string) => {
-                            const ext = (hierarchyDataExtensions as any)?.find((e: any) => e.id === id);
-                            return ext ? { value: ext.id, label: ext.name } : { value: id, label: id };
-                        }).filter((o: { value: string; label: string }) => o.value),
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, extension_number: selected ? selected.map((s: any) => s.value) : [] }),
-                        options: (hierarchyDataExtensions as any)?.map((ext: any) => ({ value: ext.id, label: ext.name })) || [],
-                        placeholder: 'Select extensions',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'traffic_type',
-                        label: 'Traffic Type',
-                        type: 'select',
-                        value: (pendingFilters as any)?.traffic_type != null && (pendingFilters as any).traffic_type !== ''
-                            ? { value: (pendingFilters as any).traffic_type, label: (pendingFilters as any).traffic_type === 'internal' ? 'Internal' : (pendingFilters as any).traffic_type === 'external' ? 'External' : 'All' }
-                            : { value: '', label: 'All' },
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, traffic_type: selected?.value ?? '' }),
-                        options: [
-                            { value: '', label: 'All' },
-                            { value: 'internal', label: 'Internal' },
-                            { value: 'external', label: 'External' },
-                        ],
-                        placeholder: 'Select traffic type',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'destination_type',
-                        label: 'Destination Type',
-                        type: 'select',
-                        value: (pendingFilters as any)?.destination_type != null && (pendingFilters as any).destination_type !== ''
-                            ? { value: (pendingFilters as any).destination_type, label: (pendingFilters as any).destination_type === 'local' ? 'Local' : (pendingFilters as any).destination_type === 'national' ? 'National' : (pendingFilters as any).destination_type === 'international' ? 'International' : 'All' }
-                            : { value: '', label: 'All' },
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, destination_type: selected?.value ?? '' }),
-                        options: [
-                            { value: '', label: 'All' },
-                            { value: 'local', label: 'Local' },
-                            { value: 'national', label: 'National' },
-                            { value: 'international', label: 'International' },
-                        ],
-                        placeholder: 'Select destination type',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'department',
-                        label: 'Departments',
-                        type: 'multi-select',
-                        value: ((pendingFilters as any)?.department || []).map((id: string) => {
-                            const dept = (hierarchyDataDepartments as any)?.find((d: any) => d.id === id);
-                            return dept ? { value: dept.id, label: dept.name } : { value: id, label: id };
-                        }).filter((o: { value: string; label: string }) => o.value),
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, department: selected ? selected.map((s: any) => s.value) : [] }),
-                        options: (hierarchyDataDepartments as any)?.map((d: any) => ({ value: d.id, label: d.name })) || [],
-                        placeholder: 'Select departments',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'start_datetime',
-                        label: 'Start Date & Time',
-                        type: 'datetime' as FilterFieldType,
-                        value: (pendingFilters as any)?.start_datetime || '',
-                        onChange: (v: string | null) => {
-                            const datetimeValue = v || '';
-                            const endDate = (pendingFilters as any)?.end_datetime || '';
-                            let next: Record<string, any> = { ...pendingFilters, start_datetime: datetimeValue };
-                            if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) next.end_datetime = datetimeValue;
-                            setPendingFilters(next);
-                        },
-                        placeholder: 'Start',
-                    },
-                    {
-                        id: 'end_datetime',
-                        label: 'End Date & Time',
-                        type: 'datetime' as FilterFieldType,
-                        value: (pendingFilters as any)?.end_datetime || '',
-                        onChange: (v: string | null) => {
-                            const datetimeValue = v || '';
-                            const startDate = (pendingFilters as any)?.start_datetime || '';
-                            let next: Record<string, any> = { ...pendingFilters, end_datetime: datetimeValue };
-                            if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) next.start_datetime = datetimeValue;
-                            setPendingFilters(next);
-                        },
-                        placeholder: 'End',
-                    },
-                ]}
-                onApply={() => {
-                    handleFiltersChange(pendingFilters);
-                    setRefreshKey((prev) => prev + 1);
-                }}
-                onReset={() => {
-                    const freshDefaults = getDefaultFilters();
-                    const resetPending: Record<string, any> = {
-                        ...pendingFilters,
-                        start_datetime: freshDefaults.pending.start_datetime,
-                        end_datetime: freshDefaults.pending.end_datetime,
-                    };
-                    const resetCurrent: Record<string, any> = {
-                        ...currentFilters,
-                        start_datetime: freshDefaults.current.start_datetime,
-                        end_datetime: freshDefaults.current.end_datetime,
-                    };
-                    setPendingFilters(resetPending);
-                    setCurrentFilters(resetCurrent);
-                    currentFiltersRef.current = resetCurrent;
-                    setSearchValue('');
-                    handleFiltersChange(resetPending);
-                    setRefreshKey((prev) => prev + 1);
-                }}
-            />
         </React.Fragment>
     );
 };
