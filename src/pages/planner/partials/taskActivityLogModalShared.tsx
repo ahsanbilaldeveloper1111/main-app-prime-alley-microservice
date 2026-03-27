@@ -115,7 +115,10 @@ function formatActivityChangeValue(val: unknown): string {
   try {
     return JSON.stringify(val);
   } catch {
-    return String(val);
+    if (typeof val === "object" && val !== null) {
+      return "[Complex value]";
+    }
+    return String(val as string | number | bigint | boolean | symbol);
   }
 }
 

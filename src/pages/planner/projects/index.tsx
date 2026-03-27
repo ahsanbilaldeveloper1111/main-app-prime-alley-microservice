@@ -182,8 +182,27 @@ export interface Task {
   completed_sub_task_count?: number;
 }
 
+/** Safe string for API scalar fields; avoids `[object Object]` from `String(object)`. */
+function stringifyApiScalar(value: unknown, fallback = ""): string {
+  if (value == null) return fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "bigint") return String(value);
+  if (typeof value === "boolean") return String(value);
+  return fallback;
+}
+
+function stringifyApiDueDateRaw(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "bigint") return String(value);
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  return undefined;
+}
+
 function mapApiPriorityToTaskPriority(raw: unknown): Task["priority"] {
-  const p = String(raw ?? "medium").toLowerCase();
+  const p = stringifyApiScalar(raw, "medium").toLowerCase();
   if (p === "urgent") return "urgent";
   if (p === "high") return "high";
   if (p === "low") return "low";
@@ -205,27 +224,26 @@ function mapApiTaskToPlannerTask(
   projectId: string,
   statuses: Array<Record<string, unknown>>,
 ): Task {
-  const id = String(api.id ?? "");
+  const id = stringifyApiScalar(api.id);
   const statusMap: Record<string, string> = {};
   statuses.forEach((s) => {
-    if (s?.id != null && s.name != null) statusMap[String(s.id)] = String(s.name);
+    if (s?.id != null && s.name != null) {
+      const mapId = stringifyApiScalar(s.id);
+      const mapName = stringifyApiScalar(s.name);
+      if (mapId !== "" && mapName !== "") statusMap[mapId] = mapName;
+    }
   });
 
   const statusNameFromApi = (): string => {
     const st = api.status as { name?: string } | undefined;
-    if (st?.name) return String(st.name);
-    const sid = api.status_id == null ? "" : String(api.status_id);
+    if (st?.name) return stringifyApiScalar(st.name);
+    const sid = api.status_id == null ? "" : stringifyApiScalar(api.status_id);
     return statusMap[sid] ?? "";
   };
 
   const statusName = statusNameFromApi().toLowerCase();
   const isCompleted = Boolean(api.is_completed);
-  let dueRaw: string | undefined;
-  if (typeof api.due_date === "string") {
-    dueRaw = api.due_date;
-  } else if (api.due_date != null) {
-    dueRaw = String(api.due_date);
-  }
+  const dueRaw = stringifyApiDueDateRaw(api.due_date);
 
   let rowStatus: Task["status"];
   if (isCompleted) {
@@ -267,7 +285,7 @@ function mapApiTaskToPlannerTask(
   return {
     id,
     projectId,
-    title: String(api.title ?? ""),
+    title: stringifyApiScalar(api.title),
     description: typeof api.description === "string" ? api.description : "",
     status: rowStatus,
     priority: mapApiPriorityToTaskPriority(api.priority),

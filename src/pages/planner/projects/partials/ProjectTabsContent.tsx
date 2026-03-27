@@ -281,8 +281,8 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             styles={styles}
             onTaskStatusChange={() => {
               if (activeTab === 'board' && project?.id) {
-                void fetchBoardTasks();
-                void fetchProjectData();
+                fetchBoardTasks().catch(() => undefined);
+                fetchProjectData().catch(() => undefined);
               }
             }}
             onTaskClick={onBoardTaskClick}
@@ -305,8 +305,8 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             onClearFilters={handleListClearFilters}
             onRefresh={() => {
               if (activeTab === 'list' && project?.id) {
-                void fetchListTasks();
-                void fetchProjectData();
+                fetchListTasks().catch(() => undefined);
+                fetchProjectData().catch(() => undefined);
               }
             }}
           />

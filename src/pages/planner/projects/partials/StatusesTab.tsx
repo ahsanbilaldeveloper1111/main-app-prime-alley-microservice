@@ -956,7 +956,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
                 );
               }}
               onReorderPageRows={(fromIdx, toIdx) => {
-                void handleStatusRowReorder(fromIdx, toIdx);
+                handleStatusRowReorder(fromIdx, toIdx).catch(() => undefined);
               }}
               sortColumn={pagination.sortColumn}
               sortDirection={pagination.sortDirection}

@@ -113,7 +113,7 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
 
   useEffect(() => {
     if (!visible || resolvedId == null) return;
-    void fetchActivitiesPreview();
+    fetchActivitiesPreview().catch(() => undefined);
   }, [visible, resolvedId, fetchActivitiesPreview]);
 
   const handleCommentsTabClick = async () => {
@@ -246,7 +246,9 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
             <Nav.Link
               className="py-2"
               active={activeTab === "comments"}
-              onClick={() => void handleCommentsTabClick()}
+              onClick={() => {
+                handleCommentsTabClick().catch(() => undefined);
+              }}
             >
               Comments{taskComments.length > 0 ? ` (${taskComments.length})` : ""}
             </Nav.Link>
@@ -255,7 +257,9 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
             <Nav.Link
               className="py-2"
               active={activeTab === "documents"}
-              onClick={() => void handleDocumentsTabClick()}
+              onClick={() => {
+                handleDocumentsTabClick().catch(() => undefined);
+              }}
             >
               Documents
             </Nav.Link>
@@ -636,7 +640,9 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
                                 variant="link"
                                 size="sm"
                                 className="p-0"
-                                onClick={() => void handleDownloadDocument(doc)}
+                                onClick={() => {
+                                  handleDownloadDocument(doc).catch(() => undefined);
+                                }}
                                 title="Download"
                                 style={{ minWidth: "auto", padding: "0.25rem" }}
                               >
@@ -646,7 +652,9 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
                                 variant="link"
                                 size="sm"
                                 className="p-0"
-                                onClick={() => void handleDeleteDocument(doc)}
+                                onClick={() => {
+                                  handleDeleteDocument(doc).catch(() => undefined);
+                                }}
                                 title="Delete"
                                 style={{ minWidth: "auto", padding: "0.25rem", color: "#dc3545" }}
                               >

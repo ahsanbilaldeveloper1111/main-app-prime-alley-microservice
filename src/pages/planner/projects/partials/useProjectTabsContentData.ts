@@ -191,32 +191,32 @@ export function useProjectTabsContentData(
 
   useEffect(() => {
     if (selectedProjectId != null && selectedProjectId !== '') {
-      void fetchProjectDataRef.current();
+      fetchProjectDataRef.current().catch(() => undefined);
     }
   }, [selectedProjectId]);
 
   useEffect(() => {
     if (activeTab === 'board' && selectedProjectId != null && selectedProjectId !== '') {
-      void fetchBoardTasksRef.current();
+      fetchBoardTasksRef.current().catch(() => undefined);
     }
   }, [activeTab, selectedProjectId]);
 
   useEffect(() => {
     if (activeTab === 'list' && selectedProjectId != null && selectedProjectId !== '') {
-      void fetchListTasksRef.current();
+      fetchListTasksRef.current().catch(() => undefined);
     }
   }, [activeTab, selectedProjectId]);
 
   const handleListApplyFilters = (filters: ListTabFiltersState) => {
     setListFilters(filters);
     setListPage(1);
-    void fetchListTasks(filters, 1, listLimit);
+    fetchListTasks(filters, 1, listLimit).catch(() => undefined);
   };
 
   const handleListClearFilters = () => {
     setListFilters(null);
     setListPage(1);
-    void fetchListTasks(null, 1, listLimit);
+    fetchListTasks(null, 1, listLimit).catch(() => undefined);
   };
 
   const defaultListPagination = {
@@ -244,7 +244,7 @@ export function useProjectTabsContentData(
         : updater;
     setListPage(next.page);
     setListLimit(next.limit);
-    void fetchListTasks(undefined, next.page, next.limit);
+    fetchListTasks(undefined, next.page, next.limit).catch(() => undefined);
   };
 
   return {
