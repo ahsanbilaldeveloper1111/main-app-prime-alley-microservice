@@ -8,6 +8,7 @@ import {
   Button,
   Badge,
   Spinner,
+  ListGroup,
 } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import {
@@ -45,7 +46,6 @@ import {
 } from "recharts";
 
 import StatsCards from "@components/GenericStatsCards";
-import { ListGroup } from 'react-bootstrap';
 import {
   Users,
   UserPlus,

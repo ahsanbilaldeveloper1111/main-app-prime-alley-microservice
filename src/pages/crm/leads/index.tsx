@@ -162,6 +162,52 @@ interface LeadData {
 }
 
 const ignoredKeys = ["stage_id", "contact_persons"];
+const DEFAULT_FOLLOWUP_FORM = {
+  leadId: null as number | null,
+  leadName: "",
+  followUpDate: "",
+  followUpStatus: "Pending",
+  communicationChannel: "Phone Call",
+  communicationChannelOther: "",
+  notes: "",
+  userExtension: "",
+};
+const DEFAULT_MEETING_FORM = {
+  leadId: null as number | null,
+  leadName: "",
+  meetingName: "",
+  meetingType: "Online",
+  meetingDate: "",
+  meetingTime: "",
+  meetingOutcome: "",
+  extensions: [] as string[],
+};
+
+function formatPhoneWithCountry(phone: string) {
+  if (!phone) {
+    return {
+      phone: "N/A",
+      countryCode: "",
+    };
+  }
+  try {
+    const parsedPhone = parsePhoneNumber(phone);
+    return {
+      phone: parsedPhone?.formatInternational() || phone,
+      countryCode: parsedPhone?.country || "",
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      phone,
+      countryCode: "",
+    };
+  }
+}
+
+function getFlagImgSrc(countryCode: string) {
+  return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+}
 
 function leadsToKanbanColumns(
   leads: LeadData[],
@@ -207,38 +253,9 @@ const PhoneContainer = ({
   onClick?: () => void;
 }) => {
   const [showPopover, setShowPopover] = useState(false);
-
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
   const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
+    return formatPhoneWithCountry(phone);
+  }, [phone]);
 
   const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
 
@@ -336,37 +353,9 @@ const PhoneContainer = ({
 
 // Phone Display Component (without Badge for view dialogs)
 const PhoneDisplay = ({ phone }: { phone: string }) => {
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
   const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
+    return formatPhoneWithCountry(phone);
+  }, [phone]);
 
   const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
   return (
@@ -733,31 +722,13 @@ const CrmLeads = () => {
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
   const [followUpIdToEdit, setFollowUpIdToEdit] = useState<number | null>(null);
-  const [followupData, setFollowupData] = useState({
-    leadId: null as number | null,
-    leadName: "",
-    followUpDate: "",
-    followUpStatus: "Pending",
-    communicationChannel: "Phone Call",
-    communicationChannelOther: "",
-    notes: "",
-    userExtension: "",
-  });
+  const [followupData, setFollowupData] = useState({ ...DEFAULT_FOLLOWUP_FORM });
   const [loadingFollowUp, setLoadingFollowUp] = useState(false);
 
   // Meeting Modal
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
   const [meetingIdToEdit, setMeetingIdToEdit] = useState<number | null>(null);
-  const [meetingData, setMeetingData] = useState({
-    leadId: null as number | null,
-    leadName: "",
-    meetingName: "",
-    meetingType: "Online",
-    meetingDate: "",
-    meetingTime: "",
-    meetingOutcome: "",
-    extensions: [] as string[],
-  });
+  const [meetingData, setMeetingData] = useState({ ...DEFAULT_MEETING_FORM });
   const [meetingAttendees, setMeetingAttendees] = useState<readonly any[]>([]);
   const [loadingMeeting, setLoadingMeeting] = useState(false);
 
@@ -2179,143 +2150,87 @@ const CrmLeads = () => {
     }
   };
 
-  // Handle follow-up creation
-  const handleCreateFollowUp = useCallback(async () => {
-    // Validate required fields
+  const resetFollowupForm = useCallback(() => {
+    setShowAddFollowupModal(false);
+    setFollowUpIdToEdit(null);
+    setFollowupData({ ...DEFAULT_FOLLOWUP_FORM });
+  }, []);
+
+  const validateFollowUpForm = useCallback(() => {
     const isValid = checkRequiredFields(followupData, [
       { field: "leadId", name: "Lead" },
       { field: "followUpDate", name: "Follow-up Date" },
       { field: "communicationChannel", name: "Communication Channel" },
     ]);
-
-    // If "Other" is selected, communicationChannelOther is required
     if (
       followupData.communicationChannel === "Other" &&
       !followupData.communicationChannelOther?.trim()
     ) {
       toast.error("Please specify the communication channel");
-      return;
+      return false;
     }
+    return isValid;
+  }, [followupData]);
 
-    if (!isValid) return;
+  const buildFollowUpPayload = useCallback(() => {
+    const payload: any = {
+      follow_up_date: followupData.followUpDate,
+      follow_up_status: followupData.followUpStatus,
+      communication_channel: followupData.communicationChannel,
+      notes: followupData.notes,
+      user_extension:
+        followupData.userExtension || (session?.user as any)?.extension || "admin",
+    };
+    if (
+      followupData.communicationChannel === "Other" &&
+      followupData.communicationChannelOther
+    ) {
+      payload.communication_channel_other = followupData.communicationChannelOther;
+    }
+    return payload;
+  }, [followupData, session]);
 
-    setLoadingFollowUp(true);
-    try {
-      const payload: any = {
-        follow_up_date: followupData.followUpDate,
-        follow_up_status: followupData.followUpStatus,
-        communication_channel: followupData.communicationChannel,
-        notes: followupData.notes,
-        user_extension:
-          followupData.userExtension ||
-          (session?.user as any)?.extension ||
-          "admin",
-      };
+  const submitFollowUp = useCallback(
+    async (mode: "create" | "update") => {
+      if (!validateFollowUpForm()) return;
+      if (mode === "update" && !followUpIdToEdit) return;
+      if (!followupData.leadId) return;
 
-      if (
-        followupData.communicationChannel === "Other" &&
-        followupData.communicationChannelOther
-      ) {
-        payload.communication_channel_other =
-          followupData.communicationChannelOther;
-      }
-
-      if (followupData.leadId) {
-        await createLeadFollowUp(followupData.leadId, payload);
-      }
-
-      // Refresh lead data (sidebar or view modal)
-      if (followupData.leadId) {
+      setLoadingFollowUp(true);
+      try {
+        const payload = buildFollowUpPayload();
+        if (mode === "create") {
+          await createLeadFollowUp(followupData.leadId, payload);
+        } else {
+          await updateLeadFollowUp(followupData.leadId, followUpIdToEdit!, payload);
+        }
         await handleRowClicked(followupData.leadId);
+        resetFollowupForm();
+      } catch (error) {
+        console.error(`Failed to ${mode} follow-up:`, error);
+      } finally {
+        setLoadingFollowUp(false);
       }
+    },
+    [
+      validateFollowUpForm,
+      followUpIdToEdit,
+      followupData.leadId,
+      buildFollowUpPayload,
+      handleRowClicked,
+      resetFollowupForm,
+    ],
+  );
 
-      // Reset form and close modal
-      setShowAddFollowupModal(false);
-      setFollowUpIdToEdit(null);
-      setFollowupData({
-        leadId: null,
-        leadName: "",
-        followUpDate: "",
-        followUpStatus: "Pending",
-        communicationChannel: "Phone Call",
-        communicationChannelOther: "",
-        notes: "",
-        userExtension: "",
-      });
-    } catch (error) {
-      console.error("Failed to create follow-up:", error);
-    } finally {
-      setLoadingFollowUp(false);
-    }
-  }, [followupData, session, handleRowClicked]);
+  // Handle follow-up creation
+  const handleCreateFollowUp = useCallback(async () => {
+    await submitFollowUp("create");
+  }, [submitFollowUp]);
 
   // Handle follow-up update
   const handleUpdateFollowUp = useCallback(async () => {
-    // Validate required fields
-    const isValid = checkRequiredFields(followupData, [
-      { field: "leadId", name: "Lead" },
-      { field: "followUpDate", name: "Follow-up Date" },
-      { field: "communicationChannel", name: "Communication Channel" },
-    ]);
-
-    // If "Other" is selected, communicationChannelOther is required
-    if (
-      followupData.communicationChannel === "Other" &&
-      !followupData.communicationChannelOther?.trim()
-    ) {
-      toast.error("Please specify the communication channel");
-      return;
-    }
-
-    if (!followUpIdToEdit || !isValid) return;
-
-    setLoadingFollowUp(true);
-    try {
-      const payload: any = {
-        follow_up_date: followupData.followUpDate,
-        follow_up_status: followupData.followUpStatus,
-        communication_channel: followupData.communicationChannel,
-        notes: followupData.notes,
-        user_extension:
-          followupData.userExtension ||
-          (session?.user as any)?.extension ||
-          "admin",
-      };
-
-      if (
-        followupData.communicationChannel === "Other" &&
-        followupData.communicationChannelOther
-      ) {
-        payload.communication_channel_other =
-          followupData.communicationChannelOther;
-      }
-
-      await updateLeadFollowUp(followupData.leadId!, followUpIdToEdit, payload);
-
-      // Refresh lead data (sidebar or view modal)
-      if (followupData.leadId) {
-        await handleRowClicked(followupData.leadId);
-      }
-
-      // Reset form and close modal
-      setShowAddFollowupModal(false);
-      setFollowUpIdToEdit(null);
-      setFollowupData({
-        leadId: null,
-        leadName: "",
-        followUpDate: "",
-        followUpStatus: "Pending",
-        communicationChannel: "Phone Call",
-        communicationChannelOther: "",
-        notes: "",
-        userExtension: "",
-      });
-    } catch (error) {
-      console.error("Failed to update follow-up:", error);
-    } finally {
-      setLoadingFollowUp(false);
-    }
-  }, [followUpIdToEdit, followupData, session, handleRowClicked]);
+    await submitFollowUp("update");
+  }, [submitFollowUp]);
   const getTodayDate = useCallback((startDateParam: string = "") => {
     let today = new Date();
     if (startDateParam) {
@@ -2390,71 +2305,15 @@ const CrmLeads = () => {
     }
   }, [followUpToDelete, viewingLead, handleViewLead]);
 
-  // Handle meeting creation
-  const handleCreateMeeting = useCallback(async () => {
-    if (
-      !meetingData.leadId ||
-      !meetingData.meetingName ||
-      !meetingData.meetingDate ||
-      !meetingData.meetingTime
-    )
-      return;
+  const resetMeetingForm = useCallback(() => {
+    setShowAddMeetingModal(false);
+    setMeetingIdToEdit(null);
+    setMeetingData({ ...DEFAULT_MEETING_FORM });
+    setMeetingAttendees([]);
+  }, []);
 
-    setLoadingMeeting(true);
-    try {
-      const payload: any = {
-        name: meetingData.meetingName,
-        meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
-        lead_id: String(meetingData.leadId),
-        meeting_outcome: "Scheduled", // Default to "Scheduled" when creating
-        extensions:
-          meetingAttendees.length > 0
-            ? meetingAttendees.map((user: any) => user.value)
-            : [(session?.user as any)?.extension || "admin"],
-      };
-
-      await createMeeting(payload);
-
-      // Refresh lead data (sidebar or view modal)
-      if (meetingData.leadId) {
-        await handleRowClicked(meetingData.leadId);
-      }
-
-      // Reset form and close modal
-      setShowAddMeetingModal(false);
-      setMeetingIdToEdit(null);
-      setMeetingData({
-        leadId: null,
-        leadName: "",
-        meetingName: "",
-        meetingType: "Online",
-        meetingDate: "",
-        meetingTime: "",
-        meetingOutcome: "",
-        extensions: [],
-      });
-      setMeetingAttendees([]);
-    } catch (error) {
-      console.error("Failed to create meeting:", error);
-    } finally {
-      setLoadingMeeting(false);
-    }
-  }, [meetingData, meetingAttendees, session, handleRowClicked]);
-
-  // Handle meeting update
-  const handleUpdateMeeting = useCallback(async () => {
-    if (
-      !meetingIdToEdit ||
-      !meetingData.meetingName ||
-      !meetingData.meetingDate ||
-      !meetingData.meetingTime
-    )
-      return;
-
-    setLoadingMeeting(true);
-    try {
+  const buildMeetingPayload = useCallback(
+    (mode: "create" | "update") => {
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
@@ -2463,40 +2322,78 @@ const CrmLeads = () => {
         extensions:
           meetingAttendees.length > 0
             ? meetingAttendees.map((user: any) => user.value)
-            : [],
+            : mode === "create"
+              ? [(session?.user as any)?.extension || "admin"]
+              : [],
       };
 
-      if (meetingData.meetingOutcome) {
+      if (mode === "create") {
+        payload.lead_id = String(meetingData.leadId);
+        payload.meeting_outcome = "Scheduled";
+      } else if (meetingData.meetingOutcome) {
         payload.meeting_outcome = meetingData.meetingOutcome;
       }
 
-      await updateMeeting(meetingIdToEdit!, payload);
+      return payload;
+    },
+    [meetingData, meetingAttendees, session],
+  );
 
-      // Refresh lead data (sidebar or view modal)
-      if (meetingData.leadId) {
-        await handleRowClicked(meetingData.leadId);
+  const submitMeeting = useCallback(
+    async (mode: "create" | "update") => {
+      const hasRequiredData =
+        mode === "create"
+          ? Boolean(
+              meetingData.leadId &&
+                meetingData.meetingName &&
+                meetingData.meetingDate &&
+                meetingData.meetingTime,
+            )
+          : Boolean(
+              meetingIdToEdit &&
+                meetingData.meetingName &&
+                meetingData.meetingDate &&
+                meetingData.meetingTime,
+            );
+      if (!hasRequiredData) return;
+
+      setLoadingMeeting(true);
+      try {
+        const payload = buildMeetingPayload(mode);
+        if (mode === "create") {
+          await createMeeting(payload);
+        } else {
+          await updateMeeting(meetingIdToEdit!, payload);
+        }
+
+        if (meetingData.leadId) {
+          await handleRowClicked(meetingData.leadId);
+        }
+        resetMeetingForm();
+      } catch (error) {
+        console.error(`Failed to ${mode} meeting:`, error);
+      } finally {
+        setLoadingMeeting(false);
       }
+    },
+    [
+      meetingIdToEdit,
+      meetingData,
+      buildMeetingPayload,
+      handleRowClicked,
+      resetMeetingForm,
+    ],
+  );
 
-      // Reset form and close modal
-      setShowAddMeetingModal(false);
-      setMeetingIdToEdit(null);
-      setMeetingData({
-        leadId: null,
-        leadName: "",
-        meetingName: "",
-        meetingType: "Online",
-        meetingDate: "",
-        meetingTime: "",
-        meetingOutcome: "",
-        extensions: [],
-      });
-      setMeetingAttendees([]);
-    } catch (error) {
-      console.error("Failed to update meeting:", error);
-    } finally {
-      setLoadingMeeting(false);
-    }
-  }, [meetingIdToEdit, meetingData, meetingAttendees, handleRowClicked]);
+  // Handle meeting creation
+  const handleCreateMeeting = useCallback(async () => {
+    await submitMeeting("create");
+  }, [submitMeeting]);
+
+  // Handle meeting update
+  const handleUpdateMeeting = useCallback(async () => {
+    await submitMeeting("update");
+  }, [submitMeeting]);
 
   // Handle edit meeting click
   const handleEditMeeting = useCallback(
