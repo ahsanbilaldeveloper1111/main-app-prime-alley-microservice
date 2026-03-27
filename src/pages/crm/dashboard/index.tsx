@@ -7,9 +7,7 @@ import {
   Col,
   Button,
   Badge,
-  ProgressBar,
   Spinner,
-  Table,
 } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import {
@@ -29,7 +27,6 @@ import {
   Handshake,
   ShoppingBag,
   TrendingUp,
-  Edit,
   Calendar,
 } from "lucide-react";
 import Link from "next/link";
@@ -41,34 +38,28 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Legend,
 } from "recharts";
 
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import { ListGroup, Form } from 'react-bootstrap';
+import StatsCards from "@components/GenericStatsCards";
+import { ListGroup } from 'react-bootstrap';
 import {
   Users,
   UserPlus,
   DollarSign,
   ShoppingCart,
-  Search,
-  Mail,
   CheckCircle,
   ChevronRight,
-  ChevronDown,
 
 } from 'lucide-react';
 import { LineChart, Line,} from 'recharts';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import { GlobalDateTimeFormat,formatNumber ,convertDateTimeWithOffsetToLocal, ModuleSlug } from "@utils/Helper";
+import { GlobalDateTimeFormat,formatNumber , ModuleSlug } from "@utils/Helper";
 
 // KPI Card Component
 interface KPICardData {
@@ -132,8 +123,8 @@ const getOrderBadgeColor = (order: OrderData): string => {
 };
 
 const getRecordTypeFromAuditableType = (auditableType: unknown): string => {
-  if (!auditableType) return "";
-  const typeParts = String(auditableType).split("\\").filter(Boolean);
+  if (typeof auditableType !== "string" || !auditableType.trim()) return "";
+  const typeParts = auditableType.split("\\").filter(Boolean);
   return typeParts.at(-1) || "";
 };
 
@@ -144,7 +135,9 @@ const getMeetingRecordNavigation = (
   const typeLabel = getRecordTypeFromAuditableType(recordType);
   const normalizedType = typeLabel.toLowerCase();
   const idValue =
-    recordId === null || recordId === undefined ? "" : String(recordId).trim();
+    typeof recordId === "string" || typeof recordId === "number"
+      ? String(recordId).trim()
+      : "";
 
   if (!normalizedType || !idValue) {
     return { label: typeLabel || "", href: null };
@@ -463,7 +456,6 @@ const CrmDashboard = () => {
   const dealsCount = dashboardData?.counts?.deals || 0;
   const ordersCount = dashboardData?.counts?.orders || 0;
   const leadToDealConversionPercentage = dashboardData?.conversion_ratios?.lead_to_deal || 0;
-  const dealToOrderConversionPercentage = dashboardData?.conversion_ratios?.deal_to_order || 0;
   
   const prospectsPercentage = prospectsCount > 0 ? 100 : 0;
   const leadsPercentage = prospectsCount > 0 ? Math.round((leadsCount / prospectsCount) * 100) : 0;

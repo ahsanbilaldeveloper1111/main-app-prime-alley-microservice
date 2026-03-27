@@ -79,7 +79,6 @@ import {
   MoreVertical,
   X,
   Users,
-  PlusCircle,
   Clock,
   Layers,
   Calendar,
@@ -100,7 +99,6 @@ import {
   UserCheck,
   User,
   Building2,
-  Mail,
   Paperclip,
   Download as DownloadIcon,
   AlertCircle,
@@ -108,7 +106,6 @@ import {
   Percent,
   Trash,
   Phone as PhoneIcon,
-  CheckSquare,
   XCircle,
 } from "lucide-react";
 import {
@@ -709,51 +706,32 @@ const CrmDeals = () => {
         page,
         per_page: perPage,
       };
-      if (filters.search) {
-        params.search = filters.search;
-      }
-      if (filters.stage_id) {
-        params.stage_id = filters.stage_id;
-      }
-      if (filters.assigned_to) {
-        params.assigned_to = filters.assigned_to;
-      }
-      if (filters.is_lost !== undefined) {
-        params.is_lost = filters.is_lost;
-      }
-      if (filters.include_lost !== undefined) {
-        params.include_lost = filters.include_lost;
-      }
-      if (filters.include_archived !== undefined) {
-        params.include_archived = filters.include_archived;
-      }
-      if (filters.follow_up_date_from) {
-        params.follow_up_date_from = filters.follow_up_date_from;
-      }
-      if (filters.follow_up_date_to) {
-        params.follow_up_date_to = filters.follow_up_date_to;
-      }
-      if (filters.probability_min) {
-        params.probability_min = filters.probability_min;
-      }
-      if (filters.probability_max) {
-        params.probability_max = filters.probability_max;
-      }
-      if (filters.deal_type) {
-        params.deal_type = filters.deal_type;
-      }
-      if (filters.industry) {
-        params.industry = filters.industry;
-      }
-      if (filters.expected_close_date_from) {
-        params.expected_close_date_from = filters.expected_close_date_from;
-      }
-      if (filters.expected_close_date_to) {
-        params.expected_close_date_to = filters.expected_close_date_to;
-      }
-      if (filters.approval_status) {
-        params.approval_status = filters.approval_status;
-      }
+      const truthyFilterKeys = [
+        "search",
+        "stage_id",
+        "assigned_to",
+        "follow_up_date_from",
+        "follow_up_date_to",
+        "probability_min",
+        "probability_max",
+        "deal_type",
+        "industry",
+        "expected_close_date_from",
+        "expected_close_date_to",
+        "approval_status",
+      ] as const;
+      truthyFilterKeys.forEach((key) => {
+        if (filters[key]) {
+          params[key] = filters[key];
+        }
+      });
+
+      const definedFilterKeys = ["is_lost", "include_lost", "include_archived"] as const;
+      definedFilterKeys.forEach((key) => {
+        if (filters[key] !== undefined) {
+          params[key] = filters[key];
+        }
+      });
       if (
         includeTableSorting &&
         dealsPagination.sortColumn
@@ -1135,7 +1113,9 @@ const CrmDeals = () => {
       return;
     }
     lastTabTotalsRequestKeyRef.current = tabTotalsRequestKey;
-    void fetchTabTotals(tabTotalsBaseFilters);
+    fetchTabTotals(tabTotalsBaseFilters).catch((error) => {
+      console.error("Failed to fetch tab totals:", error);
+    });
   }, [fetchTabTotals, tabTotalsBaseFilters, tabTotalsRequestKey]);
 
   // Fetch attachments when modal opens

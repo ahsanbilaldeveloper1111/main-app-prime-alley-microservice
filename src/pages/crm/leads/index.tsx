@@ -875,22 +875,31 @@ const CrmLeads = () => {
         params.search = search;
       }
 
-      if (filters.stage_id) params.stage_id = filters.stage_id;
-      if (filters.assigned_to) params.assigned_to = filters.assigned_to;
-      if (filters.business_type_id) params.business_type_id = filters.business_type_id;
-      if (filters.source) params.source = filters.source;
-      if (filters.lead_potential) params.lead_potential = filters.lead_potential;
-      if (filters.campaign_id) params.campaign_id = filters.campaign_id;
-      if (filters.lost_reason_id) params.lost_reason_id = filters.lost_reason_id;
-      if (filters.lead_score_min) params.lead_score_min = filters.lead_score_min;
-      if (filters.lead_score_max) params.lead_score_max = filters.lead_score_max;
-      if (filters.date_from) params.date_from = filters.date_from;
-      if (filters.date_to) params.date_to = filters.date_to;
-      if (filters.is_lost !== undefined) params.is_lost = filters.is_lost;
-      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
-      if (filters.include_archived !== undefined) {
-        params.include_archived = filters.include_archived;
-      }
+      const truthyFilterKeys = [
+        "stage_id",
+        "assigned_to",
+        "business_type_id",
+        "source",
+        "lead_potential",
+        "campaign_id",
+        "lost_reason_id",
+        "lead_score_min",
+        "lead_score_max",
+        "date_from",
+        "date_to",
+      ] as const;
+      truthyFilterKeys.forEach((key) => {
+        if (filters[key]) {
+          params[key] = filters[key];
+        }
+      });
+
+      const definedFilterKeys = ["is_lost", "include_lost", "include_archived"] as const;
+      definedFilterKeys.forEach((key) => {
+        if (filters[key] !== undefined) {
+          params[key] = filters[key];
+        }
+      });
 
       if (includeSort && leadsPagination.sortColumn) {
         params.sort_column = leadsPagination.sortColumn;
@@ -903,7 +912,7 @@ const CrmLeads = () => {
   );
 
   const getLeadsTotalFromResponse = useCallback((response: any): number => {
-    return Number((response as any)?.data?.pagination?.total) || 0;
+    return Number(response?.data?.pagination?.total) || 0;
   }, []);
 
   // Fetch leads when filters or search change
@@ -1126,7 +1135,9 @@ const CrmLeads = () => {
       return;
     }
     lastTabTotalsRequestKeyRef.current = tabTotalsRequestKey;
-    void fetchTabTotals(tabTotalsBaseFilters);
+    fetchTabTotals(tabTotalsBaseFilters).catch((error) => {
+      console.error("Failed to fetch tab totals:", error);
+    });
   }, [fetchTabTotals, tabTotalsBaseFilters, tabTotalsRequestKey]);
 
   // Initialize export filters when export modal opens
@@ -3071,6 +3082,26 @@ const CrmLeads = () => {
         </div>
       ) : undefined,
   });
+
+  const handleAddCustomTab = useCallback(
+    (tabId: string, label: string, count: number) => {
+      if (customTabs.some((tab) => tab.id === tabId)) {
+        return;
+      }
+      setCustomTabs((prevTabs) => [
+        ...prevTabs,
+        {
+          id: tabId,
+          label,
+          count,
+          removable: true,
+        },
+      ]);
+      setShowTabModal(false);
+      toast.success("Tab added successfully!");
+    },
+    [customTabs],
+  );
 
   if (!session?.user?.permissions?.includes("list-crm-leads")) {
     return null;
@@ -9934,24 +9965,7 @@ const CrmLeads = () => {
                 <Button
                   key={stage.id}
                   variant="outline-primary"
-                  onClick={() => {
-                    if (!isAlreadyAdded) {
-                      setCustomTabs((prevTabs) => {
-                        if (prevTabs.some((t) => t.id === stageId)) return prevTabs;
-                        return [
-                          ...prevTabs,
-                          {
-                            id: stageId,
-                            label: stage.name,
-                            count: stageCount,
-                            removable: true,
-                          },
-                        ];
-                      });
-                      setShowTabModal(false);
-                      toast.success("Tab added successfully!");
-                    }
-                  }}
+                  onClick={() => handleAddCustomTab(stageId, stage.name, stageCount)}
                   disabled={isAlreadyAdded}
                   className="d-flex align-items-center justify-content-start"
                   style={{ textAlign: "left" }}
@@ -9969,24 +9983,9 @@ const CrmLeads = () => {
             {/* Lost and Deleted tabs */}
             <Button
               variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.some((t) => t.id === "lost")) {
-                  setCustomTabs((prevTabs) => {
-                    if (prevTabs.some((t) => t.id === "lost")) return prevTabs;
-                    return [
-                      ...prevTabs,
-                      {
-                        id: "lost",
-                        label: "Lost",
-                        count: filterCounts.lost || 0,
-                        removable: true,
-                      },
-                    ];
-                  });
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
+              onClick={() =>
+                handleAddCustomTab("lost", "Lost", filterCounts.lost || 0)
+              }
               disabled={customTabs.some((t) => t.id === "lost")}
               className="d-flex align-items-center justify-content-start"
               style={{ textAlign: "left" }}
@@ -10001,24 +10000,9 @@ const CrmLeads = () => {
             </Button>
             <Button
               variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.some((t) => t.id === "deleted")) {
-                  setCustomTabs((prevTabs) => {
-                    if (prevTabs.some((t) => t.id === "deleted")) return prevTabs;
-                    return [
-                      ...prevTabs,
-                      {
-                        id: "deleted",
-                        label: "Deleted",
-                        count: filterCounts.deleted || 0,
-                        removable: true,
-                      },
-                    ];
-                  });
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
+              onClick={() =>
+                handleAddCustomTab("deleted", "Deleted", filterCounts.deleted || 0)
+              }
               disabled={customTabs.some((t) => t.id === "deleted")}
               className="d-flex align-items-center justify-content-start"
               style={{ textAlign: "left" }}
