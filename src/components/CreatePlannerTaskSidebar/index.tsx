@@ -330,7 +330,19 @@ function isWeeklyRepeatOnValue(s: string): s is WeeklyRepeatOnValue {
 
 function normalizeWeeklyRepeatOnFromApi(raw: unknown): string {
   if (raw == null || raw === "") return "";
-  const s = String(raw).trim().toLowerCase();
+  let asString: string;
+  if (typeof raw === "string") {
+    asString = raw;
+  } else if (typeof raw === "number" && Number.isFinite(raw)) {
+    asString = String(raw);
+  } else if (typeof raw === "bigint") {
+    asString = String(raw);
+  } else if (typeof raw === "boolean") {
+    asString = String(raw);
+  } else {
+    return "";
+  }
+  const s = asString.trim().toLowerCase();
   if (isWeeklyRepeatOnValue(s)) return s;
   const shortMap: Record<string, WeeklyRepeatOnValue> = {
     sun: "sunday",
