@@ -2614,9 +2614,14 @@ export const getOrder = async (id: number): Promise<OrderData> => {
   }
 };
 
-export const deleteOrder = async (id: number): Promise<void> => {
+export const deleteOrder = async (
+  id: number,
+  payload?: { feedback?: string },
+): Promise<void> => {
   try {
-    await axiosInstance.delete(`/crm/orders/${id}`);
+    await axiosInstance.delete(`/crm/orders/${id}`, {
+      data: payload,
+    });
     toast.success("Order deleted successfully");
   } catch (error: any) {
     toast.error(

@@ -7,6 +7,7 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -78,7 +79,6 @@ import {
   MoreVertical,
   X,
   Users,
-  PlusCircle,
   Clock,
   Layers,
   Calendar,
@@ -99,7 +99,6 @@ import {
   UserCheck,
   User,
   Building2,
-  Mail,
   Paperclip,
   Download as DownloadIcon,
   AlertCircle,
@@ -107,7 +106,6 @@ import {
   Percent,
   Trash,
   Phone as PhoneIcon,
-  CheckSquare,
   XCircle,
 } from "lucide-react";
 import {
@@ -522,6 +520,11 @@ const CrmDeals = () => {
   const [approvalMetrics, setApprovalMetrics] = useState<
     Record<string, number> | null
   >(null);
+  const [tabTotals, setTabTotals] = useState<Record<string, number>>({
+    all: 0,
+    lost: 0,
+    deleted: 0,
+  });
 
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -692,70 +695,66 @@ const CrmDeals = () => {
     fetchExtensions(ModuleSlug.CRM_DEALS);
   }, []);
 
+  const buildApprovalsDealsParams = useCallback(
+    (
+      filters: Record<string, any>,
+      page = 1,
+      perPage = 15,
+      includeTableSorting = true,
+    ) => {
+      const params: Record<string, any> = {
+        page,
+        per_page: perPage,
+      };
+      const truthyFilterKeys = [
+        "search",
+        "stage_id",
+        "assigned_to",
+        "follow_up_date_from",
+        "follow_up_date_to",
+        "probability_min",
+        "probability_max",
+        "deal_type",
+        "industry",
+        "expected_close_date_from",
+        "expected_close_date_to",
+        "approval_status",
+      ] as const;
+      truthyFilterKeys.forEach((key) => {
+        if (filters[key]) {
+          params[key] = filters[key];
+        }
+      });
+
+      const definedFilterKeys = ["is_lost", "include_lost", "include_archived"] as const;
+      definedFilterKeys.forEach((key) => {
+        if (filters[key] !== undefined) {
+          params[key] = filters[key];
+        }
+      });
+      if (
+        includeTableSorting &&
+        dealsPagination.sortColumn
+      ) {
+        params.sort_column = dealsPagination.sortColumn;
+        params.sort_direction = dealsPagination.sortDirection;
+      }
+      return params;
+    },
+    [dealsPagination.sortColumn, dealsPagination.sortDirection],
+  );
+
   // Fetch deals when filters or search change
   const fetchDeals = useCallback(
     async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
-        const params: any = {
+        const params = buildApprovalsDealsParams(
+          currentFilters,
           page,
-          per_page: perPage,
-        };
-
-        // Use search from currentFilters if available
-        if (currentFilters.search) {
-          params.search = currentFilters.search;
-        }
-
-        // Add filter parameters at top level
-        if (currentFilters.stage_id) {
-          params.stage_id = currentFilters.stage_id;
-        }
-        if (currentFilters.assigned_to) {
-          params.assigned_to = currentFilters.assigned_to;
-        }
-        if (currentFilters.is_lost !== undefined) {
-          params.is_lost = currentFilters.is_lost;
-        }
-        if (currentFilters.include_lost !== undefined) {
-          params.include_lost = currentFilters.include_lost;
-        }
-        if (currentFilters.include_archived !== undefined) {
-          params.include_archived = currentFilters.include_archived;
-        }
-        if (currentFilters.follow_up_date_from) {
-          params.follow_up_date_from = currentFilters.follow_up_date_from;
-        }
-        if (currentFilters.follow_up_date_to) {
-          params.follow_up_date_to = currentFilters.follow_up_date_to;
-        }
-        if (currentFilters.probability_min) {
-          params.probability_min = currentFilters.probability_min;
-        }
-        if (currentFilters.probability_max) {
-          params.probability_max = currentFilters.probability_max;
-        }
-        if (currentFilters.deal_type) {
-          params.deal_type = currentFilters.deal_type;
-        }
-        if (currentFilters.industry) {
-          params.industry = currentFilters.industry;
-        }
-        if (currentFilters.expected_close_date_from) {
-          params.expected_close_date_from =
-            currentFilters.expected_close_date_from;
-        }
-        if (currentFilters.expected_close_date_to) {
-          params.expected_close_date_to = currentFilters.expected_close_date_to;
-        }
-        if (currentFilters.approval_status) {
-          params.approval_status = currentFilters.approval_status;
-        }
-
-        if (dealsPagination.sortColumn) {
-          params.sort_column = dealsPagination.sortColumn;
-          params.sort_direction = dealsPagination.sortDirection;
-        }
+          perPage,
+          true,
+        );
 
         const response: any = await getDeals(params);
         console.log("Raw response from getDeals:", response);
@@ -792,7 +791,78 @@ const CrmDeals = () => {
         setLoading(false);
       }
     },
-    [currentFilters, dealsPagination.sortColumn, dealsPagination.sortDirection],
+    [buildApprovalsDealsParams, currentFilters],
+  );
+
+  const tabTotalsBaseFilters = useMemo(() => {
+    const baseFilters = { ...currentFilters };
+    delete baseFilters.stage_id;
+    delete baseFilters.include_lost;
+    delete baseFilters.include_archived;
+    return baseFilters;
+  }, [currentFilters]);
+
+  const tabTotalsRequestKey = useMemo(
+    () =>
+      JSON.stringify({
+        refreshKey,
+        filters: tabTotalsBaseFilters,
+        stageIds: stages.map((stage: { id: number | string }) => stage.id),
+      }),
+    [refreshKey, stages, tabTotalsBaseFilters],
+  );
+  const lastTabTotalsRequestKeyRef = useRef<string>("");
+
+  const fetchTabTotals = useCallback(
+    async (baseFilters: Record<string, any>) => {
+      try {
+        const [allResp, lostResp, deletedResp, ...stageResponses] =
+          await Promise.all([
+            getDeals(buildApprovalsDealsParams(baseFilters, 1, 1, false)),
+            getDeals(
+              buildApprovalsDealsParams(
+                { ...baseFilters, include_lost: true },
+                1,
+                1,
+                false,
+              ),
+            ),
+            getDeals(
+              buildApprovalsDealsParams(
+                { ...baseFilters, include_archived: true },
+                1,
+                1,
+                false,
+              ),
+            ),
+            ...stages.map((stage: { id: number | string }) =>
+              getDeals(
+                buildApprovalsDealsParams(
+                  { ...baseFilters, stage_id: String(stage.id) },
+                  1,
+                  1,
+                  false,
+                ),
+              ),
+            ),
+          ]);
+
+        const nextTotals: Record<string, number> = {
+          all: allResp?.meta?.total ?? 0,
+          lost: lostResp?.meta?.total ?? 0,
+          deleted: deletedResp?.meta?.total ?? 0,
+        };
+
+        stages.forEach((stage: { id: number | string }, index: number) => {
+          nextTotals[stage.id] = stageResponses[index]?.meta?.total ?? 0;
+        });
+
+        setTabTotals(nextTotals);
+      } catch (error) {
+        console.error("Failed to fetch approval tab totals:", error);
+      }
+    },
+    [buildApprovalsDealsParams, stages],
   );
 
   // Sync export modal filters from current table filters when modal opens
@@ -990,7 +1060,9 @@ const CrmDeals = () => {
     }
   }, [activeFilter, stages]);
 
-  // Read tab from URL on mount and when router is ready
+  // Read tab from URL on mount and when router is ready.
+  // Do not depend on activeFilter: router.query updates after local state; comparing
+  // tabFromUrl to activeFilter would reset the selected tab to a stale URL value.
   useEffect(() => {
     if (router.isReady && router.query.tab) {
       const tabFromUrl = String(router.query.tab);
@@ -1001,11 +1073,11 @@ const CrmDeals = () => {
         tabFromUrl === "deleted" ||
         (stages.length > 0 &&
           stages.some((s: any) => s.id.toString() === tabFromUrl));
-      if (isValidFilter && tabFromUrl !== activeFilter) {
-        setActiveFilter(tabFromUrl);
+      if (isValidFilter) {
+        setActiveFilter((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
       }
     }
-  }, [router.isReady, router.query.tab, stages, activeFilter]);
+  }, [router.isReady, router.query.tab, stages]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
@@ -1035,6 +1107,16 @@ const CrmDeals = () => {
     dealsPagination.rowsPerPage,
     fetchDeals,
   ]);
+
+  useEffect(() => {
+    if (lastTabTotalsRequestKeyRef.current === tabTotalsRequestKey) {
+      return;
+    }
+    lastTabTotalsRequestKeyRef.current = tabTotalsRequestKey;
+    fetchTabTotals(tabTotalsBaseFilters).catch((error) => {
+      console.error("Failed to fetch tab totals:", error);
+    });
+  }, [fetchTabTotals, tabTotalsBaseFilters, tabTotalsRequestKey]);
 
   // Fetch attachments when modal opens
   useEffect(() => {
@@ -2244,26 +2326,28 @@ const CrmDeals = () => {
     return dealsData.map(transformDealData);
   }, [dealsData, extensions]);
 
-  // Calculate filter counts (using summary_tiles if available, otherwise from data)
+  // Tab badge counts: use API totals independent of the active tab (current page data is filtered).
   const filterCounts = useMemo(() => {
     const transformed = dealsData.map(transformDealData);
     const counts: Record<string, number> = {
-      all: summaryTiles?.total_deals || totalDeals || transformed.length,
+      all:
+        tabTotals.all ??
+        summaryTiles?.total_deals ??
+        totalDeals ??
+        transformed.length,
       lost:
-        summaryTiles?.lost_deals || transformed.filter((d) => d.isLost).length,
-      deleted: summaryTiles?.deleted_deals || 0,
+        tabTotals.lost ??
+        summaryTiles?.lost_deals ??
+        transformed.filter((d) => d.isLost).length,
+      deleted: tabTotals.deleted ?? summaryTiles?.deleted_deals ?? 0,
     };
 
-    // Add counts for first 5 stages
-    stages.slice(0, 5).forEach((stage: any) => {
-      const stageDeals = transformed.filter(
-        (d) => d.stage === stage.name || d.rawData?.stage_id === stage.id,
-      );
-      counts[stage.id] = stageDeals.length;
+    stages.forEach((stage: { id: number | string }) => {
+      counts[stage.id] = tabTotals[stage.id] ?? 0;
     });
 
     return counts;
-  }, [dealsData, extensions, stages, summaryTiles, totalDeals]);
+  }, [dealsData, extensions, stages, summaryTiles, tabTotals, totalDeals]);
 
   // Update custom tabs counts when filterCounts change
   useEffect(() => {
