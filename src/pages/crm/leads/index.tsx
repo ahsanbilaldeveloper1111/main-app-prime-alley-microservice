@@ -621,6 +621,11 @@ const CrmLeads = () => {
   const [leadMetrics, setLeadMetrics] = useState<Record<string, number> | null>(
     null,
   );
+  const [tabTotals, setTabTotals] = useState<Record<string, number>>({
+    all: 0,
+    lost: 0,
+    deleted: 0,
+  });
 
   // UI State
   const [showLeadsAnalytics, setShowLeadsAnalytics] = useState(false);
@@ -851,71 +856,62 @@ const CrmLeads = () => {
     }
   };
 
+  const buildLeadsParams = useCallback(
+    (
+      filters: Record<string, any>,
+      page = 1,
+      perPage = 15,
+      search = "",
+      includeSort = true,
+    ) => {
+      const params: any = {
+        page,
+        per_page: perPage,
+      };
+
+      if (filters.search) {
+        params.search = filters.search;
+      } else if (search) {
+        params.search = search;
+      }
+
+      if (filters.stage_id) params.stage_id = filters.stage_id;
+      if (filters.assigned_to) params.assigned_to = filters.assigned_to;
+      if (filters.business_type_id) params.business_type_id = filters.business_type_id;
+      if (filters.source) params.source = filters.source;
+      if (filters.lead_potential) params.lead_potential = filters.lead_potential;
+      if (filters.campaign_id) params.campaign_id = filters.campaign_id;
+      if (filters.lost_reason_id) params.lost_reason_id = filters.lost_reason_id;
+      if (filters.lead_score_min) params.lead_score_min = filters.lead_score_min;
+      if (filters.lead_score_max) params.lead_score_max = filters.lead_score_max;
+      if (filters.date_from) params.date_from = filters.date_from;
+      if (filters.date_to) params.date_to = filters.date_to;
+      if (filters.is_lost !== undefined) params.is_lost = filters.is_lost;
+      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
+      if (filters.include_archived !== undefined) {
+        params.include_archived = filters.include_archived;
+      }
+
+      if (includeSort && leadsPagination.sortColumn) {
+        params.sort_column = leadsPagination.sortColumn;
+        params.sort_direction = leadsPagination.sortDirection;
+      }
+
+      return params;
+    },
+    [leadsPagination.sortColumn, leadsPagination.sortDirection],
+  );
+
+  const getLeadsTotalFromResponse = useCallback((response: any): number => {
+    return Number((response as any)?.data?.pagination?.total) || 0;
+  }, []);
+
   // Fetch leads when filters or search change
   const fetchLeads = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       setLoading(true);
       try {
-        const params: any = {
-          page,
-          per_page: perPage,
-        };
-
-        // Use search from currentFilters if available, otherwise use the search parameter
-        if (currentFilters.search) {
-          params.search = currentFilters.search;
-        } else if (search) {
-          params.search = search;
-        }
-
-        // Add filter parameters at top level
-        if (currentFilters.stage_id) {
-          params.stage_id = currentFilters.stage_id;
-        }
-        if (currentFilters.assigned_to) {
-          params.assigned_to = currentFilters.assigned_to;
-        }
-        if (currentFilters.business_type_id) {
-          params.business_type_id = currentFilters.business_type_id;
-        }
-        if (currentFilters.source) {
-          params.source = currentFilters.source;
-        }
-        if (currentFilters.lead_potential) {
-          params.lead_potential = currentFilters.lead_potential;
-        }
-        if (currentFilters.campaign_id) {
-          params.campaign_id = currentFilters.campaign_id;
-        }
-        if (currentFilters.lost_reason_id) {
-          params.lost_reason_id = currentFilters.lost_reason_id;
-        }
-        if (currentFilters.lead_score_min) {
-          params.lead_score_min = currentFilters.lead_score_min;
-        }
-        if (currentFilters.lead_score_max) {
-          params.lead_score_max = currentFilters.lead_score_max;
-        }
-        if (currentFilters.date_from) {
-          params.date_from = currentFilters.date_from;
-        }
-        if (currentFilters.date_to) {
-          params.date_to = currentFilters.date_to;
-        }
-        if (currentFilters.is_lost !== undefined) {
-          params.is_lost = currentFilters.is_lost;
-        }
-        if (currentFilters.include_lost !== undefined) {
-          params.include_lost = currentFilters.include_lost;
-        }
-        if (currentFilters.include_archived !== undefined) {
-          params.include_archived = currentFilters.include_archived;
-        }
-
-        if (leadsPagination.sortColumn) {
-          params.sort_column = leadsPagination.sortColumn;
-          params.sort_direction = leadsPagination.sortDirection;
-        }
+        const params = buildLeadsParams(currentFilters, page, perPage, search, true);
 
         const response: any = await getLeads(params);
         console.log("Raw response from getLeads:", response);
@@ -959,9 +955,8 @@ const CrmLeads = () => {
       }
     },
     [
+      buildLeadsParams,
       currentFilters,
-      leadsPagination.sortColumn,
-      leadsPagination.sortDirection,
     ],
   );
 
@@ -1039,16 +1034,18 @@ const CrmLeads = () => {
         tabFromUrl === "deleted" ||
         (stages.length > 0 &&
           stages.some((s: any) => s.id.toString() === tabFromUrl));
-      if (isValidFilter && tabFromUrl !== activeFilter) {
-        setActiveFilter(tabFromUrl);
-        setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
+      if (isValidFilter) {
+        setActiveFilter((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
       }
     }
-  }, [router.isReady, router.query.tab, stages, activeFilter]);
+  }, [router.isReady, router.query.tab, stages]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
     (filterId: string) => {
+      // Update active tab immediately to avoid visual lag
+      setActiveFilter(filterId);
+      setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
       // Update URL with tab query parameter
       router.push(
         {
@@ -1060,6 +1057,54 @@ const CrmLeads = () => {
       );
     },
     [router],
+  );
+
+  const tabTotalsBaseFilters = useMemo(() => {
+    const baseFilters = { ...currentFilters };
+    delete baseFilters.stage_id;
+    delete baseFilters.include_lost;
+    delete baseFilters.include_archived;
+    return baseFilters;
+  }, [currentFilters]);
+
+  const tabTotalsRequestKey = useMemo(
+    () =>
+      JSON.stringify({
+        filters: tabTotalsBaseFilters,
+        stageIds: stages.map((stage: any) => stage.id),
+      }),
+    [stages, tabTotalsBaseFilters],
+  );
+  const lastTabTotalsRequestKeyRef = useRef<string>("");
+
+  const fetchTabTotals = useCallback(
+    async (baseFilters: Record<string, any>) => {
+      try {
+        const [allResp, lostResp, deletedResp, ...stageResponses] = await Promise.all([
+          getLeads(buildLeadsParams(baseFilters, 1, 1, "", false)),
+          getLeads(buildLeadsParams({ ...baseFilters, include_lost: true }, 1, 1, "", false)),
+          getLeads(buildLeadsParams({ ...baseFilters, include_archived: true }, 1, 1, "", false)),
+          ...stages.map((stage: any) =>
+            getLeads(buildLeadsParams({ ...baseFilters, stage_id: stage.id }, 1, 1, "", false)),
+          ),
+        ]);
+
+        const nextTotals: Record<string, number> = {
+          all: getLeadsTotalFromResponse(allResp),
+          lost: getLeadsTotalFromResponse(lostResp),
+          deleted: getLeadsTotalFromResponse(deletedResp),
+        };
+
+        stages.forEach((stage: any, index) => {
+          nextTotals[stage.id] = getLeadsTotalFromResponse(stageResponses[index]);
+        });
+
+        setTabTotals(nextTotals);
+      } catch (error) {
+        console.error("Failed to fetch lead tab totals:", error);
+      }
+    },
+    [buildLeadsParams, getLeadsTotalFromResponse, stages],
   );
 
   useEffect(() => {
@@ -1075,6 +1120,14 @@ const CrmLeads = () => {
     leadsPagination.rowsPerPage,
     fetchLeads,
   ]);
+
+  useEffect(() => {
+    if (lastTabTotalsRequestKeyRef.current === tabTotalsRequestKey) {
+      return;
+    }
+    lastTabTotalsRequestKeyRef.current = tabTotalsRequestKey;
+    void fetchTabTotals(tabTotalsBaseFilters);
+  }, [fetchTabTotals, tabTotalsBaseFilters, tabTotalsRequestKey]);
 
   // Initialize export filters when export modal opens
   useEffect(() => {
@@ -2692,22 +2745,21 @@ const CrmLeads = () => {
   const filterCounts = useMemo(() => {
     const transformed = leadsData.map(transformLeadData);
     const counts: Record<string, number> = {
-      all: summaryTiles?.total_leads || totalLeads || transformed.length,
+      all: tabTotals.all ?? summaryTiles?.total_leads ?? totalLeads ?? transformed.length,
       lost:
-        summaryTiles?.lost_leads || transformed.filter((l) => l.isLost).length,
-      deleted: summaryTiles?.deleted_leads || 0,
+        tabTotals.lost ??
+        summaryTiles?.lost_leads ??
+        transformed.filter((l) => l.isLost).length,
+      deleted: tabTotals.deleted ?? summaryTiles?.deleted_leads ?? 0,
     };
 
     // Add counts for all stages (not just first 5, for custom tabs)
     stages.forEach((stage: any) => {
-      const stageLeads = transformed.filter(
-        (l) => l.stage === stage.name || l.rawData?.stage_id === stage.id,
-      );
-      counts[stage.id] = stageLeads.length;
+      counts[stage.id] = tabTotals[stage.id] ?? 0;
     });
 
     return counts;
-  }, [leadsData, extensions, stages, summaryTiles, totalLeads]);
+  }, [leadsData, extensions, stages, summaryTiles, tabTotals, totalLeads]);
 
   // Update custom tabs counts when filterCounts change
   useEffect(() => {
@@ -9876,22 +9928,26 @@ const CrmLeads = () => {
               const isAlreadyAdded = customTabs.some(
                 (t) => t.id === stage.id.toString(),
               );
-              const stageCount = filterCounts[stage.id] || 0;
+              const stageId = String(stage.id);
+              const stageCount = filterCounts[stageId] || 0;
               return (
                 <Button
                   key={stage.id}
                   variant="outline-primary"
                   onClick={() => {
                     if (!isAlreadyAdded) {
-                      setCustomTabs([
-                        ...customTabs,
-                        {
-                          id: stage.id.toString(),
-                          label: stage.name,
-                          count: stageCount,
-                          removable: true,
-                        },
-                      ]);
+                      setCustomTabs((prevTabs) => {
+                        if (prevTabs.some((t) => t.id === stageId)) return prevTabs;
+                        return [
+                          ...prevTabs,
+                          {
+                            id: stageId,
+                            label: stage.name,
+                            count: stageCount,
+                            removable: true,
+                          },
+                        ];
+                      });
                       setShowTabModal(false);
                       toast.success("Tab added successfully!");
                     }
@@ -9914,16 +9970,19 @@ const CrmLeads = () => {
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find((t) => t.id === "lost")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "lost",
-                      label: "Lost",
-                      count: filterCounts.lost || 0,
-                      removable: true,
-                    },
-                  ]);
+                if (!customTabs.some((t) => t.id === "lost")) {
+                  setCustomTabs((prevTabs) => {
+                    if (prevTabs.some((t) => t.id === "lost")) return prevTabs;
+                    return [
+                      ...prevTabs,
+                      {
+                        id: "lost",
+                        label: "Lost",
+                        count: filterCounts.lost || 0,
+                        removable: true,
+                      },
+                    ];
+                  });
                   setShowTabModal(false);
                   toast.success("Tab added successfully!");
                 }
@@ -9943,16 +10002,19 @@ const CrmLeads = () => {
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find((t) => t.id === "deleted")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "deleted",
-                      label: "Deleted",
-                      count: filterCounts.deleted || 0,
-                      removable: true,
-                    },
-                  ]);
+                if (!customTabs.some((t) => t.id === "deleted")) {
+                  setCustomTabs((prevTabs) => {
+                    if (prevTabs.some((t) => t.id === "deleted")) return prevTabs;
+                    return [
+                      ...prevTabs,
+                      {
+                        id: "deleted",
+                        label: "Deleted",
+                        count: filterCounts.deleted || 0,
+                        removable: true,
+                      },
+                    ];
+                  });
                   setShowTabModal(false);
                   toast.success("Tab added successfully!");
                 }

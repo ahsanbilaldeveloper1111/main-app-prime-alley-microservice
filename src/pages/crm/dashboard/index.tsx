@@ -23,6 +23,7 @@ import {
   DealData,
   OrderData,
 } from "@utils/crm";
+import { GetHierarchyData } from "@utils/users";
 import {
   Target,
   Handshake,
@@ -67,7 +68,7 @@ import { LineChart, Line,} from 'recharts';
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
-import { GlobalDateTimeFormat,formatNumber ,convertDateTimeWithOffsetToLocal} from "@utils/Helper";
+import { GlobalDateTimeFormat,formatNumber ,convertDateTimeWithOffsetToLocal, ModuleSlug } from "@utils/Helper";
 
 // KPI Card Component
 interface KPICardData {
@@ -130,6 +131,52 @@ const getOrderBadgeColor = (order: OrderData): string => {
   return "warning";
 };
 
+const getRecordTypeFromAuditableType = (auditableType: unknown): string => {
+  if (!auditableType) return "";
+  const typeParts = String(auditableType).split("\\").filter(Boolean);
+  return typeParts.at(-1) || "";
+};
+
+const getMeetingRecordNavigation = (
+  recordType: unknown,
+  recordId: unknown,
+): { label: string; href: string | null } => {
+  const typeLabel = getRecordTypeFromAuditableType(recordType);
+  const normalizedType = typeLabel.toLowerCase();
+  const idValue =
+    recordId === null || recordId === undefined ? "" : String(recordId).trim();
+
+  if (!normalizedType || !idValue) {
+    return { label: typeLabel || "", href: null };
+  }
+
+  if (normalizedType === "ticket") {
+    return {
+      label: typeLabel,
+      href: `/crm/tickets/tickets-detailpage?id=${encodeURIComponent(idValue)}`,
+    };
+  }
+
+  const detailPageTypeMap: Record<string, string> = {
+    prospect: "prospect",
+    lead: "lead",
+    deal: "deal",
+    order: "order",
+    company: "companies",
+    companies: "companies",
+  };
+
+  const detailType = detailPageTypeMap[normalizedType];
+  if (!detailType) {
+    return { label: typeLabel, href: null };
+  }
+
+  return {
+    label: typeLabel,
+    href: `/crm/detailspage?type=${detailType}&id=${encodeURIComponent(idValue)}`,
+  };
+};
+
 // Chart color palette - 15 colors for handling large datasets
 const CHART_COLORS = [
   "#ffc107", // Yellow
@@ -172,6 +219,7 @@ const CrmDashboard = () => {
   // Conversion percentages
   const [leadToDealPercent, setLeadToDealPercent] = useState(0);
   const [dealToOrderPercent, setDealToOrderPercent] = useState(0);
+  const [extensions, setExtensions] = useState<any[]>([]);
 
   const [dashboardOverview, setDashboardOverview] = useState<any>(null);
   
@@ -195,6 +243,17 @@ const CrmDashboard = () => {
       setDashboardOverview(data);
     } catch (error) {
       console.error("Failed to fetch dashboard overview data:", error);
+    }
+  }, []);
+
+  const fetchExtensions = useCallback(async () => {
+    try {
+      const hierarchyData = await GetHierarchyData(ModuleSlug.CRM_LEADS);
+      if (hierarchyData?.extensions) {
+        setExtensions(hierarchyData.extensions);
+      }
+    } catch (fetchError) {
+      console.error("Failed to fetch extensions:", fetchError);
     }
   }, []);
   // Fetch all dashboard data
@@ -289,6 +348,20 @@ const CrmDashboard = () => {
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  function getNameByExtension(extension: string) {
+    const extensionValue = String(extension);
+    const extensionData = extensions.find(
+      (ext) =>
+        String(ext.id) === extensionValue ||
+        String(ext.extension) === extensionValue,
+    );
+    return extensionData?.display_name || extensionData?.name || extension;
+  }
+
+  useEffect(() => {
+    fetchExtensions();
+  }, [fetchExtensions]);
 
   if (loading) {
     return (
@@ -389,7 +462,8 @@ const CrmDashboard = () => {
   const leadsCount = dashboardData?.counts?.leads || 0;
   const dealsCount = dashboardData?.counts?.deals || 0;
   const ordersCount = dashboardData?.counts?.orders || 0;
-  const orderConversionPercentage = dashboardData?.conversion_ratios?.order_conversion_percentage || 0;
+  const leadToDealConversionPercentage = dashboardData?.conversion_ratios?.lead_to_deal || 0;
+  const dealToOrderConversionPercentage = dashboardData?.conversion_ratios?.deal_to_order || 0;
   
   const prospectsPercentage = prospectsCount > 0 ? 100 : 0;
   const leadsPercentage = prospectsCount > 0 ? Math.round((leadsCount / prospectsCount) * 100) : 0;
@@ -656,7 +730,7 @@ const CrmDashboard = () => {
                   </div>
                 </div>
 
-                <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Prospects → Orders conversion: {orderConversionPercentage.toFixed(2)}%</p>
+                <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Leads → Deals conversion: {leadToDealConversionPercentage?.toFixed(2) || 0}%</p>
               </Card.Body>
             </Card>
 
@@ -667,6 +741,7 @@ const CrmDashboard = () => {
                 
                 <ListGroup variant="flush">
                   {(dashboardData?.recent_activities || []).slice(0, 5).map((activity: any, index: number) => {
+                    const recordType = getRecordTypeFromAuditableType(activity.auditable_type);
                     const getIcon = () => {
                       if (activity.type === 'lead') return <UserPlus size={16} color="#3B82F6" />;
                       if (activity.type === 'meeting') return <Calendar size={16} color="#10B981" />;
@@ -709,7 +784,16 @@ const CrmDashboard = () => {
                               </div>
                             </div>
                             {activity.user_extension && (
-                              <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>Extension: {activity.user_extension}</p>
+                              <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0, marginTop: '8px' }}>
+                                Extension: {getNameByExtension(activity.user_extension)}
+                              </p>
+                            )}
+                            {recordType && (
+                              <div style={{ marginTop: '8px' }}>
+                                <Badge bg="light" text="dark" style={{ fontSize: '12px', fontWeight: 500, color: '#64748B', border: '1px solid #E2E8F0' }}>
+                                  {recordType}
+                                </Badge>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -740,6 +824,7 @@ const CrmDashboard = () => {
                     const initials = meeting.name ? meeting.name.charAt(0).toUpperCase() : 'M';
                     const companyName = meeting.lead?.company_name || meeting.deal?.company_name || '';
                     const meetingTime = meeting.meeting_time ? moment(meeting.meeting_time).format('HH:mm') : '';
+                    const meetingRecordType = getMeetingRecordNavigation(meeting.record_type, meeting.record?.id);
                     return (
                       <ListGroup.Item key={meeting.id || index} style={{ padding: '16px 0', border: 'none', borderBottom: index < (dashboardData?.upcoming_meetings?.length || 0) - 1 ? '1px solid #F1F5F9' : 'none' }}>
                         <div style={{ display: 'flex', gap: '12px' }}>
@@ -753,6 +838,21 @@ const CrmDashboard = () => {
                             <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
                               {meeting.meeting_type} {meetingTime && `– ${meetingTime}`}
                             </p>
+                            {meetingRecordType.label && (
+                              <div style={{ marginTop: '8px' }}>
+                                {meetingRecordType.href ? (
+                                  <Link href={meetingRecordType.href} style={{ textDecoration: 'none' }}>
+                                    <Badge bg="light" text="dark" style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 500, color: '#64748B', border: '1px solid #E2E8F0' }}>
+                                      {meetingRecordType.label}
+                                    </Badge>
+                                  </Link>
+                                ) : (
+                                  <Badge bg="light" text="dark" style={{ fontSize: '12px', fontWeight: 500, color: '#64748B', border: '1px solid #E2E8F0' }}>
+                                    {meetingRecordType.label}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Calendar size={14} color="#94A3B8" />
