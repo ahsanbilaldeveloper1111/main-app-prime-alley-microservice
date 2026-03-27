@@ -12,6 +12,8 @@ interface ListProjectsParams {
   search?: string;
   status?: string;
   user_extensions?: string[];
+  start_date_from?: string;
+  end_date_to?: string;
 }
 
 interface CreateProjectData {
@@ -61,6 +63,41 @@ interface AddMemberData {
 
 interface UpdateMemberRoleData {
   role: string;
+}
+
+/** Pagination block returned with list-tasks responses. */
+export interface ListTasksPagination {
+  page?: number;
+  limit?: number;
+  total?: number;
+  last_page?: number;
+  from?: number;
+  to?: number;
+}
+
+/** Summary stats block returned with some list-tasks responses. */
+export interface ListTasksSummary {
+  total?: number;
+  open?: number;
+  openTasks?: number;
+  overdue?: number;
+  dueThisWeek?: number;
+  todayDue?: number;
+  unassigned?: number;
+  highPriority?: number;
+  scheduled?: number;
+  completed?: number;
+  pending?: number;
+  anytime?: number;
+}
+
+/** Parsed JSON body from list-tasks API responses (after axios unwrap). */
+export interface ListTasksParsedBody {
+  success?: boolean;
+  message?: string;
+  data?: unknown[];
+  pagination?: ListTasksPagination;
+  summary?: ListTasksSummary;
 }
 
 interface ListTasksParams {
@@ -240,7 +277,7 @@ const validateArrayResponse = (
  */
 export const listProjects = async (params: ListProjectsParams = {}) => {
   try {
-    const { page = 1, limit = 20, search = "", status, user_extensions } = params;
+    const { page = 1, limit = 20, search = "", status, user_extensions, start_date_from, end_date_to } = params;
 
     // Ensure array params use `param[]` formatting
     const formattedParams = new URLSearchParams();
@@ -253,6 +290,14 @@ export const listProjects = async (params: ListProjectsParams = {}) => {
 
     if (status) {
       formattedParams.append('status', status);
+    }
+
+    if (start_date_from) {
+      formattedParams.append('start_date_from', start_date_from);
+    }
+
+    if (end_date_to) {
+      formattedParams.append('end_date_to', end_date_to);
     }
 
     if (Array.isArray(user_extensions) && user_extensions.length > 0) {
@@ -300,12 +345,16 @@ export const createProject = async (data: CreateProjectData) => {
   }
 };
 
+/** Optional query params merged into GET /projects/:id (e.g. sub_task_count). */
+export type GetProjectQueryParams = Record<string, string | number | boolean | undefined>;
+
 /**
  * Get a single project by ID with optional relations
  */
 export const getProject = async (
   id: string | number,
-  withRelations?: string[]
+  withRelations?: string[],
+  queryParams?: GetProjectQueryParams
 ) => {
   try {
     // Format array parameters correctly for with[] query params
@@ -315,7 +364,13 @@ export const getProject = async (
         formattedParams.append('with[]', relation);
       });
     }
-    
+    if (queryParams) {
+      for (const [key, value] of Object.entries(queryParams)) {
+        if (value === undefined) continue;
+        formattedParams.append(key, String(value));
+      }
+    }
+
     const queryString = formattedParams.toString();
     const url = queryString 
       ? `${prefix}/projects/${id}?${queryString}`
@@ -545,92 +600,125 @@ export const removeMember = async (projectId: string | number, extensionNumber: 
 
 // ==================== Tasks API ====================
 
+function appendTruthyQueryParam(
+  searchParams: URLSearchParams,
+  key: string,
+  value: string | number | undefined,
+): void {
+  if (value) {
+    searchParams.append(key, String(value));
+  }
+}
+
+function appendBooleanIfDefined(
+  searchParams: URLSearchParams,
+  key: string,
+  value: boolean | undefined,
+): void {
+  if (value !== undefined) {
+    searchParams.append(key, String(value));
+  }
+}
+
+function appendRepeatedQueryParam(
+  searchParams: URLSearchParams,
+  key: string,
+  values: string[] | undefined,
+): void {
+  if (!values?.length) {
+    return;
+  }
+  for (const item of values) {
+    searchParams.append(key, item);
+  }
+}
+
+function appendOrderParams(
+  searchParams: URLSearchParams,
+  order: ListTasksParams['order'],
+): void {
+  const column = order?.column;
+  const dir = order?.dir;
+  if (column) {
+    searchParams.append('order[column]', column);
+  }
+  if (dir) {
+    searchParams.append('order[dir]', dir);
+  }
+}
+
+function buildListTasksSearchParams(params: ListTasksParams): URLSearchParams {
+  const {
+    page = 1,
+    limit = 20,
+    type = '',
+    project_id,
+    search = '',
+    status_id,
+    priority,
+    is_completed,
+    due_date_from,
+    due_date_to,
+    frequency,
+    is_active,
+    withRelations,
+    created_at_from,
+    created_at_to,
+    extension_numbers,
+    order,
+  } = params;
+
+  const searchParams = new URLSearchParams();
+  searchParams.append('page', String(page));
+  searchParams.append('limit', String(limit));
+  searchParams.append('type', type);
+
+  appendTruthyQueryParam(searchParams, 'project_id', project_id);
+  appendTruthyQueryParam(searchParams, 'search', search);
+  appendTruthyQueryParam(searchParams, 'status_id', status_id);
+  appendTruthyQueryParam(searchParams, 'priority', priority);
+  appendBooleanIfDefined(searchParams, 'is_completed', is_completed);
+  appendTruthyQueryParam(searchParams, 'due_date_from', due_date_from);
+  appendTruthyQueryParam(searchParams, 'due_date_to', due_date_to);
+  appendTruthyQueryParam(searchParams, 'frequency', frequency);
+  appendBooleanIfDefined(searchParams, 'is_active', is_active);
+  appendTruthyQueryParam(searchParams, 'created_at_from', created_at_from);
+  appendTruthyQueryParam(searchParams, 'created_at_to', created_at_to);
+
+  appendOrderParams(searchParams, order);
+  appendRepeatedQueryParam(searchParams, 'with[]', withRelations);
+  appendRepeatedQueryParam(searchParams, 'extension_numbers[]', extension_numbers);
+
+  return searchParams;
+}
+
+function parseListTasksResponse(
+  response: { data?: unknown },
+): ListTasksParsedBody | null {
+  const responseData = response?.data;
+  if (!responseData || typeof responseData !== 'object') {
+    return null;
+  }
+  const body = responseData as { success?: boolean; message?: string };
+  if (body.success === false) {
+    reportTasksApiError(response, body.message || 'Failed to fetch tasks');
+    toast.error(body.message || 'Failed to fetch tasks');
+    return null;
+  }
+  return responseData as ListTasksParsedBody;
+}
+
 /**
  * List all tasks with pagination and filters
  */
-export const listTasks = async (params: ListTasksParams = {}) => {
+export const listTasks = async (
+  params: ListTasksParams = {},
+): Promise<ListTasksParsedBody | null> => {
   try {
-    const {
-      page = 1,
-      limit = 20,
-      type="",
-      project_id,
-      search = "",
-      status_id,
-      priority,
-      is_completed,
-      due_date_from,
-      due_date_to,
-      frequency,
-      is_active,
-      withRelations,
-      created_at_from,
-      created_at_to,
-      extension_numbers,
-      order
-    } = params;
-    
-    // Format array parameters correctly for with[] query params
-    const formattedParams = new URLSearchParams();
-    
-    // Add regular query parameters
-    formattedParams.append('page', page.toString());
-    formattedParams.append('limit', limit.toString());
-    formattedParams.append('type', type);
-    
-    if (project_id) formattedParams.append('project_id', project_id.toString());
-    if (search) formattedParams.append('search', search);
-    if (status_id) formattedParams.append('status_id', status_id.toString());
-    if (priority) formattedParams.append('priority', priority);
-    if (is_completed !== undefined) formattedParams.append('is_completed', is_completed.toString());
-    if (due_date_from) formattedParams.append('due_date_from', due_date_from);
-    if (due_date_to) formattedParams.append('due_date_to', due_date_to);
-    if (frequency) formattedParams.append('frequency', frequency);
-    if (is_active !== undefined) formattedParams.append('is_active', is_active.toString());
-    if (created_at_from) formattedParams.append('created_at_from', created_at_from);
-    if (created_at_to) formattedParams.append('created_at_to', created_at_to);
-    
-    // Add order parameters if provided
-    if (order?.column) {
-      formattedParams.append('order[column]', order.column);
-    }
-    if (order?.dir) {
-      formattedParams.append('order[dir]', order.dir);
-    }
-    
-    // Add with[] parameters if provided
-    if (withRelations && withRelations.length > 0) {
-      withRelations.forEach((relation) => {
-        formattedParams.append('with[]', relation);
-      });
-    }
-    
-    // Add extension_numbers as JSON array string
-    if (extension_numbers && extension_numbers.length > 0) {
-      extension_numbers.forEach((relation) => {
-        formattedParams.append('extension_numbers[]', relation);
-      });
-      
-    }
-    
-    const queryString = formattedParams.toString();
-    const url = `${prefix}/tasks?${queryString}`;
-    
+    const formattedParams = buildListTasksSearchParams(params);
+    const url = `${prefix}/tasks?${formattedParams.toString()}`;
     const response = await axiosInstance.get(url);
-    
-    // For list operations, we need the full response (data, pagination, summary)
-    if (response?.data) {
-      const responseData = response.data;
-      if (responseData.success === false) {
-        reportTasksApiError(response, responseData.message || 'Failed to fetch tasks');
-        toast.error(responseData.message || 'Failed to fetch tasks');
-        return null;
-      }
-      // Return full response object for list operations
-      return responseData;
-    }
-    
-    return null;
+    return parseListTasksResponse(response);
   } catch (error) {
     console.error('API Error:', error);
     throw error;
@@ -748,21 +836,160 @@ export const getRecentActivity = async (projectId?: number) => {
   }
 };
 
+export interface TaskActivitiesQuery {
+  page?: number;
+  limit?: number;
+  /** Filter by free-text search (API param: `search`). */
+  search?: string;
+  /** Filter by action type (API param: `action`). */
+  action?: string;
+}
+
+export interface TaskActivitiesPagedResult {
+  data: any[];
+  pagination: {
+    total: number;
+    limit: number;
+    page: number;
+    last_page: number;
+    from?: number;
+    to?: number;
+  };
+}
+
 /**
- * Get activities for a specific task
+ * Task activities with pagination metadata (supports `search` and `action` filters).
  */
-export const getTaskActivities = async (taskId: string | number, page: number = 1, limit: number = 20) => {
+export const getTaskActivitiesPaged = async (
+  taskId: string | number,
+  query: TaskActivitiesQuery = {},
+): Promise<TaskActivitiesPagedResult | null> => {
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 20;
   try {
-    const response = await axiosInstance.get(`${prefix}/tasks/activities`
-      , {
-        params: { page: page, limit: limit, task_id: taskId }
-      }
-    );
-    return validateResponse(response, 'Failed to fetch task activities');
+    const params: Record<string, string | number> = { page, limit, task_id: taskId };
+    const search = query.search?.trim();
+    if (search) {
+      params.search = search;
+    }
+    const action = query.action?.trim();
+    if (action) {
+      params.action = action;
+    }
+
+    const response = await axiosInstance.get(`${prefix}/tasks/activities`, { params });
+    if (!response?.data) {
+      reportTasksApiError(response, 'Failed to fetch task activities');
+      toast.error('Failed to fetch task activities');
+      return null;
+    }
+
+    const responseData = response.data;
+    if (responseData.success === false) {
+      reportTasksApiError(response, responseData.message || 'Failed to fetch task activities');
+      toast.error(responseData.message || 'Failed to fetch task activities');
+      return null;
+    }
+
+    const data = Array.isArray(responseData.data) ? responseData.data : [];
+    const rawPag = responseData.pagination;
+    const pagination =
+      rawPag && typeof rawPag === 'object'
+        ? {
+            total: Number(rawPag.total) || data.length,
+            limit: Number(rawPag.limit) || limit,
+            page: Number(rawPag.page) || page,
+            last_page: Math.max(1, Number(rawPag.last_page) || 1),
+            from: rawPag.from,
+            to: rawPag.to,
+          }
+        : {
+            total: data.length,
+            limit,
+            page,
+            last_page: Math.max(1, Math.ceil(data.length / Math.max(limit, 1)) || 1),
+          };
+
+    return { data, pagination };
   } catch (error) {
     console.error('API Error:', error);
     throw error;
   }
+};
+
+/**
+ * Project-scoped activities with pagination (same endpoint shape as task activities; uses `project_id`).
+ * Falls back to client-side pagination via {@link getRecentActivity} when the request fails.
+ */
+export const getProjectActivitiesPaged = async (
+  projectId: number,
+  query: TaskActivitiesQuery = {},
+): Promise<TaskActivitiesPagedResult | null> => {
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 20;
+  try {
+    const params: Record<string, string | number> = { page, limit, project_id: projectId };
+    const search = query.search?.trim();
+    if (search) {
+      params.search = search;
+    }
+    const action = query.action?.trim();
+    if (action) {
+      params.action = action;
+    }
+
+    const response = await axiosInstance.get(`${prefix}/tasks/activities`, { params });
+    if (!response?.data) {
+      reportTasksApiError(response, 'Failed to fetch project activities');
+      return null;
+    }
+
+    const responseData = response.data;
+    if (responseData.success === false) {
+      reportTasksApiError(response, responseData.message || 'Failed to fetch project activities');
+      return null;
+    }
+
+    const data = Array.isArray(responseData.data) ? responseData.data : [];
+    const rawPag = responseData.pagination;
+    const pagination =
+      rawPag && typeof rawPag === 'object'
+        ? {
+            total: Number(rawPag.total) || data.length,
+            limit: Number(rawPag.limit) || limit,
+            page: Number(rawPag.page) || page,
+            last_page: Math.max(1, Number(rawPag.last_page) || 1),
+            from: rawPag.from,
+            to: rawPag.to,
+          }
+        : {
+            total: data.length,
+            limit,
+            page,
+            last_page: Math.max(1, Math.ceil(data.length / Math.max(limit, 1)) || 1),
+          };
+
+    return { data, pagination };
+  } catch (error) {
+    console.error('API Error:', error);
+    return null;
+  }
+};
+
+/**
+ * Get activities for a specific task (data array only; backward compatible).
+ */
+export const getTaskActivities = async (
+  taskId: string | number,
+  page: number = 1,
+  limit: number = 20,
+  filters?: Pick<TaskActivitiesQuery, 'search' | 'action'>,
+) => {
+  const result = await getTaskActivitiesPaged(taskId, { page, limit, ...filters });
+  if (result == null) {
+    return [];
+  }
+  return result.data;
 };
 
 // ==================== Task Comments API ====================

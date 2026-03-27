@@ -24,6 +24,7 @@ import {
 import { listStatuses } from "@utils/work-planner";
 import { getAutoTimezone } from "@utils/Helper";
 import RichTextEditor from "../../pages/help-center/partials/RichTextEditor";
+import TaskSecondaryTabs from "@pages/planner/partials/TaskSecondaryTabs";
 
 // ─── Types (from createtask-modal) ─────────────────────────────────────────────
 
@@ -183,6 +184,77 @@ function formatDateForInput(dateString: string | null | undefined): string {
   }
 }
 
+/**
+ * Interprets recurring task start date + local time in the user's timezone,
+ * returns UTC ISO-8601 for API `due_time` (e.g. `2026-03-27T18:30:00.000Z`).
+ */
+function formatRecurringDueTimeAsUtcIso(
+  startDate: string | null | undefined,
+  dueTimeLocal: string | null | undefined,
+): string | undefined {
+  const dateStr = startDate?.trim() ?? "";
+  const timeRaw = dueTimeLocal?.trim() ?? "";
+  if (!dateStr || !timeRaw) return undefined;
+  const time = timeRaw.slice(0, 5);
+  if (!/^\d{2}:\d{2}$/.test(time)) return undefined;
+  const local = new Date(`${dateStr}T${time}:00`);
+  if (Number.isNaN(local.getTime())) return undefined;
+  return local.toISOString();
+}
+
+/** Fill `<input type="time">` from API `due_time` (UTC ISO string or plain HH:mm). */
+function parseRecurringDueTimeForInput(dueTimeRaw: string | null | undefined): string {
+  if (dueTimeRaw == null || dueTimeRaw === "") return "";
+  const s = String(dueTimeRaw).trim();
+  if (s.includes("T")) {
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) {
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      return `${hh}:${mm}`;
+    }
+  }
+  const timePattern = /(\d{1,2}):(\d{2})(?::\d{2})?/;
+  const timeMatch = timePattern.exec(s);
+  if (timeMatch) {
+    const h = Math.min(23, Math.max(0, Number.parseInt(timeMatch[1], 10)));
+    const m = Math.min(59, Math.max(0, Number.parseInt(timeMatch[2], 10)));
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  }
+  return "";
+}
+
+/** Local calendar today as YYYY-MM-DD for `<input type="date" min>`. */
+function todayLocalIsoDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Earliest allowed due date: not before today, and not before start date when set.
+ * ISO date strings compare lexicographically.
+ */
+function minDueDateFromTodayAndStart(startDate: string): string {
+  const today = todayLocalIsoDate();
+  const start = startDate?.trim() ?? "";
+  if (!start) return today;
+  const later = [today, start].sort((a, b) => a.localeCompare(b));
+  return later.at(-1) ?? today;
+}
+
+function clampDueDateToMin(dueDate: string, minStr: string): string {
+  if (!dueDate.trim()) return dueDate;
+  return dueDate < minStr ? minStr : dueDate;
+}
+
+function mergeFormDataWithDueDateClamp(data: CreateTaskFormData): CreateTaskFormData {
+  const min = minDueDateFromTodayAndStart(data.startDate);
+  return { ...data, dueDate: clampDueDateToMin(data.dueDate, min) };
+}
+
 function resolveExtensionUserId(extensions: Extension[], extRef: string | undefined): number {
   if (extRef == null || extRef === "") return Number.NaN;
   const extension = extensions.find(
@@ -218,6 +290,90 @@ function normalizeEditTaskType(editTask: PlannerEditTask): PlannerTaskType {
   return "regular";
 }
 
+/** API expects lowercase full weekday names, e.g. `"tuesday"`. */
+const WEEKLY_REPEAT_ON_VALUES = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+] as const;
+
+type WeeklyRepeatOnValue = (typeof WEEKLY_REPEAT_ON_VALUES)[number];
+
+const WEEKLY_REPEAT_ON_OPTIONS: { label: string; value: WeeklyRepeatOnValue }[] = [
+  { label: "Monday", value: "monday" },
+  { label: "Tuesday", value: "tuesday" },
+  { label: "Wednesday", value: "wednesday" },
+  { label: "Thursday", value: "thursday" },
+  { label: "Friday", value: "friday" },
+  { label: "Saturday", value: "saturday" },
+  { label: "Sunday", value: "sunday" },
+];
+
+/** Legacy UI used 0–6 with Sunday = 0 (aligned with `Date.getUTCDay` / local getDay). */
+const LEGACY_DAY_INDEX_TO_WEEKDAY: Record<number, WeeklyRepeatOnValue> = {
+  0: "sunday",
+  1: "monday",
+  2: "tuesday",
+  3: "wednesday",
+  4: "thursday",
+  5: "friday",
+  6: "saturday",
+};
+
+function isWeeklyRepeatOnValue(s: string): s is WeeklyRepeatOnValue {
+  return (WEEKLY_REPEAT_ON_VALUES as readonly string[]).includes(s);
+}
+
+function normalizeWeeklyRepeatOnFromApi(raw: unknown): string {
+  if (raw == null || raw === "") return "";
+  let asString: string;
+  if (typeof raw === "string") {
+    asString = raw;
+  } else if (typeof raw === "number" && Number.isFinite(raw)) {
+    asString = String(raw);
+  } else if (typeof raw === "bigint") {
+    asString = String(raw);
+  } else if (typeof raw === "boolean") {
+    asString = String(raw);
+  } else {
+    return "";
+  }
+  const s = asString.trim().toLowerCase();
+  if (isWeeklyRepeatOnValue(s)) return s;
+  const shortMap: Record<string, WeeklyRepeatOnValue> = {
+    sun: "sunday",
+    mon: "monday",
+    tue: "tuesday",
+    wed: "wednesday",
+    thu: "thursday",
+    fri: "friday",
+    sat: "saturday",
+  };
+  if (shortMap[s]) return shortMap[s];
+  if (s.includes(",")) {
+    const first = s.split(",")[0]?.trim() ?? "";
+    if (first) return normalizeWeeklyRepeatOnFromApi(first);
+    return "";
+  }
+  const n = Number(s);
+  if (s !== "" && Number.isInteger(n) && n >= 0 && n <= 6) {
+    return LEGACY_DAY_INDEX_TO_WEEKDAY[n] ?? "";
+  }
+  return "";
+}
+
+function repeatOnForEditTask(editTask: PlannerEditTask, frequency: string): string {
+  const freq = (frequency || "weekly").toLowerCase();
+  if (freq === "weekly") {
+    return normalizeWeeklyRepeatOnFromApi(editTask.repeat_on);
+  }
+  return editTask.repeat_on == null ? "" : String(editTask.repeat_on);
+}
+
 function buildInitialFormFromEdit(
   editTask: PlannerEditTask,
   extensions: Extension[],
@@ -229,8 +385,11 @@ function buildInitialFormFromEdit(
   const taskTypeVal = normalizeEditTaskType(editTask);
   const frequency = editTask.frequency || "weekly";
   const repeatInterval = Math.max(1, Number(editTask.repeat_interval) || 1);
-  const repeatOn = editTask.repeat_on == null ? "" : String(editTask.repeat_on);
-  const dueTime = typeof editTask.due_time === "string" ? editTask.due_time : "";
+  const repeatOn = repeatOnForEditTask(editTask, frequency);
+  const dueTime =
+    typeof editTask.due_time === "string"
+      ? parseRecurringDueTimeForInput(editTask.due_time)
+      : "";
   return {
     title: editTask.title || "",
     description: editTask.description || "",
@@ -272,7 +431,7 @@ function buildInitialFormForCreate(
     linkedRecordIds: [],
     frequency: "weekly",
     repeatInterval: 1,
-    repeatOn: "",
+    repeatOn: taskType === "recurring" ? "monday" : "",
     dueTime: "",
   };
 }
@@ -599,14 +758,15 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           ...(projectId != null && projectId > 0 ? { project_id: projectId } : {}),
         });
         if (response?.data && Array.isArray(response.data)) {
+          const taskRows = response.data as TaskListRow[];
           const currentTaskId =
             isEdit && editTask?.rawData?.id != null ? Number(editTask.rawData.id) : null;
-          const records: LinkedRecord[] = response.data
+          const records: LinkedRecord[] = taskRows
             .filter(
-              (t: TaskListRow) =>
+              (t) =>
                 currentTaskId == null || Number(t.id) !== currentTaskId,
             )
-            .map((t: TaskListRow) => ({
+            .map((t) => ({
               id: Number(t.id),
               type: "task" as const,
               title: t.title || "",
@@ -642,7 +802,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       ) {
         return;
       }
-      setFormData(getInitialFormData());
+      setFormData(mergeFormDataWithDueDateClamp(getInitialFormData()));
     } else {
       setSearchQuery("");
       setFormData({
@@ -662,7 +822,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         linkedRecordIds: [],
         frequency: "weekly",
         repeatInterval: 1,
-        repeatOn: "",
+        repeatOn: taskType === "recurring" ? "monday" : "",
         dueTime: "",
       });
     }
@@ -740,6 +900,20 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     selectedStatusForTask,
   ]);
 
+  useEffect(() => {
+    if (
+      !isOpen ||
+      formData.taskType !== "recurring" ||
+      formData.frequency !== "weekly"
+    ) {
+      return;
+    }
+    const v = formData.repeatOn.trim().toLowerCase();
+    if (!isWeeklyRepeatOnValue(v)) {
+      setFormData((prev) => ({ ...prev, repeatOn: "monday" }));
+    }
+  }, [isOpen, formData.taskType, formData.frequency, formData.repeatOn]);
+
   const priorities: Priority[] = [
     { id: 0, name: "Select Priority", icon: "", color: "#6c757d" },
     { id: 1, name: "Low", icon: "🟢", color: "#10b981" },
@@ -810,8 +984,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     if (formData.taskType === "recurring") {
       payload.frequency = formData.frequency;
       payload.repeat_interval = formData.repeatInterval;
-      if (formData.repeatOn) payload.repeat_on = formData.repeatOn;
-      if (formData.dueTime) payload.due_time = formData.dueTime;
+      if (formData.frequency === "weekly" && formData.repeatOn.trim()) {
+        payload.repeat_on = formData.repeatOn.trim().toLowerCase();
+      } else if (formData.frequency === "monthly" && formData.repeatOn.trim()) {
+        payload.repeat_on = formData.repeatOn.trim();
+      }
+      const dueTimeUtc = formatRecurringDueTimeAsUtcIso(
+        formData.startDate,
+        formData.dueTime,
+      );
+      if (dueTimeUtc) payload.due_time = dueTimeUtc;
       payload.end_date = formData.dueDate || null;
     }
     return payload;
@@ -833,6 +1015,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       }
       if (!formData.startDate) {
         toast.error("Recurring tasks require a start date");
+        return false;
+      }
+      if (formData.frequency === "weekly" && !formData.repeatOn.trim()) {
+        toast.error("Please select a day of the week");
+        return false;
+      }
+    }
+    if (formData.dueDate.trim()) {
+      const minDue = minDueDateFromTodayAndStart(formData.startDate);
+      if (formData.dueDate < minDue) {
+        toast.error("Due date cannot be before today or before the start date");
         return false;
       }
     }
@@ -978,6 +1171,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   if (!isOpen) return null;
 
+  const sidebarEditTaskId =
+    isEdit && editTask
+      ? (editTask.id ?? editTask.rawData?.id ?? null)
+      : null;
+
   const labelStyle = {
     fontSize: "14px",
     color: "#141414",
@@ -985,6 +1183,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     marginBottom: 8,
   };
   const groupClass = "mb-3";
+  const dueDateMin = minDueDateFromTodayAndStart(formData.startDate);
 
   return (
     <>
@@ -1078,14 +1277,24 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           </button>
         </div>
 
-        {/* Body */}
+        {/* Body: main form scrolls; existing task shows Activities / Comments / Documents above footer */}
         <div
           style={{
             flex: 1,
-            overflowY: "auto",
-            padding: "24px",
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
           }}
         >
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              padding: "24px",
+            }}
+          >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
 
             <Row>
@@ -1516,9 +1725,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   <Form.Control
                     type="date"
                     value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, startDate: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setFormData((prev) => {
+                        const minDue = minDueDateFromTodayAndStart(newStart);
+                        const nextDue = clampDueDateToMin(prev.dueDate, minDue);
+                        return { ...prev, startDate: newStart, dueDate: nextDue };
+                      });
+                    }}
                     className="py-2"
                     style={{ fontSize: "14px" }}
                   />
@@ -1528,14 +1742,19 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
                     <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
-                    End Date
+                    Due Date
                   </Form.Label>
                   <Form.Control
                     type="date"
+                    min={dueDateMin}
                     value={formData.dueDate}
-                    onChange={(e) =>
-                      setFormData({ ...formData, dueDate: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFormData((prev) => ({
+                        ...prev,
+                        dueDate: v ? clampDueDateToMin(v, minDueDateFromTodayAndStart(prev.startDate)) : "",
+                      }));
+                    }}
                     className="py-2"
                     style={{ fontSize: "14px" }}
                   />
@@ -1554,9 +1773,23 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   </Form.Label>
                   <Form.Select
                     value={formData.frequency}
-                    onChange={(e) =>
-                      setFormData({ ...formData, frequency: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const nextFreq = e.target.value;
+                      setFormData((prev) => {
+                        let nextRepeatOn: string;
+                        if (nextFreq === "weekly") {
+                          const normalized = normalizeWeeklyRepeatOnFromApi(prev.repeatOn);
+                          nextRepeatOn = normalized || "monday";
+                        } else if (nextFreq === "monthly") {
+                          nextRepeatOn = /^\d+$/.test(prev.repeatOn.trim())
+                            ? prev.repeatOn.trim()
+                            : "1";
+                        } else {
+                          nextRepeatOn = "";
+                        }
+                        return { ...prev, frequency: nextFreq, repeatOn: nextRepeatOn };
+                      });
+                    }}
                     className="py-2"
                     style={{ fontSize: "14px" }}
                   >
@@ -1598,32 +1831,27 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Col xs={12} md={6}>
                       <Form.Group className={groupClass}>
                         <Form.Label style={labelStyle}>
-                          {formData.frequency === "weekly" ? "Repeat on (days)" : "Day of month"}
+                          {formData.frequency === "weekly" ? "Repeat on" : "Day of month"}
                         </Form.Label>
                         {formData.frequency === "weekly" ? (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => {
-                              const dayNum = String(idx);
-                              const isChecked = formData.repeatOn.split(",").map((s) => s.trim()).includes(dayNum);
-                              return (
-                                <Form.Check
-                                  key={day}
-                                  type="checkbox"
-                                  id={`repeat-${day}`}
-                                  label={day}
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    const current = formData.repeatOn.split(",").map((s) => s.trim()).filter(Boolean);
-                                    const next = isChecked
-                                      ? current.filter((d) => d !== dayNum)
-                                      : [...current, dayNum].sort((a, b) => Number(a) - Number(b));
-                                    setFormData({ ...formData, repeatOn: next.join(",") });
-                                  }}
-                                  style={{ fontSize: "13px" }}
-                                />
-                              );
-                            })}
-                          </div>
+                          <Form.Select
+                            value={
+                              isWeeklyRepeatOnValue(formData.repeatOn.trim().toLowerCase())
+                                ? formData.repeatOn.trim().toLowerCase()
+                                : "monday"
+                            }
+                            onChange={(e) =>
+                              setFormData({ ...formData, repeatOn: e.target.value })
+                            }
+                            className="py-2"
+                            style={{ fontSize: "14px" }}
+                          >
+                            {WEEKLY_REPEAT_ON_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </Form.Select>
                         ) : (
                           <Form.Control
                             type="number"
@@ -1872,6 +2100,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             
             
           </Form>
+          </div>
+          <TaskSecondaryTabs
+            taskId={sidebarEditTaskId}
+            extensions={extensions}
+            visible={Boolean(sidebarEditTaskId)}
+          />
         </div>
 
         {/* Footer */}
