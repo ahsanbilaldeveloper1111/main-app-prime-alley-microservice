@@ -1,7 +1,7 @@
 import React from "react";
 import { Button, Col, Form, Modal, Row } from "react-bootstrap";
-import { AllActivitiesModalContent, ACTIVITIES_MODAL_PER_PAGE_OPTIONS } from "./taskActivityLogModalShared";
-import type { AllActivitiesBrowserModalProps } from "./useAllActivitiesBrowserModal";
+import { AllActivitiesModalContent, ACTIVITIES_MODAL_PER_PAGE_OPTIONS } from "@planner/taskActivityLogModalShared";
+import type { AllActivitiesBrowserModalProps } from "@planner/useAllActivitiesBrowserModal";
 
 const AllActivitiesBrowserModal: React.FC<AllActivitiesBrowserModalProps> = ({
   show,

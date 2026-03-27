@@ -2,8 +2,8 @@ import React from 'react';
 import { Spinner } from 'react-bootstrap';
 import { formatDateForTable } from '@utils/Helper';
 import AllActivitiesBrowserModal from '@pages/planner/partials/AllActivitiesBrowserModal';
-import { useAllActivitiesBrowserModal } from '@pages/planner/partials/useAllActivitiesBrowserModal';
-import type { ActivityLogExtension } from '@pages/planner/partials/activityLogExtension';
+import { useAllActivitiesBrowserModal } from '@planner/useAllActivitiesBrowserModal';
+import type { ActivityLogExtension } from '@planner/activityLogExtension';
 
 interface RecentActivitySectionProps {
   activities: unknown[];

@@ -23,6 +23,7 @@
     "baseUrl": ".",
     "paths": {
       "@pages/*": ["src/pages/*"],
+      "@planner/*": ["src/planner/*"],
       "@toolkit/*": ["src/toolkit/*"],
       "@assets/*": ["src/assets/*"],
       "@layout/*": ["src/Layouts/*"],

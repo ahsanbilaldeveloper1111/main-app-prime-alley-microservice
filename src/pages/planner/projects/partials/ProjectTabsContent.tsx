@@ -11,8 +11,8 @@ import {
   filterBoardTasksForColumns,
   sliceBoardTasksByStatusId,
   sortStringsLocale,
-} from './projectTabsContentUtils';
-import { useProjectTabsContentData } from './useProjectTabsContentData';
+} from '@planner/projectTabsContentUtils';
+import { useProjectTabsContentData } from '@planner/useProjectTabsContentData';
 import TabsNavigation from './TabsNavigation';
 import OverviewTab from './OverviewTab';
 import BoardTab from './BoardTab';
@@ -21,7 +21,7 @@ import MembersTab from './MembersTab';
 import StatusesTab from './StatusesTab';
 import LabelsTab from './LabelsTab';
 import OverdueTasksModal from './OverdueTasksModal';
-import type { ActivityLogExtension } from '@pages/planner/partials/activityLogExtension';
+import type { ActivityLogExtension } from '@planner/activityLogExtension';
 
 interface ProjectTabsContentProps {
   selectedProject: any;

@@ -35,7 +35,7 @@ import {
   WORK_PLANNER_PROJECT_DETAIL_RELATIONS,
   WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS,
   mapGetTaskResponseToSidebarEditTask,
-} from "./workPlannerProjectRelations";
+} from "@planner/workPlannerProjectRelations";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { ModuleSlug } from "@utils/Helper";
 import { useHierarchyData } from "@components/filters/useHierarchyData";

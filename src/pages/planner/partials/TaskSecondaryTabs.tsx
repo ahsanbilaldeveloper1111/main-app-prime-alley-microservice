@@ -13,16 +13,16 @@ import {
   deleteTaskDocument,
 } from "@utils/tasks";
 import AllActivitiesBrowserModal from "./AllActivitiesBrowserModal";
-import { useAllActivitiesBrowserModal } from "./useAllActivitiesBrowserModal";
-import type { ActivityLogExtension } from "./activityLogExtension";
+import { useAllActivitiesBrowserModal } from "@planner/useAllActivitiesBrowserModal";
+import type { ActivityLogExtension } from "@planner/activityLogExtension";
 import {
   formatActivityDate,
   getExtensionDisplay,
   normalizeTaskActivitiesPayload,
   ActivitiesTabPanel,
-} from "./taskActivityLogModalShared";
+} from "@planner/taskActivityLogModalShared";
 
-export type { ActivityLogExtension as TaskSecondaryTabsExtension } from "./activityLogExtension";
+export type { ActivityLogExtension as TaskSecondaryTabsExtension } from "@planner/activityLogExtension";
 
 export type TaskSecondaryTabId = "activity" | "comments" | "documents";
 

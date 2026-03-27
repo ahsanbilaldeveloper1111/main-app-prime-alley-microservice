@@ -1,6 +1,6 @@
 import React from 'react';
 import { Row, Col, Spinner } from 'react-bootstrap';
-import { FileText, Users, X } from 'lucide-react';
+import { FileText, Users } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip 
@@ -8,7 +8,7 @@ import {
 import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import RecentActivitySection from './RecentActivitySection';
 import OverdueTasksSection from './OverdueTasksSection';
-import type { ActivityLogExtension } from '@pages/planner/partials/activityLogExtension';
+import type { ActivityLogExtension } from '@planner/activityLogExtension';
 
 interface OverviewTabProps {
   statusCards: any[];
@@ -136,7 +136,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             </button> */}
           </div>
           
-          {tasksByStatus.length === 0 || tasksByStatus.every(item => item.value === 0) ? (
+          {tasksByStatus.every((item) => item.value === 0) ? (
             <div style={{ 
               textAlign: 'center', 
               padding: '3rem 2rem',
@@ -159,8 +159,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
                     paddingAngle={2}
                     dataKey="value"
                   >
-                    {tasksByStatus.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    {tasksByStatus.map((entry) => (
+                      <Cell key={`status-slice-${String(entry.id)}`} fill={entry.color} />
                     ))}
                   </Pie>
                   <RechartsTooltip />
@@ -168,8 +168,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
               </ResponsiveContainer>
               
               <div>
-                {tasksByStatus.map((item, index) => (
-                  <div key={index} style={styles.legendItem}>
+                {tasksByStatus.map((item) => (
+                  <div key={`status-legend-${String(item.id)}`} style={styles.legendItem}>
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       <div style={{...styles.legendDot, backgroundColor: item.color}}></div>
                       <span style={{ fontSize: '0.9rem', color: '#4B5563' }}>{item.name}</span>
@@ -195,8 +195,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
             </button> */}
           </div>
           
-          {workloadData.length === 0 || workloadData.every(person => 
-            person.backlog === 0 && person.todo === 0 && person.progress === 0 && person.review === 0 && person.done === 0
+          {workloadData.every((person) =>
+            person.backlog === 0 && person.todo === 0 && person.progress === 0 && person.review === 0 && person.done === 0,
           ) ? (
             <div style={{ 
               textAlign: 'center', 
@@ -241,8 +241,11 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
               </ResponsiveContainer>
               
               <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.75rem', color: '#6B7280' }}>
-                {workloadData.map((person, index) => (
-                  <div key={index} style={{ display: 'inline-block', margin: '0 0.5rem' }}>
+                {workloadData.map((person) => (
+                  <div
+                    key={`workload-legend-${person.name}-${person.initials}`}
+                    style={{ display: 'inline-block', margin: '0 0.5rem' }}
+                  >
                     {person.initials}: {person.name}
                   </div>
                 ))}

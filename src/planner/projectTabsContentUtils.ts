@@ -207,7 +207,7 @@ export type ProjectOverviewDerived = {
   labels: unknown[];
   statuses: unknown[];
   members: unknown[];
-  tasksByStatus: { name: string; value: number; color: string }[];
+  tasksByStatus: { id: string | number; name: string; value: number; color: string }[];
   statusCards: {
     title: string;
     count: number;
@@ -248,6 +248,7 @@ export function deriveProjectOverviewFromDetails(
   }
 
   const tasksByStatusData = projectStatuses.map((status: any) => ({
+    id: status.id ?? status.name,
     name: status.name,
     value: statusTaskCounts[status.name] || 0,
     color: status.color || '#9E9E9E',

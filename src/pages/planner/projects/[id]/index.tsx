@@ -17,7 +17,7 @@ import {
   WORK_PLANNER_PROJECT_DETAIL_RELATIONS,
   WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS,
   mapGetTaskResponseToSidebarEditTask,
-} from "../workPlannerProjectRelations";
+} from "@planner/workPlannerProjectRelations";
 import ProjectTabsContent, { ProjectTabsContentRef } from "../partials/ProjectTabsContent";
 import { useRouter } from "next/router";
 import { ModuleSlug } from "@utils/Helper";
@@ -103,9 +103,7 @@ const WorkPlannerProjectsDetails = () => {
       if (raw == null || typeof raw !== "object") {
         return;
       }
-      setSidebarEditTask(
-        mapGetTaskResponseToSidebarEditTask(raw as Record<string, unknown>) as PlannerSidebarEditTask,
-      );
+      setSidebarEditTask(mapGetTaskResponseToSidebarEditTask(raw));
       setShowCreateTaskSidebar(true);
     } catch (err) {
       console.error("[WorkPlannerProjectDetail] getTask failed for board task", task.id, err);
