@@ -24,6 +24,7 @@ import {
 import { listStatuses } from "@utils/work-planner";
 import { getAutoTimezone } from "@utils/Helper";
 import RichTextEditor from "../../pages/help-center/partials/RichTextEditor";
+import TaskSecondaryTabs from "@pages/planner/partials/TaskSecondaryTabs";
 
 // ─── Types (from createtask-modal) ─────────────────────────────────────────────
 
@@ -630,14 +631,15 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           ...(projectId != null && projectId > 0 ? { project_id: projectId } : {}),
         });
         if (response?.data && Array.isArray(response.data)) {
+          const taskRows = response.data as TaskListRow[];
           const currentTaskId =
             isEdit && editTask?.rawData?.id != null ? Number(editTask.rawData.id) : null;
-          const records: LinkedRecord[] = response.data
+          const records: LinkedRecord[] = taskRows
             .filter(
-              (t: TaskListRow) =>
+              (t) =>
                 currentTaskId == null || Number(t.id) !== currentTaskId,
             )
-            .map((t: TaskListRow) => ({
+            .map((t) => ({
               id: Number(t.id),
               type: "task" as const,
               title: t.title || "",
@@ -1016,6 +1018,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   if (!isOpen) return null;
 
+  const sidebarEditTaskId =
+    isEdit && editTask
+      ? (editTask.id ?? editTask.rawData?.id ?? null)
+      : null;
+
   const labelStyle = {
     fontSize: "14px",
     color: "#141414",
@@ -1117,14 +1124,24 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           </button>
         </div>
 
-        {/* Body */}
+        {/* Body: main form scrolls; existing task shows Activities / Comments / Documents above footer */}
         <div
           style={{
             flex: 1,
-            overflowY: "auto",
-            padding: "24px",
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
           }}
         >
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              overflowY: "auto",
+              padding: "24px",
+            }}
+          >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
 
             <Row>
@@ -1921,6 +1938,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
             
             
           </Form>
+          </div>
+          <TaskSecondaryTabs
+            taskId={sidebarEditTaskId}
+            extensions={extensions}
+            visible={Boolean(sidebarEditTaskId)}
+          />
         </div>
 
         {/* Footer */}

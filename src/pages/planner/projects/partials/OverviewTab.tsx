@@ -1,6 +1,6 @@
 import React from 'react';
 import { Row, Col, Spinner } from 'react-bootstrap';
-import { Search, MoreVertical, FileText, Users, X } from 'lucide-react';
+import { FileText, Users, X } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, 
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip 
@@ -8,6 +8,7 @@ import {
 import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import RecentActivitySection from './RecentActivitySection';
 import OverdueTasksSection from './OverdueTasksSection';
+import type { ActivityLogExtension } from '@pages/planner/partials/activityLogExtension';
 
 interface OverviewTabProps {
   statusCards: any[];
@@ -21,7 +22,8 @@ interface OverviewTabProps {
   loadingActivities: boolean;
   overdueTasks: any[];
   loadingOverdue: boolean;
-  onViewActivity: () => void;
+  projectId: number | null | undefined;
+  hierarchyExtensions?: ActivityLogExtension[];
   onViewOverdue: () => void;
   styles: any;
 }
@@ -38,7 +40,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
   loadingActivities,
   overdueTasks,
   loadingOverdue,
-  onViewActivity,
+  projectId,
+  hierarchyExtensions,
   onViewOverdue,
   styles
 }) => {
@@ -254,7 +257,8 @@ const OverviewTab: React.FC<OverviewTabProps> = ({
         <RecentActivitySection
           activities={recentActivity}
           loading={loadingActivities}
-          onViewAll={onViewActivity}
+          projectId={projectId}
+          hierarchyExtensions={hierarchyExtensions}
           styles={styles}
         />
         

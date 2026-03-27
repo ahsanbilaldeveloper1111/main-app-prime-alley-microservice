@@ -34,6 +34,7 @@ import {
 import {
   WORK_PLANNER_PROJECT_DETAIL_RELATIONS,
   WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS,
+  mapGetTaskResponseToSidebarEditTask,
 } from "./workPlannerProjectRelations";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { ModuleSlug } from "@utils/Helper";
@@ -149,6 +150,10 @@ const coerceProjectStatusFilter = (value: unknown): ProjectStatusFilter => {
   return "active";
 };
 
+function isProjectStatusFilterActive(status: ProjectStatusFilter): boolean {
+  return status === "active" || status === "completed" || status === "archived";
+}
+
 export interface SubTask {
   id: string;
   title: string;
@@ -167,10 +172,14 @@ export interface Task {
   assignee?: string;
   dueDate?: string;
   description?: string;
+  /** Nested tasks from API `children` (same shape as top-level tasks, may nest) */
+  children?: Task[];
   subtasks?: SubTask[];
   labels?: string[];
-  completedSubtasks?: number;
-  totalSubtasks?: number;
+  /** From API when `sub_task_count` is requested */
+  sub_task_count?: number;
+  /** From API when `sub_task_count` is requested */
+  completed_sub_task_count?: number;
 }
 
 function mapApiPriorityToTaskPriority(raw: unknown): Task["priority"] {
@@ -180,6 +189,15 @@ function mapApiPriorityToTaskPriority(raw: unknown): Task["priority"] {
   if (p === "low") return "low";
   if (p === "normal" || p === "medium") return "medium";
   return "medium";
+}
+
+function readApiNumericCount(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
 }
 
 function mapApiTaskToPlannerTask(
@@ -196,7 +214,7 @@ function mapApiTaskToPlannerTask(
   const statusNameFromApi = (): string => {
     const st = api.status as { name?: string } | undefined;
     if (st?.name) return String(st.name);
-    const sid = api.status_id != null ? String(api.status_id) : "";
+    const sid = api.status_id == null ? "" : String(api.status_id);
     return statusMap[sid] ?? "";
   };
 
@@ -238,6 +256,14 @@ function mapApiTaskToPlannerTask(
   const labelObjs = (api.labels as Array<{ name?: string }> | undefined) ?? [];
   const labels = labelObjs.map((l) => l.name).filter((n): n is string => Boolean(n));
 
+  const rawChildren = api.children;
+  const children =
+    Array.isArray(rawChildren) && rawChildren.length > 0
+      ? rawChildren
+          .filter((c): c is Record<string, unknown> => c !== null && typeof c === "object")
+          .map((c) => mapApiTaskToPlannerTask(c, projectId, statuses))
+      : undefined;
+
   return {
     id,
     projectId,
@@ -249,11 +275,16 @@ function mapApiTaskToPlannerTask(
     dueDate: dueRaw,
     labels: labels.length > 0 ? labels : undefined,
     subtasks: undefined,
+    children,
+    sub_task_count: readApiNumericCount(api.sub_task_count),
+    completed_sub_task_count: readApiNumericCount(api.completed_sub_task_count),
   };
 }
 
 async function fetchTasksForExpandedProject(projectId: string): Promise<Task[]> {
-  const data = await getProject(projectId, Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS));
+  const data = await getProject(projectId, Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS), {
+    sub_task_count: true,
+  });
   if (!data || typeof data !== "object") return [];
   const payload = data as { tasks?: unknown[]; statuses?: Array<Record<string, unknown>> };
   const rawTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
@@ -290,6 +321,44 @@ interface TaskRowProps {
   canPreviewEditTask: boolean;
 }
 
+function computeOpenSubtaskCount(task: Task): number | null {
+  if (task.children && task.children.length > 0) {
+    return task.children.filter((c) => c.status !== "done").length;
+  }
+  if (task.subtasks && task.subtasks.length > 0) {
+    return task.subtasks.filter((s) => s.status !== "done").length;
+  }
+  const total = task.sub_task_count;
+  if (total == null || total <= 0) {
+    return null;
+  }
+  return Math.max(0, total - (task.completed_sub_task_count ?? 0));
+}
+
+function getSubtaskBadgeCounts(task: Task): { completed: number; total: number } | null {
+  if (task.children && task.children.length > 0) {
+    const total = task.children.length;
+    const completed = task.children.filter((c) => c.status === "done").length;
+    return { completed, total };
+  }
+  const total = task.sub_task_count;
+  if (total == null || total <= 0) {
+    return null;
+  }
+  return { completed: task.completed_sub_task_count ?? 0, total };
+}
+
+function plannerChildTasksToSubTasks(children: Task[]): SubTask[] {
+  return children.map((c) => ({
+    id: c.id,
+    title: c.title,
+    status: c.status,
+    assignee: c.assignee,
+    dueDate: c.dueDate,
+    description: c.description,
+  }));
+}
+
 /** Renders a single task row inside an expanded project, with optional subtask expansion */
 const TaskRow: React.FC<TaskRowProps> = ({
   task,
@@ -301,12 +370,15 @@ const TaskRow: React.FC<TaskRowProps> = ({
 }) => {
   const [hovered, setHovered] = useState(false);
   const isExpanded = expandedTasks.has(task.id);
-  const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+  const hasChildTasks = (task.children?.length ?? 0) > 0;
+  const subtasksLoaded = Boolean(task.subtasks && task.subtasks.length > 0);
+  const hasSubtaskCounts = task.sub_task_count != null && task.sub_task_count > 0;
+  const hasSubtasks = hasChildTasks || subtasksLoaded || hasSubtaskCounts;
+  const openSubtaskCount = computeOpenSubtaskCount(task);
+  const subtaskBadge = getSubtaskBadgeCounts(task);
   const status = statusConfig[task.status];
   const StatusIcon = status.icon;
   const indentLeft = depth * 24;
-
-  console.log("task", task);
 
   return (
     <>
@@ -354,8 +426,10 @@ const TaskRow: React.FC<TaskRowProps> = ({
             {/* Task title */}
             <button
               type="button"
-              onClick={() => {
-                if (canPreviewEditTask) void onPreview(task);
+              onClick={async () => {
+                if (canPreviewEditTask) {
+                  await onPreview(task);
+                }
               }}
               style={{
                 fontSize: "0.875rem",
@@ -373,8 +447,8 @@ const TaskRow: React.FC<TaskRowProps> = ({
               {task.title}
             </button>
 
-            {/* Subtask count badge */}
-            {hasSubtasks && (
+            {/* Subtask count badge (nested children or API counts) */}
+            {subtaskBadge && (
               <span
                 style={{
                   fontSize: "0.7rem",
@@ -385,7 +459,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
                   fontWeight: 600,
                 }}
               >
-                {task.subtasks!.filter((s) => s.status === "done").length}/{task.subtasks!.length}
+                {subtaskBadge.completed}/{subtaskBadge.total}
               </span>
             )}
 
@@ -468,9 +542,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
 
         {/* Open (subtask count as "open") */}
         <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-          {hasSubtasks
-            ? task.subtasks!.filter((s) => s.status !== "done").length
-            : "—"}
+          {openSubtaskCount ?? "—"}
         </td>
 
         {/* Overdue indicator */}
@@ -490,9 +562,21 @@ const TaskRow: React.FC<TaskRowProps> = ({
         </td>
       </tr>
 
-      {/* Subtask rows - shown when task is expanded */}
+      {/* Nested child task rows (API `children`) or legacy `subtasks` */}
       {isExpanded &&
-        hasSubtasks &&
+        hasChildTasks &&
+        task.children!.map((child) => (
+          <TaskRow
+            key={child.id}
+            task={child}
+            depth={depth + 1}
+            onPreview={onPreview}
+            expandedTasks={expandedTasks}
+            onToggleTask={onToggleTask}
+            canPreviewEditTask={canPreviewEditTask}
+          />
+        ))}
+      {isExpanded && subtasksLoaded && !hasChildTasks &&
         task.subtasks!.map((sub) => (
           <SubtaskRow
             key={sub.id}
@@ -537,7 +621,6 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
   const status = statusConfig[subtask.status];
   const StatusIcon = status.icon;
   const indentLeft = depth * 24;
-  console.log("subtask", subtask);
 
   return (
     <tr
@@ -670,6 +753,10 @@ function DetailBox({
 
 const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide }) => {
   if (!task) return null;
+  const subtasksForDetail =
+    task.children && task.children.length > 0
+      ? plannerChildTasksToSubTasks(task.children)
+      : task.subtasks ?? [];
   const status = statusConfig[task.status];
   const priority = priorityConfig[task.priority];
   const StatusIcon = status.icon;
@@ -793,20 +880,20 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
           </DetailBox>
         )}
 
-        {/* Subtasks */}
-        {task.subtasks && task.subtasks.length > 0 && (
+        {/* Subtasks (API `children` or legacy `subtasks`) */}
+        {subtasksForDetail.length > 0 && (
           <DetailBox
-            label={`Subtasks (${task.subtasks.filter((s) => s.status === "done").length}/${task.subtasks.length} completed)`}
+            label={`Subtasks (${subtasksForDetail.filter((s) => s.status === "done").length}/${subtasksForDetail.length} completed)`}
             className="mb-3"
           >
             {/* Progress */}
             <ProgressBar
-              now={Math.round((task.subtasks.filter((s) => s.status === "done").length / task.subtasks.length) * 100)}
+              now={Math.round((subtasksForDetail.filter((s) => s.status === "done").length / subtasksForDetail.length) * 100)}
               style={{ height: 6, marginBottom: 12 }}
               variant="primary"
             />
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {task.subtasks.map((sub) => {
+              {subtasksForDetail.map((sub) => {
                 const subStatus = statusConfig[sub.status];
                 const SubIcon = subStatus.icon;
                 return (
@@ -904,16 +991,6 @@ function mapTableProjectToPlannerSidebarProject(row: Project): {
   };
 }
 
-function mapGetTaskResponseToSidebarEditTask(
-  api: Record<string, unknown>,
-): CreatePlannerSidebarTaskProp {
-  const id = api.id;
-  return {
-    ...api,
-    rawData: { id: id ?? undefined },
-  } as CreatePlannerSidebarTaskProp;
-}
-
 function projectIdFromSidebarEditTask(
   task: CreatePlannerSidebarTaskProp | null | undefined,
 ): number | null {
@@ -926,6 +1003,26 @@ function projectIdFromSidebarEditTask(
     return proj.id;
   }
   return null;
+}
+
+function resolveProjectActionsMenuOpenState(
+  projectId: string,
+  nextShow: boolean,
+  previousOpenId: string | null,
+): string | null {
+  if (nextShow) {
+    return projectId;
+  }
+  return previousOpenId === projectId ? null : previousOpenId;
+}
+
+function createProjectRowActionsToggleHandler(
+  projectId: string,
+  setOpenProjectActionsId: React.Dispatch<React.SetStateAction<string | null>>,
+): (nextShow: boolean) => void {
+  return (nextShow: boolean) => {
+    setOpenProjectActionsId((prev) => resolveProjectActionsMenuOpenState(projectId, nextShow, prev));
+  };
 }
 
 /**
@@ -1050,7 +1147,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         return;
       }
       setFetchedEditTask(
-        mapGetTaskResponseToSidebarEditTask(raw as Record<string, unknown>),
+        mapGetTaskResponseToSidebarEditTask(raw as Record<string, unknown>) as CreatePlannerSidebarTaskProp,
       );
       setShowCreateTaskSidebar(true);
     } catch (err) {
@@ -1190,12 +1287,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
               <div>
                 <Dropdown
                   show={openProjectActionsId === project.id}
-                  onToggle={(nextShow) => {
-                    setOpenProjectActionsId((prev) => {
-                      if (nextShow) return project.id;
-                      return prev === project.id ? null : prev;
-                    });
-                  }}
+                  onToggle={createProjectRowActionsToggleHandler(project.id, setOpenProjectActionsId)}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Dropdown.Toggle
@@ -1857,6 +1949,8 @@ type AppliedProjectFilters = {
   status: ProjectStatusFilter;
   owner: string;
   team: string;
+  startDateFrom: string;
+  endDateTo: string;
 };
 
 const WorkPlannerProjects = () => {
@@ -1878,7 +1972,16 @@ const WorkPlannerProjects = () => {
   const [filterStatus, setFilterStatus] = useState<ProjectStatusFilter>("active");
   const [filterOwner, setFilterOwner] = useState("All Owners");
   const [filterTeam, setFilterTeam] = useState("All Teams");
-  const [appliedFilters, setAppliedFilters] = useState<AppliedProjectFilters>({ search: "", status: "active", owner: "All Owners", team: "All Teams" });
+  const [filterStartDateFrom, setFilterStartDateFrom] = useState("");
+  const [filterEndDateTo, setFilterEndDateTo] = useState("");
+  const [appliedFilters, setAppliedFilters] = useState<AppliedProjectFilters>({
+    search: "",
+    status: "active",
+    owner: "All Owners",
+    team: "All Teams",
+    startDateFrom: "",
+    endDateTo: "",
+  });
   const [customTabs] = useState<TabConfig[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -1899,7 +2002,13 @@ const WorkPlannerProjects = () => {
 
   useEffect(() => {
     if (!hierarchyLoading) {
-      fetchProjects({ search: searchTerm, status: filterStatus, owner: filterOwner });
+      fetchProjects({
+        search: searchTerm,
+        status: filterStatus,
+        owner: filterOwner,
+        startDateFrom: filterStartDateFrom,
+        endDateTo: filterEndDateTo,
+      });
     }
   }, [pagination.page, pagination.limit, hierarchyLoading]);
 
@@ -1908,12 +2017,19 @@ const WorkPlannerProjects = () => {
       setLoading(true);
       const statusParam = filters?.status && filters.status !== "all" ? filters.status : undefined;
       const ownerParam = filters?.owner && filters.owner !== "All Owners" ? [filters.owner] : undefined;
+      let startFrom = filters?.startDateFrom?.trim() || undefined;
+      let endTo = filters?.endDateTo?.trim() || undefined;
+      if (startFrom && endTo && endTo < startFrom) {
+        endTo = startFrom;
+      }
       const response = await listProjects({
         page: pagination.page,
         limit: pagination.limit,
         search: filters?.search || "",
         status: statusParam,
         user_extensions: ownerParam,
+        start_date_from: startFrom,
+        end_date_to: endTo,
       });
       if (response?.success === true && Array.isArray(response.data)) {
         setProjects(response.data.map((p: ApiProject) => mapApiProjectToProject(p)));
@@ -2107,16 +2223,91 @@ const WorkPlannerProjects = () => {
     setFilterStatus("active");
     setFilterOwner("All Owners");
     setFilterTeam("All Teams");
-    const cleared: AppliedProjectFilters = { search: "", status: "active", owner: "All Owners", team: "All Teams" };
+    setFilterStartDateFrom("");
+    setFilterEndDateTo("");
+    const cleared: AppliedProjectFilters = {
+      search: "",
+      status: "active",
+      owner: "All Owners",
+      team: "All Teams",
+      startDateFrom: "",
+      endDateTo: "",
+    };
     setAppliedFilters(cleared);
     fetchProjects(cleared);
   };
 
   const handleApplyFilters = () => {
     setPagination((prev) => ({ ...prev, page: 1 }));
-    const next: AppliedProjectFilters = { search: searchTerm, status: filterStatus, owner: filterOwner, team: filterTeam };
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status: filterStatus,
+      owner: filterOwner,
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
     setAppliedFilters(next);
     fetchProjects(next);
+  };
+
+  const applyProjectStatusFromPill = (status: ProjectStatusFilter) => {
+    setFilterStatus(status);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status,
+      owner: filterOwner,
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
+    setAppliedFilters(next);
+    fetchProjects(next);
+  };
+
+  const clearDateFiltersAndRefetch = () => {
+    setFilterStartDateFrom("");
+    setFilterEndDateTo("");
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status: filterStatus,
+      owner: filterOwner,
+      team: filterTeam,
+      startDateFrom: "",
+      endDateTo: "",
+    };
+    setAppliedFilters(next);
+    fetchProjects(next);
+  };
+
+  const handleProjectStartDateChange = (value = "") => {
+    setFilterStartDateFrom(value);
+    setFilterEndDateTo((prevEnd) => {
+      if (value && prevEnd && prevEnd < value) {
+        return value;
+      }
+      return prevEnd;
+    });
+  };
+
+  const handleProjectEndDateChange = (value = "") => {
+    const start = filterStartDateFrom.trim();
+    if (value && start && value < start) {
+      setFilterEndDateTo(start);
+      return;
+    }
+    setFilterEndDateTo(value);
+  };
+
+  const dateRangePillActiveLabel = (): string | undefined => {
+    const from = filterStartDateFrom.trim();
+    const to = filterEndDateTo.trim();
+    if (!from && !to) return undefined;
+    if (from && to) return `${from} → ${to}`;
+    if (from) return `From ${from}`;
+    return `To ${to}`;
   };
 
   const handleTabChange = (tabId: string) => {
@@ -2155,15 +2346,33 @@ const WorkPlannerProjects = () => {
 
   const statuses: Array<{ value: ProjectStatusFilter; label: string }> = [
     { value: "all", label: "All Status" },
-    { value: "active", label: "Active" },
-    { value: "completed", label: "Completed" },
-    { value: "archived", label: "Archived" },
+    { value: "active", label: "active" },
+    { value: "archived", label: "archived" },
+    { value: "completed", label: "completed" },
   ];
 
   const filterFields: FilterField[] = [
     { id: "search", label: "Search", type: "text", value: searchTerm, onChange: (v: string) => setSearchTerm(v ?? ""), placeholder: "Search projects..." },
     { id: "status", label: "Status", type: "dropdown", value: filterStatus, onChange: (v) => setFilterStatus(coerceProjectStatusFilter(v)), options: statuses },
     { id: "owner", label: "Owner / PM", type: "dropdown", value: filterOwner, onChange: (v) => setFilterOwner(v ?? "All Owners"), options: ownerSelectOptions },
+    {
+      id: "start_date_from",
+      label: "Start date (from)",
+      type: "date",
+      value: filterStartDateFrom,
+      onChange: (v: string | null) => handleProjectStartDateChange(v ?? ""),
+      placeholder: "YYYY-MM-DD",
+      max: filterEndDateTo || undefined,
+    },
+    {
+      id: "end_date_to",
+      label: "End date (to)",
+      type: "date",
+      value: filterEndDateTo,
+      onChange: (v: string | null) => handleProjectEndDateChange(v ?? ""),
+      placeholder: "YYYY-MM-DD",
+      min: filterStartDateFrom || undefined,
+    },
   ];
 
   const statsCardsData: StatsCardData[] = [
@@ -2182,13 +2391,17 @@ const WorkPlannerProjects = () => {
   const filterPills: FilterPill[] = [
     {
       id: "status",
-      label: filterStatus === "all" ? "Status" : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1),
-      active: filterStatus === "active" || filterStatus === "completed" || filterStatus === "archived",
-      activeLabel:
-        filterStatus === "active" || filterStatus === "completed" || filterStatus === "archived"
-          ? filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)
-          : undefined,
-      onClear: () => setFilterStatus("all"),
+      label: "Status",
+      active: isProjectStatusFilterActive(filterStatus),
+      activeLabel: isProjectStatusFilterActive(filterStatus) ? filterStatus : undefined,
+      showDropdown: true,
+      dropdownOptions: [
+        { label: "All Status", value: "all", onClick: () => applyProjectStatusFromPill("all") },
+        { label: "Active", value: "active", onClick: () => applyProjectStatusFromPill("active") },
+        { label: "Archived", value: "archived", onClick: () => applyProjectStatusFromPill("archived") },
+        { label: "Completed", value: "completed", onClick: () => applyProjectStatusFromPill("completed") },
+      ],
+      onClear: () => applyProjectStatusFromPill("all"),
     },
     {
       id: "owner",
@@ -2196,6 +2409,39 @@ const WorkPlannerProjects = () => {
       active: filterOwner !== "All Owners",
       activeLabel: filterOwner === "All Owners" ? undefined : getUserNameFromExtension(filterOwner),
       onClear: () => setFilterOwner("All Owners"),
+    },
+    {
+      id: "date_range",
+      label: "Dates",
+      active: Boolean(filterStartDateFrom.trim() || filterEndDateTo.trim()),
+      activeLabel: dateRangePillActiveLabel(),
+      showDropdown: true,
+      dropdownContent: (
+        <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+          <Form.Group className="mb-0">
+            <Form.Label className="small text-muted mb-1">Start date (from)</Form.Label>
+            <Form.Control
+              type="date"
+              value={filterStartDateFrom}
+              max={filterEndDateTo || undefined}
+              onChange={(e) => handleProjectStartDateChange(e.target.value)}
+            />
+          </Form.Group>
+          <Form.Group className="mb-0">
+            <Form.Label className="small text-muted mb-1">End date (to)</Form.Label>
+            <Form.Control
+              type="date"
+              value={filterEndDateTo}
+              min={filterStartDateFrom || undefined}
+              onChange={(e) => handleProjectEndDateChange(e.target.value)}
+            />
+          </Form.Group>
+          <Button variant="dark" size="sm" className="align-self-stretch" onClick={() => handleApplyFilters()}>
+            Apply dates
+          </Button>
+        </div>
+      ),
+      onClear: () => clearDateFiltersAndRefetch(),
     },
   ];
 
