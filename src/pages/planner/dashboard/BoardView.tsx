@@ -381,6 +381,7 @@ const BoardView: React.FC<BoardViewProps> = ({
   const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showFilterSidebar, setShowFilterSidebar] = useState(false);
+  const [savingTaskMove, setSavingTaskMove] = useState(false);
 
   const extensionNameByNumber = useMemo(() => {
     const map = new Map<string, string>();
@@ -449,6 +450,10 @@ const BoardView: React.FC<BoardViewProps> = ({
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, task: any) => {
+    if (savingTaskMove) {
+      e.preventDefault();
+      return;
+    }
     setDraggedTask(task);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', task.id.toString());
@@ -491,14 +496,16 @@ const BoardView: React.FC<BoardViewProps> = ({
       return;
     }
 
+    setSavingTaskMove(true);
     try {
       const payload = buildTaskMovePayload(draggedTask, targetStatusId);
       await updateTask(draggedTask.id, payload as Parameters<typeof updateTask>[1]);
       onTaskStatusChange?.();
-      setDraggedTask(null);
     } catch (error) {
       console.error('Error updating task status:', error);
       toast.error('Failed to update task status');
+    } finally {
+      setSavingTaskMove(false);
       setDraggedTask(null);
     }
   };
@@ -735,7 +742,34 @@ const BoardView: React.FC<BoardViewProps> = ({
       />
 
       {/* Kanban Board */}
-      <div className="kb-scroll" style={styles.board}>
+      <div style={{ position: 'relative', width: '100%' }}>
+        {savingTaskMove && (
+          <div
+            role="status"
+            aria-live="polite"
+            aria-busy="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.72)',
+              cursor: 'wait',
+            }}
+          >
+            <span className="visually-hidden">Updating task position</span>
+            <span className="spinner-border text-primary" style={{ width: '2.5rem', height: '2.5rem' }} aria-hidden />
+          </div>
+        )}
+        <div
+          className="kb-scroll"
+          style={{
+            ...styles.board,
+            pointerEvents: savingTaskMove ? 'none' : 'auto',
+          }}
+        >
         {statuses.map((status: any, idx: number) => {
           const statusTasks = getTasksByStatus(status.id);
           const isCollapsed = !!collapsedColumns[status.id];
@@ -853,7 +887,7 @@ const BoardView: React.FC<BoardViewProps> = ({
                         <article
                           key={task.id}
                           aria-label={task.title || 'Task'}
-                          draggable
+                          draggable={!savingTaskMove}
                           style={{
                             ...styles.taskCard,
                             boxShadow: cardHov
@@ -1029,6 +1063,7 @@ const BoardView: React.FC<BoardViewProps> = ({
             </div>
           );
         })}
+        </div>
       </div>
 
       <CreateTaskModal

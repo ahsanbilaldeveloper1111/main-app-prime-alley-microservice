@@ -54,7 +54,11 @@ interface CreateTaskSidebarProps {
 /** Minimal task shape used when editing in the sidebar (API / normalized task). */
 interface PlannerEditTask {
   id?: string | number;
-  rawData?: { id?: string | number };
+  rawData?: {
+    id?: string | number;
+    last_run_at?: string;
+    next_run_at?: string;
+  };
   project_id?: number;
   project?: { id?: number };
   status_id?: number;
@@ -76,6 +80,8 @@ interface PlannerEditTask {
   repeat_interval?: number;
   repeat_on?: string | number | null;
   due_time?: unknown;
+  last_run_at?: string;
+  next_run_at?: string;
 }
 
 interface UserType {
@@ -182,6 +188,29 @@ function formatDateForInput(dateString: string | null | undefined): string {
   } catch {
     return "";
   }
+}
+
+/** Read-only display for API schedule timestamps (e.g. `2026-03-28T08:30:03+00:00`). */
+function formatDateTimeForDisplay(iso: string | null | undefined): string {
+  if (iso == null || String(iso).trim() === "") return "—";
+  const d = new Date(String(iso).trim());
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function recurringScheduleField(
+  task: PlannerEditTask | undefined,
+  field: "last_run_at" | "next_run_at",
+): string | undefined {
+  if (!task) return undefined;
+  const direct = task[field];
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  const raw = task.rawData;
+  if (raw && typeof raw === "object") {
+    const v = raw[field];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return undefined;
 }
 
 /**
@@ -1887,6 +1916,64 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     style={{ fontSize: "14px" }}
                   />
                 </Form.Group>
+                {isEdit && (
+                  <Row>
+                    <Col xs={12} md={6}>
+                      <Form.Group className={groupClass}>
+                        <Form.Label style={labelStyle}>
+                          <Calendar
+                            size={16}
+                            className="me-2"
+                            style={{ verticalAlign: "middle" }}
+                          />
+                          Last run at
+                        </Form.Label>
+                        <div
+                          className="form-control py-2"
+                          style={{
+                            fontSize: "14px",
+                            fontWeight: 300,
+                            backgroundColor: "#f8fafc",
+                            color: "#374151",
+                            cursor: "default",
+                          }}
+                          aria-readonly="true"
+                        >
+                          {formatDateTimeForDisplay(
+                            recurringScheduleField(editTask, "last_run_at"),
+                          )}
+                        </div>
+                      </Form.Group>
+                    </Col>
+                    <Col xs={12} md={6}>
+                      <Form.Group className={groupClass}>
+                        <Form.Label style={labelStyle}>
+                          <Calendar
+                            size={16}
+                            className="me-2"
+                            style={{ verticalAlign: "middle" }}
+                          />
+                          Next run at
+                        </Form.Label>
+                        <div
+                          className="form-control py-2"
+                          style={{
+                            fontSize: "14px",
+                            fontWeight: 300,
+                            backgroundColor: "#f8fafc",
+                            color: "#374151",
+                            cursor: "default",
+                          }}
+                          aria-readonly="true"
+                        >
+                          {formatDateTimeForDisplay(
+                            recurringScheduleField(editTask, "next_run_at"),
+                          )}
+                        </div>
+                      </Form.Group>
+                    </Col>
+                  </Row>
+                )}
               </>
             )}
 

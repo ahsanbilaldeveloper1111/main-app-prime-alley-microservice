@@ -114,13 +114,17 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   }, [router]);
 
   const getTasksByStatus = (statusId: string | number | null) => {
-    const filtered = filterBoardTasksForColumns(boardTasks, {
-      searchTerm: boardSearchTerm,
-      showCompletedTasks,
-      selectedAssignee: boardSelectedAssignee,
-      selectedPriority: boardSelectedPriority,
-      selectedLabel: boardSelectedLabel,
-    });
+    const filtered = filterBoardTasksForColumns(
+      boardTasks,
+      {
+        searchTerm: boardSearchTerm,
+        showCompletedTasks,
+        selectedAssignee: boardSelectedAssignee,
+        selectedPriority: boardSelectedPriority,
+        selectedLabel: boardSelectedLabel,
+      },
+      statuses,
+    );
     return sliceBoardTasksByStatusId(filtered, statusId);
   };
 

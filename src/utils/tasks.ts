@@ -20,12 +20,20 @@ interface CreateProjectData {
   name: string;
   description?: string;
   color?: string;
+  start_date?: string;
+  end_date?: string | null;
+  status?: string;
+  timezone?: string;
 }
 
 interface UpdateProjectData {
   name?: string;
   description?: string;
   color?: string;
+  start_date?: string;
+  end_date?: string | null;
+  status?: string;
+  timezone?: string;
 }
 
 interface CreateLabelData {
@@ -116,7 +124,8 @@ interface ListTasksParams {
   withRelations?: string[];
   created_at_from?: string;
   created_at_to?: string;
-  extension_numbers?: string[];
+  /** Filter by assignee extension numbers (query: `assignees[]`). */
+  assignees?: string[];
   order?: {
     column?: string;
     dir?: 'asc' | 'desc';
@@ -664,7 +673,7 @@ function buildListTasksSearchParams(params: ListTasksParams): URLSearchParams {
     withRelations,
     created_at_from,
     created_at_to,
-    extension_numbers,
+    assignees,
     order,
   } = params;
 
@@ -687,7 +696,7 @@ function buildListTasksSearchParams(params: ListTasksParams): URLSearchParams {
 
   appendOrderParams(searchParams, order);
   appendRepeatedQueryParam(searchParams, 'with[]', withRelations);
-  appendRepeatedQueryParam(searchParams, 'extension_numbers[]', extension_numbers);
+  appendRepeatedQueryParam(searchParams, 'assignees[]', assignees);
 
   return searchParams;
 }

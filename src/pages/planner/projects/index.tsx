@@ -37,7 +37,8 @@ import {
   mapGetTaskResponseToSidebarEditTask,
 } from "@planner/workPlannerProjectRelations";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, getAutoTimezone } from "@utils/Helper";
+import { toast } from "react-toastify";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { StatsCardData } from "@components/GenericStatsCards";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
@@ -103,6 +104,7 @@ interface ApiProject {
   owner_extension_number?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+  timezone?: string | null;
   created_at: string;
   updated_at: string;
   tasks?: Array<any>;
@@ -117,6 +119,47 @@ interface ApiProject {
 }
 
 type ProjectStatusFilter = "active" | "completed" | "archived" | "all";
+
+type ProjectFormStatus = "active" | "archived" | "completed";
+
+interface ProjectFormState {
+  name: string;
+  description: string;
+  start_date: string;
+  end_date: string;
+  color: string;
+  status: ProjectFormStatus;
+  timezone: string;
+}
+
+function createEmptyProjectForm(): ProjectFormState {
+  return {
+    name: "",
+    description: "",
+    start_date: "",
+    end_date: "",
+    color: "#3b82f6",
+    status: "active",
+    timezone: getAutoTimezone(),
+  };
+}
+
+function formatApiDateForProjectInput(value: string | null | undefined): string {
+  if (value == null || value === "") return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function apiStatusToProjectFormStatus(api: string | undefined): ProjectFormStatus {
+  const s = (api ?? "active").toLowerCase();
+  if (s === "archived") return "archived";
+  if (s === "completed") return "completed";
+  return "active";
+}
 
 interface Project {
   id: string;
@@ -1982,7 +2025,7 @@ const WorkPlannerProjects = () => {
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [projectFormData, setProjectFormData] = useState({ name: "", description: "", color: "#3b82f6" });
+  const [projectFormData, setProjectFormData] = useState<ProjectFormState>(() => createEmptyProjectForm());
   const [stats, setStats] = useState({ activeProjects: 0, totalProjects: 0, tasksDueThisWeek: 0, overdueAcrossProjects: 0 });
   const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, last_page: 1, from: 0, to: 0 });
   const [activeTab, setActiveTab] = useState("all");
@@ -2015,7 +2058,7 @@ const WorkPlannerProjects = () => {
   const resetProjectModalState = useCallback(() => {
     setShowProjectModal(false);
     setEditingProject(null);
-    setProjectFormData({ name: "", description: "", color: "#3b82f6" });
+    setProjectFormData(createEmptyProjectForm());
   }, []);
 
   useEffect(() => {
@@ -2118,13 +2161,25 @@ const WorkPlannerProjects = () => {
 
   const handleCreateProject = () => {
     setEditingProject(null);
-    setProjectFormData({ name: "", description: "", color: "#3b82f6" });
+    setProjectFormData(createEmptyProjectForm());
     setShowProjectModal(true);
   };
 
   const handleEditProject = (project: Project) => {
     setEditingProject(project);
-    setProjectFormData({ name: project.name, description: project.apiData?.description || "", color: project.iconColor });
+    const api = project.apiData;
+    setProjectFormData({
+      name: project.name,
+      description: api?.description || "",
+      start_date: formatApiDateForProjectInput(api?.start_date ?? undefined),
+      end_date: formatApiDateForProjectInput(api?.end_date ?? undefined),
+      color: project.iconColor,
+      status: apiStatusToProjectFormStatus(api?.status),
+      timezone:
+        typeof api?.timezone === "string" && api.timezone.trim() !== ""
+          ? api.timezone
+          : getAutoTimezone(),
+    });
     setShowProjectModal(true);
   };
 
@@ -2152,9 +2207,27 @@ const WorkPlannerProjects = () => {
 
   const handleSubmitProject = async (e: React.FormEvent) => {
     e.preventDefault();
+    const start = projectFormData.start_date.trim();
+    const end = projectFormData.end_date.trim();
+    if (!start) {
+      toast.error("Start date is required");
+      return;
+    }
+    if (end && end < start) {
+      toast.error("End date cannot be before start date");
+      return;
+    }
     try {
       setSubmitting(true);
-      const projectData = { name: projectFormData.name, description: projectFormData.description, color: projectFormData.color };
+      const projectData: Parameters<typeof createProject>[0] = {
+        name: projectFormData.name.trim(),
+        description: projectFormData.description.trim() || undefined,
+        color: projectFormData.color,
+        status: projectFormData.status,
+        timezone: projectFormData.timezone,
+        start_date: start,
+      };
+      if (end) projectData.end_date = end;
       const result = editingProject
         ? await updateProject(editingProject.id, projectData)
         : await createProject(projectData);
@@ -2632,6 +2705,67 @@ const WorkPlannerProjects = () => {
                 <Form.Label>Description</Form.Label>
                 <Form.Control as="textarea" rows={3} value={projectFormData.description} onChange={(e) => setProjectFormData({ ...projectFormData, description: e.target.value })} placeholder="Enter project description" />
               </Form.Group>
+              <Row className="mb-3 g-2">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Start date <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Form.Control
+                      type="date"
+                      required
+                      value={projectFormData.start_date}
+                      onChange={(e) => {
+                        const newStart = e.target.value;
+                        setProjectFormData((prev) => {
+                          let nextEnd = prev.end_date;
+                          if (newStart && nextEnd && nextEnd < newStart) {
+                            nextEnd = newStart;
+                          }
+                          return { ...prev, start_date: newStart, end_date: nextEnd };
+                        });
+                      }}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>End date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      min={projectFormData.start_date || undefined}
+                      value={projectFormData.end_date}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setProjectFormData((prev) => {
+                          if (v && prev.start_date && v < prev.start_date) {
+                            toast.error("End date cannot be before start date");
+                            return prev;
+                          }
+                          return { ...prev, end_date: v };
+                        });
+                      }}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Form.Group className="mb-3">
+                <Form.Label>Status</Form.Label>
+                <Form.Select
+                  value={projectFormData.status}
+                  onChange={(e) =>
+                    setProjectFormData({
+                      ...projectFormData,
+                      status: e.target.value as ProjectFormStatus,
+                    })
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="archived">Archived</option>
+                  <option value="completed">Completed</option>
+                </Form.Select>
+              </Form.Group>
+              
               <Form.Group className="mb-3">
                 <Form.Label>Color</Form.Label>
                 <div className="d-flex align-items-center gap-3">
@@ -2641,7 +2775,15 @@ const WorkPlannerProjects = () => {
               </Form.Group>
               <div className="d-flex justify-content-end gap-2">
                 <Button variant="secondary" onClick={resetProjectModalState} disabled={submitting}>Cancel</Button>
-                <Button variant="primary" type="submit" disabled={submitting || !projectFormData.name.trim()}>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={
+                    submitting ||
+                    !projectFormData.name.trim() ||
+                    !projectFormData.start_date.trim()
+                  }
+                >
                   {submitting ? (
                     <>
                       <Spinner as="span" animation="border" size="sm" className="me-2" />
