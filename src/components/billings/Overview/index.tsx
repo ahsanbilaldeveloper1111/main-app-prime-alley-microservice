@@ -195,7 +195,7 @@ const OverviewPage = () => {
           </div>
           <div style={{ flex: 1 }}>
             <h2 style={styles.companyHeading}>
-              {companyDetails?.name ?? session?.user?.company_name}
+              {session?.user?.company_name}
             </h2>
             <TopSection
               companyDetails={companyDetails}
