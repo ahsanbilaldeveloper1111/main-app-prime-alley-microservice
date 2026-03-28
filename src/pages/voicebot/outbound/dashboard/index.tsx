@@ -12,6 +12,7 @@ import { normalizeCompaniesResponse } from "@utils/companyOptions";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 
 interface DashboardData {
   total_campaigns?: number;
@@ -78,10 +79,16 @@ const OutboundDashboardPage = () => {
     async function fetchCompanies() {
       try {
         const res = await getCompanies({ show_inactive: false });
-        const opts = normalizeCompaniesResponse(res, { prefer: "company_id" }).map((c) => ({
+        const normalizedCompanies = normalizeCompaniesResponse(res, { prefer: "company_id" }) as Array<{
+          company_id?: string;
+          identifier?: string;
+          id?: string;
+          name: string;
+        }>;
+        const opts = normalizedCompanies.map((c) => ({
           id: c.company_id ?? c.identifier ?? c.id,
           name: c.name,
-        })).filter((c) => Boolean(c.id));
+        })).filter((c): c is { id: string; name: string } => Boolean(c.id));
         if (!cancelled) setCompanies(opts);
       } catch {
         if (!cancelled) setCompanies([]);
@@ -116,8 +123,30 @@ const OutboundDashboardPage = () => {
     total_cost: totalCost,
   };
 
+  const statsCardsData: StatsCardData[] = METRIC_CARDS.map(({ key, label }) => ({
+    title: label,
+    value: cardValues[key] ?? "—",
+  }));
+
   return (
     <React.Fragment>
+      <style jsx global>{`
+        .outbound-dashboard-stats > div {
+          grid-template-columns: repeat(8, minmax(0, 1fr)) !important;
+        }
+
+        @media (max-width: 1399.98px) {
+          .outbound-dashboard-stats > div {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+          }
+        }
+
+        @media (max-width: 767.98px) {
+          .outbound-dashboard-stats > div {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          }
+        }
+      `}</style>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Outbound Dashboard" />
       <PageHeader title="Outbound Dashboard" showSearch={false}
         buttons={
@@ -157,16 +186,9 @@ const OutboundDashboardPage = () => {
         <p className="text-muted">Select a company to view dashboard.</p>
       )}
       {!loading && effectiveCompanyId && (
-        <Row className="g-3 mb-4">
-          {METRIC_CARDS.map(({ key, label }) => (
-            <Col key={key} xs={6} md={6} lg={3}>
-              <div className="p-3 rounded border bg-light h-100">
-                <div className="small text-muted">{label}</div>
-                <div className="h5 mb-0 fw-bold">{cardValues[key] ?? "—"}</div>
-              </div>
-            </Col>
-          ))}
-        </Row>
+        <div className="outbound-dashboard-stats">
+          <StatsCards data={statsCardsData} valueFontSize="28px" />
+        </div>
       )}
     </React.Fragment>
   );
