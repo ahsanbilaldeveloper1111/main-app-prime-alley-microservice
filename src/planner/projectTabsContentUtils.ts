@@ -80,7 +80,7 @@ export function applyListTabFiltersToParams(
   }
 
   if (filters.filterAssignee?.length) {
-    params.extension_numbers = filters.filterAssignee;
+    params.assignees = filters.filterAssignee;
   }
   if (filters.filterCreatedAtFrom) {
     params.created_at_from = filters.filterCreatedAtFrom;
@@ -357,17 +357,52 @@ export type BoardTabColumnFilters = {
   selectedLabel: string;
 };
 
+/** True when this workflow column represents completed/done work (API flag or name). */
+function statusColumnLooksCompleted(status: any): boolean {
+  if (status?.is_completed === true) {
+    return true;
+  }
+  const n = String(status?.name ?? '').toLowerCase();
+  return (
+    n.includes('done') ||
+    n.includes('complete') ||
+    n.includes('closed') ||
+    n === 'complete'
+  );
+}
+
+function buildCompletedColumnStatusIdSet(projectStatuses: any[]): Set<string> {
+  return new Set(
+    (projectStatuses || [])
+      .filter((s: any) => statusColumnLooksCompleted(s))
+      .map((s: any) => String(s.id)),
+  );
+}
+
+function taskStatusIdForColumnMatch(task: any): string | null {
+  const raw = task.status_id ?? task.status?.id;
+  if (raw == null || raw === '') {
+    return null;
+  }
+  return String(raw);
+}
+
 export function filterBoardTasksForColumns(
   tasks: any[],
   filters: BoardTabColumnFilters,
+  projectStatuses: any[] = [],
 ): any[] {
   const term = filters.searchTerm.toLowerCase();
+  const doneColumnStatusIds = buildCompletedColumnStatusIdSet(projectStatuses);
   return tasks.filter((task: any) => {
     if (term && !task.title?.toLowerCase().includes(term)) {
       return false;
     }
     if (!filters.showCompletedTasks && task.is_completed) {
-      return false;
+      const sid = taskStatusIdForColumnMatch(task);
+      if (sid == null || !doneColumnStatusIds.has(sid)) {
+        return false;
+      }
     }
     if (filters.selectedAssignee !== 'All Assignees') {
       const hasAssignee = task.assignees?.some((a: any) => {
@@ -398,9 +433,9 @@ export function sliceBoardTasksByStatusId(
   statusId: string | number | null,
 ): any[] {
   if (statusId === null) {
-    return filteredTasks.filter((task: any) => !task.status_id);
+    return filteredTasks.filter((task: any) => taskStatusIdForColumnMatch(task) == null);
   }
   return filteredTasks.filter(
-    (task: any) => String(task.status_id) === String(statusId),
+    (task: any) => taskStatusIdForColumnMatch(task) === String(statusId),
   );
 }

@@ -29,7 +29,7 @@ interface Task {
   task_type: string;
   assigned_to: string | null;
   assigned_to_name?: string;
-  priority: "low" | "medium" | "high" | null;
+  priority: "low" | "medium" | "high" | "urgent" | null;
   due_date: string | null;
   notes: string | null;
   repeat_status: string | null;
@@ -84,6 +84,7 @@ const STATUS_OPTIONS = [
 
 const PRIORITY_COLOR: Record<string, string> = {
   low: "#22c55e",
+  medium: "#f59e0b",
   normal: "#f59e0b",
   high: "#ef4444",
   urgent: "#ef4444",
@@ -149,7 +150,12 @@ function applyFiltersToParams(
   currentTasks: Task[]
 ) {
   if (filters.priority) {
-    const priorityMap: Record<string, string> = { low: "low", medium: "normal", high: "high" };
+    const priorityMap: Record<string, string> = {
+      low: "low",
+      medium: "normal",
+      high: "high",
+      urgent: "urgent",
+    };
     params.priority = priorityMap[String(filters.priority)] || "normal";
   }
   if (filters.due_date_from) params.due_date_from = filters.due_date_from;
@@ -160,7 +166,17 @@ function applyFiltersToParams(
     if (proj) params.project_id = proj.id;
   }
 
-  if (filters.assignee?.length) params.extension_numbers = filters.assignee;
+  if (filters.assignee?.length) params.assignees = filters.assignee;
+
+  const taskTypeFilter = filters.task_type;
+  if (
+    taskTypeFilter &&
+    (taskTypeFilter === "regular" ||
+      taskTypeFilter === "todo" ||
+      taskTypeFilter === "recurring")
+  ) {
+    params.type = taskTypeFilter;
+  }
 
   if (filters.status && filters.status !== "All Status") {
     const statusId = currentTasks.find((t) => t.rawData?.status?.name === filters.status)?.rawData?.status?.id;
@@ -245,11 +261,11 @@ const CELL_STYLE: React.CSSProperties = {
 
     // Map API task to UI Task (uses hierarchy for assignee names)
     const mapApiTaskToTask = useCallback((apiTask: ApiTask): Task => {
-      const priorityMap: Record<string, "low" | "medium" | "high"> = {
+      const priorityMap: Record<string, "low" | "medium" | "high" | "urgent"> = {
         low: "low",
         normal: "medium",
         high: "high",
-        urgent: "high",
+        urgent: "urgent",
       };
       const p = (apiTask.priority || "normal").toLowerCase();
       const priority = priorityMap[p] ?? "medium";
@@ -270,7 +286,11 @@ const CELL_STYLE: React.CSSProperties = {
 
       let dueDate: string | null = null;
       if (apiTask.due_date) {
-        dueDate = apiTask.due_time ? `${apiTask.due_date}T${apiTask.due_time}` : apiTask.due_date;
+        const raw = apiTask.due_date;
+        const timePart = apiTask.due_time?.trim();
+        // Only append due_time when due_date is date-only; full ISO + due_time would produce invalid strings like "...ZT12:00:00".
+        const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+        dueDate = timePart && isDateOnly ? `${raw}T${timePart}` : raw;
       }
 
       const isCompleted = apiTask.is_completed === true;
