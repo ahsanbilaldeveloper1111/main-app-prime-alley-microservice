@@ -2,7 +2,8 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useEffect, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { TableColumn } from "@components/GenericTable";
+import GenericTable, { FilterPill, TableColumn, ToolbarConfig } from "@components/GenericTable";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { postReportsCalls, getCampaigns, getReportsCallsBySession } from "@utils/voicebot/outbound";
 import { GetCompanies } from "@utils/users";
 import { Row, Col, Button, Form, Spinner, Modal, Tabs, Tab } from "react-bootstrap";
@@ -174,7 +175,7 @@ const OutboundReportsPage = () => {
   const [loading, setLoading] = useState(false);
   const [totalRows, setTotalRows] = useState(0);
   const [hasSearched, setHasSearched] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
 
   const [viewOpen, setViewOpen] = useState(false);
@@ -287,15 +288,17 @@ const OutboundReportsPage = () => {
     }
   }, []);
 
-  const handleSearch = useCallback(async () => {
+  const handleSearch = useCallback(async (searchTerm?: string) => {
     setLoading(true);
     setHasSearched(true);
     try {
+      const activeSearch = (searchTerm ?? searchValue).trim();
       const payload: Record<string, unknown> = {
         page_size: filters.page_size,
         page: filters.page,
       };
       payload.company_id = effectiveCompanyId;
+      if (activeSearch) payload.search = activeSearch;
       if (filters.campaign_id) {
         payload.campaign_id = filters.campaign_id;
       }
@@ -327,7 +330,7 @@ const OutboundReportsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, effectiveCompanyId]);
+  }, [filters, effectiveCompanyId, searchValue]);
 
   useEffect(() => {
     if (hasSearched) return;
@@ -367,7 +370,205 @@ const OutboundReportsPage = () => {
     },
   ];
 
-  const inputStyle = { padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "6px", fontSize: "14px" };
+  const statsCardsData: StatsCardData[] = [
+    {
+      title: "Total Calls",
+      value: Number(summary?.total_calls ?? 0) || 0,
+      subtitle: "Total outbound call sessions",
+    },
+    {
+      title: "Success Rate",
+      value: formatPercent1(summary?.success_rate),
+      subtitle: "Completed calls percentage",
+    },
+    {
+      title: "Avg Duration",
+      value: formatDuration(Number(summary?.avg_duration ?? 0)),
+      subtitle: "Average call duration",
+    },
+    {
+      title: "Total Cost",
+      value: formatUsd4(summary?.total_cost),
+      subtitle: "Accumulated session cost",
+    },
+  ];
+
+  const companyActiveLabel = (() => {
+    if (!filters.company_id) return undefined;
+    const selectedCompany = companies.find((company) => company.id === filters.company_id);
+    return selectedCompany?.name ?? filters.company_id;
+  })();
+
+  const campaignActiveLabel = (() => {
+    if (!filters.campaign_id) return undefined;
+    const selectedCampaign = campaigns.find((campaign) => String(campaign.id) === String(filters.campaign_id));
+    return selectedCampaign?.name ?? String(filters.campaign_id);
+  })();
+
+  const callStatusActiveLabel = (() => {
+    if (!filters.call_status) return undefined;
+    return CALL_STATUS_OPTIONS.find((option) => option.value === filters.call_status)?.label ?? filters.call_status;
+  })();
+
+  const dateRangeActiveLabel = filters.date_from || filters.date_to
+    ? `${filters.date_from || "Any"} - ${filters.date_to || "Any"}`
+    : undefined;
+
+  const durationActiveLabel =
+    filters.duration_min !== defaultFilters.duration_min || filters.duration_max !== defaultFilters.duration_max
+      ? `${filters.duration_min}s - ${filters.duration_max}s`
+      : undefined;
+
+  const filterPills: FilterPill[] = [
+    ...(isAdmin
+      ? [
+          {
+            id: "company_id",
+            label: "Company",
+            showDropdown: true,
+            searchable: true,
+            active: Boolean(filters.company_id),
+            activeLabel: companyActiveLabel,
+            onClear: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", page: 1 })),
+            dropdownOptions: [
+              {
+                label: "All companies",
+                value: "",
+                onClick: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", page: 1 })),
+              },
+              ...companies.map((company) => ({
+                label: company.name,
+                value: company.id,
+                onClick: () => setFilters((prev) => ({ ...prev, company_id: company.id, campaign_id: "", page: 1 })),
+              })),
+            ],
+          } satisfies FilterPill,
+        ]
+      : []),
+    {
+      id: "campaign_id",
+      label: "Campaign",
+      showDropdown: true,
+      searchable: true,
+      active: Boolean(filters.campaign_id),
+      activeLabel: campaignActiveLabel,
+      onClear: () => setFilters((prev) => ({ ...prev, campaign_id: "", page: 1 })),
+      dropdownOptions: [
+        {
+          label: "All campaigns",
+          value: "",
+          onClick: () => setFilters((prev) => ({ ...prev, campaign_id: "", page: 1 })),
+        },
+        ...campaigns.map((campaign) => ({
+          label: campaign.name,
+          value: String(campaign.id),
+          onClick: () => setFilters((prev) => ({ ...prev, campaign_id: String(campaign.id), page: 1 })),
+        })),
+      ],
+    },
+    {
+      id: "call_status",
+      label: "Call Status",
+      showDropdown: true,
+      active: Boolean(filters.call_status),
+      activeLabel: callStatusActiveLabel,
+      onClear: () => setFilters((prev) => ({ ...prev, call_status: "", page: 1 })),
+      dropdownOptions: CALL_STATUS_OPTIONS.map((option) => ({
+        label: option.label,
+        value: option.value,
+        onClick: () => setFilters((prev) => ({ ...prev, call_status: option.value, page: 1 })),
+      })),
+    },
+    {
+      id: "date_range",
+      label: "Date Range",
+      showDropdown: true,
+      active: Boolean(dateRangeActiveLabel),
+      activeLabel: dateRangeActiveLabel,
+      onClear: () => setFilters((prev) => ({ ...prev, date_from: "", date_to: "", page: 1 })),
+      dropdownContent: (
+        <div className="d-flex flex-column gap-2" style={{ minWidth: "240px" }}>
+          <div>
+            <Form.Label className="small mb-1">Date From</Form.Label>
+            <Form.Control
+              type="date"
+              value={filters.date_from}
+              onChange={(e) => setFilters((prev) => ({ ...prev, date_from: e.target.value, page: 1 }))}
+            />
+          </div>
+          <div>
+            <Form.Label className="small mb-1">Date To</Form.Label>
+            <Form.Control
+              type="date"
+              value={filters.date_to}
+              onChange={(e) => setFilters((prev) => ({ ...prev, date_to: e.target.value, page: 1 }))}
+            />
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "duration_range",
+      label: "Duration",
+      showDropdown: true,
+      active: Boolean(durationActiveLabel),
+      activeLabel: durationActiveLabel,
+      onClear: () =>
+        setFilters((prev) => ({
+          ...prev,
+          duration_min: defaultFilters.duration_min,
+          duration_max: defaultFilters.duration_max,
+          page: 1,
+        })),
+      dropdownContent: (
+        <div className="d-flex flex-column gap-2" style={{ minWidth: "240px" }}>
+          <div>
+            <Form.Label className="small mb-1">Duration Min (s)</Form.Label>
+            <Form.Control
+              type="number"
+              min={0}
+              value={filters.duration_min}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, duration_min: Number(e.target.value) || 0, page: 1 }))
+              }
+            />
+          </div>
+          <div>
+            <Form.Label className="small mb-1">Duration Max (s)</Form.Label>
+            <Form.Control
+              type="number"
+              min={0}
+              value={filters.duration_max}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, duration_max: Number(e.target.value) || 3600, page: 1 }))
+              }
+            />
+          </div>
+        </div>
+      ),
+    },
+  ];
+
+  const tableToolbar: ToolbarConfig = {
+    showSearch: true,
+    searchValue,
+    searchPlaceholder: "Search by campaign, phone, status...",
+    onSearchChange: (value: string) => setSearchValue(value),
+    onSearch: () => {
+      setFilters((prev) => ({ ...prev, page: 1 }));
+      handleSearch(searchValue);
+    },
+    showFiltersButton: true,
+    showFilterPills: true,
+    showMoreFiltersButton: false,
+    filterPills,
+    rightActions: (
+      <Button variant="primary" size="sm" onClick={() => { void handleSearch(); }} disabled={loading}>
+        {loading ? <Spinner animation="border" size="sm" className="me-1" /> : null}
+        Search
+      </Button>
+    ),
+  };
 
   return (
     <React.Fragment>
@@ -376,146 +577,14 @@ const OutboundReportsPage = () => {
         <Col>
             <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
               <h2 className="mb-0">Call Reports</h2>
-              <Button variant="outline-secondary" size="sm" onClick={() => setShowFilters((v) => !v)}>
-                {showFilters ? "Hide Filters" : "Show Filters"}
-              </Button>
             </div>
         </Col>
       </Row>
 
       {hasSearched && (
-        <Row className="g-3 mb-4">
-          <Col md={3} sm={6}>
-            <div className="border rounded p-3 bg-white h-100">
-              <div className="text-muted small">Total Calls</div>
-              <div style={{ fontSize: 34, fontWeight: 300, lineHeight: 1.1 }}>
-                {Number(summary?.total_calls ?? 0) || 0}
-              </div>
-            </div>
-          </Col>
-          <Col md={3} sm={6}>
-            <div className="border rounded p-3 bg-white h-100">
-              <div className="text-muted small">Success Rate</div>
-              <div style={{ fontSize: 34, fontWeight: 300, lineHeight: 1.1 }}>
-                {formatPercent1(summary?.success_rate)}
-              </div>
-            </div>
-          </Col>
-          <Col md={3} sm={6}>
-            <div className="border rounded p-3 bg-white h-100">
-              <div className="text-muted small">Avg Duration</div>
-              <div style={{ fontSize: 34, fontWeight: 300, lineHeight: 1.1 }}>
-                {formatDuration(Number(summary?.avg_duration ?? 0))}
-              </div>
-            </div>
-          </Col>
-          <Col md={3} sm={6}>
-            <div className="border rounded p-3 bg-white h-100">
-              <div className="text-muted small">Total Cost</div>
-              <div style={{ fontSize: 34, fontWeight: 300, lineHeight: 1.1 }}>
-                {formatUsd4(summary?.total_cost)}
-              </div>
-            </div>
-          </Col>
-        </Row>
-      )}
-
-      
-
-      {showFilters && (
-      <div className="card border rounded mb-4">
-        <div className="card-body">
-          <h6 className="card-title mb-3">Filters</h6>
-          <Row className="g-3">
-            {isAdmin && (
-              <Col md={6} lg={3}>
-                <Form.Label className="small">Company</Form.Label>
-                <Form.Select
-                  value={filters.company_id}
-                  onChange={(e) => setFilters((f) => ({ ...f, company_id: e.target.value, campaign_id: "" }))}
-                  style={inputStyle}
-                >
-                  <option value="">All companies</option>
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </Form.Select>
-              </Col>
-            )}
-            <Col md={6} lg={3}>
-              <Form.Label className="small">Campaign</Form.Label>
-              <Form.Select
-                value={filters.campaign_id}
-                onChange={(e) => setFilters((f) => ({ ...f, campaign_id: e.target.value }))}
-                style={inputStyle}
-                disabled={!effectiveCompanyId}
-              >
-                <option value="">All campaigns</option>
-                {campaigns.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </Form.Select>
-            </Col>
-            <Col md={6} lg={2}>
-              <Form.Label className="small">Call Status</Form.Label>
-              <Form.Select
-                value={filters.call_status}
-                onChange={(e) => setFilters((f) => ({ ...f, call_status: e.target.value }))}
-                style={inputStyle}
-              >
-                {CALL_STATUS_OPTIONS.map((o) => (
-                  <option key={o.value || "all"} value={o.value}>{o.label}</option>
-                ))}
-              </Form.Select>
-            </Col>
-            <Col md={6} lg={2}>
-              <Form.Label className="small">Date From</Form.Label>
-              <Form.Control
-                type="date"
-                value={filters.date_from}
-                onChange={(e) => setFilters((f) => ({ ...f, date_from: e.target.value }))}
-                style={inputStyle}
-              />
-            </Col>
-            <Col md={6} lg={2}>
-              <Form.Label className="small">Date To</Form.Label>
-              <Form.Control
-                type="date"
-                value={filters.date_to}
-                onChange={(e) => setFilters((f) => ({ ...f, date_to: e.target.value }))}
-                style={inputStyle}
-              />
-            </Col>
-            <Col md={6} lg={2}>
-              <Form.Label className="small">Duration Min (s)</Form.Label>
-              <Form.Control
-                type="number"
-                min={0}
-                value={filters.duration_min}
-                onChange={(e) => setFilters((f) => ({ ...f, duration_min: Number(e.target.value) || 0 }))}
-                style={inputStyle}
-              />
-            </Col>
-            <Col md={6} lg={2}>
-              <Form.Label className="small">Duration Max (s)</Form.Label>
-              <Form.Control
-                type="number"
-                min={0}
-                value={filters.duration_max}
-                onChange={(e) => setFilters((f) => ({ ...f, duration_max: Number(e.target.value) || 3600 }))}
-                style={inputStyle}
-              />
-            </Col>
-            
-            <Col xs={12} className="d-flex align-items-end">
-              <Button variant="primary" onClick={handleSearch} disabled={loading}>
-                {loading ? <Spinner animation="border" size="sm" className="me-1" /> : null}
-                Search
-              </Button>
-            </Col>
-          </Row>
+        <div className="mb-4">
+          <StatsCards data={statsCardsData} gridMinWidth="180px" />
         </div>
-      </div>
       )}
 
       {hasSearched && (
@@ -534,6 +603,9 @@ const OutboundReportsPage = () => {
           onPaginationChange={(newPage, newRowsPerPage) => {
             setFilters((f) => ({ ...f, page: newPage, page_size: newRowsPerPage }));
           }}
+          showToolbar={true}
+          toolbar={tableToolbar}
+          showToolbarActions={false}
           uniqueKey="id"
           hover
           striped={false}
@@ -541,7 +613,19 @@ const OutboundReportsPage = () => {
       )}
 
       {!hasSearched && (
-        <p className="text-muted">Set filters and click Search to load call reports.</p>
+        <GenericTable<CallReportRow>
+          data={[]}
+          columns={columns}
+          loading={loading}
+          emptyMessage="Use the filter pills and click Search to load call reports."
+          loadingMessage="Loading reports..."
+          showToolbar={true}
+          toolbar={tableToolbar}
+          showToolbarActions={false}
+          uniqueKey="id"
+          hover
+          striped={false}
+        />
       )}
 
       <Modal show={viewOpen} onHide={closeView} size="xl" centered>
