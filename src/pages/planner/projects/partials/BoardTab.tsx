@@ -1,7 +1,5 @@
 import React from 'react';
 import BoardView from '../../dashboard/BoardView';
-import RecentActivitySection from './RecentActivitySection';
-import OverdueTasksSection from './OverdueTasksSection';
 
 interface BoardTabProps {
   selectedProject: any;
@@ -28,10 +26,10 @@ interface BoardTabProps {
   loadingActivities: boolean;
   overdueTasks: any[];
   loadingOverdue: boolean;
-  onViewActivity: () => void;
   onViewOverdue: () => void;
   styles: any;
   onTaskStatusChange?: () => void;
+  onTaskClick?: (task: any) => void | Promise<void>;
 }
 
 const BoardTab: React.FC<BoardTabProps> = ({
@@ -59,10 +57,10 @@ const BoardTab: React.FC<BoardTabProps> = ({
   loadingActivities,
   overdueTasks,
   loadingOverdue,
-  onViewActivity,
   onViewOverdue,
   styles,
-  onTaskStatusChange
+  onTaskStatusChange,
+  onTaskClick,
 }) => {
   return (
     <>
@@ -95,6 +93,7 @@ const BoardTab: React.FC<BoardTabProps> = ({
         getAllBoardPriorities={getAllBoardPriorities}
         getTasksByStatus={getTasksByStatus}
         onTaskStatusChange={onTaskStatusChange}
+        onTaskClick={onTaskClick}
       />
       
       {/* Bottom Row - Recent Activity & Overdue Tasks */}
@@ -102,7 +101,8 @@ const BoardTab: React.FC<BoardTabProps> = ({
         <RecentActivitySection
           activities={recentActivity}
           loading={loadingActivities}
-          onViewAll={onViewActivity}
+          projectId={selectedProject?.id}
+          hierarchyExtensions={hierarchyDataExtensions}
           styles={styles}
         />
         

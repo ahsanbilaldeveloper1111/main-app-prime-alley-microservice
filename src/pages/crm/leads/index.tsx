@@ -162,6 +162,52 @@ interface LeadData {
 }
 
 const ignoredKeys = ["stage_id", "contact_persons"];
+const DEFAULT_FOLLOWUP_FORM = {
+  leadId: null as number | null,
+  leadName: "",
+  followUpDate: "",
+  followUpStatus: "Pending",
+  communicationChannel: "Phone Call",
+  communicationChannelOther: "",
+  notes: "",
+  userExtension: "",
+};
+const DEFAULT_MEETING_FORM = {
+  leadId: null as number | null,
+  leadName: "",
+  meetingName: "",
+  meetingType: "Online",
+  meetingDate: "",
+  meetingTime: "",
+  meetingOutcome: "",
+  extensions: [] as string[],
+};
+
+function formatPhoneWithCountry(phone: string) {
+  if (!phone) {
+    return {
+      phone: "N/A",
+      countryCode: "",
+    };
+  }
+  try {
+    const parsedPhone = parsePhoneNumber(phone);
+    return {
+      phone: parsedPhone?.formatInternational() || phone,
+      countryCode: parsedPhone?.country || "",
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      phone,
+      countryCode: "",
+    };
+  }
+}
+
+function getFlagImgSrc(countryCode: string) {
+  return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
+}
 
 function leadsToKanbanColumns(
   leads: LeadData[],
@@ -207,38 +253,9 @@ const PhoneContainer = ({
   onClick?: () => void;
 }) => {
   const [showPopover, setShowPopover] = useState(false);
-
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
   const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
+    return formatPhoneWithCountry(phone);
+  }, [phone]);
 
   const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
 
@@ -336,37 +353,9 @@ const PhoneContainer = ({
 
 // Phone Display Component (without Badge for view dialogs)
 const PhoneDisplay = ({ phone }: { phone: string }) => {
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
   const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
+    return formatPhoneWithCountry(phone);
+  }, [phone]);
 
   const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
   return (
@@ -621,6 +610,11 @@ const CrmLeads = () => {
   const [leadMetrics, setLeadMetrics] = useState<Record<string, number> | null>(
     null,
   );
+  const [tabTotals, setTabTotals] = useState<Record<string, number>>({
+    all: 0,
+    lost: 0,
+    deleted: 0,
+  });
 
   // UI State
   const [showLeadsAnalytics, setShowLeadsAnalytics] = useState(false);
@@ -728,31 +722,13 @@ const CrmLeads = () => {
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
   const [followUpIdToEdit, setFollowUpIdToEdit] = useState<number | null>(null);
-  const [followupData, setFollowupData] = useState({
-    leadId: null as number | null,
-    leadName: "",
-    followUpDate: "",
-    followUpStatus: "Pending",
-    communicationChannel: "Phone Call",
-    communicationChannelOther: "",
-    notes: "",
-    userExtension: "",
-  });
+  const [followupData, setFollowupData] = useState({ ...DEFAULT_FOLLOWUP_FORM });
   const [loadingFollowUp, setLoadingFollowUp] = useState(false);
 
   // Meeting Modal
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
   const [meetingIdToEdit, setMeetingIdToEdit] = useState<number | null>(null);
-  const [meetingData, setMeetingData] = useState({
-    leadId: null as number | null,
-    leadName: "",
-    meetingName: "",
-    meetingType: "Online",
-    meetingDate: "",
-    meetingTime: "",
-    meetingOutcome: "",
-    extensions: [] as string[],
-  });
+  const [meetingData, setMeetingData] = useState({ ...DEFAULT_MEETING_FORM });
   const [meetingAttendees, setMeetingAttendees] = useState<readonly any[]>([]);
   const [loadingMeeting, setLoadingMeeting] = useState(false);
 
@@ -851,71 +827,71 @@ const CrmLeads = () => {
     }
   };
 
+  const buildLeadsParams = useCallback(
+    (
+      filters: Record<string, any>,
+      page = 1,
+      perPage = 15,
+      search = "",
+      includeSort = true,
+    ) => {
+      const params: any = {
+        page,
+        per_page: perPage,
+      };
+
+      if (filters.search) {
+        params.search = filters.search;
+      } else if (search) {
+        params.search = search;
+      }
+
+      const truthyFilterKeys = [
+        "stage_id",
+        "assigned_to",
+        "business_type_id",
+        "source",
+        "lead_potential",
+        "campaign_id",
+        "lost_reason_id",
+        "lead_score_min",
+        "lead_score_max",
+        "date_from",
+        "date_to",
+      ] as const;
+      truthyFilterKeys.forEach((key) => {
+        if (filters[key]) {
+          params[key] = filters[key];
+        }
+      });
+
+      const definedFilterKeys = ["is_lost", "include_lost", "include_archived"] as const;
+      definedFilterKeys.forEach((key) => {
+        if (filters[key] !== undefined) {
+          params[key] = filters[key];
+        }
+      });
+
+      if (includeSort && leadsPagination.sortColumn) {
+        params.sort_column = leadsPagination.sortColumn;
+        params.sort_direction = leadsPagination.sortDirection;
+      }
+
+      return params;
+    },
+    [leadsPagination.sortColumn, leadsPagination.sortDirection],
+  );
+
+  const getLeadsTotalFromResponse = useCallback((response: any): number => {
+    return Number(response?.data?.pagination?.total) || 0;
+  }, []);
+
   // Fetch leads when filters or search change
   const fetchLeads = useCallback(
     async (page = 1, perPage = 15, search = "") => {
       setLoading(true);
       try {
-        const params: any = {
-          page,
-          per_page: perPage,
-        };
-
-        // Use search from currentFilters if available, otherwise use the search parameter
-        if (currentFilters.search) {
-          params.search = currentFilters.search;
-        } else if (search) {
-          params.search = search;
-        }
-
-        // Add filter parameters at top level
-        if (currentFilters.stage_id) {
-          params.stage_id = currentFilters.stage_id;
-        }
-        if (currentFilters.assigned_to) {
-          params.assigned_to = currentFilters.assigned_to;
-        }
-        if (currentFilters.business_type_id) {
-          params.business_type_id = currentFilters.business_type_id;
-        }
-        if (currentFilters.source) {
-          params.source = currentFilters.source;
-        }
-        if (currentFilters.lead_potential) {
-          params.lead_potential = currentFilters.lead_potential;
-        }
-        if (currentFilters.campaign_id) {
-          params.campaign_id = currentFilters.campaign_id;
-        }
-        if (currentFilters.lost_reason_id) {
-          params.lost_reason_id = currentFilters.lost_reason_id;
-        }
-        if (currentFilters.lead_score_min) {
-          params.lead_score_min = currentFilters.lead_score_min;
-        }
-        if (currentFilters.lead_score_max) {
-          params.lead_score_max = currentFilters.lead_score_max;
-        }
-        if (currentFilters.date_from) {
-          params.date_from = currentFilters.date_from;
-        }
-        if (currentFilters.date_to) {
-          params.date_to = currentFilters.date_to;
-        }
-        if (currentFilters.is_lost !== undefined) {
-          params.is_lost = currentFilters.is_lost;
-        }
-        if (currentFilters.include_lost !== undefined) {
-          params.include_lost = currentFilters.include_lost;
-        }
-        if (currentFilters.include_archived !== undefined) {
-          params.include_archived = currentFilters.include_archived;
-        }
-
-        if (leadsPagination.sortColumn) {
-          params.sort_column = leadsPagination.sortColumn;
-          params.sort_direction = leadsPagination.sortDirection;
-        }
+        const params = buildLeadsParams(currentFilters, page, perPage, search, true);
 
         const response: any = await getLeads(params);
         console.log("Raw response from getLeads:", response);
@@ -959,9 +935,8 @@ const CrmLeads = () => {
       }
     },
     [
+      buildLeadsParams,
       currentFilters,
-      leadsPagination.sortColumn,
-      leadsPagination.sortDirection,
     ],
   );
 
@@ -1039,16 +1014,18 @@ const CrmLeads = () => {
         tabFromUrl === "deleted" ||
         (stages.length > 0 &&
           stages.some((s: any) => s.id.toString() === tabFromUrl));
-      if (isValidFilter && tabFromUrl !== activeFilter) {
-        setActiveFilter(tabFromUrl);
-        setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
+      if (isValidFilter) {
+        setActiveFilter((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
       }
     }
-  }, [router.isReady, router.query.tab, stages, activeFilter]);
+  }, [router.isReady, router.query.tab, stages]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
     (filterId: string) => {
+      // Update active tab immediately to avoid visual lag
+      setActiveFilter(filterId);
+      setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
       // Update URL with tab query parameter
       router.push(
         {
@@ -1060,6 +1037,54 @@ const CrmLeads = () => {
       );
     },
     [router],
+  );
+
+  const tabTotalsBaseFilters = useMemo(() => {
+    const baseFilters = { ...currentFilters };
+    delete baseFilters.stage_id;
+    delete baseFilters.include_lost;
+    delete baseFilters.include_archived;
+    return baseFilters;
+  }, [currentFilters]);
+
+  const tabTotalsRequestKey = useMemo(
+    () =>
+      JSON.stringify({
+        filters: tabTotalsBaseFilters,
+        stageIds: stages.map((stage: any) => stage.id),
+      }),
+    [stages, tabTotalsBaseFilters],
+  );
+  const lastTabTotalsRequestKeyRef = useRef<string>("");
+
+  const fetchTabTotals = useCallback(
+    async (baseFilters: Record<string, any>) => {
+      try {
+        const [allResp, lostResp, deletedResp, ...stageResponses] = await Promise.all([
+          getLeads(buildLeadsParams(baseFilters, 1, 1, "", false)),
+          getLeads(buildLeadsParams({ ...baseFilters, include_lost: true }, 1, 1, "", false)),
+          getLeads(buildLeadsParams({ ...baseFilters, include_archived: true }, 1, 1, "", false)),
+          ...stages.map((stage: any) =>
+            getLeads(buildLeadsParams({ ...baseFilters, stage_id: stage.id }, 1, 1, "", false)),
+          ),
+        ]);
+
+        const nextTotals: Record<string, number> = {
+          all: getLeadsTotalFromResponse(allResp),
+          lost: getLeadsTotalFromResponse(lostResp),
+          deleted: getLeadsTotalFromResponse(deletedResp),
+        };
+
+        stages.forEach((stage: any, index) => {
+          nextTotals[stage.id] = getLeadsTotalFromResponse(stageResponses[index]);
+        });
+
+        setTabTotals(nextTotals);
+      } catch (error) {
+        console.error("Failed to fetch lead tab totals:", error);
+      }
+    },
+    [buildLeadsParams, getLeadsTotalFromResponse, stages],
   );
 
   useEffect(() => {
@@ -1075,6 +1100,16 @@ const CrmLeads = () => {
     leadsPagination.rowsPerPage,
     fetchLeads,
   ]);
+
+  useEffect(() => {
+    if (lastTabTotalsRequestKeyRef.current === tabTotalsRequestKey) {
+      return;
+    }
+    lastTabTotalsRequestKeyRef.current = tabTotalsRequestKey;
+    fetchTabTotals(tabTotalsBaseFilters).catch((error) => {
+      console.error("Failed to fetch tab totals:", error);
+    });
+  }, [fetchTabTotals, tabTotalsBaseFilters, tabTotalsRequestKey]);
 
   // Initialize export filters when export modal opens
   useEffect(() => {
@@ -2115,143 +2150,89 @@ const CrmLeads = () => {
     }
   };
 
-  // Handle follow-up creation
-  const handleCreateFollowUp = useCallback(async () => {
-    // Validate required fields
+  const resetFollowupForm = useCallback(() => {
+    setShowAddFollowupModal(false);
+    setFollowUpIdToEdit(null);
+    setFollowupData({ ...DEFAULT_FOLLOWUP_FORM });
+  }, []);
+
+  const validateFollowUpForm = useCallback(() => {
     const isValid = checkRequiredFields(followupData, [
       { field: "leadId", name: "Lead" },
       { field: "followUpDate", name: "Follow-up Date" },
       { field: "communicationChannel", name: "Communication Channel" },
     ]);
-
-    // If "Other" is selected, communicationChannelOther is required
     if (
       followupData.communicationChannel === "Other" &&
       !followupData.communicationChannelOther?.trim()
     ) {
       toast.error("Please specify the communication channel");
-      return;
+      return false;
     }
+    return isValid;
+  }, [followupData]);
 
-    if (!isValid) return;
+  const buildFollowUpPayload = useCallback(() => {
+    const payload: any = {
+      follow_up_date: followupData.followUpDate,
+      follow_up_status: followupData.followUpStatus,
+      communication_channel: followupData.communicationChannel,
+      notes: followupData.notes,
+      user_extension:
+        followupData.userExtension || (session?.user as any)?.extension || "admin",
+    };
+    if (
+      followupData.communicationChannel === "Other" &&
+      followupData.communicationChannelOther
+    ) {
+      payload.communication_channel_other = followupData.communicationChannelOther;
+    }
+    return payload;
+  }, [followupData, session]);
 
-    setLoadingFollowUp(true);
-    try {
-      const payload: any = {
-        follow_up_date: followupData.followUpDate,
-        follow_up_status: followupData.followUpStatus,
-        communication_channel: followupData.communicationChannel,
-        notes: followupData.notes,
-        user_extension:
-          followupData.userExtension ||
-          (session?.user as any)?.extension ||
-          "admin",
-      };
+  const submitFollowUp = useCallback(
+    async (mode: "create" | "update") => {
+      if (!validateFollowUpForm()) return;
+      const followUpId = followUpIdToEdit;
+      if (mode === "update" && !followUpId) return;
+      if (!followupData.leadId) return;
 
-      if (
-        followupData.communicationChannel === "Other" &&
-        followupData.communicationChannelOther
-      ) {
-        payload.communication_channel_other =
-          followupData.communicationChannelOther;
-      }
-
-      if (followupData.leadId) {
-        await createLeadFollowUp(followupData.leadId, payload);
-      }
-
-      // Refresh lead data (sidebar or view modal)
-      if (followupData.leadId) {
+      setLoadingFollowUp(true);
+      try {
+        const payload = buildFollowUpPayload();
+        if (mode === "create") {
+          await createLeadFollowUp(followupData.leadId, payload);
+        } else {
+          if (!followUpId) return;
+          await updateLeadFollowUp(followupData.leadId, followUpId, payload);
+        }
         await handleRowClicked(followupData.leadId);
+        resetFollowupForm();
+      } catch (error) {
+        console.error(`Failed to ${mode} follow-up:`, error);
+      } finally {
+        setLoadingFollowUp(false);
       }
+    },
+    [
+      validateFollowUpForm,
+      followUpIdToEdit,
+      followupData.leadId,
+      buildFollowUpPayload,
+      handleRowClicked,
+      resetFollowupForm,
+    ],
+  );
 
-      // Reset form and close modal
-      setShowAddFollowupModal(false);
-      setFollowUpIdToEdit(null);
-      setFollowupData({
-        leadId: null,
-        leadName: "",
-        followUpDate: "",
-        followUpStatus: "Pending",
-        communicationChannel: "Phone Call",
-        communicationChannelOther: "",
-        notes: "",
-        userExtension: "",
-      });
-    } catch (error) {
-      console.error("Failed to create follow-up:", error);
-    } finally {
-      setLoadingFollowUp(false);
-    }
-  }, [followupData, session, handleRowClicked]);
+  // Handle follow-up creation
+  const handleCreateFollowUp = useCallback(async () => {
+    await submitFollowUp("create");
+  }, [submitFollowUp]);
 
   // Handle follow-up update
   const handleUpdateFollowUp = useCallback(async () => {
-    // Validate required fields
-    const isValid = checkRequiredFields(followupData, [
-      { field: "leadId", name: "Lead" },
-      { field: "followUpDate", name: "Follow-up Date" },
-      { field: "communicationChannel", name: "Communication Channel" },
-    ]);
-
-    // If "Other" is selected, communicationChannelOther is required
-    if (
-      followupData.communicationChannel === "Other" &&
-      !followupData.communicationChannelOther?.trim()
-    ) {
-      toast.error("Please specify the communication channel");
-      return;
-    }
-
-    if (!followUpIdToEdit || !isValid) return;
-
-    setLoadingFollowUp(true);
-    try {
-      const payload: any = {
-        follow_up_date: followupData.followUpDate,
-        follow_up_status: followupData.followUpStatus,
-        communication_channel: followupData.communicationChannel,
-        notes: followupData.notes,
-        user_extension:
-          followupData.userExtension ||
-          (session?.user as any)?.extension ||
-          "admin",
-      };
-
-      if (
-        followupData.communicationChannel === "Other" &&
-        followupData.communicationChannelOther
-      ) {
-        payload.communication_channel_other =
-          followupData.communicationChannelOther;
-      }
-
-      await updateLeadFollowUp(followupData.leadId!, followUpIdToEdit, payload);
-
-      // Refresh lead data (sidebar or view modal)
-      if (followupData.leadId) {
-        await handleRowClicked(followupData.leadId);
-      }
-
-      // Reset form and close modal
-      setShowAddFollowupModal(false);
-      setFollowUpIdToEdit(null);
-      setFollowupData({
-        leadId: null,
-        leadName: "",
-        followUpDate: "",
-        followUpStatus: "Pending",
-        communicationChannel: "Phone Call",
-        communicationChannelOther: "",
-        notes: "",
-        userExtension: "",
-      });
-    } catch (error) {
-      console.error("Failed to update follow-up:", error);
-    } finally {
-      setLoadingFollowUp(false);
-    }
-  }, [followUpIdToEdit, followupData, session, handleRowClicked]);
+    await submitFollowUp("update");
+  }, [submitFollowUp]);
   const getTodayDate = useCallback((startDateParam: string = "") => {
     let today = new Date();
     if (startDateParam) {
@@ -2326,113 +2307,99 @@ const CrmLeads = () => {
     }
   }, [followUpToDelete, viewingLead, handleViewLead]);
 
-  // Handle meeting creation
-  const handleCreateMeeting = useCallback(async () => {
-    if (
-      !meetingData.leadId ||
-      !meetingData.meetingName ||
-      !meetingData.meetingDate ||
-      !meetingData.meetingTime
-    )
-      return;
+  const resetMeetingForm = useCallback(() => {
+    setShowAddMeetingModal(false);
+    setMeetingIdToEdit(null);
+    setMeetingData({ ...DEFAULT_MEETING_FORM });
+    setMeetingAttendees([]);
+  }, []);
 
-    setLoadingMeeting(true);
-    try {
-      const payload: any = {
-        name: meetingData.meetingName,
-        meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
-        lead_id: String(meetingData.leadId),
-        meeting_outcome: "Scheduled", // Default to "Scheduled" when creating
-        extensions:
-          meetingAttendees.length > 0
-            ? meetingAttendees.map((user: any) => user.value)
-            : [(session?.user as any)?.extension || "admin"],
-      };
+  const buildMeetingPayload = useCallback(
+    (mode: "create" | "update") => {
+      const extensions =
+        meetingAttendees.length > 0
+          ? meetingAttendees.map((user: any) => user.value)
+          : [];
 
-      await createMeeting(payload);
-
-      // Refresh lead data (sidebar or view modal)
-      if (meetingData.leadId) {
-        await handleRowClicked(meetingData.leadId);
+      if (extensions.length === 0 && mode === "create") {
+        extensions.push((session?.user as any)?.extension || "admin");
       }
 
-      // Reset form and close modal
-      setShowAddMeetingModal(false);
-      setMeetingIdToEdit(null);
-      setMeetingData({
-        leadId: null,
-        leadName: "",
-        meetingName: "",
-        meetingType: "Online",
-        meetingDate: "",
-        meetingTime: "",
-        meetingOutcome: "",
-        extensions: [],
-      });
-      setMeetingAttendees([]);
-    } catch (error) {
-      console.error("Failed to create meeting:", error);
-    } finally {
-      setLoadingMeeting(false);
-    }
-  }, [meetingData, meetingAttendees, session, handleRowClicked]);
-
-  // Handle meeting update
-  const handleUpdateMeeting = useCallback(async () => {
-    if (
-      !meetingIdToEdit ||
-      !meetingData.meetingName ||
-      !meetingData.meetingDate ||
-      !meetingData.meetingTime
-    )
-      return;
-
-    setLoadingMeeting(true);
-    try {
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
         meeting_date: meetingData.meetingDate,
         meeting_time: meetingData.meetingTime,
-        extensions:
-          meetingAttendees.length > 0
-            ? meetingAttendees.map((user: any) => user.value)
-            : [],
+        extensions,
       };
 
-      if (meetingData.meetingOutcome) {
+      if (mode === "create") {
+        payload.lead_id = String(meetingData.leadId);
+        payload.meeting_outcome = "Scheduled";
+      } else if (meetingData.meetingOutcome) {
         payload.meeting_outcome = meetingData.meetingOutcome;
       }
 
-      await updateMeeting(meetingIdToEdit!, payload);
+      return payload;
+    },
+    [meetingData, meetingAttendees, session],
+  );
 
-      // Refresh lead data (sidebar or view modal)
-      if (meetingData.leadId) {
-        await handleRowClicked(meetingData.leadId);
+  const submitMeeting = useCallback(
+    async (mode: "create" | "update") => {
+      const hasRequiredData =
+        mode === "create"
+          ? Boolean(
+              meetingData.leadId &&
+                meetingData.meetingName &&
+                meetingData.meetingDate &&
+                meetingData.meetingTime,
+            )
+          : Boolean(
+              meetingIdToEdit &&
+                meetingData.meetingName &&
+                meetingData.meetingDate &&
+                meetingData.meetingTime,
+            );
+      if (!hasRequiredData) return;
+
+      setLoadingMeeting(true);
+      try {
+        const payload = buildMeetingPayload(mode);
+        if (mode === "create") {
+          await createMeeting(payload);
+        } else {
+          await updateMeeting(meetingIdToEdit!, payload);
+        }
+
+        if (meetingData.leadId) {
+          await handleRowClicked(meetingData.leadId);
+        }
+        resetMeetingForm();
+      } catch (error) {
+        console.error(`Failed to ${mode} meeting:`, error);
+      } finally {
+        setLoadingMeeting(false);
       }
+    },
+    [
+      meetingIdToEdit,
+      meetingData,
+      buildMeetingPayload,
+      handleRowClicked,
+      resetMeetingForm,
+    ],
+  );
 
-      // Reset form and close modal
-      setShowAddMeetingModal(false);
-      setMeetingIdToEdit(null);
-      setMeetingData({
-        leadId: null,
-        leadName: "",
-        meetingName: "",
-        meetingType: "Online",
-        meetingDate: "",
-        meetingTime: "",
-        meetingOutcome: "",
-        extensions: [],
-      });
-      setMeetingAttendees([]);
-    } catch (error) {
-      console.error("Failed to update meeting:", error);
-    } finally {
-      setLoadingMeeting(false);
-    }
-  }, [meetingIdToEdit, meetingData, meetingAttendees, handleRowClicked]);
+  // Handle meeting creation
+  const handleCreateMeeting = useCallback(async () => {
+    await submitMeeting("create");
+  }, [submitMeeting]);
+
+  // Handle meeting update
+  const handleUpdateMeeting = useCallback(async () => {
+    await submitMeeting("update");
+  }, [submitMeeting]);
 
   // Handle edit meeting click
   const handleEditMeeting = useCallback(
@@ -2692,22 +2659,21 @@ const CrmLeads = () => {
   const filterCounts = useMemo(() => {
     const transformed = leadsData.map(transformLeadData);
     const counts: Record<string, number> = {
-      all: summaryTiles?.total_leads || totalLeads || transformed.length,
+      all: tabTotals.all ?? summaryTiles?.total_leads ?? totalLeads ?? transformed.length,
       lost:
-        summaryTiles?.lost_leads || transformed.filter((l) => l.isLost).length,
-      deleted: summaryTiles?.deleted_leads || 0,
+        tabTotals.lost ??
+        summaryTiles?.lost_leads ??
+        transformed.filter((l) => l.isLost).length,
+      deleted: tabTotals.deleted ?? summaryTiles?.deleted_leads ?? 0,
     };
 
     // Add counts for all stages (not just first 5, for custom tabs)
     stages.forEach((stage: any) => {
-      const stageLeads = transformed.filter(
-        (l) => l.stage === stage.name || l.rawData?.stage_id === stage.id,
-      );
-      counts[stage.id] = stageLeads.length;
+      counts[stage.id] = tabTotals[stage.id] ?? 0;
     });
 
     return counts;
-  }, [leadsData, extensions, stages, summaryTiles, totalLeads]);
+  }, [leadsData, extensions, stages, summaryTiles, tabTotals, totalLeads]);
 
   // Update custom tabs counts when filterCounts change
   useEffect(() => {
@@ -3019,6 +2985,26 @@ const CrmLeads = () => {
         </div>
       ) : undefined,
   });
+
+  const handleAddCustomTab = useCallback(
+    (tabId: string, label: string, count: number) => {
+      if (customTabs.some((tab) => tab.id === tabId)) {
+        return;
+      }
+      setCustomTabs((prevTabs) => [
+        ...prevTabs,
+        {
+          id: tabId,
+          label,
+          count,
+          removable: true,
+        },
+      ]);
+      setShowTabModal(false);
+      toast.success("Tab added successfully!");
+    },
+    [customTabs],
+  );
 
   if (!session?.user?.permissions?.includes("list-crm-leads")) {
     return null;
@@ -9876,26 +9862,13 @@ const CrmLeads = () => {
               const isAlreadyAdded = customTabs.some(
                 (t) => t.id === stage.id.toString(),
               );
-              const stageCount = filterCounts[stage.id] || 0;
+              const stageId = String(stage.id);
+              const stageCount = filterCounts[stageId] || 0;
               return (
                 <Button
                   key={stage.id}
                   variant="outline-primary"
-                  onClick={() => {
-                    if (!isAlreadyAdded) {
-                      setCustomTabs([
-                        ...customTabs,
-                        {
-                          id: stage.id.toString(),
-                          label: stage.name,
-                          count: stageCount,
-                          removable: true,
-                        },
-                      ]);
-                      setShowTabModal(false);
-                      toast.success("Tab added successfully!");
-                    }
-                  }}
+                  onClick={() => handleAddCustomTab(stageId, stage.name, stageCount)}
                   disabled={isAlreadyAdded}
                   className="d-flex align-items-center justify-content-start"
                   style={{ textAlign: "left" }}
@@ -9913,21 +9886,9 @@ const CrmLeads = () => {
             {/* Lost and Deleted tabs */}
             <Button
               variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.find((t) => t.id === "lost")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "lost",
-                      label: "Lost",
-                      count: filterCounts.lost || 0,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
+              onClick={() =>
+                handleAddCustomTab("lost", "Lost", filterCounts.lost || 0)
+              }
               disabled={customTabs.some((t) => t.id === "lost")}
               className="d-flex align-items-center justify-content-start"
               style={{ textAlign: "left" }}
@@ -9942,21 +9903,9 @@ const CrmLeads = () => {
             </Button>
             <Button
               variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.find((t) => t.id === "deleted")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "deleted",
-                      label: "Deleted",
-                      count: filterCounts.deleted || 0,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
+              onClick={() =>
+                handleAddCustomTab("deleted", "Deleted", filterCounts.deleted || 0)
+              }
               disabled={customTabs.some((t) => t.id === "deleted")}
               className="d-flex align-items-center justify-content-start"
               style={{ textAlign: "left" }}

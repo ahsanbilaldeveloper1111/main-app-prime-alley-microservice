@@ -5,19 +5,17 @@
  * 1. Added expandable project rows that show tasks when clicked (chevron arrow)
  * 2. Tasks can also be expanded to show their subtasks
  * 3. Hovering on a task row shows a "Preview" button that opens a task detail sidebar
- * 4. Added DUMMY DATA section (search for "// === DUMMY DATA ===" to find it)
- *    - Replace `getDummyTasksForProject()` with your real API call (e.g. getTasks(projectId))
- *    - The `TaskRow` and `SubtaskRow` components render the expandable rows
- * 5. A new `<TaskDetailPanel>` Offcanvas sidebar shows task details on Preview/click
- * 
- * HOW TO INTEGRATE WITH REAL DATA:
- * - Search for "NOTE: REPLACE WITH REAL API" comments
- * - The `expandedProjects` state tracks which project rows are open
- * - The `projectTasks` state is a map of { [projectId]: Task[] }
- * - When a project row is expanded, call your real tasks API and store in `projectTasks`
+ * 4. Expanding a project row loads tasks via `getProject` (same relations as project detail).
+ * 5. A `<TaskDetailPanel>` Offcanvas sidebar shows task details on Preview/click
  */
 
-import React, { ReactElement, useCallback, useEffect, useState } from "react";
+import React, {
+  ReactElement,
+  useCallback,
+  useEffect,
+  useState,
+  type ComponentProps,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
@@ -29,11 +27,18 @@ import {
   updateProject,
   deleteProject,
   getProject,
+  getTask,
   getRecentActivity,
   getOverdueTasks,
 } from "@utils/tasks";
+import {
+  WORK_PLANNER_PROJECT_DETAIL_RELATIONS,
+  WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS,
+  mapGetTaskResponseToSidebarEditTask,
+} from "@planner/workPlannerProjectRelations";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, getAutoTimezone } from "@utils/Helper";
+import { toast } from "react-toastify";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { StatsCardData } from "@components/GenericStatsCards";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
@@ -50,6 +55,7 @@ import {
   Button,
   Col,
   Container,
+  Dropdown,
   Form,
   Nav,
   Modal,
@@ -84,7 +90,7 @@ import {
   Clock,
   Eye,
 } from "lucide-react";
-
+import { usePermissions } from '@utils/permissionUtils';
 // ============================================================
 // TYPE DEFINITIONS
 // ============================================================
@@ -98,6 +104,7 @@ interface ApiProject {
   owner_extension_number?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+  timezone?: string | null;
   created_at: string;
   updated_at: string;
   tasks?: Array<any>;
@@ -112,6 +119,47 @@ interface ApiProject {
 }
 
 type ProjectStatusFilter = "active" | "completed" | "archived" | "all";
+
+type ProjectFormStatus = "active" | "archived" | "completed";
+
+interface ProjectFormState {
+  name: string;
+  description: string;
+  start_date: string;
+  end_date: string;
+  color: string;
+  status: ProjectFormStatus;
+  timezone: string;
+}
+
+function createEmptyProjectForm(): ProjectFormState {
+  return {
+    name: "",
+    description: "",
+    start_date: "",
+    end_date: "",
+    color: "#3b82f6",
+    status: "active",
+    timezone: getAutoTimezone(),
+  };
+}
+
+function formatApiDateForProjectInput(value: string | null | undefined): string {
+  if (value == null || value === "") return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function apiStatusToProjectFormStatus(api: string | undefined): ProjectFormStatus {
+  const s = (api ?? "active").toLowerCase();
+  if (s === "archived") return "archived";
+  if (s === "completed") return "completed";
+  return "active";
+}
 
 interface Project {
   id: string;
@@ -145,12 +193,9 @@ const coerceProjectStatusFilter = (value: unknown): ProjectStatusFilter => {
   return "active";
 };
 
-// ============================================================
-// === DUMMY DATA ===
-// NOTE: REPLACE WITH REAL API - Remove this section when integrating real tasks
-// Replace calls to `getDummyTasksForProject(projectId)` with your actual API
-// e.g., const tasks = await getTasks(projectId, { with: ['subtasks', 'assignees'] })
-// ============================================================
+function isProjectStatusFilterActive(status: ProjectStatusFilter): boolean {
+  return status === "active" || status === "completed" || status === "archived";
+}
 
 export interface SubTask {
   id: string;
@@ -170,106 +215,145 @@ export interface Task {
   assignee?: string;
   dueDate?: string;
   description?: string;
+  /** Nested tasks from API `children` (same shape as top-level tasks, may nest) */
+  children?: Task[];
   subtasks?: SubTask[];
   labels?: string[];
-  completedSubtasks?: number;
-  totalSubtasks?: number;
+  /** From API when `sub_task_count` is requested */
+  sub_task_count?: number;
+  /** From API when `sub_task_count` is requested */
+  completed_sub_task_count?: number;
 }
 
-const DUMMY_TASKS: Record<string, Task[]> = {
-  // Key is project ID (string). Add tasks for any project ID here.
-  // When integrating real data, this entire object can be removed.
-  default: [
-    {
-      id: "task-1",
-      projectId: "default",
-      title: "Project kickoff meeting",
-      status: "done",
-      priority: "high",
-      assignee: "John D.",
-      dueDate: "2025-01-10",
-      description: "Initial meeting to align all stakeholders on project goals and timeline.",
-      labels: ["meeting", "planning"],
-      subtasks: [
-        { id: "sub-1-1", title: "Prepare agenda", status: "done", assignee: "John D.", dueDate: "2025-01-08" },
-        { id: "sub-1-2", title: "Send invites to stakeholders", status: "done", assignee: "Jane S.", dueDate: "2025-01-09" },
-        { id: "sub-1-3", title: "Book conference room", status: "done", assignee: "John D.", dueDate: "2025-01-09" },
-      ],
-    },
-    {
-      id: "task-2",
-      projectId: "default",
-      title: "Design system setup",
-      status: "in_progress",
-      priority: "high",
-      assignee: "Alice M.",
-      dueDate: "2025-02-15",
-      description: "Establish the design tokens, component library, and documentation.",
-      labels: ["design", "frontend"],
-      subtasks: [
-        { id: "sub-2-1", title: "Define color palette", status: "done", assignee: "Alice M.", dueDate: "2025-02-01" },
-        { id: "sub-2-2", title: "Create typography scale", status: "in_progress", assignee: "Alice M.", dueDate: "2025-02-10" },
-        { id: "sub-2-3", title: "Build button components", status: "todo", assignee: "Bob K.", dueDate: "2025-02-14" },
-        { id: "sub-2-4", title: "Document component usage", status: "todo", assignee: "Bob K.", dueDate: "2025-02-15" },
-      ],
-    },
-    {
-      id: "task-3",
-      projectId: "default",
-      title: "Backend API development",
-      status: "in_progress",
-      priority: "urgent",
-      assignee: "Carlos R.",
-      dueDate: "2025-03-01",
-      description: "Develop RESTful API endpoints for the core product features.",
-      labels: ["backend", "api"],
-      subtasks: [
-        { id: "sub-3-1", title: "Auth endpoints (login, register)", status: "done", assignee: "Carlos R.", dueDate: "2025-02-05" },
-        { id: "sub-3-2", title: "User CRUD endpoints", status: "done", assignee: "Carlos R.", dueDate: "2025-02-10" },
-        { id: "sub-3-3", title: "Projects endpoints", status: "in_progress", assignee: "Diana L.", dueDate: "2025-02-20" },
-        { id: "sub-3-4", title: "Tasks endpoints", status: "todo", assignee: "Diana L.", dueDate: "2025-02-28" },
-      ],
-    },
-    {
-      id: "task-4",
-      projectId: "default",
-      title: "QA testing phase",
-      status: "overdue",
-      priority: "high",
-      assignee: "Eva P.",
-      dueDate: "2025-01-30",
-      description: "Comprehensive testing of all implemented features before release.",
-      labels: ["qa", "testing"],
-      subtasks: [],
-    },
-    {
-      id: "task-5",
-      projectId: "default",
-      title: "Deploy to staging",
-      status: "todo",
-      priority: "medium",
-      assignee: "Frank W.",
-      dueDate: "2025-03-10",
-      description: "Deploy the application to staging environment for final review.",
-      labels: ["devops"],
-      subtasks: [
-        { id: "sub-5-1", title: "Configure CI/CD pipeline", status: "todo", assignee: "Frank W.", dueDate: "2025-03-05" },
-        { id: "sub-5-2", title: "Set up environment variables", status: "todo", assignee: "Frank W.", dueDate: "2025-03-08" },
-      ],
-    },
-  ],
-};
+/** Safe string for API scalar fields; avoids `[object Object]` from `String(object)`. */
+function stringifyApiScalar(value: unknown, fallback = ""): string {
+  if (value == null) return fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "bigint") return String(value);
+  if (typeof value === "boolean") return String(value);
+  return fallback;
+}
 
-/**
- * NOTE: REPLACE WITH REAL API
- * Currently returns dummy tasks. Replace with:
- *   const response = await getTasks(projectId, { with: ['subtasks', 'assignees', 'labels'] })
- *   return response.data
- */
-const getDummyTasksForProject = (projectId: string): Task[] => {
-  // Return tasks specific to a projectId if defined, otherwise return defaults
-  return DUMMY_TASKS[projectId] || DUMMY_TASKS["default"];
-};
+function stringifyApiDueDateRaw(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "bigint") return String(value);
+  if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
+  return undefined;
+}
+
+function mapApiPriorityToTaskPriority(raw: unknown): Task["priority"] {
+  const p = stringifyApiScalar(raw, "medium").toLowerCase();
+  if (p === "urgent") return "urgent";
+  if (p === "high") return "high";
+  if (p === "low") return "low";
+  if (p === "normal" || p === "medium") return "medium";
+  return "medium";
+}
+
+function readApiNumericCount(v: unknown): number | undefined {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
+function mapApiTaskToPlannerTask(
+  api: Record<string, unknown>,
+  projectId: string,
+  statuses: Array<Record<string, unknown>>,
+): Task {
+  const id = stringifyApiScalar(api.id);
+  const statusMap: Record<string, string> = {};
+  statuses.forEach((s) => {
+    if (s?.id != null && s.name != null) {
+      const mapId = stringifyApiScalar(s.id);
+      const mapName = stringifyApiScalar(s.name);
+      if (mapId !== "" && mapName !== "") statusMap[mapId] = mapName;
+    }
+  });
+
+  const statusNameFromApi = (): string => {
+    const st = api.status as { name?: string } | undefined;
+    if (st?.name) return stringifyApiScalar(st.name);
+    const sid = api.status_id == null ? "" : stringifyApiScalar(api.status_id);
+    return statusMap[sid] ?? "";
+  };
+
+  const statusName = statusNameFromApi().toLowerCase();
+  const isCompleted = Boolean(api.is_completed);
+  const dueRaw = stringifyApiDueDateRaw(api.due_date);
+
+  let rowStatus: Task["status"];
+  if (isCompleted) {
+    rowStatus = "done";
+  } else if (dueRaw) {
+    const due = new Date(dueRaw);
+    const dueValid = Number.isFinite(due.getTime());
+    const isPastDue = dueValid && due < new Date();
+    if (isPastDue) {
+      rowStatus = "overdue";
+    } else if (statusName.includes("progress")) {
+      rowStatus = "in_progress";
+    } else {
+      rowStatus = "todo";
+    }
+  } else if (statusName.includes("progress")) {
+    rowStatus = "in_progress";
+  } else {
+    rowStatus = "todo";
+  }
+
+  const assignees = (api.assignees as Array<Record<string, unknown>> | undefined) ?? [];
+  const first = assignees[0];
+  const user = first?.user as { name?: string; display_name?: string } | undefined;
+  const assignee =
+    user?.name || user?.display_name || (first?.extension_number as string | undefined);
+
+  const labelObjs = (api.labels as Array<{ name?: string }> | undefined) ?? [];
+  const labels = labelObjs.map((l) => l.name).filter((n): n is string => Boolean(n));
+
+  const rawChildren = api.children;
+  const children =
+    Array.isArray(rawChildren) && rawChildren.length > 0
+      ? rawChildren
+          .filter((c): c is Record<string, unknown> => c !== null && typeof c === "object")
+          .map((c) => mapApiTaskToPlannerTask(c, projectId, statuses))
+      : undefined;
+
+  return {
+    id,
+    projectId,
+    title: stringifyApiScalar(api.title),
+    description: typeof api.description === "string" ? api.description : "",
+    status: rowStatus,
+    priority: mapApiPriorityToTaskPriority(api.priority),
+    assignee,
+    dueDate: dueRaw,
+    labels: labels.length > 0 ? labels : undefined,
+    subtasks: undefined,
+    children,
+    sub_task_count: readApiNumericCount(api.sub_task_count),
+    completed_sub_task_count: readApiNumericCount(api.completed_sub_task_count),
+  };
+}
+
+async function fetchTasksForExpandedProject(projectId: string): Promise<Task[]> {
+  const data = await getProject(projectId, Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS), {
+    sub_task_count: true,
+  });
+  if (!data || typeof data !== "object") return [];
+  const payload = data as { tasks?: unknown[]; statuses?: Array<Record<string, unknown>> };
+  const rawTasks = Array.isArray(payload.tasks) ? payload.tasks : [];
+  const statuses = Array.isArray(payload.statuses) ? payload.statuses : [];
+  return rawTasks
+    .filter((t): t is Record<string, unknown> => t !== null && typeof t === "object")
+    .map((t) => mapApiTaskToPlannerTask(t, projectId, statuses));
+}
 
 // ============================================================
 // HELPER COMPONENTS
@@ -292,9 +376,48 @@ const priorityConfig = {
 interface TaskRowProps {
   task: Task;
   depth?: number;
-  onPreview: (task: Task) => void;
+  onPreview: (task: Task) => void | Promise<void>;
   expandedTasks: Set<string>;
   onToggleTask: (taskId: string) => void;
+  canPreviewEditTask: boolean;
+}
+
+function computeOpenSubtaskCount(task: Task): number | null {
+  if (task.children && task.children.length > 0) {
+    return task.children.filter((c) => c.status !== "done").length;
+  }
+  if (task.subtasks && task.subtasks.length > 0) {
+    return task.subtasks.filter((s) => s.status !== "done").length;
+  }
+  const total = task.sub_task_count;
+  if (total == null || total <= 0) {
+    return null;
+  }
+  return Math.max(0, total - (task.completed_sub_task_count ?? 0));
+}
+
+function getSubtaskBadgeCounts(task: Task): { completed: number; total: number } | null {
+  if (task.children && task.children.length > 0) {
+    const total = task.children.length;
+    const completed = task.children.filter((c) => c.status === "done").length;
+    return { completed, total };
+  }
+  const total = task.sub_task_count;
+  if (total == null || total <= 0) {
+    return null;
+  }
+  return { completed: task.completed_sub_task_count ?? 0, total };
+}
+
+function plannerChildTasksToSubTasks(children: Task[]): SubTask[] {
+  return children.map((c) => ({
+    id: c.id,
+    title: c.title,
+    status: c.status,
+    assignee: c.assignee,
+    dueDate: c.dueDate,
+    description: c.description,
+  }));
 }
 
 /** Renders a single task row inside an expanded project, with optional subtask expansion */
@@ -304,10 +427,16 @@ const TaskRow: React.FC<TaskRowProps> = ({
   onPreview,
   expandedTasks,
   onToggleTask,
+  canPreviewEditTask,
 }) => {
   const [hovered, setHovered] = useState(false);
   const isExpanded = expandedTasks.has(task.id);
-  const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+  const hasChildTasks = (task.children?.length ?? 0) > 0;
+  const subtasksLoaded = Boolean(task.subtasks && task.subtasks.length > 0);
+  const hasSubtaskCounts = task.sub_task_count != null && task.sub_task_count > 0;
+  const hasSubtasks = hasChildTasks || subtasksLoaded || hasSubtaskCounts;
+  const openSubtaskCount = computeOpenSubtaskCount(task);
+  const subtaskBadge = getSubtaskBadgeCounts(task);
   const status = statusConfig[task.status];
   const StatusIcon = status.icon;
   const indentLeft = depth * 24;
@@ -358,12 +487,16 @@ const TaskRow: React.FC<TaskRowProps> = ({
             {/* Task title */}
             <button
               type="button"
-              onClick={() => onPreview(task)}
+              onClick={async () => {
+                if (canPreviewEditTask) {
+                  await onPreview(task);
+                }
+              }}
               style={{
                 fontSize: "0.875rem",
                 color: "#334155",
                 fontWeight: 500,
-                cursor: "pointer",
+                cursor: canPreviewEditTask ? "pointer" : "default",
                 textDecoration: task.status === "done" ? "line-through" : "none",
                 opacity: task.status === "done" ? 0.6 : 1,
                 background: "none",
@@ -375,8 +508,8 @@ const TaskRow: React.FC<TaskRowProps> = ({
               {task.title}
             </button>
 
-            {/* Subtask count badge */}
-            {hasSubtasks && (
+            {/* Subtask count badge (nested children or API counts) */}
+            {subtaskBadge && (
               <span
                 style={{
                   fontSize: "0.7rem",
@@ -387,7 +520,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
                   fontWeight: 600,
                 }}
               >
-                {task.subtasks!.filter((s) => s.status === "done").length}/{task.subtasks!.length}
+                {subtaskBadge.completed}/{subtaskBadge.total}
               </span>
             )}
 
@@ -413,7 +546,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
             )}
 
             {/* Preview button on hover */}
-            {hovered && (
+            {hovered && canPreviewEditTask && (
               <button
                 onClick={(e) => { e.stopPropagation(); onPreview(task); }}
                 style={{
@@ -435,7 +568,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
                 }}
               >
                 <Eye size={12} />
-                Preview
+                Preview/Edit
               </button>
             )}
           </div>
@@ -470,9 +603,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
 
         {/* Open (subtask count as "open") */}
         <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-          {hasSubtasks
-            ? task.subtasks!.filter((s) => s.status !== "done").length
-            : "—"}
+          {openSubtaskCount ?? "—"}
         </td>
 
         {/* Overdue indicator */}
@@ -492,26 +623,42 @@ const TaskRow: React.FC<TaskRowProps> = ({
         </td>
       </tr>
 
-      {/* Subtask rows - shown when task is expanded */}
+      {/* Nested child task rows (API `children`) or legacy `subtasks` */}
       {isExpanded &&
-        hasSubtasks &&
+        hasChildTasks &&
+        task.children!.map((child) => (
+          <TaskRow
+            key={child.id}
+            task={child}
+            depth={depth + 1}
+            onPreview={onPreview}
+            expandedTasks={expandedTasks}
+            onToggleTask={onToggleTask}
+            canPreviewEditTask={canPreviewEditTask}
+          />
+        ))}
+      {isExpanded && subtasksLoaded && !hasChildTasks &&
         task.subtasks!.map((sub) => (
-          <SubtaskRow key={sub.id} subtask={sub} depth={depth + 1} onPreview={() => {
-            // NOTE: REPLACE WITH REAL API - open subtask preview
-            // For now, cast subtask to Task shape for the preview panel
-            onPreview({
-              id: sub.id,
-              projectId: task.projectId,
-              title: sub.title,
-              status: sub.status,
-              priority: "medium",
-              assignee: sub.assignee,
-              dueDate: sub.dueDate,
-              description: sub.title,
-              subtasks: [],
-              labels: [],
-            });
-          }} />
+          <SubtaskRow
+            key={sub.id}
+            subtask={sub}
+            depth={depth + 1}
+            canPreviewEditTask={canPreviewEditTask}
+            onPreview={() => {
+              onPreview({
+                id: sub.id,
+                projectId: task.projectId,
+                title: sub.title,
+                status: sub.status,
+                priority: "medium",
+                assignee: sub.assignee,
+                dueDate: sub.dueDate,
+                description: sub.title,
+                subtasks: [],
+                labels: [],
+              });
+            }}
+          />
         ))}
     </>
   );
@@ -521,10 +668,16 @@ interface SubtaskRowProps {
   subtask: SubTask;
   depth: number;
   onPreview: () => void;
+  canPreviewEditTask: boolean;
 }
 
 /** Renders a subtask row (leaf node, no further expansion) */
-const SubtaskRow: React.FC<SubtaskRowProps> = ({ subtask, depth, onPreview }) => {
+const SubtaskRow: React.FC<SubtaskRowProps> = ({
+  subtask,
+  depth,
+  onPreview,
+  canPreviewEditTask,
+}) => {
   const [hovered, setHovered] = useState(false);
   const status = statusConfig[subtask.status];
   const StatusIcon = status.icon;
@@ -548,13 +701,15 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({ subtask, depth, onPreview }) =>
           <StatusIcon size={13} style={{ color: status.color, flexShrink: 0 }} />
           <button
             type="button"
-            onClick={onPreview}
+            onClick={() => {
+              if (canPreviewEditTask) onPreview();
+            }}
             style={{
               fontSize: "0.825rem",
               color: "#475569",
               textDecoration: subtask.status === "done" ? "line-through" : "none",
               opacity: subtask.status === "done" ? 0.55 : 1,
-              cursor: "pointer",
+              cursor: canPreviewEditTask ? "pointer" : "default",
               background: "none",
               border: "none",
               padding: 0,
@@ -565,7 +720,7 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({ subtask, depth, onPreview }) =>
           </button>
 
           {/* Preview button on hover */}
-          {hovered && (
+          {hovered && canPreviewEditTask && (
             <button
               onClick={(e) => { e.stopPropagation(); onPreview(); }}
               style={{
@@ -659,6 +814,10 @@ function DetailBox({
 
 const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide }) => {
   if (!task) return null;
+  const subtasksForDetail =
+    task.children && task.children.length > 0
+      ? plannerChildTasksToSubTasks(task.children)
+      : task.subtasks ?? [];
   const status = statusConfig[task.status];
   const priority = priorityConfig[task.priority];
   const StatusIcon = status.icon;
@@ -782,20 +941,20 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
           </DetailBox>
         )}
 
-        {/* Subtasks */}
-        {task.subtasks && task.subtasks.length > 0 && (
+        {/* Subtasks (API `children` or legacy `subtasks`) */}
+        {subtasksForDetail.length > 0 && (
           <DetailBox
-            label={`Subtasks (${task.subtasks.filter((s) => s.status === "done").length}/${task.subtasks.length} completed)`}
+            label={`Subtasks (${subtasksForDetail.filter((s) => s.status === "done").length}/${subtasksForDetail.length} completed)`}
             className="mb-3"
           >
             {/* Progress */}
             <ProgressBar
-              now={Math.round((task.subtasks.filter((s) => s.status === "done").length / task.subtasks.length) * 100)}
+              now={Math.round((subtasksForDetail.filter((s) => s.status === "done").length / subtasksForDetail.length) * 100)}
               style={{ height: 6, marginBottom: 12 }}
               variant="primary"
             />
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {task.subtasks.map((sub) => {
+              {subtasksForDetail.map((sub) => {
                 const subStatus = statusConfig[sub.status];
                 const SubIcon = subStatus.icon;
                 return (
@@ -861,18 +1020,71 @@ interface ExpandableProjectTableProps {
   actions: TableAction<Project>[];
 }
 
-type PlannerSidebarTaskAssignee = { extension_number: string };
-type PlannerSidebarTaskPriority = "low" | "normal" | "high" | "urgent";
-type PlannerSidebarTask = {
-  id: string;
-  title: string;
-  description: string;
-  priority: PlannerSidebarTaskPriority;
-  due_date: string;
-  type: "regular";
-  project_id?: number;
-  assignees: PlannerSidebarTaskAssignee[];
-};
+type CreatePlannerSidebarTaskProp = NonNullable<
+  ComponentProps<typeof CreateTaskSidebar>["task"]
+>;
+
+/** `project` prop shape for `CreatePlannerTaskSidebar` (numeric API project id). */
+function mapTableProjectToPlannerSidebarProject(row: Project): {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+  statuses?: ApiProject["statuses"];
+  labels?: ApiProject["labels"];
+} {
+  if (row.apiData) {
+    return {
+      id: row.apiData.id,
+      name: row.apiData.name,
+      icon: "",
+      color: row.apiData.color || "#3b82f6",
+      statuses: row.apiData.statuses,
+      labels: row.apiData.labels,
+    };
+  }
+  const id = Number(row.id);
+  return {
+    id: Number.isFinite(id) ? id : 0,
+    name: row.name,
+    icon: "",
+    color: row.iconColor || "#3b82f6",
+  };
+}
+
+function projectIdFromSidebarEditTask(
+  task: CreatePlannerSidebarTaskProp | null | undefined,
+): number | null {
+  if (task == null || typeof task !== "object") return null;
+  const t = task as Record<string, unknown>;
+  const pid = t.project_id;
+  if (typeof pid === "number" && Number.isFinite(pid)) return pid;
+  const proj = t.project as { id?: unknown } | undefined;
+  if (proj != null && typeof proj === "object" && typeof proj.id === "number") {
+    return proj.id;
+  }
+  return null;
+}
+
+function resolveProjectActionsMenuOpenState(
+  projectId: string,
+  nextShow: boolean,
+  previousOpenId: string | null,
+): string | null {
+  if (nextShow) {
+    return projectId;
+  }
+  return previousOpenId === projectId ? null : previousOpenId;
+}
+
+function createProjectRowActionsToggleHandler(
+  projectId: string,
+  setOpenProjectActionsId: React.Dispatch<React.SetStateAction<string | null>>,
+): (nextShow: boolean) => void {
+  return (nextShow: boolean) => {
+    setOpenProjectActionsId((prev) => resolveProjectActionsMenuOpenState(projectId, nextShow, prev));
+  };
+}
 
 /**
  * ExpandableProjectTable
@@ -884,10 +1096,7 @@ type PlannerSidebarTask = {
  * NOTE: Since GenericTable doesn't natively support tree/nested rows, we render
  * a custom table body and pass it as `customBody` to GenericTable's card wrapper.
  * The toolbar and pagination are still handled by GenericTable.
- *
- * NOTE: REPLACE WITH REAL API
- * In `handleToggleProject`, replace `getDummyTasksForProject(project.id)`
- * with your real API: `const tasks = await getTasks(project.id, { with: ['subtasks'] })`
+ * Expanding a row loads tasks via `getProject` + `WORK_PLANNER_PROJECT_DETAIL_RELATIONS`.
  */
 const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   projects,
@@ -905,6 +1114,8 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   columns,
   actions,
 }) => {
+  const { hasPermission } = usePermissions();
+  const canPreviewEditTask = hasPermission("edit-tasks-work-planner");
   // Track which project rows are expanded
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   // Cache of loaded tasks per project { [projectId]: Task[] }
@@ -913,9 +1124,14 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   // Loading state per project
   const [loadingTasks, setLoadingTasks] = useState<Set<string>>(new Set());
-  // Selected task for CreateTaskSidebar
-  const [editingTask, setEditingTask] = useState<PlannerSidebarTask | null>(null);
+  /** Task payload for edit mode — always loaded via `getTask`, never from the table row cache. */
+  const [fetchedEditTask, setFetchedEditTask] = useState<CreatePlannerSidebarTaskProp | null>(null);
+  const [loadingSidebarEditTask, setLoadingSidebarEditTask] = useState(false);
+  /** When set, sidebar opens in create mode for this table row’s project. */
+  const [createTaskForProject, setCreateTaskForProject] = useState<Project | null>(null);
   const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
+  /** Only one project row actions menu open at a time (controlled Dropdown). */
+  const [openProjectActionsId, setOpenProjectActionsId] = useState<string | null>(null);
 
   const buildSelectedProjectsFromIds = (selectedIds: Set<string>): Project[] => {
     const selected: Project[] = [];
@@ -936,6 +1152,23 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
     onSelectionChange(checked ? projects : []);
   };
 
+  const fetchAndStoreProjectTasks = async (projectId: string) => {
+    setLoadingTasks((prev) => new Set(prev).add(projectId));
+    try {
+      const tasks = await fetchTasksForExpandedProject(projectId);
+      setProjectTasks((prev) => ({ ...prev, [projectId]: tasks }));
+    } catch (err) {
+      console.error("[WorkPlannerProjects] Failed to load tasks for project", projectId, err);
+      setProjectTasks((prev) => ({ ...prev, [projectId]: [] }));
+    } finally {
+      setLoadingTasks((prev) => {
+        const next = new Set(prev);
+        next.delete(projectId);
+        return next;
+      });
+    }
+  };
+
   const handleToggleProject = async (project: Project, e: React.MouseEvent) => {
     e.stopPropagation();
     const projectId = project.id;
@@ -946,26 +1179,11 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       newSet.delete(projectId);
       setExpandedProjects(newSet);
     } else {
-      // Expand — load tasks if not already cached
+      // Expand — always refetch so reopening a row shows up-to-date tasks
       const newSet = new Set(expandedProjects);
       newSet.add(projectId);
       setExpandedProjects(newSet);
-
-      if (!projectTasks[projectId]) {
-        setLoadingTasks((prev) => new Set(prev).add(projectId));
-
-        // NOTE: REPLACE WITH REAL API
-        // const response = await getTasks(projectId, { with: ['subtasks', 'assignees', 'labels'] });
-        // const tasks = response.data;
-        const tasks = getDummyTasksForProject(projectId);
-
-        setProjectTasks((prev) => ({ ...prev, [projectId]: tasks }));
-        setLoadingTasks((prev) => {
-          const next = new Set(prev);
-          next.delete(projectId);
-          return next;
-        });
-      }
+      await fetchAndStoreProjectTasks(projectId);
     }
   };
 
@@ -979,18 +1197,30 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
     setExpandedTasks(newSet);
   };
 
-  const handlePreviewTask = (task: Task) => {
-    const sidebarTask: PlannerSidebarTask = {
-      id: task.id,
-      title: task.title,
-      description: task.description || "",
-      priority: task.priority === "medium" ? "normal" : task.priority,
-      due_date: task.dueDate || "",
-      type: "regular",
-      project_id: Number(task.projectId) || undefined,
-      assignees: task.assignee ? [{ extension_number: task.assignee }] : [],
-    };
-    setEditingTask(sidebarTask);
+  const handlePreviewTask = async (task: Task) => {
+    if (loadingSidebarEditTask) return;
+    setCreateTaskForProject(null);
+    setFetchedEditTask(null);
+    setLoadingSidebarEditTask(true);
+    try {
+      const raw = await getTask(task.id, Array.from(WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS));
+      if (raw == null || typeof raw !== "object") {
+        return;
+      }
+      setFetchedEditTask(
+        mapGetTaskResponseToSidebarEditTask(raw as Record<string, unknown>) as CreatePlannerSidebarTaskProp,
+      );
+      setShowCreateTaskSidebar(true);
+    } catch (err) {
+      console.error("[WorkPlannerProjects] getTask failed for sidebar edit", task.id, err);
+    } finally {
+      setLoadingSidebarEditTask(false);
+    }
+  };
+
+  const handleOpenCreateTaskForExpandedProject = (projectRow: Project) => {
+    setFetchedEditTask(null);
+    setCreateTaskForProject(projectRow);
     setShowCreateTaskSidebar(true);
   };
 
@@ -1116,38 +1346,47 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           <td className="generic-table-actions-cell" onClick={(e) => e.stopPropagation()}>
             <div className="generic-table-actions">
               <div>
-                <div className="dropdown">
-                  <button
-                    className="btn btn-link btn-sm p-1 dropdown-toggle"
-                    type="button"
-                    data-bs-toggle="dropdown"
-                    aria-expanded="false"
+                <Dropdown
+                  show={openProjectActionsId === project.id}
+                  onToggle={createProjectRowActionsToggleHandler(project.id, setOpenProjectActionsId)}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Dropdown.Toggle
+                    variant="link"
+                    size="sm"
+                    className="p-1 text-decoration-none shadow-none"
                     style={{ color: "#6b7280" }}
+                    id={`project-row-actions-${project.id}`}
                   >
                     <MoreVertical size={16} />
-                  </button>
-                  <ul className="dropdown-menu dropdown-menu-end">
-                    <li>
-                      <button
-                        className="dropdown-item"
-                        onClick={() => onEditProject(project)}
-                      >
-                        <Settings size={14} className="me-2" />
-                        Edit Project
-                      </button>
-                    </li>
-                    <li><hr className="dropdown-divider" /></li>
-                    <li>
-                      <button
-                        className="dropdown-item text-danger"
-                        onClick={() => onDeleteProject(project)}
-                      >
-                        <Trash2 size={14} className="me-2" />
-                        Delete Project
-                      </button>
-                    </li>
-                  </ul>
-                </div>
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu align="end">
+                    <Dropdown.Item
+                      as="button"
+                      type="button"
+                      onClick={() => {
+                        setOpenProjectActionsId(null);
+                        onEditProject(project);
+                      }}
+                    >
+                      <Settings size={14} className="me-2" />
+                      Edit Project
+                    </Dropdown.Item>
+                    <Dropdown.Divider />
+                    <Dropdown.Item
+                      as="button"
+                      type="button"
+                      className="text-danger"
+                      onClick={() => {
+                        setOpenProjectActionsId(null);
+                        onDeleteProject(project);
+                      }}
+                    >
+                      <Trash2 size={14} className="me-2" />
+                      Delete Project
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
               </div>
             </div>
           </td>
@@ -1183,6 +1422,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                 onPreview={handlePreviewTask}
                 expandedTasks={expandedTasks}
                 onToggleTask={handleToggleTask}
+                canPreviewEditTask={canPreviewEditTask}
               />
             );
           });
@@ -1204,8 +1444,10 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                   gap: 4,
                   padding: "4px 0",
                 }}
-                // NOTE: wire to create task flow for this project
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenCreateTaskForExpandedProject(project);
+                }}
               >
                 <Plus size={14} />
                 Add task
@@ -1225,16 +1467,32 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         isOpen={showCreateTaskSidebar}
         onClose={() => {
           setShowCreateTaskSidebar(false);
-          setEditingTask(null);
+          setFetchedEditTask(null);
+          setCreateTaskForProject(null);
         }}
-        onCreate={async () => {
+        onCreate={async (data) => {
+          const projectIdNum =
+            data.projectId ??
+            projectIdFromSidebarEditTask(fetchedEditTask) ??
+            createTaskForProject?.apiData?.id ??
+            null;
+          if (projectIdNum != null) {
+            const projectIdStr = String(projectIdNum);
+            if (expandedProjects.has(projectIdStr)) {
+              await fetchAndStoreProjectTasks(projectIdStr);
+            }
+          }
           setShowCreateTaskSidebar(false);
-          setEditingTask(null);
+          setFetchedEditTask(null);
+          setCreateTaskForProject(null);
         }}
         extensions={extensions}
-        labels={[]}
-        task={editingTask}
-        isEdit={!!editingTask}
+        labels={createTaskForProject?.apiData?.labels ?? []}
+        project={
+          createTaskForProject ? mapTableProjectToPlannerSidebarProject(createTaskForProject) : undefined
+        }
+        task={fetchedEditTask ?? undefined}
+        isEdit={!!fetchedEditTask}
         taskType="regular"
       />
 
@@ -1752,6 +2010,8 @@ type AppliedProjectFilters = {
   status: ProjectStatusFilter;
   owner: string;
   team: string;
+  startDateFrom: string;
+  endDateTo: string;
 };
 
 const WorkPlannerProjects = () => {
@@ -1765,7 +2025,7 @@ const WorkPlannerProjects = () => {
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [projectFormData, setProjectFormData] = useState({ name: "", description: "", color: "#3b82f6" });
+  const [projectFormData, setProjectFormData] = useState<ProjectFormState>(() => createEmptyProjectForm());
   const [stats, setStats] = useState({ activeProjects: 0, totalProjects: 0, tasksDueThisWeek: 0, overdueAcrossProjects: 0 });
   const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, last_page: 1, from: 0, to: 0 });
   const [activeTab, setActiveTab] = useState("all");
@@ -1773,7 +2033,16 @@ const WorkPlannerProjects = () => {
   const [filterStatus, setFilterStatus] = useState<ProjectStatusFilter>("active");
   const [filterOwner, setFilterOwner] = useState("All Owners");
   const [filterTeam, setFilterTeam] = useState("All Teams");
-  const [appliedFilters, setAppliedFilters] = useState<AppliedProjectFilters>({ search: "", status: "active", owner: "All Owners", team: "All Teams" });
+  const [filterStartDateFrom, setFilterStartDateFrom] = useState("");
+  const [filterEndDateTo, setFilterEndDateTo] = useState("");
+  const [appliedFilters, setAppliedFilters] = useState<AppliedProjectFilters>({
+    search: "",
+    status: "active",
+    owner: "All Owners",
+    team: "All Teams",
+    startDateFrom: "",
+    endDateTo: "",
+  });
   const [customTabs] = useState<TabConfig[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -1789,12 +2058,18 @@ const WorkPlannerProjects = () => {
   const resetProjectModalState = useCallback(() => {
     setShowProjectModal(false);
     setEditingProject(null);
-    setProjectFormData({ name: "", description: "", color: "#3b82f6" });
+    setProjectFormData(createEmptyProjectForm());
   }, []);
 
   useEffect(() => {
     if (!hierarchyLoading) {
-      fetchProjects({ search: searchTerm, status: filterStatus, owner: filterOwner });
+      fetchProjects({
+        search: searchTerm,
+        status: filterStatus,
+        owner: filterOwner,
+        startDateFrom: filterStartDateFrom,
+        endDateTo: filterEndDateTo,
+      });
     }
   }, [pagination.page, pagination.limit, hierarchyLoading]);
 
@@ -1803,12 +2078,19 @@ const WorkPlannerProjects = () => {
       setLoading(true);
       const statusParam = filters?.status && filters.status !== "all" ? filters.status : undefined;
       const ownerParam = filters?.owner && filters.owner !== "All Owners" ? [filters.owner] : undefined;
+      let startFrom = filters?.startDateFrom?.trim() || undefined;
+      let endTo = filters?.endDateTo?.trim() || undefined;
+      if (startFrom && endTo && endTo < startFrom) {
+        endTo = startFrom;
+      }
       const response = await listProjects({
         page: pagination.page,
         limit: pagination.limit,
         search: filters?.search || "",
         status: statusParam,
         user_extensions: ownerParam,
+        start_date_from: startFrom,
+        end_date_to: endTo,
       });
       if (response?.success === true && Array.isArray(response.data)) {
         setProjects(response.data.map((p: ApiProject) => mapApiProjectToProject(p)));
@@ -1879,13 +2161,25 @@ const WorkPlannerProjects = () => {
 
   const handleCreateProject = () => {
     setEditingProject(null);
-    setProjectFormData({ name: "", description: "", color: "#3b82f6" });
+    setProjectFormData(createEmptyProjectForm());
     setShowProjectModal(true);
   };
 
   const handleEditProject = (project: Project) => {
     setEditingProject(project);
-    setProjectFormData({ name: project.name, description: project.apiData?.description || "", color: project.iconColor });
+    const api = project.apiData;
+    setProjectFormData({
+      name: project.name,
+      description: api?.description || "",
+      start_date: formatApiDateForProjectInput(api?.start_date ?? undefined),
+      end_date: formatApiDateForProjectInput(api?.end_date ?? undefined),
+      color: project.iconColor,
+      status: apiStatusToProjectFormStatus(api?.status),
+      timezone:
+        typeof api?.timezone === "string" && api.timezone.trim() !== ""
+          ? api.timezone
+          : getAutoTimezone(),
+    });
     setShowProjectModal(true);
   };
 
@@ -1913,9 +2207,27 @@ const WorkPlannerProjects = () => {
 
   const handleSubmitProject = async (e: React.FormEvent) => {
     e.preventDefault();
+    const start = projectFormData.start_date.trim();
+    const end = projectFormData.end_date.trim();
+    if (!start) {
+      toast.error("Start date is required");
+      return;
+    }
+    if (end && end < start) {
+      toast.error("End date cannot be before start date");
+      return;
+    }
     try {
       setSubmitting(true);
-      const projectData = { name: projectFormData.name, description: projectFormData.description, color: projectFormData.color };
+      const projectData: Parameters<typeof createProject>[0] = {
+        name: projectFormData.name.trim(),
+        description: projectFormData.description.trim() || undefined,
+        color: projectFormData.color,
+        status: projectFormData.status,
+        timezone: projectFormData.timezone,
+        start_date: start,
+      };
+      if (end) projectData.end_date = end;
       const result = editingProject
         ? await updateProject(editingProject.id, projectData)
         : await createProject(projectData);
@@ -2002,16 +2314,91 @@ const WorkPlannerProjects = () => {
     setFilterStatus("active");
     setFilterOwner("All Owners");
     setFilterTeam("All Teams");
-    const cleared: AppliedProjectFilters = { search: "", status: "active", owner: "All Owners", team: "All Teams" };
+    setFilterStartDateFrom("");
+    setFilterEndDateTo("");
+    const cleared: AppliedProjectFilters = {
+      search: "",
+      status: "active",
+      owner: "All Owners",
+      team: "All Teams",
+      startDateFrom: "",
+      endDateTo: "",
+    };
     setAppliedFilters(cleared);
     fetchProjects(cleared);
   };
 
   const handleApplyFilters = () => {
     setPagination((prev) => ({ ...prev, page: 1 }));
-    const next: AppliedProjectFilters = { search: searchTerm, status: filterStatus, owner: filterOwner, team: filterTeam };
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status: filterStatus,
+      owner: filterOwner,
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
     setAppliedFilters(next);
     fetchProjects(next);
+  };
+
+  const applyProjectStatusFromPill = (status: ProjectStatusFilter) => {
+    setFilterStatus(status);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status,
+      owner: filterOwner,
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
+    setAppliedFilters(next);
+    fetchProjects(next);
+  };
+
+  const clearDateFiltersAndRefetch = () => {
+    setFilterStartDateFrom("");
+    setFilterEndDateTo("");
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status: filterStatus,
+      owner: filterOwner,
+      team: filterTeam,
+      startDateFrom: "",
+      endDateTo: "",
+    };
+    setAppliedFilters(next);
+    fetchProjects(next);
+  };
+
+  const handleProjectStartDateChange = (value = "") => {
+    setFilterStartDateFrom(value);
+    setFilterEndDateTo((prevEnd) => {
+      if (value && prevEnd && prevEnd < value) {
+        return value;
+      }
+      return prevEnd;
+    });
+  };
+
+  const handleProjectEndDateChange = (value = "") => {
+    const start = filterStartDateFrom.trim();
+    if (value && start && value < start) {
+      setFilterEndDateTo(start);
+      return;
+    }
+    setFilterEndDateTo(value);
+  };
+
+  const dateRangePillActiveLabel = (): string | undefined => {
+    const from = filterStartDateFrom.trim();
+    const to = filterEndDateTo.trim();
+    if (!from && !to) return undefined;
+    if (from && to) return `${from} → ${to}`;
+    if (from) return `From ${from}`;
+    return `To ${to}`;
   };
 
   const handleTabChange = (tabId: string) => {
@@ -2050,15 +2437,33 @@ const WorkPlannerProjects = () => {
 
   const statuses: Array<{ value: ProjectStatusFilter; label: string }> = [
     { value: "all", label: "All Status" },
-    { value: "active", label: "Active" },
-    { value: "completed", label: "Completed" },
-    { value: "archived", label: "Archived" },
+    { value: "active", label: "active" },
+    { value: "archived", label: "archived" },
+    { value: "completed", label: "completed" },
   ];
 
   const filterFields: FilterField[] = [
     { id: "search", label: "Search", type: "text", value: searchTerm, onChange: (v: string) => setSearchTerm(v ?? ""), placeholder: "Search projects..." },
     { id: "status", label: "Status", type: "dropdown", value: filterStatus, onChange: (v) => setFilterStatus(coerceProjectStatusFilter(v)), options: statuses },
     { id: "owner", label: "Owner / PM", type: "dropdown", value: filterOwner, onChange: (v) => setFilterOwner(v ?? "All Owners"), options: ownerSelectOptions },
+    {
+      id: "start_date_from",
+      label: "Start date (from)",
+      type: "date",
+      value: filterStartDateFrom,
+      onChange: (v: string | null) => handleProjectStartDateChange(v ?? ""),
+      placeholder: "YYYY-MM-DD",
+      max: filterEndDateTo || undefined,
+    },
+    {
+      id: "end_date_to",
+      label: "End date (to)",
+      type: "date",
+      value: filterEndDateTo,
+      onChange: (v: string | null) => handleProjectEndDateChange(v ?? ""),
+      placeholder: "YYYY-MM-DD",
+      min: filterStartDateFrom || undefined,
+    },
   ];
 
   const statsCardsData: StatsCardData[] = [
@@ -2077,13 +2482,17 @@ const WorkPlannerProjects = () => {
   const filterPills: FilterPill[] = [
     {
       id: "status",
-      label: filterStatus === "all" ? "Status" : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1),
-      active: filterStatus === "active" || filterStatus === "completed" || filterStatus === "archived",
-      activeLabel:
-        filterStatus === "active" || filterStatus === "completed" || filterStatus === "archived"
-          ? filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1)
-          : undefined,
-      onClear: () => setFilterStatus("all"),
+      label: "Status",
+      active: isProjectStatusFilterActive(filterStatus),
+      activeLabel: isProjectStatusFilterActive(filterStatus) ? filterStatus : undefined,
+      showDropdown: true,
+      dropdownOptions: [
+        { label: "All Status", value: "all", onClick: () => applyProjectStatusFromPill("all") },
+        { label: "Active", value: "active", onClick: () => applyProjectStatusFromPill("active") },
+        { label: "Archived", value: "archived", onClick: () => applyProjectStatusFromPill("archived") },
+        { label: "Completed", value: "completed", onClick: () => applyProjectStatusFromPill("completed") },
+      ],
+      onClear: () => applyProjectStatusFromPill("all"),
     },
     {
       id: "owner",
@@ -2091,6 +2500,39 @@ const WorkPlannerProjects = () => {
       active: filterOwner !== "All Owners",
       activeLabel: filterOwner === "All Owners" ? undefined : getUserNameFromExtension(filterOwner),
       onClear: () => setFilterOwner("All Owners"),
+    },
+    {
+      id: "date_range",
+      label: "Dates",
+      active: Boolean(filterStartDateFrom.trim() || filterEndDateTo.trim()),
+      activeLabel: dateRangePillActiveLabel(),
+      showDropdown: true,
+      dropdownContent: (
+        <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+          <Form.Group className="mb-0">
+            <Form.Label className="small text-muted mb-1">Start date (from)</Form.Label>
+            <Form.Control
+              type="date"
+              value={filterStartDateFrom}
+              max={filterEndDateTo || undefined}
+              onChange={(e) => handleProjectStartDateChange(e.target.value)}
+            />
+          </Form.Group>
+          <Form.Group className="mb-0">
+            <Form.Label className="small text-muted mb-1">End date (to)</Form.Label>
+            <Form.Control
+              type="date"
+              value={filterEndDateTo}
+              min={filterStartDateFrom || undefined}
+              onChange={(e) => handleProjectEndDateChange(e.target.value)}
+            />
+          </Form.Group>
+          <Button variant="dark" size="sm" className="align-self-stretch" onClick={() => handleApplyFilters()}>
+            Apply dates
+          </Button>
+        </div>
+      ),
+      onClear: () => clearDateFiltersAndRefetch(),
     },
   ];
 
@@ -2263,6 +2705,67 @@ const WorkPlannerProjects = () => {
                 <Form.Label>Description</Form.Label>
                 <Form.Control as="textarea" rows={3} value={projectFormData.description} onChange={(e) => setProjectFormData({ ...projectFormData, description: e.target.value })} placeholder="Enter project description" />
               </Form.Group>
+              <Row className="mb-3 g-2">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>
+                      Start date <span className="text-danger">*</span>
+                    </Form.Label>
+                    <Form.Control
+                      type="date"
+                      required
+                      value={projectFormData.start_date}
+                      onChange={(e) => {
+                        const newStart = e.target.value;
+                        setProjectFormData((prev) => {
+                          let nextEnd = prev.end_date;
+                          if (newStart && nextEnd && nextEnd < newStart) {
+                            nextEnd = newStart;
+                          }
+                          return { ...prev, start_date: newStart, end_date: nextEnd };
+                        });
+                      }}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>End date</Form.Label>
+                    <Form.Control
+                      type="date"
+                      min={projectFormData.start_date || undefined}
+                      value={projectFormData.end_date}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setProjectFormData((prev) => {
+                          if (v && prev.start_date && v < prev.start_date) {
+                            toast.error("End date cannot be before start date");
+                            return prev;
+                          }
+                          return { ...prev, end_date: v };
+                        });
+                      }}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+              <Form.Group className="mb-3">
+                <Form.Label>Status</Form.Label>
+                <Form.Select
+                  value={projectFormData.status}
+                  onChange={(e) =>
+                    setProjectFormData({
+                      ...projectFormData,
+                      status: e.target.value as ProjectFormStatus,
+                    })
+                  }
+                >
+                  <option value="active">Active</option>
+                  <option value="archived">Archived</option>
+                  <option value="completed">Completed</option>
+                </Form.Select>
+              </Form.Group>
+              
               <Form.Group className="mb-3">
                 <Form.Label>Color</Form.Label>
                 <div className="d-flex align-items-center gap-3">
@@ -2272,7 +2775,15 @@ const WorkPlannerProjects = () => {
               </Form.Group>
               <div className="d-flex justify-content-end gap-2">
                 <Button variant="secondary" onClick={resetProjectModalState} disabled={submitting}>Cancel</Button>
-                <Button variant="primary" type="submit" disabled={submitting || !projectFormData.name.trim()}>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={
+                    submitting ||
+                    !projectFormData.name.trim() ||
+                    !projectFormData.start_date.trim()
+                  }
+                >
                   {submitting ? (
                     <>
                       <Spinner as="span" animation="border" size="sm" className="me-2" />
