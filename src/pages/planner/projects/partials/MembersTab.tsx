@@ -2,9 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
 import { UserPlus, Edit, Trash2, Users, Search, Filter, Download, Eye } from 'lucide-react';
-import { useSession } from 'next-auth/react';
 import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
-import { canManage } from '@utils/work-planner';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 
@@ -15,9 +13,24 @@ interface MembersTabProps {
   onRefresh: () => void;
   styles: any;
   hierarchyDataExtensions: any[];
+  /** From parent: admin / owner per `canAdministerProjectFromMembers` (not granted to member/viewer). */
+  canManageProject: boolean;
 }
 
 const AVATAR_COLORS = ['#48bb78', '#f56565', '#4299e1', '#ed64a6', '#667eea', '#9f7aea', '#fc8181', '#ed8936'];
+
+/** API uses lowercase roles; edit `<select>` must include every role that can appear on a row (e.g. `viewer`) or the controlled value stays stale. */
+const PROJECT_MEMBER_ROLE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'member', label: 'Member' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'viewer', label: 'Viewer' },
+];
+
+function normalizeMemberRoleForForm(raw: unknown): string {
+  const r = String(raw ?? 'member').trim().toLowerCase();
+  const allowed = new Set(['member', 'admin', 'manager', 'viewer', 'owner']);
+  return allowed.has(r) ? r : 'member';
+}
 
 const MembersTab: React.FC<MembersTabProps> = ({
   selectedProject,
@@ -26,8 +39,9 @@ const MembersTab: React.FC<MembersTabProps> = ({
   onRefresh,
   styles,
   hierarchyDataExtensions,
+  canManageProject,
 }) => {
-  const { data: session } = useSession();
+  const isAllow = canManageProject;
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -50,8 +64,6 @@ const MembersTab: React.FC<MembersTabProps> = ({
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
-
-  const isAllow = useMemo(() => canManage(members, selectedProject, session), [members, selectedProject, session]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const getInitials = (name: string) => {
@@ -173,7 +185,10 @@ const MembersTab: React.FC<MembersTabProps> = ({
       className: 'text-secondary p-1',
       onClick: (row: any) => {
         setSelectedMember(row);
-        setFormData({ extension_number: row.extension_number, role: row.role || 'member' });
+        setFormData({
+          extension_number: row.extension_number,
+          role: normalizeMemberRoleForForm(row.role),
+        });
         setShowEditModal(true);
       },
     },
@@ -238,7 +253,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddMember = async () => {
-    if (!selectedProject?.id || !formData.extension_number) return;
+    if (!canManageProject || !selectedProject?.id || !formData.extension_number) return;
     try {
       setProcessing(true);
       await addMember(selectedProject.id, { extension_number: formData.extension_number, role: formData.role } as any);
@@ -253,7 +268,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
   };
 
   const handleUpdateRole = async () => {
-    if (!selectedProject?.id || !selectedMember || !formData.role) return;
+    if (!canManageProject || !selectedProject?.id || !selectedMember || !formData.role) return;
     try {
       setProcessing(true);
       await updateMemberRole(selectedProject.id, selectedMember.extension_number, { role: formData.role });
@@ -269,7 +284,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
   };
 
   const handleRemoveMember = async () => {
-    if (!selectedProject?.id || !selectedMember) return;
+    if (!canManageProject || !selectedProject?.id || !selectedMember) return;
     try {
       setProcessing(true);
       await removeMember(selectedProject.id, selectedMember.extension_number);
@@ -650,10 +665,17 @@ const MembersTab: React.FC<MembersTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Role</Form.Label>
-              <Form.Select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}>
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-                <option value="viewer">Viewer</option>
+              <Form.Select
+                value={formData.role}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, role: e.target.value }))
+                }
+              >
+                {PROJECT_MEMBER_ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </Form.Select>
             </Form.Group>
           </Form>
@@ -685,10 +707,17 @@ const MembersTab: React.FC<MembersTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Role</Form.Label>
-              <Form.Select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}>
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
+              <Form.Select
+                value={formData.role}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, role: e.target.value }))
+                }
+              >
+                {PROJECT_MEMBER_ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
                 {selectedMember?.role?.toLowerCase() === 'owner' && (
                   <option value="owner">Owner</option>
                 )}

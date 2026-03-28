@@ -13,9 +13,11 @@ import React, {
   ReactElement,
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type ComponentProps,
 } from "react";
+import { useSession } from "next-auth/react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
@@ -36,6 +38,11 @@ import {
   WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS,
   mapGetTaskResponseToSidebarEditTask,
 } from "@planner/workPlannerProjectRelations";
+import {
+  canAdministerProjectFromMembers,
+  canManageProjectFromMembers,
+  getSessionPhoneOrExtension,
+} from "@planner/projectMemberRole";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { ModuleSlug, getAutoTimezone } from "@utils/Helper";
 import { toast } from "react-toastify";
@@ -1018,6 +1025,8 @@ interface ExpandableProjectTableProps {
   onSelectionChange: (selected: Project[]) => void;
   columns: TableColumn<Project>[];
   actions: TableAction<Project>[];
+  /** `session.user.phone` (or `extension` fallback), normalized for matching `members[].extension_number`. */
+  sessionUserPhoneOrExtension: string;
 }
 
 type CreatePlannerSidebarTaskProp = NonNullable<
@@ -1113,6 +1122,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   onSelectionChange,
   columns,
   actions,
+  sessionUserPhoneOrExtension,
 }) => {
   const { hasPermission } = usePermissions();
   const canPreviewEditTask = hasPermission("edit-tasks-work-planner");
@@ -1346,47 +1356,51 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           <td className="generic-table-actions-cell" onClick={(e) => e.stopPropagation()}>
             <div className="generic-table-actions">
               <div>
-                <Dropdown
-                  show={openProjectActionsId === project.id}
-                  onToggle={createProjectRowActionsToggleHandler(project.id, setOpenProjectActionsId)}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Dropdown.Toggle
-                    variant="link"
-                    size="sm"
-                    className="p-1 text-decoration-none shadow-none"
-                    style={{ color: "#6b7280" }}
-                    id={`project-row-actions-${project.id}`}
+                {canAdministerProjectFromMembers(project, sessionUserPhoneOrExtension) ? (
+                  <Dropdown
+                    show={openProjectActionsId === project.id}
+                    onToggle={createProjectRowActionsToggleHandler(project.id, setOpenProjectActionsId)}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <MoreVertical size={16} />
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu align="end">
-                    <Dropdown.Item
-                      as="button"
-                      type="button"
-                      onClick={() => {
-                        setOpenProjectActionsId(null);
-                        onEditProject(project);
-                      }}
+                    <Dropdown.Toggle
+                      variant="link"
+                      size="sm"
+                      className="p-1 text-decoration-none shadow-none"
+                      style={{ color: "#6b7280" }}
+                      id={`project-row-actions-${project.id}`}
                     >
-                      <Settings size={14} className="me-2" />
-                      Edit Project
-                    </Dropdown.Item>
-                    <Dropdown.Divider />
-                    <Dropdown.Item
-                      as="button"
-                      type="button"
-                      className="text-danger"
-                      onClick={() => {
-                        setOpenProjectActionsId(null);
-                        onDeleteProject(project);
-                      }}
-                    >
-                      <Trash2 size={14} className="me-2" />
-                      Delete Project
-                    </Dropdown.Item>
-                  </Dropdown.Menu>
-                </Dropdown>
+                      <MoreVertical size={16} />
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu align="end">
+                      <Dropdown.Item
+                        as="button"
+                        type="button"
+                        onClick={() => {
+                          setOpenProjectActionsId(null);
+                          onEditProject(project);
+                        }}
+                      >
+                        <Settings size={14} className="me-2" />
+                        Edit Project
+                      </Dropdown.Item>
+                      <Dropdown.Divider />
+                      <Dropdown.Item
+                        as="button"
+                        type="button"
+                        className="text-danger"
+                        onClick={() => {
+                          setOpenProjectActionsId(null);
+                          onDeleteProject(project);
+                        }}
+                      >
+                        <Trash2 size={14} className="me-2" />
+                        Delete Project
+                      </Dropdown.Item>
+                    </Dropdown.Menu>
+                  </Dropdown>
+                ) : (
+                  <></>
+                )}
               </div>
             </div>
           </td>
@@ -1428,33 +1442,35 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           });
         }
 
-        // "Add task" row at the bottom of expanded project
-        rows.push(
-          <tr key={`add-task-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-            <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
-              <button
-                style={{
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "#9ca3af",
-                  fontSize: "0.825rem",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  padding: "4px 0",
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenCreateTaskForExpandedProject(project);
-                }}
-              >
-                <Plus size={14} />
-                Add task
-              </button>
-            </td>
-          </tr>
-        );
+        // "Add task" row at the bottom of expanded project (same member role as edit/delete)
+        if (canManageProjectFromMembers(project, sessionUserPhoneOrExtension)) {
+          rows.push(
+            <tr key={`add-task-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
+              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
+                <button
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#9ca3af",
+                    fontSize: "0.825rem",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "4px 0",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenCreateTaskForExpandedProject(project);
+                  }}
+                >
+                  <Plus size={14} />
+                  Add task
+                </button>
+              </td>
+            </tr>
+          );
+        }
       }
     });
 
@@ -2015,6 +2031,12 @@ type AppliedProjectFilters = {
 };
 
 const WorkPlannerProjects = () => {
+  const { data: session } = useSession();
+  const sessionUserPhoneOrExtension = useMemo(
+    () => getSessionPhoneOrExtension(session),
+    [session],
+  );
+
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
@@ -2600,8 +2622,24 @@ const WorkPlannerProjects = () => {
       icon: <MoreVertical size={16} />,
       dropdown: {
         options: [
-          { label: "Edit Project", icon: <Settings size={14} />, onClick: (row) => handleEditProject(row) },
-          { label: "Delete Project", icon: <Trash2 size={14} />, onClick: (row) => handleDeleteProject(row), className: "text-danger", divider: true },
+          {
+            label: "Edit Project",
+            icon: <Settings size={14} />,
+            onClick: (row) => {
+              if (!canAdministerProjectFromMembers(row, sessionUserPhoneOrExtension)) return;
+              handleEditProject(row);
+            },
+          },
+          {
+            label: "Delete Project",
+            icon: <Trash2 size={14} />,
+            onClick: (row) => {
+              if (!canAdministerProjectFromMembers(row, sessionUserPhoneOrExtension)) return;
+              handleDeleteProject(row);
+            },
+            className: "text-danger",
+            divider: true,
+          },
         ],
         align: "end",
       },
@@ -2655,6 +2693,7 @@ const WorkPlannerProjects = () => {
               projects={filteredProjects}
               loading={loading}
               extensions={(hierarchyDataExtensions as any[]) || []}
+              sessionUserPhoneOrExtension={sessionUserPhoneOrExtension}
               onProjectClick={handleProjectClick}
               onEditProject={handleEditProject}
               onDeleteProject={handleDeleteProject}

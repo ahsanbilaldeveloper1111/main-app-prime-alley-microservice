@@ -1,13 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Spinner } from 'react-bootstrap';
-import { FileText, Calendar, CheckCircle2, AlertCircle, Clock, Edit, Trash2 } from 'lucide-react';
+import { FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import CreateTaskModal from '@components/work-planner/createtask-modal';
-import { deleteTask, getTask, getTaskActivities } from '@utils/tasks';
+import { deleteTask, type ListTasksSummary } from '@utils/tasks';
 import TaskDetailOffcanvas from '@pages/planner/partials/TaskDetailOffcanvas';
-import TasksTable, { type TaskRow } from '@pages/planner/partials/TasksTable';
-import TaskFilterSection from '@pages/planner/partials/TaskFilterSection';
 import TasksListingPage from '@pages/planner/tasks';
 import type { PaginationState } from '@pages/planner/partials/TasksTable';
 
@@ -34,6 +31,8 @@ interface ListTabProps {
   onApplyFilters?: (filters: ListTabFilters) => void;
   onClearFilters?: () => void;
   onRefresh?: () => void;
+  embeddedListRefreshSignal?: number;
+  onEmbeddedListSummary?: (summary: ListTasksSummary | undefined) => void;
 }
 
 const ListTab: React.FC<ListTabProps> = ({ 
@@ -49,16 +48,17 @@ const ListTab: React.FC<ListTabProps> = ({
   statuses = [],
   onApplyFilters,
   onClearFilters,
-  onRefresh
+  onRefresh,
+  embeddedListRefreshSignal,
+  onEmbeddedListSummary,
 }) => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [deleting, setDeleting] = useState(false);
-  const [loadingTaskDetail, setLoadingTaskDetail] = useState(false);
   const [taskActivities, setTaskActivities] = useState<any[]>([]);
-  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [loadingActivities] = useState(false);
   const [activeDetailTab, setActiveDetailTab] = useState<'activity' | 'comments' | 'documents'>('activity');
   const [taskComments, setTaskComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -74,20 +74,6 @@ const ListTab: React.FC<ListTabProps> = ({
   const [filterPriority, setFilterPriority] = useState('All Priority');
   const [filterCreatedAtFrom, setFilterCreatedAtFrom] = useState('');
   const [filterCreatedAtTo, setFilterCreatedAtTo] = useState('');
-  
-  const getPriorityColor = (priority: string) => {
-    switch (priority?.toLowerCase()) {
-      case 'high':
-        return { bg: '#FEE2E2', color: '#991B1B' };
-      case 'medium':
-      case 'normal':
-        return { bg: '#FEF3C7', color: '#92400E' };
-      case 'low':
-        return { bg: '#E0E7FF', color: '#3730A3' };
-      default:
-        return { bg: '#F3F4F6', color: '#6B7280' };
-    }
-  };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';
@@ -96,75 +82,6 @@ const ListTab: React.FC<ListTabProps> = ({
       day: 'numeric', 
       year: 'numeric' 
     });
-  };
-
-  const handleTaskClick = async (task: any) => {
-    setSelectedTask(task);
-    setShowTaskDetail(true);
-    setTaskActivities([]);
-    setTaskComments([]);
-    setActiveDetailTab('activity');
-
-    // Fetch full task data using getTask API with relations
-    if (task.id) {
-      try {
-        setLoadingTaskDetail(true);
-        const withRelations = [
-          'parent',
-          'parent.status',
-          'parent.project',
-          'parent.assignees',
-          'parent.children',
-          'children',
-          'children.status',
-          'children.assignees',
-          'project',
-          'status',
-          'assignees',
-          'labels',
-          'comments'
-        ];
-        const taskData = await getTask(task.id, withRelations);
-        if (taskData) {
-          setSelectedTask(taskData);
-        }
-
-        // Fetch task activities
-        try {
-          setLoadingActivities(true);
-          const activitiesResponse = await getTaskActivities(task.id, 1, 5);
-          if (activitiesResponse) {
-            setTaskActivities(Array.isArray(activitiesResponse) ? activitiesResponse : []);
-          }
-        } catch (activityError) {
-          console.error('Error fetching task activities:', activityError);
-          setTaskActivities([]);
-        } finally {
-          setLoadingActivities(false);
-        }
-      } catch (error) {
-        console.error('Error fetching task details:', error);
-      } finally {
-        setLoadingTaskDetail(false);
-      }
-    }
-  };
-
-  const handleEdit = (task: any, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
-    setSelectedTask(task);
-    setShowTaskDetail(false);
-    setShowEditModal(true);
-  };
-
-  const handleDelete = (task: any, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
-    setSelectedTask(task);
-    setShowDeleteModal(true);
   };
 
   const handleEditFromDetail = () => {
@@ -339,35 +256,24 @@ const ListTab: React.FC<ListTabProps> = ({
       )}
 
       <div style={styles.card}>
-        {/* <div style={styles.cardHeader}>
-          <h5 style={styles.cardTitle}>Tasks List</h5>
-        </div> */}
-
-        {/* <TaskFilterSection
-          searchTerm={searchTerm}
-          onSearchTermChange={setSearchTerm}
-          filterProject=""
-          onFilterProjectChange={() => {}}
-          filterAssignee={filterAssignee}
-          onFilterAssigneeChange={setFilterAssignee}
-          filterStatus={filterStatus}
-          onFilterStatusChange={setFilterStatus}
-          filterPriority={filterPriority}
-          onFilterPriorityChange={setFilterPriority}
-          filterCreatedAtFrom={filterCreatedAtFrom}
-          onFilterCreatedAtFromChange={setFilterCreatedAtFrom}
-          filterCreatedAtTo={filterCreatedAtTo}
-          onFilterCreatedAtToChange={setFilterCreatedAtTo}
-          projectOptions={[]}
-          assigneeOptions={assigneeOptions}
-          statusOptions={statusOptionsList}
-          priorityOptions={priorityOptionsList}
-          onApplyFilters={handleApplyFiltersList}
-          onClearFilters={handleClearFiltersList}
-          hideProjectFilter
-          searchPlaceholder="Search tasks..."
-        /> */}
-        <TasksListingPage />
+        
+        <TasksListingPage
+          omitTodoTaskType
+          hierarchyExtensionsFromParent={extensions}
+          embeddedListRefreshSignal={embeddedListRefreshSignal}
+          onEmbeddedListSummary={onEmbeddedListSummary}
+          sidebarProject={
+            selectedProject
+              ? {
+                  id: selectedProject.id,
+                  name: selectedProject.name,
+                  color: selectedProject.color,
+                  statuses: selectedProject.statuses,
+                  labels: selectedProject.labels,
+                }
+              : undefined
+          }
+        />
 
       {/* {loading ? (
         <div style={{ textAlign: 'center', padding: '3rem' }}>

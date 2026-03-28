@@ -1,11 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, Tag } from 'lucide-react';
-import { useSession } from 'next-auth/react';
 import { createProjectLabel, updateProjectLabel, deleteProjectLabel } from '@utils/tasks';
-import { canManage } from '@utils/work-planner';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
-import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
+import  { StatsCardData } from '@components/GenericStatsCards';
 
 interface LabelsTabProps {
   selectedProject: any;
@@ -13,6 +11,7 @@ interface LabelsTabProps {
   loading: boolean;
   onRefresh: () => void;
   styles: any;
+  canManageProject: boolean;
 }
 
 const LabelsTab: React.FC<LabelsTabProps> = ({
@@ -20,13 +19,11 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   labels,
   loading,
   onRefresh,
-  styles
+  styles,
+  canManageProject,
 }) => {
-  const { data: session } = useSession();
-  const isAllow = useMemo(() => {
-    return canManage(labels, selectedProject, session);
-  }, [labels, selectedProject, session]);
-  
+  const isAllow = canManageProject;
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -51,7 +48,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddLabel = async () => {
-    if (!selectedProject?.id || !formData.name) return;
+    if (!canManageProject || !selectedProject?.id || !formData.name) return;
     
     try {
       setProcessing(true);
@@ -70,7 +67,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   };
 
   const handleUpdateLabel = async () => {
-    if (!selectedProject?.id || !selectedLabel || !formData.name) return;
+    if (!canManageProject || !selectedProject?.id || !selectedLabel || !formData.name) return;
     
     try {
       setProcessing(true);
@@ -90,7 +87,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   };
 
   const handleDeleteLabel = async () => {
-    if (!selectedProject?.id || !selectedLabel) return;
+    if (!canManageProject || !selectedProject?.id || !selectedLabel) return;
     
     try {
       setProcessing(true);

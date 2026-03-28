@@ -1,4 +1,9 @@
-import React, { useEffect, useState, useCallback, useRef, ReactElement } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef, ReactElement } from 'react';
+import { useSession } from 'next-auth/react';
+import {
+  canManageProjectFromMembers,
+  getSessionPhoneOrExtension,
+} from '@planner/projectMemberRole';
 import { useRouter } from 'next/router';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
@@ -35,6 +40,7 @@ import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 
 const WITH_RELATIONS = [
   'project',
+  'project.members',
   'status',
   'assignees',
   'labels',
@@ -74,6 +80,12 @@ const TaskDetailPage = () => {
 
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
 
+  const { data: session } = useSession();
+  const sessionUserPhoneOrExtension = useMemo(
+    () => getSessionPhoneOrExtension(session),
+    [session],
+  );
+
   const fetchTask = useCallback(async () => {
     if (!id || typeof id !== 'string') return;
     try {
@@ -91,6 +103,15 @@ const TaskDetailPage = () => {
   useEffect(() => {
     fetchTask();
   }, [fetchTask]);
+
+  const canManageTaskProject = useMemo(
+    () =>
+      canManageProjectFromMembers(
+        task?.project ?? null,
+        sessionUserPhoneOrExtension,
+      ),
+    [task?.project, sessionUserPhoneOrExtension],
+  );
 
   useEffect(() => {
     if (!task?.id) {
@@ -118,7 +139,7 @@ const TaskDetailPage = () => {
   }, [task?.id]);
 
   const handleDelete = async () => {
-    if (!task?.id) return;
+    if (!task?.id || !canManageTaskProject) return;
     try {
       setDeleting(true);
       await deleteTask(task.id);
@@ -388,14 +409,26 @@ const TaskDetailPage = () => {
             <ArrowLeft size={16} />
             Back to list
           </Button>
-          <div className="d-flex align-items-center gap-1">
-            <Button variant="link" className="text-primary p-0" onClick={() => setShowEditModal(true)} title="Edit Task">
-              <Edit size={20} />
-            </Button>
-            <Button variant="link" className="text-danger p-0" onClick={() => setShowDeleteModal(true)} title="Delete Task">
-              <Trash2 size={20} />
-            </Button>
-          </div>
+          {canManageTaskProject && (
+            <div className="d-flex align-items-center gap-1">
+              <Button
+                variant="link"
+                className="text-primary p-0"
+                onClick={() => setShowEditModal(true)}
+                title="Edit Task"
+              >
+                <Edit size={20} />
+              </Button>
+              <Button
+                variant="link"
+                className="text-danger p-0"
+                onClick={() => setShowDeleteModal(true)}
+                title="Delete Task"
+              >
+                <Trash2 size={20} />
+              </Button>
+            </div>
+          )}
         </div>
 
         <Card className="border shadow-sm">
@@ -460,24 +493,32 @@ const TaskDetailPage = () => {
                     </div>
                   );
                 })}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setShowEditModal(true)}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    backgroundColor: '#e2e8f0',
-                    color: '#64748b',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Plus size={16} />
-                </div>
+                {canManageTaskProject && (
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setShowEditModal(true)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setShowEditModal(true);
+                      }
+                    }}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      backgroundColor: '#e2e8f0',
+                      color: '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Plus size={16} />
+                  </div>
+                )}
               </div>
             </div>
 

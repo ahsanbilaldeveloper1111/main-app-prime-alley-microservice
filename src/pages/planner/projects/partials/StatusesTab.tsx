@@ -16,8 +16,6 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 import { createStatus, updateStatus, deleteStatus, reorderStatuses } from '@utils/tasks';
-import { canManage } from '@utils/work-planner';
-import { useSession } from 'next-auth/react';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import { StatsCardData } from '@components/GenericStatsCards';
 
@@ -27,6 +25,7 @@ interface StatusesTabProps {
   loading: boolean;
   onRefresh: () => void;
   styles: any;
+  canManageProject: boolean;
 }
 
 const predefinedColors = [
@@ -486,9 +485,9 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   loading,
   onRefresh,
   styles,
+  canManageProject,
 }) => {
-  const { data: session } = useSession();
-  const isAllow = useMemo(() => canManage(statuses, selectedProject, session), [statuses, selectedProject, session]);
+  const isAllow = canManageProject;
 
   const [showAddModal, setShowAddModal]     = useState(false);
   const [showEditModal, setShowEditModal]   = useState(false);
@@ -512,7 +511,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddStatus = async () => {
-    if (!selectedProject?.id || !formData.name) return;
+    if (!canManageProject || !selectedProject?.id || !formData.name) return;
     try {
       setProcessing(true);
       await createStatus(selectedProject.id, { name: formData.name, color: formData.color } as any);
@@ -527,7 +526,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   };
 
   const handleUpdateStatus = async () => {
-    if (!selectedProject?.id || !selectedStatus || !formData.name) return;
+    if (!canManageProject || !selectedProject?.id || !selectedStatus || !formData.name) return;
     try {
       setProcessing(true);
       await updateStatus(selectedProject.id, selectedStatus.id, { name: formData.name, color: formData.color } as any);
@@ -543,7 +542,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   };
 
   const handleDeleteStatus = async () => {
-    if (!selectedProject?.id || !selectedStatus) return;
+    if (!canManageProject || !selectedProject?.id || !selectedStatus) return;
     try {
       setProcessing(true);
       await deleteStatus(selectedProject.id, selectedStatus.id);
@@ -789,9 +788,13 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   }), [searchValue, filterPills, isAllow, selectedItems.length, statuses.length]);
 
   // ── Row Interaction Handlers ──────────────────────────────────────────────
-  const handleFirstColumnClick = useCallback((row: any) => {
-    openEditModal(row);
-  }, []);
+  const handleFirstColumnClick = useCallback(
+    (row: any) => {
+      if (!isAllow) return;
+      openEditModal(row);
+    },
+    [isAllow],
+  );
 
   const handleRowDoubleClick = useCallback((row: any) => {
     if (isAllow) {
@@ -801,7 +804,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
 
   const handleStatusRowReorder = useCallback(
     async (fromPageIndex: number, toPageIndex: number) => {
-      if (!selectedProject?.id || fromPageIndex === toPageIndex) return;
+      if (!canManageProject || !selectedProject?.id || fromPageIndex === toPageIndex) return;
       const offset = (pagination.currentPage - 1) * pagination.rowsPerPage;
       const fromFiltered = offset + fromPageIndex;
       const toFiltered = offset + toPageIndex;
@@ -828,6 +831,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       }
     },
     [
+      canManageProject,
       selectedProject?.id,
       pagination.currentPage,
       pagination.rowsPerPage,

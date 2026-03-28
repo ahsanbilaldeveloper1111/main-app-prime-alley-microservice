@@ -1,4 +1,10 @@
 import React, { useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
+import {
+  canManageProjectFromMembers,
+  getSessionPhoneOrExtension,
+} from '@planner/projectMemberRole';
 import {
   Plus,
   ChevronLeft,
@@ -12,7 +18,7 @@ import {
 import { formatDateForTable } from '@utils/Helper';
 import { updateTask, getTask } from '@utils/tasks';
 import { toast } from 'react-toastify';
-import CreateTaskModal from '@components/work-planner/createtask-modal';
+import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
 import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
 
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
@@ -376,6 +382,18 @@ const BoardView: React.FC<BoardViewProps> = ({
   getTasksByStatus,
   onTaskStatusChange
 }) => {
+  const router = useRouter();
+  const { data: session } = useSession();
+  const sessionUserPhoneOrExtension = useMemo(
+    () => getSessionPhoneOrExtension(session),
+    [session],
+  );
+  /** Admin + member: add/move/edit from board. Viewer: read-only. */
+  const canEditTasksOnBoard = useMemo(
+    () => canManageProjectFromMembers(selectedProject, sessionUserPhoneOrExtension),
+    [selectedProject, sessionUserPhoneOrExtension],
+  );
+
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [draggedTask, setDraggedTask] = useState<any>(null);
   const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
@@ -393,11 +411,6 @@ const BoardView: React.FC<BoardViewProps> = ({
     return map;
   }, [hierarchyDataExtensions]);
 
-  const extensionsForModal = useMemo(() => (hierarchyDataExtensions || []).map((ext: any) => ({
-    id: String(ext?.extension_number ?? ext?.id ?? ''),
-    name: String(ext?.user?.name || ext?.name || '')
-  })), [hierarchyDataExtensions]);
-
   const getUserNameFromExtension = (extensionNumber: any): string => {
     const key = String(extensionNumber || '').trim();
     if (!key) return '';
@@ -411,7 +424,7 @@ const BoardView: React.FC<BoardViewProps> = ({
     return getUserNameFromExtension(extNum);
   };
 
-  /** Same pattern as ListTab: open CreateTaskModal in edit mode after loading full task. */
+  /** Open CreatePlannerTaskSidebar in edit mode after loading full task. */
   const loadTaskAndOpenEditModal = async (task: any) => {
     if (!task?.id) return;
     try {
@@ -439,6 +452,10 @@ const BoardView: React.FC<BoardViewProps> = ({
       await Promise.resolve(onTaskClick(task));
       return;
     }
+    if (!canEditTasksOnBoard && task?.id != null) {
+      void router.push(`/planner/tasks/${task.id}`);
+      return;
+    }
     await loadTaskAndOpenEditModal(task);
   };
 
@@ -450,7 +467,7 @@ const BoardView: React.FC<BoardViewProps> = ({
 
   // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, task: any) => {
-    if (savingTaskMove) {
+    if (!canEditTasksOnBoard || savingTaskMove) {
       e.preventDefault();
       return;
     }
@@ -486,7 +503,7 @@ const BoardView: React.FC<BoardViewProps> = ({
     e.preventDefault();
     setDragOverStatus(null);
 
-    if (!draggedTask || !selectedProject?.id) {
+    if (!canEditTasksOnBoard || !draggedTask || !selectedProject?.id) {
       return;
     }
 
@@ -823,30 +840,32 @@ const BoardView: React.FC<BoardViewProps> = ({
                     borderTop: '1px solid #cccccc'
                   }}
                 >
-                  <button
-                    type="button"
-                    style={styles.addButton}
-                    onClick={() => onCreateTask(status.id)}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f5f5f5';
-                      e.currentTarget.style.color = '#000';
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.backgroundColor = 'white';
-                      e.currentTarget.style.color = TEAL;
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f5f5f5';
-                      e.currentTarget.style.color = '#000';
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.backgroundColor = 'white';
-                      e.currentTarget.style.color = TEAL;
-                    }}
-                  >
-                    <Plus size={16} />
-                    Add Task
-                  </button>
+                  {canEditTasksOnBoard && (
+                    <button
+                      type="button"
+                      style={styles.addButton}
+                      onClick={() => onCreateTask(status.id)}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f5f5f5';
+                        e.currentTarget.style.color = '#000';
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.color = TEAL;
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f5f5f5';
+                        e.currentTarget.style.color = '#000';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.backgroundColor = 'white';
+                        e.currentTarget.style.color = TEAL;
+                      }}
+                    >
+                      <Plus size={16} />
+                      Add Task
+                    </button>
+                  )}
 
                   {statusTasks.length === 0 ? (
                     <div style={{
@@ -887,7 +906,7 @@ const BoardView: React.FC<BoardViewProps> = ({
                         <article
                           key={task.id}
                           aria-label={task.title || 'Task'}
-                          draggable={!savingTaskMove}
+                          draggable={canEditTasksOnBoard && !savingTaskMove}
                           style={{
                             ...styles.taskCard,
                             boxShadow: cardHov
@@ -1066,19 +1085,38 @@ const BoardView: React.FC<BoardViewProps> = ({
         </div>
       </div>
 
-      <CreateTaskModal
-        show={showEditModal}
-        onHide={() => {
+      <CreateTaskSidebar
+        isOpen={showEditModal}
+        onClose={() => {
           setShowEditModal(false);
           setSelectedTask(null);
         }}
         onCreate={handleTaskUpdate}
-        extensions={extensionsForModal}
+        extensions={hierarchyDataExtensions as any}
         labels={labels}
-        statuses={statuses}
-        project={selectedProject}
+        statuses={statuses.map((status: any) => ({
+          id: status.id,
+          name: status.name,
+          icon: '',
+          color: status.color || '',
+        }))}
+        project={
+          selectedProject
+            ? {
+                id: selectedProject.id,
+                name: selectedProject.name,
+                icon: '',
+                color: selectedProject.color || '#3b82f6',
+                statuses: selectedProject.statuses,
+                labels: selectedProject.labels,
+              }
+            : undefined
+        }
         task={selectedTask}
-        isEdit={true}
+        isEdit
+        taskType="regular"
+        taskTypeChoices={['regular', 'recurring']}
+        lockProjectSelection
       />
     </>
   );
