@@ -563,7 +563,7 @@ const OutboundReportsPage = () => {
     showMoreFiltersButton: false,
     filterPills,
     rightActions: (
-      <Button variant="primary" size="sm" onClick={() => { void handleSearch(); }} disabled={loading}>
+      <Button variant="primary" size="sm" onClick={() => { handleSearch(); }} disabled={loading}>
         {loading ? <Spinner animation="border" size="sm" className="me-1" /> : null}
         Search
       </Button>
