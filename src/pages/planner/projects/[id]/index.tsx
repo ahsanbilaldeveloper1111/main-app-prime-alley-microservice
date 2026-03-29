@@ -111,7 +111,7 @@ const WorkPlannerProjectsDetails = () => {
   const handleBoardTaskClick = async (task: { id?: string | number }) => {
     if (task?.id == null) return;
     if (!canCreateTaskByMemberRole) {
-      void router.push(`/planner/tasks/${task.id}`);
+      await router.push(`/planner/tasks/${task.id}`);
       return;
     }
     if (loadingSidebarEditTask) return;

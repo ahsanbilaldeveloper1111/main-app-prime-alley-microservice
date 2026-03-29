@@ -26,8 +26,19 @@ const PROJECT_MEMBER_ROLE_OPTIONS: ReadonlyArray<{ value: string; label: string 
   { value: 'viewer', label: 'Viewer' },
 ];
 
+/** Coerce API role to string without `String(object)` → `[object Object]`. */
+function memberRoleRawToTrimmedString(raw: unknown): string {
+  if (typeof raw === 'string') {
+    return raw;
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return String(raw);
+  }
+  return 'member';
+}
+
 function normalizeMemberRoleForForm(raw: unknown): string {
-  const r = String(raw ?? 'member').trim().toLowerCase();
+  const r = memberRoleRawToTrimmedString(raw).trim().toLowerCase();
   const allowed = new Set(['member', 'admin', 'manager', 'viewer', 'owner']);
   return allowed.has(r) ? r : 'member';
 }

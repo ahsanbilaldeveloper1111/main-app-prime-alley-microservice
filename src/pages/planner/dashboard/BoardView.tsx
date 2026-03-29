@@ -453,7 +453,7 @@ const BoardView: React.FC<BoardViewProps> = ({
       return;
     }
     if (!canEditTasksOnBoard && task?.id != null) {
-      void router.push(`/planner/tasks/${task.id}`);
+      await router.push(`/planner/tasks/${task.id}`);
       return;
     }
     await loadTaskAndOpenEditModal(task);

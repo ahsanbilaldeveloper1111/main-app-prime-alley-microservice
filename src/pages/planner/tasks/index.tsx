@@ -720,7 +720,7 @@ const TasksListingPage = ({
       }
       if (prevEmbeddedRefreshSignal.current === embeddedListRefreshSignal) return;
       prevEmbeddedRefreshSignal.current = embeddedListRefreshSignal;
-      void fetchTasks();
+      fetchTasks().catch(() => undefined);
     }, [embeddedListRefreshSignal, isProjectScopedEmbed, fetchTasks]);
   
     useEffect(() => { fetchTasks(); }, [fetchTasks]);
