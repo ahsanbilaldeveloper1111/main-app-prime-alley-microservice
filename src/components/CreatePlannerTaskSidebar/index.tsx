@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Form, Row, Col } from "react-bootstrap";
 import {
   X,
@@ -30,6 +30,36 @@ import TaskSecondaryTabs from "@pages/planner/partials/TaskSecondaryTabs";
 
 type PlannerTaskType = "todo" | "regular" | "recurring";
 
+const TASK_TYPE_SELECT_LABELS: Record<PlannerTaskType, string> = {
+  todo: "Todo",
+  regular: "Regular",
+  recurring: "Recurring",
+};
+
+const ALL_PLANNER_TASK_TYPES: PlannerTaskType[] = ["todo", "regular", "recurring"];
+
+function normalizeTaskTypeOptions(
+  choices: readonly PlannerTaskType[] | undefined,
+): PlannerTaskType[] {
+  if (choices == null || choices.length === 0) {
+    return [...ALL_PLANNER_TASK_TYPES];
+  }
+  const filtered = choices.filter((t): t is PlannerTaskType =>
+    ALL_PLANNER_TASK_TYPES.includes(t),
+  );
+  return filtered.length > 0 ? filtered : [...ALL_PLANNER_TASK_TYPES];
+}
+
+function clampTaskTypeToAllowed(
+  current: PlannerTaskType,
+  allowed: readonly PlannerTaskType[],
+): PlannerTaskType {
+  if (allowed.length === 0) return "regular";
+  if (allowed.includes(current)) return current;
+  if (allowed.includes("regular")) return "regular";
+  return allowed[0];
+}
+
 interface Extension {
   id: string;
   name: string;
@@ -49,6 +79,9 @@ interface CreateTaskSidebarProps {
   isEdit?: boolean;
   selectedStatusForTask?: number | null;
   taskType?: PlannerTaskType;
+  taskTypeChoices?: readonly PlannerTaskType[];
+  /** When true (e.g. project details / board), the project dropdown is disabled — task stays on the current project. */
+  lockProjectSelection?: boolean;
 }
 
 /** Minimal task shape used when editing in the sidebar (API / normalized task). */
@@ -676,13 +709,20 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   isEdit = false,
   selectedStatusForTask = null,
   taskType = "regular",
+  taskTypeChoices,
+  lockProjectSelection = false,
 }) => {
+  const taskTypeOptions = useMemo(
+    () => normalizeTaskTypeOptions(taskTypeChoices),
+    [taskTypeChoices],
+  );
+
   const getInitialFormData = (): CreateTaskFormData => {
     if (isEdit && editTask) {
       return buildInitialFormFromEdit(editTask, extensions);
     }
     return buildInitialFormForCreate(
-      taskType,
+      clampTaskTypeToAllowed(taskType, taskTypeOptions),
       propProject,
       propStatuses,
       selectedStatusForTask,
@@ -831,13 +871,18 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       ) {
         return;
       }
-      setFormData(mergeFormDataWithDueDateClamp(getInitialFormData()));
+      const mergedOpen = mergeFormDataWithDueDateClamp(getInitialFormData());
+      setFormData({
+        ...mergedOpen,
+        taskType: clampTaskTypeToAllowed(mergedOpen.taskType, taskTypeOptions),
+      });
     } else {
       setSearchQuery("");
+      const defaultTaskType = clampTaskTypeToAllowed(taskType, taskTypeOptions);
       setFormData({
         title: "",
         description: "",
-        taskType,
+        taskType: defaultTaskType,
         projectId: propProject?.id || null,
         statusId:
           selectedStatusForTask ||
@@ -851,7 +896,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         linkedRecordIds: [],
         frequency: "weekly",
         repeatInterval: 1,
-        repeatOn: taskType === "recurring" ? "monday" : "",
+        repeatOn: defaultTaskType === "recurring" ? "monday" : "",
         dueTime: "",
       });
     }
@@ -862,6 +907,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     fetchedProjects.length,
     loadingProjects,
     selectedStatusForTask,
+    taskType,
+    taskTypeOptions,
   ]);
 
   useEffect(() => {
@@ -981,6 +1028,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   };
 
   const buildPayload = () => {
+    const taskTypeEff = clampTaskTypeToAllowed(formData.taskType, taskTypeOptions);
     const payload: any = {
       title: formData.title,
       description: formData.description || "",
@@ -997,7 +1045,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           const extension = extensions.find((ext) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
-      type: formData.taskType,
+      type: taskTypeEff,
     };
     if (formData.projectId) {
       payload.project_id = formData.projectId;
@@ -1010,7 +1058,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     ) {
       payload.parent_task_id = formData.linkedRecordIds[0];
     }
-    if (formData.taskType === "recurring") {
+    if (taskTypeEff === "recurring") {
       payload.frequency = formData.frequency;
       payload.repeat_interval = formData.repeatInterval;
       if (formData.frequency === "weekly" && formData.repeatOn.trim()) {
@@ -1033,7 +1081,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       toast.error("Please enter a task title");
       return false;
     }
-    if (formData.taskType === "recurring") {
+    const taskTypeEff = clampTaskTypeToAllowed(formData.taskType, taskTypeOptions);
+    if (taskTypeEff === "recurring") {
       if (!formData.projectId) {
         toast.error("Recurring tasks require a project");
         return false;
@@ -1062,8 +1111,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   };
 
   const persistTaskFromPayload = async (payload: ReturnType<typeof buildPayload>): Promise<boolean> => {
+    const taskTypeEff = clampTaskTypeToAllowed(formData.taskType, taskTypeOptions);
     if (isEdit && editTask?.id != null) {
-      if (formData.taskType === "recurring") {
+      if (taskTypeEff === "recurring") {
         return Boolean(
           await updateRecurringTask(
             editTask.id,
@@ -1075,7 +1125,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         await updateTask(editTask.id, payload as Parameters<typeof updateTask>[1]),
       );
     }
-    if (formData.taskType === "recurring") {
+    if (taskTypeEff === "recurring") {
       const recurringPayload = {
         ...payload,
         project_id: formData.projectId as number,
@@ -1354,7 +1404,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 Task Type <span style={{ color: "#ef4444" }}>*</span>
               </Form.Label>
               <Form.Select
-                value={formData.taskType}
+                value={clampTaskTypeToAllowed(formData.taskType, taskTypeOptions)}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
@@ -1364,9 +1414,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 className="py-2"
                 style={{ fontSize: "14px" }}
               >
-                <option value="todo">Todo</option>
-                <option value="regular">Regular</option>
-                <option value="recurring">Recurring</option>
+                {taskTypeOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {TASK_TYPE_SELECT_LABELS[opt]}
+                  </option>
+                ))}
               </Form.Select>
             </Form.Group>
               </Col>
@@ -2027,7 +2079,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       }}
                       className="py-2"
                       style={{ fontSize: "14px" }}
-                      disabled={loadingProjects || projects.length === 0}
+                      disabled={
+                        lockProjectSelection ||
+                        loadingProjects ||
+                        projects.length === 0
+                      }
                     >
                       {renderProjectSelectChildren(loadingProjects, projects)}
                     </Form.Select>

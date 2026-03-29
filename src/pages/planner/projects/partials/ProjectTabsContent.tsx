@@ -3,16 +3,30 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useState,
 } from 'react';
+import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import CreateTaskModal from '@components/work-planner/createtask-modal';
+import {
+  canAdministerProjectFromMembers,
+  canManageProjectFromMembers,
+  getSessionPhoneOrExtension,
+} from '@planner/projectMemberRole';
+import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
 import {
   filterBoardTasksForColumns,
   sliceBoardTasksByStatusId,
   sortStringsLocale,
 } from '@planner/projectTabsContentUtils';
-import { useProjectTabsContentData } from '@planner/useProjectTabsContentData';
+import {
+  useProjectTabsContentData,
+  type UseProjectTabsContentDataOptions,
+} from '@planner/useProjectTabsContentData';
+
+const PROJECT_DETAIL_LIST_TAB_OPTS = {
+  skipAutomaticListTabFetch: true,
+} as const satisfies UseProjectTabsContentDataOptions;
 import TabsNavigation from './TabsNavigation';
 import OverviewTab from './OverviewTab';
 import BoardTab from './BoardTab';
@@ -47,10 +61,27 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   onBoardTaskClick,
 }, ref) => {
   const router = useRouter();
+  const { data: session } = useSession();
+  const sessionUserPhoneOrExtension = useMemo(
+    () => getSessionPhoneOrExtension(session),
+    [session],
+  );
+  /** Tasks / board / create task — admin + member (+ owner); not viewer. */
+  const canManageProject = useMemo(
+    () => canManageProjectFromMembers(selectedProject, sessionUserPhoneOrExtension),
+    [selectedProject, sessionUserPhoneOrExtension],
+  );
+  /** Members, statuses, labels, project metadata — admin (+ owner) only. */
+  const canAdministerProject = useMemo(
+    () => canAdministerProjectFromMembers(selectedProject, sessionUserPhoneOrExtension),
+    [selectedProject, sessionUserPhoneOrExtension],
+  );
+
   const [activeTab, setActiveTab] = useState('overview');
   const [showTasksModal, setShowTasksModal] = useState(false);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [selectedStatusForTask, setSelectedStatusForTask] = useState<number | null>(null);
+  const [embeddedListRefreshSignal, setEmbeddedListRefreshSignal] = useState(0);
 
   const selectedProjectId = selectedProject?.id;
   const {
@@ -77,11 +108,11 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     workloadData,
     fetchProjectData,
     fetchBoardTasks,
-    fetchListTasks,
     handleListApplyFilters,
     handleListClearFilters,
     handleListPaginationChange,
-  } = useProjectTabsContentData(selectedProjectId, activeTab);
+    ingestEmbeddedListSummary,
+  } = useProjectTabsContentData(selectedProjectId, activeTab, PROJECT_DETAIL_LIST_TAB_OPTS);
 
   const [boardSearchTerm, setBoardSearchTerm] = useState('');
   const [boardSelectedAssignee, setBoardSelectedAssignee] = useState('All Assignees');
@@ -155,9 +186,9 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     if (activeTab === 'board') {
       await fetchBoardTasks();
     } else if (activeTab === 'list') {
-      await fetchListTasks();
+      setEmbeddedListRefreshSignal((n) => n + 1);
     }
-  }, [activeTab, fetchBoardTasks, fetchListTasks]);
+  }, [activeTab, fetchBoardTasks]);
 
   const handleCreateTask = async (formData: any) => {
     if (!selectedProject) {
@@ -177,7 +208,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
 
   useImperativeHandle(ref, () => ({
     openCreateTaskModal: () => {
-      if (selectedProject) {
+      if (selectedProject && canManageProject) {
         setShowCreateTaskModal(true);
       }
     },
@@ -188,7 +219,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
       await fetchProjectData();
       await refreshTaskViewsForActiveTab();
     },
-  }), [selectedProject, handleTabChange, fetchProjectData, refreshTaskViewsForActiveTab]);
+  }), [selectedProject, canManageProject, handleTabChange, fetchProjectData, refreshTaskViewsForActiveTab]);
 
   const styles = {
     tabsContainer: { backgroundColor: '#fff', borderBottom: '1px solid #E5E9F2' },
@@ -271,6 +302,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             showCompletedTasks={showCompletedTasks}
             setShowCompletedTasks={setShowCompletedTasks}
             onCreateTask={(statusId) => {
+              if (!canManageProject) return;
               setSelectedStatusForTask(statusId);
               setShowCreateTaskModal(true);
             }}
@@ -305,11 +337,13 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             extensions={hierarchyDataExtensions as any}
             labels={labels}
             statuses={statuses}
+            embeddedListRefreshSignal={embeddedListRefreshSignal}
+            onEmbeddedListSummary={ingestEmbeddedListSummary}
             onApplyFilters={handleListApplyFilters}
             onClearFilters={handleListClearFilters}
             onRefresh={() => {
               if (activeTab === 'list' && project?.id) {
-                fetchListTasks().catch(() => undefined);
+                setEmbeddedListRefreshSignal((n) => n + 1);
                 fetchProjectData().catch(() => undefined);
               }
             }}
@@ -324,6 +358,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             onRefresh={fetchProjectData}
             styles={styles}
             hierarchyDataExtensions={hierarchyDataExtensions}
+            canManageProject={canAdministerProject}
           />
         );
       case 'statuses':
@@ -334,6 +369,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             loading={loadingProjectData}
             onRefresh={fetchProjectData}
             styles={styles}
+            canManageProject={canAdministerProject}
           />
         );
       case 'labels':
@@ -344,6 +380,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             loading={loadingProjectData}
             onRefresh={fetchProjectData}
             styles={styles}
+            canManageProject={canAdministerProject}
           />
         );
       case 'reports':
@@ -375,9 +412,9 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
         loading={loadingOverdue}
       />
 
-      <CreateTaskModal
-        show={showCreateTaskModal}
-        onHide={() => {
+      <CreateTaskSidebar
+        isOpen={showCreateTaskModal}
+        onClose={() => {
           setShowCreateTaskModal(false);
           setSelectedStatusForTask(null);
         }}
@@ -385,10 +422,28 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
         onCreateAndOpen={handleCreateTask}
         extensions={hierarchyDataExtensions as any}
         labels={labels}
-        linkedRecords={selectedProject ? [{ id: selectedProject.id, type: 'crm' as const, title: selectedProject.name, reference: `Project #${selectedProject.id}` }] : []}
-        project={selectedProject ? { id: selectedProject.id, name: selectedProject.name, icon: '', color: selectedProject.color || '' } : undefined}
-        statuses={statuses.map((status: any) => ({ id: status.id, name: status.name, icon: '', color: status.color || '' }))}
+        project={
+          selectedProject
+            ? {
+                id: selectedProject.id,
+                name: selectedProject.name,
+                icon: '',
+                color: selectedProject.color || '#3b82f6',
+                statuses: selectedProject.statuses,
+                labels: selectedProject.labels,
+              }
+            : undefined
+        }
+        statuses={statuses.map((status: any) => ({
+          id: status.id,
+          name: status.name,
+          icon: '',
+          color: status.color || '',
+        }))}
         selectedStatusForTask={selectedStatusForTask}
+        taskType="regular"
+        taskTypeChoices={['regular', 'recurring']}
+        lockProjectSelection={Boolean(selectedProject)}
       />
     </>
   );

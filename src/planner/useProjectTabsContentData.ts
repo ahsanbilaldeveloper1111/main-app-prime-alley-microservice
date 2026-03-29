@@ -12,7 +12,13 @@ import {
   FileText,
   Users,
 } from 'lucide-react';
-import { getProject, getRecentActivity, getOverdueTasks, listTasks } from '@utils/tasks';
+import {
+  getProject,
+  getRecentActivity,
+  getOverdueTasks,
+  listTasks,
+  type ListTasksSummary,
+} from '@utils/tasks';
 import {
   applyListTabFiltersToParams,
   deriveProjectOverviewFromDetails,
@@ -32,9 +38,18 @@ const emptyStatusCards = () => [
   { title: 'Unassigned', count: 0, icon: Users, color: '#4FC3F7', bgLight: '#E1F5FE' },
 ];
 
+export type UseProjectTabsContentDataOptions = {
+  /**
+   * When true, do not auto-fetch list tab tasks on tab switch (embedded `TasksListingPage` loads tasks).
+   * Use `ingestEmbeddedListSummary` to update stats cards from that response.
+   */
+  skipAutomaticListTabFetch?: boolean;
+};
+
 export function useProjectTabsContentData(
   selectedProjectId: string | number | undefined,
   activeTab: string,
+  options?: UseProjectTabsContentDataOptions,
 ) {
   const [assignees, setAssignees] = useState<any[]>([]);
   const [labels, setLabels] = useState<any[]>([]);
@@ -58,6 +73,14 @@ export function useProjectTabsContentData(
   const [listPage, setListPage] = useState(1);
   const [listLimit, setListLimit] = useState(15);
   const [listFilters, setListFilters] = useState<ListTabFiltersState | null>(null);
+
+  const skipAutomaticListTabFetch = Boolean(options?.skipAutomaticListTabFetch);
+
+  const ingestEmbeddedListSummary = useCallback((summary: ListTasksSummary | null | undefined) => {
+    if (summary != null && typeof summary === 'object') {
+      setListSummary(summary);
+    }
+  }, []);
 
   const [statusCards, setStatusCards] = useState(emptyStatusCards);
   const [tasksByStatus, setTasksByStatus] = useState<any[]>([]);
@@ -202,10 +225,13 @@ export function useProjectTabsContentData(
   }, [activeTab, selectedProjectId]);
 
   useEffect(() => {
+    if (skipAutomaticListTabFetch) {
+      return;
+    }
     if (activeTab === 'list' && selectedProjectId != null && selectedProjectId !== '') {
       fetchListTasksRef.current().catch(() => undefined);
     }
-  }, [activeTab, selectedProjectId]);
+  }, [activeTab, selectedProjectId, skipAutomaticListTabFetch]);
 
   const handleListApplyFilters = (filters: ListTabFiltersState) => {
     setListFilters(filters);
@@ -275,5 +301,6 @@ export function useProjectTabsContentData(
     handleListApplyFilters,
     handleListClearFilters,
     handleListPaginationChange,
+    ingestEmbeddedListSummary,
   };
 }

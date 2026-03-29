@@ -1,7 +1,15 @@
-import React, { ReactElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Button, Modal, Form } from "react-bootstrap";
+import { Button, Modal, Form, Dropdown } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
@@ -17,7 +25,13 @@ import {
   deleteTask as deleteTaskApi,
   completeTask,
   incompleteTask,
+  type ListTasksSummary,
 } from "@utils/tasks";
+import {
+  canManageProjectFromMembers,
+  getSessionPhoneOrExtension,
+} from "@planner/projectMemberRole";
+import { useSession } from "next-auth/react";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug } from "@utils/Helper";
 
@@ -33,7 +47,10 @@ interface Task {
   due_date: string | null;
   notes: string | null;
   repeat_status: string | null;
+  /** Derived from completion + due date (toggles, due column styling). */
   status: "pending" | "completed" | "overdue";
+  /** Workflow status from API when `status` relation is loaded. */
+  workflowStatus: { id: number; name: string } | null;
   rawData?: any;
 }
 
@@ -45,7 +62,12 @@ interface ApiTask {
   priority?: string;
   due_date?: string;
   due_time?: string;
-  project?: { id: number; name: string } | null;
+  project?: {
+    id: number;
+    name: string;
+    members?: unknown[];
+    owner_extension_number?: string | null;
+  } | null;
   status?: { id: number; name: string } | null;
   assignees?: Array<{ extension_number: string }>;
   is_completed?: boolean;
@@ -58,8 +80,33 @@ type HierarchyExtension = {
   name?: string;
 };
 
+export interface TasksListingPageProps {
+  /** When true (e.g. embedded on project details list tab), To-do is omitted from filters and create/edit sidebar. */
+  omitTodoTaskType?: boolean;
+  /** When set (e.g. project list tab), create/edit sidebar uses this project and locks the project field. */
+  sidebarProject?: {
+    id: number;
+    name: string;
+    color?: string;
+    statuses?: any[];
+    labels?: any[];
+    members?: unknown[];
+    owner_extension_number?: string | null;
+  };
+  /**
+   * When embedded with `sidebarProject`, use these extensions for assignee labels and skip GetHierarchyData.
+   * Should match the shape returned by GetHierarchyData `extensions` (id, extension_number, name).
+   */
+  hierarchyExtensionsFromParent?: unknown[];
+  /** Increment from parent to refetch when embedded on project detail (parent skips its own list fetch). */
+  embeddedListRefreshSignal?: number;
+  /** Receives `summary` from `listTasks` so project list-tab stats cards stay in sync. */
+  onEmbeddedListSummary?: (summary: ListTasksSummary | undefined) => void;
+}
+
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
+/** Full list; table column still shows To-do for existing rows when `omitTodoTaskType` is on. */
 const TASK_TYPE_OPTIONS = [
   { value: "regular", label: "Regular" },
   { value: "todo", label: "To-do" },
@@ -101,6 +148,63 @@ const INITIAL_FILTER_FORM = {
   status: "All Status",
 };
 
+const TASKS_TABLE_COLUMN_STORAGE_KEY = "planner-tasks-listing-visible-columns-v1";
+
+/** Must match `key` on each table column (order = default left-to-right). */
+const DEFAULT_TASK_TABLE_COLUMN_KEYS: string[] = [
+  "complete",
+  "title",
+  "task_type",
+  "assigned_to",
+  "priority",
+  "due_date",
+  "notes",
+  "workflow_status",
+  "repeat_status",
+];
+
+/**
+ * Restores the exact visible-column list from storage (order preserved).
+ * Does not re-append “missing” defaults — those are columns the user hid.
+ */
+function parseStoredTaskTableColumns(
+  raw: string | null,
+  allowedKeys: string[],
+): string[] | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const keys = parsed.filter((c): c is string => typeof c === "string");
+    if (keys.length === 0) return null;
+    const allowed = new Set(allowedKeys);
+    const valid = keys.filter((k) => allowed.has(k));
+    return valid.length > 0 ? valid : null;
+  } catch {
+    return null;
+  }
+}
+
+function readVisibleTaskColumnKeysFromStorage(): string[] {
+  if (globalThis.window === undefined) return [...DEFAULT_TASK_TABLE_COLUMN_KEYS];
+  const stored = parseStoredTaskTableColumns(
+    globalThis.localStorage.getItem(TASKS_TABLE_COLUMN_STORAGE_KEY),
+    DEFAULT_TASK_TABLE_COLUMN_KEYS,
+  );
+  return stored ?? [...DEFAULT_TASK_TABLE_COLUMN_KEYS];
+}
+
+function persistVisibleTaskColumnKeys(keys: string[]) {
+  try {
+    globalThis.localStorage.setItem(
+      TASKS_TABLE_COLUMN_STORAGE_KEY,
+      JSON.stringify(keys),
+    );
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 const TOTAL_VIEWS = 6;
 
 const POSSIBLE_TABS = [
@@ -111,6 +215,8 @@ const POSSIBLE_TABS = [
   { id: "completed", label: "Completed" },
   { id: "pending", label: "Pending" },
 ] as const;
+
+const TASK_VIEW_TAB_IDS = new Set<string>(POSSIBLE_TABS.map((t) => t.id));
 
 const DEFAULT_VISIBLE_TAB_IDS = ["all", "due_today", "overdue", "upcoming"];
 const SAVED_VIEW_STORAGE_KEY = "planner_tasks_visible_tabs";
@@ -141,6 +247,14 @@ function stripHtmlTags(input: string): string {
   // If we never closed the tag, keep the buffered text.
   if (inTag && tagBuffer.length) out.push(...tagBuffer);
   return out.join("");
+}
+
+function taskStatusColumnLabel(row: Task): string {
+  const workflowName = row.workflowStatus?.name?.trim();
+  if (workflowName) return workflowName;
+  if (row.status === "completed") return "Completed";
+  if (row.status === "overdue") return "Overdue";
+  return "Pending";
 }
 
 function applyFiltersToParams(
@@ -214,16 +328,35 @@ function applyTabToParams(
   }
 }
 
+/** Tab bar order matches POSSIBLE_TABS. */
+function normalizeVisibleTabIdsForStorage(ids: string[]): string[] {
+  const set = new Set(ids);
+  return POSSIBLE_TABS.map((t) => t.id).filter((id) => set.has(id));
+}
+
+function persistVisibleTabIds(ids: string[]) {
+  const normalized = normalizeVisibleTabIdsForStorage(ids);
+  try {
+    globalThis.localStorage.setItem(
+      SAVED_VIEW_STORAGE_KEY,
+      JSON.stringify(normalized),
+    );
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 function getInitialVisibleTabIds(): string[] {
   if (globalThis.window === undefined) return [...DEFAULT_VISIBLE_TAB_IDS];
   try {
-    const raw = localStorage.getItem(SAVED_VIEW_STORAGE_KEY);
+    const raw = globalThis.localStorage.getItem(SAVED_VIEW_STORAGE_KEY);
     if (!raw) return [...DEFAULT_VISIBLE_TAB_IDS];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [...DEFAULT_VISIBLE_TAB_IDS];
     const validIds = new Set<string>(POSSIBLE_TABS.map((t) => t.id));
     const filtered = parsed.filter((id): id is string => typeof id === "string" && validIds.has(id));
-    return filtered.length > 0 ? filtered : [...DEFAULT_VISIBLE_TAB_IDS];
+    if (filtered.length === 0) return [...DEFAULT_VISIBLE_TAB_IDS];
+    return normalizeVisibleTabIdsForStorage(filtered);
   } catch {
     return [...DEFAULT_VISIBLE_TAB_IDS];
   }
@@ -254,10 +387,41 @@ const CELL_STYLE: React.CSSProperties = {
 };
 
 // ─── Component ─────────────────────────────────────────────────────────────────
-  
-  const TasksListingPage = () => {
+
+const TasksListingPage = ({
+  omitTodoTaskType = false,
+  sidebarProject,
+  hierarchyExtensionsFromParent,
+  embeddedListRefreshSignal,
+  onEmbeddedListSummary,
+}: TasksListingPageProps) => {
     const router = useRouter();
-    const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+    const { data: session } = useSession();
+    const sessionUserPhoneOrExtension = useMemo(
+      () => getSessionPhoneOrExtension(session),
+      [session],
+    );
+    const isProjectScopedEmbed = Boolean(sidebarProject?.id);
+    const { hierarchyDataExtensions: hierarchyFromApi } = useHierarchyData(
+      ModuleSlug.USER_DIRECTORY,
+      !isProjectScopedEmbed,
+    );
+    const hierarchyDataExtensions = useMemo(() => {
+      if (isProjectScopedEmbed) {
+        return Array.isArray(hierarchyExtensionsFromParent)
+          ? hierarchyExtensionsFromParent
+          : [];
+      }
+      return hierarchyFromApi;
+    }, [isProjectScopedEmbed, hierarchyExtensionsFromParent, hierarchyFromApi]);
+
+    const taskTypeFilterOptions = useMemo(
+      () =>
+        omitTodoTaskType
+          ? TASK_TYPE_OPTIONS.filter((o) => o.value !== "todo")
+          : TASK_TYPE_OPTIONS,
+      [omitTodoTaskType],
+    );
 
     // Map API task to UI Task (uses hierarchy for assignee names)
     const mapApiTaskToTask = useCallback((apiTask: ApiTask): Task => {
@@ -307,6 +471,12 @@ const CELL_STYLE: React.CSSProperties = {
       };
       const task_type = taskTypeMap[apiTask.type || ""] || "todo";
 
+      const apiStatus = apiTask.status;
+      const workflowStatus =
+        apiStatus && typeof apiStatus === "object" && apiStatus.name != null
+          ? { id: Number(apiStatus.id), name: String(apiStatus.name) }
+          : null;
+
       return {
         id: apiTask.id,
         title: apiTask.title || "",
@@ -318,6 +488,7 @@ const CELL_STYLE: React.CSSProperties = {
         notes: apiTask.description ? stripHtmlTags(apiTask.description) : null,
         repeat_status: apiTask.type === "recurring" ? "repeat" : "no_repeat",
         status,
+        workflowStatus,
         rawData: apiTask,
       };
     }, [hierarchyDataExtensions]);
@@ -339,7 +510,7 @@ const CELL_STYLE: React.CSSProperties = {
     const [visibleTabIds, setVisibleTabIds] = useState<string[]>(() => [...DEFAULT_VISIBLE_TAB_IDS]);
     const [showAddViewModal, setShowAddViewModal] = useState(false);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       setVisibleTabIds(getInitialVisibleTabIds());
     }, []);
 
@@ -348,36 +519,44 @@ const CELL_STYLE: React.CSSProperties = {
       [visibleTabIds]
     );
 
-    // If current active tab was hidden, switch to first visible
+    // If current active tab was hidden, switch to first visible.
+    // When embedded on project detail, `router.query.tab` is the project tab (e.g. "list"), not a task view id — do not sync to URL.
     useEffect(() => {
-      if (visibleTabIds.length > 0 && !visibleTabIds.includes(activeTab)) {
-        setActiveTab(visibleTabIds[0]);
-        router.push(
-          { pathname: router.pathname, query: { ...router.query, tab: visibleTabIds[0] } },
-          undefined,
-          { shallow: true }
-        );
-      }
-    }, [visibleTabIds, activeTab, router]);
+      if (visibleTabIds.length === 0 || visibleTabIds.includes(activeTab)) return;
+      const nextId = visibleTabIds[0];
+      setActiveTab(nextId);
+      if (isProjectScopedEmbed) return;
+      router.push(
+        { pathname: router.pathname, query: { ...router.query, tab: nextId } },
+        undefined,
+        { shallow: true },
+      );
+    }, [visibleTabIds, activeTab, router, isProjectScopedEmbed]);
 
     useEffect(() => {
+      if (isProjectScopedEmbed) return;
       if (router.isReady && router.query.tab) {
         const t = String(router.query.tab);
-        if (["all", "due_today", "overdue", "upcoming", "completed", "pending"].includes(t)) setActiveTab(t);
+        if (TASK_VIEW_TAB_IDS.has(t)) setActiveTab(t);
       }
-    }, [router.isReady, router.query.tab]);
+    }, [router.isReady, router.query.tab, isProjectScopedEmbed]);
   
     const switchTab = useCallback((id: string) => {
       setActiveTab(id);
       setPager(p => ({ ...p, page: 1 }));
+      if (isProjectScopedEmbed) return;
       router.push({ pathname: router.pathname, query: { ...router.query, tab: id } }, undefined, { shallow: true });
-    }, [router]);
+    }, [router, isProjectScopedEmbed]);
 
     const toggleVisibleTab = useCallback((tabId: string, isVisible: boolean, isOnlyOne: boolean) => {
       if (isVisible && isOnlyOne) return;
       setVisibleTabIds((prev) => {
-        if (prev.includes(tabId)) return prev.filter((id) => id !== tabId);
-        return [...prev, tabId];
+        const nextRaw = prev.includes(tabId)
+          ? prev.filter((id) => id !== tabId)
+          : [...prev, tabId];
+        const next = normalizeVisibleTabIdsForStorage(nextRaw);
+        persistVisibleTabIds(next);
+        return next;
       });
     }, []);
   
@@ -410,11 +589,43 @@ const CELL_STYLE: React.CSSProperties = {
     const [showDelete, setShowDelete] = useState(false);
     const [toDelete, setToDelete] = useState<Task | null>(null);
 
+    const [visibleTaskColumnKeys, setVisibleTaskColumnKeys] = useState<string[]>(
+      () => [...DEFAULT_TASK_TABLE_COLUMN_KEYS],
+    );
+
     const tasksRef = useRef<Task[]>([]);
     useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
-    // Fetch projects for filter and sidebar
+    useLayoutEffect(() => {
+      setVisibleTaskColumnKeys(readVisibleTaskColumnKeysFromStorage());
+    }, []);
+
     useEffect(() => {
+      if (!omitTodoTaskType) return;
+      setFilters((prev) => {
+        if (prev.task_type !== "todo") return prev;
+        const next = { ...prev };
+        delete next.task_type;
+        return next;
+      });
+      setFForm((prev) =>
+        prev.task_type?.value === "todo" ? { ...prev, task_type: null } : prev,
+      );
+    }, [omitTodoTaskType]);
+
+    useEffect(() => {
+      if (!sidebarProject?.name) return;
+      setFForm((prev) =>
+        prev.project === sidebarProject.name ? prev : { ...prev, project: sidebarProject.name },
+      );
+    }, [sidebarProject?.id, sidebarProject?.name]);
+
+    // Fetch projects for filter and sidebar (skip when embedded on a project — single project only)
+    useEffect(() => {
+      if (sidebarProject?.id) {
+        setAllProjects([{ id: sidebarProject.id, name: sidebarProject.name }]);
+        return;
+      }
       const load = async () => {
         try {
           const res = await listProjects({ page: 1, limit: 100 });
@@ -426,8 +637,18 @@ const CELL_STYLE: React.CSSProperties = {
           // ignore
         }
       };
-      load();
-    }, []);
+      void load();
+    }, [sidebarProject?.id, sidebarProject?.name]);
+
+    /** Embedded only — stable list so `fetchTasks` does not re-run when `allProjects` is set in an effect. */
+    const embeddedProjectsForFilters = useMemo((): Array<{ id: number; name: string }> => {
+      if (sidebarProject?.id == null) return [];
+      return [{ id: Number(sidebarProject.id), name: sidebarProject.name }];
+    }, [sidebarProject?.id, sidebarProject?.name]);
+
+    const projectsForApplyFilters = isProjectScopedEmbed
+      ? embeddedProjectsForFilters
+      : allProjects;
 
     // ── Fetch ─────────────────────────────────────────────────────────────────────
     const fetchTasks = useCallback(async () => {
@@ -445,10 +666,17 @@ const CELL_STYLE: React.CSSProperties = {
           withRelations: ["project", "status", "assignees"],
         };
 
-        applyFiltersToParams(params, filters, allProjects, tasksRef.current);
+        applyFiltersToParams(params, filters, projectsForApplyFilters, tasksRef.current);
         applyTabToParams(params, activeTab, { today, yesterday, tomorrow });
 
+        if (sidebarProject?.id) {
+          params.project_id = sidebarProject.id;
+        }
+
         const res = await listTasks(params);
+        if (isProjectScopedEmbed && res?.summary != null) {
+          onEmbeddedListSummary?.(res.summary);
+        }
         if (res?.data) {
           const mapped = (res.data as ApiTask[]).map((task) => mapApiTaskToTask(task));
           setTasks(mapped);
@@ -469,14 +697,80 @@ const CELL_STYLE: React.CSSProperties = {
       } finally {
         setLoading(false);
       }
-    }, [pager.page, pager.perPage, pager.sortCol, pager.sortDir, filters, activeTab, mapApiTaskToTask, allProjects]);
+    }, [
+      pager.page,
+      pager.perPage,
+      pager.sortCol,
+      pager.sortDir,
+      filters,
+      activeTab,
+      mapApiTaskToTask,
+      projectsForApplyFilters,
+      sidebarProject?.id,
+      isProjectScopedEmbed,
+      onEmbeddedListSummary,
+    ]);
+
+    const prevEmbeddedRefreshSignal = useRef<number | undefined>(undefined);
+    useEffect(() => {
+      if (!isProjectScopedEmbed || embeddedListRefreshSignal === undefined) return;
+      if (prevEmbeddedRefreshSignal.current === undefined) {
+        prevEmbeddedRefreshSignal.current = embeddedListRefreshSignal;
+        return;
+      }
+      if (prevEmbeddedRefreshSignal.current === embeddedListRefreshSignal) return;
+      prevEmbeddedRefreshSignal.current = embeddedListRefreshSignal;
+      fetchTasks().catch(() => undefined);
+    }, [embeddedListRefreshSignal, isProjectScopedEmbed, fetchTasks]);
   
     useEffect(() => { fetchTasks(); }, [fetchTasks]);
+
+    const resolveProjectForMemberCheck = useCallback(
+      (row: Task): unknown => {
+        const raw = row.rawData as { project?: Record<string, unknown> | null } | undefined;
+        const p = raw?.project ?? null;
+        if (isProjectScopedEmbed && sidebarProject) {
+          const sp = sidebarProject as {
+            members?: unknown;
+            owner_extension_number?: unknown;
+          };
+          const base = p && typeof p === "object" ? p : {};
+          return {
+            ...base,
+            id: base.id ?? sidebarProject.id,
+            name: base.name ?? sidebarProject.name,
+            members: base.members ?? sp.members,
+            owner_extension_number:
+              base.owner_extension_number ?? sp.owner_extension_number,
+          };
+        }
+        return p;
+      },
+      [isProjectScopedEmbed, sidebarProject],
+    );
+
+    const canEditTaskByProjectMembers = useCallback(
+      (row: Task) =>
+        canManageProjectFromMembers(
+          resolveProjectForMemberCheck(row),
+          sessionUserPhoneOrExtension,
+        ),
+      [resolveProjectForMemberCheck, sessionUserPhoneOrExtension],
+    );
+
+    const canCreateTaskOnEmbeddedPage = useMemo(() => {
+      if (!isProjectScopedEmbed || !sidebarProject) return true;
+      return canManageProjectFromMembers(
+        sidebarProject,
+        sessionUserPhoneOrExtension,
+      );
+    }, [isProjectScopedEmbed, sidebarProject, sessionUserPhoneOrExtension]);
   
-    const openEdit = (row: Task) => {
+    const openEdit = useCallback((row: Task) => {
+      if (!canEditTaskByProjectMembers(row)) return;
       setEditingTask(row);
       setShowCreate(true);
-    };
+    }, [canEditTaskByProjectMembers]);
 
     const handleDelete = async () => {
       if (!toDelete) return;
@@ -507,7 +801,7 @@ const CELL_STYLE: React.CSSProperties = {
     // ── Columns ───────────────────────────────────────────────────────────────────
     const columns: TableColumn<Task>[] = useMemo(() => [
       {
-        key: "status", label: "Status", sortable: false, type: "custom",
+        key: "complete", label: "Done", sortable: false, type: "custom",
         render: (row) => (
           <button
             onClick={async e => {
@@ -549,17 +843,20 @@ const CELL_STYLE: React.CSSProperties = {
               {row.title}
             </a>
 
-            <button
-              className="task-edit-btn"
-              onClick={e => { e.stopPropagation(); openEdit(row); }}
-              style={{
-                ...BTN_BASE,
-                paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11,
-                flexShrink: 0,
-              }}
-            >
-              Edit
-            </button>
+            {canEditTaskByProjectMembers(row) && (
+              <button
+                className="task-edit-btn"
+                type="button"
+                onClick={e => { e.stopPropagation(); openEdit(row); }}
+                style={{
+                  ...BTN_BASE,
+                  paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11,
+                  flexShrink: 0,
+                }}
+              >
+                Edit
+              </button>
+            )}
           </div>
         ),
       },
@@ -625,10 +922,49 @@ const CELL_STYLE: React.CSSProperties = {
         ),
       },
       {
+        key: "workflow_status", label: "Status", sortable: false, type: "custom",
+        render: (row) => (
+          <span style={CELL_STYLE}>{taskStatusColumnLabel(row)}</span>
+        ),
+      },
+      {
         key: "repeat_status", label: "Repeat Status", sortable: false, type: "custom",
         render: (row) => <span style={CELL_STYLE}>{row.repeat_status || "—"}</span>,
       },
-    ], [fetchTasks, router, handleToggleComplete]);
+    ], [fetchTasks, router, handleToggleComplete, openEdit, canEditTaskByProjectMembers]);
+
+    const tableColumnsForGrid = useMemo(() => {
+      const byKey = new Map(columns.map((c) => [c.key, c]));
+      return visibleTaskColumnKeys
+        .map((k) => byKey.get(k))
+        .filter((c): c is TableColumn<Task> => c != null);
+    }, [columns, visibleTaskColumnKeys]);
+
+    const toggleTaskColumnVisibility = useCallback((columnKey: string) => {
+      setVisibleTaskColumnKeys((prev) => {
+        const next = prev.includes(columnKey)
+          ? prev.filter((k) => k !== columnKey)
+          : [...prev, columnKey];
+        if (next.length === 0) {
+          toast.error("Keep at least one column visible");
+          return prev;
+        }
+        persistVisibleTaskColumnKeys(next);
+        return next;
+      });
+    }, []);
+
+    const selectAllTaskColumns = useCallback(() => {
+      const next = [...DEFAULT_TASK_TABLE_COLUMN_KEYS];
+      setVisibleTaskColumnKeys(next);
+      persistVisibleTaskColumnKeys(next);
+    }, []);
+
+    const resetTaskColumnsToDefault = useCallback(() => {
+      const next = [...DEFAULT_TASK_TABLE_COLUMN_KEYS];
+      setVisibleTaskColumnKeys(next);
+      persistVisibleTaskColumnKeys(next);
+    }, []);
   
     const actions: TableAction<Task>[] = useMemo(() => [], []);
   
@@ -664,7 +1000,7 @@ const CELL_STYLE: React.CSSProperties = {
         options: STATUS_OPTIONS },
       { id: "task_type", label: "Task Type", type: "select", value: fForm.task_type,
         onChange: v => setFForm(p => ({ ...p, task_type: v })),
-        options: TASK_TYPE_OPTIONS, placeholder: "Select task type...", isClearable: true },
+        options: taskTypeFilterOptions, placeholder: "Select task type...", isClearable: true },
       { id: "priority", label: "Priority", type: "select", value: fForm.priority,
         onChange: v => setFForm(p => ({ ...p, priority: v })),
         options: PRIORITY_OPTIONS, placeholder: "Select priority...", isClearable: true },
@@ -693,7 +1029,7 @@ const CELL_STYLE: React.CSSProperties = {
       {
         id: "task_type",
         label: fForm.task_type
-          ? TASK_TYPE_OPTIONS.find(o => o.value === fForm.task_type?.value)?.label || "Task type"
+          ? TASK_TYPE_OPTIONS.find((o) => o.value === fForm.task_type?.value)?.label || "Task type"
           : "Task type",
         icon: <ChevronDown size={12} />,
         showDropdown: true,
@@ -790,25 +1126,28 @@ const CELL_STYLE: React.CSSProperties = {
             </div>
   
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button
-                onClick={() => { setEditingTask(null); setShowCreate(true); }}
-                style={{ 
-                  ...BTN_BASE,
-                  backgroundColor: "#000",
-                  background: "#000",
-                  borderColor: "#000", 
-                  color: "#fff", 
-                  fontWeight: 600,
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = "#333";
-                  e.currentTarget.style.background = "#333";
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = "#000";
-                  e.currentTarget.style.background = "#000";
-                }}
-              >Create task</button>
+              {canCreateTaskOnEmbeddedPage && (
+                <button
+                  type="button"
+                  onClick={() => { setEditingTask(null); setShowCreate(true); }}
+                  style={{
+                    ...BTN_BASE,
+                    backgroundColor: "#000",
+                    background: "#000",
+                    borderColor: "#000",
+                    color: "#fff",
+                    fontWeight: 600,
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = "#333";
+                    e.currentTarget.style.background = "#333";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = "#000";
+                    e.currentTarget.style.background = "#000";
+                  }}
+                >Create task</button>
+              )}
             </div>
           </div>
   
@@ -892,7 +1231,11 @@ const CELL_STYLE: React.CSSProperties = {
             {/* All Views — enable all tabs, then hide this button */}
             {!hasAllViews && (
               <button
-                onClick={() => setVisibleTabIds(POSSIBLE_TABS.map((t) => t.id))}
+                onClick={() => {
+                  const all = POSSIBLE_TABS.map((t) => t.id);
+                  setVisibleTabIds(all);
+                  persistVisibleTabIds(all);
+                }}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -1148,7 +1491,7 @@ const CELL_STYLE: React.CSSProperties = {
                         >
                           All task types
                         </button>
-                        {TASK_TYPE_OPTIONS.map((option) => {
+                        {taskTypeFilterOptions.map((option) => {
                           const selected = fForm.task_type?.value === option.value;
                           return (
                             <button
@@ -1418,14 +1761,46 @@ const CELL_STYLE: React.CSSProperties = {
               </Button>
             </div>
   
-            {/* Edit columns */}
-            <Button
-              variant="outline-secondary"
-              style={{
-                ...BTN_BASE, fontSize: 12,
-                backgroundColor: "#fff", borderColor: "#8a8a8a", color: "#141414",
-              }}
-            >Edit columns</Button>
+            <Dropdown align="end" autoClose="outside">
+              <Dropdown.Toggle
+                variant="outline-secondary"
+                id="tasks-edit-columns-dropdown"
+                style={{
+                  ...BTN_BASE,
+                  fontSize: 12,
+                  backgroundColor: "#fff",
+                  borderColor: "#8a8a8a",
+                  color: "#141414",
+                }}
+              >
+                Edit columns
+              </Dropdown.Toggle>
+              <Dropdown.Menu style={{ minWidth: 240 }}>
+                {columns.map((col) => (
+                  <Dropdown.Item
+                    key={col.key}
+                    as="div"
+                    className="px-3 py-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Form.Check
+                      type="checkbox"
+                      id={`planner-task-col-${col.key}`}
+                      label={col.label || col.key}
+                      checked={visibleTaskColumnKeys.includes(col.key)}
+                      onChange={() => toggleTaskColumnVisibility(col.key)}
+                    />
+                  </Dropdown.Item>
+                ))}
+                <Dropdown.Divider />
+                <Dropdown.Item as="button" type="button" onClick={selectAllTaskColumns}>
+                  Select all
+                </Dropdown.Item>
+                <Dropdown.Item as="button" type="button" onClick={resetTaskColumnsToDefault}>
+                  Reset to default
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
           </div>
   
           {/* ══════════════════════════════════════════════════════
@@ -1434,7 +1809,7 @@ const CELL_STYLE: React.CSSProperties = {
           <div style={{ flex: 1, overflow: "hidden" }}>
             <GenericTable
               data={tasks}
-              columns={columns}
+              columns={tableColumnsForGrid}
               actions={actions}
               showActions={false}
               selectable
@@ -1510,10 +1885,26 @@ const CELL_STYLE: React.CSSProperties = {
             await fetchTasks();
           }}
           extensions={hierarchyDataExtensions as any}
-          labels={[]}
+          labels={sidebarProject?.labels ?? []}
+          project={
+            sidebarProject
+              ? {
+                  id: sidebarProject.id,
+                  name: sidebarProject.name,
+                  icon: "",
+                  color: sidebarProject.color || "#3b82f6",
+                  statuses: sidebarProject.statuses,
+                  labels: sidebarProject.labels,
+                }
+              : undefined
+          }
           task={editingTask?.rawData ?? editingTask}
           isEdit={!!editingTask}
           taskType="regular"
+          taskTypeChoices={
+            omitTodoTaskType ? (["regular", "recurring"] as const) : undefined
+          }
+          lockProjectSelection={Boolean(sidebarProject)}
         />
   
         {/* ── Delete confirmation ── */}
