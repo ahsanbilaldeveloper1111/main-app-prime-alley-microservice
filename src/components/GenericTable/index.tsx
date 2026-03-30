@@ -1735,11 +1735,6 @@ const GenericTable = <T extends Record<string, any>>({
     );
   };
 
-  const fullTableColSpan =
-    (selectable ? 1 : 0) +
-    visibleColumns.length +
-    (showActions && actions.length > 0 ? 1 : 0);
-
   return (
     <div className="generic-table-container">
       {/* Right‑click context menu */}
