@@ -394,8 +394,18 @@ function mapWatcherIdsFromEditTask(editTask: PlannerEditTask, extensions: Extens
   return [];
 }
 
+/** Stringify type-like API values without producing `[object Object]`. */
+function unknownToPrimitiveString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return String(value);
+  if (typeof value === "bigint") return String(value);
+  return "";
+}
+
 function plannerTypeFromLowerString(raw: unknown): PlannerTaskType | null {
-  const t = String(raw ?? "").toLowerCase();
+  const t = unknownToPrimitiveString(raw).trim().toLowerCase();
   if (t === "todo") return "todo";
   if (t === "recurring") return "recurring";
   if (t === "regular") return "regular";
@@ -445,8 +455,8 @@ function normalizeEditTaskType(editTask: PlannerEditTask): PlannerTaskType {
   }
 
   if (!inferRecurringFromScheduleScalars(editTask)) return "regular";
-  const t = String(editTask.type ?? "").toLowerCase();
-  const tt = String(asRecord.task_type ?? "").toLowerCase();
+  const t = unknownToPrimitiveString(editTask.type).trim().toLowerCase();
+  const tt = unknownToPrimitiveString(asRecord.task_type).trim().toLowerCase();
   if (t === "todo" || tt === "todo") return "regular";
   return "recurring";
 }
@@ -533,7 +543,8 @@ function repeatOnForEditTask(editTask: PlannerEditTask, frequency: string): stri
   if (freq === "weekly") {
     return normalizeWeeklyRepeatOnFromApi(rawOn);
   }
-  return rawOn == null ? "" : String(rawOn);
+  if (rawOn == null) return "";
+  return unknownToPrimitiveString(rawOn);
 }
 
 function readParentTaskFromRaw(
@@ -586,7 +597,9 @@ function buildInitialFormFromEdit(
   const assigneeIds = mapAssigneeIdsFromEditTask(editTask, extensions);
   const watcherIds = mapWatcherIdsFromEditTask(editTask, extensions);
   const taskTypeVal = normalizeEditTaskType(editTask);
-  const frequency = String(pickRecurringScalar(editTask, "frequency") || "weekly");
+  const freqRaw = pickRecurringScalar(editTask, "frequency");
+  const freqStr = unknownToPrimitiveString(freqRaw).trim();
+  const frequency = freqStr === "" ? "weekly" : freqStr;
   const repeatInterval = Math.max(1, Number(pickRecurringScalar(editTask, "repeat_interval")) || 1);
   const repeatOn = repeatOnForEditTask(editTask, frequency);
   const dueTimeRaw = pickRecurringScalar(editTask, "due_time");
@@ -1073,7 +1086,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    void fetchLinkRecordsForSearch(searchQuery, formData.projectId);
+    fetchLinkRecordsForSearch(searchQuery, formData.projectId).catch(() => undefined);
   }, [isOpen, fetchLinkRecordsForSearch]);
 
   useEffect(() => {
@@ -1432,7 +1445,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
       setSearchQuery(value);
-      void fetchLinkRecordsForSearch(value, formData.projectId);
+      fetchLinkRecordsForSearch(value, formData.projectId).catch(() => undefined);
     },
     [formData.projectId, fetchLinkRecordsForSearch],
   );
@@ -1569,7 +1582,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       projectId: newProjectId,
       statusId: null,
     }));
-    void fetchLinkRecordsForSearch(searchQuery, newProjectId);
+    fetchLinkRecordsForSearch(searchQuery, newProjectId).catch(() => undefined);
   };
 
   const sidebarEditTaskId =
@@ -2585,7 +2598,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           {onCreateAndOpen && !isEdit && (
             <button
               type="button"
-              onClick={(e) => void submitPlannerTask(e, onCreateAndOpen)}
+              onClick={(e) => {
+                submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
+              }}
               disabled={isSubmitting}
               style={{
                 padding: "8px 20px",

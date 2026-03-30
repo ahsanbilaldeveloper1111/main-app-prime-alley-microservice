@@ -93,11 +93,21 @@ function pickTaskScalar(task: Record<string, unknown>, key: string): unknown {
   return undefined;
 }
 
+/** Coerce API values for display/type checks; objects become '' to avoid '[object Object]'. */
+function plannerDetailScalarString(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return '';
+}
+
 function plannerTaskTypeFromTask(
   task: Record<string, unknown> | null | undefined,
 ): 'todo' | 'regular' | 'recurring' {
   if (task == null) return 'regular';
-  const t = String(task.type ?? task.task_type ?? '').toLowerCase();
+  const t = plannerDetailScalarString(task.type ?? task.task_type).toLowerCase();
   if (t === 'todo') return 'todo';
   if (t === 'recurring') return 'recurring';
   // Explicit API type wins; do not infer recurring from leftover schedule fields.
@@ -105,7 +115,7 @@ function plannerTaskTypeFromTask(
   if (task.is_recurring === true || task.is_recurring === 1) return 'recurring';
   const nested = readNestedRecurringRecord(task);
   if (nested) {
-    const nt = String(nested.type ?? '').toLowerCase();
+    const nt = plannerDetailScalarString(nested.type).toLowerCase();
     if (nt === 'recurring') return 'recurring';
     if (nested.is_recurring === true || nested.is_recurring === 1) return 'recurring';
   }
@@ -177,14 +187,14 @@ function taskTypeBadgeLabel(kind: 'todo' | 'regular' | 'recurring'): string {
 }
 
 function formatFrequencyLabel(raw: unknown): string {
-  const s = raw == null ? '' : String(raw).trim().toLowerCase();
+  const s = plannerDetailScalarString(raw).trim().toLowerCase();
   if (!s) return '—';
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function formatRepeatOnForDetail(frequency: unknown, repeatOn: unknown): string {
-  const f = String(frequency ?? '').toLowerCase();
-  const ro = repeatOn == null ? '' : String(repeatOn).trim();
+  const f = plannerDetailScalarString(frequency).toLowerCase();
+  const ro = plannerDetailScalarString(repeatOn).trim();
   if (!ro) return '—';
   if (f === 'weekly') {
     const day = ro.toLowerCase();
@@ -196,7 +206,8 @@ function formatRepeatOnForDetail(frequency: unknown, repeatOn: unknown): string 
 
 function formatDueTimeForDetail(raw: unknown): string {
   if (raw == null || raw === '') return '—';
-  const s = String(raw).trim();
+  const s = plannerDetailScalarString(raw).trim();
+  if (!s) return '—';
   if (s.includes('T')) {
     const d = new Date(s);
     if (!Number.isNaN(d.getTime())) {
@@ -675,7 +686,7 @@ function TaskCommentsTabPanel({
 }
 
 function recurringIntervalSuffix(frequencyRaw: unknown): string {
-  const f = String(frequencyRaw ?? '').toLowerCase();
+  const f = plannerDetailScalarString(frequencyRaw).toLowerCase();
   if (f === 'daily') return 'day(s)';
   if (f === 'weekly') return 'week(s)';
   if (f === 'monthly') return 'month(s)';
@@ -699,8 +710,8 @@ function TaskDetailRecurringSchedulePanel({
   const pick = (key: string) => pickTaskScalar(taskRecord, key);
   const freq = pick('frequency');
   const intervalRaw = pick('repeat_interval');
-  const intervalMain =
-    intervalRaw != null && intervalRaw !== '' ? String(intervalRaw) : '—';
+  const intervalStr = plannerDetailScalarString(intervalRaw);
+  const intervalMain = intervalStr === '' ? '—' : intervalStr;
   const suffix = typeof freq === 'string' ? recurringIntervalSuffix(freq) : '';
 
   return (
@@ -1240,7 +1251,9 @@ const TaskDetailPage = () => {
                   <Button
                     variant="link"
                     className="p-0 d-inline-flex align-items-center gap-1"
-                    onClick={() => void router.push(`/planner/tasks/${String(task.parent.id)}`)}
+                    onClick={() => {
+                      router.push(`/planner/tasks/${String(task.parent.id)}`).catch(() => undefined);
+                    }}
                   >
                     <ListTodo size={16} className="text-muted" />
                     {task.parent.title ||
@@ -1294,7 +1307,9 @@ const TaskDetailPage = () => {
                           <Button
                             variant="link"
                             className="p-0"
-                            onClick={() => void router.push(`/planner/tasks/${String(child.id)}`)}
+                            onClick={() => {
+                              router.push(`/planner/tasks/${String(child.id)}`).catch(() => undefined);
+                            }}
                           >
                             {child.title || child.reference || `Task #${child.id}`}
                           </Button>
