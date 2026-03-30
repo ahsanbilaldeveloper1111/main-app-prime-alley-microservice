@@ -62,24 +62,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               
             }}
           >
-            {/* Icon */}
-            {/* {IconComponent && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
-                <span
-                  style={{
-                    width: '30px',
-                    height: '30px',
-                    borderRadius: '999px',
-                    background: iconBgColor,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <IconComponent size={16} color={iconColor} />
-                </span>
-              </div>
-            )} */}
+          
 
             {/* Title */}
             <div style={{
