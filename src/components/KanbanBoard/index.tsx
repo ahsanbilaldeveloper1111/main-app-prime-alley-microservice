@@ -1,5 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { FileText, MapPin, Mail, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
+import type { BoundTableContextMenuItem } from "@components/GenericTable";
+import "@assets/css/GenericTable.css";
+import type { TableAction } from "@components/GenericTable";
 
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 const TEAL = "#006162";
@@ -29,11 +32,17 @@ export interface KanbanBoardProps {
     action: "view" | "pin" | "email" | "external",
     card: KanbanCardData
   ) => void;
+  /** Optional right-click actions for each card (mirrors `GenericTable` context menu behavior). */
+  cardActions?: TableAction<any>[];
+  /** Row object passed into actions; defaults to `card.raw`. */
+  getCardContextMenuRow?: (card: KanbanCardData) => any;
   onCardMove?: (
     cardId: string | number,
     fromColumnId: string,
     toColumnId: string
   ) => void;
+  /** Right-click menu items (same rules as GenericTable row actions). */
+  cardContextMenuItems?: (card: KanbanCardData) => BoundTableContextMenuItem[];
   searchValue?: string;
 }
 
@@ -91,14 +100,16 @@ const Card: React.FC<{
   columnId: string;
   onCardClick?: (c: KanbanCardData) => void;
   onCardAction?: (a: "view" | "pin" | "email" | "external", c: KanbanCardData) => void;
+  onCardContextMenu?: (e: React.MouseEvent<HTMLDivElement>, c: KanbanCardData) => void;
   onDragStart?: (e: React.DragEvent, id: string | number, colId: string) => void;
-}> = ({ card, columnId, onCardClick, onCardAction, onDragStart }) => {
+}> = ({ card, columnId, onCardClick, onCardAction, onCardContextMenu, onDragStart }) => {
   const [hov, setHov] = useState(false);
 
   return (
     <div
       draggable
       onDragStart={(e) => onDragStart?.(e, card.id, columnId)}
+      onContextMenu={(e) => onCardContextMenu?.(e, card)}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
@@ -364,11 +375,15 @@ const Column: React.FC<{
   onToggle: () => void;
   onCardClick?: (c: KanbanCardData) => void;
   onCardAction?: (a: "view" | "pin" | "email" | "external", c: KanbanCardData) => void;
+  onCardContextMenu?: (
+    e: React.MouseEvent<HTMLDivElement>,
+    c: KanbanCardData,
+  ) => void;
   onDragStart?: (e: React.DragEvent, id: string | number, colId: string) => void;
   onDrop?: (e: React.DragEvent, colId: string) => void;
 }> = ({
   col, filteredCards, isCollapsed, isLast,
-  onToggle, onCardClick, onCardAction, onDragStart, onDrop,
+  onToggle, onCardClick, onCardAction, onCardContextMenu, onDragStart, onDrop,
 }) => {
   const [dragOver, setDragOver] = useState(false);
 
@@ -442,6 +457,7 @@ const Column: React.FC<{
                 columnId={col.id}
                 onCardClick={onCardClick}
                 onCardAction={onCardAction}
+                onCardContextMenu={onCardContextMenu}
                 onDragStart={onDragStart}
               />
             ))
@@ -458,14 +474,55 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   columns: initialColumns,
   onCardClick,
   onCardAction,
+  cardActions,
+  getCardContextMenuRow,
   onCardMove,
+  cardContextMenuItems,
   searchValue,
 }) => {
   const [columns, setColumns]     = useState<KanbanColumnDef[]>(initialColumns);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [cardContextMenu, setCardContextMenu] = useState<{
+    x: number;
+    y: number;
+    items: BoundTableContextMenuItem[];
+  } | null>(null);
+  const cardContextMenuRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ cardId: string | number; fromColId: string } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    card: KanbanCardData;
+  } | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { setColumns(initialColumns); }, [initialColumns]);
+
+  useEffect(() => {
+    if (!cardContextMenu) return;
+    const close = () => setCardContextMenu(null);
+    const onMouseDown = (e: MouseEvent) => {
+      if (
+        cardContextMenuRef.current &&
+        !cardContextMenuRef.current.contains(e.target as Node)
+      )
+        close();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [cardContextMenu]);
+
+  const getRow = useCallback(
+    (card: KanbanCardData) => getCardContextMenuRow?.(card) ?? card.raw,
+    [getCardContextMenuRow],
+  );
 
   const getFiltered = useCallback(
     (cards: KanbanCardData[]) => {
@@ -479,6 +536,106 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     },
     [searchValue]
   );
+
+  type ContextMenuItem = {
+    label: string;
+    icon?: React.ReactNode;
+    onClick: (row: any) => void;
+    divider?: boolean;
+    className?: string;
+    disabled?: boolean;
+    disabledTitle?: string;
+    disabledClassName?: string;
+  };
+
+  const getContextMenuItems = useCallback(
+    (row: any): ContextMenuItem[] => {
+      const actions = cardActions ?? [];
+      const items: ContextMenuItem[] = [];
+      for (const action of actions) {
+        if (action.show && !action.show(row)) continue;
+
+        if (action.dropdown) {
+          const opts = action.dropdown.options.filter(
+            (o) => !o.show || o.show(row),
+          );
+          for (const o of opts) {
+            items.push({
+              label: o.label,
+              icon: o.icon,
+              onClick: o.onClick,
+              divider: o.divider ?? false,
+              className: o.className,
+            });
+          }
+          continue;
+        }
+
+        if (action.onClick && !action.render) {
+          const isDisabled = action.disabled?.(row) ?? false;
+          items.push({
+            label: action.label,
+            icon: action.icon,
+            onClick: action.onClick,
+            divider: false,
+            className: isDisabled
+              ? action.disabledClassName || "text-muted"
+              : action.className,
+            disabled: isDisabled,
+            disabledTitle: action.disabledTitle,
+            disabledClassName: action.disabledClassName,
+          });
+        }
+      }
+      return items;
+    },
+    [cardActions],
+  );
+
+  const handleCardContextMenu = useCallback(
+    (e: React.MouseEvent, card: KanbanCardData) => {
+      if (cardContextMenuItems) {
+        const items = cardContextMenuItems(card);
+        if (items.length > 0) {
+          e.preventDefault();
+          e.stopPropagation();
+          setCardContextMenu({ x: e.clientX, y: e.clientY, items });
+          return;
+        }
+      }
+      if (!cardActions || cardActions.length === 0) return;
+      const row = getRow(card);
+      const actionItems = getContextMenuItems(row);
+      if (actionItems.length === 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setContextMenu({ x: e.clientX, y: e.clientY, card });
+    },
+    [cardContextMenuItems, cardActions, getRow, getContextMenuItems],
+  );
+
+  // Close context menu on outside click or Escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onMouseDown = (e: MouseEvent) => {
+      if (
+        contextMenuRef.current &&
+        !contextMenuRef.current.contains(e.target as Node)
+      ) {
+        close();
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [contextMenu]);
 
   const handleDragStart = (e: React.DragEvent, cardId: string | number, fromColId: string) => {
     drag.current = { cardId, fromColId };
@@ -509,6 +666,59 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <>
+      {cardContextMenu && (
+        <div
+          ref={cardContextMenuRef}
+          className="gt-context-menu"
+          style={{ left: cardContextMenu.x, top: cardContextMenu.y }}
+          role="menu"
+        >
+          {cardContextMenu.items.map((item, idx) => (
+            <React.Fragment key={idx}>
+              {item.disabled && item.disabledTitle ? (
+                <span
+                  className="gt-context-menu-disabled-wrapper"
+                  title={item.disabledTitle}
+                >
+                  <button
+                    type="button"
+                    className={`gt-context-menu-item ${item.className || ""}`}
+                    disabled
+                    onClick={(e) => e.stopPropagation()}
+                    role="menuitem"
+                  >
+                    {item.icon && (
+                      <span className="gt-context-menu-icon">{item.icon}</span>
+                    )}
+                    {item.label}
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className={`gt-context-menu-item ${item.className || ""}`}
+                  disabled={item.disabled}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!item.disabled) {
+                      item.onClick();
+                      setCardContextMenu(null);
+                    }
+                  }}
+                  role="menuitem"
+                  title={item.disabled ? item.disabledTitle : undefined}
+                >
+                  {item.icon && (
+                    <span className="gt-context-menu-icon">{item.icon}</span>
+                  )}
+                  {item.label}
+                </button>
+              )}
+              {item.divider && <div className="gt-context-menu-divider" />}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
       <style>{`
         .kb-scroll::-webkit-scrollbar { height: 6px; }
         .kb-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -517,6 +727,59 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
         .kb-col-cards::-webkit-scrollbar-track { background: transparent; }
         .kb-col-cards::-webkit-scrollbar-thumb { background: #c8c8c8; border-radius: 3px; }
       `}</style>
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="gt-context-menu"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          role="menu"
+        >
+          {getContextMenuItems(getRow(contextMenu.card)).map((item) => (
+            <React.Fragment key={`${item.label}-${item.className ?? ""}`}>
+              {item.disabled && item.disabledTitle ? (
+                <span
+                  className="gt-context-menu-disabled-wrapper"
+                  title={item.disabledTitle}
+                >
+                  <button
+                    type="button"
+                    className={`gt-context-menu-item ${item.className || ""}`}
+                    disabled
+                    onClick={(e) => e.stopPropagation()}
+                    role="menuitem"
+                  >
+                    {item.icon && (
+                      <span className="gt-context-menu-icon">{item.icon}</span>
+                    )}
+                    {item.label}
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className={`gt-context-menu-item ${item.className || ""}`}
+                  disabled={item.disabled}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!item.disabled) {
+                      item.onClick(getRow(contextMenu.card));
+                      setContextMenu(null);
+                    }
+                  }}
+                  role="menuitem"
+                  title={item.disabled ? item.disabledTitle : undefined}
+                >
+                  {item.icon && (
+                    <span className="gt-context-menu-icon">{item.icon}</span>
+                  )}
+                  {item.label}
+                </button>
+              )}
+              {item.divider && <div className="gt-context-menu-divider" />}
+            </React.Fragment>
+          ))}
+        </div>
+      )}
       <div
         className="kb-scroll"
         style={{
@@ -546,6 +809,11 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onToggle={() => setCollapsed((p) => ({ ...p, [col.id]: !p[col.id] }))}
               onCardClick={onCardClick}
               onCardAction={onCardAction}
+              onCardContextMenu={
+                cardContextMenuItems || (cardActions && cardActions.length > 0)
+                  ? handleCardContextMenu
+                  : undefined
+              }
               onDragStart={handleDragStart}
               onDrop={handleDrop}
             />

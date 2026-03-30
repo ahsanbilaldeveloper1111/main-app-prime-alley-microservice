@@ -7,7 +7,6 @@ import React, {
   useMemo,
   useRef,
 } from "react";
-import parsePhoneNumber from "libphonenumber-js";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import Layout from "@layout/index";
@@ -24,8 +23,6 @@ import {
   Badge,
   InputGroup,
   Dropdown,
-  Popover,
-  OverlayTrigger,
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
@@ -36,17 +33,13 @@ import moment from "moment";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import {
-  FiUpload,
   FiDatabase,
   FiSearch,
   FiFilter,
   FiEye,
   FiEdit,
-  FiUser,
   FiUsers,
   FiPhone,
-  FiPlay,
-  FiClock,
   FiX,
   FiCalendar,
   FiTarget,
@@ -60,7 +53,6 @@ import {
   ChevronDown,
   X,
   AlertCircle as AlertCircleIcon,
-  UserPlus,
   ArrowUp,
   ArrowDown,
   Download,
@@ -73,7 +65,6 @@ import {
   Trash2,
   MoreVertical,
   Phone as PhoneIcon,
-  Phone,
   Mail,
   User,
   History,
@@ -127,10 +118,6 @@ let customFieldIdCounter = 0;
 const createCustomFieldId = () => `custom-field-${Date.now()}-${customFieldIdCounter++}`;
 import {
   ModuleSlug,
-  formatDuration,
-  formatDateTimeToLocal,
-  GlobalDateFormat,
-  GlobalTimeFormat,
   GlobalDateTimeFormat,
   RECORD_TYPES,
 } from "@utils/Helper";
@@ -138,7 +125,6 @@ import PageSummaryGrid from "@components/PageSummaryGrid";
 import { useCti } from "../../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
-import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
@@ -205,141 +191,6 @@ const DeleteModalAdditionalInfo: React.FC<DeleteModalAdditionalInfoProps> = ({
   }
 
   return null;
-};
-
-const PhoneContainer = ({
-  phone,
-  onClick,
-}: {
-  phone: string;
-  onClick?: () => void;
-}) => {
-  const [showPopover, setShowPopover] = useState(false);
-
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
-  const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-
-  const phoneBadge = (
-    <Badge
-      bg="info"
-      className="bg-opacity-10 text-dark"
-      style={{ cursor: onClick ? "pointer" : "default" }}
-      onMouseEnter={() => setShowPopover(true)}
-      onMouseLeave={() => setShowPopover(false)}
-    >
-      <div className="d-flex align-items-center gap-2">
-        {phoneNumber?.countryCode && (
-          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-        )}
-        {phoneNumber.phone}
-      </div>
-    </Badge>
-  );
-
-  if (!onClick) {
-    return phoneBadge;
-  }
-
-  const popover = (
-    <Popover
-      id={`phone-popover-${phone}`}
-      style={{
-        maxWidth: "160px",
-        pointerEvents: "auto",
-        border: "none",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-        borderRadius: "8px",
-      }}
-      onMouseEnter={() => setShowPopover(true)}
-      onMouseLeave={() => setShowPopover(false)}
-    >
-      <Popover.Body
-        className="p-0"
-        style={{
-          padding: "8px",
-          borderRadius: "8px",
-        }}
-      >
-        <Button
-          variant="default"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-            setShowPopover(false);
-          }}
-          className="d-flex align-items-center justify-content-center gap-2 w-100"
-          style={{
-            fontSize: "13px",
-            fontWeight: "600",
-            padding: "8px 16px",
-            borderRadius: "6px",
-            border: "1px solid #dee2e6",
-            backgroundColor: "transparent",
-            color: "#212529",
-            boxShadow: "none",
-            transition: "all 0.2s ease",
-            minHeight: "36px",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.backgroundColor = "#f8f9fa";
-            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.boxShadow = "none";
-          }}
-        >
-          <Phone size={18} style={{ strokeWidth: 2.5 }} />
-          <span>Call</span>
-        </Button>
-      </Popover.Body>
-    </Popover>
-  );
-
-  return (
-    <OverlayTrigger
-      show={showPopover}
-      placement="top"
-      overlay={popover}
-      trigger={[]}
-    >
-      <span style={{ display: "inline-block" }}>{phoneBadge}</span>
-    </OverlayTrigger>
-  );
 };
 
 const KPICard: React.FC<KPICardData> = ({
@@ -592,11 +443,8 @@ const CrmProspectsManagement = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const requestIdRef = useRef(0);
-  const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedDataItem, setSelectedDataItem] = useState<CrmDataItem | null>(
     null,
@@ -607,11 +455,7 @@ const CrmProspectsManagement = () => {
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [showAfterCallModal, setShowAfterCallModal] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
-  const [selectedCampaigns, setSelectedCampaigns] = useState<readonly any[]>(
-    [],
-  );
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
-  const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
   const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
   const [convertingProspectId, setConvertingProspectId] = useState<
     number | null
@@ -651,9 +495,6 @@ const CrmProspectsManagement = () => {
       id: number;
     }>
   >([]);
-  const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
-    {},
-  );
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
   // After Call modal states
@@ -689,7 +530,6 @@ const CrmProspectsManagement = () => {
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedProspect, setSelectedProspect] = useState<any>(null);
   const sidebarProspectFetchTokenRef = useRef(0);
-  const [showFilterBar, setShowFilterBar] = useState(false);
 
   // Add Contacts button states
   const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
@@ -726,21 +566,9 @@ const CrmProspectsManagement = () => {
   const [contactFormLoading, setContactFormLoading] = useState(false);
 
   // Call recordings state
-  const [callRecordings, setCallRecordings] = useState<any[]>([]);
-  const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
-  const [callRecordingsTotal, setCallRecordingsTotal] = useState(0);
   const [selectedRecording, setSelectedRecording] = useState<any>(null);
   const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
     useState(false);
-  const [downloadingRecordings, setDownloadingRecordings] = useState<
-    Set<string>
-  >(new Set());
-  const [downloadProgress, setDownloadProgress] = useState<
-    Record<string, number>
-  >({});
-
-  const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
-  const [showAllProspectStats, setShowAllProspectStats] = useState(false);
 
   // Valid filter IDs
   const validFilters = ["all", "scheduled", "has_leads"];
@@ -1011,67 +839,7 @@ const CrmProspectsManagement = () => {
     { value: "no_answer", label: "No Answer", color: "light" },
   ];
 
-  // Static call history data with varied information
-  const getCallHistory = (entryId: number) => {
-    const histories = [
-      {
-        id: 1,
-        duration: "2:34",
-        endReason: "answered",
-        disposition: "interested",
-        calledAt: "2024-01-15T10:30:00Z",
-        recordingUrl: "https://example.com/recording1.mp3",
-        comment:
-          "Client showed interest in our premium package. Asked for pricing details and wants to schedule a demo next week.",
-      },
-      {
-        id: 2,
-        duration: "0:45",
-        endReason: "busy",
-        disposition: "callback_requested",
-        calledAt: "2024-01-14T14:20:00Z",
-        recordingUrl: "https://example.com/recording2.mp3",
-        comment:
-          "Line was busy. Left voicemail with callback request for tomorrow morning.",
-      },
-      {
-        id: 3,
-        duration: "1:12",
-        endReason: "no_answer",
-        disposition: "no_answer",
-        calledAt: "2024-01-13T09:15:00Z",
-        recordingUrl: "https://example.com/recording3.mp3",
-        comment:
-          "No answer after multiple rings. Will try again later in the day.",
-      },
-      {
-        id: 4,
-        duration: "3:45",
-        endReason: "answered",
-        disposition: "not_interested",
-        calledAt: "2024-01-12T16:20:00Z",
-        recordingUrl: "https://example.com/recording4.mp3",
-        comment:
-          "Client politely declined. Not interested in our services at this time. Asked to be removed from calling list.",
-      },
-      {
-        id: 5,
-        duration: "4:12",
-        endReason: "answered",
-        disposition: "follow_up",
-        calledAt: "2024-01-11T11:30:00Z",
-        recordingUrl: "https://example.com/recording5.mp3",
-        comment:
-          "Client needs to discuss with their team. Will follow up in 2 weeks with additional information about our enterprise solutions.",
-      },
-    ];
-
-    // Return different histories based on entryId for variety
-    return histories.slice(0, (entryId % 3) + 2);
-  };
-
   // History data state
-  const [historyData, setHistoryData] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyPagination, setHistoryPagination] = useState({
     current_page: 1,
@@ -1102,7 +870,6 @@ const CrmProspectsManagement = () => {
         });
       }
 
-      setCampaignsById((prev) => ({ ...prev, ...campaignsMap }));
       return campaignsMap;
     } catch (error) {
       console.error("Failed to fetch campaigns by IDs:", error);
@@ -1117,7 +884,6 @@ const CrmProspectsManagement = () => {
         setHistoryLoading(true);
         const response = await getCrmDataHistory(page, 15);
         console.log("ZE HISTORY DATA", response);
-        setHistoryData(response.data);
         setHistoryPagination(response.pagination);
 
         // Extract campaign IDs from history data and fetch campaign names
@@ -1134,7 +900,6 @@ const CrmProspectsManagement = () => {
         }
       } catch (error) {
         console.error("Failed to fetch history data:", error);
-        setHistoryData([]);
       } finally {
         setHistoryLoading(false);
       }
@@ -1610,7 +1375,6 @@ const CrmProspectsManagement = () => {
         campaignsResponse.data.forEach((campaign: any) => {
           campaignsMap[campaign.id] = campaign.name;
         });
-        setCampaignsById(campaignsMap);
       } catch (error) {
         console.error("Failed to load campaigns:", error);
         // Fallback to empty array
@@ -2251,27 +2015,6 @@ const CrmProspectsManagement = () => {
     }
   };
 
-  // Handle drag and drop
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
   // Handle file input change
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -2291,19 +2034,10 @@ const CrmProspectsManagement = () => {
       return;
     }
 
-    setUploading(true);
-    setUploadProgress(0);
-
     try {
       // Simulate progress for better UX
       const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
+
       }, 200);
 
       // Extract tag values from selected options
@@ -2317,21 +2051,11 @@ const CrmProspectsManagement = () => {
       );
 
       clearInterval(progressInterval);
-      setUploadProgress(100);
 
       // Parse response
       const responseData = response?.data || {};
       const processedCount = responseData.processed_count || 0;
       const validationFailures = responseData.validation_failures || 0;
-      // const errors = responseData.errors || [];
-      const message = responseData.message || "Upload completed";
-
-      // Show error messages for validation failures
-      // if (errors.length > 0) {
-      //   errors.forEach((error: string) => {
-      //     toast.warn(error);
-      //   });
-      // }
 
       // Show success message
       if (processedCount > 0) {
@@ -2362,7 +2086,6 @@ const CrmProspectsManagement = () => {
       setSelectedFile(null);
       setFieldTags([]);
       setShowUploadModal(false);
-      setUploadProgress(0);
 
       // Refresh data
       setRefreshKey((prev) => prev + 1);
@@ -2373,9 +2096,6 @@ const CrmProspectsManagement = () => {
         error?.message ||
         "Failed to upload file. Please try again.";
       toast.error(errorMessage);
-      setUploadProgress(0);
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -2430,20 +2150,9 @@ const CrmProspectsManagement = () => {
   const handleDownloadCallRecording = useCallback(async (recording: any) => {
     const { Id, AgentExtension } = recording;
 
-    // Add to downloading set and initialize progress
-    setDownloadingRecordings((prev) => new Set(prev).add(Id));
-    setDownloadProgress((prev) => ({ ...prev, [Id]: 0 }));
-
     try {
       // Simulate progress updates
       const progressInterval = setInterval(() => {
-        setDownloadProgress((prev) => {
-          const currentProgress = prev[Id] || 0;
-          if (currentProgress < 90) {
-            return { ...prev, [Id]: currentProgress + Math.random() * 15 };
-          }
-          return prev;
-        });
       }, 200);
 
       await DownloadCallRecording(
@@ -2455,36 +2164,13 @@ const CrmProspectsManagement = () => {
 
       // Complete the progress
       clearInterval(progressInterval);
-      setDownloadProgress((prev) => ({ ...prev, [Id]: 100 }));
 
       // Show completion briefly before hiding
       setTimeout(() => {
-        setDownloadingRecordings((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(Id);
-          return newSet;
-        });
-        setDownloadProgress((prev) => {
-          const newProgress = { ...prev };
-          delete newProgress[Id];
-          return newProgress;
-        });
       }, 1000);
     } catch (error) {
       console.error("Download error:", error);
       toast.error("Download failed");
-
-      // Remove from downloading set on error
-      setDownloadingRecordings((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(Id);
-        return newSet;
-      });
-      setDownloadProgress((prev) => {
-        const newProgress = { ...prev };
-        delete newProgress[Id];
-        return newProgress;
-      });
     }
   }, []);
 
@@ -2561,21 +2247,6 @@ const CrmProspectsManagement = () => {
     calculateEntryCounts,
   ]);
 
-  // Handle data assignment
-  const handleDataAssignment = useCallback(async () => {
-    try {
-      const counts = await calculateEntryCounts();
-      setAssignmentCounts(counts);
-      setTotalEntriesToAssign(counts.unassigned);
-      setShowDataAssignmentModal(true);
-    } catch (error) {
-      console.error("Failed to get entry counts:", error);
-      // Fallback to static data
-      setAssignmentCounts({ total: 5000, assigned: 2000, unassigned: 3000 });
-      setTotalEntriesToAssign(3000);
-      setShowDataAssignmentModal(true);
-    }
-  }, [calculateEntryCounts]);
 
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
@@ -2961,16 +2632,6 @@ const CrmProspectsManagement = () => {
       console.error("Bulk delete error:", error);
     }
   }, [selectedItems]);
-
-  // Handle item selection
-  const handleItemSelection = useCallback((selected: CrmDataItem[]) => {
-    setSelectedItems(selected.map((item) => item.id));
-  }, []);
-
-  // Handle prospect row click
-  const handleProspectClick = useCallback((prospect: any) => {
-    openProspectSidebar(prospect);
-  }, [openProspectSidebar]);
 
   // Handle close prospect sidebar
   const handleCloseProspectSidebar = useCallback(() => {
@@ -3398,363 +3059,6 @@ const CrmProspectsManagement = () => {
       activeFilter,
       handleViewData,
       handleCallClick,
-      handleScheduleCall,
-      handleUnscheduleCallClick,
-    ],
-  );
-
-  // Define old columns for GenericListPage (keep for backward compatibility if needed)
-  const columns: Column[] = useMemo(
-    () => [
-      {
-        key: "name",
-        name: "Name",
-        selector: (row: any) => row.name,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.name ? (
-              <span className="text-muted">{props.name}</span>
-            ) : (
-              <span className="text-muted">N/A</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "phone",
-        name: "Phone",
-        selector: (row: any) => row.phone,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.phone ? (
-              <span className="status-badge info">{props.phone}</span>
-            ) : (
-              <span className="status-badge info">N/A</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "source",
-        name: "Source",
-        selector: (row: any) => row.source_file,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.source_file ? (
-              <span className="status-badge secondary">
-                {props.source_file}
-              </span>
-            ) : (
-              <span className="text-muted">N/A</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "user_extension",
-        name: "Owner",
-        selector: (row: any) => row.user_extension,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.user_extension ? (
-              <span className="status-badge success">
-                {extensions.find(
-                  (extension: any) =>
-                    extension.id.toString() ===
-                    props.user_extension?.toString(),
-                )?.display_name || props.user_extension}
-              </span>
-            ) : (
-              <span className="status-badge default">Unassigned</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "campaign",
-        name: "Campaign",
-        selector: (row: any) => row.campaign_id,
-        sortable: true,
-        cell: (props: any) => {
-          return (
-            <div>
-              {props?.campaign ? (
-                <span className="status-badge primary">
-                  {props.campaign?.name}
-                </span>
-              ) : (
-                <span className="status-badge info">No Campaign</span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        key: "last_called_at",
-        name: "Last Called",
-        selector: (row: any) => row.last_called_at,
-        sortable: true,
-        cell: (props: any) => {
-          // Generate random date within last week
-          const now = moment();
-          const oneWeekAgo = moment().subtract(7, "days");
-          const randomDays = Math.floor(Math.random() * 7);
-          const randomHours = Math.floor(Math.random() * 24);
-          const randomMinutes = Math.floor(Math.random() * 60);
-
-          const lastCalled = oneWeekAgo
-            .add(randomDays, "days")
-            .add(randomHours, "hours")
-            .add(randomMinutes, "minutes")
-            .toISOString();
-
-          return (
-            <div className="d-flex align-items-center">
-              <span className="text-uppercase">
-                {lastCalled
-                  ? moment(lastCalled).format(GlobalDateTimeFormat)
-                  : "-"}
-              </span>
-            </div>
-          );
-        },
-      },
-      {
-        key: "last_call_end_reason",
-        name: "Last Call Status",
-        selector: (row: any) => row.last_call_end_reason,
-        sortable: true,
-        cell: (props: any) => {
-          // Static data for now
-          const endReason =
-            callEndReasons.find((r) => r.value === "answered") ||
-            callEndReasons[0];
-          return (
-            <span className={`status-badge ${endReason.color as any}`}>
-              {endReason.label}
-            </span>
-          );
-        },
-      },
-      {
-        key: "disposition",
-        name: "Disposition",
-        selector: (row: any) => row.disposition,
-        sortable: true,
-        cell: (props: any) => {
-          // Static disposition data for now
-          const dispositions = [
-            { value: "interested", label: "Interested", color: "success" },
-            {
-              value: "not_interested",
-              label: "Not Interested",
-              color: "danger",
-            },
-            {
-              value: "callback_requested",
-              label: "Callback Requested",
-              color: "warning",
-            },
-            { value: "no_answer", label: "No Answer", color: "warning" },
-            { value: "busy", label: "Busy", color: "info" },
-            { value: "do_not_call", label: "Do Not Call", color: "danger" },
-            { value: "wrong_number", label: "Wrong Number", color: "info" },
-            { value: "follow_up", label: "Follow Up", color: "primary" },
-          ];
-
-          // Randomly select a disposition for demo purposes
-          const randomDisposition =
-            dispositions[Math.floor(Math.random() * dispositions.length)];
-
-          return (
-            <span className={`status-badge ${randomDisposition.color as any}`}>
-              {randomDisposition.label}
-            </span>
-          );
-        },
-      },
-      {
-        key: "scheduled_call_at",
-        name: "Next Call",
-        selector: (row: any) => row.scheduled_call_at,
-        sortable: true,
-        cell: (props: any) => {
-          if (!props.scheduled_call_at) {
-            return <span className="status-badge info">Not scheduled</span>;
-          }
-
-          const isOverdue = moment(props.scheduled_call_at).isBefore(moment());
-          const isNextHour = moment(props.scheduled_call_at).isBefore(
-            moment().add(1, "hour"),
-          );
-
-          return (
-            <div className="d-flex align-items-center">
-              <span
-                className={`status-badge text-uppercase ${
-                  isOverdue ? "danger" : isNextHour ? "warning" : ""
-                }`}
-              >
-                {props.scheduled_call_at
-                  ? moment(props.scheduled_call_at).format(GlobalDateTimeFormat)
-                  : "-"}
-                {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
-                {isNextHour && !isOverdue && (
-                  <span className="ms-1 fw-bold">(Soon)</span>
-                )}
-              </span>
-            </div>
-          );
-        },
-      },
-
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
-        ? [
-            {
-              key: "view_action",
-              name: "View",
-              selector: (row: any) => row.id,
-              sortable: false,
-              cell: (props: any) => (
-                <Button
-                  variant="primary"
-                  className="app-button"
-                  size="sm"
-                  onClick={() => handleViewData(props)}
-                  title="View Details"
-                >
-                  <FiEye size={14} />
-                </Button>
-              ),
-            },
-          ]
-        : []),
-
-      {
-        key: "call_action",
-        name: "Call",
-        selector: (row: any) => row.id,
-        sortable: false,
-        cell: (props: any) => (
-          <div className="d-flex gap-1">
-            {session?.user?.permissions?.includes(
-              "call-service-crm-data-management",
-            ) && (
-              <Button
-                variant="success"
-                className="app-button"
-                size="sm"
-                onClick={() => handleCallClick(props)}
-                title="Call Now"
-              >
-                <FiPhone size={14} />
-              </Button>
-            )}
-
-            <Dropdown>
-              <Dropdown.Toggle
-                variant="outline-secondary"
-                size="sm"
-                className="app-button"
-                id={`dropdown-${props.id}`}
-              >
-                <FiMoreVertical size={14} />
-              </Dropdown.Toggle>
-              <Dropdown.Menu>
-                {session?.user?.permissions?.includes(
-                  "call-service-crm-data-management",
-                ) && (
-                  <>
-                    {props.scheduled_call_at ? (
-                      <>
-                        <Dropdown.Item
-                          onClick={() => handleScheduleCall(props)}
-                        >
-                          <FiCalendar size={14} className="me-2" />
-                          Edit Scheduled Call
-                        </Dropdown.Item>
-                        <Dropdown.Item
-                          onClick={() => handleUnscheduleCallClick(props)}
-                          className="text-danger"
-                        >
-                          <FiX size={14} className="me-2" />
-                          Unschedule Call
-                        </Dropdown.Item>
-                      </>
-                    ) : (
-                      <Dropdown.Item onClick={() => handleScheduleCall(props)}>
-                        <FiCalendar size={14} className="me-2" />
-                        Schedule Call
-                      </Dropdown.Item>
-                    )}
-                    <Dropdown.Divider />
-                  </>
-                )}
-                <Dropdown.Item
-                  onClick={() => {
-                    window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
-                  }}
-                >
-                  <FiTarget size={14} className="me-2" />
-                  Convert to Lead
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          </div>
-        ),
-      },
-
-      {
-        key: "tags",
-        name: "Tags",
-        selector: (row: any) => row.tags,
-        sortable: false,
-        cell: (props: any) => {
-          // Show hardcoded tags for now
-          const tags = props.tags;
-          return (
-            <div className="d-flex flex-wrap gap-1">
-              {tags?.map((tag: any, index: any) => (
-                <span key={index} className="status-badge info">
-                  {tag.name}
-                </span>
-              ))}
-            </div>
-          );
-        },
-      },
-      // {
-      //   key: "delete_action",
-      //   name: "Delete",
-      //   selector: (row: any) => row.id,
-      //   sortable: false,
-      //   cell: (props: any) => (
-      //     <Button
-      //       variant="danger"
-      //       className="app-button"
-      //       size="sm"
-      //       onClick={() => handleDeleteData(props)}
-      //       title="Delete Entry"
-      //     >
-      //       <FiTrash2 size={14} />
-      //     </Button>
-      //   ),
-      // },
-    ],
-    [
-      handleViewData,
-      handleMarkAsViewed,
-      handleDeleteData,
-      handleCallAction,
-      handleCallClick,
-      handlePlayRecording,
-      extensions,
-      availableCampaigns,
-      callEndReasons,
       handleScheduleCall,
       handleUnscheduleCallClick,
     ],
@@ -4282,311 +3586,9 @@ const CrmProspectsManagement = () => {
       >
         {/* Main content area */}
         <div className="prospects-scrollable-content" style={{ flex: 1 }}>
-          {/* <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-0">
-        <div className="mb-3 mb-md-0">
-  <nav aria-label="breadcrumb">
-    <ol className="breadcrumb mb-0">
-      <li className="breadcrumb-item">
-        <a href="/dashboard" className="text-decoration-none">
-          CRM
-        </a>
-      </li>
-      <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Prospects
-      </li>
-    </ol>
-  </nav>
-</div>
-        <div className="d-flex flex-wrap gap-2">
-         
-
-{session?.user?.permissions?.includes("add-crm-data-management") && (
-  <Button
-    variant="outline-secondary"
-    className=""
-    onClick={() => setShowUploadModal(true)}
-  >
-    <span className="">
-      <Download size={16} className="me-2" />
-      Import Contacts
-    </span>
-  </Button>
-)}
-
-<Button
-  variant="outline-secondary"
-  className=""
-  onClick={() => setShowFilterBar(!showFilterBar)}
->
-  <span className="">
-    <Layers size={16} className="me-2" />
-    {showFilterBar ? "Hide Tabs" : "Show Tabs"}
-  </span>
-</Button>
-
-<Button
-  variant="outline-secondary"
-  className=""
-  onClick={handleOpenFiltersSidebar}
->
-  <span className="">
-    <FiFilter size={16} className="me-2" />
-    Filters
-  </span>
-</Button>
-
-
-        </div>
-      </div> */}
-
-          {/* Stats Cards */}
-          {/* <StatsCards 
-        data={[
-          {
-            title: 'All Prospects',
-            value: totalRecords,
-            icon: Users,
-            iconColor: '#6366F1',
-            iconBgColor: '#EEF2FF',
-            subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`
-          },
-          {
-            title: 'Scheduled',
-            value: metrics.scheduled_records,
-            icon: Calendar,
-            iconColor: '#10B981',
-            iconBgColor: '#D1FAE5',
-            metric: {
-              text: `${metrics.scheduled_next_hour_records} in next hour`,
-              dotColor: '#F59E0B'
-            }
-          },
-          {
-            title: 'Convert to Leads',
-            value: totalRecords > 0 ? `${((metrics.assigned_records / totalRecords) * 100).toFixed(1)}%` : '0%',
-            icon: Target,
-            iconColor: '#8B5CF6',
-            iconBgColor: '#EDE9FE',
-            badge: {
-              text: `${metrics.assigned_records} Ready`,
-              bgColor: '#FEF3C7',
-              textColor: '#92400E'
-            }
-          },
-          {
-            title: 'All Prospects',
-            value: totalRecords,
-            icon: Users,
-            iconColor: '#6366F1',
-            iconBgColor: '#EEF2FF',
-            subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`
-          },
-          {
-            title: 'Scheduled',
-            value: metrics.scheduled_records,
-            icon: Calendar,
-            iconColor: '#10B981',
-            iconBgColor: '#D1FAE5',
-            metric: {
-              text: `${metrics.scheduled_next_hour_records} in next hour`,
-              dotColor: '#F59E0B'
-            }
-          },
-          {
-            title: 'Convert to Leads',
-            value: totalRecords > 0 ? `${((metrics.assigned_records / totalRecords) * 100).toFixed(1)}%` : '0%',
-            icon: Target,
-            iconColor: '#8B5CF6',
-            iconBgColor: '#EDE9FE',
-            badge: {
-              text: `${metrics.assigned_records} Ready`,
-              bgColor: '#FEF3C7',
-              textColor: '#92400E'
-            }
-          }
-        ]}
-        gridMinWidth="180px"
-      /> */}
+          
 
           <div className="container-fluid">
-            {/* Analytics Section - Collapsible */}
-            {showProspectsAnalytics && (
-              <>
-                {/* Summary Stats Grid - Using KPICard design */}
-                <Row className="mb-2">
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Total Prospects"
-                      value={totalRecords}
-                      icon={<Users size={24} />}
-                      color="primary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Prospects with Calls Scheduled"
-                      value={metrics.scheduled_records}
-                      icon={<Calendar size={24} />}
-                      color="success"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Prospects with No Calls Scheduled"
-                      value={metrics.not_scheduled_records}
-                      icon={<XCircle size={24} />}
-                      color="secondary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Meetings in Next Hour"
-                      value={metrics.scheduled_next_hour_records}
-                      icon={<ClockIcon size={24} />}
-                      color="info"
-                    />
-                  </Col>
-                  {showAllProspectStats && (
-                    <>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Meetings in Next 24h"
-                          value={metrics.scheduled_next_24_hours_records}
-                          icon={<Calendar size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title=" Prospects Assigned to Team Members"
-                          value={metrics.assigned_records}
-                          icon={<UserPlus size={24} />}
-                          color="primary"
-                        />
-                      </Col>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Prospects Not Assigned to Team Members"
-                          value={metrics.unassigned_records}
-                          icon={<AlertCircleIcon size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-                    </>
-                  )}
-                </Row>
-
-                <div className="text-center mb-4">
-                  <Button
-                    variant="link"
-                    onClick={() =>
-                      setShowAllProspectStats(!showAllProspectStats)
-                    }
-                    className="text-decoration-none"
-                  >
-                    {showAllProspectStats ? (
-                      <>
-                        <ArrowUp size={16} className="me-1" />
-                        Show Less
-                      </>
-                    ) : (
-                      <>
-                        <ArrowDown size={16} className="me-1" />
-                        Show More Stats
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </>
-            )}
-
-            {/* Filter Bar */}
-            {showFilterBar &&
-              session?.user?.permissions?.includes(
-                "list-crm-data-management",
-              ) && (
-                <FilterBar
-                  quickFilters={[
-                    {
-                      id: "all",
-                      label: "All Prospects",
-                      color: "#0d6efd",
-                      icon: <Users size={16} />,
-                    },
-                    {
-                      id: "scheduled",
-                      label: "Scheduled",
-                      color: "#20c997",
-                      icon: <FiCalendar size={16} />,
-                    },
-                    {
-                      id: "has_leads",
-                      label: "Converted to Leads",
-                      color: "#0dcaf0",
-                      icon: <FiTarget size={16} />,
-                    },
-                  ]}
-                  activeFilter={activeFilter}
-                  onFilterChange={handleFilterChange}
-                  // searchValue={prospectsSearch}
-                  // onSearchChange={(value) => {
-                  //   setProspectsSearch(value);
-                  // }}
-                  // onSearch={() =>
-                  //   handleFiltersChange({
-                  //     ...currentFilters,
-                  //     search: prospectsSearch,
-                  //   })
-                  // }
-                  // searchPlaceholder="Search by name or phone..."
-                  // showAdvancedFilters={showAdvancedFilters}
-                  // onToggleAdvancedFilters={() =>
-                  //   setShowAdvancedFilters(!showAdvancedFilters)
-                  // }
-                  // advancedFilterCount={
-                  //   (prospectsFilters.assignedTo !== null ? 1 : 0) +
-                  //   (prospectsFilters.campaigns !== null &&
-                  //   prospectsFilters.campaigns.length > 0
-                  //     ? 1
-                  //     : 0) +
-                  //   (prospectsFilters.sourceFile !== null ? 1 : 0) +
-                  //   (prospectsFilters.tags !== null &&
-                  //   prospectsFilters.tags.length > 0
-                  //     ? 1
-                  //     : 0)
-                  // }
-                />
-              )}
-
-            {/* Bulk Actions */}
-            {/* {selectedItems.length > 0 &&
-          session?.user?.permissions?.includes(
-            "delete-crm-data-management"
-          ) && (
-            <div className="d-flex justify-content-end gap-2 mb-3">
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-primary" size="sm">
-                  <CheckSquare size={16} className="me-2" />
-                  Bulk Actions ({selectedItems.length})
-                </Dropdown.Toggle>
-                <Dropdown.Menu align="end">
-                  <Dropdown.Item
-                    onClick={() => {
-                      setDeleteModalMode("bulk");
-                      setShowDeleteModal(true);
-                    }}
-                    className="d-flex align-items-center text-danger"
-                  >
-                    <Trash2 size={14} className="me-2" />
-                    Delete Selected ({selectedItems.length})
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            </div>
-          )} */}
-
-            {/* Prospects Table */}
             <div
               className="prospects-table-wrapper"
               style={{
@@ -4694,6 +3696,7 @@ const CrmProspectsManagement = () => {
         getInitials,
         getRandomColor
       )}
+      cardActions={prospectsActions}
       onCardClick={(card) => handleViewData(card.raw)}
       onCardMove={(cardId, fromCol, toCol) => {
         // Optionally call updateCrmData here to persist the lifecycle_stage change
@@ -5402,352 +4405,7 @@ const CrmProspectsManagement = () => {
                           }}
                         />
                         Call Recordings
-                        <Badge
-                          bg="secondary"
-                          style={{
-                            marginLeft: "8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            padding: "4px 10px",
-                            borderRadius: "6px",
-                          }}
-                        >
-                          {callRecordingsTotal > 0
-                            ? callRecordingsTotal
-                            : callRecordings.length}
-                        </Badge>
                       </h5>
-
-                      {callRecordingsLoading ? (
-                        <div
-                          style={{
-                            padding: "48px 20px",
-                            background: "#f9fafb",
-                            borderRadius: "12px",
-                            textAlign: "center",
-                          }}
-                        >
-                          <Spinner
-                            animation="border"
-                            variant="primary"
-                            size="sm"
-                            style={{ marginBottom: "12px" }}
-                          />
-                          <p
-                            className="mb-0"
-                            style={{ color: "#6b7280", fontSize: "14px" }}
-                          >
-                            Loading recordings...
-                          </p>
-                        </div>
-                      ) : callRecordings.length === 0 ? (
-                        <div
-                          style={{
-                            padding: "48px 20px",
-                            background: "#f9fafb",
-                            border: "2px dashed #d1d5db",
-                            borderRadius: "12px",
-                            textAlign: "center",
-                          }}
-                        >
-                          <History
-                            size={40}
-                            style={{ color: "#9ca3af", marginBottom: "12px" }}
-                          />
-                          <p
-                            className="mb-0"
-                            style={{
-                              color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            No call recordings found
-                          </p>
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "12px",
-                            overflow: "hidden",
-                          }}
-                        >
-                          <div style={{ overflowX: "auto" }}>
-                            <table
-                              style={{
-                                width: "100%",
-                                borderCollapse: "collapse",
-                              }}
-                            >
-                              <thead>
-                                <tr
-                                  style={{
-                                    background: "#f9fafb",
-                                    borderBottom: "1px solid #e5e7eb",
-                                  }}
-                                >
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Date & Time
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Extension
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Direction
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "left",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                    }}
-                                  >
-                                    Duration
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: "12px 16px",
-                                      textAlign: "center",
-                                      fontSize: "11px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      width: "100px",
-                                    }}
-                                  >
-                                    Actions
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {callRecordings.map(
-                                  (recording: any, index: number) => {
-                                    const duration =
-                                      parseInt(
-                                        recording.Duration?.toString() || "0",
-                                      ) / 10000000 || 0;
-                                    const isDownloading =
-                                      downloadingRecordings.has(recording.Id);
-                                    const progress =
-                                      downloadProgress[recording.Id] || 0;
-                                    const isOutgoing =
-                                      recording.Direction === "CALL_OUTGOING";
-
-                                    return (
-                                      <tr
-                                        key={recording.Id || index}
-                                        style={{
-                                          borderBottom: "1px solid #f3f4f6",
-                                          transition: "background 0.2s ease",
-                                        }}
-                                        onMouseOver={(e) => {
-                                          e.currentTarget.style.background =
-                                            "#f9fafb";
-                                        }}
-                                        onMouseOut={(e) => {
-                                          e.currentTarget.style.background =
-                                            "white";
-                                        }}
-                                      >
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <div
-                                            style={{
-                                              fontSize: "13px",
-                                              color: "#1f2937",
-                                              fontWeight: 500,
-                                            }}
-                                          >
-                                            {formatDateTimeToLocal(
-                                              recording.DateTime,
-                                              GlobalDateFormat,
-                                            )}
-                                          </div>
-                                          <div
-                                            style={{
-                                              fontSize: "12px",
-                                              color: "#6b7280",
-                                              marginTop: "2px",
-                                            }}
-                                          >
-                                            {formatDateTimeToLocal(
-                                              recording.DateTime,
-                                              GlobalTimeFormat,
-                                              "YYYY-MM-DD HH:mm:ss.SSSSSSS",
-                                            )}
-                                          </div>
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "14px 16px",
-                                            fontSize: "13px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                          }}
-                                        >
-                                          {recording.AgentExtension || "N/A"}
-                                        </td>
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <span
-                                            style={{
-                                              display: "inline-flex",
-                                              alignItems: "center",
-                                              gap: "6px",
-                                              padding: "4px 10px",
-                                              borderRadius: "6px",
-                                              fontSize: "12px",
-                                              fontWeight: 600,
-                                              background: isOutgoing
-                                                ? "#dbeafe"
-                                                : "#d1fae5",
-                                              color: isOutgoing
-                                                ? "#1e40af"
-                                                : "#065f46",
-                                            }}
-                                          >
-                                            {isOutgoing
-                                              ? "Outgoing"
-                                              : "Incoming"}
-                                          </span>
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "14px 16px",
-                                            fontSize: "13px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                          }}
-                                        >
-                                          {formatDuration(duration)}
-                                        </td>
-                                        <td style={{ padding: "14px 16px" }}>
-                                          <div
-                                            style={{
-                                              display: "flex",
-                                              gap: "8px",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                            }}
-                                          >
-                                            <button
-                                              style={{
-                                                background: "transparent",
-                                                border: "none",
-                                                color: "#2563eb",
-                                                cursor: "pointer",
-                                                padding: "6px",
-                                                borderRadius: "6px",
-                                                transition: "all 0.2s ease",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                              }}
-                                              title="Play Recording"
-                                              onClick={() =>
-                                                handlePlayCallRecording(
-                                                  recording,
-                                                )
-                                              }
-                                              onMouseOver={(e) => {
-                                                e.currentTarget.style.background =
-                                                  "#ede9fe";
-                                              }}
-                                              onMouseOut={(e) => {
-                                                e.currentTarget.style.background =
-                                                  "transparent";
-                                              }}
-                                            >
-                                              <FiPlay size={16} />
-                                            </button>
-                                            {isDownloading ? (
-                                              <CircularProgressCircle
-                                                progress={progress}
-                                                size="small"
-                                                color="#28a745"
-                                                backgroundColor="#e9ecef"
-                                                textColor="#495057"
-                                                showPercentage={false}
-                                                className="circular-progress-inline"
-                                              />
-                                            ) : (
-                                              <button
-                                                style={{
-                                                  background: "transparent",
-                                                  border: "none",
-                                                  color: "#2563eb",
-                                                  cursor: "pointer",
-                                                  padding: "6px",
-                                                  borderRadius: "6px",
-                                                  transition: "all 0.2s ease",
-                                                  display: "flex",
-                                                  alignItems: "center",
-                                                  justifyContent: "center",
-                                                }}
-                                                title="Download Recording"
-                                                onClick={() =>
-                                                  handleDownloadCallRecording(
-                                                    recording,
-                                                  )
-                                                }
-                                                onMouseOver={(e) => {
-                                                  e.currentTarget.style.background =
-                                                    "#ede9fe";
-                                                }}
-                                                onMouseOut={(e) => {
-                                                  e.currentTarget.style.background =
-                                                    "transparent";
-                                                }}
-                                              >
-                                                <Download size={16} />
-                                              </button>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    );
-                                  },
-                                )}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -5955,15 +4613,6 @@ const CrmProspectsManagement = () => {
                             >
                               Total Calls
                             </span>
-                            <span
-                              style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {callRecordings.length}
-                            </span>
                           </div>
 
                           {selectedDataItem.scheduled_call_at && (
@@ -6028,132 +4677,6 @@ const CrmProspectsManagement = () => {
                       >
                         Recent Activity
                       </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                          maxHeight: "300px",
-                          overflowY: "auto",
-                        }}
-                      >
-                        {callRecordings.length > 0 ? (
-                          <div style={{ position: "relative" }}>
-                            {/* Timeline line */}
-                            <div
-                              style={{
-                                position: "absolute",
-                                left: "7px",
-                                top: "8px",
-                                bottom: "8px",
-                                width: "2px",
-                                background: "#e5e7eb",
-                              }}
-                            />
-
-                            {callRecordings
-                              .slice(0, 5)
-                              .map((recording: any, index: number) => {
-                                const isOutgoing =
-                                  recording.Direction === "CALL_OUTGOING";
-                                return (
-                                  <div
-                                    key={recording.Id || index}
-                                    style={{
-                                      position: "relative",
-                                      paddingLeft: "28px",
-                                      paddingBottom:
-                                        index <
-                                        Math.min(callRecordings.length, 5) - 1
-                                          ? "16px"
-                                          : "0",
-                                    }}
-                                  >
-                                    {/* Timeline dot */}
-                                    <div
-                                      style={{
-                                        position: "absolute",
-                                        left: "0",
-                                        top: "4px",
-                                        width: "16px",
-                                        height: "16px",
-                                        borderRadius: "50%",
-                                        background: isOutgoing
-                                          ? "#2563eb"
-                                          : "#10b981",
-                                        border: "3px solid white",
-                                        boxShadow: "0 0 0 1px #e5e7eb",
-                                      }}
-                                    />
-
-                                    <div>
-                                      <div
-                                        style={{
-                                          fontSize: "12px",
-                                          color: "#1f2937",
-                                          fontWeight: 600,
-                                          marginBottom: "4px",
-                                        }}
-                                      >
-                                        {isOutgoing
-                                          ? "Outgoing Call"
-                                          : "Incoming Call"}
-                                      </div>
-                                      <div
-                                        style={{
-                                          fontSize: "11px",
-                                          color: "#6b7280",
-                                        }}
-                                      >
-                                        {moment(recording.DateTime).format(
-                                          "MMM DD, hh:mm A",
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-
-                            {callRecordings.length > 5 && (
-                              <div
-                                style={{
-                                  textAlign: "center",
-                                  marginTop: "12px",
-                                  paddingTop: "12px",
-                                  borderTop: "1px solid #f3f4f6",
-                                }}
-                              >
-                                <span
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#2563eb",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  +{callRecordings.length - 5} more activities
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              textAlign: "center",
-                              padding: "20px",
-                              color: "#9ca3af",
-                            }}
-                          >
-                            <ClockIcon
-                              size={32}
-                              style={{ marginBottom: "8px", opacity: 0.5 }}
-                            />
-                            <div style={{ fontSize: "13px" }}>
-                              No activity yet
-                            </div>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -6203,110 +4726,6 @@ const CrmProspectsManagement = () => {
             </Modal>
           )}
 
-          {/* Audio Player Modal */}
-          {/* {getCallHistory(selectedDataItem.id).length > 0 && (
-              <>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: '20px',
-                  paddingBottom: '10px',
-                  borderBottom: '2px solid #f8f9fa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <History size={18} style={{ color: '#4680ff' }} />
-                  Call History ({getCallHistory(selectedDataItem.id).length})
-                </div>
-                <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
-                  <div style={{
-                    content: '',
-                    position: 'absolute',
-                    left: '8px',
-                    top: 0,
-                    bottom: 0,
-                    width: '2px',
-                    background: '#e5e7eb'
-                  }} />
-                  {getCallHistory(selectedDataItem.id).map((call, idx) => {
-                    const endReason = callEndReasons.find(
-                      (r) => r.value === call.endReason
-                    );
-                    const dispositionColors: Record<string, string> = {
-                      interested: 'success',
-                      not_interested: 'danger',
-                      callback_requested: 'warning',
-                      no_answer: 'secondary',
-                      busy: 'info',
-                      do_not_call: 'dark',
-                      wrong_number: 'light',
-                      follow_up: 'primary',
-                    };
-                    const dispositionColor = dispositionColors[call.disposition] || 'primary';
-                    const endReasonColor = endReason?.color || 'secondary';
-                    
-                    return (
-                      <div key={call.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
-                        <div style={{
-                          content: '',
-                          position: 'absolute',
-                          left: '-26px',
-                          top: '4px',
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: endReasonColor === 'success' ? '#10b981' : '#4680ff',
-                          border: '3px solid white',
-                          boxShadow: '0 0 0 2px #e5e7eb'
-                        }} />
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '12px 16px',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start'
-                        }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
-                              {moment(call.calledAt).format("MMM DD, YYYY HH:mm")} - Duration: {call.duration}
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '8px', fontWeight: 500 }}>
-                              <Badge bg={endReasonColor as any} className="me-2">
-                                {endReason?.label || call.endReason}
-                              </Badge>
-                              <Badge bg={dispositionColor as any}>
-                                {call.disposition
-                                  ?.replace("_", " ")
-                                  .replace(/\b\w/g, (l) => l.toUpperCase())}
-                              </Badge>
-                            </div>
-                            {call.comment && (
-                              <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
-                                {call.comment}
-                              </div>
-                            )}
-                          </div>
-                          {call.recordingUrl && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-1"
-                              title="Play Recording"
-                              onClick={() => handlePlayRecording(call.recordingUrl)}
-                            >
-                              <FiPlay size={16} />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )} */}
 
           {/* Delete Confirmation Modal (single + bulk) */}
           <DeleteConfirmationModal
@@ -7042,298 +5461,14 @@ const CrmProspectsManagement = () => {
                   </div>
                 </div>
 
-                {historyLoading ? (
+                {historyLoading && (
                   <div className="text-center py-5">
                     <Spinner animation="border" variant="primary" />
                     <p className="mt-3 text-muted">
                       Loading activity history...
                     </p>
                   </div>
-                ) : historyData.length === 0 ? (
-                  <div className="text-center py-5">
-                    <FiClock size={48} className="text-muted mb-3" />
-                    <h6 className="text-muted">No Activity Found</h6>
-                    <p className="text-muted">
-                      No activities have been recorded yet.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="timeline ">
-                    {historyData.map((activity, index) => {
-                      const getActivityIcon = (action: string) => {
-                        switch (action) {
-                          case "upload":
-                            return (
-                              <FiUpload size={18} className="text-white" />
-                            );
-                          case "assign":
-                            return <FiUsers size={18} className="text-white" />;
-                          case "schedule_call":
-                          case "reschedule_call":
-                            return (
-                              <FiCalendar size={18} className="text-white" />
-                            );
-                          case "cancel_call":
-                          case "unschedule_call":
-                            return <FiX size={18} className="text-white" />;
-                          default:
-                            return <FiUser size={18} className="text-white" />;
-                        }
-                      };
-
-                      const getActivityColor = (action: string) => {
-                        switch (action) {
-                          case "upload":
-                            return "primary";
-                          case "assign":
-                            return "success";
-                          case "schedule_call":
-                          case "reschedule_call":
-                            return "info";
-                          case "cancel_call":
-                          case "unschedule_call":
-                            return "warning";
-                          default:
-                            return "secondary";
-                        }
-                      };
-
-                      const formatActivityDetails = (activity: any) => {
-                        const details = activity.details || {};
-                        switch (activity.action) {
-                          case "upload":
-                            const campaignNames =
-                              details.campaign_ids
-                                ?.map(
-                                  (id: number) =>
-                                    campaignsById[id] || `Campaign #${id}`,
-                                )
-                                .join(", ") || "No campaigns";
-                            const tags = details.tags?.join(", ") || "No tags";
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>
-                                    Uploaded {activity.total_records || 0}{" "}
-                                    prospects
-                                  </strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Campaigns:</strong> {campaignNames}
-                                  </div>
-                                  <div>
-                                    <strong>Tags:</strong> {tags}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          case "assign":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>
-                                    Assigned {activity.total_records || 0}{" "}
-                                    prospects
-                                  </strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <strong>To:</strong>{" "}
-                                  {getNameByExtension(
-                                    activity.user_extension_done_to,
-                                  ) || "Campaign team"}
-                                </div>
-                              </div>
-                            );
-                          case "schedule_call":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>Scheduled call</strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Phone:</strong>{" "}
-                                    {details.phone || "N/A"}
-                                  </div>
-                                  <div>
-                                    <strong>Time:</strong>{" "}
-                                    {moment(details.scheduled_call_at).format(
-                                      "MMM DD, YYYY HH:mm",
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          case "reschedule_call":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>Rescheduled call</strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Phone:</strong>{" "}
-                                    {details.phone || "N/A"}
-                                  </div>
-                                  <div>
-                                    <strong>From:</strong>{" "}
-                                    {moment(
-                                      details.old_scheduled_call_at,
-                                    ).format("MMM DD, HH:mm")}
-                                  </div>
-                                  <div>
-                                    <strong>To:</strong>{" "}
-                                    {moment(
-                                      details.new_scheduled_call_at,
-                                    ).format("MMM DD, HH:mm")}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          case "cancel_call":
-                          case "unschedule_call":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>Cancelled call</strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Phone:</strong>{" "}
-                                    {details.phone || "N/A"}
-                                  </div>
-                                  <div>
-                                    <strong>Was scheduled:</strong>{" "}
-                                    {moment(
-                                      details.cancelled_scheduled_call_at ||
-                                        details.unscheduled_call_at,
-                                    ).format("MMM DD, HH:mm")}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          default:
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>
-                                    {activity.action
-                                      ?.replace("_", " ")
-                                      .replace(/\b\w/g, (l: string) =>
-                                        l.toUpperCase(),
-                                      )}
-                                  </strong>
-                                </div>
-                                <div className="small text-muted">
-                                  {activity.details?.description ||
-                                    "No details available"}
-                                </div>
-                              </div>
-                            );
-                        }
-                      };
-
-                      return (
-                        <div key={activity.id} className="timeline-item mb-4 ">
-                          <div className="d-flex">
-                            <div className="timeline-marker me-3">
-                              <div
-                                className={`bg-${getActivityColor(
-                                  activity.action,
-                                )} rounded-circle d-flex align-items-center justify-content-center shadow-sm`}
-                                style={{ width: "36px", height: "36px" }}
-                              >
-                                {getActivityIcon(activity.action)}
-                              </div>
-                            </div>
-                            <div className="timeline-content flex-grow-1">
-                              <div className="card border-0 shadow-sm">
-                                <div className="card-body p-3">
-                                  <div className="d-flex justify-content-between align-items-start mb-2">
-                                    <div className="flex-grow-1">
-                                      <h6 className="mb-1 d-flex align-items-center">
-                                        <strong className="text-primary">
-                                          {getNameByExtension(
-                                            activity.user_extension_done_by,
-                                          ) || "System"}
-                                        </strong>
-                                        <Badge
-                                          bg={getActivityColor(activity.action)}
-                                          className="ms-2 small"
-                                        >
-                                          {activity.action
-                                            ?.replace("_", " ")
-                                            .replace(/\b\w/g, (l: string) =>
-                                              l.toUpperCase(),
-                                            )}
-                                        </Badge>
-                                      </h6>
-                                      <div className="text-muted">
-                                        {formatActivityDetails(activity)}
-                                      </div>
-                                    </div>
-                                    <div className="text-end">
-                                      <small className="text-muted">
-                                        {moment(activity.created_at).format(
-                                          "MMM DD, YYYY",
-                                        )}
-                                      </small>
-                                      <br />
-                                      <small className="text-muted">
-                                        {moment(activity.created_at).format(
-                                          "HH:mm:ss",
-                                        )}
-                                      </small>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="timeline-line"></div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Pagination */}
-                {!historyLoading &&
-                  historyData.length > 0 &&
-                  historyPagination.last_page > 1 && (
-                    <div className="d-flex justify-content-center mt-4">
-                      <div className="btn-group" role="group">
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          disabled={historyPagination.current_page === 1}
-                          onClick={() =>
-                            fetchHistoryData(historyPagination.current_page - 1)
-                          }
-                        >
-                          Previous
-                        </Button>
-                        <Button variant="outline-secondary" size="sm" disabled>
-                          {historyPagination.current_page} /{" "}
-                          {historyPagination.last_page}
-                        </Button>
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          disabled={
-                            historyPagination.current_page ===
-                            historyPagination.last_page
-                          }
-                          onClick={() =>
-                            fetchHistoryData(historyPagination.current_page + 1)
-                          }
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                )} 
               </>
             }
             submitButtonText="Close"

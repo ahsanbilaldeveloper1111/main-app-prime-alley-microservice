@@ -77,6 +77,15 @@ const sectionHeadingNext: React.CSSProperties = {
   marginTop: "32px",
 };
 
+/** Local calendar date as YYYY-MM-DD for `<input type="date" min="…" />`. */
+function getTodayLocalYyyyMmDd(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
   width: "100%",
   textAlign: "left",
@@ -516,6 +525,15 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const followUpMin = getTodayLocalYyyyMmDd();
+    if (
+      formData.follow_up_date &&
+      formData.follow_up_date < followUpMin
+    ) {
+      toast.error("Follow-up date must be today or a future date");
+      return;
+    }
+
     if (!validateStep0() || !validateStep1() || !validateStep4()) {
       return;
     }
@@ -845,13 +863,19 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                       {fieldLabel("Follow-up Date")}
                       <input
                         type="date"
+                        min={getTodayLocalYyyyMmDd()}
                         value={formData.follow_up_date}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const minDate = getTodayLocalYyyyMmDd();
+                          if (value && value < minDate) {
+                            return;
+                          }
                           setFormData({
                             ...formData,
-                            follow_up_date: e.target.value,
-                          })
-                        }
+                            follow_up_date: value,
+                          });
+                        }}
                         style={inputStyle}
                         onFocus={focusStyle}
                         onBlur={blurStyle}
@@ -1255,7 +1279,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 70px 70px 70px auto",
+                        gridTemplateColumns: "1fr 70px 70px 100px auto",
                         gap: "8px",
                         alignItems: "center",
                         marginBottom: "12px",
@@ -1281,7 +1305,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                         key={`${item.product_id}-${index}`}
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "1fr 70px 70px 70px auto",
+                          gridTemplateColumns: "1fr 70px 70px 100px auto",
                           gap: "8px",
                           alignItems: "center",
                           marginBottom: "8px",
@@ -1349,7 +1373,13 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                               )
                             )
                           }
-                          style={{ ...inputStyle, width: "70px" }}
+                          style={{
+                            ...inputStyle,
+                            width: "100%",
+                            minWidth: 0,
+                            minHeight: "44px",
+                            paddingRight: "2rem",
+                          }}
                         >
                           <option value="">Select</option>
                           <option value="5">5</option>
@@ -1376,7 +1406,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 70px 70px 70px auto",
+                        gridTemplateColumns: "1fr 70px 70px 100px auto",
                         gap: "8px",
                         alignItems: "center",
                       }}
@@ -1458,7 +1488,13 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                             e.target.value ? Number(e.target.value) : 0,
                           )
                         }
-                        style={{ ...inputStyle, width: "70px" }}
+                        style={{
+                          ...inputStyle,
+                          width: "100%",
+                          minWidth: 0,
+                          minHeight: "44px",
+                          paddingRight: "2rem",
+                        }}
                       >
                         <option value="">Select</option>
                         <option value="5">5</option>
@@ -1473,14 +1509,20 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                           background: lineItemInput ? "#0091ae" : "#cbd5e0",
                           border: "none",
                           borderRadius: "4px",
-                          padding: "10px",
+                          width: "44px",
+                          height: "44px",
+                          minWidth: "44px",
+                          flexShrink: 0,
+                          padding: 0,
                           cursor: lineItemInput ? "pointer" : "not-allowed",
                           color: "#fff",
                           display: "flex",
                           alignItems: "center",
+                          justifyContent: "center",
+                          boxSizing: "border-box",
                         }}
                       >
-                        <Plus size={16} />
+                        <Plus size={18} />
                       </button>
                     </div>
                   </div>

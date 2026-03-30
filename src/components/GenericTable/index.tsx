@@ -124,6 +124,85 @@ export interface TableAction<T = any> {
   };
 }
 
+/** Row context menu entry (onClick receives the row). Shared by the table and Kanban card menu. */
+export type TableContextMenuItem<T = unknown> = {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: (row: T) => void;
+  divider?: boolean;
+  className?: string;
+  disabled?: boolean;
+  disabledTitle?: string;
+  disabledClassName?: string;
+};
+
+/** Bound row actions for Kanban / custom surfaces (no row argument). */
+export interface BoundTableContextMenuItem {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+  divider?: boolean;
+  className?: string;
+  disabled?: boolean;
+  disabledTitle?: string;
+  disabledClassName?: string;
+}
+
+export function buildTableContextMenuItems<T>(
+  actions: TableAction<T>[],
+  row: T,
+): TableContextMenuItem<T>[] {
+  const items: TableContextMenuItem<T>[] = [];
+  for (const action of actions) {
+    if (action.show && !action.show(row)) continue;
+    if (action.dropdown) {
+      const opts = action.dropdown.options.filter(
+        (o) => !o.show || o.show(row),
+      );
+      for (const o of opts) {
+        items.push({
+          label: o.label,
+          icon: o.icon,
+          onClick: o.onClick,
+          divider: o.divider ?? false,
+          className: o.className,
+        });
+      }
+    } else if (action.onClick && !action.render) {
+      const isDisabled = action.disabled?.(row);
+      items.push({
+        label: action.label,
+        icon: action.icon,
+        onClick: action.onClick,
+        divider: false,
+        className: isDisabled
+          ? action.disabledClassName || "text-muted"
+          : action.className,
+        disabled: isDisabled,
+        disabledTitle: action.disabledTitle,
+        disabledClassName: action.disabledClassName,
+      });
+    }
+  }
+  return items;
+}
+
+export function buildBoundTableContextMenuItems<T>(
+  actions: TableAction<T>[],
+  row: T,
+): BoundTableContextMenuItem[] {
+  return buildTableContextMenuItems(actions, row).map((item) => ({
+    label: item.label,
+    icon: item.icon,
+    onClick: () => item.onClick(row),
+    divider: item.divider,
+    className: item.className,
+    disabled: item.disabled,
+    disabledTitle: item.disabledTitle,
+    disabledClassName: item.disabledClassName,
+  }));
+}
+
 export interface PaginationConfig {
   currentPage: number;
   rowsPerPage: number;
@@ -417,54 +496,8 @@ const GenericTable = <T extends Record<string, any>>({
     }
   }, [toolbar?.showFilterPills]);
 
-  // Flatten actions into context menu items (buttons + dropdown options)
-  type ContextMenuItem = {
-    label: string;
-    icon?: React.ReactNode;
-    onClick: (row: T) => void;
-    divider?: boolean;
-    className?: string;
-    disabled?: boolean;
-    disabledTitle?: string;
-    disabledClassName?: string;
-  };
   const getContextMenuItems = useMemo(() => {
-    return (row: T): ContextMenuItem[] => {
-      const items: ContextMenuItem[] = [];
-      for (const action of actions) {
-        if (action.show && !action.show(row)) continue;
-        if (action.dropdown) {
-          const opts = action.dropdown.options.filter(
-            (o) => !o.show || o.show(row),
-          );
-          for (let i = 0; i < opts.length; i++) {
-            const o = opts[i];
-            items.push({
-              label: o.label,
-              icon: o.icon,
-              onClick: o.onClick,
-              divider: o.divider ?? false,
-              className: o.className,
-            });
-          }
-        } else if (action.onClick && !action.render) {
-          const isDisabled = action.disabled?.(row);
-          items.push({
-            label: action.label,
-            icon: action.icon,
-            onClick: action.onClick,
-            divider: false,
-            className: isDisabled
-              ? action.disabledClassName || "text-muted"
-              : action.className,
-            disabled: isDisabled,
-            disabledTitle: action.disabledTitle,
-            disabledClassName: action.disabledClassName,
-          });
-        }
-      }
-      return items;
-    };
+    return (row: T) => buildTableContextMenuItems(actions, row);
   }, [actions]);
 
   // Close context menu on outside click or Escape
