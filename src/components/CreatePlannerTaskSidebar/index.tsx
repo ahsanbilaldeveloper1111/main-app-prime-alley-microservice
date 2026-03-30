@@ -60,6 +60,11 @@ function clampTaskTypeToAllowed(
   return allowed[0];
 }
 
+/** Task / parent ids as returned by the planner API (numeric or string). */
+type PlannerApiId = string | number;
+/** API fields that may be string, number, or null (e.g. parent_task_id, repeat_on). */
+type PlannerApiNullableScalar = string | number | null;
+
 interface Extension {
   id: string;
   name: string;
@@ -86,11 +91,15 @@ interface CreateTaskSidebarProps {
 
 /** Minimal task shape used when editing in the sidebar (API / normalized task). */
 interface PlannerEditTask {
-  id?: string | number;
+  id?: PlannerApiId;
+  parent_task_id?: PlannerApiNullableScalar;
+  parent_task?: { id?: number; title?: string; reference?: string };
   rawData?: {
-    id?: string | number;
+    id?: PlannerApiId;
     last_run_at?: string;
     next_run_at?: string;
+    parent_task_id?: PlannerApiNullableScalar;
+    parent_task?: { id?: number; title?: string; reference?: string };
   };
   project_id?: number;
   project?: { id?: number };
@@ -111,7 +120,7 @@ interface PlannerEditTask {
   labels?: Array<{ id: number }>;
   frequency?: string;
   repeat_interval?: number;
-  repeat_on?: string | number | null;
+  repeat_on?: PlannerApiNullableScalar;
   due_time?: unknown;
   last_run_at?: string;
   next_run_at?: string;
@@ -173,7 +182,7 @@ interface LinkedRecord {
 }
 
 interface TaskListRow {
-  id: string | number;
+  id: PlannerApiId;
   title?: string;
   reference?: string;
 }
@@ -231,19 +240,59 @@ function formatDateTimeForDisplay(iso: string | null | undefined): string {
   return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+function readNestedRecurring(editTask: PlannerEditTask | undefined): Record<string, unknown> | null {
+  if (!editTask) return null;
+  const top = (editTask as unknown as Record<string, unknown>).recurring;
+  if (top && typeof top === "object" && !Array.isArray(top)) {
+    return top as Record<string, unknown>;
+  }
+  const raw = editTask.rawData;
+  if (raw && typeof raw === "object") {
+    const ro = raw as Record<string, unknown>;
+    const nested = ro.recurring;
+    if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+      return nested as Record<string, unknown>;
+    }
+  }
+  return null;
+}
+
+function pickRecurringScalar(editTask: PlannerEditTask | undefined, key: string): unknown {
+  if (!editTask) return undefined;
+  const top = (editTask as unknown as Record<string, unknown>)[key];
+  if (top != null && top !== "") return top;
+  const raw = editTask.rawData;
+  if (raw && typeof raw === "object") {
+    const rv = (raw as Record<string, unknown>)[key];
+    if (rv != null && rv !== "") return rv;
+  }
+  const nested = readNestedRecurring(editTask);
+  if (nested) {
+    const nv = nested[key];
+    if (nv != null && nv !== "") return nv;
+  }
+  return undefined;
+}
+
 function recurringScheduleField(
   task: PlannerEditTask | undefined,
   field: "last_run_at" | "next_run_at",
 ): string | undefined {
   if (!task) return undefined;
-  const direct = task[field];
-  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  const fromRecord = (rec: Record<string, unknown> | null | undefined): string | undefined => {
+    if (!rec) return undefined;
+    const v = rec[field];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    return undefined;
+  };
+  const direct = fromRecord(task as unknown as Record<string, unknown>);
+  if (direct) return direct;
   const raw = task.rawData;
   if (raw && typeof raw === "object") {
-    const v = raw[field];
-    if (typeof v === "string" && v.trim()) return v.trim();
+    const got = fromRecord(raw as Record<string, unknown>);
+    if (got) return got;
   }
-  return undefined;
+  return fromRecord(readNestedRecurring(task));
 }
 
 /**
@@ -345,11 +394,61 @@ function mapWatcherIdsFromEditTask(editTask: PlannerEditTask, extensions: Extens
   return [];
 }
 
+function plannerTypeFromLowerString(raw: unknown): PlannerTaskType | null {
+  const t = String(raw ?? "").toLowerCase();
+  if (t === "todo") return "todo";
+  if (t === "recurring") return "recurring";
+  if (t === "regular") return "regular";
+  return null;
+}
+
+function isTruthyRecurringFlag(value: unknown): boolean {
+  return value === true || value === 1;
+}
+
+function inferRecurringFromScheduleScalars(editTask: PlannerEditTask): boolean {
+  const freq = pickRecurringScalar(editTask, "frequency");
+  return (
+    (typeof freq === "string" && freq.trim() !== "") ||
+    pickRecurringScalar(editTask, "repeat_interval") != null ||
+    pickRecurringScalar(editTask, "last_run_at") != null ||
+    pickRecurringScalar(editTask, "next_run_at") != null
+  );
+}
+
+function taskTypeHintFromRawData(raw: unknown): PlannerTaskType | null {
+  if (raw == null || typeof raw !== "object") return null;
+  const ro = raw as Record<string, unknown>;
+  const fromRaw = plannerTypeFromLowerString(ro.type ?? ro.task_type);
+  if (fromRaw) return fromRaw;
+  if (isTruthyRecurringFlag(ro.is_recurring)) return "recurring";
+  return null;
+}
+
 function normalizeEditTaskType(editTask: PlannerEditTask): PlannerTaskType {
-  if (editTask.type === "todo" || editTask.type === "recurring") {
-    return editTask.type;
+  const fromTop = plannerTypeFromLowerString(editTask.type);
+  if (fromTop) return fromTop;
+
+  const fromRawHint = taskTypeHintFromRawData(editTask.rawData);
+  if (fromRawHint) return fromRawHint;
+
+  const asRecord = editTask as Record<string, unknown>;
+  const fromTaskTypeField = plannerTypeFromLowerString(asRecord.task_type);
+  if (fromTaskTypeField) return fromTaskTypeField;
+  if (isTruthyRecurringFlag(asRecord.is_recurring)) return "recurring";
+
+  const nested = readNestedRecurring(editTask);
+  if (nested) {
+    const fromNested = plannerTypeFromLowerString(nested.type);
+    if (fromNested) return fromNested;
+    if (isTruthyRecurringFlag(nested.is_recurring)) return "recurring";
   }
-  return "regular";
+
+  if (!inferRecurringFromScheduleScalars(editTask)) return "regular";
+  const t = String(editTask.type ?? "").toLowerCase();
+  const tt = String(asRecord.task_type ?? "").toLowerCase();
+  if (t === "todo" || tt === "todo") return "regular";
+  return "recurring";
 }
 
 /** API expects lowercase full weekday names, e.g. `"tuesday"`. */
@@ -430,10 +529,52 @@ function normalizeWeeklyRepeatOnFromApi(raw: unknown): string {
 
 function repeatOnForEditTask(editTask: PlannerEditTask, frequency: string): string {
   const freq = (frequency || "weekly").toLowerCase();
+  const rawOn = pickRecurringScalar(editTask, "repeat_on");
   if (freq === "weekly") {
-    return normalizeWeeklyRepeatOnFromApi(editTask.repeat_on);
+    return normalizeWeeklyRepeatOnFromApi(rawOn);
   }
-  return editTask.repeat_on == null ? "" : String(editTask.repeat_on);
+  return rawOn == null ? "" : String(rawOn);
+}
+
+function readParentTaskFromRaw(
+  raw: unknown,
+): PlannerEditTask["parent_task"] | undefined {
+  if (raw == null || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const p = o.parent_task ?? o.parent;
+  if (p == null || typeof p !== "object") return undefined;
+  const pt = p as Record<string, unknown>;
+  const id = pt.id;
+  const idNum = typeof id === "number" ? id : Number(id);
+  return {
+    id: Number.isFinite(idNum) ? idNum : undefined,
+    title: typeof pt.title === "string" ? pt.title : undefined,
+    reference: typeof pt.reference === "string" ? pt.reference : undefined,
+  };
+}
+
+/** Parent / "associate with" task for edit mode (`parent_task_id` from API). */
+function resolveParentTaskLinkFromEditTask(editTask: PlannerEditTask): LinkedRecord | null {
+  const raw: unknown = editTask.rawData ?? editTask;
+  const rawParent = readParentTaskFromRaw(raw);
+  const nestedParent = editTask.parent_task ?? rawParent;
+  let idRaw: unknown = editTask.parent_task_id ?? nestedParent?.id;
+  if (idRaw == null && raw != null && typeof raw === "object") {
+    const ro = raw as Record<string, unknown>;
+    idRaw = ro.parent_task_id ?? ro.parent_id;
+  }
+  const id = Number(idRaw);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const title = String(nestedParent?.title ?? "").trim();
+  const refRaw = nestedParent?.reference;
+  const reference =
+    typeof refRaw === "string" && refRaw.trim() !== "" ? refRaw.trim() : `#${id}`;
+  return {
+    id,
+    type: "task",
+    title: title || `Task #${id}`,
+    reference,
+  };
 }
 
 function buildInitialFormFromEdit(
@@ -445,13 +586,24 @@ function buildInitialFormFromEdit(
   const assigneeIds = mapAssigneeIdsFromEditTask(editTask, extensions);
   const watcherIds = mapWatcherIdsFromEditTask(editTask, extensions);
   const taskTypeVal = normalizeEditTaskType(editTask);
-  const frequency = editTask.frequency || "weekly";
-  const repeatInterval = Math.max(1, Number(editTask.repeat_interval) || 1);
+  const frequency = String(pickRecurringScalar(editTask, "frequency") || "weekly");
+  const repeatInterval = Math.max(1, Number(pickRecurringScalar(editTask, "repeat_interval")) || 1);
   const repeatOn = repeatOnForEditTask(editTask, frequency);
+  const dueTimeRaw = pickRecurringScalar(editTask, "due_time");
   const dueTime =
-    typeof editTask.due_time === "string"
-      ? parseRecurringDueTimeForInput(editTask.due_time)
+    typeof dueTimeRaw === "string"
+      ? parseRecurringDueTimeForInput(dueTimeRaw)
       : "";
+  const topDue =
+    typeof editTask.due_date === "string" && editTask.due_date.trim() !== ""
+      ? editTask.due_date
+      : undefined;
+  const endDateRaw =
+    topDue ??
+    pickRecurringScalar(editTask, "end_date") ??
+    pickRecurringScalar(editTask, "due_date");
+  const startDateRaw =
+    (pickRecurringScalar(editTask, "start_date") as string | undefined) ?? editTask.start_date;
   return {
     title: editTask.title || "",
     description: editTask.description || "",
@@ -461,10 +613,13 @@ function buildInitialFormFromEdit(
     priorityId: mapPriorityStringToId(editTask.priority),
     assigneeIds,
     watcherIds,
-    dueDate: formatDateForInput(editTask.due_date),
-    startDate: formatDateForInput(editTask.start_date),
+    dueDate: formatDateForInput(typeof endDateRaw === "string" ? endDateRaw : undefined),
+    startDate: formatDateForInput(startDateRaw),
     labelIds: editTask.label_ids ?? editTask.labels?.map((l) => l.id) ?? [],
-    linkedRecordIds: [],
+    linkedRecordIds: (() => {
+      const link = resolveParentTaskLinkFromEditTask(editTask);
+      return link ? [link.id] : [];
+    })(),
     frequency,
     repeatInterval,
     repeatOn,
@@ -694,6 +849,56 @@ function LinkedRecordListRow({
   );
 }
 
+function SelectedLinkedRecordChip({
+  record,
+  onRemove,
+}: Readonly<{ record: LinkedRecord; onRemove: (id: number) => void }>) {
+  return (
+    <button
+      type="button"
+      onClick={() => onRemove(record.id)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "6px 12px",
+        borderRadius: 6,
+        backgroundColor: "#edf6ff",
+        border: "1px solid #bfdbfe",
+        fontSize: "0.875rem",
+        cursor: "pointer",
+        font: "inherit",
+        maxWidth: "100%",
+      }}
+    >
+      <ListTodo size={14} color="#4e6fa5" style={{ flexShrink: 0 }} />
+      <span
+        style={{
+          color: "#141414",
+          fontWeight: 500,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          minWidth: 0,
+        }}
+        title={`${record.title}`}
+      >
+        {record.title}
+      </span>
+      <span
+        style={{
+          color: "#64748b",
+          fontSize: "0.8rem",
+          flexShrink: 0,
+        }}
+      >
+        {record.reference}
+      </span>
+      <X size={14} style={{ color: "#64748b", flexShrink: 0 }} />
+    </button>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
@@ -828,8 +1033,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         });
         if (response?.data && Array.isArray(response.data)) {
           const taskRows = response.data as TaskListRow[];
+          const selfIdRaw = editTask?.rawData?.id ?? editTask?.id;
+          const selfIdNum =
+            selfIdRaw != null && String(selfIdRaw).trim() !== ""
+              ? Number(selfIdRaw)
+              : Number.NaN;
           const currentTaskId =
-            isEdit && editTask?.rawData?.id != null ? Number(editTask.rawData.id) : null;
+            isEdit && Number.isFinite(selfIdNum) && selfIdNum > 0 ? selfIdNum : null;
           const records: LinkedRecord[] = taskRows
             .filter(
               (t) =>
@@ -852,7 +1062,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         setLoadingLinkedRecords(false);
       }
     },
-    [isEdit, editTask?.rawData?.id, editTask?.project_id, editTask?.project?.id]
+    [
+      isEdit,
+      editTask?.rawData?.id,
+      editTask?.id,
+      editTask?.project_id,
+      editTask?.project?.id,
+    ]
   );
 
   useEffect(() => {
@@ -1052,10 +1268,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       payload.label_ids = formData.labelIds || [];
     }
     if (formData.statusId) payload.status_id = formData.statusId;
-    if (
-      formData.linkedRecordIds &&
-      formData.linkedRecordIds.length > 0
-    ) {
+    if (isEdit) {
+      payload.parent_task_id =
+        formData.linkedRecordIds.length > 0
+          ? formData.linkedRecordIds[0]
+          : null;
+    } else if (formData.linkedRecordIds.length > 0) {
       payload.parent_task_id = formData.linkedRecordIds[0];
     }
     if (taskTypeEff === "recurring") {
@@ -1083,10 +1301,6 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     }
     const taskTypeEff = clampTaskTypeToAllowed(formData.taskType, taskTypeOptions);
     if (taskTypeEff === "recurring") {
-      if (!formData.projectId) {
-        toast.error("Recurring tasks require a project");
-        return false;
-      }
       if (!formData.statusId) {
         toast.error("Recurring tasks require a status");
         return false;
@@ -1126,19 +1340,18 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       );
     }
     if (taskTypeEff === "recurring") {
-      const recurringPayload = {
+      const recurringPayload: Parameters<typeof createRecurringTask>[0] = {
         ...payload,
-        project_id: formData.projectId as number,
         status_id: formData.statusId as number,
         start_date: formData.startDate,
         end_date: formData.dueDate || null,
-        type: "recurring" as const,
+        type: "recurring",
       };
-      return Boolean(
-        await createRecurringTask(
-          recurringPayload as Parameters<typeof createRecurringTask>[0],
-        ),
-      );
+      if (formData.projectId != null && formData.projectId > 0) {
+        recurringPayload.project_id = formData.projectId;
+        recurringPayload.label_ids = formData.labelIds || [];
+      }
+      return Boolean(await createRecurringTask(recurringPayload));
     }
     const withTz = { ...payload, timezone: getAutoTimezone() };
     return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
@@ -1201,6 +1414,54 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     }));
   };
 
+  const removeLinkedRecordById = useCallback((id: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      linkedRecordIds: prev.linkedRecordIds.filter((x) => x !== id),
+    }));
+  }, []);
+
+  const toggleLinkedRecord = useCallback((recordId: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      linkedRecordIds: prev.linkedRecordIds.includes(recordId) ? [] : [recordId],
+    }));
+  }, []);
+
+  const handleLinkedRecordsSearchChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      setSearchQuery(value);
+      void fetchLinkRecordsForSearch(value, formData.projectId);
+    },
+    [formData.projectId, fetchLinkRecordsForSearch],
+  );
+
+  const handleStartDateInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newStart = e.target.value;
+      setFormData((prev) => {
+        const minDue = minDueDateFromTodayAndStart(newStart);
+        const nextDue = clampDueDateToMin(prev.dueDate, minDue);
+        return { ...prev, startDate: newStart, dueDate: nextDue };
+      });
+    },
+    [],
+  );
+
+  const handleDueDateInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const v = e.target.value;
+      setFormData((prev) => ({
+        ...prev,
+        dueDate: v
+          ? clampDueDateToMin(v, minDueDateFromTodayAndStart(prev.startDate))
+          : "",
+      }));
+    },
+    [],
+  );
+
   const selectedAssignees = users.filter((u) =>
     formData.assigneeIds.includes(u.id)
   );
@@ -1211,8 +1472,43 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     formData.labelIds.includes(l.id)
   );
 
+  const linkedRecordsForDisplay = useMemo(() => {
+    const api = linkedRecordsFromApi;
+    const fallbackParent =
+      isEdit && editTask ? resolveParentTaskLinkFromEditTask(editTask) : null;
+    const extras: LinkedRecord[] = [];
+    for (const sid of formData.linkedRecordIds) {
+      if (api.some((r) => r.id === sid)) {
+        continue;
+      }
+      if (fallbackParent?.id === sid) {
+        extras.push(fallbackParent);
+      } else {
+        extras.push({
+          id: sid,
+          type: "task",
+          title: `Task #${sid}`,
+          reference: `#${sid}`,
+        });
+      }
+    }
+    const extraIds = new Set(extras.map((e) => e.id));
+    const rest = api.filter((r) => !extraIds.has(r.id));
+    return [...extras, ...rest];
+  }, [linkedRecordsFromApi, formData.linkedRecordIds, isEdit, editTask]);
+
+  const selectedLinkedRecords = useMemo((): LinkedRecord[] => {
+    const byId = new Map(linkedRecordsForDisplay.map((r) => [r.id, r]));
+    const out: LinkedRecord[] = [];
+    for (const id of formData.linkedRecordIds) {
+      const row = byId.get(id);
+      if (row) out.push(row);
+    }
+    return out;
+  }, [linkedRecordsForDisplay, formData.linkedRecordIds]);
+
   const renderLinkedRecordsList = (): React.ReactNode => {
-    if (loadingLinkedRecords) {
+    if (loadingLinkedRecords && linkedRecordsForDisplay.length === 0) {
       return (
         <div
           className="p-3 text-center text-muted"
@@ -1222,7 +1518,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         </div>
       );
     }
-    if (linkedRecordsFromApi.length === 0) {
+    if (linkedRecordsForDisplay.length === 0) {
       return (
         <div
           className="p-3 text-center text-muted"
@@ -1232,13 +1528,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         </div>
       );
     }
-    const toggleLinkedRecord = (recordId: number) => {
-      setFormData((prev) => ({
-        ...prev,
-        linkedRecordIds: prev.linkedRecordIds.includes(recordId) ? [] : [recordId],
-      }));
-    };
-    return linkedRecordsFromApi.map((record) => (
+    return linkedRecordsForDisplay.map((record) => (
       <LinkedRecordListRow
         key={record.id}
         record={record}
@@ -1249,6 +1539,38 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   };
 
   if (!isOpen) return null;
+
+  const handleRecurringFrequencySelectChange = (
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    const nextFreq = e.target.value;
+    setFormData((prev) => {
+      let nextRepeatOn: string;
+      if (nextFreq === "weekly") {
+        const normalized = normalizeWeeklyRepeatOnFromApi(prev.repeatOn);
+        nextRepeatOn = normalized || "monday";
+      } else if (nextFreq === "monthly") {
+        nextRepeatOn = /^\d+$/.test(prev.repeatOn.trim())
+          ? prev.repeatOn.trim()
+          : "1";
+      } else {
+        nextRepeatOn = "";
+      }
+      return { ...prev, frequency: nextFreq, repeatOn: nextRepeatOn };
+    });
+  };
+
+  const handleProjectSelectChange = (
+    e: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    const newProjectId = e.target.value ? Number(e.target.value) : null;
+    setFormData((prev) => ({
+      ...prev,
+      projectId: newProjectId,
+      statusId: null,
+    }));
+    void fetchLinkRecordsForSearch(searchQuery, newProjectId);
+  };
 
   const sidebarEditTaskId =
     isEdit && editTask
@@ -1450,18 +1772,33 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               <Col xs={12}>
               <Form.Group className={groupClass}>
                   <Form.Label style={labelStyle}>
-                    Associate with records 
+                    Associate with records
                   </Form.Label>
+                  {selectedLinkedRecords.length > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {selectedLinkedRecords.map((r) => (
+                        <SelectedLinkedRecordChip
+                          key={r.id}
+                          record={r}
+                          onRemove={removeLinkedRecordById}
+                        />
+                      ))}
+                    </div>
+                  )}
                   <div style={{ marginBottom: 8 }}>
                     <Form.Control
                       type="text"
                       placeholder="Search task..."
                       value={searchQuery}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setSearchQuery(value);
-                        fetchLinkRecordsForSearch(value, formData.projectId);
-                      }}
+                      onChange={handleLinkedRecordsSearchChange}
                       className="py-2"
                       style={{  fontSize: "14px" }}
                     />
@@ -1802,20 +2139,17 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   <Form.Label style={labelStyle}>
                     <Calendar size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                     Start Date
+                    {formData.taskType === "recurring" && (
+                      <span style={{ color: "#ef4444" }}> *</span>
+                    )}
                   </Form.Label>
                   <Form.Control
                     type="date"
                     value={formData.startDate}
-                    onChange={(e) => {
-                      const newStart = e.target.value;
-                      setFormData((prev) => {
-                        const minDue = minDueDateFromTodayAndStart(newStart);
-                        const nextDue = clampDueDateToMin(prev.dueDate, minDue);
-                        return { ...prev, startDate: newStart, dueDate: nextDue };
-                      });
-                    }}
+                    onChange={handleStartDateInputChange}
                     className="py-2"
                     style={{ fontSize: "14px" }}
+                    required={formData.taskType === "recurring"}
                   />
                 </Form.Group>
               </Col>
@@ -1829,13 +2163,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     type="date"
                     min={dueDateMin}
                     value={formData.dueDate}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setFormData((prev) => ({
-                        ...prev,
-                        dueDate: v ? clampDueDateToMin(v, minDueDateFromTodayAndStart(prev.startDate)) : "",
-                      }));
-                    }}
+                    onChange={handleDueDateInputChange}
                     className="py-2"
                     style={{ fontSize: "14px" }}
                   />
@@ -1854,23 +2182,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   </Form.Label>
                   <Form.Select
                     value={formData.frequency}
-                    onChange={(e) => {
-                      const nextFreq = e.target.value;
-                      setFormData((prev) => {
-                        let nextRepeatOn: string;
-                        if (nextFreq === "weekly") {
-                          const normalized = normalizeWeeklyRepeatOnFromApi(prev.repeatOn);
-                          nextRepeatOn = normalized || "monday";
-                        } else if (nextFreq === "monthly") {
-                          nextRepeatOn = /^\d+$/.test(prev.repeatOn.trim())
-                            ? prev.repeatOn.trim()
-                            : "1";
-                        } else {
-                          nextRepeatOn = "";
-                        }
-                        return { ...prev, frequency: nextFreq, repeatOn: nextRepeatOn };
-                      });
-                    }}
+                    onChange={handleRecurringFrequencySelectChange}
                     className="py-2"
                     style={{ fontSize: "14px" }}
                   >
@@ -2063,20 +2375,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Form.Label style={labelStyle}>
                       <FolderOpen size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                       Project
+                      {formData.taskType === "recurring" && (
+                        <span style={{ fontWeight: 400, color: "#6b7280" }}> (optional)</span>
+                      )}
                     </Form.Label>
                     <Form.Select
                       value={formData.projectId || ""}
-                      onChange={(e) => {
-                        const newProjectId = e.target.value
-                          ? Number(e.target.value)
-                          : null;
-                        setFormData((prev) => ({
-                          ...prev,
-                          projectId: newProjectId,
-                          statusId: null,
-                        }));
-                        fetchLinkRecordsForSearch(searchQuery, newProjectId);
-                      }}
+                      onChange={handleProjectSelectChange}
                       className="py-2"
                       style={{ fontSize: "14px" }}
                       disabled={
