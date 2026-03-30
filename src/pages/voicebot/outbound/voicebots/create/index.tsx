@@ -7,6 +7,7 @@ import {
   getVoicebot,
   postVoicebots,
   putVoicebot,
+  type CreateVoicebotPayload,
   type UpdateVoicebotPayload,
 } from "@utils/voicebot/outbound";
 import { toFormString, firstString } from "@utils/voicebot/formDisplay";
@@ -158,12 +159,12 @@ function buildUpdatePayload(form: OutboundVoicebotFormState): UpdateVoicebotPayl
   };
 }
 
-function buildCreatePayload(form: OutboundVoicebotFormState) {
-  // For create, API payload matches update payload (with required fields kept required)
+function buildCreatePayload(form: OutboundVoicebotFormState): CreateVoicebotPayload {
   const base = buildUpdatePayload(form);
   return {
     ...base,
     company_id: form.company_id,
+    name: form.name.trim(),
     trunk_id: form.trunk_id?.trim() ?? "",
     default_greeting: form.first_message?.trim() ?? "",
     default_system_prompt: form.system_prompt?.trim() ?? "",
@@ -455,7 +456,7 @@ const VoicebotOutboundCreate = () => {
                           </Form.Group>
                           <Form.Group className="mb-3">
                             <Form.Label style={labelStyle}>Select Trunk <span className="text-danger">*</span></Form.Label>
-                            <Form.Select value={form.trunk_id ?? ""} onChange={(e) => setForm((f) => ({ ...f, trunk_id: e.target.value }))} disabled={isEditMode} style={inputStyle}>
+                            <Form.Select value={form.trunk_id ?? ""} onChange={(e) => setForm((f) => ({ ...f, trunk_id: e.target.value }))}  style={inputStyle}>
                               <option value="">Select trunk</option>
                               {trunks.map((t) => <option key={t.id} value={t.id}>{t.name || t.id}</option>)}
                             </Form.Select>

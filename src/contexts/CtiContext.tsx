@@ -12,14 +12,362 @@ import {
   transferCalls as transferCallsAPI,
   getCallingDeviceInfo,
   getAllUserDevices,
-  GetCallLegs
+  GetCallLegs,
+  type HoldCallParams,
 } from '../utils/dialer';
 import { getCrossTabCtiManager } from '../utils/crossTabCtiManager';
-import moment from 'moment';
+import { parseCallAnswerStartTimeUtc } from '@components/live-calls/utils/helpers';
 
 // Local storage keys (matching useCtiStomp.ts)
 const CALL_STATES_STORAGE_KEY = "cti_call_states";
 const CALL_STATES_TIMESTAMP_KEY = "cti_call_states_timestamp";
+
+type ActiveCallMapValue = {
+  id: string;
+  number: string;
+  startTime: Date;
+  status: string;
+  callId?: string;
+  callingAddress?: string;
+  calledAddress?: string;
+  callingDeviceName?: string;
+  callingDeviceType?: string;
+  duration?: number;
+};
+
+const CTI_EVENT_ACTIVE_STATUSES = new Set([
+  'CONNECTED',
+  'ANSWERED',
+  'RETRIEVED',
+  'RINGING',
+  'ON_HOLD',
+]);
+
+function mapCtiCallStatusToLocalStatus(callStatus: string | undefined): string {
+  if (!callStatus) {
+    return 'dialing';
+  }
+  switch (callStatus) {
+    case 'RINGING':
+      return 'ringing';
+    case 'CONNECTED':
+    case 'ANSWERED':
+    case 'RETRIEVED':
+      return 'connected';
+    case 'ON_HOLD':
+    case 'HELD':
+      return 'onHold';
+    case 'ENDED':
+    case 'DISCONNECTED':
+    case 'DROPPED':
+      return 'ended';
+    default:
+      return 'dialing';
+  }
+}
+
+function localStatusFromCallStateRecord(callState: {
+  currentState?: string;
+  parties?: Array<{ callStatus?: string }>;
+}): string {
+  const firstParty = callState.parties?.[0];
+  const source = firstParty?.callStatus ?? callState.currentState;
+  return mapCtiCallStatusToLocalStatus(source);
+}
+
+function removeCallByCallIdFromMap(newMap: Map<string, ActiveCallMapValue>, callId: string): void {
+  const existingCall = Array.from(newMap.values()).find((c) => c.callId === callId);
+  if (existingCall) {
+    newMap.delete(existingCall.id);
+  }
+}
+
+function mergeCallStateIntoMap(newMap: Map<string, ActiveCallMapValue>, callState: any): void {
+  if (!callState.callId || !callState.parties?.length) {
+    return;
+  }
+  const firstParty = callState.parties[0];
+  if (!firstParty) {
+    return;
+  }
+
+  const { callId, callingAddress, calledAddress, callingDeviceName, callingDeviceType } = firstParty;
+  const localStatus = localStatusFromCallStateRecord(callState);
+
+  if (localStatus === 'ended') {
+    removeCallByCallIdFromMap(newMap, callId);
+    return;
+  }
+
+  const callNumber = calledAddress || callingAddress;
+  const callKey = callId || `call_${Date.now()}`;
+
+  const parsedApiStart = parseCallAnswerStartTimeUtc(callState);
+  const startTime = parsedApiStart ?? new Date();
+
+  let duration = 0;
+  if (localStatus === 'connected' && parsedApiStart) {
+    const now = new Date();
+    duration = Math.max(0, Math.round((now.getTime() - parsedApiStart.getTime()) / 1000));
+  }
+
+  const existingCall = Array.from(newMap.values()).find(
+    (call) =>
+      call.callId === callId ||
+      (call.callingAddress === callingAddress && call.calledAddress === calledAddress),
+  );
+
+  if (existingCall) {
+    newMap.set(existingCall.id, {
+      ...existingCall,
+      status: localStatus,
+      callId: callId || existingCall.callId,
+      callingAddress: callingAddress || existingCall.callingAddress,
+      calledAddress: calledAddress || existingCall.calledAddress,
+      callingDeviceName: callingDeviceName || existingCall.callingDeviceName,
+      callingDeviceType: callingDeviceType || existingCall.callingDeviceType,
+      startTime: existingCall.startTime || startTime,
+      duration: localStatus === 'connected' ? duration : existingCall.duration || 0,
+    });
+    return;
+  }
+
+  newMap.set(callKey, {
+    id: callKey,
+    number: callNumber,
+    status: localStatus,
+    startTime,
+    callId,
+    callingAddress,
+    calledAddress,
+    callingDeviceName,
+    callingDeviceType,
+    duration,
+  });
+}
+
+function isCallLegParticipantActive(item: Record<string, unknown>): boolean {
+  if (item.hasActiveParticipants === false) {
+    return false;
+  }
+  if (item.isTerminating === true) {
+    return false;
+  }
+  const status = item.status ?? item.callStatus ?? item.currentState;
+  if (status === 'DISCONNECTED' || status === 'DROPPED' || status === 'ENDED') {
+    return false;
+  }
+  return true;
+}
+
+function isObjectCallEntryActive(callData: unknown): boolean {
+  if (!callData || typeof callData !== 'object') {
+    return true;
+  }
+  return isCallLegParticipantActive(callData as Record<string, unknown>);
+}
+
+function collectActiveCallIdsFromResponseData(responseData: unknown): string[] {
+  if (Array.isArray(responseData)) {
+    return responseData
+      .filter((item: unknown) => isCallLegParticipantActive(item as Record<string, unknown>))
+      .map((item: any) => item.callId || item.call_id)
+      .filter((id: unknown): id is string => Boolean(id));
+  }
+  if (typeof responseData === 'object' && responseData !== null) {
+    return Object.entries(responseData as Record<string, unknown>)
+      .filter(([, callData]) => isObjectCallEntryActive(callData))
+      .map(([callId, callData]) => {
+        if (callData && typeof callData === 'object') {
+          const o = callData as Record<string, unknown>;
+          const id = o.callId ?? o.call_id;
+          if (typeof id === 'string' && id) {
+            return id;
+          }
+        }
+        return callId;
+      })
+      .filter((id: unknown): id is string => Boolean(id));
+  }
+  return [];
+}
+
+function mergeInactiveCallIdsFromResponseObject(
+  responseData: unknown,
+  inactiveCallIds: Set<string>,
+): void {
+  if (!responseData || typeof responseData !== 'object' || Array.isArray(responseData)) {
+    return;
+  }
+  Object.entries(responseData as Record<string, unknown>).forEach(([callId, callData]) => {
+    if (!callData || typeof callData !== 'object') {
+      return;
+    }
+    const o = callData as Record<string, unknown>;
+    if (o.hasActiveParticipants !== false) {
+      return;
+    }
+    inactiveCallIds.add(callId);
+    const nestedId = o.callId;
+    if (typeof nestedId === 'string' && nestedId !== callId) {
+      inactiveCallIds.add(nestedId);
+    }
+  });
+}
+
+function pruneCallsAfterVerification(
+  newMap: Map<string, ActiveCallMapValue>,
+  responseData: unknown,
+  activeCallIdsFromAPI: string[],
+  inactiveCallIds: Set<string>,
+): number {
+  let removedCount = 0;
+  const responseRecord =
+    responseData && typeof responseData === 'object' && !Array.isArray(responseData)
+      ? (responseData as Record<string, unknown>)
+      : null;
+
+  Array.from(newMap.entries()).forEach(([callKey, call]) => {
+    if (!call.callId) {
+      return;
+    }
+
+    let shouldRemove = false;
+    const callData = responseRecord?.[call.callId];
+
+    if (callData && typeof callData === 'object') {
+      const o = callData as Record<string, unknown>;
+      if (o.hasActiveParticipants === false) {
+        shouldRemove = true;
+        inactiveCallIds.add(call.callId);
+      }
+    }
+
+    if (!shouldRemove && !activeCallIdsFromAPI.includes(call.callId)) {
+      shouldRemove = true;
+      inactiveCallIds.add(call.callId);
+    }
+
+    if (shouldRemove) {
+      newMap.delete(callKey);
+      removedCount += 1;
+    }
+  });
+
+  return removedCount;
+}
+
+function scrubInactiveCallsFromLocalStorageState(
+  parsedCallStates: Record<string, unknown>,
+  inactiveCallIds: Set<string>,
+  responseData: unknown,
+): number {
+  let localStorageRemovedCount = 0;
+  inactiveCallIds.forEach((callId) => {
+    if (parsedCallStates[callId]) {
+      delete parsedCallStates[callId];
+      localStorageRemovedCount += 1;
+    }
+  });
+
+  const responseRecord =
+    responseData && typeof responseData === 'object' && !Array.isArray(responseData)
+      ? (responseData as Record<string, unknown>)
+      : null;
+
+  Object.keys(parsedCallStates).forEach((callId) => {
+    const callData = responseRecord?.[callId];
+    if (
+      callData &&
+      typeof callData === 'object' &&
+      (callData as Record<string, unknown>).hasActiveParticipants === false
+    ) {
+      delete parsedCallStates[callId];
+      localStorageRemovedCount += 1;
+    }
+  });
+
+  if (Object.keys(parsedCallStates).length === 0) {
+    localStorage.removeItem(CALL_STATES_STORAGE_KEY);
+    localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
+  }
+
+  return localStorageRemovedCount;
+}
+
+function logActiveCallsVerificationOutcome(
+  removedCount: number,
+  activeCallIdsFromAPI: string[],
+): void {
+  if (removedCount > 0) {
+    console.log(
+      `[CtiContext] Removed ${removedCount} inactive call(s) from activeCalls after GetCallLegs verification (hasActiveParticipants=false or not in active list)`,
+    );
+    return;
+  }
+  console.log(`[CtiContext] All ${activeCallIdsFromAPI.length} call(s) verified as active`);
+}
+
+function handleGetCallLegsSuccess(
+  responseData: unknown,
+  setActiveCalls: React.Dispatch<React.SetStateAction<Map<string, ActiveCallMapValue>>>,
+): void {
+  const activeCallIdsFromAPI = collectActiveCallIdsFromResponseData(responseData);
+  const inactiveCallIds = new Set<string>();
+  mergeInactiveCallIdsFromResponseObject(responseData, inactiveCallIds);
+
+  setActiveCalls((prev) => {
+    const newMap = new Map(prev);
+    const removedCount = pruneCallsAfterVerification(
+      newMap,
+      responseData,
+      activeCallIdsFromAPI,
+      inactiveCallIds,
+    );
+    logActiveCallsVerificationOutcome(removedCount, activeCallIdsFromAPI);
+    return newMap;
+  });
+
+  if (inactiveCallIds.size === 0) {
+    return;
+  }
+
+  try {
+    const storedCallStates = localStorage.getItem(CALL_STATES_STORAGE_KEY);
+    if (!storedCallStates) {
+      return;
+    }
+    const parsedCallStates = JSON.parse(storedCallStates) as Record<string, unknown>;
+    const localStorageRemovedCount = scrubInactiveCallsFromLocalStorageState(
+      parsedCallStates,
+      inactiveCallIds,
+      responseData,
+    );
+    if (localStorageRemovedCount > 0) {
+      console.log(
+        `[CtiContext] Removed ${localStorageRemovedCount} inactive call(s) from localStorage`,
+      );
+    }
+  } catch (error) {
+    console.error('[CtiContext] Error removing inactive calls from localStorage:', error);
+  }
+}
+
+function tickConnectedCallDuration(
+  callId: string,
+  setActiveCalls: React.Dispatch<React.SetStateAction<Map<string, ActiveCallMapValue>>>,
+): void {
+  setActiveCalls((prev) => {
+    const newMap = new Map(prev);
+    const existingCall = newMap.get(callId);
+    if (existingCall?.status === 'connected') {
+      const now = new Date();
+      const duration = Math.round((now.getTime() - existingCall.startTime.getTime()) / 1000);
+      newMap.set(callId, { ...existingCall, duration });
+    }
+    return newMap;
+  });
+}
 
 interface CtiContextType {
   // Connection state
@@ -135,18 +483,7 @@ interface CtiContextType {
   getAllUserDevices: () => any[] | null;
   
   // Active calls management (for dialer-like functionality)
-  activeCalls: Map<string, {
-    id: string;
-    number: string;
-    startTime: Date;
-    status: string;
-    callId?: string;
-    callingAddress?: string;
-    calledAddress?: string;
-    callingDeviceName?: string;
-    callingDeviceType?: string;
-    duration?: number;
-  }>;
+  activeCalls: Map<string, ActiveCallMapValue>;
   
   // Utility functions
   formatDuration: (seconds: number) => string;
@@ -169,18 +506,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
   const crossTabManagerRef = useRef(getCrossTabCtiManager());
   
   // Active calls state (similar to dialer's activeCalls)
-  const [activeCalls, setActiveCalls] = useState<Map<string, {
-    id: string;
-    number: string;
-    startTime: Date;
-    status: string;
-    callId?: string;
-    callingAddress?: string;
-    calledAddress?: string;
-    callingDeviceName?: string;
-    callingDeviceType?: string;
-    duration?: number;
-  }>>(new Map());
+  const [activeCalls, setActiveCalls] = useState<Map<string, ActiveCallMapValue>>(new Map());
   
   // Populate activeCalls from callStateMap on initialization (from complete_state or localStorage)
   // This ensures in-progress calls are shown after page reload
@@ -193,114 +519,9 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       !call.isTerminating && call.parties && call.parties.length > 0
     );
     
-    setActiveCalls(prev => {
+    setActiveCalls((prev) => {
       const newMap = new Map(prev);
-      
-      // Process all active calls from callStateMap
-      allCallStates.forEach((callState: any) => {
-        if (!callState.callId || !callState.parties || callState.parties.length === 0) return;
-        
-        // Get the first party (or find one that matches userAddress if available)
-        const firstParty = callState.parties[0];
-        if (!firstParty) return;
-        
-        const { callId, callingAddress, calledAddress, callingDeviceName, callingDeviceType, callStatus } = firstParty;
-        
-        // Determine call number from first party
-        const callNumber = calledAddress || callingAddress;
-        
-        // Map CTI status to local status
-        let localStatus = 'dialing';
-        if (callStatus) {
-          switch (callStatus) {
-            case 'RINGING': localStatus = 'ringing'; break;
-            case 'CONNECTED':
-            case 'ANSWERED':
-            case 'RETRIEVED': localStatus = 'connected'; break;
-            case 'ON_HOLD':
-            case 'HELD': localStatus = 'onHold'; break;
-            case 'ENDED':
-            case 'DISCONNECTED':
-            case 'DROPPED': localStatus = 'ended'; break;
-            default: localStatus = 'dialing';
-          }
-        } else if (callState.currentState) {
-          // Fallback to callState.currentState if party doesn't have callStatus
-          switch (callState.currentState) {
-            case 'RINGING': localStatus = 'ringing'; break;
-            case 'CONNECTED':
-            case 'ANSWERED':
-            case 'RETRIEVED': localStatus = 'connected'; break;
-            case 'ON_HOLD':
-            case 'HELD': localStatus = 'onHold'; break;
-            case 'ENDED':
-            case 'DISCONNECTED':
-            case 'DROPPED': localStatus = 'ended'; break;
-            default: localStatus = 'dialing';
-          }
-        }
-        
-        // Skip ended calls
-        if (localStatus === 'ended') {
-          // Remove from map if it exists
-          const existingCall = Array.from(newMap.values()).find(call => call.callId === callId);
-          if (existingCall) {
-            newMap.delete(existingCall.id);
-          }
-          return;
-        }
-        
-        // Use callId as the key for consistency
-        const callKey = callId || `call_${Date.now()}`;
-        
-        // Calculate startTime from eventTime if available, otherwise use current time
-        let startTime = new Date();
-        if (callState.eventTime) {
-          startTime = new Date(callState.eventTime);
-        }
-        
-        // Calculate duration if call is connected
-        let duration = 0;
-        if (localStatus === 'connected' && callState.eventTime) {
-          const now = new Date();
-          const eventTime = moment.utc(callState.eventTime).toDate();
-          duration = Math.max(0, Math.round((now.getTime() - eventTime.getTime()) / 1000));
-        }
-        
-        // Check if we already have this call in prev (to preserve any updates from eventLog)
-        const existingCall = Array.from(newMap.values()).find(call => 
-          call.callId === callId || 
-          (call.callingAddress === callingAddress && call.calledAddress === calledAddress)
-        );
-        if (existingCall) {
-          // Update existing call but preserve startTime if it was already set
-          newMap.set(existingCall.id, {
-            ...existingCall,
-            status: localStatus,
-            callId: callId || existingCall.callId,
-            callingAddress: callingAddress || existingCall.callingAddress,
-            calledAddress: calledAddress || existingCall.calledAddress,
-            callingDeviceName: callingDeviceName || existingCall.callingDeviceName,
-            callingDeviceType: callingDeviceType || existingCall.callingDeviceType,
-            startTime: existingCall.startTime || startTime,
-            duration: localStatus === 'connected' ? duration : existingCall.duration || 0
-          });
-        } else {
-          // Create new call entry
-          newMap.set(callKey, {
-            id: callKey,
-            number: callNumber,
-            status: localStatus,
-            startTime: startTime,
-            callId: callId,
-            callingAddress: callingAddress,
-            calledAddress: calledAddress,
-            callingDeviceName: callingDeviceName,
-            callingDeviceType: callingDeviceType,
-            duration: duration
-          });
-        }
-      });
+      allCallStates.forEach((callState: any) => mergeCallStateIntoMap(newMap, callState));
       
       // Note: We don't remove calls that aren't in callStateMap here because:
       // 1. eventLog processing will handle removals when calls end
@@ -313,38 +534,24 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
   
   // Process CTI events to update active calls
   useEffect(() => {
-    if (!ctiStomp.eventLog || ctiStomp.eventLog.length === 0) return;
-    
-    const latestEvent = ctiStomp.eventLog[ctiStomp.eventLog.length - 1];
-    if (!latestEvent || !latestEvent.parties || latestEvent.parties.length === 0) return;
-    
-    // For multi-party (e.g. transfer) events, prefer the CONNECTED/active leg so transfer hold uses the right party.
-    const activeStatuses = ['CONNECTED', 'ANSWERED', 'RETRIEVED', 'RINGING', 'ON_HOLD'];
-    const eventData =
-      latestEvent.parties.find((p: any) => p.callStatus && activeStatuses.includes(p.callStatus)) ||
-      latestEvent.parties[0];
-    const { callId, callingAddress, calledAddress, callStatus, callingDeviceName, callingDeviceType } = eventData;
-    
-    if (!callId || !callingAddress || !calledAddress) return;
-    
-    // Determine call number
-    const callNumber = calledAddress || callingAddress;
-    
-    // Map CTI status to local status
-    let localStatus = 'dialing';
-    if (callStatus) {
-      switch (callStatus) {
-        case 'RINGING': localStatus = 'ringing'; break;
-        case 'CONNECTED':
-        case 'ANSWERED':
-        case 'RETRIEVED': localStatus = 'connected'; break;
-        case 'ON_HOLD': localStatus = 'onHold'; break;
-        case 'ENDED':
-        case 'DISCONNECTED':
-        case 'DROPPED': localStatus = 'ended'; break;
-        default: localStatus = 'dialing';
-      }
+    const latestEvent = ctiStomp.eventLog?.at(-1);
+    if (!latestEvent?.parties?.length) {
+      return;
     }
+
+    // For multi-party (e.g. transfer) events, prefer the CONNECTED/active leg so transfer hold uses the right party.
+    const eventData =
+      latestEvent.parties.find(
+        (p: any) => p.callStatus && CTI_EVENT_ACTIVE_STATUSES.has(p.callStatus),
+      ) ?? latestEvent.parties[0];
+    const { callId, callingAddress, calledAddress, callStatus, callingDeviceName, callingDeviceType } = eventData;
+
+    if (!callId || !callingAddress || !calledAddress) {
+      return;
+    }
+
+    const callNumber = calledAddress || callingAddress;
+    const localStatus = mapCtiCallStatusToLocalStatus(callStatus);
     
     // Update active calls based on event
     setActiveCalls(prev => {
@@ -404,21 +611,11 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     const currentActiveCalls = Array.from(activeCalls.entries());
     
     currentActiveCalls.forEach(([callId, call]) => {
-      if (call.status === 'connected') {
-        const interval = setInterval(() => {
-          setActiveCalls(prev => {
-            const newMap = new Map(prev);
-            const existingCall = newMap.get(callId);
-            if (existingCall && existingCall.status === 'connected') {
-              const now = new Date();
-              const duration = Math.round((now.getTime() - existingCall.startTime.getTime()) / 1000);
-              newMap.set(callId, { ...existingCall, duration });
-            }
-            return newMap;
-          });
-        }, 1000);
-        intervals.push(interval);
+      if (call.status !== 'connected') {
+        return;
       }
+      const interval = setInterval(() => tickConnectedCallDuration(callId, setActiveCalls), 1000);
+      intervals.push(interval);
     });
     
     return () => {
@@ -446,170 +643,8 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
         const response = await GetCallLegs({ callIds: activeCallIds });
         
         if (response.success && response.data) {
-          // Extract response data - structure: { responseData: { "callId": { hasActiveParticipants: boolean, ... }, ... } }
           const responseData = response.data.responseData || response.data.data || response.data;
-          
-          // Determine which call IDs are still active based on hasActiveParticipants field
-          // Response structure: keys are call IDs, values are call objects with hasActiveParticipants field
-          let activeCallIdsFromAPI: string[] = [];
-          
-          if (Array.isArray(responseData)) {
-            // If it's an array of call legs, check hasActiveParticipants field
-            activeCallIdsFromAPI = responseData
-              .filter((item: any) => {
-                // Check hasActiveParticipants field - if false, call has ended
-                const hasActiveParticipants = item.hasActiveParticipants !== undefined 
-                  ? item.hasActiveParticipants 
-                  : true; // Default to true if field is missing (fail-safe)
-                
-                // Also check status fields as fallback
-                const status = item.status || item.callStatus || item.currentState;
-                const isTerminating = item.isTerminating === true;
-                
-                return hasActiveParticipants && 
-                       !isTerminating &&
-                       (!status || (status !== 'DISCONNECTED' && status !== 'DROPPED' && status !== 'ENDED'));
-              })
-              .map((item: any) => item.callId || item.call_id)
-              .filter((id: string) => id);
-          } else if (typeof responseData === 'object' && responseData !== null) {
-            // If it's an object with call IDs as keys (expected structure)
-            activeCallIdsFromAPI = Object.entries(responseData)
-              .filter(([callId, callData]: [string, any]) => {
-                // Check hasActiveParticipants field - primary indicator of active calls
-                if (callData && typeof callData === 'object') {
-                  const hasActiveParticipants = callData.hasActiveParticipants !== undefined 
-                    ? callData.hasActiveParticipants 
-                    : true; // Default to true if field is missing (fail-safe)
-                  
-                  // Also check isTerminating field
-                  const isTerminating = callData.isTerminating === true;
-                  
-                  // Check status fields as fallback
-                  const status = callData.status || callData.callStatus || callData.currentState;
-                  
-                  // Call is active if hasActiveParticipants is true and not terminating
-                  return hasActiveParticipants && 
-                         !isTerminating &&
-                         (!status || (status !== 'DISCONNECTED' && status !== 'DROPPED' && status !== 'ENDED'));
-                }
-                // If not an object, assume it's a call ID (key is the callId)
-                return true;
-              })
-              .map(([callId, callData]: [string, any]) => {
-                // If callData is an object, use its callId field if available, otherwise use the key
-                return (callData && typeof callData === 'object' && (callData.callId || callData.call_id)) || callId;
-              })
-              .filter((id: string) => id);
-          }
-          
-          // Collect call IDs that should be removed (for localStorage cleanup)
-          const inactiveCallIds = new Set<string>();
-          
-          // First, check all calls in responseData to identify inactive ones
-          if (responseData && typeof responseData === 'object') {
-            Object.entries(responseData).forEach(([callId, callData]: [string, any]) => {
-              if (callData && typeof callData === 'object') {
-                // Check hasActiveParticipants field - if false, mark for removal
-                if (callData.hasActiveParticipants === false) {
-                  // Add both the key (callId) and the callId from the object if it exists
-                  inactiveCallIds.add(callId);
-                  if (callData.callId && callData.callId !== callId) {
-                    inactiveCallIds.add(callData.callId);
-                  }
-                }
-              }
-            });
-          }
-          
-          // Remove calls from activeCalls that are no longer active according to the API
-          setActiveCalls(prev => {
-            const newMap = new Map(prev);
-            let removedCount = 0;
-            
-            // Remove calls whose callId is not in the active list from API
-            // Also check responseData directly for hasActiveParticipants = false
-            Array.from(newMap.entries()).forEach(([callKey, call]) => {
-              if (!call.callId) return;
-              
-              // Check if call exists in responseData
-              const callData = responseData && typeof responseData === 'object' && responseData[call.callId];
-              
-              let shouldRemove = false;
-              
-              if (callData && typeof callData === 'object') {
-                // Check hasActiveParticipants field - if false, remove the call
-                if (callData.hasActiveParticipants === false) {
-                  shouldRemove = true;
-                  inactiveCallIds.add(call.callId);
-                }
-              }
-              
-              // Also check if callId is not in the active list
-              if (!shouldRemove && !activeCallIdsFromAPI.includes(call.callId)) {
-                shouldRemove = true;
-                inactiveCallIds.add(call.callId);
-              }
-              
-              if (shouldRemove) {
-                newMap.delete(callKey);
-                removedCount++;
-              }
-            });
-            
-            if (removedCount > 0) {
-              console.log(`[CtiContext] Removed ${removedCount} inactive call(s) from activeCalls after GetCallLegs verification (hasActiveParticipants=false or not in active list)`);
-            } else {
-              console.log(`[CtiContext] All ${activeCallIdsFromAPI.length} call(s) verified as active`);
-            }
-            
-            return newMap;
-          });
-          
-          // Remove inactive calls from localStorage to prevent them from showing on subsequent refreshes
-          // This checks ALL calls in localStorage, not just ones in activeCalls
-          if (inactiveCallIds.size > 0) {
-            try {
-              const storedCallStates = localStorage.getItem(CALL_STATES_STORAGE_KEY);
-              if (storedCallStates) {
-                const parsedCallStates = JSON.parse(storedCallStates);
-                let localStorageRemovedCount = 0;
-                
-                // Remove inactive call IDs from localStorage
-                inactiveCallIds.forEach(callId => {
-                  if (parsedCallStates[callId]) {
-                    delete parsedCallStates[callId];
-                    localStorageRemovedCount++;
-                  }
-                });
-                
-                // Also check all calls in localStorage against responseData
-                Object.keys(parsedCallStates).forEach(callId => {
-                  const callData = responseData && typeof responseData === 'object' && responseData[callId];
-                  if (callData && typeof callData === 'object' && callData.hasActiveParticipants === false) {
-                    delete parsedCallStates[callId];
-                    localStorageRemovedCount++;
-                  }
-                });
-                
-                // Save updated call states back to localStorage
-                if (Object.keys(parsedCallStates).length > 0) {
-                  //localStorage.setItem(CALL_STATES_STORAGE_KEY, JSON.stringify(parsedCallStates));
-                  //localStorage.setItem(CALL_STATES_TIMESTAMP_KEY, new Date().toISOString());
-                } else {
-                  // If no active calls remain, clear storage completely
-                  localStorage.removeItem(CALL_STATES_STORAGE_KEY);
-                  localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
-                }
-                
-                if (localStorageRemovedCount > 0) {
-                  console.log(`[CtiContext] Removed ${localStorageRemovedCount} inactive call(s) from localStorage`);
-                }
-              }
-            } catch (error) {
-              console.error('[CtiContext] Error removing inactive calls from localStorage:', error);
-            }
-          }
+          handleGetCallLegsSuccess(responseData, setActiveCalls);
         } else {
           // If API call failed, log but don't remove calls (fail-safe)
           console.warn('[CtiContext] GetCallLegs verification failed, keeping all calls from localStorage');
@@ -654,12 +689,18 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       callingDeviceType = callingDeviceType || deviceInfo.callingDeviceType;
       callingDeviceName = callingDeviceName || deviceInfo.callingDeviceName;
     }
-    const calledAddress = params.calledAddress?.replaceAll(" ", "");
+    if (!callingAddress || !callingDeviceType || !callingDeviceName) {
+      return {
+        success: false,
+        error: 'No calling device information available',
+      };
+    }
+    const calledAddress = params.calledAddress?.replaceAll(' ', '');
     return await makeCallAPI({
-      callingAddress: callingAddress!,
-      calledAddress: calledAddress,
-      callingDeviceType: callingDeviceType!,
-      callingDeviceName: callingDeviceName!
+      callingAddress,
+      calledAddress,
+      callingDeviceType,
+      callingDeviceName,
     });
   }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
   
@@ -704,19 +745,28 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
         controllerDeviceType = controllerDeviceType || deviceInfo.callingDeviceType;
       }
     }
-    
+
+    if (!callingAddress || !callingDeviceType || !callingDeviceName) {
+      return {
+        success: false,
+        error: 'No calling device information available',
+      };
+    }
+
     return await endCallAPI({
       callId: params.callId,
-      callingAddress: callingAddress!,
+      callingAddress,
       calledAddress: params.calledAddress,
-      callingDeviceType: callingDeviceType!,
-      callingDeviceName: callingDeviceName!,
-      ...(controllerAddress && controllerDeviceName && controllerDeviceType ? {
-        controllerAddress,
-        controllerDeviceName,
-        controllerDeviceType
-      } : {})
-    } as any);
+      callingDeviceType,
+      callingDeviceName,
+      ...(controllerAddress && controllerDeviceName && controllerDeviceType
+        ? {
+            controllerAddress,
+            controllerDeviceName,
+            controllerDeviceType,
+          }
+        : {}),
+    } as HoldCallParams);
   }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
   
   const holdCall = useCallback(async (params: {
@@ -760,19 +810,28 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
         controllerDeviceType = controllerDeviceType || deviceInfo.callingDeviceType;
       }
     }
-    
+
+    if (!callingAddress || !callingDeviceType || !callingDeviceName) {
+      return {
+        success: false,
+        error: 'No calling device information available',
+      };
+    }
+
     return await holdCallAPI({
       callId: params.callId,
-      callingAddress: callingAddress!,
+      callingAddress,
       calledAddress: params.calledAddress,
-      callingDeviceType: callingDeviceType!,
-      callingDeviceName: callingDeviceName!,
-      ...(controllerAddress && controllerDeviceName && controllerDeviceType ? {
-        controllerAddress,
-        controllerDeviceName,
-        controllerDeviceType
-      } : {})
-    } as any);
+      callingDeviceType,
+      callingDeviceName,
+      ...(controllerAddress && controllerDeviceName && controllerDeviceType
+        ? {
+            controllerAddress,
+            controllerDeviceName,
+            controllerDeviceType,
+          }
+        : {}),
+    } as HoldCallParams);
   }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
   
   const resumeCall = useCallback(async (params: {
@@ -816,19 +875,28 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
         controllerDeviceType = controllerDeviceType || deviceInfo.callingDeviceType;
       }
     }
-    
+
+    if (!callingAddress || !callingDeviceType || !callingDeviceName) {
+      return {
+        success: false,
+        error: 'No calling device information available',
+      };
+    }
+
     return await resumeCallAPI({
       callId: params.callId,
-      callingAddress: callingAddress!,
+      callingAddress,
       calledAddress: params.calledAddress,
-      callingDeviceType: callingDeviceType!,
-      callingDeviceName: callingDeviceName!,
-      ...(controllerAddress && controllerDeviceName && controllerDeviceType ? {
-        controllerAddress,
-        controllerDeviceName,
-        controllerDeviceType
-      } : {})
-    } as any);
+      callingDeviceType,
+      callingDeviceName,
+      ...(controllerAddress && controllerDeviceName && controllerDeviceType
+        ? {
+            controllerAddress,
+            controllerDeviceName,
+            controllerDeviceType,
+          }
+        : {}),
+    } as HoldCallParams);
   }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
   
   const attendCall = useCallback(async (params: {
@@ -866,13 +934,20 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       callingDeviceType = callingDeviceType || deviceInfo.callingDeviceType;
       callingDeviceName = callingDeviceName || deviceInfo.callingDeviceName;
     }
-    
+
+    if (!callingAddress || !callingDeviceType || !callingDeviceName) {
+      return {
+        success: false,
+        error: 'No calling device information available',
+      };
+    }
+
     return await mergeCallsAPI({
       heldCallId: params.heldCallId,
       activeCallId: params.activeCallId,
-      callingAddress: callingAddress!,
-      callingDeviceType: callingDeviceType!,
-      callingDeviceName: callingDeviceName!
+      callingAddress,
+      callingDeviceType,
+      callingDeviceName,
     });
   }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
   
@@ -903,9 +978,19 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       transferInitiatorDeviceName = transferInitiatorDeviceName || deviceInfo.callingDeviceName;
     }
 
+    if (
+      !transferInitiatorAddress ||
+      !transferInitiatorDeviceType ||
+      !transferInitiatorDeviceName
+    ) {
+      return {
+        success: false,
+        error: 'No calling device information available',
+      };
+    }
+
     // Before transfer: put the active call on hold. Hold payload must use the logged-in user as controller
     // so it's correct whether 531 or 532 is the user: callingAddress = current user, calledAddress = other party.
-    const initiator = transferInitiatorAddress!;
     const controllerAddress = ctiStomp.userAddress;
     const controllerDevice = getCallingDeviceInfo(controllerAddress, ctiStomp.dnsMap);
     if (!controllerDevice) {
@@ -915,44 +1000,34 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       };
     }
 
-    console.log('activeCalls 1234', activeCalls);
-    
-
     const callEntry = Array.from(activeCalls.values()).find((c) => c.callId === params.callId);
-    
 
     if (!callEntry?.callingAddress || !callEntry?.calledAddress) {
-      return { success: false, error: "Missing calling/called addresses for this call." };
+      return { success: false, error: 'Missing calling/called addresses for this call.' };
     }
-    
+
     const holdResult = await holdCallAPI({
       callId: params.callId,
-      
-      // ✅ preserve original direction from the call itself (never derive from controller)
-      callingAddress: callEntry.callingAddress ,
-      calledAddress: callEntry.calledAddress ,
-      
-      // ✅ keep device info aligned with the calling side of the call direction
-      callingDeviceType: callEntry?.callingDeviceType || '',
-      callingDeviceName: callEntry?.callingDeviceName || '',
-      
-      // ✅ controller = logged-in user performing the action
-      controllerAddress: controllerAddress,
+      callingAddress: callEntry.callingAddress,
+      calledAddress: callEntry.calledAddress,
+      callingDeviceType: callEntry.callingDeviceType || '',
+      callingDeviceName: callEntry.callingDeviceName || '',
+      controllerAddress,
       controllerDeviceName: controllerDevice.callingDeviceName,
       controllerDeviceType: controllerDevice.callingDeviceType,
-      });
+    });
     if (!holdResult.success) {
       return holdResult;
     }
 
     return await transferCallsAPI({
       callId: params.callId,
-      transferInitiatorAddress: transferInitiatorAddress!,
-      transferInitiatorDeviceType: transferInitiatorDeviceType!,
-      transferInitiatorDeviceName: transferInitiatorDeviceName!,
+      transferInitiatorAddress,
+      transferInitiatorDeviceType,
+      transferInitiatorDeviceName,
       transferAddress: params.transferAddress,
       targetAddress: params.targetAddress,
-      mode: "CONSULT",
+      mode: 'CONSULT',
     });
   }, [ctiStomp.userAddress, ctiStomp.dnsMap, activeCalls]);
   
@@ -1004,22 +1079,25 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
   
   // Helper function to execute dial action (used by both master and forwarded requests)
   const executeDialNumber = useCallback(async (phoneNumber: string) => {
-    if (!phoneNumber || !phoneNumber.trim()) {
+    if (!phoneNumber?.trim()) {
       return {
         success: false,
-        error: 'Phone number is required'
+        error: 'Phone number is required',
       };
     }
-    
+
     // Clean the phone number: remove spaces, dashes, brackets, and other formatting characters
     // Keep only digits, +, *, and # (for extensions and special dialing)
     const cleanedNumber = phoneNumber
-      .replace(/\s+/g, '')           // Remove all spaces
-      .replace(/-/g, '')              // Remove dashes
-      .replace(/[()]/g, '')           // Remove brackets
-      .replace(/[\[\]]/g, '')         // Remove square brackets
-      .replace(/[{}]/g, '')           // Remove curly braces
-      .replace(/\./g, '')              // Remove dots
+      .replaceAll(/\s+/g, '')
+      .replaceAll('-', '')
+      .replaceAll('(', '')
+      .replaceAll(')', '')
+      .replaceAll('[', '')
+      .replaceAll(']', '')
+      .replaceAll('{', '')
+      .replaceAll('}', '')
+      .replaceAll('.', '')
       .trim();
     
     if (!cleanedNumber) {
@@ -1107,7 +1185,8 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     }
 
     const unsubscribe = manager.onActionRequest(async (event) => {
-      if (event.type !== 'action_request' || !event.data || !event.actionId) {
+      const actionId = event.actionId;
+      if (event.type !== 'action_request' || !event.data || actionId == null) {
         return;
       }
 
@@ -1156,15 +1235,10 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
             };
         }
 
-        // Send response back to requesting tab
-        manager.sendActionResponse(event.actionId!, result, result.error);
-      } catch (error: any) {
-        // Send error response
-        manager.sendActionResponse(
-          event.actionId!,
-          undefined,
-          error.message || 'Failed to execute action'
-        );
+        manager.sendActionResponse(actionId, result, result.error);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Failed to execute action';
+        manager.sendActionResponse(actionId, undefined, message);
       }
     });
 

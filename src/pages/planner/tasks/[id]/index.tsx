@@ -1,4 +1,9 @@
-import React, { useEffect, useState, useCallback, useRef, ReactElement } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef, ReactElement } from 'react';
+import { useSession } from 'next-auth/react';
+import {
+  canManageProjectFromMembers,
+  getSessionPhoneOrExtension,
+} from '@planner/projectMemberRole';
 import { useRouter } from 'next/router';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
@@ -35,6 +40,7 @@ import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 
 const WITH_RELATIONS = [
   'project',
+  'project.members',
   'status',
   'assignees',
   'labels',
@@ -47,91 +53,7 @@ const WITH_RELATIONS = [
   'children.assignees',
 ];
 
-const TaskDetailPage = () => {
-  const router = useRouter();
-  const { id } = router.query;
-  const [task, setTask] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [taskActivities, setTaskActivities] = useState<any[]>([]);
-  const [loadingActivities, setLoadingActivities] = useState(false);
-  const [activeDetailTab, setActiveDetailTab] = useState<'activity' | 'comments' | 'documents'>('activity');
-  const [taskComments, setTaskComments] = useState<any[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [newComment, setNewComment] = useState('');
-  const [submittingComment, setSubmittingComment] = useState(false);
-  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
-  const [editingCommentText, setEditingCommentText] = useState('');
-  const [taskDocuments, setTaskDocuments] = useState<any[]>([]);
-  const [loadingDocuments, setLoadingDocuments] = useState(false);
-  const [uploadingDocument, setUploadingDocument] = useState(false);
-  const [showAllActivitiesModal, setShowAllActivitiesModal] = useState(false);
-  const [allActivities, setAllActivities] = useState<any[]>([]);
-  const [loadingAllActivities, setLoadingAllActivities] = useState(false);
-  const documentInputRef = useRef<HTMLInputElement>(null);
-
-  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
-
-  const fetchTask = useCallback(async () => {
-    if (!id || typeof id !== 'string') return;
-    try {
-      setLoading(true);
-      const data = await getTask(id, WITH_RELATIONS);
-      setTask(data);
-    } catch (err) {
-      console.error('Error fetching task:', err);
-      setTask(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    fetchTask();
-  }, [fetchTask]);
-
-  useEffect(() => {
-    if (!task?.id) {
-      setTaskActivities([]);
-      return;
-    }
-    let cancelled = false;
-    const load = async () => {
-      setLoadingActivities(true);
-      try {
-        const activitiesResponse = await getTaskActivities(task.id, 1, 5);
-        if (!cancelled && activitiesResponse != null) {
-          setTaskActivities(Array.isArray(activitiesResponse) ? activitiesResponse : []);
-        }
-      } catch (err) {
-        if (!cancelled) setTaskActivities([]);
-      } finally {
-        if (!cancelled) setLoadingActivities(false);
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [task?.id]);
-
-  const handleDelete = async () => {
-    if (!task?.id) return;
-    try {
-      setDeleting(true);
-      await deleteTask(task.id);
-      setShowDeleteModal(false);
-      router.push('/planner/tasks');
-    } catch (err) {
-      console.error('Error deleting task:', err);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const getStatusVariant = (status: string | { name?: string } | null | undefined) => {
+function getStatusVariant(status: string | { name?: string } | null | undefined) {
     const raw = typeof status === 'object' && status?.name ? status.name : (status ?? '');
     const s = String(raw).toLowerCase();
     if (s.includes('progress')) return 'warning';
@@ -139,16 +61,16 @@ const TaskDetailPage = () => {
     if (s.includes('overdue')) return 'danger';
     if (s.includes('complete')) return 'success';
     return 'info';
-  };
+}
 
-  const getPriorityVariant = (priority: string) => {
+function getPriorityVariant(priority: string) {
     const p = (priority || '').toLowerCase();
     if (p === 'urgent' || p === 'high') return 'danger';
     if (p === 'normal') return 'warning';
     return 'success';
-  };
+}
 
-  const formatActivityDate = (dateString: string) => {
+function formatActivityDate(dateString: string) {
     try {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', {
@@ -162,37 +84,54 @@ const TaskDetailPage = () => {
     } catch {
       return dateString;
     }
-  };
+}
 
-  const getExtensionDisplay = (extNumber: string) => {
+function getExtensionDisplay(extNumber: string, hierarchyDataExtensions: unknown) {
     if (!hierarchyDataExtensions || !extNumber) {
       return { name: extNumber, initials: (extNumber || 'UN').toUpperCase().slice(0, 2) };
     }
     const extension = (hierarchyDataExtensions as any[]).find(
-      (ext: any) => ext.id === extNumber || ext.extension_number === extNumber
+    (ext: any) => ext.id === extNumber || ext.extension_number === extNumber,
     );
     const name = extension?.name || extNumber;
-    const initials =
-      name !== extNumber
-        ? name
+  if (name === extNumber) {
+    return { name, initials: (extNumber || 'UN').toUpperCase().slice(0, 2) };
+  }
+  const initials = name
             .split(' ')
             .map((n: string) => n[0])
             .join('')
             .substring(0, 2)
-            .toUpperCase()
-        : (extNumber || 'UN').toUpperCase().slice(0, 2);
+    .toUpperCase();
     return { name, initials };
-  };
+}
 
-  const renderActivityList = (activities: any[], avatarSize = '32px', fontSize = '0.7rem') =>
-    activities.map((activity: any, idx: number) => {
+type ActivityListProps = Readonly<{
+  activities: any[];
+  avatarSize?: string;
+  fontSize?: string;
+  hierarchyDataExtensions: unknown;
+}>;
+
+function ActivityList({
+  activities,
+  avatarSize = '32px',
+  fontSize = '0.7rem',
+  hierarchyDataExtensions,
+}: ActivityListProps) {
+  return (
+    <>
+      {activities.map((activity: any, idx: number) => {
       const extNumber = activity.extension_number || '';
-      const { name: extensionName, initials: extensionInitials } = getExtensionDisplay(extNumber);
+        const { name: extensionName, initials: extensionInitials } = getExtensionDisplay(
+          extNumber,
+          hierarchyDataExtensions,
+        );
       const activityDate = formatActivityDate(activity.created_at || '');
       const actionText = activity.description || activity.action || 'Activity';
       return (
         <div
-          key={activity.id || idx}
+            key={activity.id ?? `activity-${idx}`}
           style={{
             marginBottom: avatarSize === '32px' ? '1rem' : 0,
             display: 'flex',
@@ -233,7 +172,480 @@ const TaskDetailPage = () => {
           </div>
         </div>
       );
-    });
+      })}
+    </>
+  );
+}
+
+type TaskActivityTabPanelProps = Readonly<{
+  loadingActivities: boolean;
+  taskActivities: any[];
+  onViewAll: () => void;
+  hierarchyDataExtensions: unknown;
+}>;
+
+function TaskActivityTabPanel({
+  loadingActivities,
+  taskActivities,
+  onViewAll,
+  hierarchyDataExtensions,
+}: TaskActivityTabPanelProps) {
+  if (loadingActivities) {
+    return (
+      <div className="text-center py-4">
+        <Spinner animation="border" size="sm" />
+      </div>
+    );
+  }
+  if (taskActivities.length === 0) {
+    return <div className="text-center py-3 text-muted small">No activities found</div>;
+  }
+  return (
+    <>
+      <ActivityList activities={taskActivities} hierarchyDataExtensions={hierarchyDataExtensions} />
+      <div className="text-center mt-3">
+        <Button variant="link" size="sm" onClick={onViewAll} style={{ color: '#4e6fa5' }}>
+          View All
+        </Button>
+      </div>
+    </>
+  );
+}
+
+type AllActivitiesModalBodyProps = Readonly<{
+  loadingAllActivities: boolean;
+  allActivities: any[];
+  hierarchyDataExtensions: unknown;
+}>;
+
+function AllActivitiesModalBody({
+  loadingAllActivities,
+  allActivities,
+  hierarchyDataExtensions,
+}: AllActivitiesModalBodyProps) {
+  if (loadingAllActivities) {
+    return (
+      <div className="text-center py-4">
+        <Spinner animation="border" />
+      </div>
+    );
+  }
+  if (allActivities.length === 0) {
+    return <div className="text-center py-4 text-muted">No activities found</div>;
+  }
+  return (
+    <ActivityList
+      activities={allActivities}
+      avatarSize="40px"
+      fontSize="0.8rem"
+      hierarchyDataExtensions={hierarchyDataExtensions}
+    />
+  );
+}
+
+type TaskDocumentsTabPanelProps = Readonly<{
+  loadingDocuments: boolean;
+  taskDocuments: any[];
+  uploadingDocument: boolean;
+  documentInputRef: React.RefObject<HTMLInputElement | null>;
+  onUploadChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onUploadClick: () => void;
+  onDownload: (doc: any) => void;
+  onDelete: (doc: any) => void;
+}>;
+
+function TaskDocumentsTabPanel({
+  loadingDocuments,
+  taskDocuments,
+  uploadingDocument,
+  documentInputRef,
+  onUploadChange,
+  onUploadClick,
+  onDownload,
+  onDelete,
+}: TaskDocumentsTabPanelProps) {
+  const documentCountLabel = taskDocuments.length === 1 ? 'document' : 'documents';
+
+  if (loadingDocuments) {
+    return (
+      <div className="text-center py-4">
+        <Spinner animation="border" size="sm" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <span className="small text-muted">
+          {taskDocuments.length} {documentCountLabel}
+        </span>
+        <input
+          ref={documentInputRef}
+          type="file"
+          accept="*/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={onUploadChange}
+        />
+        <Button variant="primary" size="sm" disabled={uploadingDocument} onClick={onUploadClick}>
+          {uploadingDocument ? (
+            <Spinner animation="border" size="sm" style={{ width: 14, height: 14 }} />
+          ) : (
+            <Upload size={14} className="me-1" />
+          )}
+          Upload
+        </Button>
+      </div>
+      {taskDocuments.length === 0 ? (
+        <div className="text-center py-4 text-muted small">
+          No documents yet. Upload a file to attach it to this task.
+        </div>
+      ) : (
+        <ul className="list-unstyled mb-0">
+          {taskDocuments.map((doc: any, idx: number) => {
+            const label = doc.original_name || doc.name || doc.file_name || `Document ${idx + 1}`;
+            const rowKey =
+              doc.id === undefined || doc.id === null ? `doc-${label}-${idx}` : String(doc.id);
+            return (
+              <li
+                key={rowKey}
+                className="d-flex align-items-center justify-content-between p-2 bg-light rounded mb-2"
+              >
+                <div className="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
+                  <FileText size={18} className="text-muted flex-shrink-0" />
+                  <span className="small text-truncate">{label}</span>
+                </div>
+                <div className="d-flex gap-1 flex-shrink-0">
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-1"
+                    onClick={() => onDownload(doc)}
+                    title="Download"
+                  >
+                    <Download size={16} />
+                  </Button>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-1 text-danger"
+                    onClick={() => onDelete(doc)}
+                    title="Delete"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+}
+
+type TaskCommentsTabPanelProps = Readonly<{
+  taskId: number | string | undefined;
+  loadingComments: boolean;
+  taskComments: any[];
+  setTaskComments: React.Dispatch<React.SetStateAction<any[]>>;
+  editingCommentId: number | null;
+  setEditingCommentId: React.Dispatch<React.SetStateAction<number | null>>;
+  editingCommentText: string;
+  setEditingCommentText: React.Dispatch<React.SetStateAction<string>>;
+  newComment: string;
+  setNewComment: React.Dispatch<React.SetStateAction<string>>;
+  submittingComment: boolean;
+  setSubmittingComment: React.Dispatch<React.SetStateAction<boolean>>;
+  hierarchyDataExtensions: unknown;
+}>;
+
+function TaskCommentsTabPanel({
+  taskId,
+  loadingComments,
+  taskComments,
+  setTaskComments,
+  editingCommentId,
+  setEditingCommentId,
+  editingCommentText,
+  setEditingCommentText,
+  newComment,
+  setNewComment,
+  submittingComment,
+  setSubmittingComment,
+  hierarchyDataExtensions,
+}: TaskCommentsTabPanelProps) {
+  if (loadingComments) {
+    return (
+      <div className="text-center py-4">
+        <Spinner animation="border" size="sm" />
+      </div>
+    );
+  }
+
+  const refreshComments = async () => {
+    if (!taskId) return;
+    const res = await getTaskComments(taskId);
+    setTaskComments(Array.isArray(res) ? res : []);
+  };
+
+  return (
+    <>
+      <div className="mb-3">
+        {taskComments.length === 0 ? (
+          <div className="text-center py-4 text-muted small">No comments yet</div>
+        ) : (
+          taskComments.map((comment: any, idx: number) => {
+            const extNumber = comment.extension_number || comment.user?.extension_number || '';
+            const { name: extensionName, initials: extensionInitials } = getExtensionDisplay(
+              extNumber,
+              hierarchyDataExtensions,
+            );
+            const commentDate = formatActivityDate(comment.created_at || '');
+            const isEditing = editingCommentId === comment.id;
+            const commentKey =
+              comment.id === undefined || comment.id === null
+                ? `comment-idx-${idx}`
+                : `comment-${comment.id}`;
+            return (
+              <div key={commentKey} className="p-3 bg-light rounded mb-2">
+                {isEditing ? (
+                  <>
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      value={editingCommentText}
+                      onChange={(e) => setEditingCommentText(e.target.value)}
+                      className="mb-2"
+                    />
+                    <div className="d-flex gap-2 justify-content-end">
+                      <Button
+                        variant="light"
+                        size="sm"
+                        onClick={() => {
+                          setEditingCommentId(null);
+                          setEditingCommentText('');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        disabled={submittingComment || !editingCommentText.trim()}
+                        onClick={async () => {
+                          if (!taskId || !editingCommentText.trim()) {
+                            return;
+                          }
+                          try {
+                            setSubmittingComment(true);
+                            await updateTaskComment(taskId, comment.id, editingCommentText.trim());
+                            await refreshComments();
+                            setEditingCommentId(null);
+                            setEditingCommentText('');
+                          } finally {
+                            setSubmittingComment(false);
+                          }
+                        }}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="d-flex gap-2 mb-2">
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {extensionInitials}
+                      </div>
+                      <div className="flex-grow-1">
+                        <strong className="small">{extensionName}</strong>
+                        <div className="small text-muted">{commentDate}</div>
+                      </div>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0"
+                        onClick={() => {
+                          setEditingCommentId(comment.id);
+                          setEditingCommentText(comment.comment || '');
+                        }}
+                      >
+                        <Edit size={14} />
+                      </Button>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="p-0 text-danger"
+                        onClick={async () => {
+                          if (!taskId) return;
+                          await deleteTaskComment(taskId, comment.id);
+                          await refreshComments();
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                    <div className="small">{comment.comment}</div>
+                  </>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+      <div className="border-top pt-3">
+        <Form.Control
+          as="textarea"
+          rows={3}
+          placeholder="Add a comment..."
+          value={newComment}
+          onChange={(e) => setNewComment(e.target.value)}
+          className="mb-2"
+        />
+        <Button
+          variant="primary"
+          size="sm"
+          disabled={submittingComment || !newComment.trim()}
+          onClick={async () => {
+            if (!taskId || !newComment.trim()) {
+              return;
+            }
+            try {
+              setSubmittingComment(true);
+              await createTaskComment(taskId, newComment.trim());
+              setNewComment('');
+              await refreshComments();
+            } finally {
+              setSubmittingComment(false);
+            }
+          }}
+        >
+          <Send size={14} className="me-1" />
+          Post Comment
+        </Button>
+      </div>
+    </>
+  );
+}
+
+const TaskDetailPage = () => {
+  const router = useRouter();
+  const { id } = router.query;
+  const [task, setTask] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [taskActivities, setTaskActivities] = useState<any[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [activeDetailTab, setActiveDetailTab] = useState<'activity' | 'comments' | 'documents'>('activity');
+  const [taskComments, setTaskComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [taskDocuments, setTaskDocuments] = useState<any[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [showAllActivitiesModal, setShowAllActivitiesModal] = useState(false);
+  const [allActivities, setAllActivities] = useState<any[]>([]);
+  const [loadingAllActivities, setLoadingAllActivities] = useState(false);
+  const documentInputRef = useRef<HTMLInputElement>(null);
+
+  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+
+  const { data: session } = useSession();
+  const sessionUserPhoneOrExtension = useMemo(
+    () => getSessionPhoneOrExtension(session),
+    [session],
+  );
+
+  const fetchTask = useCallback(async () => {
+    if (!id || typeof id !== 'string') return;
+    try {
+      setLoading(true);
+      const data = await getTask(id, WITH_RELATIONS);
+      setTask(data);
+    } catch (err) {
+      console.error('Error fetching task:', err);
+      setTask(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchTask();
+  }, [fetchTask]);
+
+  const canManageTaskProject = useMemo(
+    () =>
+      canManageProjectFromMembers(
+        task?.project ?? null,
+        sessionUserPhoneOrExtension,
+      ),
+    [task?.project, sessionUserPhoneOrExtension],
+  );
+
+  useEffect(() => {
+    if (!task?.id) {
+      setTaskActivities([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setLoadingActivities(true);
+      try {
+        const activitiesResponse = await getTaskActivities(task.id, 1, 5);
+        if (!cancelled && activitiesResponse != null) {
+          setTaskActivities(Array.isArray(activitiesResponse) ? activitiesResponse : []);
+        }
+      } catch (err) {
+        console.error('Error loading task activities:', err);
+        if (!cancelled) {
+          setTaskActivities([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingActivities(false);
+        }
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [task?.id]);
+
+  const handleDelete = async () => {
+    if (!task?.id || !canManageTaskProject) return;
+    try {
+      setDeleting(true);
+      await deleteTask(task.id);
+      setShowDeleteModal(false);
+      router.push('/planner/tasks');
+    } catch (err) {
+      console.error('Error deleting task:', err);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleCommentsTabClick = async () => {
     setActiveDetailTab('comments');
@@ -247,6 +659,7 @@ const TaskDetailPage = () => {
           setTaskComments([]);
         }
       } catch (err) {
+        console.error('Error loading task comments:', err);
         setTaskComments([]);
       } finally {
         setLoadingComments(false);
@@ -261,6 +674,7 @@ const TaskDetailPage = () => {
       const data = await getTaskDocuments(task.id);
       setTaskDocuments(Array.isArray(data) ? data : data?.data ?? []);
     } catch (err) {
+      console.error('Error loading task documents:', err);
       setTaskDocuments([]);
     } finally {
       setLoadingDocuments(false);
@@ -278,8 +692,8 @@ const TaskDetailPage = () => {
     try {
       setUploadingDocument(true);
       const formData = new FormData();
-      for (let i = 0; i < files.length; i++) {
-        formData.append('documents[]', files[i]);
+      for (const file of Array.from(files)) {
+        formData.append('documents[]', file);
       }
       await postTaskDocuments(task.id, formData);
       await fetchTaskDocuments();
@@ -296,12 +710,12 @@ const TaskDetailPage = () => {
     try {
       const blob = await getTaskDocumentDownload(task.id, doc.id);
       if (!blob) return;
-      const url = window.URL.createObjectURL(blob);
+      const url = globalThis.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = doc.original_name || doc.name || doc.file_name || 'document';
       a.click();
-      window.URL.revokeObjectURL(url);
+      globalThis.URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Error downloading document:', err);
     }
@@ -325,6 +739,7 @@ const TaskDetailPage = () => {
       const activitiesResponse = await getTaskActivities(task.id, 1, 100);
       setAllActivities(Array.isArray(activitiesResponse) ? activitiesResponse : []);
     } catch (err) {
+      console.error('Error loading all activities:', err);
       setAllActivities([]);
     } finally {
       setLoadingAllActivities(false);
@@ -388,14 +803,26 @@ const TaskDetailPage = () => {
             <ArrowLeft size={16} />
             Back to list
           </Button>
+          {canManageTaskProject && (
           <div className="d-flex align-items-center gap-1">
-            <Button variant="link" className="text-primary p-0" onClick={() => setShowEditModal(true)} title="Edit Task">
+              <Button
+                variant="link"
+                className="text-primary p-0"
+                onClick={() => setShowEditModal(true)}
+                title="Edit Task"
+              >
               <Edit size={20} />
             </Button>
-            <Button variant="link" className="text-danger p-0" onClick={() => setShowDeleteModal(true)} title="Delete Task">
+              <Button
+                variant="link"
+                className="text-danger p-0"
+                onClick={() => setShowDeleteModal(true)}
+                title="Delete Task"
+              >
               <Trash2 size={20} />
             </Button>
           </div>
+          )}
         </div>
 
         <Card className="border shadow-sm">
@@ -436,12 +863,16 @@ const TaskDetailPage = () => {
             <div className="p-3 bg-light rounded border mb-3">
               <div className="small text-muted text-uppercase fw-semibold mb-2">Assignees</div>
               <div className="d-flex flex-wrap gap-2 align-items-center">
-                {(task.assignees || []).map((assignee: any, idx: number) => {
+                {(task.assignees || []).map((assignee: any) => {
                   const extNumber = assignee.extension_number || '';
-                  const { name, initials } = getExtensionDisplay(extNumber);
+                  const { name, initials } = getExtensionDisplay(extNumber, hierarchyDataExtensions);
+                  const assigneeKey =
+                    assignee.id === undefined || assignee.id === null
+                      ? `assignee-ext-${extNumber || 'unknown'}`
+                      : `assignee-${assignee.id}`;
                   return (
                     <div
-                      key={idx}
+                      key={assigneeKey}
                       title={name}
                       style={{
                         width: 36,
@@ -460,24 +891,23 @@ const TaskDetailPage = () => {
                     </div>
                   );
                 })}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setShowEditModal(true)}
+                {canManageTaskProject && (
+                  <Button
+                    type="button"
+                    variant="light"
+                    aria-label="Edit assignees"
+                    className="d-flex align-items-center justify-content-center rounded-circle p-0 border-0"
                   style={{
                     width: 36,
                     height: 36,
-                    borderRadius: '50%',
                     backgroundColor: '#e2e8f0',
                     color: '#64748b',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
                   }}
+                    onClick={() => setShowEditModal(true)}
                 >
                   <Plus size={16} />
-                </div>
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -487,10 +917,15 @@ const TaskDetailPage = () => {
                 <div className="d-flex flex-wrap gap-2">
                   {watchers.map((watcher: any, idx: number) => {
                     const extNumber = watcher.extension_number ?? watcher ?? '';
-                    const { name, initials } = getExtensionDisplay(String(extNumber));
+                    const extStr = String(extNumber);
+                    const { name, initials } = getExtensionDisplay(extStr, hierarchyDataExtensions);
+                    const watcherKey =
+                      watcher.id === undefined || watcher.id === null
+                        ? `watcher-${extStr || 'idx'}-${idx}`
+                        : `watcher-${watcher.id}`;
                     return (
                       <div
-                        key={idx}
+                        key={watcherKey}
                         title={name}
                         style={{
                           width: 36,
@@ -563,258 +998,47 @@ const TaskDetailPage = () => {
 
             {activeDetailTab === 'activity' && (
               <div className="p-3 border rounded bg-white">
-                {loadingActivities ? (
-                  <div className="text-center py-4">
-                    <Spinner animation="border" size="sm" />
-                  </div>
-                ) : taskActivities.length === 0 ? (
-                  <div className="text-center py-3 text-muted small">No activities found</div>
-                ) : (
-                  <>
-                    {renderActivityList(taskActivities)}
-                    <div className="text-center mt-3">
-                      <Button variant="link" size="sm" onClick={handleViewAllActivities} style={{ color: '#4e6fa5' }}>
-                        View All
-                      </Button>
-                    </div>
-                  </>
-                )}
+                <TaskActivityTabPanel
+                  loadingActivities={loadingActivities}
+                  taskActivities={taskActivities}
+                  onViewAll={handleViewAllActivities}
+                  hierarchyDataExtensions={hierarchyDataExtensions}
+                />
               </div>
             )}
 
             {activeDetailTab === 'comments' && (
               <div className="p-3 border rounded bg-white">
-                {loadingComments ? (
-                  <div className="text-center py-4">
-                    <Spinner animation="border" size="sm" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-3">
-                      {taskComments.length === 0 ? (
-                        <div className="text-center py-4 text-muted small">No comments yet</div>
-                      ) : (
-                        taskComments.map((comment: any, idx: number) => {
-                          const extNumber = comment.extension_number || comment.user?.extension_number || '';
-                          const { name: extensionName, initials: extensionInitials } = getExtensionDisplay(extNumber);
-                          const commentDate = formatActivityDate(comment.created_at || '');
-                          const isEditing = editingCommentId === comment.id;
-                          return (
-                            <div key={comment.id || idx} className="p-3 bg-light rounded mb-2">
-                              {isEditing ? (
-                                <>
-                                  <Form.Control
-                                    as="textarea"
-                                    rows={3}
-                                    value={editingCommentText}
-                                    onChange={(e) => setEditingCommentText(e.target.value)}
-                                    className="mb-2"
-                                  />
-                                  <div className="d-flex gap-2 justify-content-end">
-                                    <Button
-                                      variant="light"
-                                      size="sm"
-                                      onClick={() => {
-                                        setEditingCommentId(null);
-                                        setEditingCommentText('');
-                                      }}
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button
-                                      variant="primary"
-                                      size="sm"
-                                      disabled={submittingComment || !editingCommentText.trim()}
-                                      onClick={async () => {
-                                        if (task?.id && editingCommentText.trim()) {
-                                          try {
-                                            setSubmittingComment(true);
-                                            await updateTaskComment(task.id, comment.id, editingCommentText.trim());
-                                            const res = await getTaskComments(task.id);
-                                            setTaskComments(Array.isArray(res) ? res : []);
-                                            setEditingCommentId(null);
-                                            setEditingCommentText('');
-                                          } finally {
-                                            setSubmittingComment(false);
-                                          }
-                                        }
-                                      }}
-                                    >
-                                      Save
-                                    </Button>
-                                  </div>
-                                </>
-                              ) : (
-                                <>
-                                  <div className="d-flex gap-2 mb-2">
-                                    <div
-                                      style={{
-                                        width: 32,
-                                        height: 32,
-                                        borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                        color: 'white',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '0.7rem',
-                                        fontWeight: 600,
-                                      }}
-                                    >
-                                      {extensionInitials}
-                                    </div>
-                                    <div className="flex-grow-1">
-                                      <strong className="small">{extensionName}</strong>
-                                      <div className="small text-muted">{commentDate}</div>
-                                    </div>
-                                    <Button
-                                      variant="link"
-                                      size="sm"
-                                      className="p-0"
-                                      onClick={() => {
-                                        setEditingCommentId(comment.id);
-                                        setEditingCommentText(comment.comment || '');
-                                      }}
-                                    >
-                                      <Edit size={14} />
-                                    </Button>
-                                    <Button
-                                      variant="link"
-                                      size="sm"
-                                      className="p-0 text-danger"
-                                      onClick={async () => {
-                                        if (task?.id) {
-                                          await deleteTaskComment(task.id, comment.id);
-                                          const res = await getTaskComments(task.id);
-                                          setTaskComments(Array.isArray(res) ? res : []);
-                                        }
-                                      }}
-                                    >
-                                      <Trash2 size={14} />
-                                    </Button>
-                                  </div>
-                                  <div className="small">{comment.comment}</div>
-                                </>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                    <div className="border-top pt-3">
-                      <Form.Control
-                        as="textarea"
-                        rows={3}
-                        placeholder="Add a comment..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        className="mb-2"
-                      />
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={submittingComment || !newComment.trim()}
-                        onClick={async () => {
-                          if (task?.id && newComment.trim()) {
-                            try {
-                              setSubmittingComment(true);
-                              await createTaskComment(task.id, newComment.trim());
-                              setNewComment('');
-                              const res = await getTaskComments(task.id);
-                              setTaskComments(Array.isArray(res) ? res : []);
-                            } finally {
-                              setSubmittingComment(false);
-                            }
-                          }
-                        }}
-                      >
-                        <Send size={14} className="me-1" />
-                        Post Comment
-                      </Button>
-                    </div>
-                  </>
-                )}
+                <TaskCommentsTabPanel
+                  taskId={task.id}
+                  loadingComments={loadingComments}
+                  taskComments={taskComments}
+                  setTaskComments={setTaskComments}
+                  editingCommentId={editingCommentId}
+                  setEditingCommentId={setEditingCommentId}
+                  editingCommentText={editingCommentText}
+                  setEditingCommentText={setEditingCommentText}
+                  newComment={newComment}
+                  setNewComment={setNewComment}
+                  submittingComment={submittingComment}
+                  setSubmittingComment={setSubmittingComment}
+                  hierarchyDataExtensions={hierarchyDataExtensions}
+                />
               </div>
             )}
 
             {activeDetailTab === 'documents' && (
               <div className="p-3 border rounded bg-white">
-                {loadingDocuments ? (
-                  <div className="text-center py-4">
-                    <Spinner animation="border" size="sm" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                      <span className="small text-muted">
-                        {taskDocuments.length} document{taskDocuments.length !== 1 ? 's' : ''}
-                      </span>
-                      <input
-                        ref={documentInputRef}
-                        type="file"
-                        accept="*/*"
-                        multiple
-                        style={{ display: 'none' }}
-                        onChange={handleUploadDocument}
-                      />
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={uploadingDocument}
-                        onClick={() => documentInputRef.current?.click()}
-                      >
-                        {uploadingDocument ? (
-                          <Spinner animation="border" size="sm" style={{ width: 14, height: 14 }} />
-                        ) : (
-                          <Upload size={14} className="me-1" />
-                        )}
-                        Upload
-                      </Button>
-                    </div>
-                    {taskDocuments.length === 0 ? (
-                      <div className="text-center py-4 text-muted small">
-                        No documents yet. Upload a file to attach it to this task.
-                      </div>
-                    ) : (
-                      <ul className="list-unstyled mb-0">
-                        {taskDocuments.map((doc: any, idx: number) => {
-                          const label = doc.original_name || doc.name || doc.file_name || `Document ${idx + 1}`;
-                          return (
-                            <li
-                              key={doc.id ?? idx}
-                              className="d-flex align-items-center justify-content-between p-2 bg-light rounded mb-2"
-                            >
-                              <div className="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
-                                <FileText size={18} className="text-muted flex-shrink-0" />
-                                <span className="small text-truncate">{label}</span>
-                              </div>
-                              <div className="d-flex gap-1 flex-shrink-0">
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  onClick={() => handleDownloadDocument(doc)}
-                                  title="Download"
-                                >
-                                  <Download size={16} />
-                                </Button>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1 text-danger"
-                                  onClick={() => handleDeleteDocument(doc)}
-                                  title="Delete"
-                                >
-                                  <Trash2 size={16} />
-                                </Button>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </>
-                )}
+                <TaskDocumentsTabPanel
+                  loadingDocuments={loadingDocuments}
+                  taskDocuments={taskDocuments}
+                  uploadingDocument={uploadingDocument}
+                  documentInputRef={documentInputRef}
+                  onUploadChange={handleUploadDocument}
+                  onUploadClick={() => documentInputRef.current?.click()}
+                  onDownload={handleDownloadDocument}
+                  onDelete={handleDeleteDocument}
+                />
               </div>
             )}
           </Card.Body>
@@ -834,15 +1058,11 @@ const TaskDetailPage = () => {
           <Modal.Title>All Activities</Modal.Title>
         </Modal.Header>
         <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-          {loadingAllActivities ? (
-            <div className="text-center py-4">
-              <Spinner animation="border" />
-            </div>
-          ) : allActivities.length === 0 ? (
-            <div className="text-center py-4 text-muted">No activities found</div>
-          ) : (
-            renderActivityList(allActivities, '40px', '0.8rem')
-          )}
+          <AllActivitiesModalBody
+            loadingAllActivities={loadingAllActivities}
+            allActivities={allActivities}
+            hierarchyDataExtensions={hierarchyDataExtensions}
+          />
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setShowAllActivitiesModal(false)}>

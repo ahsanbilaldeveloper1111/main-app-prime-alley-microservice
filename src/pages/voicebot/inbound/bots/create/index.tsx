@@ -616,7 +616,10 @@ const VoicebotInboundBotsCreate = () => {
       <Form
         onSubmit={handleSubmit}
         onKeyDown={(e) => {
-          if (e.key === "Enter") e.preventDefault();
+          if (e.key !== "Enter") return;
+          const target = e.target as HTMLElement;
+          if (target.tagName === "TEXTAREA") return;
+          e.preventDefault();
         }}
       >
         <div style={{ maxWidth: "1600px", margin: "0 auto", padding: "24px 0" }}>

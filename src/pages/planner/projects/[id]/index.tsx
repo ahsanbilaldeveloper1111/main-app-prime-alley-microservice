@@ -3,30 +3,61 @@ import React, {
   ReactElement,
   useState,
   useEffect,
+  useMemo,
   useRef,
+  type ComponentProps,
 } from "react";
+import { useSession } from "next-auth/react";
+import {
+  canManageProjectFromMembers,
+  getSessionPhoneOrExtension,
+} from "@planner/projectMemberRole";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import { Container, Spinner, Button } from "react-bootstrap";
-import { getProject } from "@utils/tasks";
+import { getProject, getTask } from "@utils/tasks";
+import {
+  WORK_PLANNER_PROJECT_DETAIL_RELATIONS,
+  WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS,
+  mapGetTaskResponseToSidebarEditTask,
+} from "@planner/workPlannerProjectRelations";
 import ProjectTabsContent, { ProjectTabsContentRef } from "../partials/ProjectTabsContent";
 import { useRouter } from "next/router";
 import { ModuleSlug } from "@utils/Helper";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { Plus, LayoutGrid } from "lucide-react";
+import { toast } from "react-toastify";
+import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
+
+type PlannerSidebarEditTask = NonNullable<
+  ComponentProps<typeof CreateTaskSidebar>["task"]
+>;
 
 const WorkPlannerProjectsDetails = () => {
   const router = useRouter();
   const { id } = router.query;
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<any>(null);
+  const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
+  const [sidebarEditTask, setSidebarEditTask] = useState<PlannerSidebarEditTask | null>(null);
+  const [loadingSidebarEditTask, setLoadingSidebarEditTask] = useState(false);
   const projectTabsContentRef = useRef<ProjectTabsContentRef>(null);
 
   // Fetch extensions using hierarchy API
   const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+
+  const { data: session } = useSession();
+  const sessionUserPhoneOrExtension = useMemo(
+    () => getSessionPhoneOrExtension(session),
+    [session],
+  );
+  const canCreateTaskByMemberRole = useMemo(
+    () => canManageProjectFromMembers(project, sessionUserPhoneOrExtension),
+    [project, sessionUserPhoneOrExtension],
+  );
 
   // Fetch project data
   useEffect(() => {
@@ -38,18 +69,10 @@ const WorkPlannerProjectsDetails = () => {
   const fetchProjectData = async () => {
     try {
       setLoading(true);
-      const withRelations = [
-        'statuses',
-        'statuses.tasks',
-        'members.user',
-        'tasks',
-        'tasks.assignees',
-        'tasks.labels',
-        'tasks.status',
-        'owner'
-      ];
-      
-      const projectData = await getProject(id as string, withRelations);
+      const projectData = await getProject(
+        id as string,
+        Array.from(WORK_PLANNER_PROJECT_DETAIL_RELATIONS),
+      );
 
       if (projectData) {
         setProject(projectData);
@@ -67,9 +90,48 @@ const WorkPlannerProjectsDetails = () => {
     // This callback can be used for additional logic if needed
   };
 
-  // Handle create task button click
   const handleCreateTaskClick = () => {
-    projectTabsContentRef.current?.openCreateTaskModal();
+    if (!project || hierarchyLoading || !canCreateTaskByMemberRole) return;
+    setSidebarEditTask(null);
+    setShowCreateTaskSidebar(true);
+  };
+
+  const handleCreateTaskSidebarClose = () => {
+    setShowCreateTaskSidebar(false);
+    setSidebarEditTask(null);
+  };
+
+  const handleCreateTaskSidebarSuccess = async () => {
+    setShowCreateTaskSidebar(false);
+    setSidebarEditTask(null);
+    await fetchProjectData();
+    await projectTabsContentRef.current?.refreshAfterTaskChange();
+  };
+
+  const handleBoardTaskClick = async (task: { id?: string | number }) => {
+    if (task?.id == null) return;
+    if (!canCreateTaskByMemberRole) {
+      await router.push(`/planner/tasks/${task.id}`);
+      return;
+    }
+    if (loadingSidebarEditTask) return;
+    setLoadingSidebarEditTask(true);
+    try {
+      const raw = await getTask(
+        task.id,
+        Array.from(WORK_PLANNER_TASK_SIDEBAR_EDIT_RELATIONS),
+      );
+      if (raw == null || typeof raw !== "object") {
+        return;
+      }
+      setSidebarEditTask(mapGetTaskResponseToSidebarEditTask(raw));
+      setShowCreateTaskSidebar(true);
+    } catch (err) {
+      console.error("[WorkPlannerProjectDetail] getTask failed for board task", task.id, err);
+      toast.error("Failed to load task");
+    } finally {
+      setLoadingSidebarEditTask(false);
+    }
   };
 
   // Handle board view button click
@@ -142,17 +204,19 @@ const WorkPlannerProjectsDetails = () => {
         showSearch={false}
         buttons={
           <>
-            <Button 
-              variant="primary" 
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}
-              onClick={handleCreateTaskClick}
-              disabled={!project || hierarchyLoading}
-            >
-              <Plus size={18} />
-              <span>Create Task</span>
-            </Button>
-            
-            <Button 
+            {canCreateTaskByMemberRole && (
+              <Button
+                variant="primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}
+                onClick={handleCreateTaskClick}
+                disabled={!project || hierarchyLoading}
+              >
+                <Plus size={18} />
+                <span>Create Task</span>
+              </Button>
+            )}
+
+            <Button
               variant="outline-primary"
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               onClick={handleBoardViewClick}
@@ -171,7 +235,39 @@ const WorkPlannerProjectsDetails = () => {
           hierarchyDataExtensions={hierarchyDataExtensions}
           hierarchyLoading={hierarchyLoading}
           onCreateTask={handleCreateTask}
+          onBoardTaskClick={handleBoardTaskClick}
         />
+
+      <CreateTaskSidebar
+        isOpen={showCreateTaskSidebar}
+        onClose={handleCreateTaskSidebarClose}
+        onCreate={handleCreateTaskSidebarSuccess}
+        extensions={hierarchyDataExtensions as any}
+        labels={project?.labels ?? []}
+        project={
+          project
+            ? {
+                id: project.id,
+                name: project.name,
+                icon: "",
+                color: project.color || "",
+                statuses: project.statuses,
+                labels: project.labels,
+              }
+            : undefined
+        }
+        statuses={(project?.statuses ?? []).map((s: any) => ({
+          id: s.id,
+          name: s.name,
+          icon: "",
+          color: s.color || "",
+        }))}
+        isEdit={!!sidebarEditTask}
+        task={sidebarEditTask ?? undefined}
+        taskType="regular"
+        taskTypeChoices={["regular", "recurring"]}
+        lockProjectSelection
+      />
         
     </React.Fragment>
   );

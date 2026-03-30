@@ -11,7 +11,7 @@ import {
   type UpdateCampaignPayload,
 } from "@utils/voicebot/outbound";
 import { toFormString } from "@utils/voicebot/formDisplay";
-import { getCompanies } from "@utils/voicebot/inbound";
+import { GetCompanies } from "@utils/users";
 import { Form, Spinner, Tab, Row, Col, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
@@ -55,22 +55,12 @@ const defaultForm: CreateCampaignFormState = {
   status: "draft",
 };
 
-/** Normalize a phone string to E.164 (+ and digits only, 10–15 digits). Returns null if invalid. */
-function normalizeToE164(raw: string): string | null {
-  const digitsOnly = raw.replaceAll(/\D/g, "");
-  if (digitsOnly.length < 10 || digitsOnly.length > 15) return null;
-  return `+${digitsOnly}`;
-}
-
-/** Parse raw text area or CSV line into E.164 numbers (one per line), skipping invalid. */
-function parseTargetListToE164(text: string): string[] {
-  const headerWords = new Set(["phone", "number", "tel", "telephone", "mobile", "contact"]);
+/** Split textarea/CSV into non-empty entries; values are sent to the API as entered (trim + strip quotes only). */
+function parseTargetListRaw(text: string): string[] {
   return text
     .split(/[\n\r,;]+/)
     .map((s) => s.trim().replaceAll(/^["']|["']$/g, ""))
-    .filter((s) => s.length > 0 && !headerWords.has(s.toLowerCase()))
-    .map((s) => normalizeToE164(s))
-    .filter((s): s is string => s !== null);
+    .filter((s) => s.length > 0);
 }
 
 const TAB_KEYS = { basic: "basic", targets: "targets", script: "script" } as const;
@@ -126,9 +116,9 @@ async function submitCampaignForm(
       name: form.name,
       description: form.description || undefined,
       retry_attempts: form.retry_attempts,
-      status: form.status || undefined,
+      status: "draft",
       voicebot_id: form.voicebot_id,
-      target_numbers: parseTargetListToE164(form.target_list_raw ?? ""),
+      target_numbers: parseTargetListRaw(form.target_list_raw ?? ""),
       schedule_start: form.schedule_start || undefined,
       schedule_end: form.schedule_end || undefined,
       retry_interval_minutes: form.retry_interval_minutes,
@@ -140,9 +130,9 @@ async function submitCampaignForm(
     router.push("/voicebot/outbound/campaigns");
     return;
   }
-  const targetList = parseTargetListToE164(form.target_list_raw ?? "");
+  const targetList = parseTargetListRaw(form.target_list_raw ?? "");
   if (targetList.length === 0) {
-    toast.error("Enter at least one valid phone number in E.164 format (e.g. +1234567890)");
+    toast.error("Enter at least one target number (one per line or comma-separated)");
     return;
   }
   const payload: CreateCampaignPayload & Record<string, unknown> = {
@@ -155,8 +145,9 @@ async function submitCampaignForm(
     schedule_end: form.schedule_end || undefined,
     retry_attempts: form.retry_attempts,
     retry_interval_minutes: form.retry_interval_minutes,
-    status: form.status || undefined,
+    status: form.status ?? "draft",
   };
+  
   const script = (form.campaign_script ?? "").trim();
   const greeting = (form.custom_greeting ?? "").trim();
   if (script) payload.campaign_script = script;
@@ -378,8 +369,6 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
                         <Form.Label style={labelStyle}>Status</Form.Label>
                         <Form.Select value={form.status ?? "draft"} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} style={inputStyle}>
                           <option value="draft">Draft</option>
-                          <option value="active">Active</option>
-                          <option value="scheduled">Scheduled</option>
                         </Form.Select>
                       </Form.Group>
                     </Col>
@@ -419,7 +408,7 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
                     </Form.Group>
                   )}
                   <Form.Group className="mb-3">
-                    <Form.Label style={labelStyle}>Phone Numbers (E.164, one per line) <span className="text-danger">*</span></Form.Label>
+                    <Form.Label style={labelStyle}>Target numbers (one per line) <span className="text-danger">*</span></Form.Label>
                     <div className="mb-2">
                       <Button type="button" variant="link" className="p-0 text-decoration-none" onClick={downloadSampleCsv} style={{ fontSize: "13px" }}>
                         <Download size={14} className="me-1 align-middle" />
@@ -431,11 +420,11 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
                       rows={6}
                       value={form.target_list_raw ?? ""}
                       onChange={(e) => setForm((f) => ({ ...f, target_list_raw: e.target.value }))}
-                      placeholder="+1234567890\n+19876543210"
+                      placeholder={"e.g. +1234567890\n555-0100"}
                       style={{ ...inputStyle, resize: "vertical" as const }}
                     />
                     <Form.Text className="text-muted">
-                      E.164 format (e.g. +1234567890). Total valid numbers: {targetCount}
+                       Total targets: {targetCount}
                     </Form.Text>
                   </Form.Group>
                 </Tab.Pane>
@@ -528,9 +517,9 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
     const reader = new FileReader();
     reader.onload = () => {
       const text = typeof reader.result === "string" ? reader.result : "";
-      const numbers = parseTargetListToE164(text);
+      const numbers = parseTargetListRaw(text);
       setForm((f) => ({ ...f, target_list_raw: numbers.join("\n") }));
-      toast.success(`Loaded ${numbers.length} number(s) in E.164 format from ${file.name}`);
+      toast.success(`Loaded ${numbers.length} target(s) from ${file.name}`);
     };
     reader.readAsText(file, "utf-8");
     e.target.value = "";
@@ -555,7 +544,7 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
     }
     setLoadingCompanies(true);
     try {
-      const res = await getCompanies();
+      const res = await GetCompanies();
       const opts = parseCompaniesResponse(res);
       setCompanies(opts);
       if (opts.length > 0 && !form.company_id && !editCampaignId) setForm((f) => ({ ...f, company_id: opts[0].id }));
@@ -611,7 +600,7 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
     router.push("/voicebot/outbound/campaigns");
   };
 
-  const targetCount = parseTargetListToE164(form.target_list_raw ?? "").length;
+  const targetCount = parseTargetListRaw(form.target_list_raw ?? "").length;
   const validationItems = buildValidationItems(form, targetCount);
 
   const pageTitle = isEditMode ? "Edit Campaign" : "Create Campaign";

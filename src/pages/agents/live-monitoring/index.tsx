@@ -1,19 +1,18 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
+  useState,
+  useMemo,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
+import GenericTable, { TableColumn } from "@components/GenericTable";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-
-import { useState } from 'react';
-import { Container, Row, Col, Card, Table, Badge, Form, Button, Dropdown, ProgressBar } from 'react-bootstrap';
-import { Search, Users, TrendingUp, CheckCircle, Phone, MoreVertical, Copy, Volume2, Download, PhoneOff, ChevronLeft, ChevronRight } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Container, Row, Col, Card, Badge, Form, Button, Dropdown } from 'react-bootstrap';
+import { Search, Users, TrendingUp, CheckCircle, Phone, MoreVertical, Copy, Volume2, Download, PhoneOff } from 'lucide-react';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 interface Session {
   id: string;
@@ -28,13 +27,13 @@ interface Session {
 
 
 const AIMLLiveMonitoring = () => {
-  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [activeTab, setActiveTab] = useState<'transcript' | 'draft' | 'more'>('transcript');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAgent, setFilterAgent] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterSentiment, setFilterSentiment] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
   const [isPlaying, setIsPlaying] = useState(false);
 
   // Sample data for sessions
@@ -155,16 +154,143 @@ const AIMLLiveMonitoring = () => {
     return variants[status] || 'secondary';
   };
 
-  const getSentimentBadge = (sentiment: string | null): { bg: string; text: string } => {
-    const config: { [key: string]: { bg: string; text: string } } = {
-      'Positive': { bg: 'success', text: 'Positive' },
-      'Neutral': { bg: 'warning', text: 'Neutral' }
-    };
-    return sentiment ? (config[sentiment] || { bg: 'secondary', text: sentiment }) : { bg: 'secondary', text: '' };
-  };
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((session) => {
+      const matchesSearch =
+        searchQuery.trim() === "" ||
+        session.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        session.intent.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (session.agent ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (session.phone ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesAgent =
+        filterAgent === "" ||
+        (filterAgent === "gandalf" && (session.agent ?? "").toLowerCase().includes("gandalf"));
+
+      const matchesStatus =
+        filterStatus === "" ||
+        (filterStatus === "connected" && session.status === "Connected") ||
+        (filterStatus === "transfer" && session.status === "In Transfer") ||
+        (filterStatus === "ringing" && session.status === "Ringing") ||
+        (filterStatus === "completed" && session.status === "Completed");
+
+      const matchesSentiment =
+        filterSentiment === "" ||
+        (session.sentiment ?? "").toLowerCase() === filterSentiment.toLowerCase();
+
+      return matchesSearch && matchesAgent && matchesStatus && matchesSentiment;
+    });
+  }, [sessions, searchQuery, filterAgent, filterStatus, filterSentiment]);
+
+  const paginatedSessions = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredSessions.slice(start, start + rowsPerPage);
+  }, [filteredSessions, currentPage, rowsPerPage]);
+
+  const sessionsColumns = useMemo<TableColumn<Session>[]>(() => [
+    {
+      key: 'id',
+      label: 'Session ID',
+      type: 'custom',
+      render: (session) => (
+        <span style={{ fontSize: '13px', color: '#2c3e50' }}>{session.id}</span>
+      ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      type: 'custom',
+      render: (session) => (
+        <Badge
+          bg={getStatusBadge(session.status)}
+          style={{
+            fontSize: '12px',
+            fontWeight: '500',
+            padding: '6px 12px',
+            borderRadius: '6px',
+          }}
+        >
+          {session.status}
+        </Badge>
+      ),
+    },
+    {
+      key: 'agent',
+      label: 'Agent',
+      type: 'custom',
+      render: (session) => (
+        <span style={{ fontSize: '13px', color: '#2c3e50' }}>
+          {session.agent ? (
+            <span className="d-flex align-items-center">
+              <span style={{ marginRight: '8px' }}>{session.agentFlag}</span>
+              <span>{session.agent}</span>
+            </span>
+          ) : (
+            <span className="d-flex align-items-center">
+              <Phone size={14} style={{ marginRight: '6px' }} />
+              <span>{session.phone}</span>
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'intent',
+      label: 'Intent',
+      type: 'custom',
+      render: (session) => (
+        <span style={{ fontSize: '13px', color: '#2c3e50' }}>{session.intent}</span>
+      ),
+    },
+    {
+      key: 'sentiment',
+      label: 'Sentiment',
+      type: 'custom',
+      render: (session) => (
+        <>
+          {session.sentiment && (
+            <div className="d-flex align-items-center">
+              <div
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: session.sentiment === 'Positive' ? '#4caf50' : '#ff9800',
+                  marginRight: '8px',
+                }}
+              />
+              <span style={{ fontSize: '13px', color: '#6c757d' }}>{session.sentiment}</span>
+            </div>
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'duration',
+      label: 'Duration',
+      type: 'custom',
+      render: (session) => (
+        <span style={{ fontSize: '13px', color: '#2c3e50' }}>{session.duration}</span>
+      ),
+    },
+    {
+      key: '_menu',
+      label: '',
+      sortable: false,
+      type: 'custom',
+      render: () => <MoreVertical size={16} color="#95a5a6" />,
+    },
+  ], []);
 
   return (
     <React.Fragment>
+      <style jsx global>{`
+        .generic-table-responsive {
+          margin: 0 !important;
+          width: 100% !important;
+          border-radius: 0px !important;
+        }
+      `}</style>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Monitoring" />
 
       <div style={{ backgroundColor: '#f4f7fa', minHeight: '100vh'}}>
@@ -340,118 +466,27 @@ const AIMLLiveMonitoring = () => {
                   </Col>
                 </Row>
 
-                {/* Table */}
-                <div style={{ overflowX: 'auto' }}>
-                  <Table hover responsive style={{ marginBottom: '0' }}>
-                    <thead style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #e0e0e0' }}>
-                      <tr>
-                        <th style={{ fontSize: '13px', fontWeight: '600', color: '#6c757d', padding: '12px' }}>Session ID</th>
-                        <th style={{ fontSize: '13px', fontWeight: '600', color: '#6c757d', padding: '12px' }}>Status</th>
-                        <th style={{ fontSize: '13px', fontWeight: '600', color: '#6c757d', padding: '12px' }}>Agent</th>
-                        <th style={{ fontSize: '13px', fontWeight: '600', color: '#6c757d', padding: '12px' }}>Intent</th>
-                        <th style={{ fontSize: '13px', fontWeight: '600', color: '#6c757d', padding: '12px' }}>Sentiment</th>
-                        <th style={{ fontSize: '13px', fontWeight: '600', color: '#6c757d', padding: '12px' }}>Duration</th>
-                        <th style={{ fontSize: '13px', fontWeight: '600', color: '#6c757d', padding: '12px', minWidth: 'auto' }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sessions.map((session, idx) => (
-                        <tr 
-                          key={idx} 
-                          style={{ cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
-                          onClick={() => setSelectedSession(session)}
-                        >
-                          <td style={{ fontSize: '13px', padding: '12px', color: '#2c3e50' }}>
-                            {session.id}
-                          </td>
-                          <td style={{ padding: '12px' }}>
-                            <Badge 
-                              bg={getStatusBadge(session.status)} 
-                              style={{ 
-                                fontSize: '12px', 
-                                fontWeight: '500',
-                                padding: '6px 12px',
-                                borderRadius: '6px'
-                              }}
-                            >
-                              {session.status}
-                            </Badge>
-                          </td>
-                          <td style={{ fontSize: '13px', padding: '12px', color: '#2c3e50' }}>
-                            {session.agent ? (
-                              <div className="d-flex align-items-center">
-                                <span style={{ marginRight: '8px' }}>{session.agentFlag}</span>
-                                <span>{session.agent}</span>
-                              </div>
-                            ) : (
-                              <div className="d-flex align-items-center">
-                                <Phone size={14} style={{ marginRight: '6px' }} />
-                                <span>{session.phone}</span>
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ fontSize: '13px', padding: '12px', color: '#2c3e50' }}>
-                            {session.intent}
-                          </td>
-                          <td style={{ padding: '12px' }}>
-                            {session.sentiment && (
-                              <div className="d-flex align-items-center">
-                                <div 
-                                  style={{ 
-                                    width: '8px', 
-                                    height: '8px', 
-                                    borderRadius: '50%', 
-                                    backgroundColor: session.sentiment === 'Positive' ? '#4caf50' : '#ff9800',
-                                    marginRight: '8px'
-                                  }}
-                                ></div>
-                                <span style={{ fontSize: '13px', color: '#6c757d' }}>{session.sentiment}</span>
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ fontSize: '13px', padding: '12px', color: '#2c3e50' }}>
-                            {session.duration}
-                          </td>
-                          <td style={{ padding: '12px', minWidth: 'auto' }}>
-                            <MoreVertical size={16} color="#95a5a6" />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
-
-                {/* Pagination */}
-                <div className="d-flex justify-content-between align-items-center mt-3 pt-3" style={{ borderTop: '1px solid #e9ecef' }}>
-                  <div style={{ fontSize: '13px', color: '#6c757d' }}>
-                    Showing <strong>1-5</strong> of <strong>5</strong> sessions
-                  </div>
-                  <div className="d-flex align-items-center gap-2">
-                    <Button 
-                      variant="outline-secondary" 
-                      size="sm" 
-                      disabled
-                      style={{ padding: '4px 8px', border: '1px solid #dee2e6' }}
-                    >
-                      <ChevronLeft size={14} />
-                    </Button>
-                    <Button 
-                      variant="primary" 
-                      size="sm"
-                      style={{ padding: '4px 12px', minWidth: '32px' }}
-                    >
-                      1
-                    </Button>
-                    <Button 
-                      variant="outline-secondary" 
-                      size="sm" 
-                      disabled
-                      style={{ padding: '4px 8px', border: '1px solid #dee2e6' }}
-                    >
-                      <ChevronRight size={14} />
-                    </Button>
-                  </div>
-                </div>
+                <GenericTable<Session>
+                  data={paginatedSessions}
+                  columns={sessionsColumns}
+                  loading={false}
+                  emptyMessage="No sessions found"
+                  sortable={false}
+                  showToolbar={false}
+                  showToolbarActions={false}
+                  pagination={{
+                    currentPage,
+                    rowsPerPage,
+                    totalRows: filteredSessions.length,
+                    pageSizeOptions: [5, 10, 20],
+                  }}
+                  onPaginationChange={(page, nextRowsPerPage) => {
+                    setRowsPerPage(nextRowsPerPage);
+                    setCurrentPage(page);
+                  }}
+                  uniqueKey="id"
+                  noBorder
+                />
               </Card.Body>
             </Card>
           </Col>
@@ -540,45 +575,51 @@ const AIMLLiveMonitoring = () => {
                 {/* Tabs */}
                 <div className="mb-3" style={{ borderBottom: '1px solid #e0e0e0' }}>
                   <div className="d-flex" style={{ gap: '24px' }}>
-                    <div 
+                    <button
+                      type="button"
                       onClick={() => setActiveTab('transcript')}
                       style={{ 
+                        border: 'none',
+                        background: 'transparent',
                         paddingBottom: '12px', 
                         borderBottom: activeTab === 'transcript' ? '2px solid #2196f3' : '2px solid transparent',
                         fontSize: '14px',
                         color: activeTab === 'transcript' ? '#2196f3' : '#95a5a6',
-                        cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}
                     >
                       Transcript
-                    </div>
-                    <div 
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setActiveTab('draft')}
                       style={{ 
+                        border: 'none',
+                        background: 'transparent',
                         paddingBottom: '12px',
                         borderBottom: activeTab === 'draft' ? '2px solid #2196f3' : '2px solid transparent',
                         fontSize: '14px',
                         color: activeTab === 'draft' ? '#2196f3' : '#95a5a6',
-                        cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}
                     >
                       Draft
-                    </div>
-                    <div 
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setActiveTab('more')}
                       style={{ 
+                        border: 'none',
+                        background: 'transparent',
                         paddingBottom: '12px',
                         borderBottom: activeTab === 'more' ? '2px solid #2196f3' : '2px solid transparent',
                         fontSize: '14px',
                         color: activeTab === 'more' ? '#2196f3' : '#95a5a6',
-                        cursor: 'pointer',
                         transition: 'all 0.2s'
                       }}
                     >
                       More +
-                    </div>
+                    </button>
                   </div>
                 </div>
 
@@ -697,9 +738,8 @@ const AIMLLiveMonitoring = () => {
                   variant="danger" 
                   className="w-100 d-flex align-items-center justify-content-center" 
                   onClick={() => {
-                    if (window.confirm('Are you sure you want to terminate this session?')) {
+                    if (globalThis.confirm('Are you sure you want to terminate this session?')) {
                       alert('Session terminated');
-                      setSelectedSession(null);
                     }
                   }}
                   style={{ borderRadius: '8px', fontSize: '14px', padding: '12px', gap: '8px' }}

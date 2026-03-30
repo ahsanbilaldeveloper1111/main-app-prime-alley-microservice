@@ -1,11 +1,9 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, Tag } from 'lucide-react';
-import { useSession } from 'next-auth/react';
 import { createProjectLabel, updateProjectLabel, deleteProjectLabel } from '@utils/tasks';
-import { canManage } from '@utils/work-planner';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
-import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
+import type { StatsCardData } from '@components/GenericStatsCards';
 
 interface LabelsTabProps {
   selectedProject: any;
@@ -13,6 +11,23 @@ interface LabelsTabProps {
   loading: boolean;
   onRefresh: () => void;
   styles: any;
+  canManageProject: boolean;
+}
+
+function resolveLabelTaskCount(label: any): number {
+  const raw =
+    label?.tasks_count ??
+    label?.task_count ??
+    label?.tasksCount ??
+    label?.pivot?.task_count;
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return raw;
+  }
+  if (typeof raw === 'string') {
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
 }
 
 const LabelsTab: React.FC<LabelsTabProps> = ({
@@ -20,13 +35,11 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   labels,
   loading,
   onRefresh,
-  styles
+  styles: _styles,
+  canManageProject,
 }) => {
-  const { data: session } = useSession();
-  const isAllow = useMemo(() => {
-    return canManage(labels, selectedProject, session);
-  }, [labels, selectedProject, session]);
-  
+  const isAllow = canManageProject;
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -43,15 +56,12 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   });
   const [searchValue, setSearchValue] = useState('');
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [clearSelectedRows, setClearSelectedRows] = useState(false);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(['name', 'color', 'tasks']);
-  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [selectedColumns] = useState<string[]>(['name', 'color', 'tasks']);
   const [colorFilter, setColorFilter] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddLabel = async () => {
-    if (!selectedProject?.id || !formData.name) return;
+    if (!canManageProject || !selectedProject?.id || !formData.name) return;
     
     try {
       setProcessing(true);
@@ -70,7 +80,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   };
 
   const handleUpdateLabel = async () => {
-    if (!selectedProject?.id || !selectedLabel || !formData.name) return;
+    if (!canManageProject || !selectedProject?.id || !selectedLabel || !formData.name) return;
     
     try {
       setProcessing(true);
@@ -90,7 +100,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   };
 
   const handleDeleteLabel = async () => {
-    if (!selectedProject?.id || !selectedLabel) return;
+    if (!canManageProject || !selectedProject?.id || !selectedLabel) return;
     
     try {
       setProcessing(true);
@@ -105,16 +115,16 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     }
   };
 
-  const openEditModal = (label: any) => {
+  const openEditModal = useCallback((label: any) => {
     setSelectedLabel(label);
     setFormData({ name: label.name || '', color: label.color || '#4680FF' });
     setShowEditModal(true);
-  };
+  }, []);
 
-  const openDeleteModal = (label: any) => {
+  const openDeleteModal = useCallback((label: any) => {
     setSelectedLabel(label);
     setShowDeleteModal(true);
-  };
+  }, []);
 
   const predefinedColors = [
     '#4680FF', '#2CA87F', '#FFB64D', '#DC2626', '#9E9E9E',
@@ -122,13 +132,14 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     '#06b6d4', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'
   ];
 
-  // ── Enrich labels with task count ─────────────────────────────────────────
-  const enrichedLabels = useMemo(() =>
-    labels.map((label, index) => ({
-      ...label,
-      _taskCount: 0, // TODO: Integrate actual task count from backend
-    })),
-    [labels]
+  // ── Enrich labels with task count (from API fields when present) ─────────
+  const enrichedLabels = useMemo(
+    () =>
+      labels.map((label) => ({
+        ...label,
+        _taskCount: resolveLabelTaskCount(label),
+      })),
+    [labels],
   );
 
   // ── GenericTable columns ──────────────────────────────────────────────────
@@ -255,7 +266,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   const statsCardsData: StatsCardData[] = useMemo(() => {
     const totalLabels = labels.length;
     const uniqueColors = new Set(labels.map((l: any) => l.color || '#4680FF')).size;
-    const totalTasks = labels.reduce((sum: number, l: any) => sum + (l._taskCount || 0), 0);
+    const totalTasks = labels.reduce((sum: number, l: any) => sum + resolveLabelTaskCount(l), 0);
 
     return [
       {
@@ -264,11 +275,11 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
         icon: Tag,
         iconColor: '#6366F1',
         iconBgColor: '#EEF2FF',
-        subtitle: `${uniqueColors} unique colors`,
+        subtitle: `${uniqueColors} unique colors · ${totalTasks} task uses`,
       },
       {
         title: 'Active Labels',
-        value: labels.filter((l: any) => (l._taskCount || 0) > 0).length,
+        value: labels.filter((l: any) => resolveLabelTaskCount(l) > 0).length,
         icon: Tag,
         iconColor: '#10B981',
         iconBgColor: '#D1FAE5',
@@ -416,8 +427,7 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     showFilterPills: true,
     filterPills,
     
-    showEditColumns: true,
-    onEditColumnsClick: () => setShowColumnEditor(true),
+    showEditColumns: false,
     
     showExportButton: true,
     onExportClick: () => {
@@ -429,15 +439,25 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   }), [searchValue, filterPills, isAllow, selectedItems.length, labels.length]);
 
   // ── Row Interaction Handlers ──────────────────────────────────────────────
-  const handleFirstColumnClick = useCallback((row: any) => {
-    openEditModal(row);
-  }, []);
-
-  const handleRowDoubleClick = useCallback((row: any) => {
-    if (isAllow) {
+  const handleFirstColumnClick = useCallback(
+    (row: any) => {
+      if (!isAllow) {
+        return;
+      }
       openEditModal(row);
-    }
-  }, [isAllow]);
+    },
+    [isAllow, openEditModal],
+  );
+
+  const handleRowDoubleClick = useCallback(
+    (row: any) => {
+      if (!isAllow) {
+        return;
+      }
+      openEditModal(row);
+    },
+    [isAllow, openEditModal],
+  );
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -471,7 +491,6 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
           )}
           onSelectionChange={(selected) => {
             setSelectedItems(selected.map((item) => item.id));
-            setClearSelectedRows(false);
           }}
           
           // Pagination
@@ -523,16 +542,6 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
           
           // Stats cards for metrics
           statsCards={statsCardsData}
-          
-          // When Board View is selected, show board content instead of table
-          customBody={
-            viewMode === "board" ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#6B7280' }}>
-                <Tag size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                <p>Board view for labels is not yet implemented</p>
-              </div>
-            ) : undefined
-          }
         />
       </div>
 

@@ -20,6 +20,9 @@ export interface FilterField {
   options?: FilterOption[];
   isClearable?: boolean;
   styles?: any;
+  /** For `type: "date"` / `"datetime"` — passed to the native input */
+  min?: string;
+  max?: string;
 }
 
 export interface GenericFilterSidebarProps {
@@ -174,6 +177,8 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
           <Form.Control
             type="date"
             value={filter.value || ''}
+            min={filter.min}
+            max={filter.max}
             onChange={(e) => filter.onChange(e.target.value || null)}
             style={baseStyles}
           />
@@ -184,6 +189,8 @@ const GenericFilterSidebar: React.FC<GenericFilterSidebarProps> = ({
           <Form.Control
             type="datetime-local"
             value={filter.value || ''}
+            min={filter.min}
+            max={filter.max}
             onChange={(e) => filter.onChange(e.target.value || null)}
             style={baseStyles}
           />
