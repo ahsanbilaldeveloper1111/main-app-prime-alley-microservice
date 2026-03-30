@@ -134,6 +134,8 @@ export interface InvoiceData {
   terms_conditions: string | null;
   is_recurring: boolean;
   recurring_frequency: string | null;
+  /** Subscription / recurring end date from API (create/update use this key). */
+  end_date?: string | null;
   recurring_end_date: string | null;
   parent_invoice_id: string | null;
   created_by: string | null;
