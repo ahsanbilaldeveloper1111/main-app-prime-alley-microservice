@@ -11,8 +11,6 @@ import {
   getLead,
   getCrmProducts,
   createEstimate,
-  getRelevantDealTemplate,
-  getCampaignById,
   getIndustries,
   getBusinessTypes,
   CrmProduct,
@@ -23,7 +21,16 @@ import {
   BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
+import { ModuleSlug } from '@utils/Helper';
+import {
+  buildConvertDealFormStateFromLead,
+  loadCampaignIndustryContext,
+  loadDealTemplateForLead,
+  validateConvertDealStep0,
+  validateConvertDealStep1,
+  validateConvertDealStep2,
+  validateConvertDealStep4,
+} from "@utils/crm/convertToDealShared";
 import { convertCurrency, formatCurrency } from '@utils/currency';
 import { useSession } from "next-auth/react";
 
@@ -159,79 +166,15 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
       const leadData: any = await getLead(leadId);
       setSourceLead(leadData);
 
-      // Parse contact_persons
-      let contactPersonsArray: any[] = [];
-      if (leadData.contact_persons) {
-        if (typeof leadData.contact_persons === 'string') {
-          try {
-            contactPersonsArray = JSON.parse(leadData.contact_persons);
-          } catch (e) {
-            console.error("Failed to parse contact_persons:", e);
-          }
-        } else if (Array.isArray(leadData.contact_persons)) {
-          contactPersonsArray = leadData.contact_persons;
-        }
-      }
+      const leadRecord = leadData as Record<string, unknown>;
+      setFormData(buildConvertDealFormStateFromLead(leadRecord, leadId));
 
-      const primaryContact = contactPersonsArray.find(cp => cp.email) || 
-                             contactPersonsArray.find(cp => cp.phone) || 
-                             contactPersonsArray[0] || {};
-
-      const leadDataAny = leadData as any;
-      const contactPersonName = primaryContact.name || leadDataAny.contact_person_name || "";
-
-      // Calculate default expected close date (7 days from now)
-      const defaultCloseDate = new Date();
-      defaultCloseDate.setDate(defaultCloseDate.getDate() + 7);
-      const formattedCloseDate = defaultCloseDate.toISOString().split('T')[0];
-
-      // Auto-fill form data
-      setFormData({
-        name: leadData.name || "",
-        ticket_id: leadId,
-        lead_id: leadId,
-        stage_id: undefined,
-        assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
-        expected_close_date: formattedCloseDate,
-        company_name: leadData.company_name || "",
-        company_domain: (leadData as any).company_domain ?? "",
-        industry_ids: [],
-        decision_maker_title: primaryContact.title || leadDataAny.contact_person_title || "",
-        decision_maker_name: contactPersonName,
-        decision_maker_phone_country_code: primaryContact.phone_country_code || leadDataAny.contact_phone_country_code || "",
-        decision_maker_phone: primaryContact.phone || leadDataAny.contact_phone || "",
-        decision_maker_email: primaryContact.email || "",
-        deal_type: "",
-        contract_length: "",
-        contract_length_custom: "",
-        billing_model: "",
-        payment_terms: "",
-        payment_terms_custom: "",
-        risk_level: "",
-        competitors: "",
-        quotation_sent: false,
-        contract_sent: false,
-        contract_received: false,
-        follow_up_date: "",
-        currency: "AED",
-        tax_percentage: "0",
-        standard_discount_percentage: "0",
-        special_discount_percentage: "0",
-      });
-
-      // Fetch deal template
       try {
         setLoadingTemplate(true);
-        const template = await getRelevantDealTemplate({ lead_id: leadId });
+        const { template, templateFieldsData: initialFields } = await loadDealTemplateForLead(leadId);
         if (template) {
           setDealTemplate(template);
-          const initialFieldsData: Record<string, any> = {};
-          if (template.fields) {
-            template.fields.forEach((field) => {
-              initialFieldsData[field.field_name] = '';
-            });
-          }
-          setTemplateFieldsData(initialFieldsData);
+          setTemplateFieldsData(initialFields);
         }
       } catch (error) {
         console.error("Failed to fetch deal template:", error);
@@ -239,39 +182,20 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
         setLoadingTemplate(false);
       }
 
-      // Fetch campaign and industries
       if (leadData.campaign_id) {
         try {
           setLoadingIndustries(true);
-          const campaignData = await getCampaignById(leadData.campaign_id);
-          setCampaign(campaignData);
-          
-          const industriesData = (campaignData as any).industries;
-          const industryIds = (campaignData as any).industry_ids;
-          
-          let campaignIndustryIds: number[] = [];
-          if (industriesData && Array.isArray(industriesData)) {
-            campaignIndustryIds = industriesData.map((ind: any) => typeof ind === 'object' ? ind.id : ind);
-          } else if (industryIds && Array.isArray(industryIds)) {
-            campaignIndustryIds = industryIds;
-          }
-          
-          if (campaignIndustryIds.length > 0) {
-            const allIndustriesResponse = await getIndustries({ per_page: 1000 });
-            const allInds = allIndustriesResponse.data || [];
-            const filteredIndustries = allInds.filter((ind: IndustryData) => 
-              campaignIndustryIds.includes(ind.id)
-            );
-            setCampaignIndustries(filteredIndustries);
-            
+          const ctx = await loadCampaignIndustryContext(Number(leadData.campaign_id));
+          setCampaign(ctx.campaignData);
+          if (ctx.campaignIndustryIds.length > 0) {
+            setCampaignIndustries(ctx.filteredIndustries);
             setFormData((prev) => ({
               ...prev,
-              industry_ids: campaignIndustryIds,
+              industry_ids: ctx.campaignIndustryIds,
             }));
-            
-            if (filteredIndustries.length === 1) {
-              setSelectedIndustryId(filteredIndustries[0].id);
-              await fetchProductsByIndustry(filteredIndustries[0].id);
+            if (ctx.filteredIndustries.length === 1) {
+              setSelectedIndustryId(ctx.filteredIndustries[0].id);
+              await fetchProductsByIndustry(ctx.filteredIndustries[0].id);
             }
           }
         } catch (error) {
@@ -363,56 +287,13 @@ const ConvertToDealModal: React.FC<ConvertToDealModalProps> = ({
     }
   };
 
-  // Validation functions
-  const validateStep0 = (): boolean => {
-    const requiredFields = [
-      { field: 'name' as const, name: 'Deal Name' },
-      { field: 'stage_id' as const, name: 'Stage' },
-      { field: 'expected_close_date' as const, name: 'Expected Close Date' },
-      { field: 'assigned_to' as const, name: 'Assigned to' },
-      { field: 'currency' as const, name: 'Currency' },
-    ];
-    return checkRequiredFields(formData, requiredFields);
-  };
-
-  const validateStep1 = (): boolean => {
-    const requiredFields = [
-      { field: 'company_name' as const, name: 'Company Name' },
-      { field: 'decision_maker_name' as const, name: 'Decision Maker Name' },
-      { field: 'decision_maker_email' as const, name: 'Decision Maker Email', type: ValidationType.EMAIL },
-      { field: 'decision_maker_phone' as const, name: 'Decision Maker Phone' },
-    ];
-    return checkRequiredFields(formData, requiredFields);
-  };
-
-  const validateStep2 = (): boolean => {
-    if (!dealTemplate) return true;
-    
-    if (dealTemplate.fields && dealTemplate.fields.length > 0) {
-      for (const field of dealTemplate.fields) {
-        if (field.is_required) {
-          const fieldValue = templateFieldsData[field.field_name];
-          if (!fieldValue || (typeof fieldValue === 'string' && fieldValue.trim() === '')) {
-            toast.error(`${field.field_name} is required`);
-            return false;
-          }
-        }
-      }
-    }
-    return true;
-  };
-
-  const validateStep3 = (): boolean => {
-    return true;
-  };
-
-  const validateStep4 = (): boolean => {
-    if (!estimationItems || estimationItems.length === 0) {
-      toast.error('Please add at least one product to the estimation chart');
-      return false;
-    }
-    return true;
-  };
+  const validateStep0 = (): boolean =>
+    validateConvertDealStep0(formData, "Assigned to");
+  const validateStep1 = (): boolean => validateConvertDealStep1(formData);
+  const validateStep2 = (): boolean =>
+    validateConvertDealStep2(dealTemplate, templateFieldsData);
+  const validateStep3 = (): boolean => true;
+  const validateStep4 = (): boolean => validateConvertDealStep4(estimationItems);
 
   const validateCurrentStep = (): boolean => {
     switch (formStep) {

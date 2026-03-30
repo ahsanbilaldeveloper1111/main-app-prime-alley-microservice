@@ -21,6 +21,12 @@ import PhoneInput, {
 } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import Select from "react-select";
+import {
+  fieldLabel,
+  inputStyle,
+  fieldWrap,
+  dropdownToggleStyle,
+} from "@components/crmDealFormUi";
 
 // ─── Type Definitions ─────────────────────────────────────────────────────────
 interface LineItem {
@@ -246,57 +252,6 @@ const ASSOCIATION_LABEL_OPTIONS = [
   "Billing",
 ];
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-const FIELD_LABEL_STYLE: React.CSSProperties = {
-  display: "block",
-  fontSize: "14px",
-  fontWeight: "600",
-  color: "#141414",
-  marginBottom: "8px",
-};
-
-const REQUIRED_MARK_STYLE: React.CSSProperties = {
-  color: "#f2545b",
-  marginLeft: "2px",
-};
-
-const fieldLabel = (text: string, required: boolean = false) => (
-  <label
-    style={FIELD_LABEL_STYLE}
-  >
-    {text}
-    {required && <span style={REQUIRED_MARK_STYLE}>*</span>}
-  </label>
-);
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid #8a8a8a",
-  borderRadius: "4px",
-  fontSize: "16px",
-  fontWeight: "300",
-  outline: "none",
-  fontFamily: "inherit",
-  boxSizing: "border-box",
-};
-
-const fieldWrap: React.CSSProperties = { marginBottom: "20px" };
-
-const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
-  width: "100%",
-  textAlign: "left",
-  padding: "10px 12px",
-  border: "1px solid #8a8a8a",
-  borderRadius: "4px",
-  fontSize: "16px",
-  fontWeight: "300",
-  backgroundColor: "#ffffff",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  color: hasValue ? "#141414" : "#a0aec0",
-});
 
 const hoverBackgroundHandlers = (
   enabled: boolean,

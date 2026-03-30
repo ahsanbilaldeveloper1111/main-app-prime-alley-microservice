@@ -20,12 +20,8 @@ import {
   X,
   Plus,
   Filter,
-  Download,
-  Save,
   MoreVertical,
   Menu,
-  ChevronDown,
-  ExternalLink,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
 import { StatsCardData } from "@components/GenericStatsCards";
@@ -101,6 +97,14 @@ export interface DropdownOption<T = any> {
   divider?: boolean; // Add divider after this option
 }
 
+/** Options visible for a row (same rule as row actions and context menu). */
+export function getVisibleDropdownOptions<T>(
+  options: DropdownOption<T>[],
+  row: T,
+): DropdownOption<T>[] {
+  return options.filter((o) => !o.show || o.show(row));
+}
+
 export interface TableAction<T = any> {
   label: string;
   icon?: React.ReactNode;
@@ -156,9 +160,7 @@ export function buildTableContextMenuItems<T>(
   for (const action of actions) {
     if (action.show && !action.show(row)) continue;
     if (action.dropdown) {
-      const opts = action.dropdown.options.filter(
-        (o) => !o.show || o.show(row),
-      );
+      const opts = getVisibleDropdownOptions(action.dropdown.options, row);
       for (const o of opts) {
         items.push({
           label: o.label,
@@ -202,6 +204,64 @@ export function buildBoundTableContextMenuItems<T>(
     disabledClassName: item.disabledClassName,
   }));
 }
+
+/** One row in `gt-context-menu`; `onClick` is a bound handler (no row argument). */
+export type GtContextMenuItemRow = BoundTableContextMenuItem;
+
+/** Shared markup for context menu rows (GenericTable right‑click + Kanban card menu). */
+export const GtContextMenuItemList: React.FC<{
+  items: GtContextMenuItemRow[];
+  onClose: () => void;
+}> = ({ items, onClose }) => (
+  <>
+    {items.map((item, idx) => (
+      <React.Fragment
+        key={`${item.label}-${idx}-${item.className ?? ""}`}
+      >
+        {item.disabled && item.disabledTitle ? (
+          <span
+            className="gt-context-menu-disabled-wrapper"
+            title={item.disabledTitle}
+          >
+            <button
+              type="button"
+              className={`gt-context-menu-item ${item.className || ""}`}
+              disabled
+              onClick={(e) => e.stopPropagation()}
+              role="menuitem"
+            >
+              {item.icon && (
+                <span className="gt-context-menu-icon">{item.icon}</span>
+              )}
+              {item.label}
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className={`gt-context-menu-item ${item.className || ""}`}
+            disabled={item.disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!item.disabled) {
+                item.onClick();
+                onClose();
+              }
+            }}
+            role="menuitem"
+            title={item.disabled ? item.disabledTitle : undefined}
+          >
+            {item.icon && (
+              <span className="gt-context-menu-icon">{item.icon}</span>
+            )}
+            {item.label}
+          </button>
+        )}
+        {item.divider && <div className="gt-context-menu-divider" />}
+      </React.Fragment>
+    ))}
+  </>
+);
 
 export interface PaginationConfig {
   currentPage: number;
@@ -1401,50 +1461,19 @@ const GenericTable = <T extends Record<string, any>>({
           style={{ left: contextMenu.x, top: contextMenu.y }}
           role="menu"
         >
-          {getContextMenuItems(contextMenu.row).map((item, idx) => (
-            <React.Fragment key={idx}>
-              {item.disabled && item.disabledTitle ? (
-                <span
-                  className="gt-context-menu-disabled-wrapper"
-                  title={item.disabledTitle}
-                >
-                  <button
-                    type="button"
-                    className={`gt-context-menu-item ${item.className || ""}`}
-                    disabled
-                    onClick={(e) => e.stopPropagation()}
-                    role="menuitem"
-                  >
-                    {item.icon && (
-                      <span className="gt-context-menu-icon">{item.icon}</span>
-                    )}
-                    {item.label}
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className={`gt-context-menu-item ${item.className || ""}`}
-                  disabled={item.disabled}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!item.disabled) {
-                      item.onClick(contextMenu.row);
-                      setContextMenu(null);
-                    }
-                  }}
-                  role="menuitem"
-                  title={item.disabled ? item.disabledTitle : undefined}
-                >
-                  {item.icon && (
-                    <span className="gt-context-menu-icon">{item.icon}</span>
-                  )}
-                  {item.label}
-                </button>
-              )}
-              {item.divider && <div className="gt-context-menu-divider" />}
-            </React.Fragment>
-          ))}
+          <GtContextMenuItemList
+            items={getContextMenuItems(contextMenu.row).map((item) => ({
+              label: item.label,
+              icon: item.icon,
+              className: item.className,
+              divider: item.divider,
+              disabled: item.disabled,
+              disabledTitle: item.disabledTitle,
+              disabledClassName: item.disabledClassName,
+              onClick: () => item.onClick(contextMenu.row),
+            }))}
+            onClose={() => setContextMenu(null)}
+          />
         </div>
       )}
 
@@ -1811,11 +1840,10 @@ const GenericTable = <T extends Record<string, any>>({
 
                               // If action has dropdown configuration
                               if (action.dropdown) {
-                                const visibleOptions =
-                                  action.dropdown.options.filter(
-                                    (option) =>
-                                      !option.show || option.show(row),
-                                  );
+                                const visibleOptions = getVisibleDropdownOptions(
+                                  action.dropdown.options,
+                                  row,
+                                );
 
                                 if (visibleOptions.length === 0) return null;
 

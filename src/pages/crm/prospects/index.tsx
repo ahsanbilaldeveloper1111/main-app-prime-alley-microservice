@@ -22,7 +22,7 @@ import {
   Modal,
   Badge,
   InputGroup,
-  Dropdown,
+
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
@@ -36,14 +36,11 @@ import {
   FiDatabase,
   FiSearch,
   FiFilter,
-  FiEye,
   FiEdit,
   FiUsers,
-  FiPhone,
   FiX,
   FiCalendar,
   FiTarget,
-  FiMoreVertical,
 } from "react-icons/fi";
 import {
   Users,
@@ -73,7 +70,6 @@ import {
   MessageCircle,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
-import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
@@ -96,7 +92,6 @@ import {
   getCrmDataCounts,
   bulkDeleteCrmData,
   getCrmDataTags,
-  markCrmDataAsViewed,
   getCampaigns,
   scheduleCall,
   unscheduleCall,
@@ -118,12 +113,10 @@ let customFieldIdCounter = 0;
 const createCustomFieldId = () => `custom-field-${Date.now()}-${customFieldIdCounter++}`;
 import {
   ModuleSlug,
-  GlobalDateTimeFormat,
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import { useCti } from "../../../contexts/CtiContext";
-import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
@@ -2139,41 +2132,6 @@ const CrmProspectsManagement = () => {
     (item: CrmDataItem) => openProspectSidebar(item),
     [openProspectSidebar],
   );
-
-  // Handle play call recording
-  const handlePlayCallRecording = useCallback((recording: any) => {
-    setSelectedRecording(recording);
-    setShowRecordingPlayerModal(true);
-  }, []);
-
-  // Handle download call recording
-  const handleDownloadCallRecording = useCallback(async (recording: any) => {
-    const { Id, AgentExtension } = recording;
-
-    try {
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-      }, 200);
-
-      await DownloadCallRecording(
-        Id,
-        AgentExtension,
-        "call-logs/recordings/download",
-        recording.imagicle,
-      );
-
-      // Complete the progress
-      clearInterval(progressInterval);
-
-      // Show completion briefly before hiding
-      setTimeout(() => {
-      }, 1000);
-    } catch (error) {
-      console.error("Download error:", error);
-      toast.error("Download failed");
-    }
-  }, []);
-
   // Handle delete data item
   const handleDeleteData = useCallback((item: CrmDataItem) => {
     setItemToDelete(item);
@@ -2352,48 +2310,6 @@ const CrmProspectsManagement = () => {
     customDistribution,
   ]);
 
-  // Handle mark as viewed
-  const handleMarkAsViewed = useCallback(async (item: CrmDataItem) => {
-    try {
-      await markCrmDataAsViewed(item.id);
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      console.error("Mark as viewed error:", error);
-    }
-  }, []);
-
-  // Handle call actions
-  const handleCallAction = useCallback((action: string, item: CrmDataItem) => {
-    const phone = item.phone;
-    if (!phone) {
-      toast.error("No phone number available for this entry");
-      return;
-    }
-
-    switch (action) {
-      case "whatsapp":
-        window.open(`https://wa.me/${phone.replace(/[^0-9]/g, "")}`, "_blank");
-        break;
-      case "phone":
-        window.open(`tel:${phone}`, "_self");
-        break;
-      case "sms":
-        window.open(`sms:${phone}`, "_self");
-        break;
-      case "facebook":
-        toast.info("Facebook calling feature coming soon");
-        break;
-      case "telegram":
-        toast.info("Telegram calling feature coming soon");
-        break;
-      case "skype":
-        toast.info("Skype calling feature coming soon");
-        break;
-      default:
-        toast.error("Unknown action");
-    }
-  }, []);
-
   const handleNoteCreate = (
     note: string,
     createTask: boolean,
@@ -2435,13 +2351,6 @@ const CrmProspectsManagement = () => {
     },
     [dialNumber, isInitialized],
   );
-
-  // Handle recording playback
-  const handlePlayRecording = useCallback((recordingUrl: string) => {
-    // In a real app, this would open the recording player
-    toast.info(`Playing recording: ${recordingUrl}`);
-    console.log("Playing recording:", recordingUrl);
-  }, []);
 
   // Handle data assignment modal close
   const handleDataAssignmentModalClose = useCallback(() => {

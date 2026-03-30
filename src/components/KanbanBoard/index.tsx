@@ -1,8 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { FileText, MapPin, Mail, ExternalLink, ChevronLeft, ChevronRight } from "lucide-react";
-import type { BoundTableContextMenuItem } from "@components/GenericTable";
+import {
+  buildBoundTableContextMenuItems,
+  GtContextMenuItemList,
+  type BoundTableContextMenuItem,
+  type TableAction,
+} from "@components/GenericTable";
 import "@assets/css/GenericTable.css";
-import type { TableAction } from "@components/GenericTable";
 
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 const TEAL = "#006162";
@@ -537,61 +541,6 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
     [searchValue]
   );
 
-  type ContextMenuItem = {
-    label: string;
-    icon?: React.ReactNode;
-    onClick: (row: any) => void;
-    divider?: boolean;
-    className?: string;
-    disabled?: boolean;
-    disabledTitle?: string;
-    disabledClassName?: string;
-  };
-
-  const getContextMenuItems = useCallback(
-    (row: any): ContextMenuItem[] => {
-      const actions = cardActions ?? [];
-      const items: ContextMenuItem[] = [];
-      for (const action of actions) {
-        if (action.show && !action.show(row)) continue;
-
-        if (action.dropdown) {
-          const opts = action.dropdown.options.filter(
-            (o) => !o.show || o.show(row),
-          );
-          for (const o of opts) {
-            items.push({
-              label: o.label,
-              icon: o.icon,
-              onClick: o.onClick,
-              divider: o.divider ?? false,
-              className: o.className,
-            });
-          }
-          continue;
-        }
-
-        if (action.onClick && !action.render) {
-          const isDisabled = action.disabled?.(row) ?? false;
-          items.push({
-            label: action.label,
-            icon: action.icon,
-            onClick: action.onClick,
-            divider: false,
-            className: isDisabled
-              ? action.disabledClassName || "text-muted"
-              : action.className,
-            disabled: isDisabled,
-            disabledTitle: action.disabledTitle,
-            disabledClassName: action.disabledClassName,
-          });
-        }
-      }
-      return items;
-    },
-    [cardActions],
-  );
-
   const handleCardContextMenu = useCallback(
     (e: React.MouseEvent, card: KanbanCardData) => {
       if (cardContextMenuItems) {
@@ -605,13 +554,13 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       }
       if (!cardActions || cardActions.length === 0) return;
       const row = getRow(card);
-      const actionItems = getContextMenuItems(row);
+      const actionItems = buildBoundTableContextMenuItems(cardActions, row);
       if (actionItems.length === 0) return;
       e.preventDefault();
       e.stopPropagation();
       setContextMenu({ x: e.clientX, y: e.clientY, card });
     },
-    [cardContextMenuItems, cardActions, getRow, getContextMenuItems],
+    [cardContextMenuItems, cardActions, getRow],
   );
 
   // Close context menu on outside click or Escape
@@ -673,50 +622,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
           style={{ left: cardContextMenu.x, top: cardContextMenu.y }}
           role="menu"
         >
-          {cardContextMenu.items.map((item, idx) => (
-            <React.Fragment key={idx}>
-              {item.disabled && item.disabledTitle ? (
-                <span
-                  className="gt-context-menu-disabled-wrapper"
-                  title={item.disabledTitle}
-                >
-                  <button
-                    type="button"
-                    className={`gt-context-menu-item ${item.className || ""}`}
-                    disabled
-                    onClick={(e) => e.stopPropagation()}
-                    role="menuitem"
-                  >
-                    {item.icon && (
-                      <span className="gt-context-menu-icon">{item.icon}</span>
-                    )}
-                    {item.label}
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className={`gt-context-menu-item ${item.className || ""}`}
-                  disabled={item.disabled}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!item.disabled) {
-                      item.onClick();
-                      setCardContextMenu(null);
-                    }
-                  }}
-                  role="menuitem"
-                  title={item.disabled ? item.disabledTitle : undefined}
-                >
-                  {item.icon && (
-                    <span className="gt-context-menu-icon">{item.icon}</span>
-                  )}
-                  {item.label}
-                </button>
-              )}
-              {item.divider && <div className="gt-context-menu-divider" />}
-            </React.Fragment>
-          ))}
+          <GtContextMenuItemList
+            items={cardContextMenu.items}
+            onClose={() => setCardContextMenu(null)}
+          />
         </div>
       )}
       <style>{`
@@ -734,50 +643,13 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
           style={{ left: contextMenu.x, top: contextMenu.y }}
           role="menu"
         >
-          {getContextMenuItems(getRow(contextMenu.card)).map((item) => (
-            <React.Fragment key={`${item.label}-${item.className ?? ""}`}>
-              {item.disabled && item.disabledTitle ? (
-                <span
-                  className="gt-context-menu-disabled-wrapper"
-                  title={item.disabledTitle}
-                >
-                  <button
-                    type="button"
-                    className={`gt-context-menu-item ${item.className || ""}`}
-                    disabled
-                    onClick={(e) => e.stopPropagation()}
-                    role="menuitem"
-                  >
-                    {item.icon && (
-                      <span className="gt-context-menu-icon">{item.icon}</span>
-                    )}
-                    {item.label}
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className={`gt-context-menu-item ${item.className || ""}`}
-                  disabled={item.disabled}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!item.disabled) {
-                      item.onClick(getRow(contextMenu.card));
-                      setContextMenu(null);
-                    }
-                  }}
-                  role="menuitem"
-                  title={item.disabled ? item.disabledTitle : undefined}
-                >
-                  {item.icon && (
-                    <span className="gt-context-menu-icon">{item.icon}</span>
-                  )}
-                  {item.label}
-                </button>
-              )}
-              {item.divider && <div className="gt-context-menu-divider" />}
-            </React.Fragment>
-          ))}
+          <GtContextMenuItemList
+            items={buildBoundTableContextMenuItems(
+              cardActions ?? [],
+              getRow(contextMenu.card),
+            )}
+            onClose={() => setContextMenu(null)}
+          />
         </div>
       )}
       <div
