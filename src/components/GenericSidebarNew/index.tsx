@@ -3676,10 +3676,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
               ref={notesRef}
               contentEditable
               suppressContentEditableWarning
-              role="textbox"
-              aria-multiline="true"
               aria-label="Notes"
-              tabIndex={0}
               onInput={syncNotesFromEditor}
               onKeyDown={handleKeyDown}
               data-placeholder="Notes..."
