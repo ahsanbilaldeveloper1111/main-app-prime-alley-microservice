@@ -29,7 +29,11 @@ function getBrowserWindow(): Window | undefined {
   return (globalThis as typeof globalThis & { window?: Window }).window;
 }
 
-function getToken(): string | null {
+/**
+ * Same `Authorization` value axios uses (TokenService, then `sessionStorage.accessToken`).
+ * Use for `fetch()` when you need optional auth without axios interceptors (e.g. public pages).
+ */
+export function getClientBearerAuthorization(): string | null {
   const serviceToken = tokenService.getAccessToken();
   if (serviceToken) {
     return `Bearer ${serviceToken}`;
@@ -41,6 +45,10 @@ function getToken(): string | null {
   }
   const token = storage.getItem("accessToken");
   return token ? `Bearer ${token}` : null;
+}
+
+function getToken(): string | null {
+  return getClientBearerAuthorization();
 }
 
 function setAuthorizationHeader(config: InternalAxiosRequestConfig): void {

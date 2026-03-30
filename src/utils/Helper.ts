@@ -1103,7 +1103,6 @@ export function getCompanyByCrmId(
   companiesObject: { id?: string | number; name?: string }[] | null | undefined
 ): string | undefined {
   console.log('id', id);
-  console.log('companiesObject', companiesObject);
   if (id == null || id === '' || !Array.isArray(companiesObject) || companiesObject.length === 0) {
     return undefined;
   }

@@ -54,56 +54,56 @@ const WITH_RELATIONS = [
 ];
 
 function getStatusVariant(status: string | { name?: string } | null | undefined) {
-  const raw = typeof status === 'object' && status?.name ? status.name : (status ?? '');
-  const s = String(raw).toLowerCase();
-  if (s.includes('progress')) return 'warning';
-  if (s.includes('review')) return 'secondary';
-  if (s.includes('overdue')) return 'danger';
-  if (s.includes('complete')) return 'success';
-  return 'info';
+    const raw = typeof status === 'object' && status?.name ? status.name : (status ?? '');
+    const s = String(raw).toLowerCase();
+    if (s.includes('progress')) return 'warning';
+    if (s.includes('review')) return 'secondary';
+    if (s.includes('overdue')) return 'danger';
+    if (s.includes('complete')) return 'success';
+    return 'info';
 }
 
 function getPriorityVariant(priority: string) {
-  const p = (priority || '').toLowerCase();
-  if (p === 'urgent' || p === 'high') return 'danger';
-  if (p === 'normal') return 'warning';
-  return 'success';
+    const p = (priority || '').toLowerCase();
+    if (p === 'urgent' || p === 'high') return 'danger';
+    if (p === 'normal') return 'warning';
+    return 'success';
 }
 
 function formatActivityDate(dateString: string) {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  } catch {
-    return dateString;
-  }
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch {
+      return dateString;
+    }
 }
 
 function getExtensionDisplay(extNumber: string, hierarchyDataExtensions: unknown) {
-  if (!hierarchyDataExtensions || !extNumber) {
-    return { name: extNumber, initials: (extNumber || 'UN').toUpperCase().slice(0, 2) };
-  }
-  const extension = (hierarchyDataExtensions as any[]).find(
+    if (!hierarchyDataExtensions || !extNumber) {
+      return { name: extNumber, initials: (extNumber || 'UN').toUpperCase().slice(0, 2) };
+    }
+    const extension = (hierarchyDataExtensions as any[]).find(
     (ext: any) => ext.id === extNumber || ext.extension_number === extNumber,
-  );
-  const name = extension?.name || extNumber;
+    );
+    const name = extension?.name || extNumber;
   if (name === extNumber) {
     return { name, initials: (extNumber || 'UN').toUpperCase().slice(0, 2) };
   }
   const initials = name
-    .split(' ')
-    .map((n: string) => n[0])
-    .join('')
-    .substring(0, 2)
+            .split(' ')
+            .map((n: string) => n[0])
+            .join('')
+            .substring(0, 2)
     .toUpperCase();
-  return { name, initials };
+    return { name, initials };
 }
 
 type ActivityListProps = Readonly<{
@@ -122,56 +122,56 @@ function ActivityList({
   return (
     <>
       {activities.map((activity: any, idx: number) => {
-        const extNumber = activity.extension_number || '';
+      const extNumber = activity.extension_number || '';
         const { name: extensionName, initials: extensionInitials } = getExtensionDisplay(
           extNumber,
           hierarchyDataExtensions,
         );
-        const activityDate = formatActivityDate(activity.created_at || '');
-        const actionText = activity.description || activity.action || 'Activity';
-        return (
-          <div
+      const activityDate = formatActivityDate(activity.created_at || '');
+      const actionText = activity.description || activity.action || 'Activity';
+      return (
+        <div
             key={activity.id ?? `activity-${idx}`}
+          style={{
+            marginBottom: avatarSize === '32px' ? '1rem' : 0,
+            display: 'flex',
+            gap: '12px',
+            padding: avatarSize === '40px' ? '1rem 0' : 0,
+            borderBottom:
+              avatarSize === '40px' && idx < activities.length - 1 ? '1px solid #e2e8f0' : 'none',
+          }}
+        >
+          <div
             style={{
-              marginBottom: avatarSize === '32px' ? '1rem' : 0,
+              width: avatarSize,
+              height: avatarSize,
+              fontSize,
+              flexShrink: 0,
               display: 'flex',
-              gap: '12px',
-              padding: avatarSize === '40px' ? '1rem 0' : 0,
-              borderBottom:
-                avatarSize === '40px' && idx < activities.length - 1 ? '1px solid #e2e8f0' : 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              fontWeight: 600,
             }}
           >
-            <div
-              style={{
-                width: avatarSize,
-                height: avatarSize,
-                fontSize,
-                flexShrink: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: 'white',
-                fontWeight: 600,
-              }}
-            >
-              {extensionInitials}
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.875rem', color: '#1e293b', marginBottom: '0.25rem' }}>
-                {extNumber === 'system' ? (
-                  <>{actionText}</>
-                ) : (
-                  <>
-                    <strong>{extensionName}</strong> {actionText}
-                  </>
-                )}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{activityDate}</div>
-            </div>
+            {extensionInitials}
           </div>
-        );
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '0.875rem', color: '#1e293b', marginBottom: '0.25rem' }}>
+              {extNumber === 'system' ? (
+                <>{actionText}</>
+              ) : (
+                <>
+                  <strong>{extensionName}</strong> {actionText}
+                </>
+              )}
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{activityDate}</div>
+          </div>
+        </div>
+      );
       })}
     </>
   );
@@ -804,24 +804,24 @@ const TaskDetailPage = () => {
             Back to list
           </Button>
           {canManageTaskProject && (
-            <div className="d-flex align-items-center gap-1">
+          <div className="d-flex align-items-center gap-1">
               <Button
                 variant="link"
                 className="text-primary p-0"
                 onClick={() => setShowEditModal(true)}
                 title="Edit Task"
               >
-                <Edit size={20} />
-              </Button>
+              <Edit size={20} />
+            </Button>
               <Button
                 variant="link"
                 className="text-danger p-0"
                 onClick={() => setShowDeleteModal(true)}
                 title="Delete Task"
               >
-                <Trash2 size={20} />
-              </Button>
-            </div>
+              <Trash2 size={20} />
+            </Button>
+          </div>
           )}
         </div>
 
@@ -897,15 +897,15 @@ const TaskDetailPage = () => {
                     variant="light"
                     aria-label="Edit assignees"
                     className="d-flex align-items-center justify-content-center rounded-circle p-0 border-0"
-                    style={{
-                      width: 36,
-                      height: 36,
-                      backgroundColor: '#e2e8f0',
-                      color: '#64748b',
-                    }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    backgroundColor: '#e2e8f0',
+                    color: '#64748b',
+                  }}
                     onClick={() => setShowEditModal(true)}
-                  >
-                    <Plus size={16} />
+                >
+                  <Plus size={16} />
                   </Button>
                 )}
               </div>
