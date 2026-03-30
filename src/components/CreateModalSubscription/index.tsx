@@ -63,6 +63,14 @@ function toSingleSelectValue(
   return value;
 }
 
+/** Aligns with SelectBox option values (string) so company name resolves when parent passes numeric ids. */
+function normalizeCompanySelectValue(id: string | number | null | undefined): string {
+  if (id === null || id === undefined || id === "") {
+    return "";
+  }
+  return String(id);
+}
+
 function isIsoDateBefore(a: string, b: string): boolean {
   // Dates are in YYYY-MM-DD format, so lexicographic compare works.
   return String(a) < String(b);
@@ -303,8 +311,8 @@ export default function CreateSubscriptionModal({
   const [companyOptions, setCompanyOptions] = useState<
     { id: string | number; name?: string }[]
   >([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>(
-    customerId ?? "",
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(() =>
+    normalizeCompanySelectValue(customerId),
   );
   const [loadingCompanies, setLoadingCompanies] = useState(false);
 
@@ -330,7 +338,7 @@ export default function CreateSubscriptionModal({
   }
 
   const companySelectOptions: SelectBoxOption[] = companyOptions.map((c) => ({
-    value: c.id,
+    value: normalizeCompanySelectValue(c.id),
     label: c?.name ? c.name : `Company #${String(c.id)}`,
   }));
 
@@ -343,7 +351,7 @@ export default function CreateSubscriptionModal({
     }));
 
   useEffect(() => {
-    setSelectedCompanyId(customerId ?? "");
+    setSelectedCompanyId(normalizeCompanySelectValue(customerId));
   }, [customerId]);
 
   useEffect(() => {
@@ -669,8 +677,7 @@ export default function CreateSubscriptionModal({
                   value={hasCompanySelected ? selectedCompanyId : null}
                   onChange={(value) => {
                     const v = toSingleSelectValue(value);
-                    const next = v ?? "";
-                    setSelectedCompanyId(next);
+                    setSelectedCompanyId(normalizeCompanySelectValue(v));
                     setPricingData([]);
                     setExpandedRows({});
                   }}

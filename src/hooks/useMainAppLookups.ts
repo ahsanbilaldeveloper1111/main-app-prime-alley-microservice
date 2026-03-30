@@ -12,6 +12,22 @@ export interface MainAppDepartmentLookup {
 export interface MainAppUserLookup {
   id: number;
   name: string;
+  phone: string;
+}
+
+/** Raw row from `users/users` (GetMinifiedUsers) — field names vary by API. */
+type MinifiedUserApiRow = {
+  id?: number;
+  name?: string;
+  phone?: string | number | null;
+  phone_no?: string | number | null;
+};
+
+function phoneFromMinifiedUserRow(u: MinifiedUserApiRow): string {
+  const raw = u.phone ?? u.phone_no;
+  if (raw == null) return "";
+  const s = String(raw).trim();
+  return s;
 }
 
 export function useMainAppLookups() {
@@ -40,7 +56,11 @@ export function useMainAppLookups() {
         setMainAppDepartments(Array.isArray(departments) ? (departments as MainAppDepartmentLookup[]) : []);
         setMainAppUsers(
           Array.isArray(usersRaw)
-            ? (usersRaw as { id: number; name?: string }[]).map((u) => ({ id: u.id, name: u.name ?? "—" }))
+            ? (usersRaw as MinifiedUserApiRow[]).map((u) => ({
+                id: typeof u.id === "number" ? u.id : Number(u.id),
+                name: u.name != null && String(u.name).trim() !== "" ? String(u.name) : "—",
+                phone: phoneFromMinifiedUserRow(u),
+              }))
             : []
         );
       } catch (e) {

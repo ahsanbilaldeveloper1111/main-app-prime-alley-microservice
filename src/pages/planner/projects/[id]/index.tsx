@@ -3,9 +3,15 @@ import React, {
   ReactElement,
   useState,
   useEffect,
+  useMemo,
   useRef,
   type ComponentProps,
 } from "react";
+import { useSession } from "next-auth/react";
+import {
+  canManageProjectFromMembers,
+  getSessionPhoneOrExtension,
+} from "@planner/projectMemberRole";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
@@ -43,6 +49,16 @@ const WorkPlannerProjectsDetails = () => {
   // Fetch extensions using hierarchy API
   const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
 
+  const { data: session } = useSession();
+  const sessionUserPhoneOrExtension = useMemo(
+    () => getSessionPhoneOrExtension(session),
+    [session],
+  );
+  const canCreateTaskByMemberRole = useMemo(
+    () => canManageProjectFromMembers(project, sessionUserPhoneOrExtension),
+    [project, sessionUserPhoneOrExtension],
+  );
+
   // Fetch project data
   useEffect(() => {
     if (id) {
@@ -75,7 +91,7 @@ const WorkPlannerProjectsDetails = () => {
   };
 
   const handleCreateTaskClick = () => {
-    if (!project || hierarchyLoading) return;
+    if (!project || hierarchyLoading || !canCreateTaskByMemberRole) return;
     setSidebarEditTask(null);
     setShowCreateTaskSidebar(true);
   };
@@ -93,7 +109,12 @@ const WorkPlannerProjectsDetails = () => {
   };
 
   const handleBoardTaskClick = async (task: { id?: string | number }) => {
-    if (loadingSidebarEditTask || task?.id == null) return;
+    if (task?.id == null) return;
+    if (!canCreateTaskByMemberRole) {
+      await router.push(`/planner/tasks/${task.id}`);
+      return;
+    }
+    if (loadingSidebarEditTask) return;
     setLoadingSidebarEditTask(true);
     try {
       const raw = await getTask(
@@ -183,17 +204,19 @@ const WorkPlannerProjectsDetails = () => {
         showSearch={false}
         buttons={
           <>
-            <Button 
-              variant="primary" 
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}
-              onClick={handleCreateTaskClick}
-              disabled={!project || hierarchyLoading}
-            >
-              <Plus size={18} />
-              <span>Create Task</span>
-            </Button>
-            
-            <Button 
+            {canCreateTaskByMemberRole && (
+              <Button
+                variant="primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '0.5rem' }}
+                onClick={handleCreateTaskClick}
+                disabled={!project || hierarchyLoading}
+              >
+                <Plus size={18} />
+                <span>Create Task</span>
+              </Button>
+            )}
+
+            <Button
               variant="outline-primary"
               style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
               onClick={handleBoardViewClick}
@@ -242,6 +265,8 @@ const WorkPlannerProjectsDetails = () => {
         isEdit={!!sidebarEditTask}
         task={sidebarEditTask ?? undefined}
         taskType="regular"
+        taskTypeChoices={["regular", "recurring"]}
+        lockProjectSelection
       />
         
     </React.Fragment>

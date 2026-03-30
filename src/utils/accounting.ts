@@ -1,5 +1,5 @@
-  import { toast } from "react-toastify";
-import axiosInstance from "./axios";
+import { toast } from "react-toastify";
+import axiosInstance, { getClientBearerAuthorization } from "./axios";
 
 
 
@@ -389,4 +389,236 @@ export const GetCompanyDocumentDownload = async (
     throw error;
   }
 };
+
+/** POST accounting/invoices/{id}/stripe-hosted-checkout */
+export const PostInvoiceStripeHostedCheckout = async (
+  id: number | string
+) => {
+  try {
+    const response = await axiosInstance.post(
+      `accounting/invoices/${id}/stripe-hosted-checkout`,
+      { main_app: true }
+    );
+    return response?.data?.data;
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to generate Stripe hosted checkout");
+    throw error;
+  }
+};
+
+/** POST accounting/invoices/{id}/stripe-payment-link */
+export const PostInvoiceStripePaymentLink = async (
+  id: number | string
+) => {
+  try {
+    const response = await axiosInstance.post(
+      `accounting/invoices/${id}/stripe-payment-link`,
+      { main_app: true }
+    );
+    return response?.data?.data;
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to generate Stripe payment link");
+    throw error;
+  }
+};
+
+/** Public - Payment Link & Session (token-scoped)
+ * GET public/invoice-pay/{payment_link_token}
+ */
+export const GetPublicInvoicePayByToken = async (
+  paymentLinkToken: string
+) => {
+  try {
+    const response = await axiosInstance.get(
+      `public/invoice-pay/${paymentLinkToken}`
+    );
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch public invoice payment data");
+    throw error;
+  }
+};
+
+export interface PublicInvoicePayRequestPayload {
+  payment_method_id: string;
+  amount?: number;
+  currency_code?: string;
+  base_amount?: number;
+  processing_fee?: number;
+  consent_given?: boolean;
+  cardholder_name?: string;
+  billing_postal_code?: string;
+  last4?: string;
+  exp_month?: number;
+  exp_year?: number;
+  brand?: string;
+  idempotency_key?: string;
+}
+
+/** Public - Pay invoice by token
+ * POST public/invoice-pay/{payment_link_token}
+ */
+export const PostPublicInvoicePayByToken = async (
+  paymentLinkToken: string,
+  payload: PublicInvoicePayRequestPayload
+) => {
+  try {
+    const response = await axiosInstance.post(
+      `public/invoice-pay/${paymentLinkToken}`,
+      payload
+    );
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to submit public invoice payment");
+    throw error;
+  }
+};
+
+export interface PublicInvoiceCompletePaymentPayload {
+  payment_id: number;
+}
+
+/** Public - Complete payment by token
+ * POST public/invoice-pay/{payment_link_token}/complete-payment
+ */
+export const PostPublicInvoiceCompletePaymentByToken = async (
+  paymentLinkToken: string,
+  payload: PublicInvoiceCompletePaymentPayload
+) => {
+  try {
+    const response = await axiosInstance.post(
+      `public/invoice-pay/${paymentLinkToken}/complete-payment`,
+      payload
+    );
+    return extractData(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to complete public invoice payment");
+    throw error;
+  }
+};
+
+/** Payload returned by verify-checkout-session (fields depend on backend; extend as needed). */
+export interface PublicVerifyCheckoutSessionResult {
+  invoice_number?: string;
+}
+
+/**
+ * Verify Stripe Checkout session via fetch (no axios interceptors, so anonymous users are not signed out).
+ * Sends the same Bearer token as axios when the user is logged in on this browser.
+ */
+export const fetchPublicVerifyCheckoutSession = async <T = PublicVerifyCheckoutSessionResult>(
+  sessionId: string,
+): Promise<T> => {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  const auth = getClientBearerAuthorization();
+  if (auth) {
+    headers.Authorization = auth;
+  }
+
+  try {
+    const res = await fetch(
+      `/api/accounting/public/payment/verify-checkout-session?session_id=${encodeURIComponent(sessionId)}`,
+      {
+        credentials: "same-origin",
+        headers,
+      },
+    );
+
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      throw new Error(`Verification response was not valid JSON (${res.status})`);
+    }
+
+    if (!res.ok) {
+      const message =
+        (body as { message?: string })?.message ||
+        (body as { error?: string })?.error ||
+        `Verification request failed (${res.status})`;
+      throw new Error(message);
+    }
+
+    return extractData<T>(body as any);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
+  }
+};
+
+export interface PublicCancelCheckoutPayload {
+  invoice_id: number;
+  session_id?: string;
+}
+
+export interface PublicCancelCheckoutInvoiceSummary {
+  id?: number;
+  invoice_number?: string;
+}
+
+export interface PublicCancelCheckoutPaymentSummary {
+  id?: number;
+  invoice_id?: string;
+  invoice?: PublicCancelCheckoutInvoiceSummary;
+}
+
+/** Response from POST public/payment/cancel-checkout (after extractData). */
+export interface PublicCancelCheckoutResult {
+  cancelled?: boolean;
+  message?: string;
+  payment_id?: number;
+  payment?: PublicCancelCheckoutPaymentSummary;
+}
+
+/**
+ * Same as PostPublicCancelCheckout but via fetch (optional Bearer when logged in; no axios 401 sign-out loop for guests).
+ */
+export const fetchPublicCancelCheckout = async <T = PublicCancelCheckoutResult>(
+  payload: PublicCancelCheckoutPayload,
+): Promise<T> => {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+  const auth = getClientBearerAuthorization();
+  if (auth) {
+    headers.Authorization = auth;
+  }
+
+  try {
+    const res = await fetch("/api/accounting/public/payment/cancel-checkout", {
+      method: "POST",
+      credentials: "same-origin",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      throw new Error(`Cancel checkout response was not valid JSON (${res.status})`);
+    }
+
+    if (!res.ok) {
+      const message =
+        (body as { message?: string })?.message ||
+        (body as { error?: string })?.error ||
+        `Cancel checkout failed (${res.status})`;
+      throw new Error(message);
+    }
+
+    return extractData<T>(body as any);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(String(error));
+  }
+};
+
+
+
 

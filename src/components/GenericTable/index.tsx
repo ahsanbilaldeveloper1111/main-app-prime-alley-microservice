@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, useId } from "react";
+import React, { useState, useMemo, useRef, useEffect, useId } from "react";
 import {
   Table,
   Form,
@@ -96,6 +96,14 @@ export interface DropdownOption<T = any> {
   divider?: boolean; // Add divider after this option
 }
 
+/** Options visible for a row (same rule as row actions and context menu). */
+export function getVisibleDropdownOptions<T>(
+  options: DropdownOption<T>[],
+  row: T,
+): DropdownOption<T>[] {
+  return options.filter((o) => !o.show || o.show(row));
+}
+
 export interface TableAction<T = any> {
   label: string;
   icon?: React.ReactNode;
@@ -118,6 +126,141 @@ export interface TableAction<T = any> {
     toggleClassName?: string;
   };
 }
+
+/** Row context menu entry (onClick receives the row). Shared by the table and Kanban card menu. */
+export type TableContextMenuItem<T = unknown> = {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: (row: T) => void;
+  divider?: boolean;
+  className?: string;
+  disabled?: boolean;
+  disabledTitle?: string;
+  disabledClassName?: string;
+};
+
+/** Bound row actions for Kanban / custom surfaces (no row argument). */
+export interface BoundTableContextMenuItem {
+  label: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+  divider?: boolean;
+  className?: string;
+  disabled?: boolean;
+  disabledTitle?: string;
+  disabledClassName?: string;
+}
+
+export function buildTableContextMenuItems<T>(
+  actions: TableAction<T>[],
+  row: T,
+): TableContextMenuItem<T>[] {
+  const items: TableContextMenuItem<T>[] = [];
+  for (const action of actions) {
+    if (action.show && !action.show(row)) continue;
+    if (action.dropdown) {
+      const opts = getVisibleDropdownOptions(action.dropdown.options, row);
+      for (const o of opts) {
+        items.push({
+          label: o.label,
+          icon: o.icon,
+          onClick: o.onClick,
+          divider: o.divider ?? false,
+          className: o.className,
+        });
+      }
+    } else if (action.onClick && !action.render) {
+      const isDisabled = action.disabled?.(row);
+      items.push({
+        label: action.label,
+        icon: action.icon,
+        onClick: action.onClick,
+        divider: false,
+        className: isDisabled
+          ? action.disabledClassName || "text-muted"
+          : action.className,
+        disabled: isDisabled,
+        disabledTitle: action.disabledTitle,
+        disabledClassName: action.disabledClassName,
+      });
+    }
+  }
+  return items;
+}
+
+export function buildBoundTableContextMenuItems<T>(
+  actions: TableAction<T>[],
+  row: T,
+): BoundTableContextMenuItem[] {
+  return buildTableContextMenuItems(actions, row).map((item) => ({
+    label: item.label,
+    icon: item.icon,
+    onClick: () => item.onClick(row),
+    divider: item.divider,
+    className: item.className,
+    disabled: item.disabled,
+    disabledTitle: item.disabledTitle,
+    disabledClassName: item.disabledClassName,
+  }));
+}
+
+/** One row in `gt-context-menu`; `onClick` is a bound handler (no row argument). */
+export type GtContextMenuItemRow = BoundTableContextMenuItem;
+
+/** Shared markup for context menu rows (GenericTable right‑click + Kanban card menu). */
+export const GtContextMenuItemList: React.FC<{
+  items: GtContextMenuItemRow[];
+  onClose: () => void;
+}> = ({ items, onClose }) => (
+  <>
+    {items.map((item, idx) => (
+      <React.Fragment
+        key={`${item.label}-${idx}-${item.className ?? ""}`}
+      >
+        {item.disabled && item.disabledTitle ? (
+          <span
+            className="gt-context-menu-disabled-wrapper"
+            title={item.disabledTitle}
+          >
+            <button
+              type="button"
+              className={`gt-context-menu-item ${item.className || ""}`}
+              disabled
+              onClick={(e) => e.stopPropagation()}
+              role="menuitem"
+            >
+              {item.icon && (
+                <span className="gt-context-menu-icon">{item.icon}</span>
+              )}
+              {item.label}
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className={`gt-context-menu-item ${item.className || ""}`}
+            disabled={item.disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!item.disabled) {
+                item.onClick();
+                onClose();
+              }
+            }}
+            role="menuitem"
+            title={item.disabled ? item.disabledTitle : undefined}
+          >
+            {item.icon && (
+              <span className="gt-context-menu-icon">{item.icon}</span>
+            )}
+            {item.label}
+          </button>
+        )}
+        {item.divider && <div className="gt-context-menu-divider" />}
+      </React.Fragment>
+    ))}
+  </>
+);
 
 export interface PaginationConfig {
   currentPage: number;
@@ -911,10 +1054,9 @@ const GenericTable = <T extends Record<string, any>>({
     }
   }, [toolbar?.showFilterPills]);
 
-  const getContextMenuItems = useCallback(
-    (row: T) => buildContextMenuItemsForRow(actions, row),
-    [actions],
-  );
+  const getContextMenuItems = useMemo(() => {
+    return (row: T) => buildTableContextMenuItems(actions, row);
+  }, [actions]);
 
   // Close context menu on outside click or Escape
   useEffect(() => {
@@ -1594,93 +1736,6 @@ const GenericTable = <T extends Record<string, any>>({
     );
   };
 
-  const fullTableColSpan =
-    (selectable ? 1 : 0) +
-    visibleColumns.length +
-    (showActions && actions.length > 0 ? 1 : 0);
-
-  const renderMainTableBody = (): React.ReactNode => {
-    if (loading) {
-      return (
-        <tr>
-          <td colSpan={fullTableColSpan} className="text-center py-4">
-            <div className="generic-table-loading">{loadingMessage}</div>
-          </td>
-        </tr>
-      );
-    }
-    if (sortedData.length === 0) {
-      return (
-        <tr>
-          <td colSpan={fullTableColSpan} className="text-center py-4">
-            <div className="generic-table-empty">{emptyMessage}</div>
-          </td>
-        </tr>
-      );
-    }
-    return sortedData.map((row, index) => {
-      const rowStableKey = String(row[uniqueKey as keyof T] ?? index);
-      return (
-        <tr
-          key={rowStableKey}
-          onClick={() => onRowClick?.(row, index)}
-          onDoubleClick={() => onRowDoubleClick?.(row, index)}
-          onMouseEnter={() => setHoveredRowIndex(index)}
-          onMouseLeave={() => setHoveredRowIndex(null)}
-          onContextMenu={(e) => {
-            if (actions.length === 0) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const items = getContextMenuItems(row);
-            if (items.length === 0) return;
-            setContextMenu({ x: e.clientX, y: e.clientY, row });
-          }}
-          className={`generic-table-row ${rowClassName?.(row, index) || ""} ${onRowClick || onRowDoubleClick ? "clickable" : ""}`}
-        >
-          {selectable && (
-            <td
-              className="generic-table-td"
-              style={{ width: "40px" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Form.Check
-                type="checkbox"
-                checked={isSelected(row)}
-                onChange={(e) => applyRowCheckboxChange(row, e)}
-              />
-            </td>
-          )}
-          {visibleColumns.map((col, colIdx) => (
-            <GenericTableBodyDataCell
-              key={col.key}
-              col={col}
-              row={row}
-              index={index}
-              colIdx={colIdx}
-              onFirstColumnClick={onFirstColumnClick}
-              onPreviewClick={onPreviewClick}
-              hoveredRowIndex={hoveredRowIndex}
-            />
-          ))}
-          {showActions && actions.length > 0 && (
-            <td
-              className="generic-table-td generic-table-actions-cell"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <div className="generic-table-actions">
-                <GenericTableRowActionsCell
-                  row={row}
-                  rowStableKey={rowStableKey}
-                  actions={actions}
-                />
-              </div>
-            </td>
-          )}
-        </tr>
-      );
-    });
-  };
-
   return (
     <div className="generic-table-container">
       {/* Right‑click context menu */}
@@ -1691,50 +1746,19 @@ const GenericTable = <T extends Record<string, any>>({
           style={{ left: contextMenu.x, top: contextMenu.y }}
           role="menu"
         >
-          {getContextMenuItems(contextMenu.row).map((item) => (
-            <React.Fragment key={item.reactKey}>
-              {item.disabled && item.disabledTitle ? (
-                <span
-                  className="gt-context-menu-disabled-wrapper"
-                  title={item.disabledTitle}
-                >
-                  <button
-                    type="button"
-                    className={`gt-context-menu-item ${item.className || ""}`}
-                    disabled
-                    onClick={(e) => e.stopPropagation()}
-                    role="menuitem"
-                  >
-                    {item.icon && (
-                      <span className="gt-context-menu-icon">{item.icon}</span>
-                    )}
-                    {item.label}
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className={`gt-context-menu-item ${item.className || ""}`}
-                  disabled={item.disabled}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!item.disabled) {
-                      item.onClick(contextMenu.row);
-                      setContextMenu(null);
-                    }
-                  }}
-                  role="menuitem"
-                  title={item.disabled ? item.disabledTitle : undefined}
-                >
-                  {item.icon && (
-                    <span className="gt-context-menu-icon">{item.icon}</span>
-                  )}
-                  {item.label}
-                </button>
-              )}
-              {item.divider && <div className="gt-context-menu-divider" />}
-            </React.Fragment>
-          ))}
+          <GtContextMenuItemList
+            items={getContextMenuItems(contextMenu.row).map((item) => ({
+              label: item.label,
+              icon: item.icon,
+              className: item.className,
+              divider: item.divider,
+              disabled: item.disabled,
+              disabledTitle: item.disabledTitle,
+              disabledClassName: item.disabledClassName,
+              onClick: () => item.onClick(contextMenu.row),
+            }))}
+            onClose={() => setContextMenu(null)}
+          />
         </div>
       )}
 
@@ -1955,7 +1979,252 @@ const GenericTable = <T extends Record<string, any>>({
                   )}
                 </tr>
               </thead>
-              <tbody>{renderMainTableBody()}</tbody>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={
+                        (selectable ? 1 : 0) +
+                        visibleColumns.length +
+                        (showActions && actions.length > 0 ? 1 : 0)
+                      }
+                      className="text-center py-4"
+                    >
+                      <div className="generic-table-loading">
+                        {loadingMessage}
+                      </div>
+                    </td>
+                  </tr>
+                ) : sortedData.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={
+                        (selectable ? 1 : 0) +
+                        visibleColumns.length +
+                        (showActions && actions.length > 0 ? 1 : 0)
+                      }
+                      className="text-center py-4"
+                    >
+                      <div className="generic-table-empty">{emptyMessage}</div>
+                    </td>
+                  </tr>
+                ) : (
+                  sortedData.map((row, index) => (
+                    <tr
+                      key={String(row[uniqueKey as keyof T] || index)}
+                      onClick={() => onRowClick?.(row, index)}
+                      onDoubleClick={() => onRowDoubleClick?.(row, index)}
+                      onMouseEnter={() => setHoveredRowIndex(index)}
+                      onMouseLeave={() => setHoveredRowIndex(null)}
+                      onContextMenu={(e) => {
+                        if (actions.length === 0) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const items = getContextMenuItems(row);
+                        if (items.length === 0) return;
+                        setContextMenu({ x: e.clientX, y: e.clientY, row });
+                      }}
+                      className={`generic-table-row ${rowClassName?.(row, index) || ""} ${onRowClick || onRowDoubleClick ? "clickable" : ""}`}
+                    >
+                      {selectable && (
+                        <td
+                          className="generic-table-td"
+                          style={{ width: "40px" }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Form.Check
+                            type="checkbox"
+                            checked={isSelected(row)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              applyRowCheckboxChange(row, e as React.ChangeEvent<HTMLInputElement>);
+                            }}
+                          />
+                        </td>
+                      )}
+                      {visibleColumns.map((col, colIdx) => (
+                        <td
+                          key={col.key}
+                          className="generic-table-td"
+                          style={{
+                            textAlign: col.align || "left",
+                            position: colIdx === 0 ? "relative" : undefined,
+                          }}
+                        >
+                          <div
+                            onClick={(e) => {
+                              if (colIdx === 0 && onFirstColumnClick) {
+                                e.stopPropagation();
+                                onFirstColumnClick(row, index);
+                              }
+                            }}
+                            style={{
+                              cursor:
+                                colIdx === 0 && onFirstColumnClick
+                                  ? "pointer"
+                                  : undefined,
+                              display: "inline-block",
+                            }}
+                          >
+                            {renderGenericTableCellContent(col, row, index)}
+                          </div>
+                          {colIdx === 0 &&
+                            hoveredRowIndex === index &&
+                            onPreviewClick && (
+                              <button
+                                className="preview-button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onPreviewClick(row, index);
+                                }}
+                                style={{
+                                  position: "absolute",
+                                  right: "8px",
+                                  top: "50%",
+                                  transform: "translateY(-50%)",
+                                  fontSize: "12px",
+                                  padding: "4px 10px",
+                                  zIndex: 10,
+                                  whiteSpace: "nowrap",
+                                  backgroundColor: "#ffffff",
+                                  border: "1px solid #141414",
+                                  color: "#141414",
+                                  fontWeight: "300",
+                                  borderRadius: "4px",
+                                  cursor: "pointer",
+                                }}
+                              >
+                                Preview
+                              </button>
+                            )}
+                        </td>
+                      ))}
+                      {showActions && actions.length > 0 && (
+                        <td className="generic-table-td generic-table-actions-cell">
+                          <div className="generic-table-actions">
+                            {actions.map((action, actionIndex) => {
+                              if (action.show && !action.show(row)) return null;
+
+                              // If action has custom render (for dropdowns, etc.)
+                              if (action.render) {
+                                return (
+                                  <div
+                                    key={actionIndex}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {action.render(row)}
+                                  </div>
+                                );
+                              }
+
+                              // If action has dropdown configuration
+                              if (action.dropdown) {
+                                const visibleOptions = getVisibleDropdownOptions(
+                                  action.dropdown.options,
+                                  row,
+                                );
+
+                                if (visibleOptions.length === 0) return null;
+
+                                return (
+                                  <div
+                                    key={actionIndex}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Dropdown drop="down" align="end">
+                                      <Dropdown.Toggle
+                                        variant={action.variant || "link"}
+                                        size="sm"
+                                        className={action.className || ""}
+                                        id={`dropdown-${String(row[uniqueKey as keyof T])}-${actionIndex}`}
+                                      >
+                                        {action.icon}
+                                      </Dropdown.Toggle>
+                                      <Dropdown.Menu>
+                                        {visibleOptions.map(
+                                          (option, optionIndex) => {
+                                            const menuItem = (
+                                              <Dropdown.Item
+                                                key={optionIndex}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  option.onClick(row);
+                                                }}
+                                                className={option.className}
+                                              >
+                                                {option.icon && (
+                                                  <span className="me-2">
+                                                    {option.icon}
+                                                  </span>
+                                                )}
+                                                {option.label}
+                                              </Dropdown.Item>
+                                            );
+
+                                            if (option.divider) {
+                                              return (
+                                                <React.Fragment
+                                                  key={optionIndex}
+                                                >
+                                                  {menuItem}
+                                                  <Dropdown.Divider />
+                                                </React.Fragment>
+                                              );
+                                            }
+
+                                            return menuItem;
+                                          },
+                                        )}
+                                      </Dropdown.Menu>
+                                    </Dropdown>
+                                  </div>
+                                );
+                              }
+
+                              const isDisabled = action.disabled?.(row);
+                              const buttonEl = (
+                                <Button
+                                  key={actionIndex}
+                                  variant={action.variant || "link"}
+                                  size="sm"
+                                  disabled={isDisabled}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!isDisabled) action.onClick?.(row);
+                                  }}
+                                  className={`p-1 ${
+                                    isDisabled
+                                      ? `gt-action-disabled ${action.disabledClassName ?? ""}`
+                                      : action.className || ""
+                                  }`}
+                                  title={!isDisabled ? action.label : undefined}
+                                >
+                                  {action.icon || action.label}
+                                </Button>
+                              );
+                              if (
+                                isDisabled &&
+                                action.disabledTitle
+                              ) {
+                                return (
+                                  <span
+                                    key={actionIndex}
+                                    className="gt-action-disabled-wrapper"
+                                    title={action.disabledTitle}
+                                  >
+                                    {buttonEl}
+                                  </span>
+                                );
+                              }
+                              return buttonEl;
+                            })}
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))
+                )}
+              </tbody>
             </Table>
           </div>
           {pagination && (

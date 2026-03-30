@@ -1,12 +1,10 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
-import { UserPlus, Edit, Trash2, Users, Search, Filter, Download, Eye } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { UserPlus, Edit, Trash2, Users, Filter } from 'lucide-react';
 import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
-import { canManage } from '@utils/work-planner';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
-import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
+import type { StatsCardData } from '@components/GenericStatsCards';
 
 interface MembersTabProps {
   selectedProject: any;
@@ -15,19 +13,46 @@ interface MembersTabProps {
   onRefresh: () => void;
   styles: any;
   hierarchyDataExtensions: any[];
+  /** From parent: admin / owner per `canAdministerProjectFromMembers` (not granted to member/viewer). */
+  canManageProject: boolean;
 }
 
 const AVATAR_COLORS = ['#48bb78', '#f56565', '#4299e1', '#ed64a6', '#667eea', '#9f7aea', '#fc8181', '#ed8936'];
+
+/** API uses lowercase roles; edit `<select>` must include every role that can appear on a row (e.g. `viewer`) or the controlled value stays stale. */
+const PROJECT_MEMBER_ROLE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'member', label: 'Member' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'viewer', label: 'Viewer' },
+];
+
+/** Coerce API role to string without `String(object)` → `[object Object]`. */
+function memberRoleRawToTrimmedString(raw: unknown): string {
+  if (typeof raw === 'string') {
+    return raw;
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return String(raw);
+  }
+  return 'member';
+}
+
+function normalizeMemberRoleForForm(raw: unknown): string {
+  const r = memberRoleRawToTrimmedString(raw).trim().toLowerCase();
+  const allowed = new Set(['member', 'admin', 'manager', 'viewer', 'owner']);
+  return allowed.has(r) ? r : 'member';
+}
 
 const MembersTab: React.FC<MembersTabProps> = ({
   selectedProject,
   members,
   loading,
   onRefresh,
-  styles,
+  styles: _styles,
   hierarchyDataExtensions,
+  canManageProject,
 }) => {
-  const { data: session } = useSession();
+  const isAllow = canManageProject;
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -43,15 +68,9 @@ const MembersTab: React.FC<MembersTabProps> = ({
     sortDirection: 'asc' as 'asc' | 'desc',
   });
   const [searchValue, setSearchValue] = useState('');
-  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [clearSelectedRows, setClearSelectedRows] = useState(false);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(['member', 'extension_number', 'role']);
-  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [selectedColumns] = useState<string[]>(['member', 'extension_number', 'role']);
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'table' | 'board'>('table');
-
-  const isAllow = useMemo(() => canManage(members, selectedProject, session), [members, selectedProject, session]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const getInitials = (name: string) => {
@@ -85,10 +104,16 @@ const MembersTab: React.FC<MembersTabProps> = ({
 
   const getRoleColors = (role: string) => {
     switch (role?.toLowerCase()) {
-      case 'owner':   return { bg: '#FEE2E2', color: '#991B1B' };
-      case 'admin':   return { bg: '#FEF3C7', color: '#92400E' };
-      case 'manager': return { bg: '#DBEAFE', color: '#1E40AF' };
-      default:        return { bg: '#E5E7EB', color: '#4B5563' };
+      case 'owner':
+        return { bg: '#FEE2E2', color: '#991B1B' };
+      case 'admin':
+        return { bg: '#FEF3C7', color: '#92400E' };
+      case 'manager':
+        return { bg: '#DBEAFE', color: '#1E40AF' };
+      case 'viewer':
+        return { bg: '#F3E8FF', color: '#6B21A8' };
+      default:
+        return { bg: '#E5E7EB', color: '#4B5563' };
     }
   };
 
@@ -173,7 +198,10 @@ const MembersTab: React.FC<MembersTabProps> = ({
       className: 'text-secondary p-1',
       onClick: (row: any) => {
         setSelectedMember(row);
-        setFormData({ extension_number: row.extension_number, role: row.role || 'member' });
+        setFormData({
+          extension_number: row.extension_number,
+          role: normalizeMemberRoleForForm(row.role),
+        });
         setShowEditModal(true);
       },
     },
@@ -191,7 +219,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
 
   // ── Modal helpers ─────────────────────────────────────────────────────────
   const extensionOptions = useMemo(() =>
-    hierarchyDataExtensions
+    (hierarchyDataExtensions || [])
       .map((ext: any) => ({
         value: String(ext?.extension_number || ext?.id || '').trim(),
         label: String(ext?.user?.name || ext?.name || '').trim() || String(ext?.extension_number || ext?.id || 'Unknown'),
@@ -218,8 +246,12 @@ const MembersTab: React.FC<MembersTabProps> = ({
     const extNum = String(selectedMember?.extension_number || '').trim();
     if (!extNum) return null;
     const resolved = resolveMemberUser(selectedMember);
-    return allExtensionOptions.find((o: any) => String(o.value) === extNum)
-      || { value: extNum, label: resolved.name !== extNum ? `${resolved.name} (${extNum})` : extNum };
+    const found = allExtensionOptions.find((o: any) => String(o.value) === extNum);
+    if (found) {
+      return found;
+    }
+    const label = resolved.name === extNum ? extNum : `${resolved.name} (${extNum})`;
+    return { value: extNum, label };
   }, [selectedMember, allExtensionOptions]);
 
   const reactSelectStyles = {
@@ -238,7 +270,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddMember = async () => {
-    if (!selectedProject?.id || !formData.extension_number) return;
+    if (!canManageProject || !selectedProject?.id || !formData.extension_number) return;
     try {
       setProcessing(true);
       await addMember(selectedProject.id, { extension_number: formData.extension_number, role: formData.role } as any);
@@ -253,7 +285,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
   };
 
   const handleUpdateRole = async () => {
-    if (!selectedProject?.id || !selectedMember || !formData.role) return;
+    if (!canManageProject || !selectedProject?.id || !selectedMember || !formData.role) return;
     try {
       setProcessing(true);
       await updateMemberRole(selectedProject.id, selectedMember.extension_number, { role: formData.role });
@@ -269,7 +301,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
   };
 
   const handleRemoveMember = async () => {
-    if (!selectedProject?.id || !selectedMember) return;
+    if (!canManageProject || !selectedProject?.id || !selectedMember) return;
     try {
       setProcessing(true);
       await removeMember(selectedProject.id, selectedMember.extension_number);
@@ -312,13 +344,21 @@ const MembersTab: React.FC<MembersTabProps> = ({
     return filteredMembers.slice(start, end);
   }, [filteredMembers, pagination.currentPage, pagination.rowsPerPage]);
 
+  const countMembersByRole = useCallback((role: string) => {
+    const r = role.toLowerCase();
+    return members.filter((m: any) => (m.role || '').toLowerCase() === r).length;
+  }, [members]);
+
   // ── Stats Cards ───────────────────────────────────────────────────────────
   const statsCardsData: StatsCardData[] = useMemo(() => {
     const totalMembers = members.length;
-    const ownerCount = members.filter((m: any) => (m.role || '').toLowerCase() === 'owner').length;
-    const adminCount = members.filter((m: any) => (m.role || '').toLowerCase() === 'admin').length;
-    const managerCount = members.filter((m: any) => (m.role || '').toLowerCase() === 'manager').length;
-    const memberCount = members.filter((m: any) => (m.role || '').toLowerCase() === 'member' || !m.role).length;
+    const ownerCount = countMembersByRole('owner');
+    const adminCount = countMembersByRole('admin');
+    const managerCount = countMembersByRole('manager');
+    const viewerCount = countMembersByRole('viewer');
+    const memberCount = members.filter(
+      (m: any) => (m.role || '').toLowerCase() === 'member' || !m.role,
+    ).length;
 
     return [
       {
@@ -363,6 +403,17 @@ const MembersTab: React.FC<MembersTabProps> = ({
         },
       },
       {
+        title: 'Viewers',
+        value: viewerCount,
+        icon: Users,
+        iconColor: '#6B21A8',
+        iconBgColor: '#F3E8FF',
+        metric: {
+          text: 'Read-only access',
+          dotColor: '#6B21A8',
+        },
+      },
+      {
         title: 'Members',
         value: memberCount,
         icon: Users,
@@ -373,19 +424,8 @@ const MembersTab: React.FC<MembersTabProps> = ({
           dotColor: '#4B5563',
         },
       },
-      {
-        title: 'Users',
-        value: memberCount,
-        icon: Users,
-        iconColor: '#4B5563',
-        iconBgColor: '#E5E7EB',
-        metric: {
-          text: 'Standard access',
-          dotColor: '#4B5563',
-        },
-      },
     ];
-  }, [members]);
+  }, [members, countMembersByRole]);
 
   // ── Filter Pills ──────────────────────────────────────────────────────────
   const filterPills: FilterPill[] = useMemo(() => [
@@ -403,6 +443,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
         { label: 'Admin', value: 'admin', onClick: () => setRoleFilter('admin') },
         { label: 'Manager', value: 'manager', onClick: () => setRoleFilter('manager') },
         { label: 'Member', value: 'member', onClick: () => setRoleFilter('member') },
+        { label: 'Viewer', value: 'viewer', onClick: () => setRoleFilter('viewer') },
       ],
     },
   ], [roleFilter]);
@@ -502,8 +543,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
     showFilterPills: true,
     filterPills,
     
-    showEditColumns: true,
-    onEditColumnsClick: () => setShowColumnEditor(true),
+    showEditColumns: false,
     
     showExportButton: true,
     onExportClick: () => {
@@ -515,19 +555,35 @@ const MembersTab: React.FC<MembersTabProps> = ({
   }), [searchValue, filterPills, isAllow, selectedItems.length, members.length]);
 
   // ── Row Interaction Handlers ──────────────────────────────────────────────
-  const handleFirstColumnClick = useCallback((row: any) => {
-    setSelectedMember(row);
-    setFormData({ extension_number: row.extension_number, role: row.role || 'member' });
-    setShowEditModal(true);
-  }, []);
-
-  const handleRowDoubleClick = useCallback((row: any) => {
-    if (isAllow) {
+  const handleFirstColumnClick = useCallback(
+    (row: any) => {
+      if (!isAllow) {
+        return;
+      }
       setSelectedMember(row);
-      setFormData({ extension_number: row.extension_number, role: row.role || 'member' });
+      setFormData({
+        extension_number: row.extension_number,
+        role: normalizeMemberRoleForForm(row.role),
+      });
       setShowEditModal(true);
-    }
-  }, [isAllow]);
+    },
+    [isAllow],
+  );
+
+  const handleRowDoubleClick = useCallback(
+    (row: any) => {
+      if (!isAllow) {
+        return;
+      }
+      setSelectedMember(row);
+      setFormData({
+        extension_number: row.extension_number,
+        role: normalizeMemberRoleForForm(row.role),
+      });
+      setShowEditModal(true);
+    },
+    [isAllow],
+  );
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -561,7 +617,6 @@ const MembersTab: React.FC<MembersTabProps> = ({
           )}
           onSelectionChange={(selected) => {
             setSelectedItems(selected.map((item) => item.id));
-            setClearSelectedRows(false);
           }}
           
           // Pagination
@@ -613,16 +668,6 @@ const MembersTab: React.FC<MembersTabProps> = ({
           
           // Stats cards for metrics
           statsCards={statsCardsData}
-          
-          // When Board View is selected, show board content instead of table
-          customBody={
-            viewMode === "board" ? (
-              <div style={{ padding: '2rem', textAlign: 'center', color: '#6B7280' }}>
-                <Users size={48} style={{ marginBottom: '1rem', opacity: 0.3 }} />
-                <p>Board view for members is not yet implemented</p>
-              </div>
-            ) : undefined
-          }
         />
       </div>
 
@@ -642,7 +687,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
                 placeholder="Type to search"
                 isClearable
                 isSearchable
-                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                menuPortalTarget={typeof document === 'undefined' ? null : document.body}
                 menuPosition="fixed"
                 classNamePrefix="react-select"
                 styles={reactSelectStyles}
@@ -650,10 +695,17 @@ const MembersTab: React.FC<MembersTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Role</Form.Label>
-              <Form.Select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}>
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-                <option value="viewer">Viewer</option>
+              <Form.Select
+                value={formData.role}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, role: e.target.value }))
+                }
+              >
+                {PROJECT_MEMBER_ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </Form.Select>
             </Form.Group>
           </Form>
@@ -685,10 +737,17 @@ const MembersTab: React.FC<MembersTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Role</Form.Label>
-              <Form.Select value={formData.role} onChange={e => setFormData({ ...formData, role: e.target.value })}>
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
+              <Form.Select
+                value={formData.role}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, role: e.target.value }))
+                }
+              >
+                {PROJECT_MEMBER_ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
                 {selectedMember?.role?.toLowerCase() === 'owner' && (
                   <option value="owner">Owner</option>
                 )}

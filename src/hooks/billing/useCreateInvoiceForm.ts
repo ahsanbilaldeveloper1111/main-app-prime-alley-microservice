@@ -488,8 +488,9 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
         setNotes(String(invoice?.notes ?? ""));
         setTermsConditions(String(invoice?.terms_conditions ?? ""));
         setPoNumber(String(invoice?.po_number ?? ""));
-        const recEnd = invoice?.recurring_end_date;
-        setEndDate(recEnd ? String(recEnd).slice(0, 10) : "");
+        const rawEnd =
+          invoice?.end_date ?? invoice?.recurring_end_date ?? null;
+        setEndDate(rawEnd ? String(rawEnd).slice(0, 10) : "");
         const invItems = Array.isArray(invoice?.items) ? invoice.items : [];
         const mapped: InvoiceLineItem[] = invItems.map((it: InvoiceItemData) => {
           const pid = Number(it?.product_id ?? it?.product?.id ?? 0);

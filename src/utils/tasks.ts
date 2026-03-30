@@ -160,7 +160,7 @@ interface CreateRecurringTaskData {
   end_date?: string | null;
   due_time?: string;
   priority?: string;
-  project_id: number;
+  project_id?: number;
   status_id: number;
   extension_numbers?: string[];
   label_ids?: number[];
@@ -182,6 +182,8 @@ interface UpdateTaskData {
   extension_numbers?: string[];
   watchers?: string[];
   label_ids?: number[];
+  /** Send `null` to detach parent when updating. */
+  parent_task_id?: number | string | null;
 }
 
 interface UpdateRecurringTaskData {
@@ -199,6 +201,7 @@ interface UpdateRecurringTaskData {
   extension_numbers?: string[];
   label_ids?: number[];
   is_active?: boolean;
+  parent_task_id?: number | string | null;
 }
 
 // ==================== Helper Functions ====================

@@ -23,6 +23,11 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
+    // Public payment return URLs (Stripe success/cancel); no login required
+    if (path.startsWith('/public/payment/')) {
+        return NextResponse.next();
+    }
+
     // Get required permissions for this route (for 404 when path has no permission config)
     const requiredPermissions = getRequiredPermissions(path);
 
