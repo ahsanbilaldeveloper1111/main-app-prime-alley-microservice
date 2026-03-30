@@ -1,9 +1,21 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { Spinner, Button, Modal, Form } from 'react-bootstrap';
-import { Plus, Trash2, Edit, AlertCircle, Filter, Tag } from 'lucide-react';
-import { createStatus, updateStatus, deleteStatus } from '@utils/tasks';
-import { canManage } from '@utils/work-planner';
-import { useSession } from 'next-auth/react';
+import { Spinner, Button, Modal, Form, Table } from 'react-bootstrap';
+import {
+  Plus,
+  Trash2,
+  Edit,
+  Filter,
+  Tag,
+  GripVertical,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from 'lucide-react';
+import { createStatus, updateStatus, deleteStatus, reorderStatuses } from '@utils/tasks';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import { StatsCardData } from '@components/GenericStatsCards';
 
@@ -13,6 +25,7 @@ interface StatusesTabProps {
   loading: boolean;
   onRefresh: () => void;
   styles: any;
+  canManageProject: boolean;
 }
 
 const predefinedColors = [
@@ -20,15 +33,461 @@ const predefinedColors = [
   '#667EEA', '#F56565', '#48BB78', '#ED8936', '#4FC3F7',
 ];
 
+type StatusFormColorPickerProps = {
+  color: string;
+  onColorChange: (color: string) => void;
+};
+
+const StatusFormColorPicker: React.FC<StatusFormColorPickerProps> = ({
+  color,
+  onColorChange,
+}) => (
+  <>
+    <div
+      style={{
+        display: 'flex',
+        gap: '0.5rem',
+        marginBottom: '0.5rem',
+        flexWrap: 'wrap',
+      }}
+    >
+      {predefinedColors.map((preset) => (
+        <button
+          key={preset}
+          type="button"
+          onClick={() => onColorChange(preset)}
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px',
+            backgroundColor: preset,
+            border:
+              color === preset ? '3px solid #1F2937' : '2px solid #E5E9F2',
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        />
+      ))}
+    </div>
+    <Form.Control
+      type="color"
+      value={color}
+      onChange={(e) => onColorChange(e.target.value)}
+      style={{ width: '100%', height: '40px' }}
+    />
+  </>
+);
+
+function arrayMove<T>(arr: T[], from: number, to: number): T[] {
+  const next = [...arr];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
+/** Merge a reordered subset (filtered rows) back into the full project status id order. */
+function applyFilteredReorder(
+  fullOrderedIds: number[],
+  reorderedFilteredIds: number[],
+): number[] {
+  const filteredSet = new Set(reorderedFilteredIds);
+  let fi = 0;
+  return fullOrderedIds.map((id) =>
+    filteredSet.has(id) ? reorderedFilteredIds[fi++] : id,
+  );
+}
+
+type StatusesTableCustomBodyProps = {
+  paginatedStatuses: any[];
+  visibleColumns: TableColumn[];
+  actions: TableAction[];
+  isAllow: boolean;
+  processing: boolean;
+  loading: boolean;
+  selectedItems: number[];
+  onToggleSelectAllPage: (checked: boolean) => void;
+  onToggleRow: (id: number, checked: boolean) => void;
+  onReorderPageRows: (fromPageIndex: number, toPageIndex: number) => void;
+  sortColumn: string;
+  sortDirection: 'asc' | 'desc';
+  onSort: (column: string, direction: 'asc' | 'desc') => void;
+  sortable: boolean;
+  onFirstColumnClick: (row: any, index: number) => void;
+  onRowDoubleClick?: (row: any, index: number) => void;
+  emptyMessage: React.ReactNode;
+  loadingMessage: React.ReactNode;
+  maxHeight: string;
+  fixedHeight: boolean;
+  currentPage: number;
+  rowsPerPage: number;
+  totalFiltered: number;
+  pageSizeOptions: number[];
+  onPaginationChange: (page: number, rowsPerPage: number) => void;
+};
+
+const StatusesTableCustomBody: React.FC<StatusesTableCustomBodyProps> = ({
+  paginatedStatuses,
+  visibleColumns,
+  actions,
+  isAllow,
+  processing,
+  loading,
+  selectedItems,
+  onToggleSelectAllPage,
+  onToggleRow,
+  onReorderPageRows,
+  sortColumn,
+  sortDirection,
+  onSort,
+  sortable,
+  onFirstColumnClick,
+  onRowDoubleClick,
+  emptyMessage,
+  loadingMessage,
+  maxHeight,
+  fixedHeight,
+  currentPage,
+  rowsPerPage,
+  totalFiltered,
+  pageSizeOptions,
+  onPaginationChange,
+}) => {
+  const showReorder = isAllow && !processing && !loading;
+  const hasActions = isAllow && actions.length > 0;
+  const colCount =
+    (isAllow ? 1 : 0) +
+    (showReorder ? 1 : 0) +
+    visibleColumns.length +
+    (hasActions ? 1 : 0);
+
+  const renderSortIcon = (columnKey: string) => {
+    if (sortColumn !== columnKey) {
+      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp size={14} className="ms-1" />
+    ) : (
+      <ArrowDown size={14} className="ms-1" />
+    );
+  };
+
+  const handleHeaderSort = (columnKey: string) => {
+    if (!sortable) return;
+    const col = visibleColumns.find((c) => c.key === columnKey);
+    if (col?.sortable === false) return;
+    const newDirection =
+      sortColumn === columnKey && sortDirection === 'asc' ? 'desc' : 'asc';
+    onSort(columnKey, newDirection);
+  };
+
+  const totalPages = Math.ceil(totalFiltered / rowsPerPage) || 1;
+  const startRow = totalFiltered === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
+  const endRow = Math.min(currentPage * rowsPerPage, totalFiltered);
+
+  const paginationControls = (
+    <div className="generic-table-pagination">
+      <div className="pagination-info">
+        <span className="text-muted small">Show</span>
+        <Form.Select
+          size="sm"
+          value={rowsPerPage}
+          onChange={(e) =>
+            onPaginationChange(currentPage, Number(e.target.value))
+          }
+          className="pagination-select"
+        >
+          {pageSizeOptions.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </Form.Select>
+        <span className="text-muted small">entries</span>
+      </div>
+
+      <div className="text-muted small">
+        Showing {startRow} to {endRow} of {totalFiltered} entries
+      </div>
+
+      <div className="pagination-buttons">
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          disabled={currentPage === 1}
+          onClick={() => onPaginationChange(1, rowsPerPage)}
+        >
+          <ChevronsLeft size={14} />
+        </Button>
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          disabled={currentPage === 1}
+          onClick={() => onPaginationChange(currentPage - 1, rowsPerPage)}
+        >
+          <ChevronLeft size={14} />
+        </Button>
+
+        {Array.from({ length: totalPages }, (_, index) => {
+          const pageNum = index + 1;
+          if (
+            pageNum === 1 ||
+            pageNum === totalPages ||
+            (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+          ) {
+            const variant =
+              currentPage === pageNum ? 'primary' : 'outline-secondary';
+            return (
+              <Button
+                key={pageNum}
+                size="sm"
+                variant={variant}
+                onClick={() => onPaginationChange(pageNum, rowsPerPage)}
+              >
+                {pageNum}
+              </Button>
+            );
+          }
+          if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+            return (
+              <span key={pageNum} className="px-2">
+                ...
+              </span>
+            );
+          }
+          return null;
+        })}
+
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          disabled={currentPage === totalPages || totalFiltered === 0}
+          onClick={() => onPaginationChange(currentPage + 1, rowsPerPage)}
+        >
+          <ChevronRight size={14} />
+        </Button>
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          disabled={currentPage === totalPages || totalFiltered === 0}
+          onClick={() => onPaginationChange(totalPages, rowsPerPage)}
+        >
+          <ChevronsRight size={14} />
+        </Button>
+      </div>
+    </div>
+  );
+
+  const allPageSelected =
+    paginatedStatuses.length > 0 &&
+    paginatedStatuses.every((row) => selectedItems.includes(row.id));
+
+  let bodyRows: React.ReactNode;
+  if (loading) {
+    bodyRows = (
+      <tr>
+        <td colSpan={colCount} className="text-center py-4">
+          <div className="generic-table-loading">{loadingMessage}</div>
+        </td>
+      </tr>
+    );
+  } else if (paginatedStatuses.length === 0) {
+    bodyRows = (
+      <tr>
+        <td colSpan={colCount} className="text-center py-4">
+          <div className="generic-table-empty">{emptyMessage}</div>
+        </td>
+      </tr>
+    );
+  } else {
+    bodyRows = paginatedStatuses.map((row, pageIndex) => (
+      <tr
+        key={String(row.id ?? pageIndex)}
+        onDoubleClick={() => onRowDoubleClick?.(row, pageIndex)}
+        className={`generic-table-row ${onRowDoubleClick ? 'clickable' : ''}`}
+        onDragOver={(e) => {
+          if (!showReorder) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={(e) => {
+          if (!showReorder) return;
+          e.preventDefault();
+          const raw = e.dataTransfer.getData('text/plain');
+          const draggedId = Number(raw);
+          if (!Number.isFinite(draggedId)) return;
+          const fromPageIndex = paginatedStatuses.findIndex(
+            (r) => r.id === draggedId,
+          );
+          if (fromPageIndex < 0) return;
+          onReorderPageRows(fromPageIndex, pageIndex);
+        }}
+      >
+        {isAllow && (
+          <td
+            className="generic-table-td"
+            style={{ width: '40px' }}
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <Form.Check
+              type="checkbox"
+              checked={selectedItems.includes(row.id)}
+              onChange={(e) => onToggleRow(row.id, e.target.checked)}
+            />
+          </td>
+        )}
+        {showReorder && (
+          <td
+            className="generic-table-td"
+            style={{ width: '40px', cursor: 'grab' }}
+            draggable
+            onClick={(ev) => ev.stopPropagation()}
+            onDragStart={(e) => {
+              e.dataTransfer.setData('text/plain', String(row.id));
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            title="Drag to reorder"
+          >
+            <GripVertical size={16} className="text-muted" aria-hidden />
+            <span className="visually-hidden">Reorder</span>
+          </td>
+        )}
+        {visibleColumns.map((col, colIdx) => (
+          <td
+            key={col.key}
+            className="generic-table-td"
+            style={{
+              textAlign: col.align || 'left',
+              position: colIdx === 0 ? 'relative' : undefined,
+            }}
+          >
+            {colIdx === 0 ? (
+              <button
+                type="button"
+                className="border-0 bg-transparent p-0 text-start w-100"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  onFirstColumnClick(row, pageIndex);
+                }}
+              >
+                {col.render ? col.render(row, pageIndex) : null}
+              </button>
+            ) : (
+              <div>{col.render ? col.render(row, pageIndex) : null}</div>
+            )}
+          </td>
+        ))}
+        {hasActions && (
+          <td
+            className="generic-table-td"
+            style={{ textAlign: 'center', width: '120px' }}
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <div className="d-flex gap-1 justify-content-center align-items-center">
+              {actions.map((action, actionIndex) => {
+                if (action.show && !action.show(row)) return null;
+                const isDisabled = action.disabled?.(row);
+                const buttonEl = (
+                  <Button
+                    key={`${action.label}-${actionIndex}`}
+                    variant={action.variant || 'link'}
+                    size="sm"
+                    disabled={isDisabled}
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      if (!isDisabled) action.onClick?.(row);
+                    }}
+                    className={`p-1 ${
+                      isDisabled
+                        ? `gt-action-disabled ${action.disabledClassName ?? ''}`
+                        : action.className || ''
+                    }`}
+                    title={isDisabled ? undefined : action.label}
+                  >
+                    {action.icon || action.label}
+                  </Button>
+                );
+                if (isDisabled && action.disabledTitle) {
+                  return (
+                    <span
+                      key={`${action.label}-${actionIndex}-wrap`}
+                      className="gt-action-disabled-wrapper"
+                      title={action.disabledTitle}
+                    >
+                      {buttonEl}
+                    </span>
+                  );
+                }
+                return buttonEl;
+              })}
+            </div>
+          </td>
+        )}
+      </tr>
+    ));
+  }
+
+  return (
+    <>
+      <div
+        className={`generic-table-responsive ${fixedHeight ? 'fixed-height-table' : ''}`}
+        style={fixedHeight ? { maxHeight, overflow: 'auto' } : {}}
+      >
+        <Table hover className="generic-table mb-0">
+          <thead className="generic-table-header">
+            <tr>
+              {isAllow && (
+                <th className="generic-table-th" style={{ width: '40px' }}>
+                  <Form.Check
+                    type="checkbox"
+                    checked={allPageSelected}
+                    onChange={(e) => onToggleSelectAllPage(e.target.checked)}
+                  />
+                </th>
+              )}
+              {showReorder && (
+                <th className="generic-table-th" style={{ width: '40px' }}>
+                  <span className="visually-hidden">Reorder</span>
+                </th>
+              )}
+              {visibleColumns.map((col) => (
+                <th
+                  key={col.key}
+                  className={`generic-table-th ${col.sortable !== false && sortable ? 'sortable' : ''}`}
+                  style={{ textAlign: col.align || 'left' }}
+                  onClick={() => handleHeaderSort(col.key)}
+                >
+                  <div className="th-content d-flex align-items-center justify-content-between">
+                    <span>{col.label}</span>
+                    {col.sortable !== false &&
+                      sortable &&
+                      renderSortIcon(col.key)}
+                  </div>
+                </th>
+              ))}
+              {hasActions && (
+                <th className="generic-table-th" style={{ textAlign: 'center' }}>
+                  Actions
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>{bodyRows}</tbody>
+        </Table>
+      </div>
+      <div className="p-3">{paginationControls}</div>
+    </>
+  );
+};
+
 const StatusesTab: React.FC<StatusesTabProps> = ({
   selectedProject,
   statuses,
   loading,
   onRefresh,
   styles,
+  canManageProject,
 }) => {
-  const { data: session } = useSession();
-  const isAllow = useMemo(() => canManage(statuses, selectedProject, session), [statuses, selectedProject, session]);
+  const isAllow = canManageProject;
 
   const [showAddModal, setShowAddModal]     = useState(false);
   const [showEditModal, setShowEditModal]   = useState(false);
@@ -46,14 +505,13 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   });
   const [searchValue, setSearchValue] = useState('');
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [clearSelectedRows, setClearSelectedRows] = useState(false);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(['name', 'color']);
+  const [selectedColumns] = useState<string[]>(['name', 'color']);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [colorFilter, setColorFilter] = useState<string | null>(null);
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddStatus = async () => {
-    if (!selectedProject?.id || !formData.name) return;
+    if (!canManageProject || !selectedProject?.id || !formData.name) return;
     try {
       setProcessing(true);
       await createStatus(selectedProject.id, { name: formData.name, color: formData.color } as any);
@@ -68,7 +526,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   };
 
   const handleUpdateStatus = async () => {
-    if (!selectedProject?.id || !selectedStatus || !formData.name) return;
+    if (!canManageProject || !selectedProject?.id || !selectedStatus || !formData.name) return;
     try {
       setProcessing(true);
       await updateStatus(selectedProject.id, selectedStatus.id, { name: formData.name, color: formData.color } as any);
@@ -84,7 +542,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   };
 
   const handleDeleteStatus = async () => {
-    if (!selectedProject?.id || !selectedStatus) return;
+    if (!canManageProject || !selectedProject?.id || !selectedStatus) return;
     try {
       setProcessing(true);
       await deleteStatus(selectedProject.id, selectedStatus.id);
@@ -130,11 +588,26 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
     return result;
   }, [statuses, searchValue, colorFilter]);
 
+  const sortedFilteredStatuses = useMemo(() => {
+    const col = pagination.sortColumn;
+    if (!col) return filteredStatuses;
+    const dir = pagination.sortDirection;
+    return [...filteredStatuses].sort((a: any, b: any) => {
+      const aVal = a[col] ?? '';
+      const bVal = b[col] ?? '';
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      if (aStr < bStr) return dir === 'asc' ? -1 : 1;
+      if (aStr > bStr) return dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [filteredStatuses, pagination.sortColumn, pagination.sortDirection]);
+
   const paginatedStatuses = useMemo(() => {
     const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
     const end = start + pagination.rowsPerPage;
-    return filteredStatuses.slice(start, end);
-  }, [filteredStatuses, pagination.currentPage, pagination.rowsPerPage]);
+    return sortedFilteredStatuses.slice(start, end);
+  }, [sortedFilteredStatuses, pagination.currentPage, pagination.rowsPerPage]);
 
   // ── Stats Cards ───────────────────────────────────────────────────────────
   const statsCardsData: StatsCardData[] = useMemo(() => {
@@ -315,15 +788,58 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   }), [searchValue, filterPills, isAllow, selectedItems.length, statuses.length]);
 
   // ── Row Interaction Handlers ──────────────────────────────────────────────
-  const handleFirstColumnClick = useCallback((row: any) => {
-    openEditModal(row);
-  }, []);
+  const handleFirstColumnClick = useCallback(
+    (row: any) => {
+      if (!isAllow) return;
+      openEditModal(row);
+    },
+    [isAllow],
+  );
 
   const handleRowDoubleClick = useCallback((row: any) => {
     if (isAllow) {
       openEditModal(row);
     }
   }, [isAllow]);
+
+  const handleStatusRowReorder = useCallback(
+    async (fromPageIndex: number, toPageIndex: number) => {
+      if (!canManageProject || !selectedProject?.id || fromPageIndex === toPageIndex) return;
+      const offset = (pagination.currentPage - 1) * pagination.rowsPerPage;
+      const fromFiltered = offset + fromPageIndex;
+      const toFiltered = offset + toPageIndex;
+      if (
+        fromFiltered < 0 ||
+        toFiltered < 0 ||
+        fromFiltered >= sortedFilteredStatuses.length ||
+        toFiltered >= sortedFilteredStatuses.length
+      ) {
+        return;
+      }
+      const fullOrderedIds = statuses.map((s: { id: number }) => s.id);
+      const filteredIds = sortedFilteredStatuses.map((s: { id: number }) => s.id);
+      const reorderedFiltered = arrayMove(filteredIds, fromFiltered, toFiltered);
+      const status_ids = applyFilteredReorder(fullOrderedIds, reorderedFiltered);
+      try {
+        setProcessing(true);
+        await reorderStatuses(selectedProject.id, { status_ids });
+        onRefresh();
+      } catch {
+        // reorderStatuses already surfaces toast on failure
+      } finally {
+        setProcessing(false);
+      }
+    },
+    [
+      canManageProject,
+      selectedProject?.id,
+      pagination.currentPage,
+      pagination.rowsPerPage,
+      sortedFilteredStatuses,
+      statuses,
+      onRefresh,
+    ],
+  );
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -389,36 +905,6 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
     },
   ] : [];
 
-  // ── Color picker shared UI ────────────────────────────────────────────────
-  const ColorPicker = () => (
-    <>
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-        {predefinedColors.map((color) => (
-          <button
-            key={color}
-            type="button"
-            onClick={() => setFormData(prev => ({ ...prev, color }))}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '6px',
-              backgroundColor: color,
-              border: formData.color === color ? '3px solid #1F2937' : '2px solid #E5E9F2',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          />
-        ))}
-      </div>
-      <Form.Control
-        type="color"
-        value={formData.color}
-        onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-        style={{ width: '100%', height: '40px' }}
-      />
-    </>
-  );
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
@@ -436,6 +922,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       {/* Statuses Table with GenericTable */}
       <div
         className="statuses-table-wrapper"
+        data-column-editor-open={showColumnEditor ? 'true' : undefined}
         style={{
           flex: 1,
           overflow: "hidden",
@@ -447,20 +934,64 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
           data={paginatedStatuses}
           columns={columns.filter((c) => selectedColumns.includes(c.key))}
           actions={actions}
-          showActions={isAllow && actions.length > 0}
-          actionsLabel="Actions"
-          
-          // Selection
-          selectable={isAllow}
-          selectedRows={paginatedStatuses.filter((item) =>
-            selectedItems.includes(item.id)
-          )}
-          onSelectionChange={(selected) => {
-            setSelectedItems(selected.map((item) => item.id));
-            setClearSelectedRows(false);
-          }}
-          
-          // Pagination
+          showActions={false}
+          selectable={false}
+          customBody={
+            <StatusesTableCustomBody
+              paginatedStatuses={paginatedStatuses}
+              visibleColumns={columns.filter((c) =>
+                selectedColumns.includes(c.key),
+              )}
+              actions={actions}
+              isAllow={isAllow}
+              processing={processing}
+              loading={loading}
+              selectedItems={selectedItems}
+              onToggleSelectAllPage={(checked) => {
+                setSelectedItems(
+                  checked ? paginatedStatuses.map((r: any) => r.id) : [],
+                );
+              }}
+              onToggleRow={(id, checked) => {
+                setSelectedItems((prev) =>
+                  checked
+                    ? [...prev, id]
+                    : prev.filter((x) => x !== id),
+                );
+              }}
+              onReorderPageRows={(fromIdx, toIdx) => {
+                handleStatusRowReorder(fromIdx, toIdx).catch(() => undefined);
+              }}
+              sortColumn={pagination.sortColumn}
+              sortDirection={pagination.sortDirection}
+              onSort={(column, direction) => {
+                setPagination((prev) => ({
+                  ...prev,
+                  sortColumn: column,
+                  sortDirection: direction,
+                  currentPage: 1,
+                }));
+              }}
+              sortable
+              onFirstColumnClick={(row) => handleFirstColumnClick(row)}
+              onRowDoubleClick={(row) => handleRowDoubleClick(row)}
+              emptyMessage="No statuses found matching your criteria"
+              loadingMessage="Loading statuses..."
+              maxHeight="calc(100vh - 345px)"
+              fixedHeight
+              currentPage={pagination.currentPage}
+              rowsPerPage={pagination.rowsPerPage}
+              totalFiltered={filteredStatuses.length}
+              pageSizeOptions={[10, 15, 25, 50, 100]}
+              onPaginationChange={(page, rowsPerPage) => {
+                setPagination({
+                  ...pagination,
+                  currentPage: page,
+                  rowsPerPage,
+                });
+              }}
+            />
+          }
           pagination={{
             currentPage: pagination.currentPage,
             rowsPerPage: pagination.rowsPerPage,
@@ -474,8 +1005,6 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
               rowsPerPage,
             });
           }}
-          
-          // Sorting
           sortable={true}
           defaultSortColumn={pagination.sortColumn}
           defaultSortDirection={pagination.sortDirection}
@@ -487,27 +1016,15 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
               currentPage: 1,
             }));
           }}
-          
-          // Row interactions
-          onFirstColumnClick={(row) => handleFirstColumnClick(row)}
-          onRowDoubleClick={(row) => handleRowDoubleClick(row)}
-          
-          // Loading & styling
           loading={loading}
           emptyMessage="No statuses found matching your criteria"
           loadingMessage="Loading statuses..."
           hover={true}
           uniqueKey="id"
-          
-          // Fixed height mode
           fixedHeight={true}
           maxHeight="calc(100vh - 345px)"
-          
-          // Toolbar
           showToolbar={true}
           toolbar={toolbarConfig}
-          
-          // Stats cards for metrics
           statsCards={statsCardsData}
         />
       </div>
@@ -530,7 +1047,12 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Color</Form.Label>
-              <ColorPicker />
+              <StatusFormColorPicker
+                color={formData.color}
+                onColorChange={(next) =>
+                  setFormData((prev) => ({ ...prev, color: next }))
+                }
+              />
             </Form.Group>
           </Form>
         </Modal.Body>
@@ -560,7 +1082,12 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Color</Form.Label>
-              <ColorPicker />
+              <StatusFormColorPicker
+                color={formData.color}
+                onColorChange={(next) =>
+                  setFormData((prev) => ({ ...prev, color: next }))
+                }
+              />
             </Form.Group>
           </Form>
         </Modal.Body>

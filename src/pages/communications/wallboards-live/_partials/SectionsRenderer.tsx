@@ -2,7 +2,118 @@ import React from 'react'
 import { Col, Row } from 'react-bootstrap'
 import SectionContainer from './SectionContainer'
 import { SECTION_ORDER } from '@components/live-calls/utils/constants'
+import { getCallSortDurationMs } from '@components/live-calls/utils/helpers'
 import { CtiDevice } from '@components/live-calls/utils/types'
+
+const SECTION_STATUS_MAP: Record<string, string> = {
+  supervision: 'supervision',
+  oncall: 'onCall',
+  active: 'activeIdle',
+  offline: 'downOffline',
+}
+
+type SectionBuckets = {
+  supervision: any[]
+  onCall: any[]
+  activeIdle: any[]
+  downOffline: any[]
+}
+
+function getExtensionRecord(
+  userDataExtensions: Record<string, any>,
+  dn: string
+): Record<string, any> | null {
+  return (
+    userDataExtensions[dn] ??
+    userDataExtensions[String(dn)] ??
+    userDataExtensions[Number(dn)] ??
+    null
+  )
+}
+
+function matchesSearchQuery(
+  dn: string,
+  query: string,
+  userDataExtensions: Record<string, any>
+): boolean {
+  const dnLower = String(dn).toLowerCase()
+  if (dnLower.includes(query)) {
+    return true
+  }
+  const extensionData = getExtensionRecord(userDataExtensions, dn)
+  if (!extensionData) {
+    return false
+  }
+  const userName =
+    extensionData.name ??
+    extensionData.user_name ??
+    extensionData.userName ??
+    ''
+  if (!userName?.trim()) {
+    return false
+  }
+  const userNameLower = String(userName).toLowerCase().trim()
+  return userNameLower.includes(query)
+}
+
+function matchesTeamSelection(
+  dn: string,
+  selectedTeam: string,
+  userDataExtensions: Record<string, any>
+): boolean {
+  const extensionData = getExtensionRecord(userDataExtensions, dn)
+  const teamNames = extensionData?.team_name ?? []
+  if (teamNames.length === 0) {
+    return false
+  }
+  const selectedTeamStr = String(selectedTeam).toLowerCase().trim()
+  return teamNames.some((teamName: string) => {
+    const teamNameStr = String(teamName).toLowerCase().trim()
+    return (
+      teamNameStr === selectedTeamStr ||
+      teamNameStr.includes(selectedTeamStr) ||
+      selectedTeamStr.includes(teamNameStr)
+    )
+  })
+}
+
+function matchesStatusSelection(section: string, selectedStatus: string): boolean {
+  const targetSection = SECTION_STATUS_MAP[selectedStatus.toLowerCase()]
+  if (targetSection !== undefined && section !== targetSection) {
+    return false
+  }
+  return true
+}
+
+function devicesObjectToList(devices: unknown): CtiDevice[] {
+  if (devices == null || typeof devices !== 'object') {
+    return []
+  }
+  return Object.values(devices as Record<string, CtiDevice>)
+}
+
+function compareByCallDuration(
+  a: any,
+  b: any,
+  sortOrder: string
+): number {
+  const durationA = a.call ? getCallSortDurationMs(a.call) : 0
+  const durationB = b.call ? getCallSortDurationMs(b.call) : 0
+  if (sortOrder === 'longest') {
+    return durationB - durationA
+  }
+  if (sortOrder === 'shortest') {
+    return durationA - durationB
+  }
+  return 0
+}
+
+function sortSectionsByDuration(sectionArray: any[], sortOrder: string): any[] {
+  if (sortOrder === 'none') {
+    return sectionArray
+  }
+  return [...sectionArray].sort((a, b) => compareByCallDuration(a, b, sortOrder))
+}
 
 interface SectionsRendererProps {
   dnsMap: Record<string, any>
@@ -69,12 +180,10 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   sortBy,
   searchQuery,
   collapsedSections,
-  toggleSection
+  toggleSection,
 }) => {
-  // Get user data extensions for filtering
-  // Add state to force re-render when data becomes available (for cloned tabs)
   const [extensionsUpdateCounter, setExtensionsUpdateCounter] = React.useState(0)
-  
+
   const userDataExtensions = React.useMemo(() => {
     try {
       return getUserDataExtensions?.() || {}
@@ -83,204 +192,114 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
       return {}
     }
   }, [getUserDataExtensions, extensionsUpdateCounter])
-  
-  // Retry mechanism: Check periodically if data becomes available (for cloned tabs)
+
   React.useEffect(() => {
     if (!getUserDataExtensions) {
       return
     }
-    
+
     const extensions = getUserDataExtensions() || {}
     const hasData = Object.keys(extensions).length > 0
-    
+
     if (hasData) {
-      // Data is available
       return
     }
-    
-    // If no data, set up a retry mechanism to check periodically
-    // This helps when a tab is cloned and data arrives via cross-tab communication
-    const maxRetries = 30 // Check for 30 seconds total
+
+    const maxRetries = 30
     let retryCount = 0
-    
+
     const retryInterval = setInterval(() => {
       if (!getUserDataExtensions) {
         clearInterval(retryInterval)
         return
       }
-      
+
       const currentExtensions = getUserDataExtensions() || {}
       const currentHasData = Object.keys(currentExtensions).length > 0
-      
+
       if (currentHasData) {
-        // Data is now available, trigger re-render
-        setExtensionsUpdateCounter(prev => prev + 1)
+        setExtensionsUpdateCounter((prev) => prev + 1)
         clearInterval(retryInterval)
       } else {
-        retryCount++
-        // Also trigger periodic updates to check for data
+        retryCount += 1
         if (retryCount % 5 === 0) {
-          setExtensionsUpdateCounter(prev => prev + 1)
+          setExtensionsUpdateCounter((prev) => prev + 1)
         }
         if (retryCount >= maxRetries) {
-          // Stop retrying after max attempts
           clearInterval(retryInterval)
         }
       }
-    }, retryCount < 10 ? 200 : 1000) // Fast checks for first 2 seconds, then every second
-    
+    }, retryCount < 10 ? 200 : 1000)
+
     return () => {
       clearInterval(retryInterval)
     }
   }, [getUserDataExtensions, extensionsUpdateCounter])
 
-  // Filter function to check if DN matches filters
-  const matchesFilters = React.useCallback((dn: string, section: string) => {
-    // Search filter
-    if (searchQuery && searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim()
-      const dnLower = String(dn).toLowerCase()
-      
-      // Check if DN matches first (fast path)
-      const matchesDn = dnLower.includes(query)
-      if (matchesDn) {
-        return true // DN matches, no need to check name
-      }
-      
-      // Try multiple DN formats to get extension data
-      const dnString = String(dn)
-      const dnNumber = Number(dn)
-      const extensionData = userDataExtensions[dn] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null
-      
-      if (!extensionData) {
-        // No extension data and DN doesn't match, exclude
-        return false
-      }
-      
-      // Get user name - try multiple possible fields
-      const userName = extensionData?.name || extensionData?.user_name || extensionData?.userName || ''
-      
-      // Check if name matches (only if name exists)
-      if (userName && userName.trim()) {
-        const userNameLower = String(userName).toLowerCase().trim()
-        const matchesName = userNameLower.includes(query)
-        if (matchesName) {
-          return true // Name matches
+  const matchesFilters = React.useCallback(
+    (dn: string, section: string) => {
+      if (searchQuery?.trim()) {
+        const query = searchQuery.toLowerCase().trim()
+        if (!matchesSearchQuery(dn, query, userDataExtensions)) {
+          return false
         }
       }
-      
-      // Neither DN nor name matches
-      return false
-    }
 
-    // Team filter
-    if (selectedTeam && selectedTeam !== 'all') {
-      const extensionData = userDataExtensions[dn] || userDataExtensions[String(dn)] || userDataExtensions[Number(dn)]
-      const teamNames = extensionData?.team_name || []
-      
-      if (teamNames.length === 0) {
-        // If user has no teams assigned, exclude them when a team is selected
-        return false
+      if (selectedTeam && selectedTeam !== 'all') {
+        if (!matchesTeamSelection(dn, selectedTeam, userDataExtensions)) {
+          return false
+        }
       }
-      
-      // Get team names from getUserTeams to match by ID or name
-      const selectedTeamStr = String(selectedTeam).toLowerCase().trim()
-      
-      // Check if any team name matches the selected team (by name or ID)
-      const teamMatch = teamNames.some((teamName: string) => {
-        const teamNameStr = String(teamName).toLowerCase().trim()
-        // Exact match or partial match
-        return teamNameStr === selectedTeamStr || 
-               teamNameStr.includes(selectedTeamStr) || 
-               selectedTeamStr.includes(teamNameStr)
-      })
-      
-      if (!teamMatch) {
-        return false
-      }
-    }
 
-    // Status filter
-    if (selectedStatus && selectedStatus !== 'all') {
-      // Map filter values to section keys
-      const statusMap: Record<string, string> = {
-        'supervision': 'supervision',
-        'oncall': 'onCall',
-        'active': 'activeIdle',
-        'offline': 'downOffline'
+      if (selectedStatus && selectedStatus !== 'all') {
+        if (!matchesStatusSelection(section, selectedStatus)) {
+          return false
+        }
       }
-      
-      const targetSection = statusMap[selectedStatus.toLowerCase()]
-      if (targetSection && section !== targetSection) {
-        return false
-      }
-    }
 
-    return true
-  }, [selectedTeam, selectedStatus, searchQuery, userDataExtensions])
+      return true
+    },
+    [selectedTeam, selectedStatus, searchQuery, userDataExtensions]
+  )
 
-  // Group DNs by sections and apply filters
   const dnsList = Object.values(dnsMap)
-  const sections = {
-    supervision: [] as any[],
-    onCall: [] as any[],
-    activeIdle: [] as any[],
-    downOffline: [] as any[]
+  const sections: SectionBuckets = {
+    supervision: [],
+    onCall: [],
+    activeIdle: [],
+    downOffline: [],
   }
 
-  dnsList.forEach(({ dn, devices }: any) => {
-    const deviceList = Object.values(devices || {}) as CtiDevice[]
+  dnsList.forEach((entry: { dn: string; devices: unknown }) => {
+    const { dn, devices } = entry
+    const deviceList = devicesObjectToList(devices)
     const call = getDnCallState(dn)
     const active = hasActiveCalls(dn)
     const section = categorizeDns(dn, deviceList, call, active)
-    
-    // Apply filters (including status filter which needs the section)
+
     if (!matchesFilters(dn, section)) {
       return
     }
-    
-    sections[section as keyof typeof sections].push({ dn, devices: deviceList, call, active })
+
+    const bucket = sections[section as keyof SectionBuckets]
+    if (bucket) {
+      bucket.push({ dn, devices: deviceList, call, active })
+    }
   })
 
-  // Sort by duration if sortBy is set
-  const sortSectionsByDuration = (sectionArray: any[], sortOrder: string) => {
-    if (sortOrder === 'none') return sectionArray
-
-    return [...sectionArray].sort((a, b) => {
-      const getCallDuration = (item: any) => {
-        if (!item.call || !item.call.eventTime) return 0
-        const eventTime = new Date(item.call.eventTime).getTime()
-        const now = Date.now()
-        return now - eventTime // Duration in milliseconds
-      }
-
-      const durationA = getCallDuration(a)
-      const durationB = getCallDuration(b)
-
-      if (sortOrder === 'longest') {
-        return durationB - durationA // Longest first (descending)
-      } else if (sortOrder === 'shortest') {
-        return durationA - durationB // Shortest first (ascending)
-      }
-
-      return 0
-    })
-  }
-
-  // Apply sorting to each section
-  const sortedSections = {
+  const sortedSections: SectionBuckets = {
     supervision: sortSectionsByDuration(sections.supervision, sortBy),
     onCall: sortSectionsByDuration(sections.onCall, sortBy),
     activeIdle: sortSectionsByDuration(sections.activeIdle, sortBy),
-    downOffline: sortSectionsByDuration(sections.downOffline, sortBy)
+    downOffline: sortSectionsByDuration(sections.downOffline, sortBy),
   }
 
   return (
     <Row className="mt-3">
       <Col md={12}>
         <div className="container-fluid pt-3 pb-3">
-          {SECTION_ORDER.map(sectionKey => {
-            const sectionDns = sortedSections[sectionKey as keyof typeof sortedSections]
+          {SECTION_ORDER.map((sectionKey) => {
+            const sectionDns = sortedSections[sectionKey as keyof SectionBuckets]
 
             return (
               <SectionContainer
@@ -315,9 +334,10 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
           {loading && (
             <div className="col-12 text-center">
               <div className="loading-spinner">
-                <div className="spinner-border" role="status">
+                <output className="d-inline-block" aria-live="polite">
+                  <div className="spinner-border" aria-hidden="true" />
                   <span className="visually-hidden">Loading...</span>
-                </div>
+                </output>
               </div>
             </div>
           )}
@@ -328,4 +348,3 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
 }
 
 export default SectionsRenderer
-

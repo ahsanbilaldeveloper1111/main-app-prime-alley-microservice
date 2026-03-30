@@ -1,10 +1,8 @@
 import '@assets/scss/datatable-style.scss';
 
-import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
-import { io, Socket } from "socket.io-client";
-import { Col, Button, Card, Modal, Row, Form } from 'react-bootstrap';
+import React, { ReactElement, useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { Col, Button, Card, Modal, Row } from 'react-bootstrap';
 
-import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
 import type { NextPage } from 'next';
 import moment from 'moment';
@@ -14,48 +12,23 @@ import dynamic from 'next/dynamic';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
-import CallRecordingsFilters from '@components/filters/CallRecordingFilter';
-import BarFilters from '@components/BarFilters';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
-import AnimatedNumber from '@components/AnimatedNumber';
-import StatCard from '@components/StatCard';
 import ChartBar from '@components/ChartBar';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
-import { ModuleSlug } from '@utils/Helper';
-import SelectBox from '@components/SelectBox';
-import { BarChart3, Hash, Phone, PhoneIncoming, PhoneOutgoing, Filter, Calendar } from 'lucide-react';
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import GenericFilterSidebar, { FilterFieldType } from '@components/GenericFilterSidebar';
+import { Hash, Phone, PhoneIncoming, PhoneOutgoing, Calendar } from 'lucide-react';
+import StatsCards from "@components/GenericStatsCards";
 
 import '@assets/scss/common.scss';
 
 // Utils
-import { ListCallLogs, ExportCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
-import { GetHierarchyData } from '@utils/users';
-
-// Assets
-import imgStatus1 from '@assets/images/widget/img-status-1.svg';
-import imgStatus2 from '@assets/images/widget/img-status-2.svg';
-import imgStatus3 from '@assets/images/widget/img-status-3.svg';
-import imgStatus4 from '@assets/images/widget/img-status-4.svg';
-import router from 'next/router';
+import { ListCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
-import { formatDuration, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData, convertDateTimeWithOffsetToLocal, formatDateTimeToLocal } from '@utils/Helper';
-import PageLoader from '@components/PageLoader';
-import CircularProgressLoader from '@components/CircularProgressLoader';
+import { ModuleSlug, formatDuration, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData, convertDateTimeWithOffsetToLocal, formatDateTimeToLocal } from '@utils/Helper';
 import CircularProgressCircle from '@components/CircularProgressCircle';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
-
-const sparklineData = [25, 66, 41, 89, 63, 25, 44, 12, 36, 9, 54];
-
-const randomizeArray = (arr: number[]) => arr
-  .map((value: number) => ({ value, sort: Math.random() }))
-  .sort((a: { value: number; sort: number }, b: { value: number; sort: number }) => a.sort - b.sort)
-  .map(({ value }: { value: number }) => value);
 
 // Interfaces
 interface Summary {
@@ -78,14 +51,6 @@ interface ChartDirection{
   label: string[];
 }
 
-interface RecordingUpdate {
-  message: string;
-  data: {
-    AgentExtension: string;
-    [key: string]: any;
-  };
-}
-
 /** Row shape from call-recordings API (dataList items) */
 interface RecordingRow {
   Id?: string;
@@ -100,25 +65,16 @@ interface RecordingRow {
   [key: string]: any;
 }
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_CALL_LOGS_SOCKET_URL;
-
 const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactNode } = () => {
-  const { data: session, status } = useSession();
-  const { getAccessToken } = useTokenService();
-  const stableGetAccessToken = useCallback(getAccessToken, []);
-  const socketRef = useRef<Socket | null>(null);
+  const { data: session } = useSession();
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const [showPageLoader, setShowPageLoader] = useState(false);
 
-  // const [showDateRange, setShowDateRange] = useState(false);
-  // const [startDateTime, setStartDateTime] = useState<string>('');
-  // const [endDateTime, setEndDateTime] = useState<string>('');
-
-  const [showDateRange, setShowDateRange] = useState(true);
-  const [startDateTime, setStartDateTime] = useState<string>(() =>
+  const [showDateRange] = useState(true);
+  const [startDateTime] = useState<string>(() =>
     moment().clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z'
   );
-  const [endDateTime, setEndDateTime] = useState<string>(() =>
+  const [endDateTime] = useState<string>(() =>
     moment().clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z'
   );
   // Initialize filters with default values immediately to prevent first API call without dates
@@ -147,8 +103,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
   const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>(defaultFilters.applied); // Filters that trigger API calls
   const [searchValue, setSearchValue] = useState<string>('');
-  const [showAnalytics, setShowAnalytics] = useState<boolean>(false);
-  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const showAnalytics = false;
   // Refs to prevent duplicate API calls
   const appliedFiltersRef = useRef<Record<string, any>>(defaultFilters.applied);
   const isFetchingRef = useRef(false);
@@ -160,7 +115,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     hierarchyDataExtensions,
     hierarchyDataDepartments,
     hierarchyDataUsers,
-    loading: hierarchyLoading
   } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
   const [callDurationBarChartModal, setCallDurationBarChartModal] = useState(false);
   const [currentChartData, setCurrentChartData] = useState<{ series: any[]; categories: string[] } | null>(null);
@@ -171,14 +125,10 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const [audioLoading, setAudioLoading] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string>('');
   const [audioError, setAudioError] = useState<string | null>(null);
-  const [mediaPlayerShow, setMediaPlayerShow] = useState(false);
   const [downloadingRecordings, setDownloadingRecordings] = useState<Set<string>>(new Set());
   const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
   
   // State for managing data and manual additions
-  const [currentData, setCurrentData] = useState<any[]>([]);
-  const [isDataModified, setIsDataModified] = useState(false);
-  const modifiedDataRef = useRef<any[]>([]);
   const [tableData, setTableData] = useState<RecordingRow[]>([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [paginationInfo, setPaginationInfo] = useState<{
@@ -193,7 +143,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     perPage: 15,
   });
   const rowsPerPageRef = useRef(15);
-  const [socketExtensions, setSocketExtensions] = useState<number[]>([]);
 
   const [summary, setSummary] = useState<Summary>({
     numbers: 0,
@@ -237,50 +186,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       subtitle: 'Outbound calls in the system',
     },
    
-  ];
-
-  // Create cards data for PageSummaryGrid
-  const summaryCards: SummaryCard[] = [
-    {
-      id: 'total-gsms-count',
-      title: 'Extensions',
-      value: summary?.extensions || 0,
-      description: 'Extensions in the system',
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
-    },
-    {
-      id: 'assigned-gsms-count',
-      title: 'Remote Numbers',
-      value: summary?.numbers || 0,
-      description: 'Remote numbers in the system',
-      delay: 0.3,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
-    },
-    {
-      id: 'unassigned-gsms-count',
-      title: 'Inbound',
-      value: summary?.inbound || 0,
-      description: 'Inbound calls in the system',
-      delay: 0.5,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
-    },
-    {
-      id: 'total-ports-count',
-      title: 'Outbound',
-      value: summary?.outbound || 0,
-      description: 'Outbound calls in the system',
-      delay: 0.7,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
-    }
   ];
 
   const [callDirectionTwo, setCallDirectionTwo] = React.useState<{
@@ -333,48 +238,101 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     },
   });
 
-  // Functions
-  const addNewRecord = () => {
-    const newRecord = {
-      "Id": "F035BC55-6FA5-4553-A4F3-0C36D269C3E0",
-      "Direction": "CALL_OUTGOING",
-      "LocalCallId": null,
-      "RemoteCallId": null,
-      "AgentExtension": "4030",
-      "RemotePartyNumber": "0543879764",
-      "RecordId": "2025004387522",
-      "AudioTrack": "\\2025\\08\\07\\Record_20250807021403_4030_default_C808a6829400671_Recorder",
-      "Duration": 5553198016,
-      "OwnerId": "89CD4A38-A4AB-4F8F-BD52-3B1A2CE886A9",
-      "PreservingUserId": null,
-      "NoteOwnerId": null,
-      "Note": null,
-      "DateTime": "2025-08-06T22:14:03.944000Z",
-      "NoteDateTime": null,
-      "OwnerPropertiesId": "6E39C533-9D5D-4CC3-9B28-B1F4A96282AE",
-      "PreservingUserPropertiesId": null,
-      "NoteOwnerPropertiesId": null,
-      "NodeId": "IMAGICLE_GW_DC_02",
-      "Size": "2222624"
-    };
+  const getRowsArray = (response: any): RecordingRow[] => {
+    const rawData = response?.data;
+    if (Array.isArray(rawData)) return rawData;
+    if (Array.isArray(rawData?.data)) return rawData.data;
+    if (Array.isArray(response?.dataList)) return response.dataList;
+    return [];
+  };
 
-    // Update the table data directly without triggering API call
-    setTableData(prevData => {
-      const updatedData = [...prevData, newRecord];
-      modifiedDataRef.current = updatedData;
-      setIsDataModified(true);
-      return updatedData;
+  const updatePaginationFromResponse = (response: any, rowsArray: RecordingRow[], page: number, perPage: number) => {
+    const rawData = response?.data;
+    const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
+    const total =
+      response?.recordsTotal ??
+      response?.total ??
+      rawData?.recordsTotal ??
+      rawData?.total ??
+      paginationData?.total ??
+      rowsArray.length;
+    const currentPage = response?.current_page ?? paginationData?.current_page ?? page;
+    const perPageVal = response?.per_page ?? paginationData?.per_page ?? perPage;
+    rowsPerPageRef.current = perPageVal;
+
+    setPaginationInfo({
+      totalRows: Number(total) || 0,
+      totalPages: Number(paginationData?.last_page ?? response?.last_page ?? Math.max(1, Math.ceil(Number(total) / perPageVal))) || 1,
+      currentPage,
+      perPage: perPageVal,
+    });
+  };
+
+  const updateExtensionChart = (dataExtension: any[]) => {
+    if (!Array.isArray(dataExtension) || dataExtension.length === 0) {
+      setChartLoading(false);
+      return;
+    }
+
+    const ms = 10000000;
+    const newChartData: ChartDuration = { label: [], longest_call: [], shortest_call: [], average_call: [] };
+
+    dataExtension.forEach((item: any) => {
+      newChartData.label.push(item.label);
+      const longestCall = typeof item.longest_call === 'string' ? Number.parseFloat(item.longest_call) : Number(item.longest_call) || 0;
+      const shortestCall = typeof item.shortest_call === 'string' ? Number.parseFloat(item.shortest_call) : Number(item.shortest_call) || 0;
+      const averageCall = typeof item.average_call === 'string' ? Number.parseFloat(item.average_call) : Number(item.average_call) || 0;
+      newChartData.longest_call.push(longestCall / ms);
+      newChartData.shortest_call.push(shortestCall / ms);
+      newChartData.average_call.push(averageCall / ms);
     });
 
+    setChartLoading(true);
+    const dataLength = newChartData.label.length;
+    if (
+      dataLength > 0 &&
+      newChartData.shortest_call.length === dataLength &&
+      newChartData.longest_call.length === dataLength &&
+      newChartData.average_call.length === dataLength
+    ) {
+      setCurrentChartData({
+        series: [
+          { name: 'Short', data: newChartData.shortest_call },
+          { name: 'Average', data: newChartData.average_call },
+          { name: 'Long', data: newChartData.longest_call },
+        ],
+        categories: newChartData.label,
+      });
+    }
+    setChartLoading(false);
+  };
 
-    // Update summary counts
-    setSummary(prevSummary => ({
-      ...prevSummary,
-      numbers: prevSummary.numbers + 1,
-      outbound: prevSummary.outbound + 1
-    }));
+  const updateDirectionChart = (dateChart: any[]) => {
+    if (!Array.isArray(dateChart) || dateChart.length === 0) return;
 
-    toast.success('New record added successfully');
+    const newChartDirection: ChartDirection = { inbound: [], outbound: [], label: [] };
+    dateChart.forEach((item: any) => {
+      newChartDirection.inbound.push(item.inbound);
+      newChartDirection.outbound.push(item.outbound);
+      newChartDirection.label.push(item.label);
+    });
+
+    setCallDirectionTwo({
+      series: [
+        { name: 'Inbound', data: newChartDirection.inbound },
+        { name: 'Outbound', data: newChartDirection.outbound },
+      ],
+      options: {
+        chart: { type: 'bar' as const, height: 200, toolbar: { show: false } },
+        plotOptions: { bar: { horizontal: false, columnWidth: '55%', borderRadius: 5, borderRadiusApplication: 'end' as const } },
+        dataLabels: { enabled: false },
+        stroke: { show: true, width: 2, colors: ['transparent'] },
+        xaxis: { categories: newChartDirection.label },
+        yaxis: { title: { text: 'Calls' } },
+        fill: { opacity: 1 },
+        tooltip: { y: { formatter: (val: any) => `${val} calls` } },
+      },
+    });
   };
 
   const fetchCallLogsOriginal = useCallback(async (page = 1, perPage = 15, search = "") => {
@@ -408,169 +366,13 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       setSummary(response.summary)
     }
 
-    // Handle various API response structures for data (flat, nested, DataTables style)
-    const rawData = response?.data;
-    let rowsArray: RecordingRow[] = [];
-    if (Array.isArray(rawData)) {
-      rowsArray = rawData;
-    } else if (Array.isArray(rawData?.data)) {
-      rowsArray = rawData.data;
-    } else if (Array.isArray(response?.dataList)) {
-      rowsArray = response.dataList;
-    }
+    const rowsArray = getRowsArray(response);
 
-    setCurrentData(rowsArray);
     setTableData(rowsArray);
-    modifiedDataRef.current = rowsArray;
-    setIsDataModified(false);
 
-    // Update pagination info - handle various API structures
-    if (response) {
-      const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
-      const total =
-        response?.recordsTotal ??
-        response?.total ??
-        rawData?.recordsTotal ??
-        rawData?.total ??
-        paginationData?.total ??
-        (rowsArray.length > 0 ? rowsArray.length : 0);
-      const currentPage = response?.current_page ?? paginationData?.current_page ?? page;
-      const perPageVal = response?.per_page ?? paginationData?.per_page ?? perPage;
-      rowsPerPageRef.current = perPageVal;
-      setPaginationInfo({
-        totalRows: Number(total) || 0,
-        totalPages: (response?.last_page ?? paginationData?.last_page ?? Math.ceil(Number(total) / perPageVal)) || 1,
-        currentPage,
-        perPage: perPageVal,
-      });
-    }
-
-    if (response?.chart?.extension) {
-      const dataExtension = response.chart.extension;
-      if (dataExtension.length > 0) {
-        const newChartData: ChartDuration = {
-          label: [],
-          longest_call: [],
-          shortest_call: [],
-          average_call: []
-        };
-
-        const ms = 10000000;
-        dataExtension.forEach((item: any) => {
-          newChartData.label.push(item.label);
-          // Parse string values to numbers before division
-          const longestCall = typeof item.longest_call === 'string' 
-            ? Number.parseFloat(item.longest_call) 
-            : Number(item.longest_call) || 0;
-          const shortestCall = typeof item.shortest_call === 'string' 
-            ? Number.parseFloat(item.shortest_call) 
-            : Number(item.shortest_call) || 0;
-          const averageCall = typeof item.average_call === 'string' 
-            ? Number.parseFloat(item.average_call) 
-            : Number(item.average_call) || 0;
-          
-          newChartData.longest_call.push(longestCall / ms);
-          newChartData.shortest_call.push(shortestCall / ms);
-          newChartData.average_call.push(averageCall / ms);
-        });
-
-        setChartLoading(true);
-
-        const dataLength = newChartData.label.length;
-
-        if (dataLength > 0 &&
-          newChartData.shortest_call.length === dataLength &&
-          newChartData.longest_call.length === dataLength &&
-          newChartData.average_call.length === dataLength) {
-
-          // Calls Chart
-          setCurrentChartData({
-            series: [
-              { name: 'Short', data: newChartData.shortest_call },
-              { name: 'Average', data: newChartData.average_call },
-              { name: 'Long', data: newChartData.longest_call }
-            ],
-            categories: newChartData.label
-          });
-          setChartLoading(false);
-        } else {
-          setChartLoading(false);
-        }
-      } else {
-        setChartLoading(false);
-      }
-    } else {
-      setChartLoading(false);
-    }
-
-
-
-    if (response?.chart?.date) {
-      const dataDirection = response.chart.date;
-      if (dataDirection.length > 0) {
-        const newChartDirection: ChartDirection = {
-          inbound: [],
-          outbound: [],
-          label: []
-        };
-
-        dataDirection.forEach((item: any) => {
-          newChartDirection.inbound.push(item.inbound);
-          newChartDirection.outbound.push(item.outbound);
-          newChartDirection.label.push(item.label);
-        });
-
-        setCallDirectionTwo({
-          series: [
-            { name: 'Inbound', data: newChartDirection.inbound },
-            { name: 'Outbound', data: newChartDirection.outbound }
-          ],
-          options: {
-            chart: {
-              type: 'bar' as const,
-              height: 200,
-              toolbar: {
-                show: false
-              }
-            },
-            plotOptions: {
-              bar: {
-                horizontal: false,
-                columnWidth: '55%',
-                borderRadius: 5,
-                borderRadiusApplication: 'end' as const
-              },
-            },
-            dataLabels: {
-              enabled: false
-            },
-            stroke: {
-              show: true,
-              width: 2,
-              colors: ['transparent']
-            },
-            xaxis: {
-              categories: newChartDirection.label,
-            },
-            yaxis: {
-              title: {
-                text: 'Calls'
-              }
-            },
-            fill: {
-              opacity: 1
-            },
-            tooltip: {
-              y: {
-                formatter: function (val: any) {
-                  return val + ' calls'
-                }
-              }
-            }
-          }
-        });
-      }
-    }
+    updatePaginationFromResponse(response, rowsArray, page, perPage);
+    updateExtensionChart(response?.chart?.extension);
+    updateDirectionChart(response?.chart?.date);
 
       return response;
     } finally {
@@ -580,32 +382,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
   }, []);
 
-  // Wrapper function that handles modified data
-  const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
-    const response = await fetchCallLogsOriginal(page, perPage, search);
-
-    if (response?.summary) {
-      setShowDateRange(true);
-      const dataFilters = response?.filters;
-      setStartDateTime(dataFilters?.start_date);
-      setEndDateTime(dataFilters?.end_date);
-    }
-    // Return modified data if data has been manually added, otherwise return original response
-    if (isDataModified && modifiedDataRef.current.length > 0) {
-      return {
-        ...response,
-        dataList: modifiedDataRef.current
-      };
-    }
-    
-    return response;
-  }, [fetchCallLogsOriginal, isDataModified]);
-
-
   const handleOpenChartModal = (
     chartData: { series: any[]; categories: string[] } | null,
-    title: string,
-    dataType: 'calls' | 'time' | 'cost' | 'custom'
+    title: string
   ) => {
     if (chartData) {
       setCurrentChartData(chartData);
@@ -725,7 +504,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       if (exportType === 'excel') {
        
         await DownloadStreamingExport(
-          { filters: appliedFilters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_RECORDINGS},
+          { filters, isExport: true, exportType, moduleSlug: ModuleSlug.CALL_RECORDINGS},
           'call-logs/recordings',
           'recordings'
         ).finally(() => {
@@ -733,9 +512,127 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         });
       }
     } catch (error) {
+      console.error('Export failed:', error);
       toast.error('Export failed');
     }
   };
+
+  const applyFilters = (nextFilters: Record<string, any>) => {
+    handleFiltersChange(nextFilters);
+  };
+
+  const callDirectionLabel = (value: string): string => {
+    if (value === 'OUTGOING') return 'Outgoing';
+    if (value === 'INCOMING') return 'Incoming';
+    if (value === 'Both') return 'Both';
+    return '';
+  };
+
+  const tableToolbar = useMemo(() => ({
+    showSearch: true,
+    searchValue,
+    searchPlaceholder: 'Search by username, extension, phone...',
+    onSearchChange: (value: string) => setSearchValue(value),
+    onSearch: () => {
+      setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
+      fetchCallLogsOriginal(1, paginationInfo.perPage, searchValue.trim());
+    },
+    showFiltersButton: true,
+    showFilterPills: true,
+    showMoreFiltersButton: false,
+    filterPills: [
+      {
+        id: 'call_direction',
+        label: 'Call Direction',
+        showDropdown: true,
+        active: Boolean(currentFilters.call_direction),
+        activeLabel: callDirectionLabel(currentFilters.call_direction ?? ''),
+        onClear: () => applyFilters({ ...currentFilters, call_direction: '' }),
+        dropdownOptions: [
+          { label: 'Outgoing', value: 'OUTGOING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'OUTGOING' }) },
+          { label: 'Incoming', value: 'INCOMING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'INCOMING' }) },
+          { label: 'Both', value: 'Both', onClick: () => applyFilters({ ...currentFilters, call_direction: 'Both' }) },
+        ],
+      },
+      {
+        id: 'extension_number',
+        label: 'Extension',
+        showDropdown: true,
+        searchable: true,
+        active: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0,
+        activeLabel: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0
+          ? `${currentFilters.extension_number.length} selected`
+          : undefined,
+        onClear: () => applyFilters({ ...currentFilters, extension_number: [] }),
+        dropdownOptions: hierarchyDataExtensions.map((ext: any) => ({
+          label: String(ext.name ?? ext.id),
+          value: String(ext.id),
+          onClick: () => applyFilters({ ...currentFilters, extension_number: [String(ext.id)] }),
+        })),
+      },
+      {
+        id: 'department',
+        label: 'Department',
+        showDropdown: true,
+        searchable: true,
+        active: Array.isArray(currentFilters.department) && currentFilters.department.length > 0,
+        activeLabel: Array.isArray(currentFilters.department) && currentFilters.department.length > 0
+          ? `${currentFilters.department.length} selected`
+          : undefined,
+        onClear: () => applyFilters({ ...currentFilters, department: [] }),
+        dropdownOptions: hierarchyDataDepartments.map((dept: any) => ({
+          label: String(dept.name ?? dept.id),
+          value: String(dept.id),
+          onClick: () => applyFilters({ ...currentFilters, department: [String(dept.id)] }),
+        })),
+      },
+      {
+        id: 'username',
+        label: 'Username',
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(currentFilters.username),
+        activeLabel: currentFilters.username
+          ? (() => {
+              const user = hierarchyDataUsers.find((u: any) => String(u.id) === String(currentFilters.username));
+              return user ? String((user as any).name ?? (user as any).id) : String(currentFilters.username);
+            })()
+          : undefined,
+        onClear: () => applyFilters({ ...currentFilters, username: '' }),
+        dropdownOptions: hierarchyDataUsers.map((u: any) => ({
+          label: String(u.name ?? u.id),
+          value: String(u.id),
+          onClick: () => applyFilters({ ...currentFilters, username: String(u.id) }),
+        })),
+      },
+    ],
+    rightActions: (
+      <div className="d-flex align-items-center gap-2">
+        {session?.user?.permissions?.includes('export-call-recordings') && (
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm"
+            onClick={() => handleExport('excel', appliedFilters)}
+            disabled={showPageLoader}
+          >
+            {showPageLoader ? 'Exporting...' : 'Export'}
+          </button>
+        )}
+      </div>
+    ),
+  }), [
+    searchValue,
+    paginationInfo.perPage,
+    fetchCallLogsOriginal,
+    currentFilters,
+    hierarchyDataExtensions,
+    hierarchyDataDepartments,
+    hierarchyDataUsers,
+    session?.user?.permissions,
+    showPageLoader,
+    appliedFilters,
+    applyFilters,
+  ]);
 
   const handleDownload = async (props: any) => {
     const { Id, AgentExtension } = props;
@@ -779,6 +676,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       }, 1000);
       
     } catch (error) {
+      console.error('Download failed:', error);
       toast.error('Download failed');
       
       // Remove from downloading set on error
@@ -798,7 +696,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
   const handleAnalysis = async (props: any) => {
     try {
-      const { Id, AudioTrack } = props;
+      const { Id } = props;
       
       // Create data object with all parameters
       const dataObject = {
@@ -821,7 +719,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       // Pass as single encoded parameter
       const tempUrl = `/ai-ml/analysis/new?data=${encodeURIComponent(encodedData)}`;
 
-      window.open(tempUrl, '_blank');
+      globalThis.open(tempUrl, '_blank');
       
 
     } catch {
@@ -849,7 +747,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     
     setAudioLoading(true);
     setAudioError(null);
-    setMediaPlayerShow(false);
     
     try {
       const response = await axiosInstance.get(`call-logs/recordings/download/${audioTrackId}`, {
@@ -867,7 +764,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       if (response.status === 200) {
         setMediaPlayerModal(true);
         const blob = new Blob([response.data], { type: 'audio/mpeg' });
-        const audioUrl = window.URL.createObjectURL(blob);
+        const audioUrl = globalThis.URL.createObjectURL(blob);
         setAudioUrl(audioUrl);
       } else if (response.status === 204) {
         toast.error('Audio file not found');
@@ -901,6 +798,40 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     if (audioPlayerRef.current) {
       audioPlayerRef.current.pause();
     }
+  };
+
+  const renderMediaPlayerBody = () => {
+    if (audioLoading) {
+      return (
+        <div className="p-4">
+          <div className="spinner-border text-primary" aria-hidden="true" />
+          <output className="mt-2 d-block" aria-live="polite">Loading audio file...</output>
+        </div>
+      );
+    }
+
+    if (audioError) {
+      return (
+        <div className="p-4">
+          <div className="alert alert-warning">
+            <i className="ph-duotone ph-warning-circle me-2" aria-hidden="true"></i>{' '}
+            <span>File not found</span>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <AudioPlayer
+          ref={audioPlayerRef}
+          audioSrc={audioUrl}
+          title={`Call Recording - ${selectedRecording.Id}`}
+          showWaveform={true}
+          autoPlay={true}
+        />
+      </div>
+    );
   };
 
   rowsPerPageRef.current = paginationInfo.perPage;
@@ -944,7 +875,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       label: 'Duration',
       sortable: true,
       render: (row) => {
-        const duration = parseInt(String(row.Duration), 10) / 10000000 || 0;
+        const duration = Number.parseInt(String(row.Duration), 10) / 10000000 || 0;
         return <div>{formatDuration(duration)}</div>;
       },
     },
@@ -958,13 +889,21 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         const progress = downloadProgress[row.Id ?? ''] || 0;
         return (
           <div className="d-flex gap-3 action-box">
-            <i
-              data-tooltip-id="my-tooltip"
-              data-tooltip-content="Play"
-              className="ph-duotone ph-play text-info"
-              style={{ fontSize: '1rem', cursor: 'pointer' }}
+            <button
+              type="button"
+              className="btn btn-link p-0 text-info border-0"
               onClick={() => handlePlayRecording(row)}
-            />
+              aria-label="Play"
+              title="Play"
+            >
+              <i
+                data-tooltip-id="my-tooltip"
+                data-tooltip-content="Play"
+                className="ph-duotone ph-play"
+                style={{ fontSize: '1rem' }}
+                aria-hidden="true"
+              />
+            </button>
             <div style={{ display: 'inline-flex', alignItems: 'center' }}>
               {isDownloading ? (
                 <CircularProgressCircle
@@ -977,91 +916,45 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   className="circular-progress-inline"
                 />
               ) : (
-                <i
-                  data-tooltip-id="my-tooltip"
-                  data-tooltip-content="Download"
-                  className="ph-duotone ph-arrow-line-down text-info"
-                  style={{ fontSize: '1rem', cursor: 'pointer' }}
+                <button
+                  type="button"
+                  className="btn btn-link p-0 text-info border-0"
                   onClick={() => handleDownload(row)}
-                />
+                  aria-label="Download"
+                  title="Download"
+                >
+                  <i
+                    data-tooltip-id="my-tooltip"
+                    data-tooltip-content="Download"
+                    className="ph-duotone ph-arrow-line-down"
+                    style={{ fontSize: '1rem' }}
+                    aria-hidden="true"
+                  />
+                </button>
               )}
             </div>
             {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
-              <i
-                data-tooltip-id="my-tooltip"
-                data-tooltip-content="Call Analysis"
-                className="ph-duotone ph-chart-bar text-info"
-                style={{ fontSize: '1rem', cursor: 'pointer' }}
+              <button
+                type="button"
+                className="btn btn-link p-0 text-info border-0"
                 onClick={() => handleAnalysis(row)}
-              />
+                aria-label="Call Analysis"
+                title="Call Analysis"
+              >
+                <i
+                  data-tooltip-id="my-tooltip"
+                  data-tooltip-content="Call Analysis"
+                  className="ph-duotone ph-chart-bar"
+                  style={{ fontSize: '1rem' }}
+                  aria-hidden="true"
+                />
+              </button>
             )}
           </div>
         );
       },
     },
   ];
-
-  // Socket connection effect
-  // useEffect(() => {
-  //   if (status === 'authenticated' && session) {
-  //     // Initialize socket connection
-  //     socketRef.current = io(SOCKET_URL, {
-  //       auth: {
-  //         token: stableGetAccessToken()
-  //       }
-  //     });
-
-  //      // Socket event listeners
-  //      socketRef.current.on('connect', () => {
-  //        // Join room for all extensions
-  //        if (socketExtensions.length > 0) {
-  //          socketRef.current?.emit('join:recording', socketExtensions);
-  //        }
-  //      });
-
-  //     socketRef.current.on('disconnect', () => {
-  //       console.log('Socket disconnected from call recordings');
-  //     });
-
-  //      socketRef.current.on('recording_update', (data: RecordingUpdate) => {
-  //        console.log('Recording update received:', data);
-         
-  //        // Add the new recording data to the table
-  //        if (data) {
-           
-  //          // Add to table data directly
-  //          setTableData(prevData => {
-  //            const updatedData = [...prevData, data];
-  //            modifiedDataRef.current = updatedData;
-  //            setIsDataModified(true);
-  //            return updatedData;
-  //          });
-
-
-  //          // Update summary counts
-  //          setSummary(prevSummary => ({
-  //            ...prevSummary,
-  //            numbers: prevSummary.numbers + 1,
-  //            outbound: prevSummary.outbound + 1
-  //          }));
-
-  //          toast.success('New recording received and added to table');
-  //        }
-  //      });
-
-  //     socketRef.current.on('error', (error: any) => {
-  //       console.error('Socket error:', error);
-  //     });
-
-  //     // Cleanup function
-  //     return () => {
-  //       if (socketRef.current) {
-  //         socketRef.current.disconnect();
-  //         socketRef.current = null;
-  //       }
-  //     };
-  //   }
-  //  }, [status, session, stableGetAccessToken, socketExtensions]);
 
   return (
     <React.Fragment>
@@ -1108,32 +1001,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
 
                     <Col md={8} className="d-flex justify-content-end">
-                      
-                    <div className="action-buttons d-flex align-items-center gap-2">
-                      <Button
-                        variant="outline-secondary"
-                        size="sm"
-                        onClick={() => setShowFiltersSidebar(true)}
-                        className="d-flex align-items-center"
-                        style={{ fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', padding: '0.5rem 1rem' }}
-                      >
-                        <Filter size={16} className="me-1" />
-                        Filters
-                      </Button>
-                      {/* <Button
-                        variant={showAnalytics ? "primary" : "outline-secondary"}
-                        size="sm"
-                        onClick={() => setShowAnalytics(!showAnalytics)}
-                        className="d-flex align-items-center"
-                        style={{ fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', padding: '0.5rem 1rem' }}
-                      >
-                        <BarChart3 size={16} className="me-1" />
-                        <span>{showAnalytics ? 'Hide Analytics' : 'Show Analytics'}</span>
-                      </Button> */}
-                    </div>
-
-
-
                     </Col>
                   </Row>
                
@@ -1144,7 +1011,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
 
     
 
-      {/* <PageSummaryGrid cards={summaryCards} /> */}
       <div className="mb-4">
         <StatsCards data={statsCardsData} gridMinWidth="180px" />
       </div>
@@ -1181,11 +1047,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
               </span>
             </div>
           </div>
-          {/* <div className="d-flex align-items-center gap-2">
-            <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span>
-            <span className="text-muted" style={{ fontSize: '12px' }}>to</span>
-            <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-          </div> */}
         </div>
       )}
       {/* Charts */}
@@ -1196,7 +1057,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
             <Card.Body className='p-3'>
               
 
-              {!currentChartData || currentChartData.series.length === 0 || currentChartData.series.every(series => series.data.length === 0) ? (
+              {!currentChartData || currentChartData.series.some((series) => series.data.length === 0) ? (
                 <EmptyState
                   title="No Call Duration Data"
                   description="Chart data will appear here when available."
@@ -1218,7 +1079,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                   showViewAllButton={true}
                   viewAllButtonText="View All"
                   showFullScreenButton={true}
-                  onFullScreenClick={() => handleOpenChartModal(currentChartData, 'Call Duration', 'calls')}
+                  onFullScreenClick={() => handleOpenChartModal(currentChartData, 'Call Duration')}
                   useLogScale={true}
                 />
                 </>
@@ -1231,7 +1092,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           <Card>
             <Card.Body className='p-3'>
             
-              {!callDirectionTwo.series || callDirectionTwo.series.length === 0 || callDirectionTwo.series.every(series => series.data.length === 0) ? (
+              {!callDirectionTwo.series.length || callDirectionTwo.series.some((series) => series.data.length === 0) ? (
                 <EmptyState
                   title="No Call Direction Data"
                   description="Chart data will appear here when available."
@@ -1267,6 +1128,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                    loading={tableLoading}
                    emptyMessage="No call recordings found."
                    loadingMessage="Loading call recordings..."
+                   showToolbar={true}
+                   toolbar={tableToolbar}
+                   showToolbarActions={false}
                    pagination={{
                      currentPage: paginationInfo.currentPage,
                      rowsPerPage: paginationInfo.perPage,
@@ -1287,125 +1151,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                  />
             )}
 
-<GenericFilterSidebar
-        isOpen={showFiltersSidebar}
-        onClose={() => setShowFiltersSidebar(false)}
-        title="Filters"
-        subtitle="Filter and refine call recordings"
-        width="400px"
-        filters={[
-          {
-            id: 'call_direction',
-            label: 'Call Direction',
-            type: 'select',
-            value: (currentFilters as any)?.call_direction
-              ? { value: (currentFilters as any).call_direction, label: (currentFilters as any).call_direction === 'OUTGOING' ? 'Outgoing' : (currentFilters as any).call_direction === 'INCOMING' ? 'Incoming' : 'Both' }
-              : null,
-            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, call_direction: selected?.value ?? '' }),
-            options: [
-              { value: 'OUTGOING', label: 'Outgoing' },
-              { value: 'INCOMING', label: 'Incoming' },
-              { value: 'Both', label: 'Both' },
-            ],
-            placeholder: 'Select call direction',
-            isClearable: true,
-          },
-          {
-            id: 'extension_number',
-            label: 'Extension',
-            type: 'multi-select',
-            value: ((currentFilters as any)?.extension_number || []).map((id: string) => {
-              const ext = (hierarchyDataExtensions as any)?.find((e: any) => e.id === id);
-              return ext ? { value: ext.id, label: ext.name } : { value: id, label: id };
-            }).filter((o: { value: string; label: string }) => o.value),
-            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, extension_number: selected ? selected.map((s: any) => s.value) : [] }),
-            options: (hierarchyDataExtensions as any)?.map((ext: any) => ({ value: ext.id, label: ext.name })) || [],
-            placeholder: 'Select extensions',
-            isClearable: true,
-          },
-          {
-            id: 'department',
-            label: 'Departments',
-            type: 'multi-select',
-            value: ((currentFilters as any)?.department || []).map((id: string) => {
-              const dept = (hierarchyDataDepartments as any)?.find((d: any) => d.id === id);
-              return dept ? { value: dept.id, label: dept.name } : { value: id, label: id };
-            }).filter((o: { value: string; label: string }) => o.value),
-            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, department: selected ? selected.map((s: any) => s.value) : [] }),
-            options: (hierarchyDataDepartments as any)?.map((d: any) => ({ value: d.id, label: d.name })) || [],
-            placeholder: 'Select departments',
-            isClearable: true,
-          },
-          {
-            id: 'username',
-            label: 'Username',
-            type: 'select',
-            value: (currentFilters as any)?.username
-              ? (() => {
-                  const uid = (currentFilters as any).username;
-                  const user = (hierarchyDataUsers as any)?.find((u: any) => u.id === uid);
-                  return user ? { value: user.id, label: user.name } : { value: uid, label: uid };
-                })()
-              : null,
-            onChange: (selected: any) => setCurrentFilters({ ...currentFilters, username: selected?.value ?? '' }),
-            options: (hierarchyDataUsers as any)?.map((u: any) => ({ value: u.id, label: u.name })) || [],
-            placeholder: 'Select username',
-            isClearable: true,
-          },
-          {
-            id: 'remote_party_number',
-            label: 'Remote Party Numbers',
-            type: 'text',
-            value: ((currentFilters as any)?.remote_party_number || []).join(', '),
-            onChange: (v: string) => {
-              const values = v.split(',').map((s) => s.trim()).filter(Boolean);
-              setCurrentFilters({ ...currentFilters, remote_party_number: values });
-            },
-            placeholder: 'Enter remote party numbers (comma separated)',
-          },
-          {
-            id: 'start_date',
-            label: 'Start Date & Time',
-            type: 'datetime' as FilterFieldType,
-            value: (currentFilters as any)?.start_date || '',
-            onChange: (v: string | null) => {
-              const datetimeValue = v || '';
-              const endDate = (currentFilters as any)?.end_date || '';
-              let next: Record<string, any> = { ...currentFilters, start_date: datetimeValue };
-              if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) next.end_date = datetimeValue;
-              setCurrentFilters(next);
-            },
-            placeholder: 'Start',
-          },
-          {
-            id: 'end_date',
-            label: 'End Date & Time',
-            type: 'datetime' as FilterFieldType,
-            value: (currentFilters as any)?.end_date || '',
-            onChange: (v: string | null) => {
-              const datetimeValue = v || '';
-              const startDate = (currentFilters as any)?.start_date || '';
-              let next: Record<string, any> = { ...currentFilters, end_date: datetimeValue };
-              if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) next.start_date = datetimeValue;
-              setCurrentFilters(next);
-            },
-            placeholder: 'End',
-          },
-        ]}
-        onApply={() => {
-          handleFiltersChange(currentFilters);
-          setRefreshKey((prev) => prev + 1);
-        }}
-        onReset={() => {
-          const freshDefaults = getDefaultFilters();
-          const resetCurrent: Record<string, any> = { ...freshDefaults.current };
-          setCurrentFilters(resetCurrent);
-          setSearchValue('');
-          handleFiltersChange(resetCurrent);
-          setRefreshKey((prev) => prev + 1);
-        }}
-      />
-
       {/* Media Player Modal */}
       <Modal
         show={mediaPlayerModal}
@@ -1416,39 +1161,12 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         <Modal.Header closeButton>
           <Modal.Title>
             Playing a Call Recording 
-            {/* - {selectedRecording?.Id || 'Unknown'} */}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {selectedRecording && (
             <div className="text-center d-flex flex-column align-items-center">
-              {audioLoading ? (
-                <div className="p-4">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                  <p className="mt-2">Loading audio file...</p>
-                </div>
-              ) : audioError ? (
-                <div className="p-4">
-                  <div className="alert alert-warning">
-                    <i className="ph-duotone ph-warning-circle me-2"></i>
-                    File not found
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <AudioPlayer
-                    ref={audioPlayerRef}
-                    audioSrc={audioUrl}
-                    title={`Call Recording - ${selectedRecording.Id}`}
-                    showWaveform={true}
-                    autoPlay={true}
-                  />
-                </div>
-              )}
-              
-              
+              {renderMediaPlayerBody()}
             </div>
           )}
         </Modal.Body>

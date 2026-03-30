@@ -1,6 +1,6 @@
 import React from 'react'
 import { Button, Col, Row } from 'react-bootstrap'
-import { ChevronDown, ChevronUp, DiscAlbum, PhoneCall, Filter } from 'lucide-react'
+import { ChevronDown, ChevronUp, Filter } from 'lucide-react'
 import Link from 'next/link'
 
 interface PageHeaderProps {
@@ -84,24 +84,6 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                     </>
                   )}
                 </Button>
-                
-                {/* {session?.user?.permissions?.includes('dial-call-cti') && (
-                  <Button 
-                    variant="outline-secondary"
-                    size="sm"
-                    onClick={() => window.open('/cti/dialer', '_blank')}
-                    className="d-flex align-items-center"
-                    style={{ 
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      whiteSpace: 'nowrap',
-                      padding: '0.5rem 1rem'
-                    }}
-                  >
-                    <PhoneCall size={16} className="me-1" />
-                    <span className="">Dialer</span>
-                  </Button>
-                )} */}
                 
                 <Button
                   onClick={toggleFullscreen}

@@ -1,6 +1,6 @@
 import React from "react";
-import { Table } from "react-bootstrap";
 import { Check } from "lucide-react";
+import GenericTable, { type TableColumn } from "@components/GenericTable";
 import { formatStartTime, formatDuration, type CallRow } from "./types";
 
 export interface RecentCallsTableProps {
@@ -11,55 +11,59 @@ export interface RecentCallsTableProps {
 const RecentCallsTable = ({ loading, calls }: RecentCallsTableProps) => (
   <>
     <h5 className="mb-3">Recent Calls</h5>
-    <div className="mb-4 card">
-      <Table responsive bordered hover className="mb-0">
-        <thead>
-          <tr>
-            <th>Bot</th>
-            <th>Company</th>
-            <th>Duration</th>
-            <th>Status</th>
-            <th>Start Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(() => {
-            if (loading) {
-              return (
-                <tr>
-                  <td colSpan={5} className="text-center text-muted">Loading...</td>
-                </tr>
-              );
-            }
-            if (calls.length === 0) {
-              return (
-                <tr>
-                  <td colSpan={5} className="text-center text-muted">No recent calls.</td>
-                </tr>
-              );
-            }
-            return calls.map((call, i) => (
-              <tr key={String(call.session_id ?? call.id ?? i)}>
-                <td>{String(call.bot_name ?? call.bot ?? "—")}</td>
-                <td>{String(call.company_name ?? call.company ?? "—")}</td>
-                <td>{formatDuration(call.call_duration_seconds)}</td>
-                <td>
-                  {String(call.status ?? "") === "completed" ? (
-                    <span className="text-success d-inline-flex align-items-center gap-1">
-                      <Check size={16} /> Completed
-                    </span>
-                  ) : (
-                    String(call.status ?? "—")
-                  )}
-                </td>
-                <td className="text-nowrap small">
-                  {formatStartTime(call.session_start_time)}
-                </td>
-              </tr>
-            ));
-          })()}
-        </tbody>
-      </Table>
+    <div className="mb-4">
+      <GenericTable<CallRow>
+        data={calls}
+        columns={[
+          {
+            key: "bot",
+            label: "Bot",
+            type: "custom",
+            render: (call) => String(call.bot_name ?? call.bot ?? "—"),
+          } as TableColumn<CallRow>,
+          {
+            key: "company",
+            label: "Company",
+            type: "custom",
+            render: (call) => String(call.company_name ?? call.company ?? "—"),
+          } as TableColumn<CallRow>,
+          {
+            key: "call_duration_seconds",
+            label: "Duration",
+            type: "custom",
+            render: (call) => formatDuration(call.call_duration_seconds),
+          } as TableColumn<CallRow>,
+          {
+            key: "status",
+            label: "Status",
+            type: "custom",
+            render: (call) =>
+              String(call.status ?? "") === "completed" ? (
+                <span className="text-success d-inline-flex align-items-center gap-1">
+                  <Check size={16} /> Completed
+                </span>
+              ) : (
+                String(call.status ?? "—")
+              ),
+          } as TableColumn<CallRow>,
+          {
+            key: "session_start_time",
+            label: "Start Time",
+            type: "custom",
+            render: (call) => (
+              <span className="text-nowrap small">
+                {formatStartTime(call.session_start_time)}
+              </span>
+            ),
+          } as TableColumn<CallRow>,
+        ]}
+        loading={loading}
+        loadingMessage="Loading..."
+        emptyMessage="No recent calls."
+        uniqueKey="session_id"
+        showToolbar={false}
+        showToolbarActions={false}
+      />
     </div>
   </>
 );

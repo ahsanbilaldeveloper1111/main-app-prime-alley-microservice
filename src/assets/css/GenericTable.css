@@ -3,9 +3,6 @@
   width: 100%;
   overflow: hidden;
 }
-/* body {
-  overflow: hidden;
-} */
 /* Card */
 .generic-table-card {
   width: 100%;
@@ -13,18 +10,10 @@
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
   border-top: none !important;
 }
-
-/* Table Responsive Wrapper */
-/* .generic-table-responsive {
-  width: 100%;
-  overflow-x: auto;
-  overflow-y: visible;
-  -webkit-overflow-scrolling: touch;
-  border: 1px solid #ccc;
-  border-radius: 15px 15px 0px 0px;
-  padding: 14px 25px;
-} */
-
+button.gt-first-column-trigger {
+  border: none !important;
+  background: transparent !important;
+}
 .generic-table-responsive {
   width: 97%;
   overflow-x: auto;
@@ -33,6 +22,7 @@
   border: 1px solid #ccc;
   border-radius: 15px 15px 0px 0px;
   margin: 14px 25px;
+  position: relative;
 }
 
 /* Fixed height table styles */
@@ -51,15 +41,6 @@
   background-color: #f7f2f7;
 }
 
-/* Table */
-/* .generic-table {
-  width: 100%;
-  table-layout: auto;
-  margin-bottom: 0 !important;
-  border-collapse: collapse;
-  border: 1px solid #ccc;
-} */
-
 .generic-table {
   width: 100%;
   table-layout: auto;
@@ -77,7 +58,6 @@
   padding: 0.6rem 0.75rem !important;
   vertical-align: middle;
   white-space: nowrap;
-  font-weight: 500;
   font-size: 12px !important;
   color: #000000 !important;
   border-bottom: 1px solid #dfe1e6;
@@ -257,8 +237,8 @@ button.preview-button:hover, button.preview-button:focus {
 }
 
 .pagination-buttons .btn.btn-primary {
-  background-color: #00a4bd;
-  border-color: #00a4bd;
+  background-color: #006f80;
+  border-color: #006f80;
   color: #fff;
 }
 
@@ -271,21 +251,6 @@ button.preview-button:hover, button.preview-button:focus {
 
 .column-selector-menu .dropdown-item {
   padding: 8px 16px;
-}
-
-/* Actions Cell */
-.generic-table-actions-cell {
-  min-width: 80px;
-  width: 80px;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.generic-table-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
 }
 
 .generic-table-actions .btn-link {
@@ -443,28 +408,28 @@ button.preview-button:hover, button.preview-button:focus {
 
 /* Badge variant colors */
 .gt-badge-primary {
-  background-color: rgba(13, 110, 253, 0.1);
-  color: #0d6efd;
+  background-color: #dbeafe;
+  color: #1e3a8a;
 }
 
 .gt-badge-secondary {
-  background-color: rgba(108, 117, 125, 0.1);
-  color: #495057;
+  background-color: #e5e7eb;
+  color: #111827;
 }
 
 .gt-badge-success {
-  background-color: rgba(25, 135, 84, 0.1);
-  color: #146c43;
+  background-color: #dcfce7;
+  color: #14532d;
 }
 
 .gt-badge-danger {
-  background-color: rgba(220, 53, 69, 0.1);
-  color: #b02a37;
+  background-color: #fee2e2;
+  color: #7f1d1d;
 }
 
 .gt-badge-warning {
-  background-color: rgba(255, 193, 7, 0.1);
-  color: #997404;
+  background-color: #fef3c7;
+  color: #78350f;
 }
 
 .gt-badge-info {
@@ -473,8 +438,8 @@ button.preview-button:hover, button.preview-button:focus {
 }
 
 .gt-badge-dark {
-  background-color: rgba(33, 37, 41, 0.1);
-  color: #212529;
+  background-color: #d1d5db;
+  color: #111827;
 }
 
 .gt-badge-light {
@@ -485,21 +450,21 @@ button.preview-button:hover, button.preview-button:focus {
 
 /* Status badge variant colors (for badges with dots) */
 .gt-status-badge.gt-badge-primary {
-  background-color: rgba(13, 110, 253, 0.1);
-  color: #0d6efd;
+  background-color: #dbeafe;
+  color: #1e3a8a;
 }
 
 .gt-status-badge.gt-badge-primary .gt-status-dot {
-  background-color: #0d6efd;
+  background-color: #1e3a8a;
 }
 
 .gt-status-badge.gt-badge-success {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #065f46;
+  background-color: #dcfce7;
+  color: #14532d;
 }
 
 .gt-status-badge.gt-badge-success .gt-status-dot {
-  background-color: #10b981;
+  background-color: #166534;
 }
 
 .gt-status-badge.gt-badge-secondary {
@@ -512,21 +477,21 @@ button.preview-button:hover, button.preview-button:focus {
 }
 
 .gt-status-badge.gt-badge-danger {
-  background-color: rgba(220, 53, 69, 0.1);
-  color: #b02a37;
+  background-color: #fee2e2;
+  color: #7f1d1d;
 }
 
 .gt-status-badge.gt-badge-danger .gt-status-dot {
-  background-color: #dc3545;
+  background-color: #991b1b;
 }
 
 .gt-status-badge.gt-badge-warning {
-  background-color: rgba(255, 193, 7, 0.1);
-  color: #997404;
+  background-color: #fef3c7;
+  color: #78350f;
 }
 
 .gt-status-badge.gt-badge-warning .gt-status-dot {
-  background-color: #ffc107;
+  background-color: #92400e;
 }
 
 .gt-status-badge.gt-badge-info {
@@ -539,12 +504,12 @@ button.preview-button:hover, button.preview-button:focus {
 }
 
 .gt-status-badge.gt-badge-dark {
-  background-color: rgba(33, 37, 41, 0.1);
-  color: #212529;
+  background-color: #d1d5db;
+  color: #111827;
 }
 
 .gt-status-badge.gt-badge-dark .gt-status-dot {
-  background-color: #212529;
+  background-color: #111827;
 }
 
 .generic-table-td span.bg-info {
@@ -717,7 +682,6 @@ button.preview-button:hover, button.preview-button:focus {
 .gt-toolbar-tabs-section {
   padding: 2px 2px 0;
   margin-bottom: -1px;
-  /* border-bottom: 1px solid #edf2f7; */
 }
 .members-table-wrapper .gt-toolbar-tabs-section {
  margin-left: 15px;
@@ -771,7 +735,7 @@ button.preview-button:hover, button.preview-button:focus {
 }
 
 .gt-tab-button.active .gt-tab-count {
-  background: #000000;
+  background: #111827;
   color: #fff;
 }
 
@@ -797,14 +761,12 @@ button.preview-button:hover, button.preview-button:focus {
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: transparent;
-  border: none;
+  background: #fff;
+  border: 1px solid #ccc;
   border-radius: 20px;
   color: #516f90;
   cursor: pointer;
   transition: all 0.2s ease;
-  background: #fff;
-  border: 1px solid #ccc;
   margin-bottom: 4px;
 }
 
@@ -845,7 +807,7 @@ button.preview-button:hover, button.preview-button:focus {
 .gt-search-icon {
   background: #fff;
   border-right: none;
-  color: #8b959e;
+  color: #4b5563;
   border-radius: 50px 0 0 50px !important;
 
   border-top: 1px solid #8a8a8a !important ;
@@ -936,8 +898,6 @@ background: #fff !important;
   justify-content: space-between;
   gap: 12px;
   padding: 0px 24px 0px;
-  /* border-top: 1px solid #edf2f7; */
-  background-color: #ffffff;
   background-color: #ffffff;
   border-left: 1px solid #ccc;
   border-right: 1px solid #ccc;
@@ -1260,11 +1220,6 @@ background: #fff !important;
   .generic-table-td:last-child {
     display: table-cell;
   }
-}
-
-/* Ensure proper scrolling on all screen sizes */
-.generic-table-responsive {
-  position: relative;
 }
 
 /* Improve touch scrolling */

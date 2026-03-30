@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { GetHierarchyData } from '@utils/users';
 
-export const useHierarchyData = (moduleSlug?: string) => {
+export const useHierarchyData = (
+  moduleSlug?: string,
+  /** When false, skips GetHierarchyData (e.g. parent already loaded extensions). */
+  fetchEnabled: boolean = true,
+) => {
   const [hierarchyDataUsers, setHierarchyDataUsers] = useState<string[]>([]);
   const [hierarchyDataDepartments, setHierarchyDataDepartments] = useState<string[]>([]);
   const [hierarchyDataCompanies, setHierarchyDataCompanies] = useState<string[]>([]);
@@ -10,12 +14,14 @@ export const useHierarchyData = (moduleSlug?: string) => {
   const [error, setError] = useState<unknown>(null);
 
   useEffect(() => {
+    if (!fetchEnabled) {
+      setLoading(false);
+      return;
+    }
     const fetchHierarchyData = async () => {
       try {
         setLoading(true);
-        //console.log('useHierarchyData - moduleSlug:', moduleSlug);
         const hierarchyData = await GetHierarchyData(moduleSlug);
-        //console.log(hierarchyData);
         if (hierarchyData) {
           setHierarchyDataUsers(hierarchyData?.users);
           setHierarchyDataDepartments(hierarchyData?.departments);
@@ -30,8 +36,8 @@ export const useHierarchyData = (moduleSlug?: string) => {
       }
     };
 
-    fetchHierarchyData();
-  }, [moduleSlug]);
+    void fetchHierarchyData();
+  }, [moduleSlug, fetchEnabled]);
 
   return {
     hierarchyDataUsers,

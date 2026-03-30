@@ -1,5 +1,5 @@
 import React from "react";
-import { Table } from "react-bootstrap";
+import GenericTable, { type TableColumn } from "@components/GenericTable";
 import type { CompanyTableRow } from "./types";
 
 export interface CompanyOverviewTableProps {
@@ -10,45 +10,48 @@ export interface CompanyOverviewTableProps {
 const CompanyOverviewTable = ({ loading, rows }: CompanyOverviewTableProps) => (
   <>
     <h5 className="mb-3">Company Overview (Active Companies)</h5>
-    <div className="card">
-      <Table responsive bordered hover className="mb-0">
-        <thead>
-          <tr>
-            <th>Company</th>
-            <th>Tier</th>
-            <th>Bots</th>
-            <th>Calls</th>
-            <th>Cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {(() => {
-            if (loading) {
-              return (
-                <tr>
-                  <td colSpan={5} className="text-center text-muted">Loading...</td>
-                </tr>
-              );
-            }
-            if (rows.length === 0) {
-              return (
-                <tr>
-                  <td colSpan={5} className="text-center text-muted">No companies.</td>
-                </tr>
-              );
-            }
-            return rows.map((row, i) => (
-              <tr key={row.company + "-" + i}>
-                <td>{row.company}</td>
-                <td className="text-capitalize">{row.tier}</td>
-                <td>{row.bots}</td>
-                <td>{row.calls}</td>
-                <td>${row.cost}</td>
-              </tr>
-            ));
-          })()}
-        </tbody>
-      </Table>
+    <div>
+      <GenericTable<CompanyTableRow>
+        data={rows}
+        columns={[
+          {
+            key: "company",
+            label: "Company",
+            type: "text",
+            emptyValue: "—",
+          } as TableColumn<CompanyTableRow>,
+          {
+            key: "tier",
+            label: "Tier",
+            type: "custom",
+            render: (row) => <span className="text-capitalize">{row.tier}</span>,
+          } as TableColumn<CompanyTableRow>,
+          {
+            key: "bots",
+            label: "Bots",
+            type: "text",
+            emptyValue: "0",
+          } as TableColumn<CompanyTableRow>,
+          {
+            key: "calls",
+            label: "Calls",
+            type: "text",
+            emptyValue: "0",
+          } as TableColumn<CompanyTableRow>,
+          {
+            key: "cost",
+            label: "Cost",
+            type: "custom",
+            render: (row) => <span>${row.cost}</span>,
+          } as TableColumn<CompanyTableRow>,
+        ]}
+        loading={loading}
+        loadingMessage="Loading..."
+        emptyMessage="No companies."
+        uniqueKey="company"
+        showToolbar={false}
+        showToolbarActions={false}
+      />
     </div>
   </>
 );

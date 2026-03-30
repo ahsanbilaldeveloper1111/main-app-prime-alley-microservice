@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback, useId } from "react";
 import {
   Table,
   Form,
@@ -448,6 +448,506 @@ export interface GenericTableProps<T = any> {
   customBody?: React.ReactNode;
 }
 
+function safeStringifyValue(val: unknown): string {
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val;
+  if (typeof val === "number" || typeof val === "boolean" || typeof val === "bigint") return String(val);
+  try {
+    return JSON.stringify(val);
+  } catch {
+    return "";
+  }
+}
+
+function truncateGtText(text: string | number, maxLength = 20): string {
+  const str = String(text ?? "");
+  if (str.length <= maxLength) return str;
+  return `${str.slice(0, maxLength)}...`;
+}
+
+function parseStoredColumnKeys(raw: string | null, defaults: string[]): string[] | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const keys = parsed.filter((c): c is string => typeof c === "string");
+    if (keys.length === 0) return null;
+    const missing = defaults.filter((c) => !keys.includes(c));
+    return missing.length > 0 ? [...keys, ...missing] : keys;
+  } catch {
+    return null;
+  }
+}
+
+type GenericTableContextMenuItem<T extends Record<string, any>> = {
+  reactKey: string;
+  label: string;
+  icon?: React.ReactNode;
+  onClick: (row: T) => void;
+  divider?: boolean;
+  className?: string;
+  disabled?: boolean;
+  disabledTitle?: string;
+  disabledClassName?: string;
+};
+
+function buildContextMenuItemsForRow<T extends Record<string, any>>(
+  tableActions: TableAction<T>[],
+  row: T,
+): GenericTableContextMenuItem<T>[] {
+  const items: GenericTableContextMenuItem<T>[] = [];
+  let seq = 0;
+
+  for (const action of tableActions) {
+    if (action.show && !action.show(row)) continue;
+    if (action.dropdown) {
+      const opts = action.dropdown.options.filter((o) => !o.show || o.show(row));
+      for (const o of opts) {
+        items.push({
+          reactKey: `gt-ctxm-${seq++}-${action.label}-${o.label}`,
+          label: o.label,
+          icon: o.icon,
+          onClick: o.onClick,
+          divider: o.divider ?? false,
+          className: o.className,
+        });
+      }
+    } else if (action.onClick && !action.render) {
+      const isDisabled = action.disabled?.(row);
+      items.push({
+        reactKey: `gt-ctxm-${seq++}-${action.label}`,
+        label: action.label,
+        icon: action.icon,
+        onClick: action.onClick,
+        divider: false,
+        className: isDisabled
+          ? action.disabledClassName || "text-muted"
+          : action.className,
+        disabled: isDisabled,
+        disabledTitle: action.disabledTitle,
+        disabledClassName: action.disabledClassName,
+      });
+    }
+  }
+  return items;
+}
+
+function renderGenericTableCellContent<T extends Record<string, any>>(
+  column: TableColumn<T>,
+  row: T,
+  index: number,
+): React.ReactNode {
+  if (column.render) {
+    return column.render(row, index);
+  }
+  const getValue = (): unknown => {
+    if (column.accessor) return column.accessor(row);
+    return row[column.key as keyof T];
+  };
+  const value = getValue();
+
+  if (value === null || value === undefined || value === "") {
+    return <span className="gt-empty-cell">{column.emptyValue || "--"}</span>;
+  }
+
+  switch (column.type) {
+    case "avatar": {
+      const name = safeStringifyValue(value);
+      const displayName = truncateGtText(name, 20);
+      const initials =
+        column.avatar?.getInitials?.(row) ||
+        name.slice(0, 2).toUpperCase();
+      const bgColor = column.avatar?.getColor?.(row) || "#6c757d";
+      return (
+        <div className="gt-name-cell" title={name}>
+          <div className="gt-avatar" style={{ backgroundColor: bgColor }}>
+            {initials}
+          </div>
+          <span className="gt-name-text">{displayName}</span>
+        </div>
+      );
+    }
+    case "badge": {
+      const badgeText = safeStringifyValue(value);
+      const truncatedBadgeText = truncateGtText(badgeText, 20);
+      const badgeVariant = column.badge?.getVariant?.(row) || "secondary";
+      const badgeColor = column.badge?.getColor?.(row);
+      const showDot = column.badge?.showDot?.(row) ?? false;
+      const badgeClass = showDot
+        ? `gt-status-badge gt-badge-${badgeVariant}`
+        : `gt-badge gt-badge-${badgeVariant}`;
+      return (
+        <span
+          className={badgeClass}
+          style={badgeColor ? { backgroundColor: badgeColor } : undefined}
+          title={badgeText}
+        >
+          {showDot && <span className="gt-status-dot"></span>}
+          {truncatedBadgeText}
+        </span>
+      );
+    }
+    case "multi-field": {
+      if (!column.fields) {
+        return <span className="gt-text">{safeStringifyValue(value)}</span>;
+      }
+      const primaryValue = String(row[column.fields.primary as keyof T] || "");
+      const secondaryValue = column.fields.secondary
+        ? String(row[column.fields.secondary as keyof T] || "")
+        : null;
+      const truncatedPrimary = truncateGtText(primaryValue, 20);
+      const truncatedSecondary = secondaryValue
+        ? truncateGtText(secondaryValue, 20)
+        : null;
+      const multiTitleSecondary = secondaryValue ? `\n${secondaryValue}` : "";
+      const multiTitle = `${primaryValue}${multiTitleSecondary}`;
+      return (
+        <div
+          className="gt-company-cell"
+          title={multiTitle}
+        >
+          <div className="gt-company-name gt-text">
+            {truncatedPrimary || column.emptyValue || "--"}
+          </div>
+          {truncatedSecondary && (
+            <div
+              className={column.fields.secondaryClass || "gt-company-industry"}
+            >
+              {truncatedSecondary}
+            </div>
+          )}
+        </div>
+      );
+    }
+    case "phone":
+      return value as React.ReactNode;
+    case "date": {
+      const dateText = safeStringifyValue(value);
+      const truncatedDate = truncateGtText(dateText, 20);
+      return (
+        <span className="gt-text" title={dateText}>
+          {truncatedDate}
+        </span>
+      );
+    }
+    case "text":
+    default: {
+      const textValue = safeStringifyValue(value);
+      const truncatedText = truncateGtText(textValue, 20);
+      return (
+        <span className="gt-text" title={textValue}>
+          {truncatedText}
+        </span>
+      );
+    }
+  }
+}
+
+function filterPillOptionsForQuery(
+  pill: FilterPill,
+  filterPillSearch: Record<string, string>,
+): NonNullable<FilterPill["dropdownOptions"]> {
+  const opts = pill.dropdownOptions ?? [];
+  if (opts.length === 0) return [];
+  const q = (filterPillSearch[pill.id] ?? "").trim().toLowerCase();
+  if (!pill.searchable || q.length === 0) return opts;
+  return opts.filter(
+    (o) =>
+      (o.label ?? "").toLowerCase().includes(q) ||
+      String(o.value ?? "").toLowerCase().includes(q),
+  );
+}
+
+function GenericTableFilterPillMenuBody({
+  pill,
+  filterPillSearch,
+  setFilterPillSearch,
+}: Readonly<{
+  pill: FilterPill;
+  filterPillSearch: Record<string, string>;
+  setFilterPillSearch: React.Dispatch<
+    React.SetStateAction<Record<string, string>>
+  >;
+}>) {
+  if (pill.dropdownContent) {
+    return <div className="px-2 py-2">{pill.dropdownContent}</div>;
+  }
+
+  const hasOptions = Boolean(
+    pill.dropdownOptions && pill.dropdownOptions.length > 0,
+  );
+  const optionsToShow = hasOptions
+    ? filterPillOptionsForQuery(pill, filterPillSearch)
+    : [];
+
+  const clearPillQuery = () => {
+    setFilterPillSearch((prev) => ({ ...prev, [pill.id]: "" }));
+  };
+
+  return (
+    <>
+      {pill.searchable && hasOptions && (
+        <div className="px-2 pb-2">
+          <Form.Control
+            size="sm"
+            type="text"
+            placeholder="Search..."
+            value={filterPillSearch[pill.id] ?? ""}
+            onChange={(e) =>
+              setFilterPillSearch((prev) => ({
+                ...prev,
+                [pill.id]: e.target.value,
+              }))
+            }
+            autoFocus
+          />
+        </div>
+      )}
+      {hasOptions ? (
+        optionsToShow.map((option) => (
+          <Dropdown.Item
+            key={`${pill.id}:${option.value}:${option.label}`}
+            onClick={() => {
+              (option.onClick || pill.onClick)?.();
+              clearPillQuery();
+            }}
+          >
+            {option.label}
+          </Dropdown.Item>
+        ))
+      ) : (
+        <>
+          <Dropdown.Item onClick={pill.onClick}>All</Dropdown.Item>
+          <Dropdown.Item onClick={pill.onClick}>Active</Dropdown.Item>
+          <Dropdown.Item onClick={pill.onClick}>Inactive</Dropdown.Item>
+        </>
+      )}
+    </>
+  );
+}
+
+function GenericTableFirstColumnTrigger({
+  children,
+  onActivate,
+}: Readonly<{
+  children: React.ReactNode;
+  onActivate: () => void;
+}>) {
+  return (
+    <button
+      type="button"
+      className="gt-first-column-trigger"
+      onClick={(e) => {
+        e.stopPropagation();
+        onActivate();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.stopPropagation();
+          onActivate();
+        }
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+const GT_PREVIEW_BUTTON_STYLE: React.CSSProperties = {
+  position: "absolute",
+  right: "8px",
+  top: "50%",
+  transform: "translateY(-50%)",
+  fontSize: "12px",
+  padding: "4px 10px",
+  zIndex: 10,
+  whiteSpace: "nowrap",
+  backgroundColor: "#ffffff",
+  border: "1px solid #141414",
+  color: "#141414",
+  fontWeight: "300",
+  borderRadius: "4px",
+  cursor: "pointer",
+};
+
+function GenericTableBodyDataCell<T extends Record<string, any>>({
+  col,
+  row,
+  index,
+  colIdx,
+  onFirstColumnClick,
+  onPreviewClick,
+  hoveredRowIndex,
+}: Readonly<{
+  col: TableColumn<T>;
+  row: T;
+  index: number;
+  colIdx: number;
+  onFirstColumnClick?: (row: T, index: number) => void;
+  onPreviewClick?: (row: T, index: number) => void;
+  hoveredRowIndex: number | null;
+}>) {
+  const cellContent = renderGenericTableCellContent(col, row, index);
+  const firstColumnClickable =
+    colIdx === 0 && onFirstColumnClick !== undefined;
+
+  return (
+    <td
+      className="generic-table-td"
+      style={{
+        textAlign: col.align || "left",
+        position: colIdx === 0 ? "relative" : undefined,
+      }}
+    >
+      {firstColumnClickable ? (
+        <GenericTableFirstColumnTrigger
+          onActivate={() => onFirstColumnClick?.(row, index)}
+        >
+          {cellContent}
+        </GenericTableFirstColumnTrigger>
+      ) : (
+        cellContent
+      )}
+      {colIdx === 0 &&
+        hoveredRowIndex === index &&
+        onPreviewClick !== undefined && (
+          <button
+            type="button"
+            className="preview-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPreviewClick(row, index);
+            }}
+            style={GT_PREVIEW_BUTTON_STYLE}
+          >
+            Preview
+          </button>
+        )}
+    </td>
+  );
+}
+
+function GenericTableRowActionsCell<T extends Record<string, any>>({
+  row,
+  rowStableKey,
+  actions,
+}: Readonly<{
+  row: T;
+  rowStableKey: string;
+  actions: TableAction<T>[];
+}>) {
+  return (
+    <>
+      {actions.map((action, actionIndex) => {
+        if (action.show && !action.show(row)) return null;
+        const actionStableKey = `gt-act-${rowStableKey}-${actionIndex}-${action.label}`;
+
+        if (action.render) {
+          return (
+            <React.Fragment key={actionStableKey}>
+              {action.render(row)}
+            </React.Fragment>
+          );
+        }
+
+        if (action.dropdown) {
+          const visibleOptions = action.dropdown.options.filter(
+            (option) => !option.show || option.show(row),
+          );
+
+          if (visibleOptions.length === 0) return null;
+
+          return (
+            <Dropdown key={actionStableKey} drop="down" align="end">
+              <Dropdown.Toggle
+                variant={action.variant || "link"}
+                size="sm"
+                className={action.className || ""}
+                id={`dropdown-${rowStableKey}-${actionIndex}`}
+              >
+                {action.icon}
+              </Dropdown.Toggle>
+              <Dropdown.Menu
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                {visibleOptions.map((option, optionIndex) => {
+                  const optKey = `${actionStableKey}-opt-${option.label}-${optionIndex}`;
+                  const menuItem = (
+                    <Dropdown.Item
+                      key={optKey}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        option.onClick(row);
+                      }}
+                      className={option.className}
+                    >
+                      {option.icon && (
+                        <span className="me-2">{option.icon}</span>
+                      )}
+                      {option.label}
+                    </Dropdown.Item>
+                  );
+
+                  if (option.divider) {
+                    return (
+                      <React.Fragment key={`${optKey}-div`}>
+                        {menuItem}
+                        <Dropdown.Divider />
+                      </React.Fragment>
+                    );
+                  }
+
+                  return menuItem;
+                })}
+              </Dropdown.Menu>
+            </Dropdown>
+          );
+        }
+
+        const isDisabled = action.disabled?.(row);
+        const buttonEl = (
+          <Button
+            key={actionStableKey}
+            variant={action.variant || "link"}
+            size="sm"
+            disabled={isDisabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isDisabled) {
+                return;
+              }
+              action.onClick?.(row);
+            }}
+            className={`p-1 ${
+              isDisabled
+                ? `gt-action-disabled ${action.disabledClassName ?? ""}`
+                : action.className || ""
+            }`}
+            title={isDisabled ? undefined : action.label}
+          >
+            {action.icon || action.label}
+          </Button>
+        );
+        if (isDisabled && action.disabledTitle) {
+          return (
+            <span
+              key={actionStableKey}
+              className="gt-action-disabled-wrapper"
+              title={action.disabledTitle}
+            >
+              {buttonEl}
+            </span>
+          );
+        }
+        return buttonEl;
+      })}
+    </>
+  );
+}
+
 const GenericTable = <T extends Record<string, any>>({
   data,
   columns,
@@ -491,6 +991,8 @@ const GenericTable = <T extends Record<string, any>>({
   customBody,
 }: GenericTableProps<T>) => {
   const router = useRouter();
+  const columnCustomizerHeaderId = useId();
+  const columnCustomizerActionsId = useId();
   // Sorting state (synced from props when parent controls sort, e.g. server-side)
   const [sortColumn, setSortColumn] = useState(defaultSortColumn);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
@@ -505,17 +1007,12 @@ const GenericTable = <T extends Record<string, any>>({
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
     if (selectedColumnsProp && selectedColumnsProp.length > 0) return selectedColumnsProp;
     const defaults = defaultSelectedColumns || columns.map((c) => c.key);
-    if (columnStorageKey && typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem(columnStorageKey);
-        if (saved) {
-          const savedCols: string[] = JSON.parse(saved);
-          const missing = defaults.filter(
-            (c: string) => !savedCols.includes(c),
-          );
-          return missing.length > 0 ? [...savedCols, ...missing] : savedCols;
-        }
-      } catch (_e) {}
+    if (columnStorageKey && globalThis.window !== undefined) {
+      const stored = parseStoredColumnKeys(
+        globalThis.localStorage.getItem(columnStorageKey),
+        defaults,
+      );
+      if (stored) return stored;
     }
     return defaults;
   });
@@ -582,36 +1079,6 @@ const GenericTable = <T extends Record<string, any>>({
     };
   }, [contextMenu]);
 
-  // Check if a row is selected
-  const isSelected = (row: T) => {
-    return selectedRows.some(
-      (selectedRow) =>
-        selectedRow[uniqueKey as keyof T] === row[uniqueKey as keyof T],
-    );
-  };
-
-  // Handle select all
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      onSelectionChange?.(sortedData);
-    } else {
-      onSelectionChange?.([]);
-    }
-  };
-
-  // Handle individual row selection
-  const handleRowSelection = (row: T, checked: boolean) => {
-    if (checked) {
-      onSelectionChange?.([...selectedRows, row]);
-    } else {
-      onSelectionChange?.(
-        selectedRows.filter(
-          (r) => r[uniqueKey as keyof T] !== row[uniqueKey as keyof T],
-        ),
-      );
-    }
-  };
-
   // Filter visible columns (use effective so controlled parent updates apply)
   const visibleColumns = useMemo(() => {
     if (!customizableColumns) return columns;
@@ -627,151 +1094,7 @@ const GenericTable = <T extends Record<string, any>>({
     [visibleColumns, sortable],
   );
 
-  // Truncate text utility
-  const truncateText = (
-    text: string | number,
-    maxLength: number = 20,
-  ): string => {
-    const str = String(text || "");
-    if (str.length <= maxLength) return str;
-    return str.substring(0, maxLength) + "...";
-  };
-
-  // Handle sorting
-  const handleSort = (column: string) => {
-    if (!sortable) return;
-
-    const newDirection =
-      sortColumn === column && sortDirection === "asc" ? "desc" : "asc";
-    setSortColumn(column);
-    setSortDirection(newDirection);
-
-    if (onSort) {
-      onSort(column, newDirection);
-    }
-  };
-
-  // Render cell content based on column type
-  const renderCellContent = (column: TableColumn<T>, row: T, index: number) => {
-    // Custom render function takes precedence
-    if (column.render) {
-      return column.render(row, index);
-    }
-
-    // Get value using accessor or key
-    const getValue = () => {
-      if (column.accessor) return column.accessor(row);
-      return row[column.key as keyof T];
-    };
-
-    const value = getValue();
-
-    // Handle empty values
-    if (value === null || value === undefined || value === "") {
-      return <span className="gt-empty-cell">{column.emptyValue || "--"}</span>;
-    }
-
-    // Render based on type
-    switch (column.type) {
-      case "avatar":
-        const name = String(value);
-        const displayName = truncateText(name, 20);
-        const initials =
-          column.avatar?.getInitials?.(row) ||
-          name.substring(0, 2).toUpperCase();
-        const bgColor = column.avatar?.getColor?.(row) || "#6c757d";
-
-        return (
-          <div className="gt-name-cell" title={name}>
-            <div className="gt-avatar" style={{ backgroundColor: bgColor }}>
-              {initials}
-            </div>
-            <span className="gt-name-text">{displayName}</span>
-          </div>
-        );
-
-      case "badge":
-        const badgeText = String(value);
-        const truncatedBadgeText = truncateText(badgeText, 20);
-        const badgeVariant = column.badge?.getVariant?.(row) || "secondary";
-        const badgeColor = column.badge?.getColor?.(row);
-        const showDot = column.badge?.showDot?.(row) ?? false;
-        const badgeClass = showDot
-          ? `gt-status-badge gt-badge-${badgeVariant}`
-          : `gt-badge gt-badge-${badgeVariant}`;
-
-        return (
-          <span
-            className={badgeClass}
-            style={badgeColor ? { backgroundColor: badgeColor } : undefined}
-            title={badgeText}
-          >
-            {showDot && <span className="gt-status-dot"></span>}
-            {truncatedBadgeText}
-          </span>
-        );
-
-      case "multi-field":
-        if (!column.fields) return value;
-
-        const primaryValue = String(
-          row[column.fields.primary as keyof T] || "",
-        );
-        const secondaryValue = column.fields.secondary
-          ? String(row[column.fields.secondary as keyof T] || "")
-          : null;
-        const truncatedPrimary = truncateText(primaryValue, 20);
-        const truncatedSecondary = secondaryValue
-          ? truncateText(secondaryValue, 20)
-          : null;
-
-        return (
-          <div
-            className="gt-company-cell"
-            title={`${primaryValue}${secondaryValue ? "\n" + secondaryValue : ""}`}
-          >
-            <div className="gt-company-name gt-text">
-              {truncatedPrimary || column.emptyValue || "--"}
-            </div>
-            {truncatedSecondary && (
-              <div
-                className={
-                  column.fields.secondaryClass || "gt-company-industry"
-                }
-              >
-                {truncatedSecondary}
-              </div>
-            )}
-          </div>
-        );
-
-      case "phone":
-        // Phone component should be passed via render function
-        return value;
-
-      case "date":
-        // Date formatting handled by accessor function
-        const dateText = String(value);
-        const truncatedDate = truncateText(dateText, 20);
-        return (
-          <span className="gt-text" title={dateText}>
-            {truncatedDate}
-          </span>
-        );
-
-      case "text":
-      default:
-        const textValue = String(value);
-        const truncatedText = truncateText(textValue, 20);
-        return (
-          <span className="gt-text" title={textValue}>
-            {truncatedText}
-          </span>
-        );
-    }
-  };
-
-  // Sort data (client-side if no onSort provided)
+  // Sort data (client-side if no onSort provided) — before selection handlers that depend on it
   const sortedData = useMemo(() => {
     if (onSort || !sortColumn) return data;
 
@@ -787,6 +1110,55 @@ const GenericTable = <T extends Record<string, any>>({
       return 0;
     });
   }, [data, sortColumn, sortDirection, onSort]);
+
+  // Check if a row is selected
+  const isSelected = (row: T) => {
+    return selectedRows.some(
+      (selectedRow) =>
+        selectedRow[uniqueKey as keyof T] === row[uniqueKey as keyof T],
+    );
+  };
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const branch = String(e.target.checked) as "true" | "false";
+    const selectAllHandlers: Record<"true" | "false", () => void> = {
+      true: () => onSelectionChange?.(sortedData),
+      false: () => onSelectionChange?.([]),
+    };
+    selectAllHandlers[branch]();
+  };
+
+  const applyRowCheckboxChange = (
+    row: T,
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    e.stopPropagation();
+    const branch = String(e.target.checked) as "true" | "false";
+    const rowCheckboxHandlers: Record<"true" | "false", () => void> = {
+      true: () => onSelectionChange?.([...selectedRows, row]),
+      false: () =>
+        onSelectionChange?.(
+          selectedRows.filter(
+            (r) => r[uniqueKey as keyof T] !== row[uniqueKey as keyof T],
+          ),
+        ),
+    };
+    rowCheckboxHandlers[branch]();
+  };
+
+  // Handle sorting
+  const handleSort = (column: string) => {
+    if (!sortable) return;
+
+    const newDirection =
+      sortColumn === column && sortDirection === "asc" ? "desc" : "asc";
+    setSortColumn(column);
+    setSortDirection(newDirection);
+
+    if (onSort) {
+      onSort(column, newDirection);
+    }
+  };
 
   // Render sort icon
   const renderSortIcon = (column: string) => {
@@ -811,7 +1183,10 @@ const GenericTable = <T extends Record<string, any>>({
       setSelectedColumns(newSelected);
     }
     if (columnStorageKey) {
-      localStorage.setItem(columnStorageKey, JSON.stringify(newSelected));
+      globalThis.localStorage.setItem(
+        columnStorageKey,
+        JSON.stringify(newSelected),
+      );
     }
     if (onColumnChange) {
       onColumnChange(newSelected);
@@ -821,6 +1196,12 @@ const GenericTable = <T extends Record<string, any>>({
   // Render toolbar
   const renderToolbar = () => {
     if (!showToolbar || !toolbar) return null;
+
+    let tableViewToggleLabel: string = toolbar.tableViewLabel || "Table view";
+    if (toolbar.currentTableView !== undefined) {
+      tableViewToggleLabel =
+        toolbar.currentTableView === "table" ? "Table view" : "Board View";
+    }
 
     return (
       <div className="gt-toolbar-container">
@@ -950,13 +1331,7 @@ const GenericTable = <T extends Record<string, any>>({
                   className="gt-toolbar-btn"
                 >
                   <Menu size={16} className="me-1" />
-                  <span>
-                    {toolbar.currentTableView !== undefined
-                      ? toolbar.currentTableView === "table"
-                        ? "Table view"
-                        : "Board View"
-                      : toolbar.tableViewLabel || "Table view"}
-                  </span>
+                  <span>{tableViewToggleLabel}</span>
                 </Dropdown.Toggle>
                 <Dropdown.Menu>
                   {toolbar.currentTableView !== undefined &&
@@ -993,18 +1368,6 @@ const GenericTable = <T extends Record<string, any>>({
                 </Dropdown.Menu>
               </Dropdown>
             )}
-
-            {/* View Switcher */}
-            {/* {toolbar.showViewSwitcher && (
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn gt-icon-btn"
-                onClick={() => toolbar.onViewChange?.('table')}
-              >
-                <Menu size={16} />
-              </Button>
-            )} */}
 
             {/* Edit Columns */}
             {toolbar.showEditColumns && (
@@ -1126,14 +1489,20 @@ const GenericTable = <T extends Record<string, any>>({
                       Import
                     </Dropdown.Item>
                   )}
-                  {/* <Dropdown.Item>Bulk Actions</Dropdown.Item> */}
                   <Dropdown.Divider />
                   <Dropdown.Item
                     onClick={() => {
-                      if (typeof window !== "undefined") {
-                        window.open("/main-settings/smart-crm", "_blank");
-                      } else {
+                      if (globalThis.window === undefined) {
                         router.push("/main-settings/smart-crm");
+                        return;
+                      }
+                      const win = globalThis.open(
+                        "/main-settings/smart-crm",
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                      if (win != null) {
+                        win.opener = null;
                       }
                     }}
                   >
@@ -1142,18 +1511,6 @@ const GenericTable = <T extends Record<string, any>>({
                 </Dropdown.Menu>
               </Dropdown>
             )}
-
-            {/* Save */}
-            {/* {toolbar.showSaveButton && (
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="gt-toolbar-btn"
-                onClick={toolbar.onSaveClick}
-              >
-                Save
-              </Button>
-            )} */}
 
             {/* Custom Actions */}
             {toolbar.customActions}
@@ -1183,109 +1540,30 @@ const GenericTable = <T extends Record<string, any>>({
                           <span className="gt-filter-pill-dot" title="Filter applied" />
                         )}
                         {pill.active && pill.onClear && (
-                          <span
+                          <button
+                            type="button"
                             className="gt-filter-pill-clear"
-                            role="button"
-                            tabIndex={0}
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
                               pill.onClear?.();
                             }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                pill.onClear?.();
-                              }
-                            }}
                             title="Clear filter"
                             aria-label="Clear filter"
                           >
-                            <X size={14} />
-                          </span>
+                            <X size={14} aria-hidden />
+                          </button>
                         )}
                       </Dropdown.Toggle>
                       <Dropdown.Menu
-                        style={{ maxHeight: "280px", overflowY: "auto" }}
+                        style={{ maxHeight: "280px" }}
+                        onMouseDown={(e) => e.stopPropagation()}
                       >
-                        {pill.dropdownContent ? (
-                          <div
-                            className="px-2 py-2"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {pill.dropdownContent}
-                          </div>
-                        ) : (
-                          <>
-                        {pill.searchable &&
-                          pill.dropdownOptions &&
-                          pill.dropdownOptions.length > 0 && (
-                            <div
-                              className="px-2 pb-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <Form.Control
-                                size="sm"
-                                type="text"
-                                placeholder="Search..."
-                                value={filterPillSearch[pill.id] ?? ""}
-                                onChange={(e) =>
-                                  setFilterPillSearch((prev) => ({
-                                    ...prev,
-                                    [pill.id]: e.target.value,
-                                  }))
-                                }
-                                autoFocus
-                              />
-                            </div>
-                          )}
-                        {pill.dropdownOptions &&
-                        pill.dropdownOptions.length > 0 ? (
-                          (() => {
-                            const q = (filterPillSearch[pill.id] ?? "")
-                              .trim()
-                              .toLowerCase();
-                            const options =
-                              pill.searchable && q
-                                ? pill.dropdownOptions.filter(
-                                    (o) =>
-                                      (o.label ?? "")
-                                        .toLowerCase()
-                                        .includes(q) ||
-                                      (o.value ?? "").toLowerCase().includes(q),
-                                  )
-                                : pill.dropdownOptions;
-                            return options.map((option, idx) => (
-                              <Dropdown.Item
-                                key={idx}
-                                onClick={() => {
-                                  (option.onClick || pill.onClick)?.();
-                                  setFilterPillSearch((prev) => ({
-                                    ...prev,
-                                    [pill.id]: "",
-                                  }));
-                                }}
-                              >
-                                {option.label}
-                              </Dropdown.Item>
-                            ));
-                          })()
-                        ) : (
-                          <>
-                            <Dropdown.Item onClick={pill.onClick}>
-                              All
-                            </Dropdown.Item>
-                            <Dropdown.Item onClick={pill.onClick}>
-                              Active
-                            </Dropdown.Item>
-                            <Dropdown.Item onClick={pill.onClick}>
-                              Inactive
-                            </Dropdown.Item>
-                          </>
-                        )}
-                          </>
-                        )}
+                        <GenericTableFilterPillMenuBody
+                          pill={pill}
+                          filterPillSearch={filterPillSearch}
+                          setFilterPillSearch={setFilterPillSearch}
+                        />
                       </Dropdown.Menu>
                     </Dropdown>
                   ) : (
@@ -1351,9 +1629,14 @@ const GenericTable = <T extends Record<string, any>>({
       totalRows,
       pageSizeOptions = [10, 25, 50, 100],
     } = pagination;
-    const totalPages = Math.ceil(totalRows / rowsPerPage);
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, totalRows);
+    const totalPages =
+      totalRows === 0 ? 1 : Math.ceil(totalRows / rowsPerPage);
+    const startRow =
+      totalRows === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
+    const endRow =
+      totalRows === 0
+        ? 0
+        : Math.min(currentPage * rowsPerPage, totalRows);
 
     return (
       <div className="generic-table-pagination">
@@ -1398,7 +1681,7 @@ const GenericTable = <T extends Record<string, any>>({
             <ChevronLeft size={14} />
           </Button>
 
-          {[...Array(totalPages)].map((_, index) => {
+          {Array.from({ length: totalPages }, (_, index) => {
             const pageNum = index + 1;
             if (
               pageNum === 1 ||
@@ -1417,7 +1700,8 @@ const GenericTable = <T extends Record<string, any>>({
                   {pageNum}
                 </Button>
               );
-            } else if (
+            }
+            if (
               pageNum === currentPage - 2 ||
               pageNum === currentPage + 2
             ) {
@@ -1451,6 +1735,93 @@ const GenericTable = <T extends Record<string, any>>({
     );
   };
 
+  const fullTableColSpan =
+    (selectable ? 1 : 0) +
+    visibleColumns.length +
+    (showActions && actions.length > 0 ? 1 : 0);
+
+  const renderMainTableBody = (): React.ReactNode => {
+    if (loading) {
+      return (
+        <tr>
+          <td colSpan={fullTableColSpan} className="text-center py-4">
+            <div className="generic-table-loading">{loadingMessage}</div>
+          </td>
+        </tr>
+      );
+    }
+    if (sortedData.length === 0) {
+      return (
+        <tr>
+          <td colSpan={fullTableColSpan} className="text-center py-4">
+            <div className="generic-table-empty">{emptyMessage}</div>
+          </td>
+        </tr>
+      );
+    }
+    return sortedData.map((row, index) => {
+      const rowStableKey = String(row[uniqueKey as keyof T] ?? index);
+      return (
+        <tr
+          key={rowStableKey}
+          onClick={() => onRowClick?.(row, index)}
+          onDoubleClick={() => onRowDoubleClick?.(row, index)}
+          onMouseEnter={() => setHoveredRowIndex(index)}
+          onMouseLeave={() => setHoveredRowIndex(null)}
+          onContextMenu={(e) => {
+            if (actions.length === 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const items = getContextMenuItems(row);
+            if (items.length === 0) return;
+            setContextMenu({ x: e.clientX, y: e.clientY, row });
+          }}
+          className={`generic-table-row ${rowClassName?.(row, index) || ""} ${onRowClick || onRowDoubleClick ? "clickable" : ""}`}
+        >
+          {selectable && (
+            <td
+              className="generic-table-td"
+              style={{ width: "40px" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Form.Check
+                type="checkbox"
+                checked={isSelected(row)}
+                onChange={(e) => applyRowCheckboxChange(row, e)}
+              />
+            </td>
+          )}
+          {visibleColumns.map((col, colIdx) => (
+            <GenericTableBodyDataCell
+              key={col.key}
+              col={col}
+              row={row}
+              index={index}
+              colIdx={colIdx}
+              onFirstColumnClick={onFirstColumnClick}
+              onPreviewClick={onPreviewClick}
+              hoveredRowIndex={hoveredRowIndex}
+            />
+          ))}
+          {showActions && actions.length > 0 && (
+            <td
+              className="generic-table-td generic-table-actions-cell"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="generic-table-actions">
+                <GenericTableRowActionsCell
+                  row={row}
+                  rowStableKey={rowStableKey}
+                  actions={actions}
+                />
+              </div>
+            </td>
+          )}
+        </tr>
+      );
+    });
+  };
+
   return (
     <div className="generic-table-container">
       {/* Right‑click context menu */}
@@ -1481,13 +1852,7 @@ const GenericTable = <T extends Record<string, any>>({
       {renderToolbar()}
 
       {/* Table or custom body (e.g. Board view) */}
-      {customBody != null ? (
-        <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
-          <Card.Body className="p-0">
-            {customBody}
-          </Card.Body>
-        </Card>
-      ) : (
+      {customBody === undefined || customBody === null ? (
       <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
         <Card.Body className="p-0">
           <div
@@ -1563,7 +1928,7 @@ const GenericTable = <T extends Record<string, any>>({
                                 variant="link"
                                 size="sm"
                                 className="d-inline-flex align-items-center p-1 text-secondary text-decoration-none border-0"
-                                id="column-customizer-toggle"
+                                id={columnCustomizerHeaderId}
                                 style={{ minWidth: "auto" }}
                               >
                                 <Layers size={18} />
@@ -1589,7 +1954,7 @@ const GenericTable = <T extends Record<string, any>>({
                                     if (selectedColumnsProp === undefined)
                                       setSelectedColumns(allKeys);
                                     if (columnStorageKey)
-                                      localStorage.setItem(
+                                      globalThis.localStorage.setItem(
                                         columnStorageKey,
                                         JSON.stringify(allKeys),
                                       );
@@ -1606,7 +1971,7 @@ const GenericTable = <T extends Record<string, any>>({
                                     if (selectedColumnsProp === undefined)
                                       setSelectedColumns(defaultKeys);
                                     if (columnStorageKey)
-                                      localStorage.setItem(
+                                      globalThis.localStorage.setItem(
                                         columnStorageKey,
                                         JSON.stringify(defaultKeys),
                                       );
@@ -1639,7 +2004,7 @@ const GenericTable = <T extends Record<string, any>>({
                               variant="link"
                               size="sm"
                               className="d-inline-flex align-items-center p-1 text-secondary text-decoration-none border-0"
-                              id="column-customizer-toggle"
+                              id={columnCustomizerActionsId}
                               style={{ minWidth: "auto" }}
                             >
                               <Layers size={18} />
@@ -1665,7 +2030,7 @@ const GenericTable = <T extends Record<string, any>>({
                                   if (selectedColumnsProp === undefined)
                                     setSelectedColumns(allKeys);
                                   if (columnStorageKey)
-                                    localStorage.setItem(
+                                    globalThis.localStorage.setItem(
                                       columnStorageKey,
                                       JSON.stringify(allKeys),
                                     );
@@ -1682,7 +2047,7 @@ const GenericTable = <T extends Record<string, any>>({
                                   if (selectedColumnsProp === undefined)
                                     setSelectedColumns(defaultKeys);
                                   if (columnStorageKey)
-                                    localStorage.setItem(
+                                    globalThis.localStorage.setItem(
                                       columnStorageKey,
                                       JSON.stringify(defaultKeys),
                                     );
@@ -1953,6 +2318,12 @@ const GenericTable = <T extends Record<string, any>>({
           )}
         </Card.Body>
       </Card>
+      ) : (
+        <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
+          <Card.Body className="p-0">
+            {customBody}
+          </Card.Body>
+        </Card>
       )}
     </div>
   );

@@ -2,25 +2,23 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
-import { DownloadCallRecording, GetTranscriptionOverview } from '@utils/calls';
+import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
+import { DownloadCallRecording } from '@utils/calls';
 import { GetImagicalTranscriptions } from '@utils/aiml';
-import { Button, Modal, Row, Form, Badge } from 'react-bootstrap';
-import { Col } from 'react-bootstrap';
+import { Badge, Button, Col, Modal, Row } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { ModuleSlug, formatDateTimeToLocal, GlobalDateTimeFormat, formatDuration, encodeAnalysisData, GlobalDateFormat, convertDateTimeWithOffsetToLocal, GlobalTimeFormat } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
-import BarFilters from '@components/BarFilters';
-import SelectBox from '@components/SelectBox';
 import axiosInstance from '@utils/axios';
 import '@assets/scss/common.scss';
 import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
 import moment from 'moment';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import CircularProgressCircle from '@components/CircularProgressCircle';
+import { Calendar } from 'lucide-react';
 
 
 interface TranscriptionSummary {
@@ -39,8 +37,7 @@ interface TranscriptionSummary {
 
 
 const AnalyzeRecordings = () => {
-    const { data:session, status } = useSession();
-    const [filterLoading, setFilterLoading] = useState(false);
+    const { data:session } = useSession();
     
     // Audio player state
     const [mediaPlayerModal, setMediaPlayerModal] = useState(false);
@@ -70,19 +67,6 @@ const AnalyzeRecordings = () => {
         currentFiltersRef.current = currentFilters;
     }, [currentFilters]);
 
-    const [transcriptionOverview, setTranscriptionOverview] = useState<any>(null);
-
-    useEffect(() => {
-      handleGetTranscriptionOverview();
-    }, []);
-
-    const handleGetTranscriptionOverview = async () => {
-      const response = await GetTranscriptionOverview();
-      setTranscriptionOverview(response);
-    };
-
-    // Removed duplicate call - fetchTableData handles all API calls
-
     const [transcriptionSummary, setTranscriptionSummary] = useState<TranscriptionSummary>({
         total_transcriptions: 0,
         incomplete_transcriptions: 0,
@@ -97,125 +81,24 @@ const AnalyzeRecordings = () => {
         queued_transcriptions: 0,
     });
 
-    // Base card configuration to avoid duplication
-    const baseCardConfig = {
-        showAnimatedNumber: true,
-        animationDuration: 1000,
-        fontStyle: 'style-2' as const
-    };
-
-    // Create cards data for PageSummaryGrid using transcription summary
-    const summaryCards: SummaryCard[] = useMemo(() => [
-        {
-            id: 'total-transcriptions',
-            title: 'Total Calls',
-            value: transcriptionSummary?.total_transcriptions || 0,
-            description: 'Total calls in the system',
-            delay: 0.1,
-            ...baseCardConfig
-        },
-        {
-            id: 'queued-transcriptions',
-            title: 'Calls In Queue',
-            value: transcriptionSummary?.queued_transcriptions || 0,
-            description: 'Queued calls in the system',
-            delay: 0.2,
-            ...baseCardConfig
-        },
-        {
-            id: 'transribing-transcriptions',
-            title: 'Transcribing',
-            value: transcriptionSummary?.transribing_transcriptions || 0,
-            description: 'Transcribing calls in the system',
-            delay: 0.7,
-            ...baseCardConfig
-        },
-        {
-            id: 'analyzed-transcriptions',
-            title: 'Analyzing',
-            value: transcriptionSummary?.analyzing_transcriptions || 0,
-            description: 'Analyzing calls in the system',
-            delay: 0.6,
-            ...baseCardConfig
-        },
-        {
-            id: 'completed-transcriptions',
-            title: 'Completed',
-            value: transcriptionSummary?.completed_transcriptions || 0,
-            description: 'Completed calls in the system',
-            delay: 0.9,
-            ...baseCardConfig
-        },
-        {
-            id: 'failed-transcriptions',
-            title: 'Failed',
-            value: transcriptionSummary?.failed_transcriptions || 0,
-            description: 'Failed calls in the system',
-            delay: 1,
-            ...baseCardConfig
-        },
-        {
-            id: 'incomplete-transcriptions',
-            title: 'Incomplete',
-            value: transcriptionSummary?.incomplete_transcriptions || 0,
-            description: 'Incomplete calls in the system',
-            delay: 0.3,
-            ...baseCardConfig
-        },
-        {
-            id: 'reanalysis-calls',
-            title: 'Reanalysis',
-            value: transcriptionSummary?.reanalysis_calls || 0,
-            description: 'Reanalysis calls in the system',
-            delay: 0.3,
-            ...baseCardConfig
-        },
-
-
-
-        
-        // {
-        //     id: 'analyzed-transcriptions',
-        //     title: 'Analyzed Transcriptions',
-        //     value: transcriptionSummary?.analyzed_transcriptions || 0,
-        //     description: 'Analyzed transcriptions in the system',
-        //     delay: 0.6,
-        //     ...baseCardConfig
-        // },
-        
-        // {
-        //     id: 'in-progress-transcriptions',
-        //     title: 'In Progress Transcriptions',
-        //     value: transcriptionSummary?.in_progress_transcriptions || 0,
-        //     description: 'In progress transcriptions in the system',
-        //     delay: 0.4,
-        //     ...baseCardConfig
-        // },    
-        // {
-        //     id: 'transcribed-transcriptions',
-        //     title: 'Transcribed Transcriptions',
-        //     value: transcriptionSummary?.transcribed_transcriptions || 0,
-        //     description: 'Transcribed transcriptions in the system',
-        //     delay: 0.8,
-        //     ...baseCardConfig
-        // },
-        
-        
-      
-        
+    // Stats cards data for GenericStatsCards component
+    const statsCardsData = useMemo<StatsCardData[]>(() => [
+        { title: 'Total Calls', value: transcriptionSummary?.total_transcriptions || 0, subtitle: 'Total calls in the system' },
+        { title: 'Calls In Queue', value: transcriptionSummary?.queued_transcriptions || 0, subtitle: 'Queued calls in the system' },
+        { title: 'Transcribing', value: transcriptionSummary?.transribing_transcriptions || 0, subtitle: 'Transcribing calls' },
+        { title: 'Analyzing', value: transcriptionSummary?.analyzing_transcriptions || 0, subtitle: 'Analyzing calls' },
+        { title: 'Completed', value: transcriptionSummary?.completed_transcriptions || 0, subtitle: 'Completed calls' },
+        { title: 'Failed', value: transcriptionSummary?.failed_transcriptions || 0, subtitle: 'Failed calls' },
+        { title: 'Incomplete', value: transcriptionSummary?.incomplete_transcriptions || 0, subtitle: 'Incomplete calls' },
+        { title: 'Reanalysis', value: transcriptionSummary?.reanalysis_calls || 0, subtitle: 'Reanalysis calls' },
     ], [transcriptionSummary]);
 
     const [searchValue, setSearchValue] = useState<string>('');
-    const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>({
-        start_datetime: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DDTHH:mm'),
-        end_datetime: moment().endOf('day').format('YYYY-MM-DDTHH:mm'),
-    });
+    const [tableLoading, setTableLoading] = useState(false);
+    const rowsPerPageRef = useRef(15);
 
     // Get hierarchy data for extensions
-    const { 
-        hierarchyDataExtensions,
-        loading: hierarchyLoading 
-    } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
+    const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.CALL_RECORDINGS);
 
     // Table data state
     const [tableData, setTableData] = useState<any[]>([]);
@@ -226,243 +109,179 @@ const AnalyzeRecordings = () => {
         perPage: 15,
     });
 
-    // Table columns configuration for call recordings
-    const columns = [
+    // Table columns configuration for call analysis
+    const tableColumns: TableColumn<any>[] = [
         {
-            key: 'date',
-            name: 'Date',
-            selector: (row: any) => row.DateTime,
+            key: 'datetime',
+            label: 'Date',
             sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div style={{textTransform: 'uppercase'}}>
-                        {convertDateTimeWithOffsetToLocal(props.datetime,undefined, GlobalDateFormat as string)}
-                    </div>
-                )
-            }
+            render: (row) => (
+                <div style={{ textTransform: 'uppercase' }}>
+                    {convertDateTimeWithOffsetToLocal(row.datetime ?? '', undefined, GlobalDateFormat)}
+                </div>
+            ),
         },
         {
-            key: 'time',
-            name: 'Time',
-            selector: (row: any) => row.DateTime,
-            sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div>
-                        {convertDateTimeWithOffsetToLocal(props.datetime,undefined, GlobalTimeFormat as string)}
-                    </div>
-                )
-            }
+            key: 'datetime_time',
+            label: 'Time',
+            sortable: false,
+            render: (row) => (
+                <div>{convertDateTimeWithOffsetToLocal(row.datetime ?? '', undefined, GlobalTimeFormat)}</div>
+            ),
         },
         {
-            key: 'AgentExtension',
-            name: 'Extension',
-            selector: (row: any) => row.AgentExtension,
-            sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div>
-                        {props?.local_party_model?.localParty || ''}
-                    </div>
-                )
-            }
+            key: 'local_party_model',
+            label: 'Extension',
+            sortable: false,
+            render: (row) => <div>{row.local_party_model?.localParty || ''}</div>,
         },
-        {
-            key: 'remoteParty',
-            name: 'Remote Number',
-            selector: (row: any) => row.remoteParty,
-            sortable: true
-        },
+        { key: 'remoteParty', label: 'Remote Number', sortable: true },
         {
             key: 'direction',
-            name: 'Direction',
-            selector: (row: any) => row?.direction,
+            label: 'Direction',
             sortable: true,
-            cell: (props: any) => {
-                const direction = props?.direction;
+            render: (row) => {
+                const direction = row.direction;
                 const badgeClass = direction === 'CALL_INCOMING' ? 'badge bg-success' : 'badge bg-primary';
                 return (
-                    <span className={badgeClass} style={{textTransform: 'uppercase'}}>
+                    <span className={badgeClass} style={{ textTransform: 'uppercase' }}>
                         {direction === 'CALL_INCOMING' ? 'Incoming' : 'Outgoing'}
                     </span>
                 );
-            }
+            },
         },
         {
             key: 'duration',
-            name: 'Duration',
-            selector: (row: any) => row.duration,
+            label: 'Duration',
             sortable: true,
-            cell: (props: any) => {
-                const duration = parseInt(props?.duration?.toString())/10000000 || 0;
-                return (
-                    <div>
-                        {formatDuration(duration)}
-                    </div>
-                );
-            }
-        },
-       
-         {
-            key:'qualification',
-            name: 'Qualification',
-            selector: (row: any) => row.status,
-            sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div>
-                        <Badge bg={props?.analysis?.qualified === true ? 'success' : 'warning'}>
-                            {props?.analysis?.qualified === true ? 'Qualified' : 'Unqualified'}
-                        </Badge>
-                       
-                    </div>
-                )
-            }
+            render: (row) => (
+                <div>{formatDuration(Number.parseInt(String(row.duration ?? '0'), 10) / 10000000 || 0)}</div>
+            ),
         },
         {
-            key:'follow_up',
-            name: 'Follow Up',
-            selector: (row: any) => row.follow_up,
+            key: 'qualification',
+            label: 'Qualification',
             sortable: true,
-            cell: (props: any) => {
-                const followUpRequired = props?.analysis?.analysis?.follow_up_required;
-                if (followUpRequired === true) {
-                    return 'Required';
-                } else if (followUpRequired === false) {
-                    return 'Not Required';
-                }
+            render: (row) => (
+                <Badge bg={row.analysis?.qualified === true ? 'success' : 'warning'}>
+                    {row.analysis?.qualified === true ? 'Qualified' : 'Unqualified'}
+                </Badge>
+            ),
+        },
+        {
+            key: 'follow_up',
+            label: 'Follow Up',
+            sortable: false,
+            render: (row) => {
+                const followUpRequired = row.analysis?.analysis?.follow_up_required;
+                if (followUpRequired === true) return 'Required';
+                if (followUpRequired === false) return 'Not Required';
                 return 'N/A';
-            }
+            },
         },
         {
-            key:'sentiment',
-            name: 'Sentiment',
-            selector: (row: any) => row.sentiment,
-            sortable: true,
-            cell: (props: any) => {
-                return props?.analysis?.analysis?.sentiment || 'N/A';
-            }
+            key: 'sentiment',
+            label: 'Sentiment',
+            sortable: false,
+            render: (row) => <>{row.analysis?.analysis?.sentiment || 'N/A'}</>,
         },
         {
-            key:'main_topic',
-            name: 'Main Intent',
-            selector: (row: any) => row.main_intent,
-            sortable: true,
-            cell: (props: any) => {
-                return props?.analysis?.classification?.main_topic || 'N/A';
-            }
+            key: 'main_topic',
+            label: 'Main Intent',
+            sortable: false,
+            render: (row) => <>{row.analysis?.classification?.main_topic || 'N/A'}</>,
         },
-       
         {
-            key:'status',
-            name: 'Status',
-            selector: (row: any) => row.status,
+            key: 'status',
+            label: 'Status',
             sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div>
-                        {(() => {
-                            const status = props?.status?.toLowerCase();
-                            
-                            switch (status) {
-                                case 'complete':
-                                case 'completed':
-                                    return (
-                                        <Badge bg="success">
-                                            Completed
-                                        </Badge>
-                                    );
-                                case 'in_progress':
-                                    return (
-                                        <Badge bg="info">
-                                            In Progress
-                                        </Badge>
-                                    );
-                                case 'incomplete':
-                                    return (
-                                        <Badge bg="warning">
-                                            Incomplete
-                                        </Badge>
-                                    );
-                                case 'queued':
-                                    return (
-                                        <Badge bg="secondary">
-                                            Queued
-                                        </Badge>
-                                    );
-                                default:
-                                    return (
-                                        <Badge bg="secondary">
-                                            {status || 'Unknown'}
-                                        </Badge>
-                                    );
-                            }
-                        })()}
-                    </div>
-                )
-            }
+            render: (row) => {
+                const status = row.status?.toLowerCase();
+                switch (status) {
+                    case 'complete':
+                    case 'completed': return <Badge bg="success">Completed</Badge>;
+                    case 'in_progress': return <Badge bg="info">In Progress</Badge>;
+                    case 'incomplete': return <Badge bg="warning">Incomplete</Badge>;
+                    case 'queued': return <Badge bg="secondary">Queued</Badge>;
+                    default: return <Badge bg="secondary">{status || 'Unknown'}</Badge>;
+                }
+            },
         },
+        {
+            key: 'message',
+            label: 'Message',
+            sortable: false,
+            render: (row) => <>{row.message || 'N/A'}</>,
+        },
+    ];
 
+    const recordingActions: TableAction<any>[] = [
         {
-            key:'message',
-            name: 'Message',
-            selector: (row: any) => row?.message,
-            sortable: true,
-            cell: (props: any) => {
-                return props?.message || 'N/A';
-            }
-        },
-        {
-            key: 'Action',
-            name: 'Action',
-            selector: (row: any) => row.Action,
-            sortable: true,
-            cell: (props: any) => {
-                return (
-                    <div className='d-flex gap-3 action-box'>
+            label: 'Actions',
+            render: (row) => (
+                <div className='d-flex gap-3 action-box'>
+                    <button
+                        type="button"
+                        className="btn btn-link p-0 border-0 text-info"
+                        onClick={() => handlePlayRecording(row)}
+                        aria-label="Play"
+                        title="Play"
+                    >
                         <i
                             data-tooltip-id="my-tooltip"
                             data-tooltip-content="Play"
-                            className='ph-duotone ph-play text-info'
-                            style={{ fontSize: '1rem', cursor: 'pointer' }}
-                            onClick={() => handlePlayRecording(props)}
+                            className='ph-duotone ph-play'
+                            style={{ fontSize: '1rem' }}
+                            aria-hidden="true"
                         />
-                        <div style={{ display: 'inline-flex', alignItems: 'center' }}>
-                            {downloadingRecordings.has(props.Id) ? (
-                                <CircularProgressCircle 
-                                    progress={downloadProgress[props.Id] || 0}
-                                    size="small" 
-                                    color="#28a745"
-                                    backgroundColor="#e9ecef"
-                                    textColor="#495057"
-                                    showPercentage={false}
-                                    className="circular-progress-inline"
-                                />
-                            ) : (
+                    </button>
+                    <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        {downloadingRecordings.has(row.uuid) ? (
+                            <CircularProgressCircle
+                                progress={downloadProgress[row.uuid] || 0}
+                                size="small"
+                                color="#28a745"
+                                backgroundColor="#e9ecef"
+                                textColor="#495057"
+                                showPercentage={false}
+                                className="circular-progress-inline"
+                            />
+                        ) : (
+                            <button
+                                type="button"
+                                className="btn btn-link p-0 border-0 text-info"
+                                onClick={() => handleDownload(row)}
+                                aria-label="Download"
+                                title="Download"
+                            >
                                 <i
                                     data-tooltip-id="my-tooltip"
                                     data-tooltip-content="Download"
-                                    className='ph-duotone ph-arrow-line-down text-info'
-                                    style={{ fontSize: '1rem', cursor: 'pointer' }}
-                                    onClick={() => {
-                                        handleDownload(props);
-                                    }}
+                                    className='ph-duotone ph-arrow-line-down'
+                                    style={{ fontSize: '1rem' }}
+                                    aria-hidden="true"
                                 />
-                            )}
-                        </div>
+                            </button>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        className="btn btn-link p-0 border-0 text-info"
+                        onClick={() => handleAnalysis(row)}
+                        aria-label="Call Analysis"
+                        title="Call Analysis"
+                    >
                         <i
                             data-tooltip-id="my-tooltip"
                             data-tooltip-content="Call Analysis"
-                            className='ph-duotone ph-chart-bar text-info'
+                            className='ph-duotone ph-chart-bar'
                             style={{ fontSize: '1rem' }}
-                            onClick={() => {
-                                handleAnalysis(props);
-                            }}
+                            aria-hidden="true"
                         />
-                    </div>
-                )
-            }
-        }
+                    </button>
+                </div>
+            ),
+        },
     ];
 
 
@@ -529,6 +348,7 @@ const AnalyzeRecordings = () => {
         const requestPromise = (async () => {
             try {
                 setShowPageLoader(true);
+                setTableLoading(true);
             
                 // Extract start_datetime and end_datetime from filters for separate parameters
                 // Use the dates from getDatesFromFilters which has fallback logic - always returns a value
@@ -562,7 +382,7 @@ const AnalyzeRecordings = () => {
                 }
                 pendingRequestsRef.current.delete(requestKey);
 
-                if(response &&  response?.success === true){
+                if (response?.success === true) {
                     console.log(response?.data);
                     setTableData(response?.data);
                     setPaginationInfo({
@@ -598,12 +418,14 @@ const AnalyzeRecordings = () => {
                         current_page: response?.pagination?.page || 1,
                         per_page: limit, // Use the requested perPage value
                     };
-                }else{
+                } else {
                     toast.error('Failed to get transcriptions');
                     return { data: [], total: 0, last_page: 0, current_page: 1, per_page: limit };
                 }
 
             } catch (error) {
+                console.error('Failed to fetch call analysis records:', error);
+                toast.error('Failed to load call analysis records');
                 setShowPageLoader(false);
                 setTableData([]);
                 setPaginationInfo({
@@ -618,6 +440,8 @@ const AnalyzeRecordings = () => {
                 }
                 pendingRequestsRef.current.delete(requestKey);
                 return { data: [], total: 0, last_page: 0, current_page: 1, per_page: limit };
+            } finally {
+                setTableLoading(false);
             }
         })();
         
@@ -628,95 +452,159 @@ const AnalyzeRecordings = () => {
         return requestPromise;
     }, []); // Empty dependency array - using refs to access latest values
 
-    const handleFiltersChange = async (filters: any) => {
-        setFilterLoading(true);
-        
-        try {
-            // Convert datetime-local format to UTC format for API
-            const apiFilters: any = {};
-            
-            if (filters.start_datetime) {
-                // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-                // Convert to UTC ISO format
-                let startMoment = moment(filters.start_datetime);
-                
-                if (filters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                    // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-                    startMoment = moment(filters.start_datetime + ':00');
-                } else if (!filters.start_datetime.includes('T')) {
-                    // If only date, set to 00:00:00
-                    startMoment = moment(filters.start_datetime).startOf('day');
-                }
-                
-                // Convert to UTC
-                apiFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-            }
-            
-            if (filters.end_datetime) {
-                // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
-                // Convert to UTC ISO format
-                let endMoment = moment(filters.end_datetime);
-                
-                if (filters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                    // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-                    const timePart = filters.end_datetime.split('T')[1];
-                    if (timePart === '23:59') {
-                        endMoment = moment(filters.end_datetime + ':59');
-                    } else {
-                        endMoment = moment(filters.end_datetime + ':00');
-                    }
-                } else if (!filters.end_datetime.includes('T')) {
-                    // If only date, set to 23:59:59
-                    endMoment = moment(filters.end_datetime).endOf('day');
-                }
-                
-                // Convert to UTC
-                apiFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-            }
-            
-            // Always include local_parties and direction if they exist, even if empty
-            // This ensures they're sent to the API when explicitly set
-            if (filters.local_parties !== undefined) {
-                if (filters.local_parties && filters.local_parties.length > 0) {
-                    // Ensure extension_number is an array of strings
-                    apiFilters.local_parties = Array.isArray(filters.local_parties) 
-                        ? filters.local_parties.map((ext: any) => String(ext))
-                        : [String(filters.local_parties)];
-                } else {
-                    // Set to empty array to clear the filter
-                    apiFilters.local_parties = [];
-                }
-            }
-            if (filters.direction !== undefined) {
-                apiFilters.direction = filters.direction || '';
-            }
-            if (filters.status !== undefined) {
-                apiFilters.status = filters.status || '';
-            }
-            if (filters.qualification !== undefined) {
-                apiFilters.qualified = filters.qualification || '';
-            }
-            if (filters.follow_up !== undefined) {
-                apiFilters.follow_up_required = filters.follow_up || '';
-            }
-            if (filters.sentiment !== undefined) {
-                apiFilters.sentiment = filters.sentiment || '';
-            }
-            if (filters.main_intent !== undefined) {
-                apiFilters.main_intent = filters.main_intent || '';
-            }
+            const getQualificationActiveLabel = (value: string | undefined): string | undefined => {
+                if (value === 'qualified') return 'Qualified';
+                if (value === 'unqualified') return 'Unqualified';
+                return undefined;
+            };
 
-            setCurrentFilters(apiFilters);
-            // Update the ref immediately so fetchTableData can use the latest values
-            currentFiltersRef.current = apiFilters;
-            setAppliedFilters(filters);
-            // Don't call fetchTableData directly here - GenericListPage will handle it when filters prop changes
-        } catch (error) {
-            toast.error('Failed to apply filters. Please try again.');
-        } finally {
-            setFilterLoading(false);
-        }
+            const getFollowUpActiveLabel = (value: string | undefined): string | undefined => {
+                if (value === 'true') return 'Required';
+                if (value === 'false') return 'Not Required';
+                return undefined;
+            };
+
+    // Direct filter apply (already in API-ready format, no conversion needed)
+    const applyFilters = (nextFilters: Record<string, any>) => {
+        setCurrentFilters(nextFilters);
+        currentFiltersRef.current = nextFilters;
+        setRefreshKey((prev) => prev + 1);
     };
+
+    const callDirectionLabel = (value: string): string => {
+        if (value === 'CALL_OUTGOING') return 'Outgoing';
+        if (value === 'CALL_INCOMING') return 'Incoming';
+        return '';
+    };
+
+    const tableToolbar = useMemo(() => ({
+        showSearch: true,
+        searchValue,
+        searchPlaceholder: 'Search call recordings...',
+        onSearchChange: (value: string) => setSearchValue(value),
+        onSearch: () => {
+            setPaginationInfo((prev: any) => ({ ...prev, currentPage: 1 }));
+            fetchTableData(1, rowsPerPageRef.current, searchValue.trim());
+        },
+        showFiltersButton: true,
+        showFilterPills: true,
+        showMoreFiltersButton: false,
+        filterPills: [
+            {
+                id: 'direction',
+                label: 'Direction',
+                showDropdown: true,
+                active: Boolean(currentFilters.direction),
+                activeLabel: callDirectionLabel(currentFilters.direction ?? ''),
+                onClear: () => applyFilters({ ...currentFilters, direction: '' }),
+                dropdownOptions: [
+                    { label: 'Outgoing', value: 'CALL_OUTGOING', onClick: () => applyFilters({ ...currentFilters, direction: 'CALL_OUTGOING' }) },
+                    { label: 'Incoming', value: 'CALL_INCOMING', onClick: () => applyFilters({ ...currentFilters, direction: 'CALL_INCOMING' }) },
+                ],
+            },
+            {
+                id: 'status',
+                label: 'Analysis Status',
+                showDropdown: true,
+                active: Boolean(currentFilters.status),
+                activeLabel: currentFilters.status ? currentFilters.status.toUpperCase() : undefined,
+                onClear: () => applyFilters({ ...currentFilters, status: '' }),
+                dropdownOptions: [
+                    { label: 'Queued', value: 'queued', onClick: () => applyFilters({ ...currentFilters, status: 'queued' }) },
+                    { label: 'Transcribing', value: 'transribing', onClick: () => applyFilters({ ...currentFilters, status: 'transribing' }) },
+                    { label: 'Analyzing', value: 'analyzing', onClick: () => applyFilters({ ...currentFilters, status: 'analyzing' }) },
+                    { label: 'Completed', value: 'completed', onClick: () => applyFilters({ ...currentFilters, status: 'completed' }) },
+                    { label: 'Failed', value: 'failed', onClick: () => applyFilters({ ...currentFilters, status: 'failed' }) },
+                    { label: 'Incomplete', value: 'incomplete', onClick: () => applyFilters({ ...currentFilters, status: 'incomplete' }) },
+                    { label: 'Reanalysis', value: 'reanalysis', onClick: () => applyFilters({ ...currentFilters, status: 'reanalysis' }) },
+                ],
+            },
+            {
+                id: 'qualified',
+                label: 'Qualification',
+                showDropdown: true,
+                active: Boolean(currentFilters.qualified),
+                activeLabel: getQualificationActiveLabel(currentFilters.qualified),
+                onClear: () => applyFilters({ ...currentFilters, qualified: '' }),
+                dropdownOptions: [
+                    { label: 'Qualified', value: 'qualified', onClick: () => applyFilters({ ...currentFilters, qualified: 'qualified' }) },
+                    { label: 'Unqualified', value: 'unqualified', onClick: () => applyFilters({ ...currentFilters, qualified: 'unqualified' }) },
+                ],
+            },
+            {
+                id: 'follow_up_required',
+                label: 'Follow Up',
+                showDropdown: true,
+                active: currentFilters.follow_up_required !== undefined && currentFilters.follow_up_required !== '',
+                activeLabel: getFollowUpActiveLabel(currentFilters.follow_up_required),
+                onClear: () => applyFilters({ ...currentFilters, follow_up_required: '' }),
+                dropdownOptions: [
+                    { label: 'Required', value: 'true', onClick: () => applyFilters({ ...currentFilters, follow_up_required: 'true' }) },
+                    { label: 'Not Required', value: 'false', onClick: () => applyFilters({ ...currentFilters, follow_up_required: 'false' }) },
+                ],
+            },
+            {
+                id: 'sentiment',
+                label: 'Sentiment',
+                showDropdown: true,
+                active: Boolean(currentFilters.sentiment),
+                activeLabel: currentFilters.sentiment
+                    ? currentFilters.sentiment.charAt(0).toUpperCase() + currentFilters.sentiment.slice(1)
+                    : undefined,
+                onClear: () => applyFilters({ ...currentFilters, sentiment: '' }),
+                dropdownOptions: [
+                    { label: 'Positive', value: 'positive', onClick: () => applyFilters({ ...currentFilters, sentiment: 'positive' }) },
+                    { label: 'Neutral', value: 'neutral', onClick: () => applyFilters({ ...currentFilters, sentiment: 'neutral' }) },
+                    { label: 'Negative', value: 'negative', onClick: () => applyFilters({ ...currentFilters, sentiment: 'negative' }) },
+                ],
+            },
+            {
+                id: 'main_intent',
+                label: 'Main Intent',
+                showDropdown: true,
+                active: Boolean(currentFilters.main_intent),
+                activeLabel: currentFilters.main_intent || undefined,
+                onClear: () => applyFilters({ ...currentFilters, main_intent: '' }),
+                dropdownOptions: [
+                    { label: 'Purchase', value: 'required', onClick: () => applyFilters({ ...currentFilters, main_intent: 'required' }) },
+                    { label: 'Inquiry', value: 'inquiry', onClick: () => applyFilters({ ...currentFilters, main_intent: 'inquiry' }) },
+                    { label: 'Support', value: 'support', onClick: () => applyFilters({ ...currentFilters, main_intent: 'support' }) },
+                    { label: 'Complaint', value: 'complaint', onClick: () => applyFilters({ ...currentFilters, main_intent: 'complaint' }) },
+                    { label: 'Follow-up', value: 'follow-up', onClick: () => applyFilters({ ...currentFilters, main_intent: 'follow-up' }) },
+                ],
+            },
+            {
+                id: 'local_parties',
+                label: 'Extension',
+                showDropdown: true,
+                searchable: true,
+                active: Array.isArray(currentFilters.local_parties) && currentFilters.local_parties.length > 0,
+                activeLabel: Array.isArray(currentFilters.local_parties) && currentFilters.local_parties.length > 0
+                    ? `${currentFilters.local_parties.length} selected`
+                    : undefined,
+                onClear: () => applyFilters({ ...currentFilters, local_parties: [] }),
+                dropdownOptions: hierarchyDataExtensions.map((ext: any) => ({
+                    label: String(ext.name ?? ext.id),
+                    value: String(ext.id),
+                    onClick: () => applyFilters({ ...currentFilters, local_parties: [String(ext.id)] }),
+                })),
+            },
+        ],
+    }), [
+        searchValue,
+        currentFilters,
+        hierarchyDataExtensions,
+        fetchTableData,
+        applyFilters,
+    ]);
+
+    rowsPerPageRef.current = paginationInfo.perPage;
+
+    // Initial load and refetch when filters/refresh change
+    useEffect(() => {
+        setPaginationInfo((prev: any) => ({ ...prev, currentPage: 1 }));
+        fetchTableData(1, rowsPerPageRef.current, '');
+    }, [refreshKey, fetchTableData]);
 
 
     // Helper function to clear download state
@@ -774,6 +662,7 @@ const AnalyzeRecordings = () => {
             }, 1000);
             
         } catch (error) {
+            console.error('Download failed:', error);
             toast.error('Download failed');
             clearDownloadState(uuid);
         }
@@ -803,7 +692,7 @@ const AnalyzeRecordings = () => {
             // Pass as single encoded parameter
             const tempUrl = `/ai-ml/analysis/new?data=${encodeURIComponent(encodedData)}`;
       
-            window.open(tempUrl, '_blank');
+            globalThis.open(tempUrl, '_blank');
             
       
           } catch {
@@ -849,7 +738,7 @@ const AnalyzeRecordings = () => {
             if (response.status === 200) {
                 setMediaPlayerModal(true);
                 const blob = new Blob([response.data], { type: 'audio/mpeg' });
-                const audioUrl = window.URL.createObjectURL(blob);
+                const audioUrl = globalThis.URL.createObjectURL(blob);
                 setAudioUrl(audioUrl);
             } else if (response.status === 204) {
                 toast.error('Audio file not found');
@@ -858,13 +747,13 @@ const AnalyzeRecordings = () => {
             }
             
         } catch (error: any) {
-            if (error.response) {
-                if (error.response.status === 204) {
+            if (error?.response?.status) {
+                if (error.response?.status === 204) {
                     toast.error('Audio file not found');
                 } else {
-                    setAudioError(`Error loading audio: ${error.response.status}`);
+                    setAudioError(`Error loading audio: ${error.response?.status}`);
                 }
-            } else if (error.request) {
+            } else if (error?.request) {
                 setAudioError('No response received from server');
             } else {
                 setAudioError(`Request error: ${error.message}`);
@@ -883,6 +772,40 @@ const AnalyzeRecordings = () => {
         if (audioPlayerRef.current) {
             audioPlayerRef.current.pause();
         }
+    };
+
+    const renderModalBody = () => {
+        if (audioLoading) {
+            return (
+                <div className="p-4">
+                    <div className="spinner-border text-primary" aria-hidden="true" />
+                    <output className="mt-2 d-block" aria-live="polite">Loading audio file...</output>
+                </div>
+            );
+        }
+
+        if (audioError) {
+            return (
+                <div className="p-4">
+                    <div className="alert alert-warning">
+                        <i className="ph-duotone ph-warning-circle" aria-hidden="true" />{' '}
+                        <span>File not found</span>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div>
+                <AudioPlayer
+                    ref={audioPlayerRef}
+                    audioSrc={audioUrl}
+                    title={`Call Recording - ${selectedRecording?.Id}`}
+                    showWaveform={true}
+                    autoPlay={true}
+                />
+            </div>
+        );
     };
 
 
@@ -910,287 +833,68 @@ const AnalyzeRecordings = () => {
                 </Col>
             </Row>
 
-            <PageSummaryGrid cards={summaryCards} />
+            <div className="mb-4">
+                <StatsCards data={statsCardsData} gridMinWidth="160px" />
+            </div>
 
-            <BarFilters
-                searchValue={searchValue}
-                onSearchChange={(value) => setSearchValue(value)}
-                onSearch={() => {
-                    handleFiltersChange({ ...appliedFilters, search: searchValue });
-                }}
-                leftContent={
-                    <>
-                        {(() => {
-                            // Use same logic as API call to get dates
-                            const { startDate, endDate } = getDatesFromFilters(currentFilters);
-                            return (
-                                <p className="mb-0">
-                                    Date Range : <span className="status-badge primary">
-                                        {formatDateTimeToLocal(startDate, GlobalDateTimeFormat)}
-                                    </span> to <span className="status-badge primary">
-                                        {formatDateTimeToLocal(endDate, GlobalDateTimeFormat)}
-                                    </span>
-                                </p>
-                            );
-                        })()}
-                    </>
-                }
-                searchPlaceholder="Search call recordings..."
-                showSearch={false}
-                filters={appliedFilters}
-                onSubmit={() => {
-                    handleFiltersChange(appliedFilters);
-                }}
-                onReset={() => {
-                    const resetFilters: Record<string, any> = {
-                        start_datetime: moment().subtract(1, 'day').startOf('day').format('YYYY-MM-DDTHH:mm'),
-                        end_datetime: moment().endOf('day').format('YYYY-MM-DDTHH:mm'),
-                    };
-                    setSearchValue('');
-                    setAppliedFilters(resetFilters);
-                    handleFiltersChange(resetFilters);
-                }}
-                filterContent={
-                    <>
-                        {/* Date Range */}
-                        <Col md={4}>
-                            <Form.Group>
-                                <Form.Label>Start Date & Time</Form.Label>
-                                <Form.Control
-                                    type="datetime-local"
-                                    value={(appliedFilters as any)?.start_datetime || ''}
-                                    max={moment().format('YYYY-MM-DDTHH:mm')}
-                                    onChange={(e) => {
-                                        const datetimeValue = e.target.value;
-                                        const endDatetime = (appliedFilters as any)?.end_datetime || '';
-                                        
-                                        let updatedFilters: any = {
-                                            ...appliedFilters,
-                                            start_datetime: datetimeValue
-                                        };
-                                        
-                                        if (datetimeValue && endDatetime && moment(datetimeValue).isAfter(moment(endDatetime))) {
-                                            updatedFilters.end_date = datetimeValue;
-                                        }
-                                        
-                                        setAppliedFilters(updatedFilters);
-                                    }}
-                                />
-                            </Form.Group>
-                        </Col>
-
-                        <Col md={4}>
-                            <Form.Group>
-                                <Form.Label>End Date & Time</Form.Label>
-                                <Form.Control
-                                    type="datetime-local"
-                                    value={(appliedFilters as any)?.end_datetime || ''}
-                                    min={(appliedFilters as any)?.start_datetime || ''}
-                                    max={moment().format('YYYY-MM-DDTHH:mm')}
-                                    onChange={(e) => {
-                                        const datetimeValue = e.target.value;
-                                        const startDatetime = (appliedFilters as any)?.start_datetime || '';
-                                        
-                                        let updatedFilters: any = {
-                                            ...appliedFilters,
-                                            end_datetime: datetimeValue
-                                        };
-                                        
-                                        if (datetimeValue && startDatetime && moment(datetimeValue).isBefore(moment(startDatetime))) {
-                                            updatedFilters.start_datetime = datetimeValue;
-                                        }
-                                        
-                                        setAppliedFilters(updatedFilters);
-                                    }}
-                                />
-                            </Form.Group>
-                        </Col>
-
-                        {/* Extension */}
-                        <Col md={4}>
-                            <Form.Group>
-                                <Form.Label>Extension</Form.Label>
-                                <SelectBox
-                                    isMulti
-                                    isSearchable={true}
-                                    isDisabled={hierarchyLoading}
-                                    value={(appliedFilters as any)?.local_parties?.length > 0 ? (appliedFilters as any)?.local_parties : null}
-                                    onChange={(value) => {
-                                        // Ensure extension_number is always an array of strings
-                                        const extensionArray = value 
-                                            ? (Array.isArray(value) ? value : [value]).map((ext: any) => String(ext))
-                                            : [];
-                                        setAppliedFilters({ ...appliedFilters, local_parties: extensionArray });
-                                    }}
-                                    options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
-                                        value: String(ext.id), // Ensure value is always a string
-                                        label: ext.name
-                                    })) || []}
-                                    placeholder="Select extensions"
-                                />
-                            </Form.Group>
-                        </Col>
-
-                        {/* Call Direction */}
-                        <Col md={4}>
-                            <Form.Group>
-                                <Form.Label>Call Direction</Form.Label>
-                                <SelectBox
-                                    isSearchable={false}
-                                    value={(appliedFilters as any)?.direction || null}
-                                    onChange={(value) => {
-                                        setAppliedFilters({ ...appliedFilters, direction: value as string || '' });
-                                    }}
-                                    options={[
-                                        { value: 'CALL_OUTGOING', label: 'Outgoing' },
-                                        { value: 'CALL_INCOMING', label: 'Incoming' }
-                                    ]}
-                                    placeholder="Select call direction"
-                                />
-                            </Form.Group>
-                        </Col>
-
-                        {/* Call status */}
-                        <Col md={4}>
-                            <Form.Group>
-                                <Form.Label>Analysis Status</Form.Label>
-                                <SelectBox
-                                    isSearchable={false}
-                                    value={(appliedFilters as any)?.status || null}
-                                    onChange={(value) => {
-                                        setAppliedFilters({ ...appliedFilters, status: value as string || '' });
-                                    }}
-                                    options={[
-                                        { value: '', label: 'All' },
-                                        //{ value: 'in_progress', label: 'IN_PROGRESS' },
-                                        { value: 'queued', label: 'QUEUED' },
-                                        { value: 'transribing', label: 'TRANSCRIBING' },
-                                        { value: 'analyzing', label: 'ANALYZING' },
-
-
-                                        { value: 'completed', label: 'COMPLETED' },
-                                        { value: 'failed', label: 'FAILED' },
-                                        { value: 'incomplete', label: 'IN_COMPLETE' },
-                                        
-                                        // { value: 'analyzed', label: 'ANALYZED' },
-                                        
-                                        // { value: 'transcribed', label: 'TRANSCRIBED' },
-
-                                        { value: 'reanalysis', label: 'REANALYSIS' },
-                                        
-                                        
-                                    ]}
-                                    placeholder="Select analysis status"
-                                />
-                            </Form.Group>
-                        </Col>
-
-
-                        {/* qualification */}
-                        <Col md={4}>
-                            <Form.Group>
-                                <Form.Label>Qualification</Form.Label>
-                                <SelectBox
-                                    isSearchable={false}
-                                    value={(appliedFilters as any)?.qualification || null}
-                                    onChange={(value) => {
-                                        setAppliedFilters({ ...appliedFilters, qualification: value as string || '' });
-                                    }}
-                                    options={[
-                                        { value: 'qualified', label: 'Qualified' },
-                                        { value: 'unqualified', label: 'Unqualified' },
-                                        { value: '', label: 'N/A' }
-                                    ]}
-                                    placeholder="Select qualification"
-                                />
-                            </Form.Group>
-                        </Col>
-
-
-                        {/* follow-up */}
-                        <Col md={4}>
-                            <Form.Group>
-                                <Form.Label>Follow Up</Form.Label>
-                                <SelectBox
-                                    isSearchable={false}
-                                    value={(appliedFilters as any)?.follow_up || null}
-                                    onChange={(value) => {
-                                        setAppliedFilters({ ...appliedFilters, follow_up: value as string || '' });
-                                    }}
-                                    options={[
-                                        { value: 'true', label: 'Required' },
-                                        { value: 'false', label: 'Not Required' },
-                                        { value: '', label: 'N/A' }
-                                    ]}
-                                    placeholder="Select follow up"
-                                />
-                            </Form.Group>
-                        </Col>
-
-
-                         {/* Sentiment */}
-                         <Col md={4}>
-                            <Form.Group>
-                                <Form.Label>Sentiment</Form.Label>
-                                <SelectBox
-                                    isSearchable={false}
-                                    value={(appliedFilters as any)?.sentiment || null}
-                                    onChange={(value) => {
-                                        setAppliedFilters({ ...appliedFilters, sentiment: value as string || '' });
-                                    }}
-                                    options={[
-                                        { value: 'positive', label: 'Positive' },
-                                        { value: 'neutral', label: 'Neutral' },
-                                        { value: 'negative', label: 'Negative' },
-                                        { value: '', label: 'N/A' }
-                                    ]}
-                                    placeholder="Select sentiment"
-                                />
-                            </Form.Group>
-                        </Col>
-
-
-                        {/* Main intent */}
-                        <Col md={4}>
-                            <Form.Group>
-                                <Form.Label>Main Intent</Form.Label>
-                                <SelectBox
-                                    isSearchable={false}
-                                    value={(appliedFilters as any)?.main_intent || null}
-                                    onChange={(value) => {
-                                        setAppliedFilters({ ...appliedFilters, main_intent: value as string || '' });
-                                    }}
-                                    options={[
-                                        { value: 'required', label: 'Purchase' },
-                                        { value: 'inquiry', label: 'Inquiry' },
-                                        { value: 'support', label: 'Support' },
-                                        { value: 'complaint', label: 'Complaint' },
-                                        { value: 'follow-up', label: 'Follow-up' },
-                                        { value: '', label: 'N/A' }
-                                    ]}
-                                    placeholder="Select main intent"
-                                />
-                            </Form.Group>
-                        </Col>
-
-                    </>
-                }
-            />
+            {currentFilters.start_datetime && currentFilters.end_datetime && (
+                <div
+                    className="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
+                    style={{
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '10px',
+                        padding: '10px 12px',
+                    }}
+                >
+                    <div className="d-flex align-items-center gap-2">
+                        <span
+                            className="d-inline-flex align-items-center justify-content-center"
+                            style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#eef2ff', color: '#4f46e5' }}
+                        >
+                            <Calendar size={16} />
+                        </span>
+                        <div className="d-flex align-items-center gap-2">
+                            <span className="text-muted" style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.3px' }}>
+                                Selected Date Range
+                            </span>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                                {formatDateTimeToLocal(currentFilters.start_datetime, GlobalDateTimeFormat)} — {formatDateTimeToLocal(currentFilters.end_datetime, GlobalDateTimeFormat)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Data Table */}
             {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
-                                <GenericListPage
-                                    columns={columns}
-                                    fetchData={fetchTableData}
-                                    title="Call Recordings"
-                                    searchPlaceholder="Search call recordings..."
-                                    defaultPageSize={15}
-                                    filters={currentFilters}
-                                    refreshKey={refreshKey}
-                                    search={false}
-                                    tableStyle='table-style-2'
-                                />
-                            )}
+                <GenericTable<any>
+                    data={tableData}
+                    columns={tableColumns}
+                    actions={recordingActions}
+                    actionsLabel="Action"
+                    loading={tableLoading}
+                    emptyMessage="No call analysis records found."
+                    loadingMessage="Loading call analysis..."
+                    showToolbar={true}
+                    toolbar={tableToolbar}
+                    showToolbarActions={false}
+                    pagination={{
+                        currentPage: paginationInfo.currentPage,
+                        rowsPerPage: paginationInfo.perPage,
+                        totalRows: paginationInfo.totalRows,
+                        pageSizeOptions: [10, 15, 25, 50, 100],
+                    }}
+                    onPaginationChange={(page, rowsPerPage) => {
+                        setPaginationInfo((prev: any) => ({ ...prev, currentPage: page, perPage: rowsPerPage }));
+                        fetchTableData(page, rowsPerPage, searchValue.trim());
+                    }}
+                    sortable={true}
+                    hover={true}
+                    striped={false}
+                    uniqueKey="uuid"
+                />
+            )}
 
             {/* Media Player Modal */}
             <Modal
@@ -1208,31 +912,7 @@ const AnalyzeRecordings = () => {
                 <Modal.Body>
                     {selectedRecording && (
                         <div className="text-center d-flex flex-column align-items-center">
-                            {audioLoading ? (
-                                <div className="p-4">
-                                    <div className="spinner-border text-primary" role="status">
-                                        <span className="visually-hidden">Loading...</span>
-                                    </div>
-                                    <p className="mt-2">Loading audio file...</p>
-                                </div>
-                            ) : audioError ? (
-                                <div className="p-4">
-                                    <div className="alert alert-warning">
-                                        <i className="ph-duotone ph-warning-circle me-2"></i>
-                                        File not found
-                                    </div>
-                                </div>
-                            ) : (
-                                <div>
-                                    <AudioPlayer
-                                        ref={audioPlayerRef}
-                                        audioSrc={audioUrl}
-                                        title={`Call Recording - ${selectedRecording.Id}`}
-                                        showWaveform={true}
-                                        autoPlay={true}
-                                    />
-                                </div>
-                            )}
+                            {renderModalBody()}
                         </div>
                     )}
                 </Modal.Body>
