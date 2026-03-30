@@ -24,8 +24,7 @@ import {
   Menu,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
-import { StatsCardData } from "@components/GenericStatsCards";
-import MetricsSummaryCards from "@components/MetricsSummaryCards";
+import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { useRouter } from "next/router";
 
 // Type definitions
@@ -294,6 +293,7 @@ export interface GenericTableProps<T = any> {
 
   // Stats cards
   statsCards?: StatsCardData[]; // Stats cards data to display above table
+  metricsGridMinWidth?: string; // Grid min width for metrics cards layout
   
   // Hide toolbar actions (three dots menu)
   showToolbarActions?: boolean;
@@ -843,6 +843,7 @@ const GenericTable = <T extends Record<string, any>>({
   fixedHeight = false,
   maxHeight = "calc(100vh - 300px)",
   statsCards,
+  metricsGridMinWidth = "200px",
   showToolbarActions = true,
   noBorder = false,
   customBody,
@@ -1470,7 +1471,7 @@ const GenericTable = <T extends Record<string, any>>({
               borderRight: "1px solid #cccccc",
             }}
           >
-            <MetricsSummaryCards data={statsCards} />
+            <StatsCards data={statsCards} gridMinWidth={metricsGridMinWidth} />
           </div>
         )}
       </div>

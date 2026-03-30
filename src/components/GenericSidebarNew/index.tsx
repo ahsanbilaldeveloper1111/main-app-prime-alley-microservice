@@ -764,6 +764,8 @@ interface RecordSummaryDisplay {
 
 type CrmEntityType = "prospect" | "lead" | "deal" | "order";
 
+type SidebarRecordType = CrmEntityType | "company" | "activity";
+
 export interface GenericSidebarProps {
   isOpen: boolean;
   onClose?: () => void;
@@ -820,7 +822,7 @@ export interface GenericSidebarProps {
   // Context payload for integrations
   contextPayload?: Record<string, unknown>;
 
-  recordType?: CrmEntityType | "company" | "activity";
+  recordType?: SidebarRecordType;
   recordId?: number;
   /** When recordType is "activity", the underlying entity type for fetching history chain (e.g. "lead", "deal"). */
   activityEntityType?: CrmEntityType;
@@ -3219,7 +3221,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
             {/* Send Reminder */}
             <div>
-              <label
+              <p
                 style={{
                   fontSize: "13px",
                   color: "#141414",
@@ -3229,7 +3231,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 }}
               >
                 Send reminder
-              </label>
+              </p>
               <button
                 onClick={() => setShowReminderPicker(!showReminderPicker)}
                 style={{
@@ -3318,7 +3320,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   cursor: "pointer",
                 }}
               />
-              Set to repeat
+              <span>Set to repeat</span>
             </label>
           </div>
 
@@ -3336,7 +3338,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           >
             {/* Task Type */}
             <div style={{ position: "relative" }}>
-              <label
+              <p
                 style={{
                   fontSize: "13px",
                   color: "#718096",
@@ -3346,7 +3348,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 }}
               >
                 Task Type
-              </label>
+              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -3436,7 +3438,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
             {/* Priority */}
             <div style={{ position: "relative" }}>
-              <label
+              <p
                 style={{
                   fontSize: "13px",
                   color: "#718096",
@@ -3446,7 +3448,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 }}
               >
                 Priority
-              </label>
+              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -3536,7 +3538,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
             {/* Queue */}
             <div style={{ position: "relative" }}>
-              <label
+              <p
                 style={{
                   fontSize: "13px",
                   color: "#718096",
@@ -3546,7 +3548,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 }}
               >
                 Queue
-              </label>
+              </p>
               <button
                 type="button"
                 onClick={() => {
@@ -3637,6 +3639,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
             {/* Activity Assigned To */}
             <div style={{ position: "relative" }}>
               <label
+                htmlFor="activity-assigned-select"
                 style={{
                   fontSize: "13px",
                   color: "#718096",
@@ -3648,6 +3651,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 Activity assigned to
               </label>
               <Select
+                inputId="activity-assigned-select"
                 options={activityAssignedExtensions.map((ext: any) => ({
                   value: ext.id?.toString() || ext.extension?.toString() || "",
                   label:
@@ -3672,6 +3676,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
               ref={notesRef}
               contentEditable
               suppressContentEditableWarning
+              role="textbox"
+              aria-multiline="true"
+              aria-label="Notes"
+              tabIndex={0}
               onInput={syncNotesFromEditor}
               onKeyDown={handleKeyDown}
               data-placeholder="Notes..."
@@ -3977,14 +3985,12 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
   // State management
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [title, setTitle] = useState("");
-  const [selectedHost, setSelectedHost] = useState(hostEmail);
+  const selectedHost = hostEmail;
   const [startDate, setStartDate] = useState(new Date());
   const [startTime, setStartTime] = useState("01:00");
   const [endTime, setEndTime] = useState("01:30");
   const [attendees, setAttendees] = useState<string[]>(initialAttendees);
-  const [attendeeCount, setAttendeeCount] = useState(
-    initialAttendees.length > 0 ? initialAttendees.length : 2,
-  );
+  const attendeeCount = initialAttendees.length > 0 ? initialAttendees.length : 2;
   const [location, setLocation] = useState("");
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [reminders, setReminders] = useState<string[]>([]);
@@ -4032,19 +4038,6 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Calendar utilities
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    return new Date(year, month + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    return new Date(year, month, 1).getDay();
-  };
-
   const formatDateRange = (date: Date) => {
     const startOfWeek = new Date(date);
     startOfWeek.setDate(date.getDate() - date.getDay());
@@ -4057,53 +4050,6 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
       month: "short",
     };
     return `${startOfWeek.toLocaleDateString("en-US", options)} - ${endOfWeek.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}`;
-  };
-
-  const generateCalendarDays = () => {
-    const daysInMonth = getDaysInMonth(currentMonth);
-    const firstDay = getFirstDayOfMonth(currentMonth);
-    const days = [];
-
-    // Previous month days
-    const prevMonthDays = getDaysInMonth(
-      new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1),
-    );
-    for (let i = firstDay - 1; i >= 0; i--) {
-      days.push({
-        day: prevMonthDays - i,
-        isCurrentMonth: false,
-        date: new Date(
-          currentMonth.getFullYear(),
-          currentMonth.getMonth() - 1,
-          prevMonthDays - i,
-        ),
-      });
-    }
-
-    // Current month days
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push({
-        day: i,
-        isCurrentMonth: true,
-        date: new Date(currentMonth.getFullYear(), currentMonth.getMonth(), i),
-      });
-    }
-
-    // Next month days to fill the grid
-    const remainingDays = 35 - days.length; // 5 weeks * 7 days
-    for (let i = 1; i <= remainingDays; i++) {
-      days.push({
-        day: i,
-        isCurrentMonth: false,
-        date: new Date(
-          currentMonth.getFullYear(),
-          currentMonth.getMonth() + 1,
-          i,
-        ),
-      });
-    }
-
-    return days;
   };
 
   const isToday = (date: Date) => {
@@ -4216,11 +4162,10 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
     ? ["Mon", "Tue", "Wed", "Thu", "Fri"]
     : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  const timeSlots = [];
-  for (let hour = 0; hour < 24; hour++) {
-    timeSlots.push(`${hour.toString().padStart(2, "0")}:00`);
-    timeSlots.push(`${hour.toString().padStart(2, "0")}:30`);
-  }
+  const timeSlots = Array.from({ length: 24 }, (_, hour) => [
+    `${hour.toString().padStart(2, "0")}:00`,
+    `${hour.toString().padStart(2, "0")}:30`,
+  ]).flat();
 
   const locations = [
     "Conference Room A",
@@ -4369,7 +4314,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
           <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
             {/* Host Section */}
             <div style={{ marginBottom: "24px" }}>
-              <label
+              <p
                 style={{
                   fontSize: "14px",
                   fontWeight: "600",
@@ -4379,7 +4324,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 }}
               >
                 Host
-              </label>
+              </p>
 
               <div style={{ position: "relative" }}>
                 <button
@@ -4410,6 +4355,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
             {/* Title */}
             <div style={{ marginBottom: "24px" }}>
               <label
+                htmlFor="meeting-title-input"
                 style={{
                   fontSize: "14px",
                   fontWeight: "600",
@@ -4422,6 +4368,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
               </label>
               <input
                 ref={titleInputRef}
+                id="meeting-title-input"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -4448,7 +4395,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 }}
               >
                 <div>
-                  <label
+                  <p
                     style={{
                       fontSize: "13px",
                       fontWeight: "600",
@@ -4458,7 +4405,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                     }}
                   >
                     Start date
-                  </label>
+                  </p>
                   <div
                     style={{
                       padding: "8px 12px",
@@ -4473,16 +4420,32 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                       position: "relative",
                       cursor: "pointer",
                     }}
-                    onClick={openStartDatePicker}
                   >
-                    <Calendar size={16} style={{ color: "#718096" }} />
-                    <span>
-                      {startDate.toLocaleDateString("en-US", {
-                        month: "2-digit",
-                        day: "2-digit",
-                        year: "numeric",
-                      })}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={openStartDatePicker}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        border: "none",
+                        background: "transparent",
+                        color: "inherit",
+                        padding: 0,
+                        cursor: "pointer",
+                        textAlign: "left",
+                      }}
+                    >
+                      <Calendar size={16} style={{ color: "#718096" }} />
+                      <span>
+                        {startDate.toLocaleDateString("en-US", {
+                          month: "2-digit",
+                          day: "2-digit",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </button>
                     <input
                       aria-label="Start date"
                       ref={startDateInputRef}
@@ -4494,13 +4457,10 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                       }}
                       style={{
                         position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        height: "100%",
+                        width: "1px",
+                        height: "1px",
                         opacity: 0,
-                        cursor: "pointer",
-                        zIndex: 2,
+                        pointerEvents: "none",
                       }}
                     />
                   </div>
@@ -4508,6 +4468,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
 
                 <div>
                   <label
+                    htmlFor="meeting-start-time"
                     style={{
                       fontSize: "13px",
                       fontWeight: "600",
@@ -4533,6 +4494,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                   >
                     <Clock size={16} style={{ color: "#718096" }} />
                     <select
+                      id="meeting-start-time"
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
                       style={{
@@ -4556,6 +4518,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
 
                 <div>
                   <label
+                    htmlFor="meeting-end-time"
                     style={{
                       fontSize: "13px",
                       fontWeight: "600",
@@ -4581,6 +4544,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                   >
                     <Clock size={16} style={{ color: "#718096" }} />
                     <select
+                      id="meeting-end-time"
                       value={endTime}
                       onChange={(e) => setEndTime(e.target.value)}
                       style={{
@@ -4606,7 +4570,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
 
             {/* Attendees */}
             <div style={{ marginBottom: "24px" }}>
-              <label
+              <p
                 style={{
                   fontSize: "14px",
                   fontWeight: "600",
@@ -4616,7 +4580,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 }}
               >
                 Attendees
-              </label>
+              </p>
               <button
                 onClick={() => setShowAttendeesDropdown(!showAttendeesDropdown)}
                 style={{
@@ -4644,7 +4608,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
               style={{ marginBottom: "24px", position: "relative" }}
               ref={locationDropdownRef}
             >
-              <label
+              <p
                 style={{
                   fontSize: "14px",
                   fontWeight: "600",
@@ -4654,7 +4618,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 }}
               >
                 Location
-              </label>
+              </p>
               <button
                 onClick={() => setShowLocationDropdown(!showLocationDropdown)}
                 style={{
@@ -4728,7 +4692,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
 
             {/* Scheduled reminder emails */}
             <div style={{ marginBottom: "24px" }}>
-              <label
+              <p
                 style={{
                   fontSize: "14px",
                   fontWeight: "600",
@@ -4738,7 +4702,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 }}
               >
                 Scheduled reminder emails
-              </label>
+              </p>
               <button
                 style={{
                   background: "transparent",
@@ -4768,6 +4732,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
             {/* Attendee description */}
             <div style={{ marginBottom: "24px" }}>
               <label
+                htmlFor="meeting-description"
                 style={{
                   fontSize: "14px",
                   fontWeight: "600",
@@ -4779,6 +4744,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 Attendee description
               </label>
               <textarea
+                id="meeting-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Send a description to your attendees..."
@@ -4891,7 +4857,6 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                 <>
                   <span
                     className="spinner-border spinner-border-sm"
-                    role="status"
                     aria-hidden="true"
                     style={{
                       width: "14px",
@@ -4899,7 +4864,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                       borderWidth: "2px",
                     }}
                   />
-                  Scheduling...
+                  <span>Scheduling...</span>
                 </>
               ) : (
                 "Schedule meeting"
@@ -5201,7 +5166,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                     accentColor: "#141414",
                   }}
                 />
-                Hide weekends
+                <span>Hide weekends</span>
               </label>
 
               {/* Right - Timezone Selector */}
@@ -5335,7 +5300,8 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
               }
 
               return (
-                  <div
+                  <button
+                    type="button"
                     key={day}
                     style={{
                       padding: "12px",
@@ -5346,6 +5312,8 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                           : "none",
                       backgroundColor: "#ffffff",
                       cursor: "pointer",
+                      border: "none",
+                      width: "100%",
                     }}
                     onClick={() => setStartDateAndSyncWeek(currentDayDate)}
                   >
@@ -5377,7 +5345,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                     >
                       {currentDayDate.getDate()}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -5413,8 +5381,9 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
 
                   {/* Day Cells */}
                   {weekDays.map((_, dayIndex) => (
-                    <div
-                      key={dayIndex}
+                    <button
+                      type="button"
+                      key={weekDays[dayIndex]}
                       style={{
                         borderRight:
                           dayIndex < weekDays.length - 1
@@ -5423,6 +5392,9 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                         backgroundColor: "#fafafa",
                         cursor: "pointer",
                         position: "relative",
+                        border: "none",
+                        width: "100%",
+                        minHeight: "60px",
                       }}
                       onClick={() => {
                         const cellDate = getDateForColumn(dayIndex);
@@ -5461,7 +5433,7 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
                           Prime alley x Hub...
                         </div>
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
               ))}
@@ -5472,6 +5444,396 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
     </div>
   );
 };    
+
+// ============================================================================
+// HELPERS (module scope — no component state dependencies)
+// ============================================================================
+
+const parseTaskDueDate = (
+  activityDate: string,
+  _activityTime: string,
+): string => {
+  // Custom date is sent as YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(activityDate)) return activityDate;
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, "0");
+  const d = String(today.getDate()).padStart(2, "0");
+  const base = `${y}-${m}-${d}`;
+  if (activityDate === "Today") return base;
+  const addDays = (n: number) => {
+    const t = new Date(today);
+    t.setDate(t.getDate() + n);
+    return t.toISOString().slice(0, 10);
+  };
+  if (activityDate === "Tomorrow") return addDays(1);
+  if (
+    activityDate?.includes("3 business") ||
+    activityDate?.includes("Friday")
+  )
+    return addDays(3);
+  if (activityDate === "In 1 week") return addDays(7);
+  if (activityDate === "In 2 weeks") return addDays(14);
+  if (activityDate === "In 1 month") return addDays(30);
+  return addDays(3);
+};
+
+const isCrmEntityType = (value: string): value is CrmEntityType =>
+  value === "prospect" ||
+  value === "lead" ||
+  value === "deal" ||
+  value === "order";
+
+const normalizeActivityEntityType = (entityType: string): CrmEntityType => {
+  return isCrmEntityType(entityType) ? entityType : "order";
+};
+
+const buildActivitiesBaseUrl = (
+  type: CrmEntityType | "activity" | "company",
+  id: number | string,
+  entityTypeOverride?: CrmEntityType,
+): string | null => {
+  const effectiveType =
+    type === "activity"
+      ? normalizeActivityEntityType(entityTypeOverride ?? "lead")
+      : normalizeActivityEntityType(type);
+  const effectiveId = type === "activity" ? Number(id) : id;
+
+  if (type === "activity" && Number.isNaN(effectiveId)) return null;
+
+  return `/crm/detailspage?type=${effectiveType}&id=${effectiveId}&section=activities`;
+};
+
+type RecentActivitiesState = {
+  loading: boolean;
+  data: Record<string, unknown> | null;
+  detailPath: (id: number) => string;
+};
+
+const getRecentActivitiesState = ({
+  recordType,
+  prospectLoading,
+  prospectData,
+  leadLoading,
+  leadData,
+  dealLoading,
+  dealData,
+  orderLoading,
+  orderData,
+  activityHistoryChainLoading,
+  activityHistoryChain,
+  activityEntityType,
+}: {
+  recordType?: CrmEntityType | "activity" | "company";
+  prospectLoading: boolean;
+  prospectData: unknown;
+  leadLoading: boolean;
+  leadData: unknown;
+  dealLoading: boolean;
+  dealData: unknown;
+  orderLoading: boolean;
+  orderData: unknown;
+  activityHistoryChainLoading: boolean;
+  activityHistoryChain: HistoryChainRecord[] | null;
+  activityEntityType?: CrmEntityType;
+}): RecentActivitiesState | null => {
+  if (!recordType) return null;
+
+  const states: Record<string, RecentActivitiesState> = {
+    prospect: {
+      loading: prospectLoading,
+      data: prospectData as Record<string, unknown> | null,
+      detailPath: (id: number) =>
+        `/crm/detailspage?type=prospect&id=${id}&section=activities`,
+    },
+    lead: {
+      loading: leadLoading,
+      data: leadData as Record<string, unknown> | null,
+      detailPath: (id: number) =>
+        `/crm/detailspage?type=lead&id=${id}&section=activities`,
+    },
+    deal: {
+      loading: dealLoading,
+      data: dealData as Record<string, unknown> | null,
+      detailPath: (id: number) =>
+        `/crm/detailspage?type=deal&id=${id}&section=activities`,
+    },
+    order: {
+      loading: orderLoading,
+      data: orderData as Record<string, unknown> | null,
+      detailPath: (id: number) =>
+        `/crm/detailspage?type=order&id=${id}&section=activities`,
+    },
+    activity: {
+      loading: activityHistoryChainLoading,
+      data:
+        activityHistoryChain == null
+          ? null
+          : ({ audit_trail: activityHistoryChain } as Record<string, unknown>),
+      detailPath: (id: number) =>
+        `/crm/detailspage?type=${normalizeActivityEntityType(activityEntityType ?? "lead")}&id=${id}&section=activities`,
+    },
+  };
+
+  return states[recordType] ?? null;
+};
+
+type SidebarRecordDataState = {
+  prospectData: CrmDataItem | null;
+  prospectLoading: boolean;
+  leadData: LeadData | null;
+  leadLoading: boolean;
+  dealData: DealData | null;
+  dealLoading: boolean;
+  orderData: OrderData | null;
+  orderLoading: boolean;
+  activityHistoryChain: HistoryChainRecord[] | null;
+  activityHistoryChainLoading: boolean;
+};
+
+const useSidebarRecordData = ({
+  isOpen,
+  recordType,
+  recordId,
+  activityEntityType,
+}: {
+  isOpen: boolean;
+  recordType?: SidebarRecordType;
+  recordId?: number | string;
+  activityEntityType?: CrmEntityType;
+}): SidebarRecordDataState => {
+  const [prospectData, setProspectData] = useState<CrmDataItem | null>(null);
+  const [prospectLoading, setProspectLoading] = useState(false);
+  const [leadData, setLeadData] = useState<LeadData | null>(null);
+  const [leadLoading, setLeadLoading] = useState(false);
+  const [dealData, setDealData] = useState<DealData | null>(null);
+  const [dealLoading, setDealLoading] = useState(false);
+  const [orderData, setOrderData] = useState<OrderData | null>(null);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [activityHistoryChain, setActivityHistoryChain] = useState<
+    HistoryChainRecord[] | null
+  >(null);
+  const [activityHistoryChainLoading, setActivityHistoryChainLoading] =
+    useState(false);
+
+  useEffect(() => {
+    if (!isOpen || recordType !== "prospect" || recordId == null) {
+      setProspectData(null);
+      return;
+    }
+    const id = Number(recordId);
+    if (Number.isNaN(id)) {
+      setProspectData(null);
+      return;
+    }
+    setProspectLoading(true);
+    getAllCrmDataById(id)
+      .then((data) => {
+        setProspectData(data);
+      })
+      .catch(() => {
+        setProspectData(null);
+      })
+      .finally(() => {
+        setProspectLoading(false);
+      });
+  }, [isOpen, recordType, recordId]);
+
+  useEffect(() => {
+    if (!isOpen || recordType !== "lead" || recordId == null) {
+      setLeadData(null);
+      return;
+    }
+    const id = Number(recordId);
+    if (Number.isNaN(id)) {
+      setLeadData(null);
+      return;
+    }
+    setLeadLoading(true);
+    getLead(id)
+      .then((data) => {
+        setLeadData(data);
+      })
+      .catch(() => {
+        setLeadData(null);
+      })
+      .finally(() => {
+        setLeadLoading(false);
+      });
+  }, [isOpen, recordType, recordId]);
+
+  useEffect(() => {
+    if (!isOpen || recordType !== "deal" || recordId == null) {
+      setDealData(null);
+      return;
+    }
+    const id = Number(recordId);
+    if (Number.isNaN(id)) {
+      setDealData(null);
+      return;
+    }
+    setDealLoading(true);
+    getDeal(id)
+      .then((data) => setDealData(data))
+      .catch(() => setDealData(null))
+      .finally(() => setDealLoading(false));
+  }, [isOpen, recordType, recordId]);
+
+  useEffect(() => {
+    if (!isOpen || recordType !== "order" || recordId == null) {
+      setOrderData(null);
+      return;
+    }
+    const id = Number(recordId);
+    if (Number.isNaN(id)) {
+      setOrderData(null);
+      return;
+    }
+    setOrderLoading(true);
+    getOrder(id)
+      .then((data) => setOrderData(data))
+      .catch(() => setOrderData(null))
+      .finally(() => setOrderLoading(false));
+  }, [isOpen, recordType, recordId]);
+
+  useEffect(() => {
+    if (
+      !isOpen ||
+      recordType !== "activity" ||
+      recordId == null ||
+      !activityEntityType
+    ) {
+      setActivityHistoryChain(null);
+      return;
+    }
+    const id = Number(recordId);
+    if (Number.isNaN(id)) {
+      setActivityHistoryChain(null);
+      return;
+    }
+    setActivityHistoryChainLoading(true);
+    getHistoryChain(activityEntityType, id)
+      .then((data) => setActivityHistoryChain(data ?? null))
+      .catch(() => setActivityHistoryChain(null))
+      .finally(() => setActivityHistoryChainLoading(false));
+  }, [isOpen, recordType, recordId, activityEntityType]);
+
+  return {
+    prospectData,
+    prospectLoading,
+    leadData,
+    leadLoading,
+    dealData,
+    dealLoading,
+    orderData,
+    orderLoading,
+    activityHistoryChain,
+    activityHistoryChainLoading,
+  };
+};
+
+const useSidebarNotes = ({
+  isOpen,
+  recordType,
+  recordId,
+}: {
+  isOpen: boolean;
+  recordType?: SidebarRecordType;
+  recordId?: number;
+}) => {
+  const [sidebarNotesList, setSidebarNotesList] = useState<CrmNoteItem[]>([]);
+  const [sidebarNotesLoading, setSidebarNotesLoading] = useState(false);
+
+  const refreshSidebarNotes = useCallback(async () => {
+    if (
+      !isOpen ||
+      !recordType ||
+      recordType === "activity" ||
+      recordType === "company" ||
+      recordId == null ||
+      Number.isNaN(Number(recordId))
+    ) {
+      return;
+    }
+
+    setSidebarNotesLoading(true);
+    try {
+      const res = await getCrmNotes(recordType, Number(recordId));
+      setSidebarNotesList(res?.data ?? []);
+    } catch {
+      setSidebarNotesList([]);
+    } finally {
+      setSidebarNotesLoading(false);
+    }
+  }, [isOpen, recordId, recordType]);
+
+  useEffect(() => {
+    void refreshSidebarNotes();
+  }, [refreshSidebarNotes]);
+
+  return {
+    sidebarNotesList,
+    sidebarNotesLoading,
+    setSidebarNotesList,
+    refreshSidebarNotes,
+  };
+};
+
+const useSidebarCallRecordings = ({
+  isOpen,
+  phone,
+}: {
+  isOpen: boolean;
+  phone?: string;
+}) => {
+  const [sidebarCallRecordings, setSidebarCallRecordings] = useState<any[]>([]);
+  const [sidebarCallRecordingsLoading, setSidebarCallRecordingsLoading] =
+    useState(false);
+  const callRecordingsFetchKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      callRecordingsFetchKeyRef.current = null;
+      return;
+    }
+
+    const normalizedPhone = (phone || "").trim().replaceAll(/\s/g, "");
+    if (!normalizedPhone) {
+      setSidebarCallRecordings([]);
+      return;
+    }
+
+    const fetchKey = `${normalizedPhone}`;
+    if (callRecordingsFetchKeyRef.current === fetchKey) return;
+
+    callRecordingsFetchKeyRef.current = fetchKey;
+    setSidebarCallRecordingsLoading(true);
+    ListCallLogs(
+      {
+        page: 1,
+        perPage: 20,
+        search: "",
+        filters: { remote_party_number: [String(normalizedPhone)] },
+        reportType: "recordings",
+        moduleSlug: ModuleSlug.CALL_RECORDINGS,
+      },
+      "call-logs/recordings",
+    )
+      .then((response: any) => {
+        const data = response ?? {};
+        setSidebarCallRecordings(
+          Array.isArray(data.dataList) ? data.dataList : [],
+        );
+      })
+      .catch(() => setSidebarCallRecordings([]))
+      .finally(() => setSidebarCallRecordingsLoading(false));
+  }, [isOpen, phone]);
+
+  return {
+    sidebarCallRecordings,
+    sidebarCallRecordingsLoading,
+  };
+};
 
 // ============================================================================
 // MAIN COMPONENT
@@ -5537,7 +5899,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     useState(false);
   const [availableDevices, setAvailableDevices] = useState<any[]>([]);
   const [pendingDialedNumber, setPendingDialedNumber] = useState("");
-  const [isDialing, setIsDialing] = useState(false);
   const extension =
     (session?.user as { extension?: string; phone?: string } | undefined)
       ?.extension ??
@@ -5551,131 +5912,23 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       ?.tenant ??
     "";
 
-  // Fetched prospect when sidebar is opened for a prospect (by recordId)
-  const [prospectData, setProspectData] = useState<CrmDataItem | null>(null);
-  const [prospectLoading, setProspectLoading] = useState(false);
-
-  // When sidebar is opened for a prospect, fetch prospect by ID
-  useEffect(() => {
-    if (!isOpen || recordType !== "prospect" || recordId == null) {
-      setProspectData(null);
-      return;
-    }
-    const id = Number(recordId);
-    if (Number.isNaN(id)) {
-      setProspectData(null);
-      return;
-    }
-    setProspectLoading(true);
-    getAllCrmDataById(id)
-      .then((data) => {
-        setProspectData(data);
-      })
-      .catch(() => {
-        setProspectData(null);
-      })
-      .finally(() => {
-        setProspectLoading(false);
-      });
-  }, [isOpen, recordType, recordId]);
-
-  // Fetched lead when sidebar is opened for a lead (by recordId) – for Recent activities
-  const [leadData, setLeadData] = useState<LeadData | null>(null);
-  const [leadLoading, setLeadLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen || recordType !== "lead" || recordId == null) {
-      setLeadData(null);
-      return;
-    }
-    const id = Number(recordId);
-    if (Number.isNaN(id)) {
-      setLeadData(null);
-      return;
-    }
-    setLeadLoading(true);
-    getLead(id)
-      .then((data) => {
-        setLeadData(data);
-      })
-      .catch(() => {
-        setLeadData(null);
-      })
-      .finally(() => {
-        setLeadLoading(false);
-      });
-  }, [isOpen, recordType, recordId]);
-
-  // Fetched deal when sidebar is opened for a deal (by recordId) – for Recent activities
-  const [dealData, setDealData] = useState<DealData | null>(null);
-  const [dealLoading, setDealLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen || recordType !== "deal" || recordId == null) {
-      setDealData(null);
-      return;
-    }
-    const id = Number(recordId);
-    if (Number.isNaN(id)) {
-      setDealData(null);
-      return;
-    }
-    setDealLoading(true);
-    getDeal(id)
-      .then((data) => setDealData(data))
-      .catch(() => setDealData(null))
-      .finally(() => setDealLoading(false));
-  }, [isOpen, recordType, recordId]);
-
-  // Fetched order when sidebar is opened for an order (by recordId) – for Recent activities
-  const [orderData, setOrderData] = useState<OrderData | null>(null);
-  const [orderLoading, setOrderLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen || recordType !== "order" || recordId == null) {
-      setOrderData(null);
-      return;
-    }
-    const id = Number(recordId);
-    if (Number.isNaN(id)) {
-      setOrderData(null);
-      return;
-    }
-    setOrderLoading(true);
-    getOrder(id)
-      .then((data) => setOrderData(data))
-      .catch(() => setOrderData(null))
-      .finally(() => setOrderLoading(false));
-  }, [isOpen, recordType, recordId]);
-
-  // Fetched history chain when sidebar is opened for an activity (recordType "activity") – for Recent activities timeline
-  const [activityHistoryChain, setActivityHistoryChain] = useState<
-    HistoryChainRecord[] | null
-  >(null);
-  const [activityHistoryChainLoading, setActivityHistoryChainLoading] =
-    useState(false);
-
-  useEffect(() => {
-    if (
-      !isOpen ||
-      recordType !== "activity" ||
-      recordId == null ||
-      !activityEntityType
-    ) {
-      setActivityHistoryChain(null);
-      return;
-    }
-    const id = Number(recordId);
-    if (Number.isNaN(id)) {
-      setActivityHistoryChain(null);
-      return;
-    }
-    setActivityHistoryChainLoading(true);
-    getHistoryChain(activityEntityType, id)
-      .then((data) => setActivityHistoryChain(data ?? null))
-      .catch(() => setActivityHistoryChain(null))
-      .finally(() => setActivityHistoryChainLoading(false));
-  }, [isOpen, recordType, recordId, activityEntityType]);
+  const {
+    prospectData,
+    prospectLoading,
+    leadData,
+    leadLoading,
+    dealData,
+    dealLoading,
+    orderData,
+    orderLoading,
+    activityHistoryChain,
+    activityHistoryChainLoading,
+  } = useSidebarRecordData({
+    isOpen,
+    recordType,
+    recordId,
+    activityEntityType,
+  });
 
   // Record summary from API crm_summary.
   // Always show the section; when summary is missing/empty, the UI will display a fallback message.
@@ -5707,7 +5960,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         setShowCallModal(false);
         return;
       }
-      setIsDialing(true);
       try {
         const result = await ctiDialNumber(numberToDial);
         if (result?.success) {
@@ -5719,7 +5971,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       } catch {
         toast.error("Failed to make call");
       } finally {
-        setIsDialing(false);
+        // call finished
       }
     },
     [ctiDialNumber, getAllUserDevices, onCall],
@@ -5737,7 +5989,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         selectedAt: new Date().toISOString(),
       };
       localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
-      setIsDialing(true);
       try {
         const result = await makeCall({
           callingAddress: ctiUserAddress ?? "",
@@ -5754,7 +6005,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       } catch {
         toast.error("Failed to make call");
       } finally {
-        setIsDialing(false);
+        // call finished
       }
     },
     [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
@@ -5790,6 +6041,24 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       ? Number(recordId)
       : undefined;
 
+  const {
+    sidebarNotesList,
+    sidebarNotesLoading,
+    setSidebarNotesList,
+    refreshSidebarNotes,
+  } = useSidebarNotes({
+    isOpen,
+    recordType,
+    recordId,
+  });
+  const {
+    sidebarCallRecordings,
+    sidebarCallRecordingsLoading,
+  } = useSidebarCallRecordings({
+    isOpen,
+    phone,
+  });
+
   const activityModalsParams =
     activityRecordTypeForModals && activityRecordIdForModals != null
       ? {
@@ -5802,20 +6071,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           // refresh the sidebar notes list for this record so the
           // "Notes" section in GenericSidebar updates immediately.
           onNoteCreated: () => {
-            setSidebarNotesLoading(true);
-            getCrmNotes(
-              activityRecordTypeForModals,
-              activityRecordIdForModals,
-            )
-              .then((res) => {
-                setSidebarNotesList(res?.data ?? []);
-              })
-              .catch(() => {
-                setSidebarNotesList([]);
-              })
-              .finally(() => {
-                setSidebarNotesLoading(false);
-              });
+            void refreshSidebarNotes();
           },
         }
       : {
@@ -5852,12 +6108,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     top: 0,
     left: 0,
   });
-  const [sidebarNotesList, setSidebarNotesList] = useState<CrmNoteItem[]>([]);
-  const [sidebarNotesLoading, setSidebarNotesLoading] = useState(false);
-  const [sidebarCallRecordings, setSidebarCallRecordings] = useState<any[]>([]);
-  const [sidebarCallRecordingsLoading, setSidebarCallRecordingsLoading] =
-    useState(false);
-  const callRecordingsFetchKeyRef = useRef<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const sectionDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>(
     {},
@@ -5880,65 +6130,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     }
     setCollapsedSections(collapsed);
   }, [isOpen, recordType, recordId]);
-
-  // Fetch notes when sidebar is open and we have a CRM record
-  useEffect(() => {
-    if (
-      !isOpen ||
-      !recordType ||
-      recordId == null ||
-      Number.isNaN(Number(recordId))
-    ) {
-      return;
-    }
-
-    //skip for activity
-    if (recordType === "activity") return;
-    const rType = recordType as CrmEntityType;
-    setSidebarNotesLoading(true);
-    getCrmNotes(rType, Number(recordId))
-      .then((res) => {
-        setSidebarNotesList(res?.data ?? []);
-      })
-      .catch(() => setSidebarNotesList([]))
-      .finally(() => setSidebarNotesLoading(false));
-  }, [isOpen, recordType, recordId]);
-
-  // Fetch call recordings when sidebar is open and we have a phone number (ref prevents double call)
-  useEffect(() => {
-    if (!isOpen) {
-      callRecordingsFetchKeyRef.current = null;
-      return;
-    }
-    const normalizedPhone = (phone || "").trim().replace(/\s/g, "");
-    if (!normalizedPhone) {
-      setSidebarCallRecordings([]);
-      return;
-    }
-    const fetchKey = `${normalizedPhone}`;
-    if (callRecordingsFetchKeyRef.current === fetchKey) return;
-    callRecordingsFetchKeyRef.current = fetchKey;
-    setSidebarCallRecordingsLoading(true);
-    ListCallLogs(
-      {
-        page: 1,
-        perPage: 20,
-        search: "",
-        filters: { remote_party_number: [String(normalizedPhone)] },
-        reportType: "recordings",
-        moduleSlug: ModuleSlug.CALL_RECORDINGS,
-      },
-      "call-logs/recordings",
-    )
-      .then((response: any) => {
-        const data = response ?? {};
-        setSidebarCallRecordings(
-          Array.isArray(data.dataList) ? data.dataList : [],
-        );
-      })
-      .catch(() => setSidebarCallRecordings([]))
-      .finally(() => setSidebarCallRecordingsLoading(false));
-  }, [isOpen, phone]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -6031,12 +6222,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         toast.success("Note created successfully");
         onNoteCreate?.(note, createTask, taskDueDate);
         // Refresh sidebar notes list
-        getCrmNotes(
-          crmRecordType as CrmEntityType,
-          Number(recordId),
-        )
-          .then((res) => setSidebarNotesList(res?.data ?? []))
-          .catch(() => {});
+        void refreshSidebarNotes();
       } catch {
         // createCrmNote already shows toast on error
       }
@@ -6112,35 +6298,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
   const handleTaskClose = () => {
     setShowTaskModal(false);
-  };
-
-  const parseTaskDueDate = (
-    activityDate: string,
-    activityTime: string,
-  ): string => {
-    // Custom date is sent as YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}$/.test(activityDate)) return activityDate;
-    const today = new Date();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, "0");
-    const d = String(today.getDate()).padStart(2, "0");
-    const base = `${y}-${m}-${d}`;
-    if (activityDate === "Today") return base;
-    const addDays = (n: number) => {
-      const t = new Date(today);
-      t.setDate(t.getDate() + n);
-      return t.toISOString().slice(0, 10);
-    };
-    if (activityDate === "Tomorrow") return addDays(1);
-    if (
-      activityDate?.includes("3 business") ||
-      activityDate?.includes("Friday")
-    )
-      return addDays(3);
-    if (activityDate === "In 1 week") return addDays(7);
-    if (activityDate === "In 2 weeks") return addDays(14);
-    if (activityDate === "In 1 month") return addDays(30);
-    return addDays(3);
   };
 
   const handleTaskSave = async (taskData: {
@@ -6239,7 +6396,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       type: RECORD_TYPES;
     },
   ) => {
-    if (!record || record.id == null || record.type == null) {
+    if (record?.id == null || record?.type == null) {
       toast.error(
         "No record linked. Schedule the meeting from a prospect, lead, deal, or order.",
       );
@@ -6397,32 +6554,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     setShowMoreModal(false);
   };
 
-  const buildActivitiesBaseUrl = (
-    type: string,
-    id: number | string,
-    entityTypeOverride?: string,
-  ): string | null => {
-    const effectiveType = type === "activity" ? entityTypeOverride ?? "lead" : type;
-    const effectiveId =
-      type === "activity" ? Number(id) : id;
-
-    if (type === "activity" && Number.isNaN(effectiveId)) {
-      return null;
-    }
-
-    switch (effectiveType) {
-      case "prospect":
-        return `/crm/detailspage?type=prospect&id=${effectiveId}&section=activities`;
-      case "lead":
-        return `/crm/detailspage?type=lead&id=${effectiveId}&section=activities`;
-      case "deal":
-        return `/crm/detailspage?type=deal&id=${effectiveId}&section=activities`;
-      case "order":
-      default:
-        return `/crm/detailspage?type=order&id=${effectiveId}&section=activities`;
-    }
-  };
-
   const goToRecordDetailActivity = (activityType?: string) => {
     if (!recordType || recordId == null) return;
 
@@ -6446,34 +6577,17 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleMoreActionSelect = (actionId: string) => {
-    switch (actionId) {
-      case "note":
-        handleNoteClick();
-        break;
-      case "task":
-        handleTaskClick();
-        break;
-      case "log-call":
-        goToRecordDetailActivity("calls");
-        break;
-      case "log-whatsapp":
-        goToRecordDetailActivity("whatsapp");
-        break;
-      case "log-sms":
-        // Navigate to Activities tab with SMS sub-tab active
-        goToRecordDetailActivity("sms");
-        break;
-      case "log-meeting":
-        // Navigate to Activities tab with Meetings sub-tab active
-        goToRecordDetailActivity("meetings");
-        break;
-      case "log-email":
-        // Navigate to Activities tab with Emails sub-tab active
-        goToRecordDetailActivity("emails");
-        break;
-      default:
-        break;
-    }
+    const activityTypeMap: Record<string, string> = {
+      "log-call": "calls",
+      "log-whatsapp": "whatsapp",
+      "log-sms": "sms",
+      "log-meeting": "meetings",
+      "log-email": "emails",
+    };
+    if (actionId === "note") { handleNoteClick(); return; }
+    if (actionId === "task") { handleTaskClick(); return; }
+    const activityType = activityTypeMap[actionId];
+    if (activityType) goToRecordDetailActivity(activityType);
   };
 
   // Process quick actions to override note and email actions if provided
@@ -6781,65 +6895,20 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       : entry.description?.trim() || "Record updated";
   };
 
-  const recentActivitiesState = (() => {
-    if (!recordType) return null;
-    switch (recordType) {
-      case "prospect":
-        return {
-          loading: prospectLoading,
-          data: prospectData as Record<string, unknown> | null,
-          detailPath: (id: number) =>
-            `/crm/detailspage?type=prospect&id=${id}&section=activities`,
-        };
-      case "lead":
-        return {
-          loading: leadLoading,
-          data: leadData as Record<string, unknown> | null,
-          detailPath: (id: number) =>
-            `/crm/detailspage?type=lead&id=${id}&section=activities`,
-        };
-      case "deal":
-        return {
-          loading: dealLoading,
-          data: dealData as Record<string, unknown> | null,
-          detailPath: (id: number) =>
-            `/crm/detailspage?type=deal&id=${id}&section=activities`,
-        };
-      case "order":
-        return {
-          loading: orderLoading,
-          data: orderData as Record<string, unknown> | null,
-          detailPath: (id: number) =>
-            `/crm/detailspage?type=order&id=${id}&section=activities`,
-        };
-      case "activity":
-        return {
-          loading: activityHistoryChainLoading,
-          data:
-            activityHistoryChain == null
-              ? null
-              : ({ audit_trail: activityHistoryChain } as Record<
-                  string,
-                  unknown
-                >),
-          detailPath: (id: number) => {
-            const entityType = activityEntityType ?? "lead";
-            switch (entityType) {
-              case "prospect":
-                return `/crm/detailspage?type=prospect&id=${id}&section=activities`;
-              case "lead":
-                return `/crm/detailspage?type=lead&id=${id}&section=activities`;
-              case "deal":
-                return `/crm/detailspage?type=deal&id=${id}&section=activities`;
-              default:
-                return `/crm/detailspage?type=order&id=${id}&section=activities`;
-            }
-          },
-        };
-      default:
-        return null;
-    }
-  })();
+  const recentActivitiesState = getRecentActivitiesState({
+    recordType,
+    prospectLoading,
+    prospectData,
+    leadLoading,
+    leadData,
+    dealLoading,
+    dealData,
+    orderLoading,
+    orderData,
+    activityHistoryChainLoading,
+    activityHistoryChain,
+    activityEntityType,
+  });
 
   const enhanceNotesSection = (section: any): any => {
     const updatedSection = {
@@ -7060,7 +7129,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
             {field.value.map((tag: any, idx: number) => (
               <span
-                key={idx}
+                key={typeof tag === "string" ? tag : (tag.name ?? idx)}
                 style={{
                   padding: "4px 10px",
                   backgroundColor: "#eaf0f6",
@@ -7243,7 +7312,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const renderSection = (section: SidebarSection) => {
-    const SectionIcon = section.icon;
     const EmptyIcon = section.emptyState?.icon;
     const isCollapsed = collapsedSections.has(section.id);
     const showActions = showSectionActions === section.id;
@@ -7419,9 +7487,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     overflow: "hidden",
                   }}
                 >
-                  {(section.actions ?? []).map((action, index) => (
+                  {(section.actions ?? []).map((action) => (
                     <button
-                      key={index}
+                      key={action.label}
                       onClick={() => {
                         action.onClick();
                         setShowSectionActions(null);
@@ -7841,7 +7909,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         onActionSelect={handleMoreActionSelect}
       />
 
-      <div
+      <div className="generic-sidebar-new-container"
         style={{
           width,
           backgroundColor: "#f0f0f0",

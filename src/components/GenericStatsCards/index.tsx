@@ -63,7 +63,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
             }}
           >
             {/* Icon */}
-            {IconComponent && (
+            {/* {IconComponent && (
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '10px' }}>
                 <span
                   style={{
@@ -79,7 +79,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                   <IconComponent size={16} color={iconColor} />
                 </span>
               </div>
-            )}
+            )} */}
 
             {/* Title */}
             <div style={{
