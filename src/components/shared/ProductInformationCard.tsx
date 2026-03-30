@@ -30,6 +30,7 @@ export function ProductInformationCard({
   additionalOpen,
   onAdditionalOpenChange,
   idPrefix = "cmp",
+  disableSku = false,
 }: Readonly<{
   title?: string;
   error?: string | null;
@@ -49,6 +50,8 @@ export function ProductInformationCard({
   additionalOpen: boolean;
   onAdditionalOpenChange: (next: boolean) => void;
   idPrefix?: string;
+  /** When true (e.g. editing an existing product), SKU cannot be changed. */
+  disableSku?: boolean;
 }>) {
   const [dragOver, setDragOver] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -109,9 +112,10 @@ export function ProductInformationCard({
             type="text"
             value={productSku}
             onChange={(e) => onProductSkuChange(e.target.value)}
-            style={FIELD_INPUT}
+            style={{...FIELD_INPUT, cursor: disableSku ? "not-allowed" : "pointer"}}
             onFocus={onBorderFocus}
             onBlur={onBorderBlur}
+            disabled={disableSku}
           />
         </div>
 

@@ -154,6 +154,51 @@ const formatProductPriceAED = (row: { base_price?: unknown; data?: { base_price?
   return price == null ? emptyFallback : `AED ${Number(price).toLocaleString()}`;
 };
 
+const BILLING_PRODUCTS_COLUMN_STORAGE_KEY = "billing-products-table-columns";
+
+const DEFAULT_PRODUCT_TABLE_COLUMN_KEYS: string[] = [
+  "name",
+  "sku",
+  "tax_category",
+  "base_price",
+  "is_active",
+  "actions",
+];
+
+function parseStoredProductColumnKeys(raw: string | null): string[] | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    const allowed = new Set(DEFAULT_PRODUCT_TABLE_COLUMN_KEYS);
+    const keys = parsed.filter(
+      (k): k is string => typeof k === "string" && allowed.has(k),
+    );
+    return keys.length > 0 ? keys : null;
+  } catch {
+    return null;
+  }
+}
+
+function loadProductTableColumnsFromStorage(): string[] {
+  const win = (globalThis as unknown as { window?: Window & { localStorage: Storage } }).window;
+  if (win === undefined) {
+    return [...DEFAULT_PRODUCT_TABLE_COLUMN_KEYS];
+  }
+  const fromDedicated = parseStoredProductColumnKeys(
+    win.localStorage.getItem(BILLING_PRODUCTS_COLUMN_STORAGE_KEY),
+  );
+  if (fromDedicated) {
+    return fromDedicated;
+  }
+  const legacy = parseStoredProductColumnKeys(win.localStorage.getItem("crmDataSelectedColumns"));
+  return legacy ?? [...DEFAULT_PRODUCT_TABLE_COLUMN_KEYS];
+}
+
 const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
   padding: "9px 13px",
   backgroundColor: "#000000",
@@ -342,18 +387,14 @@ const BillingManagement = () => {
     "table" | "board"
   >("table");
 
-  // Column customization and pagination states
-  const defaultSelectedColumns = [
-    "name",
-    "sku",
-    "tax_category",
-    "base_price",
-    "is_active",
-    "actions",
-  ];
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(
-    () => defaultSelectedColumns,
-  );
+  // Column customization and pagination states (defaults SSR-safe; hydrate from localStorage on client)
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => [
+    ...DEFAULT_PRODUCT_TABLE_COLUMN_KEYS,
+  ]);
+
+  useEffect(() => {
+    setSelectedColumns(loadProductTableColumnsFromStorage());
+  }, []);
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -1519,10 +1560,7 @@ const BillingManagement = () => {
           setSelectedColumns(keys);
           const w = (globalThis as unknown as { window?: Window }).window;
           if (w) {
-            w.localStorage.setItem(
-              "crmDataSelectedColumns",
-              JSON.stringify(keys),
-            );
+            w.localStorage.setItem(BILLING_PRODUCTS_COLUMN_STORAGE_KEY, JSON.stringify(keys));
           }
         }}
       />

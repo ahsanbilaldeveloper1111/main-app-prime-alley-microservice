@@ -288,6 +288,7 @@ export default function CreateProductModal({
         additionalOpen={additionalOpen}
         onAdditionalOpenChange={setAdditionalOpen}
         idPrefix="cmp"
+        disableSku={isEditMode}
       />
 
       <BillingDetailsCard
