@@ -36,6 +36,11 @@ import {
 import ApprovalDetailSidebar from "./sidebar";
 import DeleteConfirmationModal from "../../partial/DeleteConfirmationModal";
 import NewRequestModal from "@pages/workforce/NewRequestModal";
+import {
+  findMainAppUserByRequestUserId,
+  getUserDisplayNameFromLookup,
+  type UserRequestIdValue,
+} from "./userLookup";
 
 const TAB_TO_STATUS: Record<string, string> = {
   Pending: "pending",
@@ -297,12 +302,7 @@ const ApprovalRequest = () => {
   const { mainAppUsers } = useMainAppLookups();
 
   const getDisplayName = useCallback(
-    (userId: string | number | null | undefined): string => {
-      if (userId == null || userId === "") return "—";
-      const idStr = String(userId);
-      const u = mainAppUsers?.find((x: MainAppUserLookup) => String(x.id) === idStr);
-      return u?.name ?? idStr;
-    },
+    (userId: UserRequestIdValue) => getUserDisplayNameFromLookup(mainAppUsers, userId),
     [mainAppUsers]
   );
 
@@ -516,7 +516,7 @@ const ApprovalRequest = () => {
   const selectedRequestedByName =
     selectedRequestedByUserId == null
       ? ""
-      : (requestedByUsers.find((u: MainAppUserLookup) => String(u.id) === selectedRequestedByUserId)?.name ??
+      : (findMainAppUserByRequestUserId(requestedByUsers, selectedRequestedByUserId)?.name ??
         selectedRequestedByUserId);
   const dateOptions = ["Today", "Last 7 days", "Last 30 days", "Last 3 months", "All time"];
   const totalRequests = requestsPagination?.total ?? 0;
@@ -735,11 +735,13 @@ const ApprovalRequest = () => {
               return q.length === 0 || name.toLowerCase().includes(q);
             })
             .map((u: MainAppUserLookup) => {
-              const uid = String(u.id);
-              const isSelected = selectedRequestedByUserId != null && uid === selectedRequestedByUserId;
+              const phoneKey = String(u.phone ?? "").trim();
+              const isSelected =
+                selectedRequestedByUserId != null &&
+                findMainAppUserByRequestUserId([u], selectedRequestedByUserId) != null;
               return (
                 <label
-                  key={uid}
+                  key={u.id}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -753,7 +755,7 @@ const ApprovalRequest = () => {
                     type="radio"
                     name="approval-request-user-filter"
                     checked={isSelected}
-                    onChange={() => setSelectedRequestedByUserId(uid)}
+                    onChange={() => setSelectedRequestedByUserId(phoneKey)}
                   />
                   <span>{u.name}</span>
                 </label>
@@ -1197,22 +1199,7 @@ const ApprovalRequest = () => {
                   ))}
                 </div>
               )}
-              <Form.Control
-                type="file"
-                multiple
-                onChange={(e) => {
-                  const files = (e.target as HTMLInputElement).files;
-                  setEditForm((f) => ({
-                    ...f,
-                    attachments: files ? Array.from(files) : [],
-                  }));
-                }}
-              />
-              {editForm.attachments.length > 0 && (
-                <Form.Text className="d-block mt-1 text-muted">
-                  {editForm.attachments.length} new file(s) selected: {editForm.attachments.map((f) => f.name).join(", ")}
-                </Form.Text>
-              )}
+              
             </Form.Group>
             {editingRequest?.user_request_category_id != null &&
               (categoryFields[editingRequest.user_request_category_id] ?? []).length > 0 && (

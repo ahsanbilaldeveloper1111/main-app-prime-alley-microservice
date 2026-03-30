@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useEffect, useState, useMemo } from "react";
+import React, { ReactElement, useCallback, useEffect, useState, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
@@ -34,6 +34,7 @@ interface OnboardingEmployee {
 type LookupUser = {
   id: string | number;
   name?: string | null;
+  phone?: string | null;
 } & Record<string, unknown>;
 
 
@@ -96,6 +97,12 @@ const getAvatarColor = (name: string): string => {
   return `hsla(${hue}, 55%, 45%, 0.6)`;
 };
 
+function journeyUsersPillLabel(selectedCount: number, appliedCount: number): string | undefined {
+  if (selectedCount > 0) return `${selectedCount} selected`;
+  if (appliedCount > 0) return `${appliedCount} selected`;
+  return undefined;
+}
+
 function hierarchyLabel(item: unknown): string {
   if (item == null) return "—";
   if (typeof item === "string") return item;
@@ -144,12 +151,12 @@ const EmployeesOnboarding = () => {
   const [loadingJourneys, setLoadingJourneys] = useState(true);
   const [refreshJourneysKey, setRefreshJourneysKey] = useState(0);
 
-  const toggleSelectedUserId = (idStr: string, isSelected: boolean) => {
+  const toggleSelectedUserId = useCallback((idStr: string, isSelected: boolean) => {
     setSelectedUserIds((prev) => {
       if (isSelected) return prev.filter((id) => id !== idStr);
       return [...prev, idStr];
     });
-  };
+  }, []);
 
   const filteredManagers = useMemo(() => {
     const needle = userSearchTerm.trim().toLowerCase();
@@ -192,8 +199,10 @@ const EmployeesOnboarding = () => {
 
   const employees: OnboardingEmployee[] = useMemo(() => {
     return journeysData.map((j) => {
-      const userId = j.user_id == null ? "" : String(j.user_id);
-      const name = users.find((u) => String(u.id) === userId)?.name ?? (userId || "—");
+      const userId = j.user_id == null ? "" : String(j.user_id).trim();
+      const name =
+        users.find((u) => String(u.phone ?? "").trim() === userId || String(u.id) === userId)?.name ??
+        (userId || "—");
       const statusKey = (j.status ?? "in_progress").toLowerCase().replaceAll(/\s/g, "_");
       const status: OnboardingEmployee["status"] =
         STATUS_DISPLAY[statusKey] ?? "In Progress";
@@ -247,7 +256,12 @@ const EmployeesOnboarding = () => {
   const appliedUserNames = useMemo(
     () =>
       appliedUserIds
-        .map((id) => users.find((u) => String(u.id) === id)?.name ?? id)
+        .map((id) => {
+          const idStr = String(id).trim();
+          const byPhone = users.find((u) => String(u.phone ?? "").trim() === idStr);
+          const byId = users.find((u) => String(u.id) === idStr);
+          return byPhone?.name ?? byId?.name ?? id;
+        })
         .join(", "),
     [appliedUserIds, users],
   );
@@ -417,6 +431,7 @@ const EmployeesOnboarding = () => {
           placeholder="Search user..."
           value={userSearchTerm}
           onChange={(e) => setUserSearchTerm(e.target.value)}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{
             width: "100%",
             marginBottom: "8px",
@@ -427,33 +442,36 @@ const EmployeesOnboarding = () => {
           }}
         />
         <div style={{ maxHeight: "200px", overflowY: "auto", marginBottom: "8px" }}>
-          {filteredManagers.map((mgr, idx) => {
-              const label = hierarchyLabel(mgr);
-              const idStr = String((mgr as { id?: string | number }).id ?? label ?? idx);
-              const isSelected = selectedUserIds.includes(idStr);
-              return (
-                <label
-                  key={idStr}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "6px 4px",
-                    fontSize: "13px",
-                    cursor: "pointer",
+          {filteredManagers.map((mgr: LookupUser, idx: number) => {
+            const label = hierarchyLabel(mgr);
+            const phone = String(mgr.phone ?? "").trim();
+            const idStr = phone || String(mgr.id ?? idx);
+            const rowKey = `${String(mgr.id ?? "row")}-${idx}`;
+            const isSelected = selectedUserIds.includes(idStr);
+            return (
+              <label
+                key={rowKey}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "6px 4px",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onChange={() => {
+                    toggleSelectedUserId(idStr, isSelected);
                   }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => {
-                      toggleSelectedUserId(idStr, isSelected);
-                    }}
-                  />
-                  <span>{label}</span>
-                </label>
-              );
-            })}
+                />
+                <span>{label}</span>
+              </label>
+            );
+          })}
         </div>
         <div style={{ display: "flex", gap: "8px" }}>
           <button
@@ -494,7 +512,7 @@ const EmployeesOnboarding = () => {
         </div>
       </div>
     ),
-    [filteredManagers, selectedUserIds],
+    [filteredManagers, selectedUserIds, userSearchTerm, toggleSelectedUserId],
   );
 
   const filterPills = useMemo<FilterPill[]>(
@@ -504,15 +522,17 @@ const EmployeesOnboarding = () => {
         label: "Employment",
         showDropdown: true,
         searchable: true,
-        active: Boolean(appliedEmploymentType),
-        activeLabel: appliedEmploymentType || undefined,
-        onClear: appliedEmploymentType
-          ? () => {
-              setSelectedEmploymentType("");
-              setAppliedEmploymentType("");
-              setCurrentPage(1);
-            }
-          : undefined,
+        dropdownSelectedValue: selectedEmploymentType || "__all__",
+        active: Boolean(selectedEmploymentType || appliedEmploymentType),
+        activeLabel: selectedEmploymentType || appliedEmploymentType || undefined,
+        onClear:
+          selectedEmploymentType || appliedEmploymentType
+            ? () => {
+                setSelectedEmploymentType("");
+                setAppliedEmploymentType("");
+                setCurrentPage(1);
+              }
+            : undefined,
         dropdownOptions: employmentFilterOptions,
       },
       {
@@ -520,25 +540,27 @@ const EmployeesOnboarding = () => {
         label: "Contract",
         showDropdown: true,
         searchable: true,
-        active: Boolean(appliedContract),
-        activeLabel: appliedContract || undefined,
-        onClear: appliedContract
-          ? () => {
-              setSelectedContract("");
-              setAppliedContract("");
-              setCurrentPage(1);
-            }
-          : undefined,
+        dropdownSelectedValue: selectedContract || "__all__",
+        active: Boolean(selectedContract || appliedContract),
+        activeLabel: selectedContract || appliedContract || undefined,
+        onClear:
+          selectedContract || appliedContract
+            ? () => {
+                setSelectedContract("");
+                setAppliedContract("");
+                setCurrentPage(1);
+              }
+            : undefined,
         dropdownOptions: contractFilterOptions,
       },
       {
         id: "journey-users",
         label: "Users",
         showDropdown: true,
-        active: appliedUserIds.length > 0,
-        activeLabel: appliedUserIds.length > 0 ? `${appliedUserIds.length} selected` : undefined,
+        active: selectedUserIds.length > 0 || appliedUserIds.length > 0,
+        activeLabel: journeyUsersPillLabel(selectedUserIds.length, appliedUserIds.length),
         onClear:
-          appliedUserIds.length > 0
+          selectedUserIds.length > 0 || appliedUserIds.length > 0
             ? () => {
                 setSelectedUserIds([]);
                 setAppliedUserIds([]);
@@ -552,6 +574,9 @@ const EmployeesOnboarding = () => {
       appliedEmploymentType,
       appliedContract,
       appliedUserIds,
+      selectedEmploymentType,
+      selectedContract,
+      selectedUserIds,
       employmentFilterOptions,
       contractFilterOptions,
       usersDropdownContent,

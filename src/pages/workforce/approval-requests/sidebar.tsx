@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { Button, Modal } from "react-bootstrap";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import { getUserDisplayNameFromLookup, type UserRequestIdValue } from "./userLookup";
 import { useSession } from "next-auth/react";
 import {
   X,
@@ -178,12 +179,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   const { mainAppUsers } = useMainAppLookups();
 
   const getDisplayName = useCallback(
-    (userId: string | number | null | undefined): string => {
-      if (userId == null || userId === "") return "—";
-      const idStr = String(userId);
-      const u = mainAppUsers?.find((x) => String(x.id) === idStr);
-      return u?.name ?? idStr;
-    },
+    (userId: UserRequestIdValue) => getUserDisplayNameFromLookup(mainAppUsers, userId),
     [mainAppUsers]
   );
 
