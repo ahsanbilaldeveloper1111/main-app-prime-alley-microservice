@@ -586,6 +586,13 @@ export interface CustomerProductPricingUpsertPayload {
 
 export interface CustomerProductPricingListParams extends PaginationParams {
   search?: string;
+  status?: string;
+  billing_cycle?: string;
+  sort_direction?: string;
+  /** Filter subscriptions with renewal period on/after this date (YYYY-MM-DD). */
+  renewal_start_date?: string;
+  /** Filter subscriptions with renewal period on/before this date (YYYY-MM-DD). */
+  renewal_end_date?: string;
 }
 
 export const getCustomerProductPricingList = async (

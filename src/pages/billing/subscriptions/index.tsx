@@ -35,6 +35,7 @@ import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSide
 import GenericSidebar from "@components/GenericSidebarNew";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import ColumnEditorModal from "@components/ColumnEditorModal";
 
 interface Product {
   id: number;
@@ -64,6 +65,85 @@ const normalizePricingStatus = (
   }
   return "Active";
 };
+
+function formatNextBillingDateFilterPillLabel(from?: string, to?: string): string | undefined {
+  const fromD = from?.trim();
+  const toD = to?.trim();
+  if (fromD && toD) {
+    return `${moment(fromD).format("MMM D")} – ${moment(toD).format("MMM D, YYYY")}`;
+  }
+  if (fromD) {
+    return moment(fromD).format("MMM D, YYYY");
+  }
+  if (toD) {
+    return moment(toD).format("MMM D, YYYY");
+  }
+  return undefined;
+}
+
+/** YYYY-MM-DD compares correctly as strings. */
+function renewalEndDateOnOrAfterStart(
+  start: string | undefined,
+  end: string | undefined,
+): string | undefined {
+  const s = start?.trim();
+  const e = end?.trim();
+  if (!e) {
+    return end;
+  }
+  if (!s) {
+    return end;
+  }
+  if (e < s) {
+    return s;
+  }
+  return end;
+}
+
+const BILLING_SUBSCRIPTIONS_COLUMN_STORAGE_KEY = "billing-subscriptions-table-columns";
+
+const DEFAULT_SUBSCRIPTION_TABLE_COLUMN_KEYS: string[] = [
+  "name",
+  "description",
+  "base_price",
+  "selling_price",
+  "renewal_start_date",
+  "renewal_end_date",
+  "status",
+  "billing_cycle",
+  "subscriptions",
+  "actions",
+];
+
+function parseStoredSubscriptionColumnKeys(raw: string | null): string[] | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    const allowed = new Set(DEFAULT_SUBSCRIPTION_TABLE_COLUMN_KEYS);
+    const keys = parsed.filter(
+      (k): k is string => typeof k === "string" && allowed.has(k),
+    );
+    return keys.length > 0 ? keys : null;
+  } catch {
+    return null;
+  }
+}
+
+function loadSubscriptionTableColumnsFromStorage(): string[] {
+  const win = (globalThis as unknown as { window?: Window & { localStorage: Storage } }).window;
+  if (win === undefined) {
+    return [...DEFAULT_SUBSCRIPTION_TABLE_COLUMN_KEYS];
+  }
+  const stored = parseStoredSubscriptionColumnKeys(
+    win.localStorage.getItem(BILLING_SUBSCRIPTIONS_COLUMN_STORAGE_KEY),
+  );
+  return stored ?? [...DEFAULT_SUBSCRIPTION_TABLE_COLUMN_KEYS];
+}
 
 const normalizeBillingCycle = (
   value: unknown,
@@ -180,8 +260,8 @@ const ProductDetails = () => {
     search?: string;
     status?: string;
     billing_cycle?: string;
-    renewal_end_date_from?: string;
-    renewal_end_date_to?: string;
+    renewal_start_date?: string;
+    renewal_end_date?: string;
   }>({});
 
   const handleFiltersChange = useCallback((filters: any) => {
@@ -233,7 +313,9 @@ const ProductDetails = () => {
         status: currentFilters.status || undefined,
         sort_direction: "desc",
         billing_cycle: currentFilters.billing_cycle || undefined,
-      } as any)) as any;
+        renewal_start_date: currentFilters.renewal_start_date || undefined,
+        renewal_end_date: currentFilters.renewal_end_date || undefined,
+      })) as any;
 
       if (currentRequestId !== requestIdRef.current) return;
 
@@ -481,6 +563,20 @@ const ProductDetails = () => {
     [deletingProductId, handleOpenEditModal, openDeleteConfirmation]
   );
 
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => [
+    ...DEFAULT_SUBSCRIPTION_TABLE_COLUMN_KEYS,
+  ]);
+
+  useEffect(() => {
+    setSelectedColumns(loadSubscriptionTableColumnsFromStorage());
+  }, []);
+
+  const visibleTableColumns = useMemo(
+    () => tableColumns.filter((c) => selectedColumns.includes(c.key)),
+    [tableColumns, selectedColumns],
+  );
+
   const [selectedProductView, setSelectedProductView] = useState<any>(null);
   const [showProductSidebar, setShowProductSidebar] = useState(false);
 
@@ -566,13 +662,14 @@ const ProductDetails = () => {
       id: "renewal_end_date",
       label: "Next Billing Date",
       showDropdown: true,
-      active: !!currentFilters.renewal_end_date_from,
-      activeLabel: currentFilters.renewal_end_date_from
-        ? moment(currentFilters.renewal_end_date_from).format("MMM D, YYYY")
-        : undefined,
+      active: !!(currentFilters.renewal_start_date || currentFilters.renewal_end_date),
+      activeLabel: formatNextBillingDateFilterPillLabel(
+        currentFilters.renewal_start_date,
+        currentFilters.renewal_end_date,
+      ),
       onClear: () => {
         setCurrentFilters((prev) => {
-          const { renewal_end_date_from, renewal_end_date_to, ...rest } = prev;
+          const { renewal_start_date, renewal_end_date, ...rest } = prev;
           return rest;
         });
         setPagination((prev) => ({ ...prev, currentPage: 1 }));
@@ -583,10 +680,16 @@ const ProductDetails = () => {
           <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>From</div>
           <input
             type="date"
-            value={currentFilters.renewal_end_date_from ?? ""}
+            value={currentFilters.renewal_start_date ?? ""}
+            max={currentFilters.renewal_end_date || undefined}
             style={{ width: "100%", padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 4, marginBottom: 8 }}
             onChange={(e) => {
-              setCurrentFilters((prev) => ({ ...prev, renewal_end_date_from: e.target.value || undefined }));
+              const nextStart = e.target.value || undefined;
+              setCurrentFilters((prev) => ({
+                ...prev,
+                renewal_start_date: nextStart,
+                renewal_end_date: renewalEndDateOnOrAfterStart(nextStart, prev.renewal_end_date),
+              }));
               setPagination((prev) => ({ ...prev, currentPage: 1 }));
               setRefreshKey((k) => k + 1);
             }}
@@ -594,10 +697,15 @@ const ProductDetails = () => {
           <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>To</div>
           <input
             type="date"
-            value={currentFilters.renewal_end_date_to ?? ""}
+            value={currentFilters.renewal_end_date ?? ""}
+            min={currentFilters.renewal_start_date || undefined}
             style={{ width: "100%", padding: "6px 12px", border: "1px solid #e5e7eb", borderRadius: 4 }}
             onChange={(e) => {
-              setCurrentFilters((prev) => ({ ...prev, renewal_end_date_to: e.target.value || undefined }));
+              const nextEndRaw = e.target.value || undefined;
+              setCurrentFilters((prev) => ({
+                ...prev,
+                renewal_end_date: renewalEndDateOnOrAfterStart(prev.renewal_start_date, nextEndRaw),
+              }));
               setPagination((prev) => ({ ...prev, currentPage: 1 }));
               setRefreshKey((k) => k + 1);
             }}
@@ -673,7 +781,7 @@ const ProductDetails = () => {
     tabsDropdownLabel: "Subscriptions",
     onFiltersClick: handleOpenFiltersSidebar,
     onExportClick: () => {},
-    onEditColumnsClick: () => {},
+    onEditColumnsClick: () => setShowColumnEditor(true),
     showImport: false,
     onImportClick: () => {},
     currentTableView: "table",
@@ -766,7 +874,7 @@ const ProductDetails = () => {
 
       <GenericTable
         data={dataList}
-        columns={tableColumns}
+        columns={visibleTableColumns}
         pagination={{
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
@@ -792,8 +900,6 @@ const ProductDetails = () => {
         uniqueKey="id"
         onRowClick={(row) => handleViewProduct(row)}
         onPreviewClick={(row) => handlePreviewClick(row)}
-        customizableColumns={true}
-        columnStorageKey="customer-product-details-columns"
         fixedHeight={true}
         maxHeight="calc(100vh - 345px)"
         showToolbar={true}
@@ -956,6 +1062,24 @@ const ProductDetails = () => {
           onCreateAndAddAnother={handleEditSubscriptionSaved}
         />
       )}
+
+      <ColumnEditorModal
+        show={showColumnEditor}
+        onHide={() => setShowColumnEditor(false)}
+        title="Customize Columns"
+        columns={tableColumns.map((c) => ({ key: c.key, label: c.label }))}
+        selectedColumnKeys={selectedColumns}
+        onApply={(keys) => {
+          setSelectedColumns(keys);
+          const w = (globalThis as unknown as { window?: Window }).window;
+          if (w) {
+            w.localStorage.setItem(
+              BILLING_SUBSCRIPTIONS_COLUMN_STORAGE_KEY,
+              JSON.stringify(keys),
+            );
+          }
+        }}
+      />
 
       <DeleteConfirmationModal
         show={showDeleteModal}
