@@ -71,6 +71,52 @@ function getPrimaryContact(
   return contactPersonsArray[0] ?? {};
 }
 
+/**
+ * Maps lead `user_extension` to `assigned_to` without using Object's default
+ * stringification (e.g. "[object Object]") when the API shape varies.
+ */
+function userExtensionToAssignedString(value: unknown): string | null {
+  if (value == null || value === "") return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const o = value as Record<string, unknown>;
+    const nested = o.user_extension;
+    if (typeof nested === "string") return nested;
+    if (typeof nested === "number" || typeof nested === "boolean") {
+      return String(nested);
+    }
+    const id = o.id;
+    if (typeof id === "string") return id;
+    if (typeof id === "number") return String(id);
+    return null;
+  }
+  return null;
+}
+
+function businessTypeOtherToString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const o = value as Record<string, unknown>;
+    const nested = o.business_type_other;
+    if (typeof nested === "string") return nested;
+    if (typeof nested === "number" || typeof nested === "boolean") {
+      return String(nested);
+    }
+    const label = o.label;
+    if (typeof label === "string") return label;
+    const name = o.name;
+    if (typeof name === "string") return name;
+  }
+  return "";
+}
+
 export function buildConvertDealFormStateFromLead(
   leadData: Record<string, unknown>,
   leadId: number,
@@ -91,7 +137,7 @@ export function buildConvertDealFormStateFromLead(
     ticket_id: leadId,
     lead_id: leadId,
     stage_id: undefined,
-    assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
+    assigned_to: userExtensionToAssignedString(leadData.user_extension),
     expected_close_date: formattedCloseDate,
     company_name: (leadData.company_name as string | undefined) || "",
     company_domain: (leadData.company_domain as string | undefined) ?? "",
@@ -144,7 +190,7 @@ export function getBusinessTypeUiStateFromLead(leadData: Record<string, unknown>
   if (leadData.business_type_other) {
     return {
       businessTypeId: null,
-      businessTypeOther: String(leadData.business_type_other),
+      businessTypeOther: businessTypeOtherToString(leadData.business_type_other),
       showOtherBusinessType: true,
     };
   }
