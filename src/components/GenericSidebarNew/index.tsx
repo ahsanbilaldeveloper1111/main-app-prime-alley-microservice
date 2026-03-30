@@ -3676,10 +3676,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
               ref={notesRef}
               contentEditable
               suppressContentEditableWarning
-              role="textbox"
-              aria-multiline="true"
               aria-label="Notes"
-              tabIndex={0}
               onInput={syncNotesFromEditor}
               onKeyDown={handleKeyDown}
               data-placeholder="Notes..."
@@ -5768,13 +5765,14 @@ const useSidebarNotes = ({
   }, [isOpen, recordId, recordType]);
 
   useEffect(() => {
-    void refreshSidebarNotes();
+    refreshSidebarNotes().catch(() => {
+      // refreshSidebarNotes handles its own failure state
+    });
   }, [refreshSidebarNotes]);
 
   return {
     sidebarNotesList,
     sidebarNotesLoading,
-    setSidebarNotesList,
     refreshSidebarNotes,
   };
 };
@@ -6044,7 +6042,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const {
     sidebarNotesList,
     sidebarNotesLoading,
-    setSidebarNotesList,
     refreshSidebarNotes,
   } = useSidebarNotes({
     isOpen,
@@ -6071,7 +6068,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           // refresh the sidebar notes list for this record so the
           // "Notes" section in GenericSidebar updates immediately.
           onNoteCreated: () => {
-            void refreshSidebarNotes();
+            refreshSidebarNotes().catch(() => {
+              // refreshSidebarNotes handles its own failure state
+            });
           },
         }
       : {
@@ -6222,7 +6221,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         toast.success("Note created successfully");
         onNoteCreate?.(note, createTask, taskDueDate);
         // Refresh sidebar notes list
-        void refreshSidebarNotes();
+        refreshSidebarNotes().catch(() => {
+          // refreshSidebarNotes handles its own failure state
+        });
       } catch {
         // createCrmNote already shows toast on error
       }
