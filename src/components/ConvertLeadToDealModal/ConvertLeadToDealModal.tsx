@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Modal, Button, Form, Row, Col, Card, Badge, Table, Dropdown } from "react-bootstrap";
-import Select from 'react-select';
+import { Button, Form, Badge, Dropdown } from "react-bootstrap";
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber } from "react-phone-number-input";
-import { Plus, Edit, Trash2, Package, X } from "lucide-react";
+import { Plus,  Trash2, X } from "lucide-react";
 import { toast } from "react-toastify";
 import {
   createDeal,
@@ -11,8 +10,6 @@ import {
   getLead,
   getCrmProducts,
   createEstimate,
-  getRelevantDealTemplate,
-  getCampaignById,
   getIndustries,
   getBusinessTypes,
   CrmProduct,
@@ -23,9 +20,28 @@ import {
   BusinessTypeData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
-import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
-import { convertCurrency, formatCurrency } from '@utils/currency';
+import { ModuleSlug } from '@utils/Helper';
+import { convertCurrency } from '@utils/currency';
 import { useSession } from "next-auth/react";
+import {
+  fieldLabel,
+  inputStyle,
+  fieldWrap,
+  sectionHeading,
+  sectionHeadingNext,
+  dropdownToggleStyle,
+  getTodayLocalYyyyMmDd,
+} from "@components/crmDealFormUi";
+import {
+  buildConvertDealFormStateFromLead,
+  getBusinessTypeUiStateFromLead,
+  loadCampaignIndustryContext,
+  loadDealTemplateForLead,
+  validateConvertDealStep0,
+  validateConvertDealStep1,
+  validateConvertDealStep2,
+  validateConvertDealStep4,
+} from "@utils/crm/convertToDealShared";
 
 export interface ConvertLeadToDealModalProps {
   show: boolean;
@@ -33,64 +49,6 @@ export interface ConvertLeadToDealModalProps {
   leadId: number;
   onSuccess?: () => void;
 }
-
-// ─── Edit Deal–style UI (match renderCreateDealForm) ───────────────────────────
-const fieldLabel = (text: string, required: boolean = false) => (
-  <label
-    style={{
-      display: "block",
-      fontSize: "14px",
-      fontWeight: "600",
-      color: "#141414",
-      marginBottom: "8px",
-    }}
-  >
-    {text}
-    {required && <span style={{ color: "#f2545b", marginLeft: "2px" }}>*</span>}
-  </label>
-);
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "10px 12px",
-  border: "1px solid #8a8a8a",
-  borderRadius: "4px",
-  fontSize: "16px",
-  fontWeight: "300",
-  outline: "none",
-  fontFamily: "inherit",
-  boxSizing: "border-box",
-};
-
-const fieldWrap: React.CSSProperties = { marginBottom: "20px" };
-
-const sectionHeading: React.CSSProperties = {
-  fontSize: "16px",
-  fontWeight: "600",
-  color: "#141414",
-  marginBottom: "16px",
-  marginTop: 0,
-};
-
-const sectionHeadingNext: React.CSSProperties = {
-  ...sectionHeading,
-  marginTop: "32px",
-};
-
-const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
-  width: "100%",
-  textAlign: "left",
-  padding: "10px 12px",
-  border: "1px solid #8a8a8a",
-  borderRadius: "4px",
-  fontSize: "16px",
-  fontWeight: "300",
-  backgroundColor: "#ffffff",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  color: hasValue ? "#141414" : "#a0aec0",
-});
 
 const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
   show,
@@ -229,96 +187,24 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
       setLoadingLead(true);
       const leadData: any = await getLead(leadId);
       setSourceLead(leadData);
-      
-      // Parse contact_persons
-      let contactPersonsArray: any[] = [];
-      if (leadData.contact_persons) {
-        if (typeof leadData.contact_persons === 'string') {
-          try {
-            contactPersonsArray = JSON.parse(leadData.contact_persons);
-          } catch (e) {
-            console.error("Failed to parse contact_persons:", e);
-          }
-        } else if (Array.isArray(leadData.contact_persons)) {
-          contactPersonsArray = leadData.contact_persons;
-        }
-      }
 
-      const primaryContact = contactPersonsArray.find(cp => cp.email) || 
-                             contactPersonsArray.find(cp => cp.phone) || 
-                             contactPersonsArray[0] || {};
-
-      const leadDataAny = leadData as any;
-      const contactPersonName = primaryContact.name || leadDataAny.contact_person_name || "";
-
-      // Calculate default expected close date (7 days from now)
-      const defaultCloseDate = new Date();
-      defaultCloseDate.setDate(defaultCloseDate.getDate() + 7);
-      const formattedCloseDate = defaultCloseDate.toISOString().split('T')[0];
-
-      // Auto-fill form data
+      const leadRecord = leadData as Record<string, unknown>;
       setFormData({
-        name: leadData.name || "",
-        ticket_id: leadId,
-        lead_id: leadId,
-        stage_id: undefined,
-        assigned_to: leadData.user_extension ? String(leadData.user_extension) : null,
-        expected_close_date: formattedCloseDate,
-        company_name: leadData.company_name || "",
-        company_domain: (leadData as any).company_domain ?? "",
-        industry_ids: [],
-        decision_maker_title: primaryContact.title || leadDataAny.contact_person_title || "",
-        decision_maker_name: contactPersonName,
-        decision_maker_phone_country_code: primaryContact.phone_country_code || leadDataAny.contact_phone_country_code || "",
-        decision_maker_phone: primaryContact.phone || leadDataAny.contact_phone || "",
-        decision_maker_email: primaryContact.email || "",
-        deal_type: "",
-        contract_length: "",
-        contract_length_custom: "",
-        billing_model: "",
-        payment_terms: "",
-        payment_terms_custom: "",
-        risk_level: "",
-        competitors: "",
-        quotation_sent: false,
-        contract_sent: false,
-        contract_received: false,
-        follow_up_date: "",
-        currency: "AED",
-        tax_percentage: "0",
-        standard_discount_percentage: "0",
-        special_discount_percentage: "0",
+        ...buildConvertDealFormStateFromLead(leadRecord, leadId),
         business_type_id: leadData.business_type_id || null,
       });
 
-      // Set business type controls based on lead data
-      if (leadData.business_type_id) {
-        setBusinessTypeId(Number(leadData.business_type_id));
-        setBusinessTypeOther("");
-        setShowOtherBusinessType(false);
-      } else if (leadData.business_type_other) {
-        setBusinessTypeId(null);
-        setBusinessTypeOther(leadData.business_type_other);
-        setShowOtherBusinessType(true);
-      } else {
-        setBusinessTypeId(null);
-        setBusinessTypeOther("");
-        setShowOtherBusinessType(false);
-      }
+      const bt = getBusinessTypeUiStateFromLead(leadRecord);
+      setBusinessTypeId(bt.businessTypeId);
+      setBusinessTypeOther(bt.businessTypeOther);
+      setShowOtherBusinessType(bt.showOtherBusinessType);
 
-      // Fetch deal template
       try {
         setLoadingTemplate(true);
-        const template = await getRelevantDealTemplate({ lead_id: leadId });
+        const { template, templateFieldsData: initialFields } = await loadDealTemplateForLead(leadId);
         if (template) {
           setDealTemplate(template);
-          const initialFieldsData: Record<string, any> = {};
-          if (template.fields) {
-            template.fields.forEach((field) => {
-              initialFieldsData[field.field_name] = '';
-            });
-          }
-          setTemplateFieldsData(initialFieldsData);
+          setTemplateFieldsData(initialFields);
         }
       } catch (error) {
         console.error("Failed to fetch deal template:", error);
@@ -326,39 +212,20 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
         setLoadingTemplate(false);
       }
 
-      // Fetch campaign and industries
       if (leadData.campaign_id) {
         try {
           setLoadingIndustries(true);
-          const campaignData = await getCampaignById(leadData.campaign_id);
-          setCampaign(campaignData);
-          
-          const industriesData = (campaignData as any).industries;
-          const industryIds = (campaignData as any).industry_ids;
-          
-          let campaignIndustryIds: number[] = [];
-          if (industriesData && Array.isArray(industriesData)) {
-            campaignIndustryIds = industriesData.map((ind: any) => typeof ind === 'object' ? ind.id : ind);
-          } else if (industryIds && Array.isArray(industryIds)) {
-            campaignIndustryIds = industryIds;
-          }
-          
-          if (campaignIndustryIds.length > 0) {
-            const allIndustriesResponse = await getIndustries({ per_page: 1000 });
-            const allInds = allIndustriesResponse.data || [];
-            const filteredIndustries = allInds.filter((ind: IndustryData) => 
-              campaignIndustryIds.includes(ind.id)
-            );
-            setCampaignIndustries(filteredIndustries);
-            
+          const ctx = await loadCampaignIndustryContext(Number(leadData.campaign_id));
+          setCampaign(ctx.campaignData);
+          if (ctx.campaignIndustryIds.length > 0) {
+            setCampaignIndustries(ctx.filteredIndustries);
             setFormData((prev) => ({
               ...prev,
-              industry_ids: campaignIndustryIds,
+              industry_ids: ctx.campaignIndustryIds,
             }));
-            
-            if (filteredIndustries.length === 1) {
-              setSelectedIndustryId(filteredIndustries[0].id);
-              await fetchProductsByIndustry(filteredIndustries[0].id);
+            if (ctx.filteredIndustries.length === 1) {
+              setSelectedIndustryId(ctx.filteredIndustries[0].id);
+              await fetchProductsByIndustry(ctx.filteredIndustries[0].id);
             }
           }
         } catch (error) {
@@ -432,56 +299,12 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
     }
   };
 
-  // Validation functions
-  const validateStep0 = (): boolean => {
-    const requiredFields = [
-      { field: 'name' as const, name: 'Deal Name' },
-      { field: 'stage_id' as const, name: 'Stage' },
-      { field: 'expected_close_date' as const, name: 'Expected Close Date' },
-      { field: 'assigned_to' as const, name: 'Owner' },
-      { field: 'currency' as const, name: 'Currency' },
-    ];
-    return checkRequiredFields(formData, requiredFields);
-  };
-
-  const validateStep1 = (): boolean => {
-    const requiredFields = [
-      { field: 'company_name' as const, name: 'Company Name' },
-      { field: 'decision_maker_name' as const, name: 'Decision Maker Name' },
-      { field: 'decision_maker_email' as const, name: 'Decision Maker Email', type: ValidationType.EMAIL },
-      { field: 'decision_maker_phone' as const, name: 'Decision Maker Phone' },
-    ];
-    return checkRequiredFields(formData, requiredFields);
-  };
-
-  const validateStep2 = (): boolean => {
-    if (!dealTemplate) return true;
-    
-    if (dealTemplate.fields && dealTemplate.fields.length > 0) {
-      for (const field of dealTemplate.fields) {
-        if (field.is_required) {
-          const fieldValue = templateFieldsData[field.field_name];
-          if (!fieldValue || (typeof fieldValue === 'string' && fieldValue.trim() === '')) {
-            toast.error(`${field.field_name} is required`);
-            return false;
-          }
-        }
-      }
-    }
-    return true;
-  };
-
-  const validateStep3 = (): boolean => {
-    return true;
-  };
-
-  const validateStep4 = (): boolean => {
-    if (!estimationItems || estimationItems.length === 0) {
-      toast.error('Please add at least one product to the estimation chart');
-      return false;
-    }
-    return true;
-  };
+  const validateStep0 = (): boolean =>
+    validateConvertDealStep0(formData, "Owner");
+  const validateStep1 = (): boolean => validateConvertDealStep1(formData);
+  const validateStep2 = (): boolean =>
+    validateConvertDealStep2(dealTemplate, templateFieldsData);
+  const validateStep4 = (): boolean => validateConvertDealStep4(estimationItems);
 
   const addLineItem = () => {
     if (!lineItemInput) return;
@@ -515,6 +338,15 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const followUpMin = getTodayLocalYyyyMmDd();
+    if (
+      formData.follow_up_date &&
+      formData.follow_up_date < followUpMin
+    ) {
+      toast.error("Follow-up date must be today or a future date");
+      return;
+    }
 
     if (!validateStep0() || !validateStep1() || !validateStep4()) {
       return;
@@ -845,13 +677,19 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                       {fieldLabel("Follow-up Date")}
                       <input
                         type="date"
+                        min={getTodayLocalYyyyMmDd()}
                         value={formData.follow_up_date}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          const minDate = getTodayLocalYyyyMmDd();
+                          if (value && value < minDate) {
+                            return;
+                          }
                           setFormData({
                             ...formData,
-                            follow_up_date: e.target.value,
-                          })
-                        }
+                            follow_up_date: value,
+                          });
+                        }}
                         style={inputStyle}
                         onFocus={focusStyle}
                         onBlur={blurStyle}
@@ -1255,7 +1093,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 70px 70px 70px auto",
+                        gridTemplateColumns: "1fr 70px 70px 100px auto",
                         gap: "8px",
                         alignItems: "center",
                         marginBottom: "12px",
@@ -1281,7 +1119,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                         key={`${item.product_id}-${index}`}
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "1fr 70px 70px 70px auto",
+                          gridTemplateColumns: "1fr 70px 70px 100px auto",
                           gap: "8px",
                           alignItems: "center",
                           marginBottom: "8px",
@@ -1349,7 +1187,13 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                               )
                             )
                           }
-                          style={{ ...inputStyle, width: "70px" }}
+                          style={{
+                            ...inputStyle,
+                            width: "100%",
+                            minWidth: 0,
+                            minHeight: "44px",
+                            paddingRight: "2rem",
+                          }}
                         >
                           <option value="">Select</option>
                           <option value="5">5</option>
@@ -1376,7 +1220,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 70px 70px 70px auto",
+                        gridTemplateColumns: "1fr 70px 70px 100px auto",
                         gap: "8px",
                         alignItems: "center",
                       }}
@@ -1458,7 +1302,13 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                             e.target.value ? Number(e.target.value) : 0,
                           )
                         }
-                        style={{ ...inputStyle, width: "70px" }}
+                        style={{
+                          ...inputStyle,
+                          width: "100%",
+                          minWidth: 0,
+                          minHeight: "44px",
+                          paddingRight: "2rem",
+                        }}
                       >
                         <option value="">Select</option>
                         <option value="5">5</option>
@@ -1473,14 +1323,20 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                           background: lineItemInput ? "#0091ae" : "#cbd5e0",
                           border: "none",
                           borderRadius: "4px",
-                          padding: "10px",
+                          width: "44px",
+                          height: "44px",
+                          minWidth: "44px",
+                          flexShrink: 0,
+                          padding: 0,
                           cursor: lineItemInput ? "pointer" : "not-allowed",
                           color: "#fff",
                           display: "flex",
                           alignItems: "center",
+                          justifyContent: "center",
+                          boxSizing: "border-box",
                         }}
                       >
-                        <Plus size={16} />
+                        <Plus size={18} />
                       </button>
                     </div>
                   </div>

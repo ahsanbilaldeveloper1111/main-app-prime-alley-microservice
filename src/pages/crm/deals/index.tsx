@@ -15,6 +15,7 @@ import GenericTable, {
   TableColumn,
   TableAction,
   TabConfig,
+  buildBoundTableContextMenuItems,
 } from "@components/GenericTable";
 import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
@@ -3055,6 +3056,15 @@ const CrmDeals = () => {
     handleMarkLost,
   ]);
 
+  const getDealCardContextMenuItems = useCallback(
+    (card: KanbanCardData) => {
+      if (!card.raw) return [];
+      const row = transformDealData(card.raw);
+      return buildBoundTableContextMenuItems(dealsActions, row);
+    },
+    [dealsActions, extensions],
+  );
+
   const dealsToolbarConfig = useCrmToolbarConfig({
     entity: "deals",
     searchValue: dealsSearch,
@@ -3351,6 +3361,7 @@ const CrmDeals = () => {
                     <KanbanBoard
                       columns={dealsToKanbanColumns(dealsData, stages)}
                       onCardClick={(card) => handleViewDeal(Number(card.id))}
+                      cardContextMenuItems={getDealCardContextMenuItems}
                       onCardMove={(cardId, fromCol, toCol) => {
                         const deal = dealsData.find((d) => d.id === Number(cardId) || d.id === cardId);
                         if (deal) {

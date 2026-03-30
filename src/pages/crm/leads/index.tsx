@@ -3910,7 +3910,7 @@ const CrmLeads = () => {
                     label: "Phone",
                     value:
                       selectedLead?.phone ||
-                      selectedLead?.rawData?.phone ||
+                      selectedLead?.rawData?.phone || selectedLead.contact_phone_country_code+" "+selectedLead?.contact_phone ||
                       "N/A",
                     type: "phone",
                     copyable: true,
