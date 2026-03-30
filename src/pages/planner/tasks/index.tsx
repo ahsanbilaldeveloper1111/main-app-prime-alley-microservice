@@ -14,7 +14,7 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
 import { FiSearch } from "react-icons/fi";
-import { Plus, X, ChevronDown, Filter } from "lucide-react";
+import { Plus, X, ChevronDown, Filter, MoreVertical, Settings, Trash2 } from "lucide-react";
 import GenericTable, { TableColumn, TableAction, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -161,6 +161,7 @@ const DEFAULT_TASK_TABLE_COLUMN_KEYS: string[] = [
   "notes",
   "workflow_status",
   "repeat_status",
+  "actions",
 ];
 
 /**
@@ -255,6 +256,39 @@ function taskStatusColumnLabel(row: Task): string {
   if (row.status === "completed") return "Completed";
   if (row.status === "overdue") return "Overdue";
   return "Pending";
+}
+
+/** e.g. `no_repeat` → "No Repeat" for table display. */
+function formatRepeatStatusLabel(value: string | null | undefined): string {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return raw
+    .split(/_+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function resolveTaskActionsMenuOpenState(
+  taskId: number,
+  nextShow: boolean,
+  previousOpenId: number | null,
+): number | null {
+  if (nextShow) {
+    return taskId;
+  }
+  return previousOpenId === taskId ? null : previousOpenId;
+}
+
+function createTaskRowActionsToggleHandler(
+  taskId: number,
+  setOpenTaskActionsId: React.Dispatch<React.SetStateAction<number | null>>,
+): (nextShow: boolean) => void {
+  return (nextShow: boolean) => {
+    setOpenTaskActionsId((prev) =>
+      resolveTaskActionsMenuOpenState(taskId, nextShow, prev),
+    );
+  };
 }
 
 function applyFiltersToParams(
@@ -588,6 +622,7 @@ const TasksListingPage = ({
     // ── Delete confirmation ──────────────────────────────────────────────────────
     const [showDelete, setShowDelete] = useState(false);
     const [toDelete, setToDelete] = useState<Task | null>(null);
+    const [openTaskActionsId, setOpenTaskActionsId] = useState<number | null>(null);
 
     const [visibleTaskColumnKeys, setVisibleTaskColumnKeys] = useState<string[]>(
       () => [...DEFAULT_TASK_TABLE_COLUMN_KEYS],
@@ -597,7 +632,14 @@ const TasksListingPage = ({
     useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
     useLayoutEffect(() => {
-      setVisibleTaskColumnKeys(readVisibleTaskColumnKeysFromStorage());
+      const fromStorage = readVisibleTaskColumnKeysFromStorage();
+      if (!fromStorage.includes("actions")) {
+        const next = [...fromStorage, "actions"];
+        persistVisibleTaskColumnKeys(next);
+        setVisibleTaskColumnKeys(next);
+        return;
+      }
+      setVisibleTaskColumnKeys(fromStorage);
     }, []);
 
     useEffect(() => {
@@ -772,6 +814,11 @@ const TasksListingPage = ({
       setShowCreate(true);
     }, [canEditTaskByProjectMembers]);
 
+    const openDeleteConfirm = useCallback((row: Task) => {
+      setToDelete(row);
+      setShowDelete(true);
+    }, []);
+
     const handleDelete = async () => {
       if (!toDelete) return;
       try {
@@ -929,9 +976,77 @@ const TasksListingPage = ({
       },
       {
         key: "repeat_status", label: "Repeat Status", sortable: false, type: "custom",
-        render: (row) => <span style={CELL_STYLE}>{row.repeat_status || "—"}</span>,
+        render: (row) => {
+          const label = formatRepeatStatusLabel(row.repeat_status);
+          return <span style={CELL_STYLE}>{label || "—"}</span>;
+        },
       },
-    ], [fetchTasks, router, handleToggleComplete, openEdit, canEditTaskByProjectMembers]);
+      {
+        key: "actions",
+        label: "Actions",
+        sortable: false,
+        type: "custom",
+        render: (row) => {
+          const canManage = canEditTaskByProjectMembers(row);
+          return (
+            <Dropdown
+              show={openTaskActionsId === row.id}
+              onToggle={createTaskRowActionsToggleHandler(row.id, setOpenTaskActionsId)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Dropdown.Toggle
+                variant="link"
+                size="sm"
+                className="p-1 text-decoration-none shadow-none"
+                style={{ color: "#6b7280" }}
+                id={`task-row-actions-${row.id}`}
+                aria-label="Task actions"
+              >
+                <MoreVertical size={16} />
+              </Dropdown.Toggle>
+              <Dropdown.Menu align="end">
+                <Dropdown.Item
+                  as="button"
+                  type="button"
+                  disabled={!canManage}
+                  title={canManage ? undefined : "You cannot edit tasks in this project"}
+                  onClick={() => {
+                    setOpenTaskActionsId(null);
+                    openEdit(row);
+                  }}
+                >
+                  <Settings size={14} className="me-2" />
+                  Edit Task
+                </Dropdown.Item>
+                <Dropdown.Divider />
+                <Dropdown.Item
+                  as="button"
+                  type="button"
+                  className="text-danger"
+                  disabled={!canManage}
+                  title={canManage ? undefined : "You cannot delete tasks in this project"}
+                  onClick={() => {
+                    setOpenTaskActionsId(null);
+                    openDeleteConfirm(row);
+                  }}
+                >
+                  <Trash2 size={14} className="me-2" />
+                  Delete Task
+                </Dropdown.Item>
+              </Dropdown.Menu>
+            </Dropdown>
+          );
+        },
+      },
+    ], [
+      fetchTasks,
+      router,
+      handleToggleComplete,
+      openEdit,
+      openDeleteConfirm,
+      canEditTaskByProjectMembers,
+      openTaskActionsId,
+    ]);
 
     const tableColumnsForGrid = useMemo(() => {
       const byKey = new Map(columns.map((c) => [c.key, c]));

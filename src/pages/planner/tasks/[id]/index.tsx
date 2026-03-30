@@ -19,7 +19,18 @@ import {
   Form,
   Modal,
 } from 'react-bootstrap';
-import { ArrowLeft, Edit, Trash2, Plus, Calendar, Send, Upload, FileText, Download } from 'lucide-react';
+import {
+  ArrowLeft,
+  Edit,
+  Trash2,
+  Plus,
+  Calendar,
+  Send,
+  Upload,
+  FileText,
+  Download,
+  ListTodo,
+} from 'lucide-react';
 import {
   getTask,
   deleteTask,
@@ -35,7 +46,7 @@ import {
 } from '@utils/tasks';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { ModuleSlug } from '@utils/Helper';
-import CreateTaskModal from '@components/work-planner/createtask-modal';
+import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 
 const WITH_RELATIONS = [
@@ -63,6 +74,149 @@ function getStatusVariant(status: string | { name?: string } | null | undefined)
     return 'info';
 }
 
+function readNestedRecurringRecord(task: Record<string, unknown>): Record<string, unknown> | null {
+  const top = task.recurring;
+  if (top && typeof top === 'object' && !Array.isArray(top)) {
+    return top as Record<string, unknown>;
+  }
+  return null;
+}
+
+function pickTaskScalar(task: Record<string, unknown>, key: string): unknown {
+  const top = task[key];
+  if (top != null && top !== '') return top;
+  const nested = readNestedRecurringRecord(task);
+  if (nested) {
+    const nv = nested[key];
+    if (nv != null && nv !== '') return nv;
+  }
+  return undefined;
+}
+
+/** Coerce API values for display/type checks; objects become '' to avoid '[object Object]'. */
+function plannerDetailScalarString(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  return '';
+}
+
+function plannerTaskTypeFromTask(
+  task: Record<string, unknown> | null | undefined,
+): 'todo' | 'regular' | 'recurring' {
+  if (task == null) return 'regular';
+  const t = plannerDetailScalarString(task.type ?? task.task_type).toLowerCase();
+  if (t === 'todo') return 'todo';
+  if (t === 'recurring') return 'recurring';
+  // Explicit API type wins; do not infer recurring from leftover schedule fields.
+  if (t === 'regular') return 'regular';
+  if (task.is_recurring === true || task.is_recurring === 1) return 'recurring';
+  const nested = readNestedRecurringRecord(task);
+  if (nested) {
+    const nt = plannerDetailScalarString(nested.type).toLowerCase();
+    if (nt === 'recurring') return 'recurring';
+    if (nested.is_recurring === true || nested.is_recurring === 1) return 'recurring';
+  }
+  const freq = pickTaskScalar(task, 'frequency');
+  const hasRecurringSignals =
+    (typeof freq === 'string' && freq.trim() !== '') ||
+    pickTaskScalar(task, 'repeat_interval') != null ||
+    pickTaskScalar(task, 'last_run_at') != null ||
+    pickTaskScalar(task, 'next_run_at') != null;
+  if (hasRecurringSignals && t !== 'todo') return 'recurring';
+  return 'regular';
+}
+
+function readTaskScheduleField(
+  task: Record<string, unknown>,
+  field: 'last_run_at' | 'next_run_at',
+): string | undefined {
+  const from = (o: Record<string, unknown> | null | undefined): string | undefined => {
+    if (!o) return undefined;
+    const v = o[field];
+    return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+  };
+  return from(task) ?? from(readNestedRecurringRecord(task));
+}
+
+/** e.g. "23 December 2025" — stable for API `YYYY-MM-DD` (parsed as local calendar date). */
+const PLANNER_DETAIL_LONG_DATE: Intl.DateTimeFormatOptions = {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+};
+
+function formatPlannerDetailDateLong(value: string | null | undefined): string {
+  if (value == null || String(value).trim() === '') return '—';
+  const s = String(value).trim();
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})(?:$|[^\d])/.exec(s);
+  if (ymd) {
+    const y = Number(ymd[1]);
+    const m = Number(ymd[2]) - 1;
+    const day = Number(ymd[3]);
+    const local = new Date(y, m, day);
+    if (!Number.isNaN(local.getTime())) {
+      return local.toLocaleDateString('en-GB', PLANNER_DETAIL_LONG_DATE);
+    }
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleDateString('en-GB', PLANNER_DETAIL_LONG_DATE);
+}
+
+function formatPlannerDetailDateTime(iso: string | null | undefined): string {
+  if (iso == null || String(iso).trim() === '') return '—';
+  const d = new Date(String(iso).trim());
+  if (Number.isNaN(d.getTime())) return '—';
+  const datePart = d.toLocaleDateString('en-GB', PLANNER_DETAIL_LONG_DATE);
+  const timePart = d.toLocaleTimeString('en-GB', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  return `${datePart}, ${timePart}`;
+}
+
+function taskTypeBadgeLabel(kind: 'todo' | 'regular' | 'recurring'): string {
+  console.log('kind', kind);
+  if (kind === 'todo') return 'Todo';
+  if (kind === 'recurring') return 'Recurring';
+  return 'Regular';
+}
+
+function formatFrequencyLabel(raw: unknown): string {
+  const s = plannerDetailScalarString(raw).trim().toLowerCase();
+  if (!s) return '—';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function formatRepeatOnForDetail(frequency: unknown, repeatOn: unknown): string {
+  const f = plannerDetailScalarString(frequency).toLowerCase();
+  const ro = plannerDetailScalarString(repeatOn).trim();
+  if (!ro) return '—';
+  if (f === 'weekly') {
+    const day = ro.toLowerCase();
+    return day.charAt(0).toUpperCase() + day.slice(1);
+  }
+  if (f === 'monthly') return `Day ${ro} of month`;
+  return ro;
+}
+
+function formatDueTimeForDetail(raw: unknown): string {
+  if (raw == null || raw === '') return '—';
+  const s = plannerDetailScalarString(raw).trim();
+  if (!s) return '—';
+  if (s.includes('T')) {
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+  }
+  return s;
+}
+
 function getPriorityVariant(priority: string) {
     const p = (priority || '').toLowerCase();
     if (p === 'urgent' || p === 'high') return 'danger';
@@ -71,19 +225,7 @@ function getPriorityVariant(priority: string) {
 }
 
 function formatActivityDate(dateString: string) {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      });
-    } catch {
-      return dateString;
-    }
+  return formatPlannerDetailDateTime(dateString);
 }
 
 function getExtensionDisplay(extNumber: string, hierarchyDataExtensions: unknown) {
@@ -543,6 +685,87 @@ function TaskCommentsTabPanel({
   );
 }
 
+function recurringIntervalSuffix(frequencyRaw: unknown): string {
+  const f = plannerDetailScalarString(frequencyRaw).toLowerCase();
+  if (f === 'daily') return 'day(s)';
+  if (f === 'weekly') return 'week(s)';
+  if (f === 'monthly') return 'month(s)';
+  if (f === 'yearly') return 'year(s)';
+  return '';
+}
+
+type TaskDetailRecurringSchedulePanelProps = Readonly<{
+  taskRecord: Record<string, unknown>;
+  endDateDisplay: string | null;
+  lastRunAt: string | undefined;
+  nextRunAt: string | undefined;
+}>;
+
+function TaskDetailRecurringSchedulePanel({
+  taskRecord,
+  endDateDisplay,
+  lastRunAt,
+  nextRunAt,
+}: TaskDetailRecurringSchedulePanelProps) {
+  const pick = (key: string) => pickTaskScalar(taskRecord, key);
+  const freq = pick('frequency');
+  const intervalRaw = pick('repeat_interval');
+  const intervalStr = plannerDetailScalarString(intervalRaw);
+  const intervalMain = intervalStr === '' ? '—' : intervalStr;
+  const suffix = typeof freq === 'string' ? recurringIntervalSuffix(freq) : '';
+
+  return (
+    <div className="p-3 bg-light rounded border mb-3">
+      <div className="small text-muted text-uppercase fw-semibold mb-2">Recurring schedule</div>
+      <Row className="g-3">
+        <Col xs={6} md={4}>
+          <div className="small text-muted">Frequency</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+            {formatFrequencyLabel(freq)}
+          </div>
+        </Col>
+        <Col xs={6} md={4}>
+          <div className="small text-muted">Repeat every</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+            {intervalMain}
+            {suffix ? <span className="text-muted small ms-1">{suffix}</span> : null}
+          </div>
+        </Col>
+        <Col xs={12} md={4}>
+          <div className="small text-muted">Repeat on / day</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+            {formatRepeatOnForDetail(freq, pick('repeat_on'))}
+          </div>
+        </Col>
+        <Col xs={12} md={6}>
+          <div className="small text-muted">Scheduled time</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+            {formatDueTimeForDetail(pick('due_time'))}
+          </div>
+        </Col>
+        <Col xs={12} md={6}>
+          <div className="small text-muted">Schedule ends</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+            {formatPlannerDetailDateLong(endDateDisplay)}
+          </div>
+        </Col>
+        <Col xs={12} md={6}>
+          <div className="small text-muted">Last run at</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+            {formatPlannerDetailDateTime(lastRunAt)}
+          </div>
+        </Col>
+        <Col xs={12} md={6}>
+          <div className="small text-muted">Next run at</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+            {formatPlannerDetailDateTime(nextRunAt)}
+          </div>
+        </Col>
+      </Row>
+    </div>
+  );
+}
+
 const TaskDetailPage = () => {
   const router = useRouter();
   const { id } = router.query;
@@ -569,6 +792,23 @@ const TaskDetailPage = () => {
   const documentInputRef = useRef<HTMLInputElement>(null);
 
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+
+  const sidebarProjectFromTask = useMemo(() => {
+    const p = task?.project;
+    if (p == null || typeof p !== 'object' || p.id == null) return undefined;
+    return {
+      id: Number(p.id),
+      name: String(p.name ?? ''),
+      icon: '',
+      color: typeof p.color === 'string' && p.color ? p.color : '#3b82f6',
+      statuses: Array.isArray(p.statuses) ? p.statuses : undefined,
+      labels: Array.isArray(p.labels) ? p.labels : undefined,
+    };
+  }, [task?.project]);
+
+  const editSidebarTaskType = task
+    ? plannerTaskTypeFromTask(task as Record<string, unknown>)
+    : 'regular';
 
   const { data: session } = useSession();
   const sessionUserPhoneOrExtension = useMemo(
@@ -784,6 +1024,28 @@ const TaskDetailPage = () => {
     task.watchers ??
     (task.watcher_numbers?.map((extNum: string) => ({ extension_number: extNum })) ?? []);
 
+  const taskRecord = task as Record<string, unknown>;
+  console.log('taskRecord', taskRecord);
+  const detailTaskKind = plannerTaskTypeFromTask(taskRecord);
+  console.log('detailTaskKind', detailTaskKind);
+  const pickScalar = (key: string) => pickTaskScalar(taskRecord, key);
+  const lastRunAt = readTaskScheduleField(taskRecord, 'last_run_at');
+  const nextRunAt = readTaskScheduleField(taskRecord, 'next_run_at');
+  const showRecurringBlock =
+    detailTaskKind === 'recurring' ||
+    lastRunAt != null ||
+    nextRunAt != null ||
+    (typeof pickScalar('frequency') === 'string' && String(pickScalar('frequency')).trim() !== '');
+  const startDateDisplay =
+    (typeof task.start_date === 'string' && task.start_date.trim() !== ''
+      ? task.start_date
+      : null) ??
+    (typeof pickScalar('start_date') === 'string' ? String(pickScalar('start_date')) : null);
+  const endDateDisplay =
+    (typeof task.due_date === 'string' && task.due_date.trim() !== '' ? task.due_date : null) ??
+    (typeof pickScalar('end_date') === 'string' ? String(pickScalar('end_date')) : null);
+  const dueTimeDetailLabel = formatDueTimeForDetail(task.due_time);
+
   return (
     <>
       <BreadcrumbItem
@@ -832,7 +1094,7 @@ const TaskDetailPage = () => {
           </Card.Header>
           <Card.Body>
             <Row className="g-2 mb-3">
-              <Col xs={6} md={3}>
+              <Col xs={6} md={4}>
                 <div className="p-3 bg-light rounded border">
                   <div className="small text-muted text-uppercase fw-semibold mb-1">Status</div>
                   <Badge bg={getStatusVariant(statusName)} className="px-3 py-2 w-100">
@@ -840,7 +1102,7 @@ const TaskDetailPage = () => {
                   </Badge>
                 </div>
               </Col>
-              <Col xs={6} md={3}>
+              <Col xs={6} md={4}>
                 <div className="p-3 bg-light rounded border">
                   <div className="small text-muted text-uppercase fw-semibold mb-1">Priority</div>
                   <Badge bg={getPriorityVariant(priorityVal)} className="px-3 py-2 w-100">
@@ -848,17 +1110,47 @@ const TaskDetailPage = () => {
                   </Badge>
                 </div>
               </Col>
-              <Col xs={12} md={6}>
+              <Col xs={6} md={4}>
+                <div className="p-3 bg-light rounded border">
+                  <div className="small text-muted text-uppercase fw-semibold mb-1">Type</div>
+                  <Badge bg="secondary" className="px-3 py-2 w-100 text-capitalize">
+                    {taskTypeBadgeLabel(detailTaskKind)}
+                  </Badge>
+                </div>
+              </Col>
+              <Col xs={6} md={4}>
                 <div className="p-3 bg-light rounded border">
                   <div className="small text-muted text-uppercase fw-semibold mb-1">Due Date</div>
                   <div className="d-flex align-items-center" style={{ fontSize: '0.9rem', fontWeight: 500 }}>
                     <Calendar size={16} className="me-2 text-muted" />
-                    {task.due_date || '—'}
-                    {task.due_time && <span className="ms-1 small">({task.due_time})</span>}
+                    {formatPlannerDetailDateLong(endDateDisplay)}
+                    {dueTimeDetailLabel !== '—' && (
+                      <span className="ms-1 small text-muted">({dueTimeDetailLabel})</span>
+                    )}
                   </div>
                 </div>
               </Col>
+              {startDateDisplay ? (
+                <Col xs={12} md={4}>
+                  <div className="p-3 bg-light rounded border">
+                    <div className="small text-muted text-uppercase fw-semibold mb-1">Start date</div>
+                    <div className="d-flex align-items-center" style={{ fontSize: '0.9rem', fontWeight: 500 }}>
+                      <Calendar size={16} className="me-2 text-muted" />
+                      {formatPlannerDetailDateLong(startDateDisplay)}
+                    </div>
+                  </div>
+                </Col>
+              ) : null}
             </Row>
+
+            {showRecurringBlock && (
+              <TaskDetailRecurringSchedulePanel
+                taskRecord={taskRecord}
+                endDateDisplay={endDateDisplay}
+                lastRunAt={lastRunAt}
+                nextRunAt={nextRunAt}
+              />
+            )}
 
             <div className="p-3 bg-light rounded border mb-3">
               <div className="small text-muted text-uppercase fw-semibold mb-2">Assignees</div>
@@ -952,6 +1244,81 @@ const TaskDetailPage = () => {
               <div className="small text-muted text-uppercase fw-semibold mb-1">Project</div>
               <span>{projectName}</span>
             </div>
+
+            {typeof task.parent === 'object' && task.parent?.id != null && (
+                <div className="p-3 bg-light rounded border mb-3">
+                  <div className="small text-muted text-uppercase fw-semibold mb-1">Parent task</div>
+                  <Button
+                    variant="link"
+                    className="p-0 d-inline-flex align-items-center gap-1"
+                    onClick={() => {
+                      router.push(`/planner/tasks/${String(task.parent.id)}`).catch(() => undefined);
+                    }}
+                  >
+                    <ListTodo size={16} className="text-muted" />
+                    {task.parent.title ||
+                      task.parent.reference ||
+                      `Task #${task.parent.id}`}
+                  </Button>
+                </div>
+              )}
+
+            {Array.isArray(task.labels) && task.labels.length > 0 && (
+              <div className="p-3 bg-light rounded border mb-3">
+                <div className="small text-muted text-uppercase fw-semibold mb-2">Labels</div>
+                <div className="d-flex flex-wrap gap-2">
+                  {task.labels.map((label: { id?: number; name?: string; color?: string }, idx: number) => {
+                    const labelKey =
+                      label.id == null ? `label-idx-${idx}` : `label-${label.id}`;
+                    return (
+                      <Badge
+                        key={labelKey}
+                        className="px-2 py-1"
+                        style={{
+                          backgroundColor: label.color || '#94a3b8',
+                          color: '#141414',
+                        }}
+                      >
+                        {label.name ?? 'Label'}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {Array.isArray(task.children) && task.children.length > 0 && (
+              <div className="p-3 bg-light rounded border mb-3">
+                <div className="small text-muted text-uppercase fw-semibold mb-2">Subtasks</div>
+                <ul className="list-unstyled mb-0">
+                  {task.children
+                    .filter(
+                      (child: { id?: number }): child is { id: number; title?: string; reference?: string } =>
+                        child.id != null,
+                    )
+                    .map(
+                      (
+                        child: { id: number; title?: string; reference?: string },
+                        idx: number,
+                      ) => {
+                      const childKey = `child-${child.id}-${idx}`;
+                      return (
+                        <li key={childKey} className="mb-1">
+                          <Button
+                            variant="link"
+                            className="p-0"
+                            onClick={() => {
+                              router.push(`/planner/tasks/${String(child.id)}`).catch(() => undefined);
+                            }}
+                          >
+                            {child.title || child.reference || `Task #${child.id}`}
+                          </Button>
+                        </li>
+                      );
+                    })}
+                </ul>
+              </div>
+            )}
 
             <div className="p-3 bg-light rounded border mb-3">
               <div className="small text-muted text-uppercase fw-semibold mb-2">Description</div>
@@ -1071,22 +1438,30 @@ const TaskDetailPage = () => {
         </Modal.Footer>
       </Modal>
 
-      <CreateTaskModal
-        show={showEditModal}
-        onHide={() => setShowEditModal(false)}
-        task={task}
-        isEdit
-        extensions={hierarchyDataExtensions as any}
-        labels={task?.labels || []}
-        linkedRecords={[]}
+      <CreateTaskSidebar
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
         onCreate={async () => {
           setShowEditModal(false);
           await fetchTask();
         }}
-        onCreateAndOpen={async () => {
-          setShowEditModal(false);
-          await fetchTask();
-        }}
+        extensions={hierarchyDataExtensions as any}
+        labels={sidebarProjectFromTask?.labels ?? task?.labels ?? []}
+        project={sidebarProjectFromTask}
+        statuses={
+          sidebarProjectFromTask?.statuses?.map(
+            (s: { id: number; name: string; color?: string }) => ({
+              id: s.id,
+              name: s.name,
+              icon: '',
+              color: s.color || '#3b82f6',
+            }),
+          ) ?? []
+        }
+        task={task ? { ...task, rawData: task } : undefined}
+        isEdit={Boolean(showEditModal && task)}
+        taskType={editSidebarTaskType}
+        lockProjectSelection={false}
       />
 
       <DeleteConfirmationModal
