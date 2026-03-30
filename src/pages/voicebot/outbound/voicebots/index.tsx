@@ -161,23 +161,25 @@ const VoicebotsPage = () => {
       key: "actions",
       label: "Actions",
       render: (row) => (
-        <div className="d-flex gap-1">
+        <div className="action-icons-wrap">
           <Button
             size="sm"
             variant="outline-primary"
+            className="icon-action-btn"
             onClick={() => router.push(`/voicebot/outbound/voicebots/edit?id=${encodeURIComponent(botId(row))}&company_id=${encodeURIComponent(String(row.company_id ?? ""))}`)}
           >
-            <Pencil size={14} />
+            <Pencil size={12} />
           </Button>
           <Button
             size="sm"
             variant="outline-danger"
+            className="icon-action-btn"
             onClick={() => {
               setSelectedRow(row);
               setShowDeleteModal(true);
             }}
           >
-            <Trash2 size={14} />
+            <Trash2 size={12} />
           </Button>
         </div>
       ),
@@ -208,61 +210,169 @@ const VoicebotsPage = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Outbound - Voice Bots" />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div className="d-flex align-items-center gap-2">
-              <h2 className="mb-0">Voice Bots</h2>
-            </div>
-            <div className="d-flex align-items-center gap-2 flex-wrap">
-              {isAdmin && (
-                <Form.Select
-                  style={{ width: "220px" }}
-                  value={companyFilter}
-                  onChange={(e) => setCompanyFilter(e.target.value)}
-                >
-                  <option value="">All companies</option>
-                  {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Form.Select>
-              )}
-              <Form.Select
-                style={{ width: "150px" }}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </Form.Select>
-              <Button variant="primary" onClick={() => router.push("/voicebot/outbound/voicebots/create")}>
-                <Plus size={18} className="me-1" /> Add Voice Bot
-              </Button>
-            </div>
-          </div>
-        </Col>
-      </Row>
+      <style jsx global>{`
+        .voicebot-page .add-voicebot-btn {
+          padding: 9px 13px !important;
+          height: 38px !important;
+          background-color: rgb(0, 0, 0) !important;
+          color: rgb(255, 255, 255) !important;
+          border: none !important;
+          border-radius: 4px !important;
+          font-size: 12px !important;
+          font-weight: 500 !important;
+          cursor: pointer !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+        }
 
-      <GenericTable<VoicebotRow>
-        data={data}
-        columns={columns}
-        loading={loading}
-        emptyMessage="No voice bots found."
-        loadingMessage="Loading voice bots..."
-        pagination={{
-          currentPage: page,
-          rowsPerPage: pageSize,
-          totalRows: totalRows || data.length,
-          pageSizeOptions: [10, 25, 50],
+        .voicebot-page .filter-select {
+          height: 38px !important;
+          border-radius: 4px !important;
+          background-color: #ffffff !important;
+          color: #141414 !important;
+          font-size: 12px !important;
+          font-weight: 500 !important;
+          padding-top: 10px;
+        }
+
+        .voicebot-page .icon-action-btn {
+          width: 28px !important;
+          height: 28px !important;
+          min-width: 28px !important;
+          min-height: 28px !important;
+          padding: 0 !important;
+          border: none !important;
+          border-radius: 4px !important;
+          background: transparent !important;
+          color: #141414 !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+        }
+
+        .voicebot-page .icon-action-btn:hover,
+        .voicebot-page .icon-action-btn:focus,
+        .voicebot-page .icon-action-btn:active {
+          border: none !important;
+          background: #f3f4f6 !important;
+          color: #141414 !important;
+          box-shadow: none !important;
+        }
+
+        .voicebot-page .action-icons-wrap {
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+        }
+
+        .voicebot-page .generic-table thead th:last-child,
+        .voicebot-page .generic-table tbody td:last-child {
+          width: 95px !important;
+          min-width: 95px !important;
+          max-width: 95px !important;
+          white-space: nowrap;
+        }
+
+        .voicebot-page .generic-table thead th:last-child .th-content {
+          justify-content: center !important;
+        }
+
+        .voicebot-page .generic-table tbody td:last-child {
+          text-align: center;
+        }
+
+          .generic-table-card {
+          border: none !important;
+          }
+          .generic-table-responsive {
+    width: 98% !important;
+   
+    border-radius: 0 !important;
+    margin: 0 auto !important;
+}
+      `}</style>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Outbound - Voice Bots" />
+      <div
+        className="voicebot-page"
+        style={{
+          display: "flex",
+          gap: "0",
+          height: "calc(100vh)",
+          overflow: "hidden",
         }}
-        onPaginationChange={(newPage, newRowsPerPage) => {
-          setPage(newPage);
-          setPageSize(newRowsPerPage);
-        }}
-        uniqueKey="id"
-        hover
-        striped={false}
-      />
+      >
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            overflowX: "hidden",
+            backgroundColor: "#ffffff",
+            marginRight: "6px",
+          }}
+        >
+          <Row className="mb-3">
+            <Col md={12}>
+              <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap ps-3 pe-3 gap-2">
+                <h1 style={{ fontWeight: 300, color: "#141414", fontSize: "24px", margin: 0 }}>
+                  Voice Bots
+                </h1>
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  {isAdmin && (
+                    <Form.Select
+                      className="filter-select"
+                      style={{ width: "220px" }}
+                      value={companyFilter}
+                      onChange={(e) => setCompanyFilter(e.target.value)}
+                    >
+                      <option value="">All companies</option>
+                      {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </Form.Select>
+                  )}
+                  <Form.Select
+                    className="filter-select"
+                    style={{ width: "150px" }}
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </Form.Select>
+                  <button
+                   
+                    className="add-voicebot-btn"
+                    onClick={() => router.push("/voicebot/outbound/voicebots/create")}
+                  >
+                    <Plus size={18} /> Add Voice Bot
+                  </button>
+                </div>
+              </div>
+            </Col>
+          </Row>
+
+          <GenericTable<VoicebotRow>
+            data={data}
+            columns={columns}
+            loading={loading}
+            emptyMessage="No voice bots found."
+            loadingMessage="Loading voice bots..."
+            pagination={{
+              currentPage: page,
+              rowsPerPage: pageSize,
+              totalRows: totalRows || data.length,
+              pageSizeOptions: [10, 25, 50],
+            }}
+            onPaginationChange={(newPage, newRowsPerPage) => {
+              setPage(newPage);
+              setPageSize(newRowsPerPage);
+            }}
+            uniqueKey="id"
+            hover
+            striped={false}
+          />
+        </div>
+      </div>
 
       <DeleteConfirmationModal
         show={showDeleteModal}
