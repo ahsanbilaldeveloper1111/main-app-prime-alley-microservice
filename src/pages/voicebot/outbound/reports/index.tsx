@@ -1,18 +1,20 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { FilterPill, TableColumn, ToolbarConfig } from "@components/GenericTable";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
+import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import { postReportsCalls, getCampaigns, getReportsCallsBySession } from "@utils/voicebot/outbound";
 import { GetCompanies } from "@utils/users";
-import { Row, Col, Button, Form, Spinner, Modal, Tabs, Tab } from "react-bootstrap";
+import { Row, Col, Button, Form, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { formatDuration, GlobalDateTimeFormat } from "@utils/Helper";
 import "@assets/scss/common.scss";
 import moment from "moment";
 import { formatFixed, formatPercent } from "@utils/voicebot/outbound/formatters";
+import { Activity, DollarSign, MessageSquareText, PieChart, PhoneCall } from "lucide-react";
 
 function formatCost(value: number): string {
   return formatFixed(value, 4, "0.0000");
@@ -178,10 +180,10 @@ const OutboundReportsPage = () => {
   const [searchValue, setSearchValue] = useState("");
   const [summary, setSummary] = useState<ReportsSummary | null>(null);
 
-  const [viewOpen, setViewOpen] = useState(false);
-  const [viewLoading, setViewLoading] = useState(false);
-  const [viewTab, setViewTab] = useState<string>("overview");
-  const [viewData, setViewData] = useState<CallSessionDetails | null>(null);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [sidebarLoading, setSidebarLoading] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<CallReportRow | null>(null);
+  const [sidebarData, setSidebarData] = useState<CallSessionDetails | null>(null);
 
   const effectiveCompanyId = isAdmin ? filters.company_id : companyIdentifier;
 
@@ -250,43 +252,190 @@ const OutboundReportsPage = () => {
     if (hasSearched) handleSearch();
   }, [filters.page, filters.page_size]);
 
-  const closeView = () => {
-    setViewOpen(false);
-    setViewLoading(false);
-    setViewData(null);
-    setViewTab("overview");
+  const closeSidebar = () => {
+    setShowSidebar(false);
+    setSidebarLoading(false);
+    setSelectedRow(null);
+    setSidebarData(null);
   };
 
-  const handleView = useCallback(async (row: CallReportRow) => {
+  const handlePreviewClick = useCallback(async (row: CallReportRow) => {
     const sessionId = toSessionId(row);
-    const companyId = row.company_id;
+    const companyId = row.company_id ?? effectiveCompanyId;
     if (!sessionId || !companyId) {
       toast.error("Missing session id or company id for this row");
       return;
     }
-    console.log("sessionId", sessionId);
-    console.log("companyId", companyId);
-    setViewOpen(true);
-    setViewLoading(true);
-    setViewData(null);
-    setViewTab("overview");
+    setSelectedRow(row);
+    setShowSidebar(true);
+    setSidebarLoading(true);
+    setSidebarData(null);
 
     try {
       const res = (await getReportsCallsBySession(sessionId, companyId)) as CallSessionApiResponse;
       if (res?.status === false) {
         toast.error(res?.detail ?? res?.message ?? "Failed to load call session");
-        setViewData(null);
+        setSidebarData(null);
         return;
       }
-      setViewData(res?.data ?? null);
+      setSidebarData(res?.data ?? null);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       toast.error(e?.response?.data?.detail ?? String(e?.message ?? "Failed to load call session"));
-      setViewData(null);
+      setSidebarData(null);
     } finally {
-      setViewLoading(false);
+      setSidebarLoading(false);
     }
-  }, []);
+  }, [effectiveCompanyId]);
+
+  const conversationContent = useMemo(() => {
+    if (sidebarLoading) {
+      return (
+        <div className="text-muted d-flex align-items-center gap-2" style={{ padding: "8px 0" }}>
+          <Spinner animation="border" size="sm" /> Loading...
+        </div>
+      );
+    }
+
+    if (!Array.isArray(sidebarData?.conversation) || sidebarData.conversation.length === 0) {
+      return <div className="text-muted">No conversation messages.</div>;
+    }
+
+    return (
+      <div style={{ maxHeight: 300, overflowY: "auto" }}>
+        {sidebarData.conversation.map((message, index) => {
+          const role = String(message.role ?? "message");
+          const isAssistant = role === "assistant";
+
+          return (
+            <div
+              key={`${message.timestamp ?? "t"}-${index}`}
+              style={{
+                marginBottom: "10px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                padding: "10px",
+                backgroundColor: isAssistant ? "#ffffff" : "#f8fbfd",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#6b7280",
+                  marginBottom: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "8px",
+                }}
+              >
+                <span style={{ fontWeight: 600, textTransform: "capitalize", color: "#141414" }}>{role}</span>
+                <span>{formatDateTime(message.timestamp)}</span>
+              </div>
+              <div style={{ fontSize: "14px", color: "#141414", whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
+                {String(message.content ?? "")}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }, [sidebarData, sidebarLoading]);
+
+  const usageFields = useMemo(() => {
+    if (!sidebarData?.usage || Object.keys(sidebarData.usage).length === 0) {
+      return [{ label: "Usage", value: "No usage data." }];
+    }
+
+    return Object.entries(sidebarData.usage).map(([key, value]) => ({
+      label: key,
+      value: displayText(value),
+    }));
+  }, [sidebarData]);
+
+  const costBreakdownFields = useMemo(() => {
+    if (!sidebarData?.cost_breakdown) {
+      return [{ label: "Cost", value: "No cost breakdown." }];
+    }
+
+    return [
+      { label: "llm_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.llm_cost ?? 0))}` },
+      { label: "tts_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.tts_cost ?? 0))}` },
+      { label: "stt_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.stt_cost ?? 0))}` },
+      { label: "total_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.total_cost ?? 0))}` },
+    ];
+  }, [sidebarData]);
+
+  const sidebarSections = useMemo<SidebarSection[]>(() => {
+    const dataForView = sidebarData;
+
+    return [
+      {
+        id: "session-overview",
+        title: "Session Overview",
+        icon: PhoneCall,
+        collapsible: true,
+        defaultExpanded: true,
+        isLoading: sidebarLoading,
+        fields: [
+          { label: "Session ID", value: dataForView?.session_id ?? selectedRow?.session_id ?? "—", copyable: true },
+          { label: "Campaign", value: dataForView?.campaign_name ?? selectedRow?.campaign_name ?? "—" },
+          { label: "Phone", value: dataForView?.phone_number ?? selectedRow?.phone_number ?? "—", type: "phone" },
+          { label: "Status", value: dataForView?.call_status ?? selectedRow?.call_status ?? "—", type: "badge" },
+          {
+            label: "Duration",
+            value: formatDuration(Number(dataForView?.call_duration_seconds ?? selectedRow?.call_duration_seconds ?? 0)),
+          },
+          { label: "Total Cost", value: `$${formatCost(Number(selectedRow?.total_cost ?? dataForView?.cost_breakdown?.total_cost ?? 0))}` },
+        ],
+      },
+      {
+        id: "timing-outcome",
+        title: "Timing & Outcome",
+        icon: Activity,
+        collapsible: true,
+        defaultExpanded: true,
+        isLoading: sidebarLoading,
+        fields: [
+          { label: "Start", value: dataForView?.session_start_time, type: "datetime" },
+          { label: "End", value: dataForView?.session_end_time, type: "datetime" },
+          { label: "Disconnect", value: dataForView?.disconnect_reason ?? "—" },
+          { label: "Transfer attempted", value: formatBool(dataForView?.transfer_attempted) },
+          { label: "Transfer successful", value: formatBool(dataForView?.transfer_successful) },
+          { label: "Transfer to", value: dataForView?.transfer_to ?? "—" },
+          { label: "Idle timeout triggered", value: formatBool(dataForView?.idle_timeout_triggered) },
+          { label: "Max duration triggered", value: formatBool(dataForView?.max_duration_triggered) },
+          { label: "Error", value: dataForView?.error_message || "—" },
+        ],
+      },
+      {
+        id: "conversation",
+        title: "Conversation",
+        icon: MessageSquareText,
+        collapsible: true,
+        defaultExpanded: true,
+        customContent: conversationContent,
+      },
+      {
+        id: "usage",
+        title: "Usage",
+        icon: PieChart,
+        collapsible: true,
+        defaultExpanded: false,
+        isLoading: sidebarLoading,
+        fields: usageFields,
+      },
+      {
+        id: "cost-breakdown",
+        title: "Cost Breakdown",
+        icon: DollarSign,
+        collapsible: true,
+        defaultExpanded: false,
+        isLoading: sidebarLoading,
+        fields: costBreakdownFields,
+      },
+    ];
+  }, [sidebarData, sidebarLoading, selectedRow, conversationContent, usageFields, costBreakdownFields]);
 
   const handleSearch = useCallback(async (searchTerm?: string) => {
     setLoading(true);
@@ -341,7 +490,25 @@ const OutboundReportsPage = () => {
   }, [hasSearched, isAdmin, effectiveCompanyId, companies.length, handleSearch]);
 
   const columns: TableColumn<CallReportRow>[] = [
-    { key: "campaign_name", label: "Campaign", render: (r) => displayText(r.campaign_name) },
+    {
+      key: "campaign_name",
+      label: "Campaign",
+      render: (r) => (
+        <span
+          style={{
+            display: "inline-block",
+            maxWidth: "100%",
+            paddingRight: "92px",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+          title={displayText(r.campaign_name)}
+        >
+          {displayText(r.campaign_name)}
+        </span>
+      ),
+    },
     { key: "phone_number", label: "Phone Number", render: (r) => displayText(r.phone_number) },
     {
       key: "call_status",
@@ -354,20 +521,6 @@ const OutboundReportsPage = () => {
     { key: "call_duration_seconds", label: "Duration", render: (r) => formatDuration(Number(r.call_duration_seconds ?? 0)) },
     { key: "total_cost", label: "Cost", render: (r) => formatCost(Number(r.total_cost ?? 0)) },
     { key: "session_start_time", label: "Date Time", render: (r) => formatDateTime(r.session_start_time) },
-    {
-      key: "actions",
-      label: "Actions",
-      render: (r) => (
-        <Button
-          size="sm"
-          variant="outline-primary"
-          onClick={() => handleView(r)}
-          disabled={!toSessionId(r)}
-        >
-          View
-        </Button>
-      ),
-    },
   ];
 
   const statsCardsData: StatsCardData[] = [
@@ -392,6 +545,8 @@ const OutboundReportsPage = () => {
       subtitle: "Accumulated session cost",
     },
   ];
+
+  const tableStatsCards = hasSearched ? statsCardsData : [];
 
   const companyActiveLabel = (() => {
     if (!filters.company_id) return undefined;
@@ -572,238 +727,100 @@ const OutboundReportsPage = () => {
 
   return (
     <React.Fragment>
+      <style jsx global>{`
+        .generic-sidebar-new-container {
+          margin-top: 0px !important;
+        }
+      `}</style>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Outbound - Reports" />
-      <Row className="mb-3">
-        <Col>
-            <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-              <h2 className="mb-0">Call Reports</h2>
-            </div>
-        </Col>
-      </Row>
+      <div
+        style={{
+          display: "flex",
+          gap: "0",
+          height: "calc(100vh)",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", backgroundColor: "#ffffff", marginRight: "6px" }}>
+          <Row className="mb-3">
+            <Col>
+              <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap ps-3">
+              <h1 style={{ fontWeight: 300, color: "#141414", fontSize: "24px"}}>
+            Call Reports
+          </h1>
+              </div>
+            </Col>
+          </Row>
 
-      {hasSearched && (
-        <div className="mb-4">
-          <StatsCards data={statsCardsData} gridMinWidth="180px" />
+          {hasSearched && (
+            <GenericTable<CallReportRow>
+              data={data}
+              columns={columns}
+              loading={loading}
+              emptyMessage="No call reports found. Adjust filters and try again."
+              loadingMessage="Loading reports..."
+              pagination={{
+                currentPage: filters.page,
+                rowsPerPage: filters.page_size,
+                totalRows,
+                pageSizeOptions: [10, 25, 50, 100],
+              }}
+              onPaginationChange={(newPage, newRowsPerPage) => {
+                setFilters((f) => ({ ...f, page: newPage, page_size: newRowsPerPage }));
+              }}
+              showToolbar={true}
+              toolbar={tableToolbar}
+              showToolbarActions={false}
+              uniqueKey="id"
+              hover
+              striped={false}
+              statsCards={tableStatsCards}
+              metricsGridMinWidth="0px"
+              onPreviewClick={(row) => {
+                handlePreviewClick(row);
+              }}
+            />
+          )}
+
+          {!hasSearched && (
+            <GenericTable<CallReportRow>
+              data={[]}
+              columns={columns}
+              loading={loading}
+              emptyMessage="Use the filter pills and click Search to load call reports."
+              loadingMessage="Loading reports..."
+              showToolbar={true}
+              toolbar={tableToolbar}
+              showToolbarActions={false}
+              uniqueKey="id"
+              hover
+              striped={false}
+              statsCards={tableStatsCards}
+              metricsGridMinWidth="0px"
+              onPreviewClick={(row) => {
+                handlePreviewClick(row);
+              }}
+            />
+          )}
         </div>
-      )}
 
-      {hasSearched && (
-        <GenericTable<CallReportRow>
-          data={data}
-          columns={columns}
-          loading={loading}
-          emptyMessage="No call reports found. Adjust filters and try again."
-          loadingMessage="Loading reports..."
-          pagination={{
-            currentPage: filters.page,
-            rowsPerPage: filters.page_size,
-            totalRows,
-            pageSizeOptions: [10, 25, 50, 100],
-          }}
-          onPaginationChange={(newPage, newRowsPerPage) => {
-            setFilters((f) => ({ ...f, page: newPage, page_size: newRowsPerPage }));
-          }}
-          showToolbar={true}
-          toolbar={tableToolbar}
-          showToolbarActions={false}
-          uniqueKey="id"
-          hover
-          striped={false}
-        />
-      )}
-
-      {!hasSearched && (
-        <GenericTable<CallReportRow>
-          data={[]}
-          columns={columns}
-          loading={loading}
-          emptyMessage="Use the filter pills and click Search to load call reports."
-          loadingMessage="Loading reports..."
-          showToolbar={true}
-          toolbar={tableToolbar}
-          showToolbarActions={false}
-          uniqueKey="id"
-          hover
-          striped={false}
-        />
-      )}
-
-      <Modal show={viewOpen} onHide={closeView} size="xl" centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Call Session</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {viewLoading && (
-            <div className="text-muted d-flex align-items-center gap-2">
-              <Spinner animation="border" size="sm" /> Loading…
-            </div>
-          )}
-
-          {!viewLoading && !viewData && (
-            <div className="text-muted">No session data available.</div>
-          )}
-
-          {!viewLoading && viewData && (
-            <Tabs activeKey={viewTab} onSelect={(k) => setViewTab(String(k))} className="mb-3">
-              <Tab eventKey="overview" title="Overview">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <div className="border rounded p-3 bg-light">
-                      <div className="fw-bold mb-2">Session</div>
-                      <div><b>Session ID:</b> {viewData.session_id || "—"}</div>
-                      <div><b>Campaign:</b> {viewData.campaign_name || "—"}</div>
-                      <div><b>Phone:</b> {viewData.phone_number || "—"}</div>
-                      <div><b>Status:</b> {viewData.call_status || "—"}</div>
-                      <div><b>Duration:</b> {formatDuration(Number(viewData.call_duration_seconds ?? 0))}</div>
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <div className="border rounded p-3 bg-light">
-                      <div className="fw-bold mb-2">Timing & Outcome</div>
-                      <div><b>Start:</b> {formatDateTime(viewData.session_start_time)}</div>
-                      <div><b>End:</b> {formatDateTime(viewData.session_end_time)}</div>
-                      <div><b>Disconnect:</b> {viewData.disconnect_reason || "—"}</div>
-                      <div><b>Transfer attempted:</b> {formatBool(viewData.transfer_attempted)}</div>
-                      <div><b>Transfer successful:</b> {formatBool(viewData.transfer_successful)}</div>
-                      <div><b>Transfer to:</b> {viewData.transfer_to || "—"}</div>
-                    </div>
-                  </div>
-                </div>
-                {viewData.error_message && (
-                  <div className="alert alert-warning mt-3 mb-0">
-                    <b>Error:</b> {viewData.error_message}
-                  </div>
-                )}
-              </Tab>
-
-              <Tab eventKey="conversation" title="Conversation">
-                {Array.isArray(viewData.conversation) && viewData.conversation.length > 0 ? (
-                  <div
-                    style={{
-                      maxHeight: 520,
-                      overflowY: "auto",
-                      padding: 12,
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 12,
-                      background:
-                        "linear-gradient(180deg, rgba(245,245,245,1) 0%, rgba(255,255,255,1) 100%)",
-                    }}
-                  >
-                    {viewData.conversation.map((m, i) => (
-                      <div
-                        key={`${m.timestamp ?? "t"}-${i}`}
-                        style={{
-                          display: "flex",
-                          justifyContent: m.role === "assistant" ? "flex-start" : "flex-end",
-                          marginBottom: 10,
-                        }}
-                      >
-                        <div
-                          style={{
-                            maxWidth: "78%",
-                            padding: "10px 12px",
-                            borderRadius: 14,
-                            backgroundColor: m.role === "assistant" ? "#ffffff" : "rgb(0, 97, 98)",
-                            color: m.role === "assistant" ? "#141414" : "#ffffff",
-                            border: m.role === "assistant" ? "1px solid #e5e7eb" : "1px solid rgb(0, 97, 98)",
-                            boxShadow: "rgba(20, 20, 20, 0.08) 0px 1px 8px 0px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              gap: 12,
-                              marginBottom: 6,
-                              opacity: 0.9,
-                              fontSize: 12,
-                            }}
-                          >
-                            <div style={{ fontWeight: 700, textTransform: "capitalize" }}>
-                              {String(m.role ?? "message")}
-                            </div>
-                            <div style={{ whiteSpace: "nowrap", opacity: 0.85 }}>
-                              {formatDateTime(m.timestamp)}
-                            </div>
-                          </div>
-                          <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>
-                            {String(m.content ?? "")}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-muted">No conversation messages.</div>
-                )}
-              </Tab>
-
-              <Tab eventKey="usage" title="Usage">
-                {viewData.usage ? (
-                  <div className="table-responsive">
-                    <table className="table table-sm table-bordered">
-                      <thead>
-                        <tr>
-                          <th scope="col">Metric</th>
-                          <th scope="col">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(viewData.usage).map(([k, v]) => (
-                          <tr key={k}>
-                            <th scope="row" className="fw-bold">{k}</th>
-                            <td>{displayText(v)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-muted">No usage data.</div>
-                )}
-              </Tab>
-
-              <Tab eventKey="cost_breakdown" title="Cost breakdown">
-                {viewData.cost_breakdown ? (
-                  <div className="table-responsive">
-                    <table className="table table-sm table-bordered">
-                      <thead>
-                        <tr>
-                          <th scope="col">Cost</th>
-                          <th scope="col">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <th scope="row" className="fw-bold">llm_cost</th>
-                          <td>{formatCost(Number(viewData.cost_breakdown.llm_cost ?? 0))}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row" className="fw-bold">tts_cost</th>
-                          <td>{formatCost(Number(viewData.cost_breakdown.tts_cost ?? 0))}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row" className="fw-bold">stt_cost</th>
-                          <td>{formatCost(Number(viewData.cost_breakdown.stt_cost ?? 0))}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row" className="fw-bold">total_cost</th>
-                          <td>{formatCost(Number(viewData.cost_breakdown.total_cost ?? 0))}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-muted">No cost breakdown.</div>
-                )}
-              </Tab>
-            </Tabs>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeView}>Close</Button>
-        </Modal.Footer>
-      </Modal>
+        {showSidebar && (
+          <GenericSidebar
+            isOpen={showSidebar}
+            onClose={closeSidebar}
+            title={displayText(sidebarData?.campaign_name ?? selectedRow?.campaign_name, "Call Session")}
+            subtitle={displayText(sidebarData?.session_id ?? selectedRow?.session_id, "Session")}
+            phone={displayText(sidebarData?.phone_number ?? selectedRow?.phone_number, "")}
+            company={displayText(selectedRow?.company_id ?? sidebarData?.company_id, "")}
+            avatar={{
+              initials: "CS",
+              name: "Call Session",
+              gradient: "linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)",
+            }}
+            sections={sidebarSections}
+          />
+        )}
+      </div>
     </React.Fragment>
   );
 };

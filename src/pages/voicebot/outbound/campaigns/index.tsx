@@ -85,11 +85,12 @@ function campaignDraftDispatchControl(
     <Button
       size="sm"
       variant="outline-success"
+      className="icon-action-btn icon-dispatch-btn"
       onClick={() => onOpenDispatch(row, id)}
       disabled={!!loadingKey}
       title="Dispatch campaign"
     >
-      {loadingKey === `dispatch-${id}` ? <Spinner animation="border" size="sm" /> : <Play size={14} />}
+      {loadingKey === `dispatch-${id}` ? <Spinner animation="border" size="sm" /> : <Play size={12} />}
     </Button>
   );
 }
@@ -107,11 +108,11 @@ function campaignActiveControls(
   }
   return (
     <>
-      <Button size="sm" title="Pause campaign" variant="outline-warning" onClick={() => onPause(row)} disabled={!!loadingKey}>
-        {loadingKey === `pause-${id}` ? <Spinner animation="border" size="sm" /> : <Pause size={14} />}
+      <Button size="sm" title="Pause campaign" variant="outline-warning" className="icon-action-btn icon-pause-btn" onClick={() => onPause(row)} disabled={!!loadingKey}>
+        {loadingKey === `pause-${id}` ? <Spinner animation="border" size="sm" /> : <Pause size={12} />}
       </Button>
-      <Button title="Stop campaign" size="sm" variant="outline-danger" onClick={() => onStop(row)} disabled={!!loadingKey}>
-        {loadingKey === `stop-${id}` ? <Spinner animation="border" size="sm" /> : <Square size={14} />}
+      <Button title="Stop campaign" size="sm" variant="outline-danger" className="icon-action-btn icon-stop-btn" onClick={() => onStop(row)} disabled={!!loadingKey}>
+        {loadingKey === `stop-${id}` ? <Spinner animation="border" size="sm" /> : <Square size={12} />}
       </Button>
     </>
   );
@@ -128,8 +129,8 @@ function campaignPausedResumeControl(
     return null;
   }
   return (
-    <Button size="sm" title="Resume campaign" variant="outline-info" onClick={() => onResume(row)} disabled={!!loadingKey}>
-      {loadingKey === `resume-${id}` ? <Spinner animation="border" size="sm" /> : <RotateCw size={14} />}
+    <Button size="sm" title="Resume campaign" variant="outline-info" className="icon-action-btn icon-resume-btn" onClick={() => onResume(row)} disabled={!!loadingKey}>
+      {loadingKey === `resume-${id}` ? <Spinner animation="border" size="sm" /> : <RotateCw size={12} />}
     </Button>
   );
 }
@@ -178,10 +179,10 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
   const editCompanyParam = encodeURIComponent(String(row.company_id ?? effectiveCompanyId ?? ""));
 
   return (
-    <div className="d-flex flex-wrap gap-1 align-items-center">
+    <div className="action-icons-wrap">
       <Link href={`/voicebot/outbound/campaigns/edit/${id}?company_id=${editCompanyParam}`}>
-        <Button size="sm" variant="outline-primary" title="Edit campaign">
-          <Pencil size={14} />
+        <Button size="sm" variant="outline-primary" className="icon-action-btn icon-edit-btn" title="Edit campaign">
+          <Pencil size={12} />
         </Button>
       </Link>
       {campaignRowLifecycleActions({
@@ -195,11 +196,11 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
         onResume,
         onStop,
       })}
-      <Button size="sm" variant="outline-secondary" onClick={() => onLoadStatus(row)} title="Campaign status">
-        <Activity size={14} />
+      <Button size="sm" variant="outline-secondary" className="icon-action-btn icon-status-btn" onClick={() => onLoadStatus(row)} title="Campaign status">
+        <Activity size={12} />
       </Button>
-      <Button title="Delete campaign" size="sm" variant="outline-danger" onClick={() => onDelete(row)}>
-        <Trash2 size={14} />
+      <Button title="Delete campaign" size="sm" variant="outline-danger" className="icon-action-btn icon-delete-btn" onClick={() => onDelete(row)}>
+        <Trash2 size={12} />
       </Button>
     </div>
   );
@@ -440,70 +441,193 @@ const CampaignsPage = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Outbound - Campaigns" />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div className="d-flex align-items-center gap-2">
-              
-              <h2 className="mb-0">Campaigns</h2>
-            </div>
-            <div className="d-flex align-items-center gap-2 flex-wrap">
-              {isAdmin && (
-                <Form.Select
-                  style={{ width: "180px" }}
-                  value={companyFilter}
-                  onChange={(e) => setCompanyFilter(e.target.value)}
-                >
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Form.Select>
-              )}
-              <Form.Select
-                style={{ width: "150px" }}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All statuses</option>
-                <option value="active">Active</option>
-                <option value="draft">Draft</option>
-                <option value="paused">Paused</option>
-                <option value="running">Running</option>
-                <option value="completed">Completed</option>
-              </Form.Select>
-              <Link href="/voicebot/outbound/campaigns/create">
-                <Button variant="primary">
-                  <Plus size={18} className="me-1" /> Add Campaign
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </Col>
-      </Row>
+      <style jsx global>{`
+        .voicebot-campaign-page .add-campaign-btn {
+          padding: 9px 13px !important;
+          height: 38px !important;
+          background-color: rgb(0, 0, 0) !important;
+          color: rgb(255, 255, 255) !important;
+          border: none !important;
+          border-radius: 4px !important;
+          font-size: 12px !important;
+          font-weight: 500 !important;
+          cursor: pointer !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+        }
 
-      <GenericTable<CampaignRow>
-        data={data}
-        columns={columns}
-        loading={loading}
-        emptyMessage="No campaigns found."
-        loadingMessage="Loading campaigns..."
-        pagination={{
-          currentPage: page,
-          rowsPerPage: pageSize,
-          totalRows: totalRows || data.length,
-          pageSizeOptions: [10, 25, 50],
+        .voicebot-campaign-page .filter-select {
+          height: 38px !important;
+          border-radius: 4px !important;
+          background-color: #ffffff !important;
+          color: #141414 !important;
+          font-size: 12px !important;
+          font-weight: 500 !important;
+          padding-top: 10px;
+        }
+
+        .voicebot-campaign-page .icon-action-btn {
+          width: 28px !important;
+          height: 28px !important;
+          min-width: 28px !important;
+          min-height: 28px !important;
+          padding: 0 !important;
+          border: none !important;
+          border-radius: 4px !important;
+          background: transparent !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          box-shadow: none !important;
+        }
+
+        .voicebot-campaign-page .icon-edit-btn,
+        .voicebot-campaign-page .icon-status-btn {
+          color: #374151 !important;
+        }
+
+        .voicebot-campaign-page .icon-dispatch-btn,
+        .voicebot-campaign-page .icon-resume-btn {
+          color: #047857 !important;
+        }
+
+        .voicebot-campaign-page .icon-pause-btn {
+          color: #b45309 !important;
+        }
+
+        .voicebot-campaign-page .icon-stop-btn,
+        .voicebot-campaign-page .icon-delete-btn {
+          color: #b91c1c !important;
+        }
+
+        .voicebot-campaign-page .icon-action-btn:hover,
+        .voicebot-campaign-page .icon-action-btn:focus,
+        .voicebot-campaign-page .icon-action-btn:active {
+          border: none !important;
+          background: #f3f4f6 !important;
+          box-shadow: none !important;
+        }
+
+        .voicebot-campaign-page .action-icons-wrap {
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+          flex-wrap: nowrap;
+        }
+
+        .voicebot-campaign-page .generic-table thead th:last-child,
+        .voicebot-campaign-page .generic-table tbody td:last-child {
+          width: 164px !important;
+          min-width: 164px !important;
+          max-width: 164px !important;
+          white-space: nowrap;
+        }
+
+        .voicebot-campaign-page .generic-table thead th:last-child .th-content {
+          justify-content: center !important;
+        }
+
+        .voicebot-campaign-page .generic-table tbody td:last-child {
+          text-align: center;
+        }
+
+        .voicebot-campaign-page .generic-table-card {
+          border: none !important;
+        }
+
+        .voicebot-campaign-page .generic-table-responsive {
+          width: 98% !important;
+          border-radius: 0 !important;
+          margin: 0 auto !important;
+        }
+      `}</style>
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Outbound - Campaigns" />
+      <div
+        className="voicebot-campaign-page"
+        style={{
+          display: "flex",
+          gap: "0",
+          height: "calc(100vh)",
+          overflow: "hidden",
         }}
-        onPaginationChange={(newPage, newRowsPerPage) => {
-          setPage(newPage);
-          setPageSize(newRowsPerPage);
-        }}
-        uniqueKey="id"
-        hover
-        striped={false}
-      />
+      >
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            overflowX: "hidden",
+            backgroundColor: "#ffffff",
+            marginRight: "6px",
+          }}
+        >
+          <Row className="mb-3">
+            <Col md={12}>
+              <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap ps-3 pe-3 gap-2">
+                <h1 style={{ fontWeight: 300, color: "#141414", fontSize: "24px", margin: 0 }}>
+                  Campaigns
+                </h1>
+                <div className="d-flex align-items-center gap-2 flex-wrap">
+                  {isAdmin && (
+                    <Form.Select
+                      className="filter-select"
+                      style={{ width: "220px" }}
+                      value={companyFilter}
+                      onChange={(e) => setCompanyFilter(e.target.value)}
+                    >
+                      <option value="">All companies</option>
+                      {companies.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  )}
+                  <Form.Select
+                    className="filter-select"
+                    style={{ width: "150px" }}
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                  >
+                    <option value="">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="draft">Draft</option>
+                    <option value="paused">Paused</option>
+                    <option value="running">Running</option>
+                    <option value="completed">Completed</option>
+                  </Form.Select>
+                  <Link href="/voicebot/outbound/campaigns/create">
+                    <button className="add-campaign-btn">
+                      <Plus size={18} /> Add Campaign
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            </Col>
+          </Row>
+
+          <GenericTable<CampaignRow>
+            data={data}
+            columns={columns}
+            loading={loading}
+            emptyMessage="No campaigns found."
+            loadingMessage="Loading campaigns..."
+            pagination={{
+              currentPage: page,
+              rowsPerPage: pageSize,
+              totalRows: totalRows || data.length,
+              pageSizeOptions: [10, 25, 50],
+            }}
+            onPaginationChange={(newPage, newRowsPerPage) => {
+              setPage(newPage);
+              setPageSize(newRowsPerPage);
+            }}
+            uniqueKey="id"
+            hover
+            striped={false}
+          />
+        </div>
+      </div>
 
       {/* Campaign Summary / Dispatch Modal */}
       <Modal show={showDispatchModal} onHide={() => { setShowDispatchModal(false); setRowToDispatch(null); setDispatchSummaryData(null); }} centered size="lg">
