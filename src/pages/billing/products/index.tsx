@@ -25,9 +25,7 @@ import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import CreateProductModal from "@components/CreateModalProduct";
 import {
   FiTrash2,
-  FiEdit,
-  FiCalendar,
-  FiTarget,
+  FiEdit
 } from "react-icons/fi";
 import {
   Clock as ClockIcon,
