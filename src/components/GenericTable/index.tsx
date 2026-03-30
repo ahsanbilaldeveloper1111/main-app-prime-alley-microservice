@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback, useId } from "react";
+import React, { useState, useMemo, useRef, useEffect, useId } from "react";
 import {
   Table,
   Form,
@@ -1740,88 +1740,6 @@ const GenericTable = <T extends Record<string, any>>({
     visibleColumns.length +
     (showActions && actions.length > 0 ? 1 : 0);
 
-  const renderMainTableBody = (): React.ReactNode => {
-    if (loading) {
-      return (
-        <tr>
-          <td colSpan={fullTableColSpan} className="text-center py-4">
-            <div className="generic-table-loading">{loadingMessage}</div>
-          </td>
-        </tr>
-      );
-    }
-    if (sortedData.length === 0) {
-      return (
-        <tr>
-          <td colSpan={fullTableColSpan} className="text-center py-4">
-            <div className="generic-table-empty">{emptyMessage}</div>
-          </td>
-        </tr>
-      );
-    }
-    return sortedData.map((row, index) => {
-      const rowStableKey = String(row[uniqueKey as keyof T] ?? index);
-      return (
-        <tr
-          key={rowStableKey}
-          onClick={() => onRowClick?.(row, index)}
-          onDoubleClick={() => onRowDoubleClick?.(row, index)}
-          onMouseEnter={() => setHoveredRowIndex(index)}
-          onMouseLeave={() => setHoveredRowIndex(null)}
-          onContextMenu={(e) => {
-            if (actions.length === 0) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const items = getContextMenuItems(row);
-            if (items.length === 0) return;
-            setContextMenu({ x: e.clientX, y: e.clientY, row });
-          }}
-          className={`generic-table-row ${rowClassName?.(row, index) || ""} ${onRowClick || onRowDoubleClick ? "clickable" : ""}`}
-        >
-          {selectable && (
-            <td
-              className="generic-table-td"
-              style={{ width: "40px" }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Form.Check
-                type="checkbox"
-                checked={isSelected(row)}
-                onChange={(e) => applyRowCheckboxChange(row, e)}
-              />
-            </td>
-          )}
-          {visibleColumns.map((col, colIdx) => (
-            <GenericTableBodyDataCell
-              key={col.key}
-              col={col}
-              row={row}
-              index={index}
-              colIdx={colIdx}
-              onFirstColumnClick={onFirstColumnClick}
-              onPreviewClick={onPreviewClick}
-              hoveredRowIndex={hoveredRowIndex}
-            />
-          ))}
-          {showActions && actions.length > 0 && (
-            <td
-              className="generic-table-td generic-table-actions-cell"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <div className="generic-table-actions">
-                <GenericTableRowActionsCell
-                  row={row}
-                  rowStableKey={rowStableKey}
-                  actions={actions}
-                />
-              </div>
-            </td>
-          )}
-        </tr>
-      );
-    });
-  };
-
   return (
     <div className="generic-table-container">
       {/* Right‑click context menu */}
@@ -2123,7 +2041,7 @@ const GenericTable = <T extends Record<string, any>>({
                             checked={isSelected(row)}
                             onChange={(e) => {
                               e.stopPropagation();
-                              handleRowSelection(row, e.target.checked);
+                              applyRowCheckboxChange(row, e as React.ChangeEvent<HTMLInputElement>);
                             }}
                           />
                         </td>
@@ -2152,7 +2070,7 @@ const GenericTable = <T extends Record<string, any>>({
                               display: "inline-block",
                             }}
                           >
-                            {renderCellContent(col, row, index)}
+                            {renderGenericTableCellContent(col, row, index)}
                           </div>
                           {colIdx === 0 &&
                             hoveredRowIndex === index &&
