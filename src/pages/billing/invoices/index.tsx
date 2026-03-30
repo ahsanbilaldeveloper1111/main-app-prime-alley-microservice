@@ -135,6 +135,95 @@ function getErrorMessage(error: unknown): string {
   return "Unknown error";
 }
 
+const stripePaymentModalPanelStyle: React.CSSProperties = {
+  border: "1px solid #E5E7EB",
+  borderRadius: 8,
+  padding: 16,
+  background: "#FFFFFF",
+};
+
+const stripeUrlToolbarButtonRowStyle: React.CSSProperties = {
+  display: "flex",
+  gap: 8,
+  flexWrap: "wrap",
+};
+
+async function copyTextWithClipboardToast(
+  text: string,
+  successMessage: string,
+  errorMessage: string,
+): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast.success(successMessage);
+  } catch {
+    toast.error(errorMessage);
+  }
+}
+
+type StripePaymentModalPanelProps = Readonly<{
+  children: React.ReactNode;
+  marginBottom?: number;
+}>;
+
+function StripePaymentModalPanel({ children, marginBottom }: StripePaymentModalPanelProps) {
+  const style: React.CSSProperties = { ...stripePaymentModalPanelStyle };
+  if (marginBottom !== undefined) {
+    style.marginBottom = marginBottom;
+  }
+  return <div style={style}>{children}</div>;
+}
+
+type ReadonlyPaymentUrlToolbarProps = Readonly<{
+  url: string;
+  extraBelowField?: React.ReactNode;
+  copySuccessMessage: string;
+  copyErrorMessage: string;
+  openButtonLabel: string;
+  onOpenPaymentUrl: () => void;
+  primaryButtonLabel: string;
+  onPrimaryClick: () => Promise<void>;
+}>;
+
+function ReadonlyPaymentUrlToolbar({
+  url,
+  extraBelowField,
+  copySuccessMessage,
+  copyErrorMessage,
+  openButtonLabel,
+  onOpenPaymentUrl,
+  primaryButtonLabel,
+  onPrimaryClick,
+}: ReadonlyPaymentUrlToolbarProps) {
+  return (
+    <>
+      <Form.Control type="text" readOnly value={url} style={{ marginBottom: 10 }} />
+      {extraBelowField}
+      <div style={stripeUrlToolbarButtonRowStyle}>
+        <Button
+          variant="outline-secondary"
+          onClick={async () => {
+            await copyTextWithClipboardToast(url, copySuccessMessage, copyErrorMessage);
+          }}
+        >
+          Copy
+        </Button>
+        <Button variant="outline-primary" onClick={onOpenPaymentUrl}>
+          {openButtonLabel}
+        </Button>
+        <Button
+          variant="primary"
+          onClick={async () => {
+            await onPrimaryClick();
+          }}
+        >
+          {primaryButtonLabel}
+        </Button>
+      </div>
+    </>
+  );
+}
+
 type InvoiceFilters = {
   search?: string;
   status?: string;
@@ -251,6 +340,32 @@ const InvoiceList = () => {
       const invoiceId = selectedInvoiceForPaymentLink.id;
       try {
         const response = await PostInvoiceStripeHostedCheckout(invoiceId);
+        if (response?.success === true) {
+          toast.success(response?.message || labels.successFallback);
+          try {
+            await loadInvoiceIntoPaymentLinkModal(invoiceId);
+          } catch (refreshError) {
+            toast.error(`Failed to refresh invoice: ${getErrorMessage(refreshError)}`);
+          }
+          setRefreshKey((prev) => prev + 1);
+        } else {
+          toast.error(response?.message || labels.failureFallback);
+        }
+      } catch {
+        // Toast is handled in API helper.
+      }
+    },
+    [loadInvoiceIntoPaymentLinkModal, selectedInvoiceForPaymentLink],
+  );
+
+  const requestStripePaymentLinkForModal = useCallback(
+    async (labels: { successFallback: string; failureFallback: string }) => {
+      if (!selectedInvoiceForPaymentLink?.id) {
+        return;
+      }
+      const invoiceId = selectedInvoiceForPaymentLink.id;
+      try {
+        const response = await PostInvoiceStripePaymentLink(invoiceId);
         if (response?.success === true) {
           toast.success(response?.message || labels.successFallback);
           try {
@@ -1012,15 +1127,7 @@ const InvoiceList = () => {
           <Modal.Title>Generate Payment Link - {selectedInvoiceForPaymentLink?.invoice_number ?? selectedInvoiceForPaymentLink?.id}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <div
-            style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 8,
-              padding: 16,
-              marginBottom: 14,
-              background: "#FFFFFF",
-            }}
-          >
+          <StripePaymentModalPanel marginBottom={14}>
             <h6 style={{ marginBottom: 8 }}>Stripe Checkout link</h6>
             <p style={{ marginBottom: 12, color: "#6B7280", fontSize: 14 }}>
               One-time hosted page. Copy or open in browser. Success -&gt;
@@ -1034,61 +1141,35 @@ const InvoiceList = () => {
               {"."}
             </p>
             {selectedStripeCheckoutUrl ? (
-              <>
-                <Form.Control
-                  type="text"
-                  readOnly
-                  value={selectedStripeCheckoutUrl}
-                  style={{ marginBottom: 10 }}
-                />
-                {checkoutExpiresLocalText && (
-                  <p style={{ marginBottom: 10, color: "#6B7280", fontSize: 13 }}>
-                    Checkout session expires in about{" "}
-                    {checkoutRemainingText && (
-                      <strong>{checkoutRemainingText}</strong>
-                    )}
-                  </p>
-                )}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <Button
-                    variant="outline-secondary"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(selectedStripeCheckoutUrl);
-                        toast.success("Checkout link copied");
-                      } catch {
-                        toast.error("Failed to copy checkout link");
-                      }
-                    }}
-                  >
-                    Copy
-                  </Button>
-                  <Button
-                    variant="outline-primary"
-                    onClick={() => {
-                      openPaymentUrlInNewTabAndCloseModal(selectedStripeCheckoutUrl);
-                    }}
-                  >
-                    Open Stripe
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      void requestStripeHostedCheckoutForModal({
-                        successFallback: "New Checkout link generated",
-                        failureFallback: "Failed to generate new Checkout link",
-                      });
-                    }}
-                  >
-                    New Link
-                  </Button>
-                </div>
-              </>
+              <ReadonlyPaymentUrlToolbar
+                url={selectedStripeCheckoutUrl}
+                extraBelowField={
+                  checkoutExpiresLocalText ? (
+                    <p style={{ marginBottom: 10, color: "#6B7280", fontSize: 13 }}>
+                      Checkout session expires in about{" "}
+                      {checkoutRemainingText ? <strong>{checkoutRemainingText}</strong> : null}
+                    </p>
+                  ) : undefined
+                }
+                copySuccessMessage="Checkout link copied"
+                copyErrorMessage="Failed to copy checkout link"
+                openButtonLabel="Open Stripe"
+                onOpenPaymentUrl={() => {
+                  openPaymentUrlInNewTabAndCloseModal(selectedStripeCheckoutUrl);
+                }}
+                primaryButtonLabel="New Link"
+                onPrimaryClick={async () => {
+                  await requestStripeHostedCheckoutForModal({
+                    successFallback: "New Checkout link generated",
+                    failureFallback: "Failed to generate new Checkout link",
+                  });
+                }}
+              />
             ) : (
               <Button
                 variant="primary"
-                onClick={() => {
-                  void requestStripeHostedCheckoutForModal({
+                onClick={async () => {
+                  await requestStripeHostedCheckoutForModal({
                     successFallback: "Stripe Checkout link generated",
                     failureFallback: "Failed to generate Stripe Checkout link",
                   });
@@ -1097,79 +1178,31 @@ const InvoiceList = () => {
                 Generate Stripe Checkout Link
               </Button>
             )}
-          </div>
+          </StripePaymentModalPanel>
 
-          <div
-            style={{
-              border: "1px solid #E5E7EB",
-              borderRadius: 8,
-              padding: 16,
-              background: "#FFFFFF",
-            }}
-          >
+          <StripePaymentModalPanel>
             <h6 style={{ marginBottom: 8 }}>Stripe Payment Link</h6>
             <p style={{ marginBottom: 8, color: "#6B7280", fontSize: 14 }}>
               Persistent link visible in Stripe Dashboard -&gt; Payment links.
               Same success/cancel redirects as Checkout.
             </p>
             {selectedStripePaymentLinkUrl ? (
-              <>
-                <Form.Control
-                  type="text"
-                  readOnly
-                  value={selectedStripePaymentLinkUrl}
-                  style={{ marginBottom: 10 }}
-                />
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <Button
-                    variant="outline-secondary"
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(selectedStripePaymentLinkUrl);
-                        toast.success("Payment link copied");
-                      } catch {
-                        toast.error("Failed to copy payment link");
-                      }
-                    }}
-                  >
-                    Copy
-                  </Button>
-                  <Button
-                    variant="outline-primary"
-                    onClick={() => {
-                      openPaymentUrlInNewTabAndCloseModal(selectedStripePaymentLinkUrl);
-                    }}
-                  >
-                    Open Link
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={async () => {
-                      if (!selectedInvoiceForPaymentLink?.id) {
-                        return;
-                      }
-                      const { id: invoiceId } = selectedInvoiceForPaymentLink;
-                      try {
-                        const response = await PostInvoiceStripePaymentLink(invoiceId);
-                        if (response?.success === true) {
-                          toast.success(response?.message || "New payment link generated");
-                          try {
-                            await loadInvoiceIntoPaymentLinkModal(invoiceId);
-                          } catch (refreshError) {
-                            toast.error(`Failed to refresh invoice: ${getErrorMessage(refreshError)}`);
-                          }
-                        } else {
-                          toast.error(response?.message || "Failed to generate new payment link");
-                        }
-                      } catch {
-                        // Toast is handled in API helper.
-                      }
-                    }}
-                  >
-                    New Link
-                  </Button>
-                </div>
-              </>
+              <ReadonlyPaymentUrlToolbar
+                url={selectedStripePaymentLinkUrl}
+                copySuccessMessage="Payment link copied"
+                copyErrorMessage="Failed to copy payment link"
+                openButtonLabel="Open Link"
+                onOpenPaymentUrl={() => {
+                  openPaymentUrlInNewTabAndCloseModal(selectedStripePaymentLinkUrl);
+                }}
+                primaryButtonLabel="New Link"
+                onPrimaryClick={async () => {
+                  await requestStripePaymentLinkForModal({
+                    successFallback: "New payment link generated",
+                    failureFallback: "Failed to generate new payment link",
+                  });
+                }}
+              />
             ) : (
               <>
                 <p style={{ marginBottom: 12, color: "#6B7280", fontSize: 14 }}>
@@ -1178,33 +1211,17 @@ const InvoiceList = () => {
                 <Button
                   variant="primary"
                   onClick={async () => {
-                    if (!selectedInvoiceForPaymentLink?.id) {
-                      return;
-                    }
-                    const { id: invoiceId } = selectedInvoiceForPaymentLink;
-                    try {
-                      const response = await PostInvoiceStripePaymentLink(invoiceId);
-                      if (response?.success === true) {
-                        toast.success(response?.message || "Stripe Payment link generated");
-                        try {
-                          await loadInvoiceIntoPaymentLinkModal(invoiceId);
-                        } catch (refreshError) {
-                          toast.error(`Failed to refresh invoice: ${getErrorMessage(refreshError)}`);
-                        }
-                       
-                      } else {
-                        toast.error(response?.message || "Failed to generate Stripe Payment link");
-                      }
-                    } catch {
-                      // Toast is handled in API helper.
-                    }
+                    await requestStripePaymentLinkForModal({
+                      successFallback: "Stripe Payment link generated",
+                      failureFallback: "Failed to generate Stripe Payment link",
+                    });
                   }}
                 >
                   Generate Stripe Payment link
                 </Button>
               </>
             )}
-          </div>
+          </StripePaymentModalPanel>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={closeGeneratePaymentLinkModal}>
