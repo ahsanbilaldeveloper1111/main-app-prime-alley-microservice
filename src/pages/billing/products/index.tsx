@@ -25,9 +25,7 @@ import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import CreateProductModal from "@components/CreateModalProduct";
 import {
   FiTrash2,
-  FiEdit,
-  FiCalendar,
-  FiTarget,
+  FiEdit
 } from "react-icons/fi";
 import {
   Clock as ClockIcon,
@@ -1537,49 +1535,8 @@ const BillingManagement = () => {
         <Modal.Body>
           <p className="text-muted mb-3">Select a filter to add as a new tab</p>
           <div className="d-grid gap-2">
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.some((t) => t.id === "scheduled")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "scheduled",
-                      label: "Scheduled",
-                      count: metrics.scheduled_records,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "scheduled")}
-            >
-              <FiCalendar size={16} className="me-2" />
-              Scheduled
-            </Button>
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.some((t) => t.id === "has_leads")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "has_leads",
-                      label: "Convert to Leads",
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "has_leads")}
-            >
-              <FiTarget size={16} className="me-2" />
-              Convert to Leads
-            </Button>
+            
+            
           </div>
         </Modal.Body>
         <Modal.Footer>
