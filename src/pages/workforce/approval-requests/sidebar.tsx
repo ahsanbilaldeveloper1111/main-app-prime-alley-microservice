@@ -39,11 +39,14 @@ interface PendingApproval {
   color: string;
 }
 
+type RequestUserIdentifier = string | number | null;
+type DialogVariant = "success" | "error" | "warning";
+
 interface RequestApprovalItem {
   id: number;
   level: string | number;
   status: string | null;
-  approved_by_user_id: string | number | null;
+  approved_by_user_id: RequestUserIdentifier;
   approved_at: string | null;
   notes: string | null;
 }
@@ -101,6 +104,60 @@ function getApprovalStatusPillStyle(status: string): { bg: string; color: string
   if (status === "rejected") return { bg: "#fee2e2", color: "#991b1b" };
   return { bg: "#f3f4f6", color: "#4b5563" };
 }
+
+function getDialogTypeBgColor(type: DialogVariant): string {
+  if (type === "success") return "#d1fae5";
+  if (type === "error") return "#fee2e2";
+  return "#fef3c7";
+}
+
+function getEventView(eventType: string): { bgColor: string; avatarBgColor: string; icon: React.ReactNode } {
+  if (eventType === "approved") {
+    return { bgColor: "#d1fae5", avatarBgColor: "#10b981", icon: <CheckCircle size={20} /> };
+  }
+  if (eventType === "rejected") {
+    return { bgColor: "#fee2e2", avatarBgColor: "#ef4444", icon: <XCircle size={20} /> };
+  }
+  return { bgColor: "#f9fafb", avatarBgColor: "#6b7280", icon: <Edit3 size={20} /> };
+}
+
+function getApprovalActionValidationError(
+  comment: string,
+  extensionNumber: string,
+  action: "approve" | "reject"
+): string | null {
+  if (!comment.trim()) {
+    return action === "approve"
+      ? "Please add a comment before approving this request."
+      : "Please add a comment explaining the reason for rejection.";
+  }
+  if (!extensionNumber) {
+    return action === "approve"
+      ? "Current user phone/extension is required to approve this request."
+      : "Current user phone/extension is required to reject this request.";
+  }
+  return null;
+}
+
+function getApprovalValidationDialogConfig(
+  extensionNumber: string,
+  message: string
+): { type: DialogVariant; title: string; message: string } {
+  if (!extensionNumber) {
+    return { type: "error", title: "Missing Extension", message };
+  }
+  return { type: "warning", title: "Comment Required", message };
+}
+
+function isPhoneInAssignees(
+  sessionPhone: string,
+  assignees: Array<{ user_id?: RequestUserIdentifier }>
+): boolean {
+  if (!sessionPhone) return false;
+  return assignees.some((assignee) => String(assignee.user_id ?? "").trim() === sessionPhone);
+}
+
+type SidebarSubmittingAction = "approve" | "reject" | "changes" | null;
 
 function AttachmentPreview({ att, downloadAttachment }: AttachmentPreviewProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -201,6 +258,72 @@ function AttachmentPreview({ att, downloadAttachment }: AttachmentPreviewProps) 
   );
 }
 
+type ApprovalsByLevelSectionProps = Readonly<{
+  approvalsByLevel: RequestApprovalItem[];
+  getDisplayName: (userId: UserRequestIdValue) => string;
+}>;
+
+function ApprovalsByLevelSection({ approvalsByLevel, getDisplayName }: ApprovalsByLevelSectionProps) {
+  if (approvalsByLevel.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: "16px" }}>
+      <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: "500", color: "#6b7280" }}>
+        Who has approved
+      </div>
+      <div
+        style={{
+          padding: "10px 12px",
+          backgroundColor: "#f8fafc",
+          border: "1px solid #e5e7eb",
+          borderRadius: "10px",
+          fontSize: "13px",
+          color: "#374151",
+        }}
+      >
+        {approvalsByLevel.map((approval, idx, arr) => {
+          const statusNormalized = String(approval.status ?? "").toLowerCase();
+          const isPending = statusNormalized === "pending";
+          const statusPillStyle = getApprovalStatusPillStyle(statusNormalized);
+          const approvedBy =
+            approval.approved_by_user_id == null ? "-" : getDisplayName(approval.approved_by_user_id);
+          return (
+            <div
+              key={approval.id}
+              style={{
+                padding: "8px 0",
+                borderBottom: idx < arr.length - 1 ? "1px solid #e5e7eb" : "none",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "4px" }}>
+                <strong style={{ color: "#374151" }}>Level {String(approval.level)}</strong>
+                <span
+                  style={{
+                    backgroundColor: statusPillStyle.bg,
+                    color: statusPillStyle.color,
+                    borderRadius: "999px",
+                    padding: "2px 8px",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                  }}
+                >
+                  {formatApprovalStatusLabel(approval.status)}
+                </span>
+              </div>
+              {!isPending && <div style={{ color: "#111827", fontWeight: 500 }}>By: {approvedBy}</div>}
+              {!isPending && approval.approved_at && (
+                <div style={{ color: "#6b7280" }}>At: {formatEventDate(approval.approved_at)}</div>
+              )}
+              {!isPending && approval.notes && <div style={{ color: "#6b7280" }}>Note: {approval.notes}</div>}
+              {isPending && <div style={{ color: "#6b7280" }}>Awaiting approval</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   request,
   categoryName = "—",
@@ -220,15 +343,34 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
 
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [submittingAction, setSubmittingAction] = useState<"approve" | "reject" | "changes" | null>(null);
+  const [submittingAction, setSubmittingAction] = useState<SidebarSubmittingAction>(null);
   const maxCommentLength = 500;
   const [showDialog, setShowDialog] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<{
-    type: "success" | "error" | "warning";
+    type: DialogVariant;
     title: string;
     message: string;
     onConfirm?: () => void;
   } | null>(null);
+
+  const openActionResultDialog = useCallback(
+    (type: DialogVariant, title: string, message: string, closeOnConfirm = false) => {
+      setDialogConfig({
+        type,
+        title,
+        message,
+        onConfirm: closeOnConfirm
+          ? () => {
+              setComment("");
+              onSuccess?.();
+              onClose();
+            }
+          : undefined,
+      });
+      setShowDialog(true);
+    },
+    [onClose, onSuccess]
+  );
 
   const created_at = (request as UserRequest & { created_at?: string }).created_at;
   const pendingApprovals: PendingApproval[] = [
@@ -239,22 +381,10 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   ];
 
   const handleApprove = async () => {
-    if (!comment.trim()) {
-      setDialogConfig({
-        type: "warning",
-        title: "Comment Required",
-        message: "Please add a comment before approving this request.",
-      });
-      setShowDialog(true);
-      return;
-    }
     const extensionNumber = String((session?.user as { phone?: string | number } | undefined)?.phone ?? "").trim();
-    if (!extensionNumber) {
-      setDialogConfig({
-        type: "error",
-        title: "Missing Extension",
-        message: "Current user phone/extension is required to approve this request.",
-      });
+    const validationError = getApprovalActionValidationError(comment, extensionNumber, "approve");
+    if (validationError) {
+      setDialogConfig(getApprovalValidationDialogConfig(extensionNumber, validationError));
       setShowDialog(true);
       return;
     }
@@ -268,24 +398,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
         timezone: currentTimezone,
       });
       toast.success("Request approved");
-      setDialogConfig({
-        type: "success",
-        title: "Request Approved",
-        message: `The request has been approved successfully.`,
-        onConfirm: () => {
-          setComment("");
-          onSuccess?.();
-          onClose();
-        },
-      });
-      setShowDialog(true);
+      openActionResultDialog("success", "Request Approved", "The request has been approved successfully.", true);
     } catch {
-      setDialogConfig({
-        type: "error",
-        title: "Error",
-        message: "Failed to approve request.",
-      });
-      setShowDialog(true);
+      openActionResultDialog("error", "Error", "Failed to approve request.");
     } finally {
       setSubmitting(false);
       setSubmittingAction(null);
@@ -293,22 +408,10 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   };
 
   const handleReject = async () => {
-    if (!comment.trim()) {
-      setDialogConfig({
-        type: "warning",
-        title: "Comment Required",
-        message: "Please add a comment explaining the reason for rejection.",
-      });
-      setShowDialog(true);
-      return;
-    }
     const extensionNumber = String((session?.user as { phone?: string | number } | undefined)?.phone ?? "").trim();
-    if (!extensionNumber) {
-      setDialogConfig({
-        type: "error",
-        title: "Missing Extension",
-        message: "Current user phone/extension is required to reject this request.",
-      });
+    const validationError = getApprovalActionValidationError(comment, extensionNumber, "reject");
+    if (validationError) {
+      setDialogConfig(getApprovalValidationDialogConfig(extensionNumber, validationError));
       setShowDialog(true);
       return;
     }
@@ -322,24 +425,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
         extension_number: extensionNumber,
       });
       toast.success("Request rejected");
-      setDialogConfig({
-        type: "error",
-        title: "Request Rejected",
-        message: "The request has been rejected.",
-        onConfirm: () => {
-          setComment("");
-          onSuccess?.();
-          onClose();
-        },
-      });
-      setShowDialog(true);
+      openActionResultDialog("error", "Request Rejected", "The request has been rejected.", true);
     } catch {
-      setDialogConfig({
-        type: "error",
-        title: "Error",
-        message: "Failed to reject request.",
-      });
-      setShowDialog(true);
+      openActionResultDialog("error", "Error", "Failed to reject request.");
     } finally {
       setSubmitting(false);
       setSubmittingAction(null);
@@ -361,24 +449,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
     try {
       await updateUserRequest(request.id, { status: "pending", comment: comment.trim() });
       toast.success("Changes requested");
-      setDialogConfig({
-        type: "warning",
-        title: "Changes Requested",
-        message: "Changes have been requested for this request.",
-        onConfirm: () => {
-          setComment("");
-          onSuccess?.();
-          onClose();
-        },
-      });
-      setShowDialog(true);
+      openActionResultDialog("warning", "Changes Requested", "Changes have been requested for this request.", true);
     } catch {
-      setDialogConfig({
-        type: "error",
-        title: "Error",
-        message: "Failed to request changes.",
-      });
-      setShowDialog(true);
+      openActionResultDialog("error", "Error", "Failed to request changes.");
     } finally {
       setSubmitting(false);
       setSubmittingAction(null);
@@ -423,6 +496,8 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   const events = request.events ?? [];
   const dynamicFields = request.dynamic_fields && typeof request.dynamic_fields === "object" ? request.dynamic_fields : {};
   const requestAssigneesRaw = (request as UserRequest & { assignees?: Array<{ user_id?: string | number | null }> }).assignees ?? [];
+  const sessionPhone = String((session?.user as { phone?: string | number } | undefined)?.phone ?? "").trim();
+  const isCurrentUserAssignee = isPhoneInAssignees(sessionPhone, requestAssigneesRaw);
   const approvalsByLevel = (
     (request as UserRequest & { approvals?: RequestApprovalItem[] }).approvals ?? []
   ).slice().sort((a, b) => Number(a.level) - Number(b.level));
@@ -435,21 +510,6 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
     });
   const statusDisplay = (request.status || "").toLowerCase();
   const isPending = statusDisplay === "pending";
-  const getDialogTypeBgColor = (type: "success" | "error" | "warning"): string => {
-    if (type === "success") return "#d1fae5";
-    if (type === "error") return "#fee2e2";
-    return "#fef3c7";
-  };
-
-  const getEventView = (eventType: string): { bgColor: string; avatarBgColor: string; icon: React.ReactNode } => {
-    if (eventType === "approved") {
-      return { bgColor: "#d1fae5", avatarBgColor: "#10b981", icon: <CheckCircle size={20} /> };
-    }
-    if (eventType === "rejected") {
-      return { bgColor: "#fee2e2", avatarBgColor: "#ef4444", icon: <XCircle size={20} /> };
-    }
-    return { bgColor: "#f9fafb", avatarBgColor: "#6b7280", icon: <Edit3 size={20} /> };
-  };
 
   return (
     <div style={{
@@ -707,62 +767,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             </div>
           )}
 
-          {approvalsByLevel.length > 0 && (
-            <div style={{ marginBottom: "16px" }}>
-              <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: "500", color: "#6b7280" }}>
-                Who has approved
-              </div>
-              <div
-                style={{
-                  padding: "10px 12px",
-                  backgroundColor: "#f8fafc",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "10px",
-                  fontSize: "13px",
-                  color: "#374151",
-                }}
-              >
-                {approvalsByLevel.map((approval, idx, arr) => {
-                  const statusNormalized = String(approval.status ?? "").toLowerCase();
-                  const isPending = statusNormalized === "pending";
-                  const statusPillStyle = getApprovalStatusPillStyle(statusNormalized);
-                  const approvedBy =
-                    approval.approved_by_user_id == null ? "-" : getDisplayName(approval.approved_by_user_id);
-                  return (
-                    <div
-                      key={approval.id}
-                      style={{
-                        padding: "8px 0",
-                        borderBottom: idx < arr.length - 1 ? "1px solid #e5e7eb" : "none",
-                      }}
-                    >
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "4px" }}>
-                        <strong style={{ color: "#374151" }}>Level {String(approval.level)}</strong>
-                        <span
-                          style={{
-                            backgroundColor: statusPillStyle.bg,
-                            color: statusPillStyle.color,
-                            borderRadius: "999px",
-                            padding: "2px 8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {formatApprovalStatusLabel(approval.status)}
-                        </span>
-                      </div>
-                      {!isPending && <div style={{ color: "#111827", fontWeight: 500 }}>By: {approvedBy}</div>}
-                      {!isPending && approval.approved_at && (
-                        <div style={{ color: "#6b7280" }}>At: {formatEventDate(approval.approved_at)}</div>
-                      )}
-                      {!isPending && approval.notes && <div style={{ color: "#6b7280" }}>Note: {approval.notes}</div>}
-                      {isPending && <div style={{ color: "#6b7280" }}>Awaiting approval</div>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <ApprovalsByLevelSection approvalsByLevel={approvalsByLevel} getDisplayName={getDisplayName} />
 
 
           {Object.keys(dynamicFields).length > 0 && (
@@ -908,7 +913,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           {isPending ? (
             <>
          
-         {session?.user?.permissions?.includes('approve-request-approval-request-staff-management') && (
+         {session?.user?.permissions?.includes('approve-request-approval-request-staff-management') && isCurrentUserAssignee && (
           <button
             type="button"
             onClick={handleApprove}
@@ -937,7 +942,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           </button>
           )}
 
-          {session?.user?.permissions?.includes('reject-request-approval-request-staff-management') && (
+          {session?.user?.permissions?.includes('reject-request-approval-request-staff-management') && isCurrentUserAssignee && (
           <button
             type="button"
             onClick={handleReject}
