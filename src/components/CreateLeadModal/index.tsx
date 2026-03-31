@@ -624,11 +624,13 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
           if (found) setSelectedCrmData(found);
         } else {
           try {
-            const record = await getCrmDataById(crmDataIdNum as number);
-            setSelectedCrmData(record);
+            if (crmDataIdNum) {
+              const record = await getCrmDataById(crmDataIdNum);
+              setSelectedCrmData(record);
+            }
           } catch {
             setSelectedCrmData(null);
-          }
+            }
         }
         setEditFetching(false);
       })

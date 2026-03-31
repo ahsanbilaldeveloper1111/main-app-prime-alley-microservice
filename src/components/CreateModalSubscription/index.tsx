@@ -31,6 +31,7 @@ import {
   type ProductData,
   upsertCustomerProductPricing,
 } from "@utils/accounts";
+import { toDateInputValue } from "@utils/dateInputValue";
 
 interface CreateSubscriptionModalProps {
   customerId: string | number;
@@ -72,8 +73,10 @@ function normalizeCompanySelectValue(id: string | number | null | undefined): st
 }
 
 function isIsoDateBefore(a: string, b: string): boolean {
-  // Dates are in YYYY-MM-DD format, so lexicographic compare works.
-  return String(a) < String(b);
+  // Compare YYYY-MM-DD (or normalize empty to avoid invalid `<` on ISO tails).
+  const aa = toDateInputValue(a) || "0000-01-01";
+  const bb = toDateInputValue(b) || "0000-01-01";
+  return aa < bb;
 }
 
 const STATUS_OPTIONS: SelectBoxOption[] = [
@@ -188,12 +191,14 @@ function PricingRowFormFields({
       <Field label="Current period start date">
         <input
           type="date"
-          value={row.renewal_start_date}
+          value={toDateInputValue(row.renewal_start_date)}
           onChange={(e) => {
             const nextStart = e.target.value;
-            const nextEnd = isIsoDateBefore(row.renewal_end_date, nextStart)
+            const currentEnd =
+              toDateInputValue(row.renewal_end_date) || nextStart;
+            const nextEnd = isIsoDateBefore(currentEnd, nextStart)
               ? nextStart
-              : row.renewal_end_date;
+              : currentEnd;
             updateRow(row.product_id, {
               renewal_start_date: nextStart,
               renewal_end_date: nextEnd,
@@ -206,18 +211,18 @@ function PricingRowFormFields({
       <Field label="Current period end date">
         <input
           type="date"
-          value={row.renewal_end_date}
-          min={row.renewal_start_date}
-          onChange={(e) =>
+          value={toDateInputValue(row.renewal_end_date)}
+          min={toDateInputValue(row.renewal_start_date) || undefined}
+          onChange={(e) => {
+            const next = e.target.value;
+            const startNorm =
+              toDateInputValue(row.renewal_start_date) || next;
             updateRow(row.product_id, {
-              renewal_end_date: isIsoDateBefore(
-                e.target.value,
-                row.renewal_start_date,
-              )
-                ? row.renewal_start_date
-                : e.target.value,
-            })
-          }
+              renewal_end_date: isIsoDateBefore(next, startNorm)
+                ? startNorm
+                : next,
+            });
+          }}
           disabled={submitting}
           style={FIELD_INPUT}
         />
@@ -515,8 +520,8 @@ export default function CreateSubscriptionModal({
     custom_description: String(row.custom_description ?? "").trim() ? row.custom_description : null,
     is_active: Boolean(row.is_active),
     discount_applicability_id: row.discount_applicability_id ?? null,
-    renewal_start_date: row.renewal_start_date ? String(row.renewal_start_date) : null,
-    renewal_end_date: row.renewal_end_date ? String(row.renewal_end_date) : null,
+    renewal_start_date: toDateInputValue(row.renewal_start_date) || null,
+    renewal_end_date: toDateInputValue(row.renewal_end_date) || null,
     status: row.status,
     billing_cycle: row.billing_cycle,
     subscriptions: Math.max(0, Number(row.subscriptions ?? 0) || 0),

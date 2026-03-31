@@ -42,17 +42,16 @@ import GenericTable, {
 } from "@components/GenericTable";
 
 import GenericSidebar from "@components/GenericSidebarNew";
-import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import GenericFilterSidebar, { type FilterField } from "@components/GenericFilterSidebar";
 import { type StatsCardData } from "@components/GenericStatsCards";
-import {
-
-  CrmDataItem,
-} from "@utils/crm";
-import { deleteProduct, getProducts } from "@utils/accounts";
+import { deleteProduct, getProducts, type ProductData } from "@utils/accounts";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+
+/** Row from `getProducts` / list-products — not CRM `getCrmData`. */
+type BillingProductRow = ProductData & Record<string, unknown>;
 
 let customFieldIdSeq = 0;
 function createCustomFieldId(fieldName: string): string {
@@ -73,21 +72,34 @@ function createCustomFieldId(fieldName: string): string {
   customFieldIdSeq += 1;
   return `${Date.now()}-${customFieldIdSeq}-${fieldName}`;
 }
-import {
-  RECORD_TYPES,
-} from "@utils/Helper";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
-import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 
 const VALID_FILTERS = new Set(["all"]);
 
-type ActivitiesPanelRef = {
-  refetchTasks?: () => void;
-  refetchNotes?: () => void;
-  refetchEmails?: () => void;
-  refetchMeetings?: () => void;
-};
+function billingProductActiveFilterToDropdownValue(
+  isActive: boolean | undefined,
+): string {
+  if (isActive === true) {
+    return "true";
+  }
+  if (isActive === false) {
+    return "false";
+  }
+  return "";
+}
+
+function billingProductDropdownValueToActiveFilter(
+  value: string,
+): boolean | undefined {
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  return undefined;
+}
 
 // Helper function to get initials from name (first two words, first two letters, only a-z)
 const getInitials = (name: string): string => {
@@ -153,6 +165,47 @@ const formatProductPriceAED = (row: { base_price?: unknown; data?: { base_price?
   const price = row?.base_price ?? row?.data?.base_price;
   return price == null ? emptyFallback : `AED ${Number(price).toLocaleString()}`;
 };
+
+/** Billing products toolbar (same UX as billing subscriptions filter pills). */
+function formatBillingProductsFilterDateLabel(from?: string, to?: string): string | undefined {
+  const fromD = from?.trim();
+  const toD = to?.trim();
+  if (fromD && toD) {
+    return `${moment(fromD).format("MMM D")} – ${moment(toD).format("MMM D, YYYY")}`;
+  }
+  if (fromD) {
+    return moment(fromD).format("MMM D, YYYY");
+  }
+  if (toD) {
+    return moment(toD).format("MMM D, YYYY");
+  }
+  return undefined;
+}
+
+function billingProductsIsActiveLabel(isActive: unknown): string | undefined {
+  if (isActive === true) return "Active";
+  if (isActive === false) return "Inactive";
+  return undefined;
+}
+
+/** YYYY-MM-DD compares correctly as strings (end date not before start). */
+function billingProductsDateToOnOrAfterFrom(
+  start: string | undefined,
+  end: string | undefined,
+): string | undefined {
+  const s = start?.trim();
+  const e = end?.trim();
+  if (!e) {
+    return end;
+  }
+  if (!s) {
+    return end;
+  }
+  if (e < s) {
+    return s;
+  }
+  return end;
+}
 
 const BILLING_PRODUCTS_COLUMN_STORAGE_KEY = "billing-products-table-columns";
 
@@ -369,19 +422,10 @@ const BillingManagement = () => {
     },
     [router],
   );
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [prospectsSearch, setProspectsSearch] = useState("");
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showTabModal, setShowTabModal] = useState(false);
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
-  const [prospectsFilters, setProspectsFilters] = useState({
-    assignedTo: null as string | null,
-    campaigns: null as string[] | null,
-    nextCallDateFrom: null as string | null,
-    nextCallDateTo: null as string | null,
-    sourceFile: null as string | null,
-    tags: null as string[] | null,
-  });
   /** View mode: table or board; dropdown shows only the other option to switch */
   const [prospectsViewMode, setProspectsViewMode] = useState<
     "table" | "board"
@@ -402,7 +446,7 @@ const BillingManagement = () => {
     sortColumn: "",
     sortDirection: "asc" as "asc" | "desc",
   });
-  const [dataList, setDataList] = useState<CrmDataItem[]>([]);
+  const [dataList, setDataList] = useState<BillingProductRow[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   /** Total count of all products (unchanged when switching tabs) */
   const [totalAllProducts, setTotalAllProducts] = useState(0);
@@ -417,86 +461,32 @@ const BillingManagement = () => {
     total_value: 0,
   });
 
-  // Custom select styles
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "45px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused
-        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
-        : "none",
-      "&:hover": {
-        borderColor: "#86b7fe",
-      },
-    }),
-    multiValue: (provided: any) => ({
-      ...provided,
-      backgroundColor: "#0d6efd",
-      color: "white",
-      fontSize: "0.813rem",
-    }),
-    multiValueLabel: (provided: any) => ({
-      ...provided,
-      color: "white",
-      padding: "2px 6px",
-    }),
-    multiValueRemove: (provided: any) => ({
-      ...provided,
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#0b5ed7",
-        color: "white",
-      },
-    }),
-    placeholder: (provided: any) => ({
-      ...provided,
-      color: "#6c757d",
-      fontSize: "0.875rem",
-    }),
-    singleValue: (provided: any) => ({
-      ...provided,
-      fontSize: "0.875rem",
-    }),
-  };
-
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
-  const sidebarActivitiesPanelRef = useRef<ActivitiesPanelRef | null>(null);
-  const sidebarRecordId = Number(
-    selectedProspect?.id ?? selectedProspect?.data?.id ?? 0,
-  );
-  const sidebarRecordName = selectedProspect?.name ?? "Prospect";
-  const sidebarRecordPhone = selectedProspect?.phone ?? "";
-  const sidebarRecordEmail =
-    selectedProspect?.data?.email ??
-    selectedProspect?.data?.data?.email ??
-    selectedProspect?.email ??
-    "";
-
-  const sidebarActivityModals = useCrmActivityModals({
-    recordType: "prospect",
-    recordId: sidebarRecordId,
-    recordName: sidebarRecordName,
-    recordEmail: sidebarRecordEmail,
-    recordPhone: sidebarRecordPhone,
-    onTaskCreated: () => sidebarActivitiesPanelRef.current?.refetchTasks?.(),
-    onNoteCreated: () => sidebarActivitiesPanelRef.current?.refetchNotes?.(),
-    onEmailSent: () => sidebarActivitiesPanelRef.current?.refetchEmails?.(),
-    onMeetingScheduled: () =>
-      sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
-  });
+  // Keep toolbar search and filter fetch in sync (same pattern as billing subscriptions).
+  useEffect(() => {
+    setCurrentFilters((prev) => ({ ...prev, search: prospectsSearch || undefined }));
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, [prospectsSearch]);
 
   const buildProductsParams = useCallback(
     (overrides: { page?: number; per_page?: number } = {}) => {
-      const params: any = {
+      const params: Record<string, unknown> = {
         page: pagination.currentPage,
         per_page: pagination.rowsPerPage,
         ...overrides,
       };
 
       if (memoizedFilters.search) params.search = memoizedFilters.search;
+      if (typeof memoizedFilters.is_active === "boolean") {
+        params.is_active = memoizedFilters.is_active;
+      }
+      if (memoizedFilters.created_at_from) {
+        params.created_at_from = memoizedFilters.created_at_from;
+      }
+      if (memoizedFilters.created_at_to) {
+        params.created_at_to = memoizedFilters.created_at_to;
+      }
 
       if (pagination.sortColumn) {
         params.sort_column = pagination.sortColumn;
@@ -507,6 +497,9 @@ const BillingManagement = () => {
     },
     [
       memoizedFilters.search,
+      memoizedFilters.is_active,
+      memoizedFilters.created_at_from,
+      memoizedFilters.created_at_to,
       pagination.currentPage,
       pagination.rowsPerPage,
       pagination.sortColumn,
@@ -514,68 +507,137 @@ const BillingManagement = () => {
     ],
   );
 
-  function getNameByExtension(extension: string) {
-    const extensionData = extensions.find((ext) => ext.id === extension);
-    return extensionData?.display_name || extensionData?.name || extension;
-  }
-  // Handle filter changes
+  // Handle filter changes (toolbar / sidebar); fetch follows `currentFilters` via `buildProductsParams`.
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters(filters);
-    setRefreshKey((prev) => prev + 1);
   }, []);
 
-  const applyTableFiltersPatch = useCallback(
-    (patch: Record<string, any>) => {
-      const next: Record<string, any> = { ...currentFilters, ...patch };
+  const applyIsActiveFilter = useCallback((isActive: boolean) => {
+    setCurrentFilters((prev) => ({ ...prev, is_active: isActive }));
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    setRefreshKey((k) => k + 1);
+  }, []);
 
-      Object.keys(next).forEach((k) => {
-        const v = next[k];
-        if (
-          v === undefined ||
-          v === null ||
-          v === "" ||
-          (Array.isArray(v) && v.length === 0)
-        ) {
-          delete next[k];
-        }
-      });
-
-      handleFiltersChange(next);
-      setPagination((prev) => ({ ...prev, currentPage: 1 }));
-    },
-    [currentFilters, handleFiltersChange, setPagination],
+  // Filter pills: Active/Inactive (`is_active` true/false) + Create date (`created_at_from` / `created_at_to`).
+  const productsFilterPills = useMemo<FilterPill[]>(
+    () => [
+      {
+        id: "is_active",
+        label: "Status",
+        showDropdown: true,
+        active: typeof currentFilters.is_active === "boolean",
+        activeLabel: billingProductsIsActiveLabel(currentFilters.is_active),
+        onClear: () => {
+          setCurrentFilters((prev) => {
+            const { is_active, ...rest } = prev;
+            return rest;
+          });
+          setPagination((prev) => ({ ...prev, currentPage: 1 }));
+          setRefreshKey((k) => k + 1);
+        },
+        dropdownContent: (
+          <div style={{ minWidth: 200 }}>
+            {([
+              { label: "Active", value: true },
+              { label: "Inactive", value: false },
+            ] as const).map(({ label, value }) => (
+              <button
+                key={label}
+                type="button"
+                style={{
+                  padding: "8px 12px",
+                  cursor: "pointer",
+                  background: currentFilters.is_active === value ? "#f0f0f0" : "transparent",
+                  borderRadius: "4px",
+                  border: "none",
+                  width: "100%",
+                  textAlign: "left",
+                }}
+                onClick={() => applyIsActiveFilter(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ),
+      },
+      {
+        id: "create_date",
+        label: "Create Date",
+        showDropdown: true,
+        active: !!(
+          currentFilters.created_at_from || currentFilters.created_at_to
+        ),
+        activeLabel: formatBillingProductsFilterDateLabel(
+          currentFilters.created_at_from,
+          currentFilters.created_at_to,
+        ),
+        onClear: () => {
+          setCurrentFilters((prev) => {
+            const { created_at_from, created_at_to, ...rest } = prev;
+            return rest;
+          });
+          setPagination((prev) => ({ ...prev, currentPage: 1 }));
+          setRefreshKey((k) => k + 1);
+        },
+        dropdownContent: (
+          <div style={{ minWidth: 220, padding: "4px 0" }}>
+            <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>From</div>
+            <input
+              type="date"
+              value={currentFilters.created_at_from ?? ""}
+              max={currentFilters.created_at_to || undefined}
+              style={{
+                width: "100%",
+                padding: "6px 12px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 4,
+                marginBottom: 8,
+              }}
+              onChange={(e) => {
+                const nextStart = e.target.value || undefined;
+                setCurrentFilters((prev) => ({
+                  ...prev,
+                  created_at_from: nextStart,
+                  created_at_to: billingProductsDateToOnOrAfterFrom(
+                    nextStart,
+                    prev.created_at_to,
+                  ),
+                }));
+                setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                setRefreshKey((k) => k + 1);
+              }}
+            />
+            <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>To</div>
+            <input
+              type="date"
+              value={currentFilters.created_at_to ?? ""}
+              min={currentFilters.created_at_from || undefined}
+              style={{
+                width: "100%",
+                padding: "6px 12px",
+                border: "1px solid #e5e7eb",
+                borderRadius: 4,
+              }}
+              onChange={(e) => {
+                const nextEndRaw = e.target.value || undefined;
+                setCurrentFilters((prev) => ({
+                  ...prev,
+                  created_at_to: billingProductsDateToOnOrAfterFrom(
+                    prev.created_at_from,
+                    nextEndRaw,
+                  ),
+                }));
+                setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                setRefreshKey((k) => k + 1);
+              }}
+            />
+          </div>
+        ),
+      },
+    ],
+    [currentFilters, applyIsActiveFilter],
   );
-
-  const hasAdvancedFiltersApplied = useMemo(() => {
-    const campaign = currentFilters.campaign_id;
-    const hasCampaign =
-      Array.isArray(campaign) ? campaign.length > 0 : !!campaign;
-
-    const tags = currentFilters.tags;
-    const hasTags = Array.isArray(tags) ? tags.length > 0 : !!tags;
-
-    const hasSource = !!currentFilters.source_file;
-    const hasNextCall =
-      !!currentFilters.scheduled_call_from || !!currentFilters.scheduled_call_to;
-
-    return hasCampaign || hasTags || hasSource || hasNextCall;
-  }, [currentFilters]);
-
-  const showAdvancedFilterPills =
-    showAdvancedFilters || hasAdvancedFiltersApplied;
-
-  // Quote-specific filter pills
-  const productsFilterPills = useMemo<FilterPill[]>(() => {
-   
-    return [
-  
-     
-    ];
-  }, [
-    applyTableFiltersPatch,
-    currentFilters,
-    customSelectStyles,
-  ]);
 
   // Handle activeFilter changes to update currentFilters
   useEffect(() => {
@@ -604,7 +666,8 @@ const BillingManagement = () => {
         return;
       }
 
-      const items = (response?.data || []) as any[];
+      const rawList = response?.data;
+      const items: any[] = Array.isArray(rawList) ? rawList : [];
       const total = response?.pagination?.total ?? items.length;
 
       setDataList(items as any);
@@ -710,40 +773,23 @@ const BillingManagement = () => {
     }
   }, [clearSelectedRows]);
 
-  const openProspectSidebar = useCallback((item: unknown) => {
-    setSelectedProspect(item);
+  const handleViewProduct = useCallback((row: any) => {
+    setSelectedProspect(row);
     setShowProspectSidebar(true);
 
     const id =
-      item && typeof item === "object" && "id" in item
-        ? Number((item as { id?: unknown }).id)
+      row && typeof row === "object" && "id" in row
+        ? Number((row as { id?: unknown }).id)
         : Number.NaN;
     if (!Number.isFinite(id) || id <= 0) return;
-
-  
-   
   }, []);
 
   // Backwards-compatible alias used throughout the file
   const handleViewData = useCallback(
-    (item: CrmDataItem) => openProspectSidebar(item),
-    [openProspectSidebar],
+    (item: BillingProductRow) => handleViewProduct(item),
+    [handleViewProduct],
   );
 
-
-  const handleNoteCreate = (
-    note: string,
-    createTask: boolean,
-    taskDueDate?: string,
-  ) => {
-    console.log("Note created:", {
-      prospectId: selectedProspect.id,
-      note,
-      createTask,
-      taskDueDate,
-    });
-  };
- 
 
   // Handle close prospect sidebar
   const handleCloseProspectSidebar = useCallback(() => {
@@ -752,15 +798,18 @@ const BillingManagement = () => {
     setSelectedProspect(null);
   }, []);
 
-  // Handle close filters sidebar
+  const handleOpenFiltersSidebar = useCallback(() => {
+    setShowFiltersSidebar(true);
+  }, []);
+
   const handleCloseFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(false);
   }, []);
 
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback((prospect: any) => {
-    openProspectSidebar(prospect);
-  }, [openProspectSidebar]);
+  // Preview button on row hover – opens the same sidebar
+  const handlePreviewClick = useCallback((row: any) => {
+    handleViewProduct(row);
+  }, [handleViewProduct]);
 
   // Handle first column click - navigates to detail page with prospect ID in URL
   const handleFirstColumnClick = useCallback(
@@ -1002,12 +1051,17 @@ const BillingManagement = () => {
     );
   };
 
-  const prospectsToolbarConfig = useCrmToolbarConfig({
-    entity: "prospects",
+  /** `invoices` avoids CRM "prospects" filter pills; we supply billing pills only (like subscriptions). */
+  const productsToolbarConfig = useCrmToolbarConfig({
+    entity: "invoices" as any,
     searchValue: prospectsSearch,
     searchPlaceholder: "Search products...",
     onSearchChange: setProspectsSearch,
-    onSearch: () => {},
+    onSearch: () => {
+      setCurrentFilters((prev) => ({ ...prev, search: prospectsSearch || undefined }));
+      setPagination((prev) => ({ ...prev, currentPage: 1 }));
+      setRefreshKey((prev) => prev + 1);
+    },
     currentFilters,
     handleFiltersChange,
     refresh: () => setRefreshKey((prev) => prev + 1),
@@ -1028,22 +1082,17 @@ const BillingManagement = () => {
       if (activeFilter === tabId) handleFilterChange("all");
     },
     tabsDropdownLabel: "Products",
-    onFiltersClick: () => setShowFiltersSidebar(true),
+    onFiltersClick: handleOpenFiltersSidebar,
     onExportClick: () => {},
     onEditColumnsClick: () => setShowColumnEditor(true),
     showImport: false,
     onImportClick: () => {},
     currentTableView: prospectsViewMode,
     onTableViewChange: setProspectsViewMode,
-    extensions,
+    extensions: [],
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
     rightActions: renderAddProductButton(),
-    prospectsTabCountOverrides: {
-      loading,
-      totalRecords,
-      activeFilter,
-    },
   });
 
     // Handle create product
@@ -1062,6 +1111,39 @@ const BillingManagement = () => {
         fetchCrmData();
         // Don't close modal, just reset form
       }, [fetchCrmData]);
+
+  const productFilterFields: FilterField[] = useMemo(
+    () => [
+      {
+        id: "search",
+        label: "Search",
+        type: "text",
+        value: currentFilters.search ?? "",
+        onChange: (value) =>
+          setCurrentFilters((prev) => ({ ...prev, search: value || undefined })),
+        placeholder: "Search products...",
+      },
+      {
+        id: "is_active",
+        label: "Status",
+        type: "dropdown",
+        value: billingProductActiveFilterToDropdownValue(
+          currentFilters.is_active,
+        ),
+        onChange: (value) =>
+          setCurrentFilters((prev) => ({
+            ...prev,
+            is_active: billingProductDropdownValueToActiveFilter(value ?? ""),
+          })),
+        options: [
+          { value: "", label: "All" },
+          { value: "true", label: "Active" },
+          { value: "false", label: "Inactive" },
+        ],
+      },
+    ],
+    [currentFilters.search, currentFilters.is_active],
+  );
 
   if (!session?.user?.permissions?.includes("list-crm-data-management")) {
     return null;
@@ -1257,18 +1339,11 @@ const BillingManagement = () => {
                 // Toolbar
                 showToolbar={true}
                 toolbar={{
-                  ...prospectsToolbarConfig,
-                  // Hide Advanced filters button while the filters sidebar is open
-                  showAdvancedFilters: !showFiltersSidebar,
-                  // Keep pills visible by default so advanced pills can appear inline
+                  ...productsToolbarConfig,
                   showFilterPills: true,
-                  onAdvancedFiltersClick: () =>
-                    setShowAdvancedFilters((prev) => !prev),
-                  filterPills: [
-                    ...(prospectsToolbarConfig.filterPills ?? []),
-                    ...(showAdvancedFilterPills ? productsFilterPills : []),
-                  ],
+                  filterPills: productsFilterPills,
                   showMoreFiltersButton: true,
+                  onAdvancedFiltersClick: handleOpenFiltersSidebar,
                 }}
                 // Stats cards for metrics
                 statsCards={productsStatsCards}
@@ -1318,32 +1393,10 @@ const BillingManagement = () => {
             onClose={handleCloseProspectSidebar}
             title={getProductDisplayName(selectedProspect) || "Product Details"}
             subtitle={getProductSku(selectedProspect)}
-            email={session?.user?.email || ""}
-            phone={""}
-            senderName={session?.user?.name || ""}
-            senderEmail={session?.user?.email || ""}
-            record={{
-              id: selectedProspect?.id,
-              type: RECORD_TYPES.PROSPECT,
-            }}
             avatar={{
               initials: getInitials(selectedProspect?.name || selectedProspect?.title || "P"),
               name: selectedProspect?.name || selectedProspect?.title || "Product",
               gradient: getRandomColor(selectedProspect?.name || selectedProspect?.title || ""),
-            }}
-            recordType="prospect"
-            recordId={
-              selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
-            }
-            resolveUserLabel={getNameByExtension}
-            onNoteCreate={handleNoteCreate}
-            
-            
-            recordLink={{
-              label: "View product details",
-              onClick: () => {
-                
-              },
             }}
             actionsDropdown={{
               label: "Actions",
@@ -1479,71 +1532,25 @@ const BillingManagement = () => {
             ]}
           />
         )}
-        {sidebarActivityModals.modals}
         {/* Filters Sidebar */}
         <GenericFilterSidebar
           isOpen={showFiltersSidebar}
           onClose={handleCloseFiltersSidebar}
           title="Filters"
-          subtitle="Filter products by various criteria"
+          subtitle="Filter products by search and active state"
           width="400px"
-          filters={[
-            {
-              id: "search",
-              label: "Search",
-              type: "text",
-              value: prospectsSearch,
-              onChange: (value) => setProspectsSearch(value),
-              placeholder: "Search by quote title...",
-            },
-            
-            
-          ]}
+          filters={productFilterFields}
           onApply={() => {
-            const filtersToApply: Record<string, any> = {};
-
-            if (prospectsSearch) {
-              filtersToApply.search = prospectsSearch;
-            }
-            if (prospectsFilters.assignedTo) {
-              filtersToApply.user_extension = [prospectsFilters.assignedTo];
-            }
-            if (prospectsFilters.campaigns) {
-              filtersToApply.status = prospectsFilters.campaigns;
-            }
-            if (prospectsFilters.nextCallDateFrom) {
-              filtersToApply.last_activity_date = prospectsFilters.nextCallDateFrom;
-            }
-            if (prospectsFilters.tags) {
-              filtersToApply.signing_status = prospectsFilters.tags;
-            }
-
-            handleFiltersChange(filtersToApply);
-            setPagination((prev) => ({
-              ...prev,
-              currentPage: 1,
-            }));
-            setRefreshKey((prev) => prev + 1);
+            setProspectsSearch(currentFilters.search ?? "");
+            setPagination((prev) => ({ ...prev, currentPage: 1 }));
+            setRefreshKey((k) => k + 1);
             setShowFiltersSidebar(false);
           }}
           onReset={() => {
-            setProspectsSearch("");
-            setProspectsFilters({
-              assignedTo: null,
-              campaigns: null,
-              nextCallDateFrom: null,
-              nextCallDateTo: null,
-              sourceFile: null,
-              tags: null,
-            });
-            handleFiltersChange({});
             setCurrentFilters({});
-            setActiveFilter("all");
-            setPagination((prev) => ({
-              ...prev,
-              currentPage: 1,
-            }));
-            setRefreshKey((prev) => prev + 1);
+            setProspectsSearch("");
+            setPagination((prev) => ({ ...prev, currentPage: 1 }));
+            setRefreshKey((k) => k + 1);
           }}
         />
       </div>{" "}
