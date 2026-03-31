@@ -59,7 +59,6 @@ import {
   Modal,
   Popover,
   OverlayTrigger,
-  Tooltip as BsTooltip,
   Spinner,
 } from "react-bootstrap";
 import Select from "react-select";
@@ -2738,24 +2737,16 @@ const CrmLeads = () => {
               {lead.stage || "-"}
             </Badge>
           );
-          if (lead.isLost && lead.lostReasonName) {
-            return (
-              <OverlayTrigger
-                placement="top"
-                overlay={
-                  <BsTooltip id={`stage-${lead.id}`}>
-                    Reason: {lead.lostReasonName}
-                  </BsTooltip>
-                }
-              >
-                <span className="d-inline-block" style={{ cursor: "help" }}>
-                  {badge}
-                </span>
-              </OverlayTrigger>
-            );
-          }
           return badge;
         },
+      },
+      {
+        key: "stage.name",
+        label: "Lost Reason",
+        sortable: true,
+        type: "text",
+        accessor: (lead: LeadData) =>
+          lead.lostReasonName || lead.rawData?.stage?.name || null,
       },
       {
         key: "leadPotential",
@@ -3693,7 +3684,8 @@ const CrmLeads = () => {
               <GenericTable
                 data={filteredLeads}
                 columns={leadsColumns.filter((c) =>
-                  selectedLeadsColumns.includes(c.key),
+                  selectedLeadsColumns.includes(c.key) ||
+                  (activeFilter === "lost" && c.key === "stage.name"),
                 )}
                 actions={leadsActions}
                 showActions={false}

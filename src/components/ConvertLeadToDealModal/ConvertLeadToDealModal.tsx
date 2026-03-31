@@ -12,6 +12,7 @@ import {
   createEstimate,
   getIndustries,
   getBusinessTypes,
+  getDealTemplates,
   CrmProduct,
   StageData,
   DealTemplateData,
@@ -56,6 +57,22 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
   leadId,
   onSuccess
 }) => {
+  const normalizeTemplateDataKey = (key: string): string => {
+    const normalizedKey = key.trim().toLowerCase().replaceAll(/[^a-z0-9]+/g, "_");
+    let start = 0;
+    let end = normalizedKey.length;
+
+    while (start < end && normalizedKey[start] === "_") {
+      start += 1;
+    }
+
+    while (end > start && normalizedKey[end - 1] === "_") {
+      end -= 1;
+    }
+
+    return normalizedKey.slice(start, end);
+  };
+
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const [loadingLead, setLoadingLead] = useState(false);
@@ -75,6 +92,8 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
   const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
+  const [availableTemplates, setAvailableTemplates] = useState<DealTemplateData[]>([]);
+  const [loadingTemplateList, setLoadingTemplateList] = useState(false);
   const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
   const [businessTypeId, setBusinessTypeId] = useState<number | null>(null);
   const [businessTypeOther, setBusinessTypeOther] = useState<string>("");
@@ -144,6 +163,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
     if (!show) {
       setEstimationItems([]);
       setTemplateFieldsData({});
+      setDealTemplate(null);
       setBusinessTypeId(null);
       setBusinessTypeOther("");
       setShowOtherBusinessType(false);
@@ -158,6 +178,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
       fetchExtensions();
       fetchBusinessTypes();
       fetchAllIndustries();
+      fetchAvailableTemplates();
       const fetchLineItemProducts = async () => {
         setLoadingLineItemProducts(true);
         try {
@@ -240,6 +261,45 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
     } finally {
       setLoadingLead(false);
     }
+  };
+
+  const fetchAvailableTemplates = async () => {
+    try {
+      setLoadingTemplateList(true);
+      const response = await getDealTemplates({ per_page: 1000, page: 1 });
+      setAvailableTemplates(response?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch deal templates:", error);
+      setAvailableTemplates([]);
+    } finally {
+      setLoadingTemplateList(false);
+    }
+  };
+
+  const handleTemplateSelectionChange = (templateIdRaw: string) => {
+    if (!templateIdRaw) {
+      setDealTemplate(null);
+      setTemplateFieldsData({});
+      return;
+    }
+
+    const selectedTemplateId = Number(templateIdRaw);
+    const selectedTemplate = availableTemplates.find(
+      (template) => template.id === selectedTemplateId,
+    );
+
+    if (!selectedTemplate) {
+      return;
+    }
+
+    setDealTemplate(selectedTemplate);
+    const nextTemplateFieldValues: Record<string, string> = {};
+    (selectedTemplate.fields || []).forEach((field) => {
+      const previousValue = templateFieldsData[field.field_name];
+      nextTemplateFieldValues[field.field_name] =
+        previousValue == null ? "" : String(previousValue);
+    });
+    setTemplateFieldsData(nextTemplateFieldValues);
   };
 
   const fetchStages = async () => {
@@ -395,9 +455,12 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
       if (dealTemplate && dealTemplate.id) {
         payload.deal_template_id = dealTemplate.id;
         const filteredTemplateData: Record<string, any> = {};
+        if (dealTemplate.name) {
+          filteredTemplateData.template_name = dealTemplate.name;
+        }
         Object.entries(templateFieldsData).forEach(([key, value]) => {
           if (value !== null && value !== undefined && value !== '') {
-            filteredTemplateData[key] = value;
+            filteredTemplateData[normalizeTemplateDataKey(key)] = value;
           }
         });
         if (Object.keys(filteredTemplateData).length > 0) {
@@ -883,16 +946,37 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                   </>
 
                 {/* Deal Characteristics (template) */}
-                {dealTemplate && (
-                  <>
-                    <h3 style={sectionHeadingNext}>DEAL CHARACTERISTICS</h3>
-                    {dealTemplate.name && (
-                      <div style={{ marginBottom: "16px" }}>
-                        <Badge bg="info" style={{ fontWeight: "500" }}>
-                          Template: {dealTemplate.name}
-                        </Badge>
-                      </div>
-                    )}
+                  <h3 style={sectionHeadingNext}>DEAL CHARACTERISTICS</h3>
+                  <div style={fieldWrap}>
+                    {fieldLabel("Deal Template")}
+                    <Form.Select
+                      value={dealTemplate?.id || ""}
+                      onChange={(e) => handleTemplateSelectionChange(e.target.value)}
+                      style={inputStyle}
+                      disabled={loadingTemplateList}
+                    >
+                      <option value="">
+                        {loadingTemplateList
+                          ? "Loading templates..."
+                          : "Select Deal Template (Optional)"}
+                      </option>
+                      {availableTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </div>
+
+                  {dealTemplate && (
+                    <>
+                      {dealTemplate.name && (
+                        <div style={{ marginBottom: "16px" }}>
+                          <Badge bg="info" style={{ fontWeight: "500" }}>
+                            Template: {dealTemplate.name}
+                          </Badge>
+                        </div>
+                      )}
                     {dealTemplate.description && (
                       <div
                         style={{
@@ -1007,7 +1091,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                       </p>
                     )}
                   </>
-                )}
+                  )}
 
                 {/* Negotiation Progress */}
                 <>
@@ -1093,7 +1177,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 70px 70px 100px auto",
+                        gridTemplateColumns: "1fr 120px 70px 70px 100px auto",
                         gap: "8px",
                         alignItems: "center",
                         marginBottom: "12px",
@@ -1101,6 +1185,9 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     >
                       <span style={{ fontSize: "14px", fontWeight: "600", color: "#141414" }}>
                         Add line item
+                      </span>
+                      <span style={{ fontSize: "14px", fontWeight: "600", color: "#141414" }}>
+                        Pricing
                       </span>
                       <span style={{ fontSize: "14px", fontWeight: "600", color: "#141414" }}>
                         Quantity
@@ -1119,7 +1206,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                         key={`${item.product_id}-${index}`}
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "1fr 70px 70px 100px auto",
+                          gridTemplateColumns: "1fr 120px 70px 70px 100px auto",
                           gap: "8px",
                           alignItems: "center",
                           marginBottom: "8px",
@@ -1136,6 +1223,21 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                           }}
                         >
                           {item.product_service}
+                        </div>
+                        <div
+                          style={{
+                            padding: "10px 12px",
+                            border: "1px solid #eaf0f6",
+                            borderRadius: "4px",
+                            fontSize: "14px",
+                            color: "#141414",
+                            backgroundColor: "#f7fafc",
+                            minHeight: "44px",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          {formData.currency} {Number(item.unit_price || 0).toFixed(2)}
                         </div>
                         <input
                           type="number"
@@ -1220,7 +1322,7 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     <div
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 70px 70px 100px auto",
+                        gridTemplateColumns: "1fr 120px 70px 70px 100px auto",
                         gap: "8px",
                         alignItems: "center",
                       }}
@@ -1271,6 +1373,22 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                           )}
                         </Dropdown.Menu>
                       </Dropdown>
+                      <div
+                        style={{
+                          ...inputStyle,
+                          width: "100%",
+                          minHeight: "44px",
+                          display: "flex",
+                          alignItems: "center",
+                          backgroundColor: "#f7fafc",
+                        }}
+                      >
+                        {lineItemInput
+                          ? `${formData.currency} ${Number(
+                              lineItemProducts.find((p) => p.name === lineItemInput)?.price || 0,
+                            ).toFixed(2)}`
+                          : `${formData.currency} 0.00`}
+                      </div>
                       <input
                         type="number"
                         min={1}
