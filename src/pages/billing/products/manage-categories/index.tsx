@@ -42,6 +42,7 @@ const ManageCategories = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<ProductCategoryRow[]>([]);
+  const [searchValue, setSearchValue] = useState("");
 
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [addCategoryPayload, setAddCategoryPayload] = useState<{
@@ -85,7 +86,7 @@ const ManageCategories = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await getProductCategoriesList();
+      const response = await getProductCategoriesList({ search: searchValue });
 
       if (currentRequestId !== requestIdRef.current) return;
 
@@ -102,7 +103,7 @@ const ManageCategories = () => {
         setLoading(false);
       }
     }
-  }, []);
+  }, [searchValue]);
 
   useEffect(() => {
     fetchCategories();
@@ -221,7 +222,10 @@ const ManageCategories = () => {
 
       <PageHeader
         title="Manage Categories"
-        showSearch={false}
+        showSearch={true}
+        searchPlaceholder="Search categories..."
+        searchValue={searchValue}
+        onSearchChange={(value) => setSearchValue(value)}
         buttons={
           <div className="d-flex gap-2">
             <Button variant="primary" onClick={openAddCategoryModal}>
