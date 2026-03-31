@@ -10,6 +10,10 @@ import {
   getIndustries,
   getCrmProducts,
   createEstimate,
+  getDealTemplates,
+  DealTemplateData,
+  DealTemplateField,
+  getRelevantDealTemplate,
 } from "@utils/crm";
 import type { CrmProduct } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
@@ -305,6 +309,13 @@ const parsePercent = (value: unknown): number => {
   return 0;
 };
 
+const normalizeTemplateDataKey = (key: string): string =>
+  key
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
 const mapEstimateChartToLineItems = (
   chart: EstimateChartItem[],
   fallbackTaxPct: number,
@@ -473,6 +484,10 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
   const [businessTypes, setBusinessTypes] = useState<any[]>([]);
   const [allIndustries, setAllIndustries] = useState<any[]>([]);
   const [showOtherBusinessType, setShowOtherBusinessType] = useState(false);
+  const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
+  const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, string>>({});
+  const [availableTemplates, setAvailableTemplates] = useState<DealTemplateData[]>([]);
+  const [loadingTemplateList, setLoadingTemplateList] = useState(false);
 
   // Revisions (edit mode only)
   const [editEstimates, setEditEstimates] = useState<any[]>([]);
@@ -513,11 +528,13 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
           hierarchyData,
           businessTypesResponse,
           industriesResponse,
+          dealTemplatesResponse,
         ] = await Promise.all([
           getStages("deal"),
           GetHierarchyData(ModuleSlug.CRM_DEALS),
           getBusinessTypes({ per_page: 1000 }),
           getIndustries({ per_page: 1000 }),
+          getDealTemplates({ per_page: 1000, page: 1 }),
         ]);
         setStages(stagesData || []);
         if (hierarchyData?.extensions) {
@@ -525,10 +542,14 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
         }
         setBusinessTypes(businessTypesResponse?.data || []);
         setAllIndustries(industriesResponse?.data || []);
+        setAvailableTemplates(dealTemplatesResponse?.data || []);
       } catch (error) {
         console.error("Failed to fetch initial data:", error);
+      } finally {
+        setLoadingTemplateList(false);
       }
     };
+    setLoadingTemplateList(true);
     fetchInitialData();
   }, []);
 
@@ -546,6 +567,19 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
 
           const dealAny = deal as any;
           const progressFlags = getProgressFlags(dealAny);
+          const dealTemplateData = dealAny.deal_template as DealTemplateData | undefined;
+          const dealTemplateFieldValues = (dealAny.deal_template_field_values || {}) as Record<
+            string,
+            string
+          >;
+          const dealTemplateDataValues = (dealAny.template_data || {}) as Record<
+            string,
+            string
+          >;
+          const mergedTemplateValues: Record<string, string> = {
+            ...dealTemplateFieldValues,
+            ...dealTemplateDataValues,
+          };
 
           setDealForm({
             ...initialDealForm,
@@ -595,6 +629,44 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
             follow_up_date: formatDate(deal.follow_up_date),
             currency: deal.currency || "AED",
           });
+
+          if (dealTemplateData) {
+            setDealTemplate(dealTemplateData);
+            const initialTemplateValues: Record<string, string> = {};
+            (dealTemplateData.fields || []).forEach((field) => {
+              const normalizedFieldKey = normalizeTemplateDataKey(field.field_name);
+              initialTemplateValues[field.field_name] =
+                String(
+                  mergedTemplateValues[field.field_name] ??
+                    mergedTemplateValues[normalizedFieldKey] ??
+                    "",
+                );
+            });
+            setTemplateFieldsData(initialTemplateValues);
+          } else if (dealId) {
+            // Fallback for older payloads where deal_template isn't embedded in deal response.
+            const relevantTemplate = await getRelevantDealTemplate({ deal_id: dealId });
+            if (relevantTemplate) {
+              setDealTemplate(relevantTemplate);
+              const initialTemplateValues: Record<string, string> = {};
+              (relevantTemplate.fields || []).forEach((field) => {
+                const normalizedFieldKey = normalizeTemplateDataKey(field.field_name);
+                initialTemplateValues[field.field_name] =
+                  String(
+                    mergedTemplateValues[field.field_name] ??
+                      mergedTemplateValues[normalizedFieldKey] ??
+                      "",
+                  );
+              });
+              setTemplateFieldsData(initialTemplateValues);
+            } else {
+              setDealTemplate(null);
+              setTemplateFieldsData({});
+            }
+          } else {
+            setDealTemplate(null);
+            setTemplateFieldsData({});
+          }
 
           // Set business type
           if (dealAny.business_type_id) {
@@ -715,6 +787,38 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
     dealForm.decision_maker_name.trim() !== "" &&
     dealForm.decision_maker_email.trim() !== "" &&
     dealForm.decision_maker_phone.trim() !== "";
+
+  const validateTemplateFields = (): boolean => {
+    if (!dealTemplate?.fields?.length) return true;
+
+    for (const field of dealTemplate.fields) {
+      if (!field.is_required) continue;
+      const value = templateFieldsData[field.field_name];
+      if (!value || value.trim() === "") {
+        toast.error(`${field.field_name} is required`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleTemplateSelectionChange = (templateIdRaw: string) => {
+    if (!templateIdRaw) {
+      setDealTemplate(null);
+      setTemplateFieldsData({});
+      return;
+    }
+
+    const templateId = Number(templateIdRaw);
+    const selected = availableTemplates.find((t) => t.id === templateId);
+    if (!selected) return;
+    setDealTemplate(selected);
+    const nextValues: Record<string, string> = {};
+    (selected.fields || []).forEach((field) => {
+      nextValues[field.field_name] = templateFieldsData[field.field_name] || "";
+    });
+    setTemplateFieldsData(nextValues);
+  };
 
   // Line items
   const addLineItem = () => {
@@ -1245,6 +1349,103 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               >
                 DEAL CHARACTERISTICS
               </h3>
+
+              {isEditMode && (
+                <div style={fieldWrap}>
+                  {fieldLabel("Deal Template")}
+                  <Form.Select
+                    value={dealTemplate?.id || ""}
+                    onChange={(e) => handleTemplateSelectionChange(e.target.value)}
+                    style={inputStyle}
+                    disabled={loadingTemplateList}
+                  >
+                    <option value="">
+                      {loadingTemplateList ? "Loading templates..." : "Select Deal Template (Optional)"}
+                    </option>
+                    {availableTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </Form.Select>
+                </div>
+              )}
+
+              {dealTemplate && (
+                <Card className="mb-3 border-0 bg-light">
+                  <Card.Body>
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <h6 className="fw-bold mb-0 text-info">
+                        TEMPLATE FIELDS
+                      </h6>
+                      {dealTemplate.name && (
+                        <span className="badge bg-info">Template: {dealTemplate.name}</span>
+                      )}
+                    </div>
+                    {dealTemplate.description && (
+                      <div className="alert alert-info py-2 mb-3">
+                        <small>{dealTemplate.description}</small>
+                      </div>
+                    )}
+                    {dealTemplate.fields && dealTemplate.fields.length > 0 ? (
+                      <div className="row">
+                        {[...(dealTemplate.fields || [])]
+                          .sort(
+                            (a: DealTemplateField, b: DealTemplateField) =>
+                              (Number(a.sort_order) || 0) -
+                              (Number(b.sort_order) || 0),
+                          )
+                          .map((field: DealTemplateField) => {
+                            const value = templateFieldsData[field.field_name] || "";
+                            return (
+                              <div className="col-md-6" key={field.field_name}>
+                                <div style={fieldWrap}>
+                                  {fieldLabel(field.field_name, field.is_required)}
+                                  {field.field_type === "dropdown" ? (
+                                    <Form.Select
+                                      value={value}
+                                      onChange={(e) =>
+                                        setTemplateFieldsData((prev) => ({
+                                          ...prev,
+                                          [field.field_name]: e.target.value,
+                                        }))
+                                      }
+                                      style={inputStyle}
+                                    >
+                                      <option value="">Select {field.field_name}</option>
+                                      {(field.options || []).map((option: string) => (
+                                        <option key={option} value={option}>
+                                          {option}
+                                        </option>
+                                      ))}
+                                    </Form.Select>
+                                  ) : (
+                                    <input
+                                      type="text"
+                                      value={value}
+                                      onChange={(e) =>
+                                        setTemplateFieldsData((prev) => ({
+                                          ...prev,
+                                          [field.field_name]: e.target.value,
+                                        }))
+                                      }
+                                      style={inputStyle}
+                                      onFocus={focusStyle}
+                                      onBlur={blurStyle}
+                                      placeholder={`Enter ${field.field_name}`}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    ) : (
+                      <div className="text-muted">No fields defined in this template.</div>
+                    )}
+                  </Card.Body>
+                </Card>
+              )}
 
               {/* Deal Type */}
               <div style={fieldWrap}>
@@ -2154,6 +2355,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
             disabled={!isFormValid || loading}
             onClick={async () => {
               if (!isFormValid) return;
+              if (!validateTemplateFields()) return;
               setLoading(true);
               try {
                 const payload: any = {
@@ -2191,6 +2393,23 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                   follow_up_date: dealForm.follow_up_date || "",
                   currency: dealForm.currency,
                 };
+
+                if (dealTemplate?.id) {
+                  payload.deal_template_id = dealTemplate.id;
+                  const filteredTemplateData: Record<string, string> = {};
+                  if (dealTemplate.name) {
+                    filteredTemplateData.template_name = dealTemplate.name;
+                  }
+                  Object.entries(templateFieldsData).forEach(([key, value]) => {
+                    if (key === "template_name") return;
+                    if (!value || !String(value).trim()) return;
+                    payload[`deal_template_field_values[${key}]`] = value;
+                    filteredTemplateData[normalizeTemplateDataKey(key)] = String(value);
+                  });
+                  if (Object.keys(filteredTemplateData).length > 0) {
+                    payload.template_data = filteredTemplateData;
+                  }
+                }
 
                 if (isEditMode && dealId) {
                   await updateDeal(dealId, payload);

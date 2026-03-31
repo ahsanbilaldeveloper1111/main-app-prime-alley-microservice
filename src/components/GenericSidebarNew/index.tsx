@@ -286,6 +286,7 @@ const RecentActivitiesSection = ({
         }}
       >
         {displayTrail.map((entry: any, index: number) => {
+          console.log("entry", entry);
           const timestamp = entry.created_at
             ? new Date(entry.created_at).toLocaleString("en-US", {
                 month: "short",
@@ -6872,6 +6873,21 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         : null;
 
     if (!changes) return entry.description?.trim() || "Record updated";
+
+    const isLeadConvertedToLost =
+      isValidChangeValue(changes.status) &&
+      isValidChangeValue(changes.is_lost) &&
+      isValidChangeValue(changes.stage_id) &&
+      isValidChangeValue(changes.lost_feedback) &&
+      changes.is_lost.old === false &&
+      changes.is_lost.new === true &&
+      changes.status.old === "new" &&
+      changes.status.new === "lost";
+
+    if (isLeadConvertedToLost) {
+      const convertedStatus = resolveFieldVal("status", changes.status.new);
+      return `Lead converted to ${convertedStatus}`;
+    }
 
     const lines: string[] = [];
     Object.entries(changes).forEach(([field, val]) => {
