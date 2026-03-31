@@ -77,6 +77,30 @@ import ColumnEditorModal from "@components/ColumnEditorModal";
 
 const VALID_FILTERS = new Set(["all"]);
 
+function billingProductActiveFilterToDropdownValue(
+  isActive: boolean | undefined,
+): string {
+  if (isActive === true) {
+    return "true";
+  }
+  if (isActive === false) {
+    return "false";
+  }
+  return "";
+}
+
+function billingProductDropdownValueToActiveFilter(
+  value: string,
+): boolean | undefined {
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  return undefined;
+}
+
 // Helper function to get initials from name (first two words, first two letters, only a-z)
 const getInitials = (name: string): string => {
   const trimmed = String(name ?? "").trim();
@@ -1103,17 +1127,13 @@ const BillingManagement = () => {
         id: "is_active",
         label: "Status",
         type: "dropdown",
-        value:
-          currentFilters.is_active === true
-            ? "true"
-            : currentFilters.is_active === false
-              ? "false"
-              : "",
+        value: billingProductActiveFilterToDropdownValue(
+          currentFilters.is_active,
+        ),
         onChange: (value) =>
           setCurrentFilters((prev) => ({
             ...prev,
-            is_active:
-              value === "true" ? true : value === "false" ? false : undefined,
+            is_active: billingProductDropdownValueToActiveFilter(value ?? ""),
           })),
         options: [
           { value: "", label: "All" },
