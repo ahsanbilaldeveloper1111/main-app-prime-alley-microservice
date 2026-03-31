@@ -3,7 +3,9 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 import React, {
+  type Dispatch,
   ReactElement,
+  type SetStateAction,
   useCallback,
   useEffect,
   useMemo,
@@ -37,7 +39,7 @@ import {
 import { getMinifiedCompanies } from "@utils/crm";
 import { formatNumber } from "@utils/Helper";
 
-import { Button, Form, Modal } from "react-bootstrap";
+import { Button, Form, Modal, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
@@ -228,6 +230,7 @@ type ReadonlyPaymentUrlToolbarProps = Readonly<{
   onOpenPaymentUrl: () => void;
   primaryButtonLabel: string;
   onPrimaryClick: () => Promise<void>;
+  primaryBusy?: boolean;
 }>;
 
 function ReadonlyPaymentUrlToolbar({
@@ -239,6 +242,7 @@ function ReadonlyPaymentUrlToolbar({
   onOpenPaymentUrl,
   primaryButtonLabel,
   onPrimaryClick,
+  primaryBusy = false,
 }: ReadonlyPaymentUrlToolbarProps) {
   return (
     <>
@@ -258,11 +262,25 @@ function ReadonlyPaymentUrlToolbar({
         </Button>
         <Button
           variant="primary"
+          disabled={primaryBusy}
           onClick={async () => {
             await onPrimaryClick();
           }}
         >
-          {primaryButtonLabel}
+          {primaryBusy ? (
+            <>
+              <Spinner
+                animation="border"
+                size="sm"
+                className="me-2"
+                role="status"
+                aria-hidden="true"
+              />
+              {primaryButtonLabel}
+            </>
+          ) : (
+            primaryButtonLabel
+          )}
         </Button>
       </div>
     </>
@@ -276,6 +294,367 @@ type InvoiceFilters = {
   date_from?: string;
   date_to?: string;
 };
+
+type InvoiceSummary = {
+  paid_count?: number;
+  pending_count?: number;
+  overdue_count?: number;
+};
+
+type StripeModalLabels = {
+  successFallback: string;
+  failureFallback: string;
+};
+
+type StripeInvoiceActionResponse = {
+  success?: boolean;
+  message?: string;
+};
+
+async function applyStripeInvoiceModalResponse(
+  response: StripeInvoiceActionResponse | null | undefined,
+  labels: StripeModalLabels,
+  invoiceId: number,
+  loadInvoice: (id: number) => Promise<unknown>,
+  bumpRefresh: () => void,
+): Promise<void> {
+  const success = response?.success === true;
+  if (success) {
+    toast.success(response?.message || labels.successFallback);
+    try {
+      await loadInvoice(invoiceId);
+    } catch (refreshError) {
+      toast.error(`Failed to refresh invoice: ${getErrorMessage(refreshError)}`);
+    }
+    bumpRefresh();
+    return;
+  }
+  toast.error(response?.message || labels.failureFallback);
+}
+
+type InvoiceListFetchOutcome =
+  | { kind: "stale" }
+  | {
+      kind: "success";
+      data: InvoiceData[];
+      total: number;
+      summary?: InvoiceSummary;
+    }
+  | { kind: "error"; message: string };
+
+async function fetchInvoiceListPage(
+  currentRequestId: number,
+  requestIdRef: { current: number },
+  args: {
+    page: number;
+    perPage: number;
+    memoizedFilters: InvoiceFilters;
+    selectedCompanyId: string;
+  },
+): Promise<InvoiceListFetchOutcome> {
+  const { page, perPage, memoizedFilters, selectedCompanyId } = args;
+  try {
+    const response = await getInvoices({
+      page,
+      per_page: perPage,
+      search: memoizedFilters.search || "",
+      crm_company_not_null: true,
+      ...memoizedFilters,
+      ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
+    });
+    if (currentRequestId !== requestIdRef.current) {
+      return { kind: "stale" };
+    }
+    const data = response?.data || [];
+    const total = response?.pagination?.total ?? 0;
+    return {
+      kind: "success",
+      data,
+      total,
+      summary: response?.summary,
+    };
+  } catch (error) {
+    if (currentRequestId !== requestIdRef.current) {
+      return { kind: "stale" };
+    }
+    return { kind: "error", message: getErrorMessage(error) };
+  }
+}
+
+const INVOICE_STATUS_FILTER_CHOICES: { value: string; label: string }[] = [
+  { value: "", label: "All Status" },
+  { value: STATUS_DRAFT, label: "Draft" },
+  { value: STATUS_SENT, label: "Sent" },
+  { value: STATUS_PAID, label: "Paid" },
+  { value: STATUS_PENDING, label: "Pending" },
+  { value: STATUS_OVERDUE, label: "Overdue" },
+  { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
+  { value: STATUS_CANCELLED, label: "Cancelled" },
+  { value: STATUS_FAILED, label: "Failed" },
+  { value: STATUS_REFUNDED, label: "Refunded" },
+];
+
+const invoiceFilterPillButtonStyle: React.CSSProperties = {
+  padding: "8px 12px",
+  cursor: "pointer",
+  background: "transparent",
+  borderRadius: "4px",
+  border: "none",
+  width: "100%",
+  textAlign: "left",
+  fontSize: 13,
+};
+
+function buildInvoiceStatusFilterPills(
+  currentFilters: InvoiceFilters,
+  setCurrentFilters: Dispatch<SetStateAction<InvoiceFilters>>,
+  applyInvoiceFiltersAndRefresh: () => void,
+  handleStatusFilterPillSelect: (optValue: string) => void,
+  handleInvoiceDateFromPillChange: (nextValue: string | undefined) => void,
+): FilterPill[] {
+  return [
+    {
+      id: "status",
+      label: "Status",
+      showDropdown: true,
+      active: !!currentFilters.status,
+      activeLabel: currentFilters.status
+        ? getStatusLabel(currentFilters.status)
+        : undefined,
+      onClear: () => {
+        setCurrentFilters((prev) => {
+          const { status, ...rest } = prev;
+          return rest;
+        });
+        applyInvoiceFiltersAndRefresh();
+      },
+      dropdownContent: (
+        <div style={{ minWidth: 200 }}>
+          {INVOICE_STATUS_FILTER_CHOICES.map((opt) => (
+            <button
+              key={opt.value || "all"}
+              type="button"
+              style={{
+                ...invoiceFilterPillButtonStyle,
+                background:
+                  (opt.value === "" && !currentFilters.status) ||
+                  currentFilters.status === opt.value
+                    ? "#f0f0f0"
+                    : "transparent",
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={() => handleStatusFilterPillSelect(opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "date_from",
+      label: "Date From",
+      showDropdown: true,
+      active: !!currentFilters.date_from,
+      activeLabel: currentFilters.date_from || undefined,
+      onClear: () => {
+        setCurrentFilters((prev) => {
+          const { date_from, ...rest } = prev;
+          return rest;
+        });
+        applyInvoiceFiltersAndRefresh();
+      },
+      dropdownContent: (
+        <div style={{ minWidth: 220, padding: "4px 0" }}>
+          <input
+            type="date"
+            value={currentFilters.date_from ?? ""}
+            style={{
+              width: "100%",
+              padding: "6px 12px",
+              border: "1px solid #e5e7eb",
+              borderRadius: 4,
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onChange={(e) =>
+              handleInvoiceDateFromPillChange(e.target.value || undefined)
+            }
+          />
+        </div>
+      ),
+    },
+  ];
+}
+
+type InvoiceStripePaymentLinkModalProps = Readonly<{
+  show: boolean;
+  onHide: () => void;
+  invoiceTitle: string;
+  selectedStripeCheckoutUrl: string;
+  selectedStripePaymentLinkUrl: string;
+  checkoutExpiresLocalText: string;
+  checkoutRemainingText: string;
+  stripeHostedCheckoutLoading: boolean;
+  stripePaymentLinkLoading: boolean;
+  openPaymentUrlInNewTabAndCloseModal: (url: string) => void;
+  requestStripeHostedCheckoutForModal: (labels: StripeModalLabels) => Promise<void>;
+  requestStripePaymentLinkForModal: (labels: StripeModalLabels) => Promise<void>;
+}>;
+
+function InvoiceStripePaymentLinkModal({
+  show,
+  onHide,
+  invoiceTitle,
+  selectedStripeCheckoutUrl,
+  selectedStripePaymentLinkUrl,
+  checkoutExpiresLocalText,
+  checkoutRemainingText,
+  stripeHostedCheckoutLoading,
+  stripePaymentLinkLoading,
+  openPaymentUrlInNewTabAndCloseModal,
+  requestStripeHostedCheckoutForModal,
+  requestStripePaymentLinkForModal,
+}: InvoiceStripePaymentLinkModalProps) {
+  const checkoutExpiryHint = checkoutExpiresLocalText ? (
+    <p style={{ marginBottom: 10, color: "#6B7280", fontSize: 13 }}>
+      Checkout session expires in about{" "}
+      {checkoutRemainingText ? <strong>{checkoutRemainingText}</strong> : null}
+    </p>
+  ) : undefined;
+
+  return (
+    <Modal show={show} onHide={onHide} centered size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>Generate Payment Link - {invoiceTitle}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <StripePaymentModalPanel marginBottom={14}>
+          <h6 style={{ marginBottom: 8 }}>Stripe Checkout link</h6>
+          <p style={{ marginBottom: 12, color: "#6B7280", fontSize: 14 }}>
+            One-time hosted page. Copy or open in browser. Success -&gt;
+            {" "}
+            <code>/public/payment/success?session_id=&#123;CHECKOUT_SESSION_ID&#125;</code>;
+            <br />
+            Cancel payment link -&gt;{" "}
+            <code>
+              /public/payment/cancel?invoice_id=…&amp;session_id=&#123;CHECKOUT_SESSION_ID&#125;
+            </code>
+            {"."}
+          </p>
+          {selectedStripeCheckoutUrl ? (
+            <ReadonlyPaymentUrlToolbar
+              url={selectedStripeCheckoutUrl}
+              extraBelowField={checkoutExpiryHint}
+              copySuccessMessage="Checkout link copied"
+              copyErrorMessage="Failed to copy checkout link"
+              openButtonLabel="Open Stripe"
+              onOpenPaymentUrl={() => {
+                openPaymentUrlInNewTabAndCloseModal(selectedStripeCheckoutUrl);
+              }}
+              primaryButtonLabel="New Link"
+              primaryBusy={stripeHostedCheckoutLoading}
+              onPrimaryClick={async () => {
+                await requestStripeHostedCheckoutForModal({
+                  successFallback: "New Checkout link generated",
+                  failureFallback: "Failed to generate new Checkout link",
+                });
+              }}
+            />
+          ) : (
+            <Button
+              variant="primary"
+              disabled={stripeHostedCheckoutLoading}
+              onClick={async () => {
+                await requestStripeHostedCheckoutForModal({
+                  successFallback: "Stripe Checkout link generated",
+                  failureFallback: "Failed to generate Stripe Checkout link",
+                });
+              }}
+            >
+              {stripeHostedCheckoutLoading ? (
+                <>
+                  <Spinner
+                    animation="border"
+                    size="sm"
+                    className="me-2"
+                    role="status"
+                    aria-hidden="true"
+                  />
+                  Generating…
+                </>
+              ) : (
+                "Generate Stripe Checkout Link"
+              )}
+            </Button>
+          )}
+        </StripePaymentModalPanel>
+
+        <StripePaymentModalPanel>
+          <h6 style={{ marginBottom: 8 }}>Stripe Payment Link</h6>
+          <p style={{ marginBottom: 8, color: "#6B7280", fontSize: 14 }}>
+            Persistent link visible in Stripe Dashboard -&gt; Payment links.
+            Same success/cancel redirects as Checkout.
+          </p>
+          {selectedStripePaymentLinkUrl ? (
+            <ReadonlyPaymentUrlToolbar
+              url={selectedStripePaymentLinkUrl}
+              copySuccessMessage="Payment link copied"
+              copyErrorMessage="Failed to copy payment link"
+              openButtonLabel="Open Link"
+              onOpenPaymentUrl={() => {
+                openPaymentUrlInNewTabAndCloseModal(selectedStripePaymentLinkUrl);
+              }}
+              primaryButtonLabel="New Link"
+              primaryBusy={stripePaymentLinkLoading}
+              onPrimaryClick={async () => {
+                await requestStripePaymentLinkForModal({
+                  successFallback: "New payment link generated",
+                  failureFallback: "Failed to generate new payment link",
+                });
+              }}
+            />
+          ) : (
+            <>
+              <p style={{ marginBottom: 12, color: "#6B7280", fontSize: 14 }}>
+                No Payment Link yet. Create one to get a persistent URL and see it in Stripe Dashboard.
+              </p>
+              <Button
+                variant="primary"
+                disabled={stripePaymentLinkLoading}
+                onClick={async () => {
+                  await requestStripePaymentLinkForModal({
+                    successFallback: "Stripe Payment link generated",
+                    failureFallback: "Failed to generate Stripe Payment link",
+                  });
+                }}
+              >
+                {stripePaymentLinkLoading ? (
+                  <>
+                    <Spinner
+                      animation="border"
+                      size="sm"
+                      className="me-2"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    Generating…
+                  </>
+                ) : (
+                  "Generate Stripe Payment link"
+                )}
+              </Button>
+            </>
+          )}
+        </StripePaymentModalPanel>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onHide}>
+          Cancel
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
 
 const InvoiceList = () => {
   const { data: session } = useSession();
@@ -308,6 +687,8 @@ const InvoiceList = () => {
     null,
   );
   const [checkoutNowMs, setCheckoutNowMs] = useState<number>(() => Date.now());
+  const [stripeHostedCheckoutLoading, setStripeHostedCheckoutLoading] = useState(false);
+  const [stripePaymentLinkLoading, setStripePaymentLinkLoading] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<InvoiceData | null>(null);
   const [deletingInvoice, setDeletingInvoice] = useState(false);
@@ -371,6 +752,8 @@ const InvoiceList = () => {
   const closeGeneratePaymentLinkModal = useCallback(() => {
     setShowGeneratePaymentLinkModal(false);
     setSelectedInvoiceForPaymentLink(null);
+    setStripeHostedCheckoutLoading(false);
+    setStripePaymentLinkLoading(false);
   }, []);
 
   const openPaymentUrlInNewTabAndCloseModal = useCallback(
@@ -386,52 +769,54 @@ const InvoiceList = () => {
   );
 
   const requestStripeHostedCheckoutForModal = useCallback(
-    async (labels: { successFallback: string; failureFallback: string }) => {
+    async (labels: StripeModalLabels) => {
       if (!selectedInvoiceForPaymentLink?.id) {
         return;
       }
       const invoiceId = selectedInvoiceForPaymentLink.id;
+      setStripeHostedCheckoutLoading(true);
       try {
-        const response = await PostInvoiceStripeHostedCheckout(invoiceId);
-        if (response?.success === true) {
-          toast.success(response?.message || labels.successFallback);
-          try {
-            await loadInvoiceIntoPaymentLinkModal(invoiceId);
-          } catch (refreshError) {
-            toast.error(`Failed to refresh invoice: ${getErrorMessage(refreshError)}`);
-          }
-          setRefreshKey((prev) => prev + 1);
-        } else {
-          toast.error(response?.message || labels.failureFallback);
-        }
+        const response = (await PostInvoiceStripeHostedCheckout(
+          invoiceId,
+        )) as StripeInvoiceActionResponse | null | undefined;
+        await applyStripeInvoiceModalResponse(
+          response,
+          labels,
+          invoiceId,
+          loadInvoiceIntoPaymentLinkModal,
+          () => setRefreshKey((prev) => prev + 1),
+        );
       } catch {
         // Toast is handled in API helper.
+      } finally {
+        setStripeHostedCheckoutLoading(false);
       }
     },
     [loadInvoiceIntoPaymentLinkModal, selectedInvoiceForPaymentLink],
   );
 
   const requestStripePaymentLinkForModal = useCallback(
-    async (labels: { successFallback: string; failureFallback: string }) => {
+    async (labels: StripeModalLabels) => {
       if (!selectedInvoiceForPaymentLink?.id) {
         return;
       }
       const invoiceId = selectedInvoiceForPaymentLink.id;
+      setStripePaymentLinkLoading(true);
       try {
-        const response = await PostInvoiceStripePaymentLink(invoiceId);
-        if (response?.success === true) {
-          toast.success(response?.message || labels.successFallback);
-          try {
-            await loadInvoiceIntoPaymentLinkModal(invoiceId);
-          } catch (refreshError) {
-            toast.error(`Failed to refresh invoice: ${getErrorMessage(refreshError)}`);
-          }
-          setRefreshKey((prev) => prev + 1);
-        } else {
-          toast.error(response?.message || labels.failureFallback);
-        }
+        const response = (await PostInvoiceStripePaymentLink(
+          invoiceId,
+        )) as StripeInvoiceActionResponse | null | undefined;
+        await applyStripeInvoiceModalResponse(
+          response,
+          labels,
+          invoiceId,
+          loadInvoiceIntoPaymentLinkModal,
+          () => setRefreshKey((prev) => prev + 1),
+        );
       } catch {
         // Toast is handled in API helper.
+      } finally {
+        setStripePaymentLinkLoading(false);
       }
     },
     [loadInvoiceIntoPaymentLinkModal, selectedInvoiceForPaymentLink],
@@ -716,11 +1101,6 @@ const InvoiceList = () => {
   }, []);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
-  type InvoiceSummary = {
-    paid_count?: number;
-    pending_count?: number;
-    overdue_count?: number;
-  };
   const [summary, setSummary] = useState<InvoiceSummary | null>(null);
 
   const [invoiceList, setInvoiceList] = useState<InvoiceData[]>([]);
@@ -747,35 +1127,37 @@ const InvoiceList = () => {
     const currentRequestId = invoiceRequestIdRef.current;
     setInvoiceLoading(true);
     try {
-      const response = await getInvoices({
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-        search: memoizedFilters.search || "",
-        crm_company_not_null: true,
-        
-        ...memoizedFilters,
-        ...(selectedCompanyId ? { crm_company_id: selectedCompanyId } : {}),
-      });
-      if (currentRequestId !== invoiceRequestIdRef.current) return;
-      const data = response?.data || [];
-      const total = response?.pagination?.total ?? 0;
-      setInvoiceList(data);
-      setTotalRecords(total);
-      setPagination((prev) => ({ ...prev, totalRows: total }));
-      // Keep total all invoices when no status filter is applied
-      if (!memoizedFilters.status) {
-        setTotalAllInvoices(total);
+      const outcome = await fetchInvoiceListPage(
+        currentRequestId,
+        invoiceRequestIdRef,
+        {
+          page: pagination.currentPage,
+          perPage: pagination.rowsPerPage,
+          memoizedFilters,
+          selectedCompanyId,
+        },
+      );
+      if (outcome.kind === "stale") {
+        return;
       }
-      if (response?.summary) setSummary(response.summary);
-    } catch (error) {
-      if (currentRequestId !== invoiceRequestIdRef.current) return;
-      const message = getErrorMessage(error);
-      toast.error(`Failed to load invoices: ${message}`, {
-        toastId: "billing_invoices_load_failed",
-      });
-      setInvoiceList([]);
-      setTotalRecords(0);
-      setPagination((prev) => ({ ...prev, totalRows: 0 }));
+      if (outcome.kind === "error") {
+        toast.error(`Failed to load invoices: ${outcome.message}`, {
+          toastId: "billing_invoices_load_failed",
+        });
+        setInvoiceList([]);
+        setTotalRecords(0);
+        setPagination((prev) => ({ ...prev, totalRows: 0 }));
+        return;
+      }
+      setInvoiceList(outcome.data);
+      setTotalRecords(outcome.total);
+      setPagination((prev) => ({ ...prev, totalRows: outcome.total }));
+      if (!memoizedFilters.status) {
+        setTotalAllInvoices(outcome.total);
+      }
+      if (outcome.summary) {
+        setSummary(outcome.summary);
+      }
     } finally {
       if (invoiceRequestIdRef.current === currentRequestId) {
         setInvoiceLoading(false);
@@ -822,104 +1204,14 @@ const InvoiceList = () => {
 
   // Filter pills must use GenericTable `FilterPill` shape (`showDropdown` + `dropdownContent` / `dropdownOptions`), not ad-hoc `type`/`options`.
   const invoiceFilterPills = React.useMemo<FilterPill[]>(
-    () => {
-      const statusChoices: { value: string; label: string }[] = [
-        { value: "", label: "All Status" },
-        { value: STATUS_DRAFT, label: "Draft" },
-        { value: STATUS_SENT, label: "Sent" },
-        { value: STATUS_PAID, label: "Paid" },
-        { value: STATUS_PENDING, label: "Pending" },
-        { value: STATUS_OVERDUE, label: "Overdue" },
-        { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
-        { value: STATUS_CANCELLED, label: "Cancelled" },
-        { value: STATUS_FAILED, label: "Failed" },
-        { value: STATUS_REFUNDED, label: "Refunded" },
-      ];
-
-      const pillButtonStyle: React.CSSProperties = {
-        padding: "8px 12px",
-        cursor: "pointer",
-        background: "transparent",
-        borderRadius: "4px",
-        border: "none",
-        width: "100%",
-        textAlign: "left",
-        fontSize: 13,
-      };
-
-      return [
-        {
-          id: "status",
-          label: "Status",
-          showDropdown: true,
-          active: !!currentFilters.status,
-          activeLabel: currentFilters.status
-            ? getStatusLabel(currentFilters.status)
-            : undefined,
-          onClear: () => {
-            setCurrentFilters((prev) => {
-              const { status, ...rest } = prev;
-              return rest;
-            });
-            applyInvoiceFiltersAndRefresh();
-          },
-          dropdownContent: (
-            <div style={{ minWidth: 200 }}>
-              {statusChoices.map((opt) => (
-                <button
-                  key={opt.value || "all"}
-                  type="button"
-                  style={{
-                    ...pillButtonStyle,
-                    background:
-                      (opt.value === "" && !currentFilters.status) ||
-                      currentFilters.status === opt.value
-                        ? "#f0f0f0"
-                        : "transparent",
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={() => handleStatusFilterPillSelect(opt.value)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          ),
-        },
-        {
-          id: "date_from",
-          label: "Date From",
-          showDropdown: true,
-          active: !!currentFilters.date_from,
-          activeLabel: currentFilters.date_from || undefined,
-          onClear: () => {
-            setCurrentFilters((prev) => {
-              const { date_from, ...rest } = prev;
-              return rest;
-            });
-            applyInvoiceFiltersAndRefresh();
-          },
-          dropdownContent: (
-            <div style={{ minWidth: 220, padding: "4px 0" }}>
-              <input
-                type="date"
-                value={currentFilters.date_from ?? ""}
-                style={{
-                  width: "100%",
-                  padding: "6px 12px",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 4,
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onChange={(e) =>
-                  handleInvoiceDateFromPillChange(e.target.value || undefined)
-                }
-              />
-            </div>
-          ),
-        },
-      ];
-    },
+    () =>
+      buildInvoiceStatusFilterPills(
+        currentFilters,
+        setCurrentFilters,
+        applyInvoiceFiltersAndRefresh,
+        handleStatusFilterPillSelect,
+        handleInvoiceDateFromPillChange,
+      ),
     [
       currentFilters,
       applyInvoiceFiltersAndRefresh,
@@ -1256,113 +1548,24 @@ const InvoiceList = () => {
         loading={deletingInvoice}
       />
 
-      <Modal show={showGeneratePaymentLinkModal} onHide={closeGeneratePaymentLinkModal} centered size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>Generate Payment Link - {selectedInvoiceForPaymentLink?.invoice_number ?? selectedInvoiceForPaymentLink?.id}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <StripePaymentModalPanel marginBottom={14}>
-            <h6 style={{ marginBottom: 8 }}>Stripe Checkout link</h6>
-            <p style={{ marginBottom: 12, color: "#6B7280", fontSize: 14 }}>
-              One-time hosted page. Copy or open in browser. Success -&gt;
-              {" "}
-              <code>/public/payment/success?session_id=&#123;CHECKOUT_SESSION_ID&#125;</code>;
-              <br />
-              Cancel payment link -&gt;{" "}
-              <code>
-                /public/payment/cancel?invoice_id=…&amp;session_id=&#123;CHECKOUT_SESSION_ID&#125;
-              </code>
-              {"."}
-            </p>
-            {selectedStripeCheckoutUrl ? (
-              <ReadonlyPaymentUrlToolbar
-                url={selectedStripeCheckoutUrl}
-                extraBelowField={
-                  checkoutExpiresLocalText ? (
-                    <p style={{ marginBottom: 10, color: "#6B7280", fontSize: 13 }}>
-                      Checkout session expires in about{" "}
-                      {checkoutRemainingText ? <strong>{checkoutRemainingText}</strong> : null}
-                    </p>
-                  ) : undefined
-                }
-                copySuccessMessage="Checkout link copied"
-                copyErrorMessage="Failed to copy checkout link"
-                openButtonLabel="Open Stripe"
-                onOpenPaymentUrl={() => {
-                  openPaymentUrlInNewTabAndCloseModal(selectedStripeCheckoutUrl);
-                }}
-                primaryButtonLabel="New Link"
-                onPrimaryClick={async () => {
-                  await requestStripeHostedCheckoutForModal({
-                    successFallback: "New Checkout link generated",
-                    failureFallback: "Failed to generate new Checkout link",
-                  });
-                }}
-              />
-            ) : (
-              <Button
-                variant="primary"
-                onClick={async () => {
-                  await requestStripeHostedCheckoutForModal({
-                    successFallback: "Stripe Checkout link generated",
-                    failureFallback: "Failed to generate Stripe Checkout link",
-                  });
-                }}
-              >
-                Generate Stripe Checkout Link
-              </Button>
-            )}
-          </StripePaymentModalPanel>
-
-          <StripePaymentModalPanel>
-            <h6 style={{ marginBottom: 8 }}>Stripe Payment Link</h6>
-            <p style={{ marginBottom: 8, color: "#6B7280", fontSize: 14 }}>
-              Persistent link visible in Stripe Dashboard -&gt; Payment links.
-              Same success/cancel redirects as Checkout.
-            </p>
-            {selectedStripePaymentLinkUrl ? (
-              <ReadonlyPaymentUrlToolbar
-                url={selectedStripePaymentLinkUrl}
-                copySuccessMessage="Payment link copied"
-                copyErrorMessage="Failed to copy payment link"
-                openButtonLabel="Open Link"
-                onOpenPaymentUrl={() => {
-                  openPaymentUrlInNewTabAndCloseModal(selectedStripePaymentLinkUrl);
-                }}
-                primaryButtonLabel="New Link"
-                onPrimaryClick={async () => {
-                  await requestStripePaymentLinkForModal({
-                    successFallback: "New payment link generated",
-                    failureFallback: "Failed to generate new payment link",
-                  });
-                }}
-              />
-            ) : (
-              <>
-                <p style={{ marginBottom: 12, color: "#6B7280", fontSize: 14 }}>
-                  No Payment Link yet. Create one to get a persistent URL and see it in Stripe Dashboard.
-                </p>
-                <Button
-                  variant="primary"
-                  onClick={async () => {
-                    await requestStripePaymentLinkForModal({
-                      successFallback: "Stripe Payment link generated",
-                      failureFallback: "Failed to generate Stripe Payment link",
-                    });
-                  }}
-                >
-                  Generate Stripe Payment link
-                </Button>
-              </>
-            )}
-          </StripePaymentModalPanel>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={closeGeneratePaymentLinkModal}>
-            Cancel
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <InvoiceStripePaymentLinkModal
+        show={showGeneratePaymentLinkModal}
+        onHide={closeGeneratePaymentLinkModal}
+        invoiceTitle={String(
+          selectedInvoiceForPaymentLink?.invoice_number ??
+            selectedInvoiceForPaymentLink?.id ??
+            "",
+        )}
+        selectedStripeCheckoutUrl={selectedStripeCheckoutUrl}
+        selectedStripePaymentLinkUrl={selectedStripePaymentLinkUrl}
+        checkoutExpiresLocalText={checkoutExpiresLocalText}
+        checkoutRemainingText={checkoutRemainingText}
+        stripeHostedCheckoutLoading={stripeHostedCheckoutLoading}
+        stripePaymentLinkLoading={stripePaymentLinkLoading}
+        openPaymentUrlInNewTabAndCloseModal={openPaymentUrlInNewTabAndCloseModal}
+        requestStripeHostedCheckoutForModal={requestStripeHostedCheckoutForModal}
+        requestStripePaymentLinkForModal={requestStripePaymentLinkForModal}
+      />
 
       {/* View Invoice Modal */}
       <InvoiceViewModal

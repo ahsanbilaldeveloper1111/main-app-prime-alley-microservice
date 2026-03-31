@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // Public payment return URLs (Stripe success/cancel); no login required
-    if (path.startsWith('/public/payment/')) {
+    if (path.startsWith('/public/payment')) {
         return NextResponse.next();
     }
 

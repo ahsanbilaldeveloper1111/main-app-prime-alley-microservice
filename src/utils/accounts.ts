@@ -1433,12 +1433,13 @@ export const createProduct = async (
   }
 };
 
-export const getProductCategoriesList = async (): Promise<
+export const getProductCategoriesList = async (params: PaginationParams = {}): Promise<
   ProductCategoryData[]
 > => {
   try {
     const response = await axiosInstance.get(
-      "/accounting/products/categories-list"
+      "/accounting/products/categories-list",
+      { params }
     );
     return extractData<ProductCategoryData[]>(response.data);
   } catch (error: any) {
