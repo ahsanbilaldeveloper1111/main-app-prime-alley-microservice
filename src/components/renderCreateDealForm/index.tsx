@@ -313,8 +313,8 @@ const normalizeTemplateDataKey = (key: string): string =>
   key
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+    .replaceAll(/[^a-z0-9]+/g, "_")
+    .replaceAll(/^_+|_+$/g, "");
 
 const mapEstimateChartToLineItems = (
   chart: EstimateChartItem[],
@@ -643,7 +643,7 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                 );
             });
             setTemplateFieldsData(initialTemplateValues);
-          } else if (dealId) {
+          } else {
             // Fallback for older payloads where deal_template isn't embedded in deal response.
             const relevantTemplate = await getRelevantDealTemplate({ deal_id: dealId });
             if (relevantTemplate) {
@@ -663,9 +663,6 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
               setDealTemplate(null);
               setTemplateFieldsData({});
             }
-          } else {
-            setDealTemplate(null);
-            setTemplateFieldsData({});
           }
 
           // Set business type
@@ -2402,9 +2399,10 @@ export const CreateDealSidebar: React.FC<CreateDealSidebarProps> = ({
                   }
                   Object.entries(templateFieldsData).forEach(([key, value]) => {
                     if (key === "template_name") return;
-                    if (!value || !String(value).trim()) return;
-                    payload[`deal_template_field_values[${key}]`] = value;
-                    filteredTemplateData[normalizeTemplateDataKey(key)] = String(value);
+                    const normalizedValue = value.trim();
+                    if (!normalizedValue) return;
+                    payload[`deal_template_field_values[${key}]`] = normalizedValue;
+                    filteredTemplateData[normalizeTemplateDataKey(key)] = normalizedValue;
                   });
                   if (Object.keys(filteredTemplateData).length > 0) {
                     payload.template_data = filteredTemplateData;

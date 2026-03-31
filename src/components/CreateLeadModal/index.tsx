@@ -625,7 +625,7 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
         } else {
           try {
             if (crmDataIdNum) {
-              const record = await getCrmDataById(crmDataIdNum as number);
+              const record = await getCrmDataById(crmDataIdNum);
               setSelectedCrmData(record);
             }
           } catch {
