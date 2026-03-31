@@ -1,7 +1,7 @@
 import '@assets/scss/datatable-style.scss';
 
 import React, { ReactElement, useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Col, Button, Card, Modal, Row } from 'react-bootstrap';
+import { Col, Button, Card, Form, Modal, Row } from 'react-bootstrap';
 
 import { useSession } from 'next-auth/react';
 import type { NextPage } from 'next';
@@ -65,33 +65,110 @@ interface RecordingRow {
   [key: string]: any;
 }
 
+// ─── Filter menu components (lifted out of CallRecordings to satisfy Sonar) ──
+
+interface PhoneFilterMenuProps {
+  value: string;
+  onChange: (value: string) => void;
+  onApply: (value: string) => void;
+  closeMenu: () => void;
+}
+const PhoneFilterMenu: React.FC<PhoneFilterMenuProps> = ({ value, onChange, onApply, closeMenu }) => (
+  <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+    <Form.Control
+      size="sm"
+      type="text"
+      placeholder="Enter phone number"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+    <div className="d-flex justify-content-end gap-2">
+      <Button variant="outline-secondary" size="sm" onClick={closeMenu}>Cancel</Button>
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={() => { onApply(value.trim()); closeMenu(); }}
+      >Apply</Button>
+    </div>
+  </div>
+);
+
+interface DateFilterMenuProps {
+  value: string;
+  onChange: (value: string) => void;
+  onApply: (value: string) => void;
+  closeMenu: () => void;
+}
+const DateFilterMenu: React.FC<DateFilterMenuProps> = ({ value, onChange, onApply, closeMenu }) => (
+  <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+    <Form.Control
+      size="sm"
+      type="date"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+    <div className="d-flex justify-content-end gap-2">
+      <Button variant="outline-secondary" size="sm" onClick={closeMenu}>Cancel</Button>
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={() => { onApply(value); closeMenu(); }}
+      >Apply</Button>
+    </div>
+  </div>
+);
+
+// ─── Dropdown content factories (defined outside CallRecordings to satisfy Sonar) ──
+
+function createPhoneDropdownContent(
+  value: string,
+  onChange: (v: string) => void,
+  onApply: (v: string) => void,
+) {
+  return function PhoneDropdownRender({ closeMenu }: { closeMenu: () => void }) {
+    return (
+      <PhoneFilterMenu value={value} onChange={onChange} onApply={onApply} closeMenu={closeMenu} />
+    );
+  };
+}
+
+function createDateDropdownContent(
+  value: string,
+  onChange: (v: string) => void,
+  onApply: (v: string) => void,
+) {
+  return function DateDropdownRender({ closeMenu }: { closeMenu: () => void }) {
+    return (
+      <DateFilterMenu value={value} onChange={onChange} onApply={onApply} closeMenu={closeMenu} />
+    );
+  };
+}
+
 const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactNode } = () => {
   const { data: session } = useSession();
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const [showPageLoader, setShowPageLoader] = useState(false);
 
   const [showDateRange] = useState(true);
-  const [startDateTime] = useState<string>(() =>
+  const [startDateTime, setStartDateTime] = useState<string>(() =>
     moment().clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z'
   );
-  const [endDateTime] = useState<string>(() =>
+  const [endDateTime, setEndDateTime] = useState<string>(() =>
     moment().clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z'
   );
   // Initialize filters with default values immediately to prevent first API call without dates
   const getDefaultFilters = () => {
     const now = moment();
-    const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
-    const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
     const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     return {
       current: {
-        start_date: startDateInput,
-        end_date: endDateInput
+        start_date: '',
+        end_date: '',
       },
       applied: {
         start_date: startDateApi,
-        end_date: endDateApi
+        end_date: endDateApi,
       }
     };
   };
@@ -363,7 +440,10 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       );
 
     if (response?.summary) {
-      setSummary(response.summary)
+      setSummary(response.summary);
+      const dataFilters = response?.filters;
+      if (dataFilters?.start_date) setStartDateTime(dataFilters.start_date);
+      if (dataFilters?.end_date) setEndDateTime(dataFilters.end_date);
     }
 
     const rowsArray = getRowsArray(response);
@@ -396,16 +476,22 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const handleFiltersChange = (filters: any) => {
     // Format datetime values to include seconds and timezone offset (remove timezone key)
     const formattedFilters: any = { ...filters };
+
+    // Backward compatibility: normalize alternate keys to API keys expected by recordings endpoint.
+    if (formattedFilters.start_datetime && !formattedFilters.start_date) {
+      formattedFilters.start_date = formattedFilters.start_datetime;
+    }
+    if (formattedFilters.end_datetime && !formattedFilters.end_date) {
+      formattedFilters.end_date = formattedFilters.end_datetime;
+    }
+    delete formattedFilters.start_datetime;
+    delete formattedFilters.end_datetime;
     
     if (formattedFilters.start_date) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
+      // date picker returns YYYY-MM-DD; normalize to UTC timestamp expected by API.
       let startMoment = moment(formattedFilters.start_date);
       
-      if (formattedFilters.start_date.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-        // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-        startMoment = moment(formattedFilters.start_date + ':00');
-      } else if (!formattedFilters.start_date.includes('T')) {
-        // If only date, set to 00:00:00
+      if (formattedFilters.start_date.match(/^\d{4}-\d{2}-\d{2}$/) || !formattedFilters.start_date.includes('T')) {
         startMoment = moment(formattedFilters.start_date).startOf('day');
       }
       
@@ -414,20 +500,11 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
     
     if (formattedFilters.end_date) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
+      // date picker returns YYYY-MM-DD; normalize to UTC timestamp expected by API.
       let endMoment = moment(formattedFilters.end_date);
       
-      if (formattedFilters.end_date.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-        // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-        const timePart = formattedFilters.end_date.split('T')[1];
-        if (timePart === '23:59') {
-          endMoment = moment(formattedFilters.end_date + ':59');
-        } else {
-          endMoment = moment(formattedFilters.end_date + ':00');
-        }
-      } else if (!formattedFilters.end_date.includes('T')) {
-        // If only date, set to 23:59:59
-        endMoment = moment(formattedFilters.end_date).endOf('day');
+      if (formattedFilters.end_date.match(/^\d{4}-\d{2}-\d{2}$/) || !formattedFilters.end_date.includes('T')) {
+        endMoment = moment(formattedFilters.end_date).startOf('day');
       }
       
       // Convert to UTC
@@ -604,6 +681,47 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           value: String(u.id),
           onClick: () => applyFilters({ ...currentFilters, username: String(u.id) }),
         })),
+      },
+      {
+        id: 'remote_party_number',
+        label: 'Remote Party Number',
+        showDropdown: true,
+        active: Boolean(currentFilters.remote_party_number),
+        activeLabel: currentFilters.remote_party_number ? String(currentFilters.remote_party_number) : undefined,
+        onClear: () => applyFilters({ ...currentFilters, remote_party_number: '' }),
+        dropdownContent: createPhoneDropdownContent(
+          currentFilters.remote_party_number ?? '',
+          (v) => setCurrentFilters({ ...currentFilters, remote_party_number: v }),
+          (v) => applyFilters({ ...currentFilters, remote_party_number: v }),
+        ),
+      },
+      {
+        id: 'start_date',
+        label: 'Start Date & Time',
+        showDropdown: true,
+        active: Boolean(currentFilters.start_date),
+        activeLabel: currentFilters.start_date ? moment(currentFilters.start_date).format('MMM DD, YYYY') : undefined,
+        activeLabelOnly: true,
+        onClear: () => applyFilters({ ...currentFilters, start_date: '' }),
+        dropdownContent: createDateDropdownContent(
+          currentFilters.start_date ?? '',
+          (v) => setCurrentFilters({ ...currentFilters, start_date: v }),
+          (v) => applyFilters({ ...currentFilters, start_date: v }),
+        ),
+      },
+      {
+        id: 'end_date',
+        label: 'End Date & Time',
+        showDropdown: true,
+        active: Boolean(currentFilters.end_date),
+        activeLabel: currentFilters.end_date ? moment(currentFilters.end_date).format('MMM DD, YYYY') : undefined,
+        activeLabelOnly: true,
+        onClear: () => applyFilters({ ...currentFilters, end_date: '' }),
+        dropdownContent: createDateDropdownContent(
+          currentFilters.end_date ?? '',
+          (v) => setCurrentFilters({ ...currentFilters, end_date: v }),
+          (v) => applyFilters({ ...currentFilters, end_date: v }),
+        ),
       },
     ],
     rightActions: (
@@ -1176,12 +1294,13 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           </Button>
         </Modal.Footer>
       </Modal>
+
     </React.Fragment>
-  );
-};
+    );
+  };
 
-CallRecordings.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
-};
+  CallRecordings.getLayout = (page: ReactElement) => {
+    return <Layout>{page}</Layout>;
+  };
 
-export default CallRecordings;
+  export default CallRecordings;
