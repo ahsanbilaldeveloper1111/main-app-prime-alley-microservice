@@ -1380,7 +1380,8 @@ export const getProducts = async (
 
     // Handle the actual API response structure
     if (response.data?.code === 200 && response.data?.data?.success) {
-      const productsData = response.data.data.data; // The product array
+      const rawList = response.data.data.data;
+      const productsData = Array.isArray(rawList) ? rawList : [];
       return {
         summary: response?.data?.data?.summary,
         data: productsData,
@@ -1398,7 +1399,8 @@ export const getProducts = async (
     }
 
     // Fallback to extractData if structure is different
-    const productsData = extractData<ProductData[]>(response.data);
+    const extracted = extractData<ProductData[]>(response.data);
+    const productsData = Array.isArray(extracted) ? extracted : [];
     return {
       data: productsData,
       summary: response?.data?.data?.summary,
