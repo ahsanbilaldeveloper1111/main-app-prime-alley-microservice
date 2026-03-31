@@ -4,7 +4,7 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
 import { ListCallLogs, DownloadCallsExport } from '@utils/calls';
-import { Row, Col } from 'react-bootstrap';
+import { Row, Col, Form, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import StatsCards from '@components/GenericStatsCards';
@@ -101,16 +101,14 @@ const CallLogs = () => {
     // Initialize filters with default values immediately to prevent first API call without dates
     const getDefaultFilters = () => {
         const now = moment();
-        const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
-        const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
         const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         return {
-            pending: {
-                start_datetime: startDateInput,
-                end_datetime: endDateInput
-            },
             current: {
+                start_datetime: '',
+                end_datetime: ''
+            },
+            applied: {
                 start_datetime: startDateApi,
                 end_datetime: endDateApi
             }
@@ -119,10 +117,11 @@ const CallLogs = () => {
     
     const defaultFilters = getDefaultFilters();
     const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
+    const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>(defaultFilters.applied);
     const [searchValue, setSearchValue] = useState<string>('');
     
     // Refs to prevent duplicate API calls
-    const currentFiltersRef = useRef<Record<string, any>>(defaultFilters.current);
+    const appliedFiltersRef = useRef<Record<string, any>>(defaultFilters.applied);
     const isFetchingRef = useRef(false);
     const lastFetchTimeRef = useRef(0);
     const lastFetchParamsRef = useRef<string>('');
@@ -183,7 +182,7 @@ const CallLogs = () => {
 
     const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
         const now = Date.now();
-        const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
+        const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(appliedFiltersRef.current)}`;
 
         if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
             return;
@@ -203,7 +202,7 @@ const CallLogs = () => {
                 page,
                 perPage,
                 search,
-                filters: currentFiltersRef.current,
+                filters: appliedFiltersRef.current,
                 moduleSlug: ModuleSlug.CALL_LOGS,
             }, 'call-logs/list');
 
@@ -307,8 +306,9 @@ const CallLogs = () => {
         delete formattedFilters.timezone;
         
         // Update both state and ref immediately
-        setCurrentFilters(formattedFilters);
-        currentFiltersRef.current = formattedFilters;
+        setCurrentFilters(filters);
+        setAppliedFilters(formattedFilters);
+        appliedFiltersRef.current = formattedFilters;
         
         // Trigger refresh for GenericListPage to fetch new data
         setRefreshKey((prev) => prev + 1);
@@ -318,7 +318,7 @@ const CallLogs = () => {
         setIsExporting(true);
         try {
             const exportPayload = {
-                ...currentFilters,
+                ...appliedFilters,
                 timezone: getAutoTimezone()
             };
             await DownloadCallsExport( exportPayload,'call-logs/analytics/download')
@@ -349,7 +349,7 @@ const CallLogs = () => {
         return '';
     };
 
-    const tableToolbar = useMemo(() => ({
+    const tableToolbar = useMemo<any>(() => ({
         showSearch: true,
         searchValue,
         searchPlaceholder: 'Search by username, extension, phone...',
@@ -453,6 +453,138 @@ const CallLogs = () => {
                     }),
                 })),
             },
+            {
+                id: 'phone_number',
+                label: 'Numbers',
+                showDropdown: true,
+                active: Boolean(currentFilters.phone_number),
+                activeLabel: currentFilters.phone_number ? String(currentFilters.phone_number) : undefined,
+                onClear: () => applyFilters({ ...currentFilters, phone_number: '' }),
+                dropdownContent: ({ closeMenu }: { closeMenu: () => void }) => (
+                    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+                        <Form.Control
+                            size="sm"
+                            type="text"
+                            placeholder="Enter number"
+                            value={currentFilters.phone_number ?? ''}
+                            onChange={(e) =>
+                                setCurrentFilters((prev) => ({
+                                    ...prev,
+                                    phone_number: e.target.value,
+                                }))
+                            }
+                        />
+                        <div className="d-flex justify-content-end gap-2">
+                            <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => closeMenu()}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => {
+                                    applyFilters({
+                                        ...currentFilters,
+                                        phone_number: String(currentFilters.phone_number ?? '').trim(),
+                                    });
+                                    closeMenu();
+                                }}
+                            >
+                                Apply
+                            </Button>
+                        </div>
+                    </div>
+                ),
+            },
+            {
+                id: 'start_datetime',
+                label: 'Start Date & Time',
+                showDropdown: true,
+                active: Boolean(currentFilters.start_datetime),
+                activeLabel: currentFilters.start_datetime ? moment(currentFilters.start_datetime).format('MMM DD, YYYY') : undefined,
+                activeLabelOnly: true,
+                onClear: () => applyFilters({ ...currentFilters, start_datetime: '' }),
+                dropdownContent: ({ closeMenu }: { closeMenu: () => void }) => (
+                    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+                        <Form.Control
+                            size="sm"
+                            type="date"
+                            value={currentFilters.start_datetime ?? ''}
+                            onChange={(e) =>
+                                setCurrentFilters((prev) => ({
+                                    ...prev,
+                                    start_datetime: e.target.value,
+                                }))
+                            }
+                        />
+                        <div className="d-flex justify-content-end gap-2">
+                            <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => closeMenu()}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => {
+                                    applyFilters({ ...currentFilters, start_datetime: currentFilters.start_datetime ?? '' });
+                                    closeMenu();
+                                }}
+                            >
+                                Apply
+                            </Button>
+                        </div>
+                    </div>
+                ),
+            },
+            {
+                id: 'end_datetime',
+                label: 'End Date & Time',
+                showDropdown: true,
+                active: Boolean(currentFilters.end_datetime),
+                activeLabel: currentFilters.end_datetime ? moment(currentFilters.end_datetime).format('MMM DD, YYYY') : undefined,
+                activeLabelOnly: true,
+                onClear: () => applyFilters({ ...currentFilters, end_datetime: '' }),
+                dropdownContent: ({ closeMenu }: { closeMenu: () => void }) => (
+                    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+                        <Form.Control
+                            size="sm"
+                            type="date"
+                            value={currentFilters.end_datetime ?? ''}
+                            onChange={(e) =>
+                                setCurrentFilters((prev) => ({
+                                    ...prev,
+                                    end_datetime: e.target.value,
+                                }))
+                            }
+                        />
+                        <div className="d-flex justify-content-end gap-2">
+                            <Button
+                                variant="outline-secondary"
+                                size="sm"
+                                onClick={() => closeMenu()}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => {
+                                    applyFilters({ ...currentFilters, end_datetime: currentFilters.end_datetime ?? '' });
+                                    closeMenu();
+                                }}
+                            >
+                                Apply
+                            </Button>
+                        </div>
+                    </div>
+                ),
+            },
         ],
         rightActions: (
             <div className="d-flex align-items-center gap-2">
@@ -473,6 +605,7 @@ const CallLogs = () => {
         tablePagination.rowsPerPage,
         fetchCallLogs,
         currentFilters,
+        appliedFilters,
         hierarchyDataExtensions,
         hierarchyDataDepartments,
         session?.user?.permissions,

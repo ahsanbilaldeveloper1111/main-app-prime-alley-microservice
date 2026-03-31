@@ -16,6 +16,7 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import VoicebotEditSidebar from "@components/VoiceBotEditSidebar";
 import "@assets/scss/common.scss";
 import { useSession } from "next-auth/react";
 
@@ -64,6 +65,9 @@ const VoicebotsPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedRow, setSelectedRow] = useState<VoicebotRow | null>(null);
+  const [editSidebarOpen, setEditSidebarOpen] = useState(false);
+  const [editBotId, setEditBotId] = useState("");
+  const [editCompanyId, setEditCompanyId] = useState("");
   const [trunks, setTrunks] = useState<Array<{ id: string; trunk_id?: string; name?: string }>>([]);
   const [trunksFetched, setTrunksFetched] = useState(false);
 
@@ -166,7 +170,11 @@ const VoicebotsPage = () => {
             size="sm"
             variant="outline-primary"
             className="icon-action-btn"
-            onClick={() => router.push(`/voicebot/outbound/voicebots/edit?id=${encodeURIComponent(botId(row))}&company_id=${encodeURIComponent(String(row.company_id ?? ""))}`)}
+            onClick={() => {
+              setEditBotId(botId(row));
+              setEditCompanyId(String(row.company_id ?? ""));
+              setEditSidebarOpen(true);
+            }}
           >
             <Pencil size={12} />
           </Button>
@@ -381,6 +389,14 @@ const VoicebotsPage = () => {
         itemName={selectedRow?.name}
         itemType="voice bot"
         loading={deleteLoading}
+      />
+
+      <VoicebotEditSidebar
+        isOpen={editSidebarOpen}
+        onClose={() => setEditSidebarOpen(false)}
+        botId={editBotId}
+        companyId={editCompanyId}
+        onSaved={() => fetchVoicebots()}
       />
     </React.Fragment>
   );
