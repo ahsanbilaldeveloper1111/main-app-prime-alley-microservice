@@ -57,12 +57,10 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
   leadId,
   onSuccess
 }) => {
-  const normalizeTemplateDataKey = (key: string): string =>
-    key
-      .trim()
-      .toLowerCase()
-      .replaceAll(/[^a-z0-9]+/g, "_")
-      .replaceAll(/^_+|_+$/g, "");
+  const normalizeTemplateDataKey = (key: string): string => {
+    const normalizedKey = key.trim().toLowerCase().replaceAll(/[^a-z0-9]+/g, "_");
+    return normalizedKey.replace(/^_+/, "").replace(/_+$/, "");
+  };
 
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);

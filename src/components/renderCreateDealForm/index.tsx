@@ -309,12 +309,10 @@ const parsePercent = (value: unknown): number => {
   return 0;
 };
 
-const normalizeTemplateDataKey = (key: string): string =>
-  key
-    .trim()
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, "_")
-    .replaceAll(/^_+|_+$/g, "");
+const normalizeTemplateDataKey = (key: string): string => {
+  const normalizedKey = key.trim().toLowerCase().replaceAll(/[^a-z0-9]+/g, "_");
+  return normalizedKey.replace(/^_+/, "").replace(/_+$/, "");
+};
 
 const mapEstimateChartToLineItems = (
   chart: EstimateChartItem[],
