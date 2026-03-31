@@ -21,7 +21,15 @@ import {
   Pencil,
   Trash2,
 } from "lucide-react";
-import { approveUserRequest, rejectUserRequest, updateUserRequest, type UserRequest, type UserRequestAttachment } from "@utils/staffManagement";
+import {
+  approveUserRequest,
+  getUserRequestApprovalInfo,
+  rejectUserRequest,
+  updateUserRequest,
+  type UserRequest,
+  type UserRequestAttachment,
+} from "@utils/staffManagement";
+
 
 interface ApprovalDetailSidebarProps {
   request: UserRequest;
@@ -49,6 +57,15 @@ interface RequestApprovalItem {
   approved_by_user_id: RequestUserIdentifier;
   approved_at: string | null;
   notes: string | null;
+}
+
+interface UserRequestApprovalInfo {
+  can_approve: boolean;
+  can_reject: boolean;
+  assignees_for_current_level: string[];
+  current_approval_level: string | number | null;
+  approval_rule?: string | null;
+  approve_in_order?: boolean | null;
 }
 
 interface AttachmentPreviewProps {
@@ -84,10 +101,11 @@ function formatDynamicFieldKey(rawKey: string): string {
 function formatDynamicFieldValue(value: unknown): string {
   if (value == null) return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "string") return value.trim() === "" ? "—" : value.trim();
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
   if (Array.isArray(value)) return value.length ? value.map(String).join(", ") : "—";
   if (typeof value === "object") return JSON.stringify(value);
-  const text = String(value).trim();
-  return text === "" ? "—" : text;
+  return "—";
 }
 
 function formatApprovalStatusLabel(status: string | null | undefined): string {
@@ -155,6 +173,11 @@ function isPhoneInAssignees(
 ): boolean {
   if (!sessionPhone) return false;
   return assignees.some((assignee) => String(assignee.user_id ?? "").trim() === sessionPhone);
+}
+
+function formatCurrentApprovalLevelLabel(level: string | number | null | undefined): string {
+  if (level == null) return "";
+  return ` (Level ${String(level)})`;
 }
 
 type SidebarSubmittingAction = "approve" | "reject" | "changes" | null;
@@ -352,6 +375,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
     message: string;
     onConfirm?: () => void;
   } | null>(null);
+  const [approvalInfo, setApprovalInfo] = useState<UserRequestApprovalInfo | null>(null);
 
   const openActionResultDialog = useCallback(
     (type: DialogVariant, title: string, message: string, closeOnConfirm = false) => {
@@ -371,6 +395,23 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
     },
     [onClose, onSuccess]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    getUserRequestApprovalInfo(request.id)
+      .then((data) => {
+        if (!cancelled) {
+          setApprovalInfo(data as UserRequestApprovalInfo);
+          console.log("[ApprovalDetailSidebar] approval-info:", data);
+        }
+      })
+      .catch(() => {
+        // Error toasts are already handled by API utility.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [request.id]);
 
   const created_at = (request as UserRequest & { created_at?: string }).created_at;
   const pendingApprovals: PendingApproval[] = [
@@ -495,19 +536,17 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   const attachments = request.attachments ?? [];
   const events = request.events ?? [];
   const dynamicFields = request.dynamic_fields && typeof request.dynamic_fields === "object" ? request.dynamic_fields : {};
-  const requestAssigneesRaw = (request as UserRequest & { assignees?: Array<{ user_id?: string | number | null }> }).assignees ?? [];
-  const sessionPhone = String((session?.user as { phone?: string | number } | undefined)?.phone ?? "").trim();
-  const isCurrentUserAssignee = isPhoneInAssignees(sessionPhone, requestAssigneesRaw);
   const approvalsByLevel = (
     (request as UserRequest & { approvals?: RequestApprovalItem[] }).approvals ?? []
   ).slice().sort((a, b) => Number(a.level) - Number(b.level));
-  const approverNames = requestAssigneesRaw
-    .map((assignee) => String(assignee.user_id ?? "").trim())
+  const approverNames = (approvalInfo?.assignees_for_current_level ?? [])
+    .map((userId) => String(userId ?? "").trim())
     .filter((userId) => userId !== "")
     .map((userId) => {
       const matchedUser = mainAppUsers.find((user) => String(user.phone ?? "").trim() === userId);
       return matchedUser?.name ?? userId;
     });
+  const currentLevelLabel = formatCurrentApprovalLevelLabel(approvalInfo?.current_approval_level);
   const statusDisplay = (request.status || "").toLowerCase();
   const isPending = statusDisplay === "pending";
 
@@ -733,7 +772,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           {approverNames.length > 0 && (
             <div style={{ marginBottom: "16px" }}>
               <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: "500", color: "#6b7280" }}>
-                Who can approve:
+                Who can approve{currentLevelLabel}:
               </div>
               <div
                 style={{
@@ -913,7 +952,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           {isPending ? (
             <>
          
-         {session?.user?.permissions?.includes('approve-request-approval-request-staff-management') && isCurrentUserAssignee && (
+         {session?.user?.permissions?.includes('approve-request-approval-request-staff-management') && approvalInfo?.can_approve === true && (
           <button
             type="button"
             onClick={handleApprove}
@@ -942,7 +981,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
           </button>
           )}
 
-          {session?.user?.permissions?.includes('reject-request-approval-request-staff-management') && isCurrentUserAssignee && (
+          {session?.user?.permissions?.includes('reject-request-approval-request-staff-management') && approvalInfo?.can_reject === true && (
           <button
             type="button"
             onClick={handleReject}

@@ -704,6 +704,19 @@ export const getUserRequest = async (id: number): Promise<UserRequest> => {
   }
 };
 
+export const getUserRequestApprovalInfo = async (
+  id: number
+): Promise<unknown> => {
+  try {
+    const response = await axiosInstance.get<ApiResponse<unknown>>(
+      `${PREFIX}/user-requests/${id}/approval-info`
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to fetch user request approval info");
+  }
+};
+
 export type UserRequestUpdateInput =
   | FormData
   | (UserRequestUpdatePayload & {
