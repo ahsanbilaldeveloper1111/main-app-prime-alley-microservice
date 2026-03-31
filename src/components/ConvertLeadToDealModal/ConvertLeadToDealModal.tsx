@@ -59,7 +59,18 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
 }) => {
   const normalizeTemplateDataKey = (key: string): string => {
     const normalizedKey = key.trim().toLowerCase().replaceAll(/[^a-z0-9]+/g, "_");
-    return normalizedKey.replace(/^_+/, "").replace(/_+$/, "");
+    let start = 0;
+    let end = normalizedKey.length;
+
+    while (start < end && normalizedKey[start] === "_") {
+      start += 1;
+    }
+
+    while (end > start && normalizedKey[end - 1] === "_") {
+      end -= 1;
+    }
+
+    return normalizedKey.slice(start, end);
   };
 
   const { data: session } = useSession();
