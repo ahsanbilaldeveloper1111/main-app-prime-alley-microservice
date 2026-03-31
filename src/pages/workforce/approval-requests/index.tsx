@@ -40,7 +40,7 @@ import {
   findMainAppUserByRequestUserId,
   getUserDisplayNameFromLookup,
   type UserRequestIdValue,
-} from "./userLookup";
+} from "@utils/workforceApprovalRequestsUserLookup";
 
 const TAB_TO_STATUS: Record<string, string> = {
   Pending: "pending",

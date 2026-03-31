@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { Button, Modal } from "react-bootstrap";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
-import { getUserDisplayNameFromLookup, type UserRequestIdValue } from "./userLookup";
+import { getUserDisplayNameFromLookup, type UserRequestIdValue } from "@utils/workforceApprovalRequestsUserLookup";
 import { useSession } from "next-auth/react";
 import {
   X,
