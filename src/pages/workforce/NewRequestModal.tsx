@@ -36,6 +36,40 @@ type CreateFormState = {
   attachments: File[];
 };
 
+const getFieldKey = (field: UserRequestCategoryField): string | null => {
+  const key = field.key?.trim();
+  return key ?? null;
+};
+
+const getStringValue = (values: Record<string, unknown>, key: string): string => {
+  const value = values[key];
+  return typeof value === "string" ? value : "";
+};
+
+const getStringArrayValue = (values: Record<string, unknown>, key: string): string[] => {
+  const value = values[key];
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+};
+
+const getBooleanValue = (values: Record<string, unknown>, key: string): boolean => Boolean(values[key]);
+
+const isAttachmentField = (fieldType: string): boolean => fieldType === "file" || fieldType === "attachment";
+
+const getBasicInputType = (fieldType: string): "number" | "date" | "text" => {
+  if (fieldType === "number") return "number";
+  if (fieldType === "date") return "date";
+  return "text";
+};
+
 const defaultForm: CreateFormState = {
   user_request_category_id: "",
   subject: "",
@@ -45,6 +79,157 @@ const defaultForm: CreateFormState = {
   dynamic_fields: {},
   dynamic_files: {},
   attachments: [],
+};
+
+type DynamicFieldInputProps = {
+  field: UserRequestCategoryField;
+  dynamicFields: Record<string, unknown>;
+  onDynamicFieldChange: (key: string, value: unknown) => void;
+  onDynamicFileChange: (key: string, file: File | null) => void;
+};
+
+const DynamicFieldInput: React.FC<DynamicFieldInputProps> = ({
+  field,
+  dynamicFields,
+  onDynamicFieldChange,
+  onDynamicFileChange,
+}) => {
+  const key = getFieldKey(field);
+  if (!key) return null;
+
+  if (field.type === "textarea") {
+    return (
+      <Form.Control
+        as="textarea"
+        rows={2}
+        value={getStringValue(dynamicFields, key)}
+        onChange={(e) => onDynamicFieldChange(key, e.target.value)}
+        placeholder={field.config?.placeholder ?? undefined}
+      />
+    );
+  }
+
+  if (isAttachmentField(field.type)) {
+    return (
+      <Form.Control
+        type="file"
+        onChange={(e) => {
+          const file = (e.target as HTMLInputElement).files?.[0] ?? null;
+          onDynamicFileChange(key, file);
+        }}
+      />
+    );
+  }
+
+  if (field.type === "select") {
+    return (
+      <Form.Select value={getStringValue(dynamicFields, key)} onChange={(e) => onDynamicFieldChange(key, e.target.value)}>
+        <option value="">Select...</option>
+        {(field.options ?? []).map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </Form.Select>
+    );
+  }
+
+  if (field.type === "multiselect") {
+    return (
+      <Form.Select
+        multiple
+        value={getStringArrayValue(dynamicFields, key)}
+        onChange={(e) => {
+          const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, (option) => option.value);
+          onDynamicFieldChange(key, selected);
+        }}
+      >
+        {(field.options ?? []).map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </Form.Select>
+    );
+  }
+
+  if (field.type === "radio") {
+    return (
+      <div className="d-flex flex-wrap gap-2">
+        {(field.options ?? []).map((opt) => (
+          <Form.Check
+            key={opt.value}
+            type="radio"
+            id={`${key}-${opt.value}`}
+            name={key}
+            label={opt.label}
+            value={opt.value}
+            checked={getStringValue(dynamicFields, key) === opt.value}
+            onChange={() => onDynamicFieldChange(key, opt.value)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (field.type === "checkbox") {
+    const selectedValues = getStringArrayValue(dynamicFields, key);
+    return (
+      <div className="d-flex flex-wrap gap-2">
+        {(field.options ?? []).map((opt) => {
+          const checked = selectedValues.includes(opt.value);
+          return (
+            <Form.Check
+              key={opt.value}
+              type="checkbox"
+              id={`${key}-${opt.value}`}
+              label={opt.label}
+              checked={checked}
+              onChange={() => {
+                const nextValues = checked
+                  ? selectedValues.filter((value) => value !== opt.value)
+                  : [...selectedValues, opt.value];
+                onDynamicFieldChange(key, nextValues);
+              }}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (field.type === "boolean") {
+    return (
+      <Form.Check
+        type="checkbox"
+        id={`${key}-boolean`}
+        label={field.config?.help_text ?? "Yes / No"}
+        checked={getBooleanValue(dynamicFields, key)}
+        onChange={(e) => onDynamicFieldChange(key, e.target.checked)}
+      />
+    );
+  }
+
+  if (field.type === "toggle") {
+    return (
+      <Form.Check
+        type="switch"
+        id={`${key}-toggle`}
+        label={field.config?.help_text ?? "Enable"}
+        checked={getBooleanValue(dynamicFields, key)}
+        onChange={(e) => onDynamicFieldChange(key, e.target.checked)}
+      />
+    );
+  }
+
+  return (
+    <Form.Control
+      type={getBasicInputType(field.type)}
+      value={getStringValue(dynamicFields, key)}
+      onChange={(e) => onDynamicFieldChange(key, e.target.value)}
+      placeholder={field.config?.placeholder ?? undefined}
+    />
+  );
 };
 
 const NewRequestModal: React.FC<NewRequestModalProps> = ({
@@ -140,26 +325,45 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const subCategories = selectedParent?.children ?? [];
   const hasSubCategories = subCategories.length > 0;
   /** Category id whose fields to show: effective (child/parent) when set, else selected parent when it has children */
-  const displayFieldsCategoryId =
-    effectiveCategoryId !== ""
-      ? Number(effectiveCategoryId)
-      : hasSubCategories && selectedParentId !== ""
-        ? Number(selectedParentId)
-        : null;
-  const displayFields = displayFieldsCategoryId != null ? (categoryFields[displayFieldsCategoryId] ?? []) : [];
-  const isLoadingDisplayFields =
-    displayFieldsCategoryId != null &&
-    (displayFieldsCategoryId === Number(effectiveCategoryId) ? loadingFields : categoryFields[displayFieldsCategoryId] === undefined);
+  const getDisplayFieldsCategoryId = (): number | null => {
+    if (effectiveCategoryId !== "") {
+      return Number(effectiveCategoryId);
+    }
+    if (hasSubCategories && selectedParentId === "") {
+      return null;
+    }
+    if (hasSubCategories) {
+      return Number(selectedParentId);
+    }
+    return null;
+  };
+  const displayFieldsCategoryId = getDisplayFieldsCategoryId();
+  const hasDisplayFieldsCategory = displayFieldsCategoryId !== null;
+  const displayFields = hasDisplayFieldsCategory ? (categoryFields[displayFieldsCategoryId] ?? []) : [];
+  const getIsLoadingDisplayFields = (): boolean => {
+    if (!hasDisplayFieldsCategory) {
+      return false;
+    }
+    if (displayFieldsCategoryId === Number(effectiveCategoryId)) {
+      return loadingFields;
+    }
+    return categoryFields[displayFieldsCategoryId] === undefined;
+  };
+  const isLoadingDisplayFields = getIsLoadingDisplayFields();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const categoryId =
-      form.user_request_category_id !== ""
-        ? form.user_request_category_id
-        : hasSubCategories
-          ? selectedParentId
-          : "";
-    if (categoryId === "" || !form.subject.trim()) {
+    const categoryId = (() => {
+      if (form.user_request_category_id !== "") {
+        return form.user_request_category_id;
+      }
+      if (hasSubCategories) {
+        return selectedParentId;
+      }
+      return "";
+    })();
+    const hasSubject = form.subject.trim().length > 0;
+    if (categoryId === "" || hasSubject === false) {
       toast.error("Category and subject are required");
       return;
     }
@@ -193,6 +397,20 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDynamicFieldChange = (key: string, value: unknown) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      dynamic_fields: { ...currentForm.dynamic_fields, [key]: value },
+    }));
+  };
+
+  const handleDynamicFileChange = (key: string, file: File | null) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      dynamic_files: { ...currentForm.dynamic_files, [key]: file },
+    }));
   };
 
   return (
@@ -310,129 +528,12 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                       {field.label ?? field.key}
                       {field.required && " *"}
                     </Form.Label>
-                    {field.type === "textarea" ? (
-                      <Form.Control
-                        as="textarea"
-                        rows={2}
-                        value={(form.dynamic_fields[field.key ?? ""] as string) ?? ""}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: e.target.value },
-                          }))
-                        }
-                        placeholder={field.config?.placeholder ?? undefined}
-                      />
-                    ) : field.type === "file" || (field as { type: string }).type === "attachment" ? (
-                      <Form.Control
-                        type="file"
-                        onChange={(e) => {
-                          const file = (e.target as HTMLInputElement).files?.[0] ?? null;
-                          setForm((f) => ({
-                            ...f,
-                            dynamic_files: { ...f.dynamic_files, [field.key ?? ""]: file },
-                          }));
-                        }}
-                      />
-                    ) : field.type === "select" ? (
-                      <Form.Select
-                        value={(form.dynamic_fields[field.key ?? ""] as string) ?? ""}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: e.target.value },
-                          }))
-                        }
-                      >
-                        <option value="">Select...</option>
-                        {(field.options ?? []).map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </Form.Select>
-                    ) : field.type === "multiselect" ? (
-                      <Form.Select
-                        multiple
-                        value={
-                          Array.isArray(form.dynamic_fields[field.key ?? ""])
-                            ? (form.dynamic_fields[field.key ?? ""] as string[])
-                            : typeof form.dynamic_fields[field.key ?? ""] === "string"
-                              ? (form.dynamic_fields[field.key ?? ""] as string).split(",").filter(Boolean)
-                              : []
-                        }
-                        onChange={(e) => {
-                          const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, (o) => o.value);
-                          setForm((f) => ({
-                            ...f,
-                            dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: selected },
-                          }));
-                        }}
-                      >
-                        {(field.options ?? []).map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </Form.Select>
-                    ) : field.type === "radio" ? (
-                      <div className="d-flex flex-wrap gap-2">
-                        {(field.options ?? []).map((opt) => (
-                          <Form.Check
-                            key={opt.value}
-                            type="radio"
-                            id={`${field.key}-${opt.value}`}
-                            name={field.key ?? ""}
-                            label={opt.label}
-                            value={opt.value}
-                            checked={(form.dynamic_fields[field.key ?? ""] as string) === opt.value}
-                            onChange={() =>
-                              setForm((f) => ({
-                                ...f,
-                                dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: opt.value },
-                              }))
-                            }
-                          />
-                        ))}
-                      </div>
-                    ) : field.type === "checkbox" ? (
-                      <div className="d-flex flex-wrap gap-2">
-                        {(field.options ?? []).map((opt) => {
-                          const arr = (Array.isArray(form.dynamic_fields[field.key ?? ""])
-                            ? (form.dynamic_fields[field.key ?? ""] as string[])
-                            : []) as string[];
-                          const checked = arr.includes(opt.value);
-                          return (
-                            <Form.Check
-                              key={opt.value}
-                              type="checkbox"
-                              id={`${field.key}-${opt.value}`}
-                              label={opt.label}
-                              checked={checked}
-                              onChange={() => {
-                                const next = checked ? arr.filter((v) => v !== opt.value) : [...arr, opt.value];
-                                setForm((f) => ({
-                                  ...f,
-                                  dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: next },
-                                }));
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <Form.Control
-                        type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
-                        value={(form.dynamic_fields[field.key ?? ""] as string) ?? ""}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            dynamic_fields: { ...f.dynamic_fields, [field.key ?? ""]: e.target.value },
-                          }))
-                        }
-                        placeholder={field.config?.placeholder ?? undefined}
-                      />
-                    )}
+                    <DynamicFieldInput
+                      field={field}
+                      dynamicFields={form.dynamic_fields}
+                      onDynamicFieldChange={handleDynamicFieldChange}
+                      onDynamicFileChange={handleDynamicFileChange}
+                    />
                   </div>
                 ))
                 )}
