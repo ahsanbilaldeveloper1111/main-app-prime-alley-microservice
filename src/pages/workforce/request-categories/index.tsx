@@ -172,7 +172,7 @@ type CategoryFormState = UserRequestCategoryPayload & { workflow_levels?: Workfl
 
 type AssigneesListProps = Readonly<{
   assignees: WorkflowLevelAssignee[];
-  mainAppUsers: { id: number; name: string }[];
+  mainAppUsers: { id: number; name: string; phone: string }[];
   levelIndex: number;
   categoryForm: CategoryFormState;
   setCategoryForm: React.Dispatch<React.SetStateAction<CategoryFormState>>;
@@ -216,7 +216,9 @@ function AssigneesList({ assignees, mainAppUsers, levelIndex, categoryForm, setC
     setDraggedIndex(null);
   };
 
-  const userOptions = mainAppUsers.map((u) => ({ value: String(u.id), label: u.name ?? String(u.id) }));
+  const userOptions = mainAppUsers
+    .filter((u) => (u.phone ?? "").trim() !== "")
+    .map((u) => ({ value: String(u.phone).trim(), label: u.name ? `${u.name} (${u.phone})` : String(u.phone) }));
 
   return (
     <ul className="list-unstyled d-flex flex-column gap-2 mb-0" aria-label="Workflow assignees">
@@ -247,7 +249,12 @@ function AssigneesList({ assignees, mainAppUsers, levelIndex, categoryForm, setC
               value={
                 assignee.user_id
                   ? (() => {
-                      const u = mainAppUsers.find((x) => String(x.id) === assignee.user_id);
+                      const u = mainAppUsers.find(
+                        (x) => String(x.phone ?? "").trim() === assignee.user_id || String(x.id) === assignee.user_id
+                      );
+                      if (u && (u.phone ?? "").trim() !== "") {
+                        return { value: String(u.phone).trim(), label: u.name ? `${u.name} (${u.phone})` : String(u.phone) };
+                      }
                       return { value: assignee.user_id, label: u?.name ?? assignee.user_id };
                     })()
                   : null
@@ -288,7 +295,7 @@ type WorkflowLevelRowProps = Readonly<{
   idx: number;
   categoryForm: CategoryFormState;
   setCategoryForm: React.Dispatch<React.SetStateAction<CategoryFormState>>;
-  mainAppUsers: { id: number; name: string }[];
+  mainAppUsers: { id: number; name: string; phone: string }[];
 }>;
 
 function WorkflowLevelRow({ lvl, idx, categoryForm, setCategoryForm, mainAppUsers }: WorkflowLevelRowProps) {
@@ -395,7 +402,7 @@ function WorkflowLevelRow({ lvl, idx, categoryForm, setCategoryForm, mainAppUser
 type SubCategoryWorkflowFormProps = Readonly<{
   categoryForm: CategoryFormState;
   setCategoryForm: React.Dispatch<React.SetStateAction<CategoryFormState>>;
-  mainAppUsers: { id: number; name: string }[];
+  mainAppUsers: { id: number; name: string; phone: string }[];
 }>;
 
 function SubCategoryWorkflowForm({ categoryForm, setCategoryForm, mainAppUsers }: SubCategoryWorkflowFormProps) {
@@ -503,11 +510,12 @@ const RequestCategories = () => {
   const [showDeleteFieldModal, setShowDeleteFieldModal] = useState(false);
   const [fieldPendingDelete, setFieldPendingDelete] = useState<UserRequestCategoryField | null>(null);
   const [deletingField, setDeletingField] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
 
   const loadCategories = useCallback(async (page = 1, limit = 10) => {
     setLoading(true);
     try {
-      const { data, pagination: p } = await getUserRequestCategories({ page, limit, parent_id: null, children: false });
+      const { data, pagination: p } = await getUserRequestCategories({ page, limit, parent_id: null, children: false, search: searchValue });
       setCategories(data);
       if (p) setPagination({ page: p.page, limit: p.limit, total: p.total, last_page: p.last_page });
       else setPagination(null);
@@ -518,10 +526,10 @@ const RequestCategories = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [searchValue]);
 
   useEffect(() => {
-    loadCategories();
+    loadCategories(1, pagination?.limit ?? 10);
   }, [loadCategories]);
 
   const loadChildren = useCallback(async (parentId: number) => {
@@ -574,6 +582,11 @@ const RequestCategories = () => {
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
+    const trimmedName = categoryForm.name?.trim() ?? "";
+    if (!trimmedName) {
+      toast.error("Category name is required.");
+      return;
+    }
     const isSubCategory = categoryForm.parent_id != null && categoryForm.parent_id !== 0;
     const workflowLevels = categoryForm.workflow_levels ?? [];
     if (isSubCategory && (!workflowLevels.length || workflowLevels.every((lvl) => !(lvl.assignees ?? []).filter((a) => (a.user_id ?? "").trim()).length))) {
@@ -581,7 +594,7 @@ const RequestCategories = () => {
       return;
     }
     const payload: UserRequestCategoryPayload = {
-      name: categoryForm.name?.trim() || undefined,
+      name: trimmedName,
       code: categoryForm.code?.trim() || undefined,
       description: categoryForm.description?.trim() || undefined,
       is_active: categoryForm.is_active,
@@ -661,6 +674,7 @@ const RequestCategories = () => {
 
   const openAddField = () => {
     setEditingField(null);
+    setAutoGenerateKey(true);
     setFieldForm({
       key: "",
       label: "",
@@ -704,24 +718,31 @@ const RequestCategories = () => {
     setShowFieldModal(true);
   };
 
-  const generateKeyFromLabel = () => {
-    setFieldForm((f) => ({ ...f, key: slugifyForKey(f.label) }));
-  };
-
   const handleSaveField = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fieldsCategoryId) return;
-    if (!fieldForm.key?.trim() || !fieldForm.label?.trim()) {
-      toast.error("Key and label are required");
+    const trimmedLabel = fieldForm.label?.trim() ?? "";
+    if (!trimmedLabel) {
+      toast.error("Label is required");
+      return;
+    }
+    const generatedKey = slugifyForKey(trimmedLabel);
+    const payloadForSave: UserRequestCategoryFieldPayload = {
+      ...fieldForm,
+      label: trimmedLabel,
+      key: fieldForm.key?.trim() || generatedKey,
+    };
+    if (!payloadForSave.key) {
+      toast.error("Failed to generate field key from label");
       return;
     }
     setSavingField(true);
     try {
       if (editingField) {
-        await updateUserRequestCategoryField(fieldsCategoryId, editingField.id, fieldForm);
+        await updateUserRequestCategoryField(fieldsCategoryId, editingField.id, payloadForSave);
         toast.success("Field updated");
       } else {
-        await createUserRequestCategoryField(fieldsCategoryId, fieldForm);
+        await createUserRequestCategoryField(fieldsCategoryId, payloadForSave);
         toast.success("Field added");
       }
       setShowFieldModal(false);
@@ -790,12 +811,6 @@ const RequestCategories = () => {
           {
             key: "name",
             label: "Name",
-            type: "text",
-            emptyValue: "—",
-          },
-          {
-            key: "code",
-            label: "Code",
             type: "text",
             emptyValue: "—",
           },
@@ -897,7 +912,7 @@ const RequestCategories = () => {
               </div>
             ),
           },
-          { key: "key", label: "Key", type: "text" },
+          
           { key: "label", label: "Label", type: "text" },
           { key: "type", label: "Type", type: "text" },
           {
@@ -939,7 +954,10 @@ const RequestCategories = () => {
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Request Categories" />
       <PageHeader
         title=""
-        showSearch={false}
+        showSearch={true}
+        searchPlaceholder="Search categories..."
+        searchValue={searchValue}
+        onSearchChange={(value) => setSearchValue(value)}
         buttons={
           <>
           {session?.user?.permissions?.includes(MANAGE_REQUEST_CATEGORIES_PERMISSION) && (
@@ -961,12 +979,7 @@ const RequestCategories = () => {
             type: "text",
             emptyValue: "—",
           },
-          {
-            key: "code",
-            label: "Code",
-            type: "text",
-            emptyValue: "—",
-          },
+         
           {
             key: "description",
             label: "Description",
@@ -1038,31 +1051,20 @@ const RequestCategories = () => {
             <div className="row g-3">
               <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label>Name (optional)</Form.Label>
+                  <Form.Label>Name <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="text"
                     value={categoryForm.name ?? ""}
                     onChange={(e) => setCategoryForm((f) => ({ ...f, name: e.target.value }))}
+                    required
                     placeholder="e.g. Leave Request"
                   />
                 </Form.Group>
               </div>
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Code (optional)</Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={categoryForm.code ?? ""}
-                    onChange={(e) => setCategoryForm((f) => ({ ...f, code: e.target.value || undefined }))}
-                    placeholder="e.g. LEAVE"
-                  />
-                </Form.Group>
-              </div>
-              
               
               <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label>Status</Form.Label>
+                  <Form.Label>Status <span className="text-danger">*</span></Form.Label>
                   <Form.Select
                     value={categoryForm.is_active === false ? "false" : "true"}
                     onChange={(e) => setCategoryForm((f) => ({ ...f, is_active: e.target.value === "true" }))}
@@ -1072,18 +1074,8 @@ const RequestCategories = () => {
                   </Form.Select>
                 </Form.Group>
               </div>
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Sort order</Form.Label>
-                  <Form.Control
-                    type="number"
-                    min={0}
-                    value={categoryForm.sort_order ?? 0}
-                    onChange={(e) => setCategoryForm((f) => ({ ...f, sort_order: Number.parseInt(String(e.target.value), 10) || 0 }))}
-                  />
-                </Form.Group>
-              </div>
-             
+              
+              
              
               {categoryForm.parent_id != null && categoryForm.parent_id !== 0 && (
                 <SubCategoryWorkflowForm
@@ -1246,40 +1238,10 @@ const RequestCategories = () => {
         <Form onSubmit={handleSaveField}>
           <Modal.Body>
             <div className="row g-3">
+              
               <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label>Key *</Form.Label>
-                  <div className="input-group">
-                    <Form.Control
-                      type="text"
-                      value={fieldForm.key}
-                      onChange={(e) => setFieldForm((f) => ({ ...f, key: e.target.value }))}
-                      placeholder="e.g. doc_type"
-                      required
-                      pattern="^[A-Za-z][A-Za-z0-9_]*$"
-                      title="Letters, numbers, underscore only; must start with a letter"
-                      disabled={!!editingField}
-                    />
-                    <Button type="button" variant="outline-secondary" onClick={generateKeyFromLabel} disabled={!!editingField}>
-                      Generate
-                    </Button>
-                  </div>
-                  <Form.Text className="text-muted small">Letters/numbers/underscore only.</Form.Text>
-                  <div className="mt-2">
-                    <Form.Check
-                      type="switch"
-                      id="auto-generate-key"
-                      label="Auto-generate key from label"
-                      checked={autoGenerateKey}
-                      onChange={(e) => setAutoGenerateKey(e.target.checked)}
-                      disabled={!!editingField}
-                    />
-                  </div>
-                </Form.Group>
-              </div>
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Label *</Form.Label>
+                  <Form.Label>Label <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="text"
                     value={fieldForm.label}
@@ -1310,9 +1272,9 @@ const RequestCategories = () => {
                   </Form.Select>
                 </Form.Group>
               </div>
-              <div className="col-md-3">
+              <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label>Required</Form.Label>
+                  <Form.Label>Is Required</Form.Label>
                   <Form.Select
                     value={fieldForm.required === true ? "true" : "false"}
                     onChange={(e) => setFieldForm((f) => ({ ...f, required: e.target.value === "true" }))}
@@ -1322,18 +1284,7 @@ const RequestCategories = () => {
                   </Form.Select>
                 </Form.Group>
               </div>
-              <div className="col-md-3">
-                <Form.Group>
-                  <Form.Label>Sort</Form.Label>
-                  <Form.Control
-                    type="number"
-                    value={fieldForm.sort_order ?? 0}
-                    onChange={(e) =>
-                      setFieldForm((f) => ({ ...f, sort_order: Number.parseInt(String(e.target.value), 10) || 0 }))
-                    }
-                  />
-                </Form.Group>
-              </div>
+              
               <div className="col-md-6">
                 <Form.Group>
                   <Form.Label>Active</Form.Label>

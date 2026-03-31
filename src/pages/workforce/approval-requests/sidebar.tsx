@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { Button, Modal } from "react-bootstrap";
+import { Modal } from "react-bootstrap";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { getUserDisplayNameFromLookup, type UserRequestIdValue } from "@utils/workforceApprovalRequestsUserLookup";
 import { useSession } from "next-auth/react";
@@ -18,11 +18,10 @@ import {
   Edit3,
   UserPlus,
   File,
-  ExternalLink,
   Pencil,
   Trash2,
 } from "lucide-react";
-import { updateUserRequest, type UserRequest, type UserRequestAttachment } from "@utils/staffManagement";
+import { approveUserRequest, rejectUserRequest, updateUserRequest, type UserRequest, type UserRequestAttachment } from "@utils/staffManagement";
 
 interface ApprovalDetailSidebarProps {
   request: UserRequest;
@@ -40,19 +39,27 @@ interface PendingApproval {
   color: string;
 }
 
-interface HistoryItem {
-  id: string;
-  avatar: string;
-  name: string;
-  action: string;
-  timestamp: string;
+interface RequestApprovalItem {
+  id: number;
+  level: string | number;
+  status: string | null;
+  approved_by_user_id: string | number | null;
+  approved_at: string | null;
+  notes: string | null;
+}
+
+interface AttachmentPreviewProps {
+  readonly att: UserRequestAttachment;
+  readonly downloadAttachment: (id: number) => Promise<Blob>;
 }
 
 function formatEventDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
     const d = new Date(iso);
-    return isNaN(d.getTime()) ? "—" : d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+    return Number.isNaN(d.getTime())
+      ? "—"
+      : d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
   } catch {
     return "—";
   }
@@ -62,13 +69,40 @@ function isImageMime(mime: string | null | undefined): boolean {
   return Boolean(mime?.startsWith("image/"));
 }
 
-function AttachmentPreview({
-  att,
-  downloadAttachment,
-}: {
-  att: UserRequestAttachment;
-  downloadAttachment: (id: number) => Promise<Blob>;
-}) {
+function formatDynamicFieldKey(rawKey: string): string {
+  return String(rawKey ?? "")
+    .replaceAll("_", " ")
+    .trim()
+    .split(/\s+/)
+    .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : ""))
+    .join(" ");
+}
+
+function formatDynamicFieldValue(value: unknown): string {
+  if (value == null) return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) return value.length ? value.map(String).join(", ") : "—";
+  if (typeof value === "object") return JSON.stringify(value);
+  const text = String(value).trim();
+  return text === "" ? "—" : text;
+}
+
+function formatApprovalStatusLabel(status: string | null | undefined): string {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (normalized === "pending") return "Pending";
+  if (normalized === "approved") return "Approved";
+  if (normalized === "rejected") return "Rejected";
+  if (!normalized) return "Unknown";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function getApprovalStatusPillStyle(status: string): { bg: string; color: string } {
+  if (status === "approved") return { bg: "#dcfce7", color: "#166534" };
+  if (status === "rejected") return { bg: "#fee2e2", color: "#991b1b" };
+  return { bg: "#f3f4f6", color: "#4b5563" };
+}
+
+function AttachmentPreview({ att, downloadAttachment }: AttachmentPreviewProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const isImage = isImageMime(att.mime_type);
@@ -95,11 +129,9 @@ function AttachmentPreview({
   if (isImage && imageUrl) {
     return (
       <>
-        <div
-          role="button"
-          tabIndex={0}
+        <button
+          type="button"
           onClick={() => setShowImageModal(true)}
-          onKeyDown={(e) => e.key === "Enter" && setShowImageModal(true)}
           style={{
             width: "56px",
             height: "56px",
@@ -108,7 +140,10 @@ function AttachmentPreview({
             flexShrink: 0,
             backgroundColor: "#f3f4f6",
             cursor: "pointer",
+            border: "none",
+            padding: 0,
           }}
+          aria-label={`Preview attachment ${att.original_name || "image"}`}
         >
           <img
             src={imageUrl}
@@ -120,7 +155,7 @@ function AttachmentPreview({
               display: "block",
             }}
           />
-        </div>
+        </button>
         <Modal
           show={showImageModal}
           onHide={() => setShowImageModal(false)}
@@ -185,6 +220,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
 
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submittingAction, setSubmittingAction] = useState<"approve" | "reject" | "changes" | null>(null);
   const maxCommentLength = 500;
   const [showDialog, setShowDialog] = useState(false);
   const [dialogConfig, setDialogConfig] = useState<{
@@ -212,9 +248,25 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
       setShowDialog(true);
       return;
     }
+    const extensionNumber = String((session?.user as { phone?: string | number } | undefined)?.phone ?? "").trim();
+    if (!extensionNumber) {
+      setDialogConfig({
+        type: "error",
+        title: "Missing Extension",
+        message: "Current user phone/extension is required to approve this request.",
+      });
+      setShowDialog(true);
+      return;
+    }
+    const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setSubmitting(true);
+    setSubmittingAction("approve");
     try {
-      await updateUserRequest(request.id, { status: "approved", comment: comment.trim() });
+      await approveUserRequest(request.id, {
+        extension_number: extensionNumber,
+        notes: comment.trim(),
+        timezone: currentTimezone,
+      });
       toast.success("Request approved");
       setDialogConfig({
         type: "success",
@@ -236,6 +288,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
       setShowDialog(true);
     } finally {
       setSubmitting(false);
+      setSubmittingAction(null);
     }
   };
 
@@ -249,9 +302,25 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
       setShowDialog(true);
       return;
     }
+    const extensionNumber = String((session?.user as { phone?: string | number } | undefined)?.phone ?? "").trim();
+    if (!extensionNumber) {
+      setDialogConfig({
+        type: "error",
+        title: "Missing Extension",
+        message: "Current user phone/extension is required to reject this request.",
+      });
+      setShowDialog(true);
+      return;
+    }
+    const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setSubmitting(true);
+    setSubmittingAction("reject");
     try {
-      await updateUserRequest(request.id, { status: "rejected", comment: comment.trim() });
+      await rejectUserRequest(request.id, {
+        notes: comment.trim(),
+        timezone: currentTimezone,
+        extension_number: extensionNumber,
+      });
       toast.success("Request rejected");
       setDialogConfig({
         type: "error",
@@ -273,6 +342,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
       setShowDialog(true);
     } finally {
       setSubmitting(false);
+      setSubmittingAction(null);
     }
   };
 
@@ -287,6 +357,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
       return;
     }
     setSubmitting(true);
+    setSubmittingAction("changes");
     try {
       await updateUserRequest(request.id, { status: "pending", comment: comment.trim() });
       toast.success("Changes requested");
@@ -310,6 +381,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
       setShowDialog(true);
     } finally {
       setSubmitting(false);
+      setSubmittingAction(null);
     }
   };
 
@@ -322,23 +394,12 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
       a.download = att.original_name || "attachment";
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
       toast.success("Download started");
     } catch {
       toast.error("Download failed");
     }
-  };
-
-  const handleOpenAttachment = (att: UserRequestAttachment) => {
-    handleDownloadAttachment(att).then(() => {
-      setDialogConfig({
-        type: "success",
-        title: "Opening Document",
-        message: "The document has been downloaded.",
-      });
-      setShowDialog(true);
-    });
   };
 
   const closeDialog = () => {
@@ -361,8 +422,34 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
   const attachments = request.attachments ?? [];
   const events = request.events ?? [];
   const dynamicFields = request.dynamic_fields && typeof request.dynamic_fields === "object" ? request.dynamic_fields : {};
+  const requestAssigneesRaw = (request as UserRequest & { assignees?: Array<{ user_id?: string | number | null }> }).assignees ?? [];
+  const approvalsByLevel = (
+    (request as UserRequest & { approvals?: RequestApprovalItem[] }).approvals ?? []
+  ).slice().sort((a, b) => Number(a.level) - Number(b.level));
+  const approverNames = requestAssigneesRaw
+    .map((assignee) => String(assignee.user_id ?? "").trim())
+    .filter((userId) => userId !== "")
+    .map((userId) => {
+      const matchedUser = mainAppUsers.find((user) => String(user.phone ?? "").trim() === userId);
+      return matchedUser?.name ?? userId;
+    });
   const statusDisplay = (request.status || "").toLowerCase();
   const isPending = statusDisplay === "pending";
+  const getDialogTypeBgColor = (type: "success" | "error" | "warning"): string => {
+    if (type === "success") return "#d1fae5";
+    if (type === "error") return "#fee2e2";
+    return "#fef3c7";
+  };
+
+  const getEventView = (eventType: string): { bgColor: string; avatarBgColor: string; icon: React.ReactNode } => {
+    if (eventType === "approved") {
+      return { bgColor: "#d1fae5", avatarBgColor: "#10b981", icon: <CheckCircle size={20} /> };
+    }
+    if (eventType === "rejected") {
+      return { bgColor: "#fee2e2", avatarBgColor: "#ef4444", icon: <XCircle size={20} /> };
+    }
+    return { bgColor: "#f9fafb", avatarBgColor: "#6b7280", icon: <Edit3 size={20} /> };
+  };
 
   return (
     <div style={{
@@ -568,6 +655,8 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             )}
           </div>
 
+          
+
           <div style={{
             display: "flex",
             gap: "12px",
@@ -581,15 +670,151 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             </div>
           </div>
 
+          {approverNames.length > 0 && (
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: "500", color: "#6b7280" }}>
+                Who can approve:
+              </div>
+              <div
+                style={{
+                  padding: "10px",
+                  backgroundColor: "#f9fafb",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                }}
+              >
+                {approverNames.map((name) => (
+                  <span
+                    key={name}
+                    style={{
+                      padding: "5px 10px",
+                      borderRadius: "999px",
+                      backgroundColor: "#eef2ff",
+                      border: "1px solid #e0e7ff",
+                      color: "#3730a3",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {approvalsByLevel.length > 0 && (
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: "500", color: "#6b7280" }}>
+                Who has approved
+              </div>
+              <div
+                style={{
+                  padding: "10px 12px",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  fontSize: "13px",
+                  color: "#374151",
+                }}
+              >
+                {approvalsByLevel.map((approval, idx, arr) => {
+                  const statusNormalized = String(approval.status ?? "").toLowerCase();
+                  const isPending = statusNormalized === "pending";
+                  const statusPillStyle = getApprovalStatusPillStyle(statusNormalized);
+                  const approvedBy =
+                    approval.approved_by_user_id == null ? "-" : getDisplayName(approval.approved_by_user_id);
+                  return (
+                    <div
+                      key={approval.id}
+                      style={{
+                        padding: "8px 0",
+                        borderBottom: idx < arr.length - 1 ? "1px solid #e5e7eb" : "none",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "4px" }}>
+                        <strong style={{ color: "#374151" }}>Level {String(approval.level)}</strong>
+                        <span
+                          style={{
+                            backgroundColor: statusPillStyle.bg,
+                            color: statusPillStyle.color,
+                            borderRadius: "999px",
+                            padding: "2px 8px",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {formatApprovalStatusLabel(approval.status)}
+                        </span>
+                      </div>
+                      {!isPending && <div style={{ color: "#111827", fontWeight: 500 }}>By: {approvedBy}</div>}
+                      {!isPending && approval.approved_at && (
+                        <div style={{ color: "#6b7280" }}>At: {formatEventDate(approval.approved_at)}</div>
+                      )}
+                      {!isPending && approval.notes && <div style={{ color: "#6b7280" }}>Note: {approval.notes}</div>}
+                      {isPending && <div style={{ color: "#6b7280" }}>Awaiting approval</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+
           {Object.keys(dynamicFields).length > 0 && (
             <div style={{ marginBottom: "16px" }}>
               <div style={{ marginBottom: "8px", fontSize: "13px", fontWeight: "500", color: "#6b7280" }}>
                 Details
               </div>
-              <div style={{ padding: "12px", backgroundColor: "#f9fafb", borderRadius: "8px", fontSize: "13px", color: "#374151" }}>
-                {Object.entries(dynamicFields).map(([key, value]) => (
-                  <div key={key} style={{ marginBottom: "4px" }}>
-                    <strong>{key}:</strong> {typeof value === "object" ? JSON.stringify(value) : String(value ?? "")}
+              <div
+                style={{
+                  padding: "10px 12px",
+                  backgroundColor: "#f8fafc",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "10px",
+                  fontSize: "13px",
+                  color: "#374151",
+                }}
+              >
+                {Object.entries(dynamicFields).map(([key, value], idx, arr) => (
+                  <div
+                    key={key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "16px",
+                      padding: "8px 0",
+                      borderBottom: idx < arr.length - 1 ? "1px solid #e5e7eb" : "none",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: "#6b7280",
+                        fontWeight: 600,
+                        letterSpacing: "0.1px",
+                        flex: "0 0 46%",
+                        minWidth: 0,
+                      }}
+                    >
+                      {formatDynamicFieldKey(key)}
+                    </span>
+                    <span
+                      style={{
+                        color: "#111827",
+                        textAlign: "right",
+                        fontWeight: 500,
+                        flex: "1 1 54%",
+                        minWidth: 0,
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {formatDynamicFieldValue(value)}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -708,7 +933,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
           >
             <CheckCircle size={18} />
-            Approve
+            {submittingAction === "approve" ? "Approving..." : "Approve"}
           </button>
           )}
 
@@ -737,7 +962,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
           >
             <XCircle size={18} />
-            Reject
+            {submittingAction === "reject" ? "Rejecting..." : "Reject"}
           </button>
           )}
 
@@ -766,7 +991,7 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
           >
             <Edit3 size={16} />
-            Request Changes
+            {submittingAction === "changes" ? "Submitting..." : "Request Changes"}
           </button>
           )}
 
@@ -777,38 +1002,40 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
         </div>
 
         {/* Comment Section */}
-        <div style={{ marginBottom: '32px' }}>
-          <div style={{ position: 'relative' }}>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value.slice(0, maxCommentLength))}
-              placeholder="Add a comment *"
-              style={{
-                width: '100%',
-                minHeight: '100px',
-                padding: '12px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '14px',
-                color: '#1f2937',
-                resize: 'vertical',
-                outline: 'none',
-                fontFamily: 'inherit'
-              }}
-              onFocus={(e) => e.currentTarget.style.borderColor = '#6366f1'}
-              onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
-            />
-            <div style={{
-              position: 'absolute',
-              bottom: '12px',
-              right: '12px',
-              fontSize: '12px',
-              color: '#9ca3af'
-            }}>
-              {comment.length}/{maxCommentLength}
+        {statusDisplay !== "approved" && (
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ position: 'relative' }}>
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value.slice(0, maxCommentLength))}
+                placeholder="Add a comment *"
+                style={{
+                  width: '100%',
+                  minHeight: '100px',
+                  padding: '12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  color: '#1f2937',
+                  resize: 'vertical',
+                  outline: 'none',
+                  fontFamily: 'inherit'
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = '#6366f1'}
+                onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+              />
+              <div style={{
+                position: 'absolute',
+                bottom: '12px',
+                right: '12px',
+                fontSize: '12px',
+                color: '#9ca3af'
+              }}>
+                {comment.length}/{maxCommentLength}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Pending Approvals Section */}
         <div style={{ marginBottom: '32px' }}>
@@ -844,9 +1071,9 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
             gridTemplateColumns: 'repeat(4, 1fr)', 
             gap: '12px'
           }}>
-            {pendingApprovals.map((approval, index) => (
+            {pendingApprovals.map((approval) => (
               <div
-                key={index}
+                key={`${approval.label}-${approval.count}`}
                 style={{
                   textAlign: 'center',
                   padding: '16px 8px',
@@ -942,15 +1169,16 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                 </div>
               </div>
             </div>
-            {events.map((ev) => (
+            {events.map((ev) => {
+              const eventView = getEventView(ev.event_type);
+              return (
               <div
                 key={ev.id}
                 style={{
                   display: "flex",
                   gap: "12px",
                   padding: "12px",
-                  backgroundColor:
-                    ev.event_type === "approved" ? "#d1fae5" : ev.event_type === "rejected" ? "#fee2e2" : "#f9fafb",
+                  backgroundColor: eventView.bgColor,
                   borderRadius: "8px",
                 }}
               >
@@ -958,15 +1186,14 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                   width: "40px",
                   height: "40px",
                   borderRadius: "50%",
-                  backgroundColor:
-                    ev.event_type === "approved" ? "#10b981" : ev.event_type === "rejected" ? "#ef4444" : "#6b7280",
+                  backgroundColor: eventView.avatarBgColor,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
                   color: "white",
                 }}>
-                  {ev.event_type === "approved" ? <CheckCircle size={20} /> : ev.event_type === "rejected" ? <XCircle size={20} /> : <Edit3 size={20} />}
+                  {eventView.icon}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: "14px", fontWeight: "500", color: "#1f2937", marginBottom: "2px" }}>
@@ -983,7 +1210,8 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
             {!isPending && (
               <div
                 style={{
@@ -1026,96 +1254,55 @@ const ApprovalDetailSidebar: React.FC<ApprovalDetailSidebarProps> = ({
 
       {/* Confirmation Dialog */}
       {showDialog && dialogConfig ? (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000,
-          }}
-          onClick={closeDialog}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '12px',
-              padding: '24px',
-              maxWidth: '400px',
-              width: '90%',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '20px' }}>
+        <Modal show onHide={closeDialog} centered style={{ zIndex: 999999 }}>
+          <Modal.Body style={{ padding: "24px" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", marginBottom: "20px" }}>
               <div
                 style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   flexShrink: 0,
-                  backgroundColor: 
-                    dialogConfig.type === 'success' ? '#d1fae5' :
-                    dialogConfig.type === 'error' ? '#fee2e2' : '#fef3c7',
+                  backgroundColor: getDialogTypeBgColor(dialogConfig.type),
                 }}
               >
-                {dialogConfig.type === 'success' && <CheckCircle size={28} color="#10b981" />}
-                {dialogConfig.type === 'error' && <XCircle size={28} color="#ef4444" />}
-                {dialogConfig.type === 'warning' && <Edit3 size={28} color="#f59e0b" />}
+                {dialogConfig.type === "success" && <CheckCircle size={28} color="#10b981" />}
+                {dialogConfig.type === "error" && <XCircle size={28} color="#ef4444" />}
+                {dialogConfig.type === "warning" && <Edit3 size={28} color="#f59e0b" />}
               </div>
               <div style={{ flex: 1 }}>
-                <h3
-                  style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: '#1f2937',
-                    margin: '0 0 8px 0',
-                  }}
-                >
+                <h3 style={{ fontSize: "18px", fontWeight: "600", color: "#1f2937", margin: "0 0 8px 0" }}>
                   {dialogConfig.title}
                 </h3>
-                <p
-                  style={{
-                    fontSize: '14px',
-                    color: '#6b7280',
-                    lineHeight: '1.5',
-                    margin: 0,
-                  }}
-                >
-                  {dialogConfig.message}
-                </p>
+                <p style={{ fontSize: "14px", color: "#6b7280", lineHeight: "1.5", margin: 0 }}>{dialogConfig.message}</p>
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
               <button
+                type="button"
                 onClick={closeDialog}
                 style={{
-                  padding: '10px 24px',
-                  backgroundColor: '#6366f1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
+                  padding: "10px 24px",
+                  backgroundColor: "#6366f1",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#4f46e5')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#6366f1')}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#4f46e5")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#6366f1")}
               >
                 OK
               </button>
             </div>
-          </div>
-        </div>
+          </Modal.Body>
+        </Modal>
       ) : null}
     </div>
   );

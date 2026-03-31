@@ -737,6 +737,44 @@ export const updateUserRequest = async (
   }
 };
 
+export const approveUserRequest = async (
+  id: number,
+  payload?: {
+    extension_number?: string | null;
+    notes?: string | null;
+    timezone?: string | null;
+  }
+): Promise<UserRequest> => {
+  try {
+    const response = await axiosInstance.post<ApiResponse<UserRequest>>(
+      `${PREFIX}/user-requests/${id}/approve`,
+      payload ?? {}
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to approve user request");
+  }
+};
+
+export const rejectUserRequest = async (
+  id: number,
+  payload?: {
+    extension_number?: string | null;
+    notes?: string | null;
+    timezone?: string | null;
+  }
+): Promise<UserRequest> => {
+  try {
+    const response = await axiosInstance.post<ApiResponse<UserRequest>>(
+      `${PREFIX}/user-requests/${id}/reject`,
+      payload ?? {}
+    );
+    return extractData(response);
+  } catch (error: unknown) {
+    handleApiError(error, "Failed to reject user request");
+  }
+};
+
 function buildUserRequestUpdateFormData(
   _id: number,
   payload: UserRequestUpdatePayload & {
@@ -749,15 +787,15 @@ function buildUserRequestUpdateFormData(
   if (payload.status != null) form.append("status", payload.status);
   if (payload.subject != null) form.append("subject", payload.subject);
   if (payload.reason != null) form.append("reason", payload.reason);
-  if (payload.dynamic_fields !== undefined)
-    form.append(
-      "dynamic_fields",
-      payload.dynamic_fields === null
-        ? ""
-        : typeof payload.dynamic_fields === "string"
-          ? payload.dynamic_fields
-          : JSON.stringify(payload.dynamic_fields)
-    );
+  if (payload.dynamic_fields !== undefined) {
+    if (payload.dynamic_fields === null) {
+      form.append("dynamic_fields", "");
+    } else if (typeof payload.dynamic_fields === "string") {
+      form.append("dynamic_fields", payload.dynamic_fields);
+    } else {
+      form.append("dynamic_fields", JSON.stringify(payload.dynamic_fields));
+    }
+  }
   if (payload.comment != null) form.append("comment", payload.comment);
   if (payload.dynamic_files) {
     Object.entries(payload.dynamic_files).forEach(([key, fileOrFiles]) => {

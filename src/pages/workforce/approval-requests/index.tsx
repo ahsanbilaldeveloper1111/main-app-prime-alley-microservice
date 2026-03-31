@@ -518,7 +518,7 @@ const ApprovalRequest = () => {
       ? ""
       : (findMainAppUserByRequestUserId(requestedByUsers, selectedRequestedByUserId)?.name ??
         selectedRequestedByUserId);
-  const dateOptions = ["Today", "Last 7 days", "Last 30 days", "Last 3 months", "All time"];
+  const dateOptions = ["Today", "Last 7 days", "Last 30 days", "All time"];
   const totalRequests = requestsPagination?.total ?? 0;
 
   const getCategoryName = (categoryId: number | string | null): string => {
@@ -597,7 +597,8 @@ const ApprovalRequest = () => {
         sortable: false,
         render: (request) => {
           const iconType = getTypeIconFromCategory(request.user_request_category_id);
-          const categoryName = getCategoryName(request.user_request_category_id);
+          const categoryName =
+            (request as UserRequest & { category?: { name?: string | null } }).category?.name ?? "—";
           return (
             <div
               style={{
@@ -804,13 +805,61 @@ const ApprovalRequest = () => {
     [requestedBySearchTerm, selectedRequestedByUserId, requestedByUsers]
   );
 
+  const typeDropdownContent = useMemo(
+    () => (
+      <div style={{ minWidth: "220px" }}>
+        <div style={{ maxHeight: "240px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedType("");
+              setCurrentPage(1);
+            }}
+            style={{
+              textAlign: "left",
+              border: "0px solid #e5e7eb",
+              backgroundColor: selectedType === "" ? "#eef2ff" : "white",
+              color: "#111827",
+              borderRadius: "6px",
+              padding: "8px 10px",
+              fontSize: "13px",
+            }}
+          >
+            All Types
+          </button>
+          {types.map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => {
+                setSelectedType(type);
+                setCurrentPage(1);
+              }}
+              style={{
+                textAlign: "left",
+                border: "1px solid #e5e7eb",
+                backgroundColor: selectedType === type ? "#eef2ff" : "white",
+                color: "#111827",
+                borderRadius: "6px",
+                padding: "8px 10px",
+                fontSize: "13px",
+              }}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+      </div>
+    ),
+    [selectedType, types]
+  );
+
   const filterPills = useMemo<FilterPill[]>(
     () => [
       {
         id: "approval-type",
         label: "Type",
         showDropdown: true,
-        searchable: true,
         active: Boolean(selectedType),
         activeLabel: selectedType || undefined,
         onClear: selectedType
@@ -819,24 +868,7 @@ const ApprovalRequest = () => {
               setCurrentPage(1);
             }
           : undefined,
-        dropdownOptions: [
-          {
-            label: "All Types",
-            value: "__all__",
-            onClick: () => {
-              setSelectedType("");
-              setCurrentPage(1);
-            },
-          },
-          ...types.map((type) => ({
-            label: type,
-            value: type,
-            onClick: () => {
-              setSelectedType(type);
-              setCurrentPage(1);
-            },
-          })),
-        ],
+        dropdownContent: typeDropdownContent,
       },
       {
         id: "approval-requested-by",
@@ -857,7 +889,7 @@ const ApprovalRequest = () => {
         id: "approval-date",
         label: "Dates",
         showDropdown: true,
-        searchable: true,
+        searchable: false,
         active: Boolean(selectedDate),
         activeLabel: selectedDate || undefined,
         onClear: selectedDate
@@ -888,7 +920,7 @@ const ApprovalRequest = () => {
     ],
     [
       selectedType,
-      types,
+      typeDropdownContent,
       selectedRequestedByUserId,
       selectedRequestedByName,
       requestedByDropdownContent,
