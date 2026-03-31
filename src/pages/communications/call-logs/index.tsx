@@ -41,6 +41,97 @@ interface Summary {
     outbound: number;
 }
 
+interface NumberFilterMenuProps {
+    value: string;
+    onChange: (value: string) => void;
+    onApply: (value: string) => void;
+    closeMenu: () => void;
+}
+
+const NumberFilterMenu: React.FC<NumberFilterMenuProps> = ({ value, onChange, onApply, closeMenu }) => (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+        <Form.Control
+            size="sm"
+            type="text"
+            placeholder="Enter number"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+        />
+        <div className="d-flex justify-content-end gap-2">
+            <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
+                Cancel
+            </Button>
+            <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                    onApply(value.trim());
+                    closeMenu();
+                }}
+            >
+                Apply
+            </Button>
+        </div>
+    </div>
+);
+
+interface DateFilterMenuProps {
+    value: string;
+    onChange: (value: string) => void;
+    onApply: (value: string) => void;
+    closeMenu: () => void;
+}
+
+const DateFilterMenu: React.FC<DateFilterMenuProps> = ({ value, onChange, onApply, closeMenu }) => (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+        <Form.Control
+            size="sm"
+            type="date"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+        />
+        <div className="d-flex justify-content-end gap-2">
+            <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
+                Cancel
+            </Button>
+            <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                    onApply(value);
+                    closeMenu();
+                }}
+            >
+                Apply
+            </Button>
+        </div>
+    </div>
+);
+
+function createNumberDropdownContent(
+    value: string,
+    onChange: (value: string) => void,
+    onApply: (value: string) => void,
+) {
+    return function NumberDropdownRender({ closeMenu }: { closeMenu: () => void }) {
+        return (
+            <NumberFilterMenu value={value} onChange={onChange} onApply={onApply} closeMenu={closeMenu} />
+        );
+    };
+}
+
+function createDateDropdownContent(
+    value: string,
+    onChange: (value: string) => void,
+    onApply: (value: string) => void,
+) {
+    return function DateDropdownRender({ closeMenu }: { closeMenu: () => void }) {
+        return (
+            <DateFilterMenu value={value} onChange={onChange} onApply={onApply} closeMenu={closeMenu} />
+        );
+    };
+}
+
 const CallLogs = () => {
     const { data:session } = useSession();
     const [showPageLoader, setShowPageLoader] = useState(false);
@@ -460,43 +551,10 @@ const CallLogs = () => {
                 active: Boolean(currentFilters.phone_number),
                 activeLabel: currentFilters.phone_number ? String(currentFilters.phone_number) : undefined,
                 onClear: () => applyFilters({ ...currentFilters, phone_number: '' }),
-                dropdownContent: ({ closeMenu }: { closeMenu: () => void }) => (
-                    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-                        <Form.Control
-                            size="sm"
-                            type="text"
-                            placeholder="Enter number"
-                            value={currentFilters.phone_number ?? ''}
-                            onChange={(e) =>
-                                setCurrentFilters((prev) => ({
-                                    ...prev,
-                                    phone_number: e.target.value,
-                                }))
-                            }
-                        />
-                        <div className="d-flex justify-content-end gap-2">
-                            <Button
-                                variant="outline-secondary"
-                                size="sm"
-                                onClick={() => closeMenu()}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => {
-                                    applyFilters({
-                                        ...currentFilters,
-                                        phone_number: String(currentFilters.phone_number ?? '').trim(),
-                                    });
-                                    closeMenu();
-                                }}
-                            >
-                                Apply
-                            </Button>
-                        </div>
-                    </div>
+                dropdownContent: createNumberDropdownContent(
+                    currentFilters.phone_number ?? '',
+                    (value) => setCurrentFilters({ ...currentFilters, phone_number: value }),
+                    (value) => applyFilters({ ...currentFilters, phone_number: value }),
                 ),
             },
             {
@@ -507,39 +565,10 @@ const CallLogs = () => {
                 activeLabel: currentFilters.start_datetime ? moment(currentFilters.start_datetime).format('MMM DD, YYYY') : undefined,
                 activeLabelOnly: true,
                 onClear: () => applyFilters({ ...currentFilters, start_datetime: '' }),
-                dropdownContent: ({ closeMenu }: { closeMenu: () => void }) => (
-                    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-                        <Form.Control
-                            size="sm"
-                            type="date"
-                            value={currentFilters.start_datetime ?? ''}
-                            onChange={(e) =>
-                                setCurrentFilters((prev) => ({
-                                    ...prev,
-                                    start_datetime: e.target.value,
-                                }))
-                            }
-                        />
-                        <div className="d-flex justify-content-end gap-2">
-                            <Button
-                                variant="outline-secondary"
-                                size="sm"
-                                onClick={() => closeMenu()}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => {
-                                    applyFilters({ ...currentFilters, start_datetime: currentFilters.start_datetime ?? '' });
-                                    closeMenu();
-                                }}
-                            >
-                                Apply
-                            </Button>
-                        </div>
-                    </div>
+                dropdownContent: createDateDropdownContent(
+                    currentFilters.start_datetime ?? '',
+                    (value) => setCurrentFilters({ ...currentFilters, start_datetime: value }),
+                    (value) => applyFilters({ ...currentFilters, start_datetime: value }),
                 ),
             },
             {
@@ -550,39 +579,10 @@ const CallLogs = () => {
                 activeLabel: currentFilters.end_datetime ? moment(currentFilters.end_datetime).format('MMM DD, YYYY') : undefined,
                 activeLabelOnly: true,
                 onClear: () => applyFilters({ ...currentFilters, end_datetime: '' }),
-                dropdownContent: ({ closeMenu }: { closeMenu: () => void }) => (
-                    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-                        <Form.Control
-                            size="sm"
-                            type="date"
-                            value={currentFilters.end_datetime ?? ''}
-                            onChange={(e) =>
-                                setCurrentFilters((prev) => ({
-                                    ...prev,
-                                    end_datetime: e.target.value,
-                                }))
-                            }
-                        />
-                        <div className="d-flex justify-content-end gap-2">
-                            <Button
-                                variant="outline-secondary"
-                                size="sm"
-                                onClick={() => closeMenu()}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => {
-                                    applyFilters({ ...currentFilters, end_datetime: currentFilters.end_datetime ?? '' });
-                                    closeMenu();
-                                }}
-                            >
-                                Apply
-                            </Button>
-                        </div>
-                    </div>
+                dropdownContent: createDateDropdownContent(
+                    currentFilters.end_datetime ?? '',
+                    (value) => setCurrentFilters({ ...currentFilters, end_datetime: value }),
+                    (value) => applyFilters({ ...currentFilters, end_datetime: value }),
                 ),
             },
         ],
