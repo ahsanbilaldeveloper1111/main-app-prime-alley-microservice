@@ -61,8 +61,8 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
     key
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
+      .replaceAll(/[^a-z0-9]+/g, "_")
+      .replaceAll(/^_+|_+$/g, "");
 
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
@@ -937,7 +937,6 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                   </>
 
                 {/* Deal Characteristics (template) */}
-                <>
                   <h3 style={sectionHeadingNext}>DEAL CHARACTERISTICS</h3>
                   <div style={fieldWrap}>
                     {fieldLabel("Deal Template")}
@@ -1084,7 +1083,6 @@ const ConvertLeadToDealModal: React.FC<ConvertLeadToDealModalProps> = ({
                     )}
                   </>
                   )}
-                </>
 
                 {/* Negotiation Progress */}
                 <>

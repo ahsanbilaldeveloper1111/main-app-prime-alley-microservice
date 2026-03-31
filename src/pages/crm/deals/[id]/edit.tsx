@@ -42,8 +42,18 @@ const EditDeal = () => {
     key
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "");
+      .replaceAll(/[^a-z0-9]+/g, "_")
+      .replaceAll(/^_+|_+$/g, "");
+
+  const isTemplatePrimitiveValue = (
+    value: unknown,
+  ): value is string | number | boolean =>
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean";
+
+  const getNormalizedTemplateValue = (value: string | number | boolean): string =>
+    typeof value === "string" ? value.trim() : String(value);
 
   const router = useRouter();
   const { id } = router.query;
@@ -653,10 +663,11 @@ const EditDeal = () => {
         // Add template field values
         Object.entries(templateFieldsData).forEach(([key, value]) => {
           if (key === "template_name") return;
-          if (value !== null && value !== undefined && String(value).trim() !== "") {
-            payload[`deal_template_field_values[${key}]`] = value;
-            filteredTemplateData[normalizeTemplateDataKey(key)] = value;
-          }
+          if (!isTemplatePrimitiveValue(value)) return;
+          const normalizedValue = getNormalizedTemplateValue(value);
+          if (!normalizedValue) return;
+          payload[`deal_template_field_values[${key}]`] = normalizedValue;
+          filteredTemplateData[normalizeTemplateDataKey(key)] = normalizedValue;
         });
         if (Object.keys(filteredTemplateData).length > 0) {
           payload.template_data = filteredTemplateData;
@@ -1167,10 +1178,13 @@ const EditDeal = () => {
                       <div className="fw-semibold mb-2">Template Data</div>
                       <div className="small text-muted">
                         {Object.entries(templateFieldsData)
-                          .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+                          .filter(([, value]) => {
+                            if (!isTemplatePrimitiveValue(value)) return false;
+                            return getNormalizedTemplateValue(value) !== "";
+                          })
                           .map(([key, value]) => (
                             <div key={key}>
-                              <strong>{key}</strong>: {String(value)}
+                              <strong>{key}</strong>: {getNormalizedTemplateValue(value)}
                             </div>
                           ))}
                       </div>

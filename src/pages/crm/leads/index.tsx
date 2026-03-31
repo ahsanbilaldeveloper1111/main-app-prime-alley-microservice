@@ -59,7 +59,6 @@ import {
   Modal,
   Popover,
   OverlayTrigger,
-  Tooltip as BsTooltip,
   Spinner,
 } from "react-bootstrap";
 import Select from "react-select";
