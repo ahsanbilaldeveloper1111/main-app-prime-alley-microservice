@@ -11,6 +11,7 @@ import {
   getCampaignById,
   getIndustries,
   getLead,
+  getDealTemplates,
   CrmProduct,
   StageData,
   IndustryData,
@@ -37,6 +38,13 @@ import { ModuleSlug, ValidationType, checkRequiredFields } from '@utils/Helper';
 import { convertCurrency, formatCurrency } from '@utils/currency';
 
 const EditDeal = () => {
+  const normalizeTemplateDataKey = (key: string): string =>
+    key
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
   const router = useRouter();
   const { id } = router.query;
   const { data: session } = useSession();
@@ -62,6 +70,9 @@ const EditDeal = () => {
   const [sourceLead, setSourceLead] = useState<any>(null);
   const [dealTemplate, setDealTemplate] = useState<DealTemplateData | null>(null);
   const [templateFieldsData, setTemplateFieldsData] = useState<Record<string, any>>({});
+  const [availableTemplates, setAvailableTemplates] = useState<DealTemplateData[]>([]);
+  const [loadingTemplateList, setLoadingTemplateList] = useState(false);
+  const [initialTemplateFieldValues, setInitialTemplateFieldValues] = useState<Record<string, any>>({});
 
   // Business type state
   const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
@@ -125,8 +136,22 @@ const EditDeal = () => {
     fetchStages();
     fetchExtensions();
     fetchBusinessTypes();
+    fetchAvailableTemplates();
     // Don't fetch all products initially - wait for industry selection
   }, []);
+
+  const fetchAvailableTemplates = async () => {
+    try {
+      setLoadingTemplateList(true);
+      const response = await getDealTemplates({ per_page: 1000, page: 1 });
+      setAvailableTemplates(response?.data || []);
+    } catch (error) {
+      console.error("Failed to fetch deal templates:", error);
+      setAvailableTemplates([]);
+    } finally {
+      setLoadingTemplateList(false);
+    }
+  };
 
   const fetchBusinessTypes = async () => {
     try {
@@ -340,9 +365,25 @@ const EditDeal = () => {
         if (dealTemplateData) {
           setDealTemplate(dealTemplateData);
           
-          // Load existing template field values from deal
+          // Load existing template field values from deal (supports both key formats)
           const dealTemplateFieldValues = (deal as any).deal_template_field_values || {};
-          setTemplateFieldsData(dealTemplateFieldValues);
+          const dealTemplateDataValues = (deal as any).template_data || {};
+          const mergedTemplateValues: Record<string, any> = {
+            ...dealTemplateFieldValues,
+            ...dealTemplateDataValues,
+          };
+          const hydratedTemplateValues: Record<string, any> = {
+            template_name: dealTemplateData.name || "",
+          };
+          (dealTemplateData.fields || []).forEach((field: DealTemplateField) => {
+            const normalizedFieldKey = normalizeTemplateDataKey(field.field_name);
+            hydratedTemplateValues[field.field_name] =
+              mergedTemplateValues[field.field_name] ??
+              mergedTemplateValues[normalizedFieldKey] ??
+              "";
+          });
+          setInitialTemplateFieldValues(hydratedTemplateValues);
+          setTemplateFieldsData(hydratedTemplateValues);
         }
 
         // Set additional data
@@ -481,6 +522,32 @@ const EditDeal = () => {
     return true;
   };
 
+  const handleTemplateSelectionChange = (templateIdRaw: string) => {
+    if (!templateIdRaw) {
+      setDealTemplate(null);
+      setTemplateFieldsData({});
+      return;
+    }
+
+    const selectedTemplateId = Number(templateIdRaw);
+    const selectedTemplate = availableTemplates.find(
+      (template) => template.id === selectedTemplateId,
+    );
+    if (!selectedTemplate) return;
+
+    setDealTemplate(selectedTemplate);
+    const nextTemplateValues: Record<string, any> = {};
+    nextTemplateValues.template_name = selectedTemplate.name || "";
+    (selectedTemplate.fields || []).forEach((field) => {
+      const normalizedFieldKey = normalizeTemplateDataKey(field.field_name);
+      nextTemplateValues[field.field_name] =
+        initialTemplateFieldValues[field.field_name] ??
+        initialTemplateFieldValues[normalizedFieldKey] ??
+        "";
+    });
+    setTemplateFieldsData(nextTemplateValues);
+  };
+
   const validateStep3 = (): boolean => {
     // Step 3 (Progress & Notes) has no required fields
     return true;
@@ -512,8 +579,8 @@ const EditDeal = () => {
     e.preventDefault();
     if (validateCurrentStep()) {
       let nextStep = formStep + 1;
-      // Skip step 2 (Characteristics) if no template is available
-      if (nextStep === 2 && !dealTemplate) {
+      // Skip step 2 (Characteristics) if no templates are available
+      if (nextStep === 2 && !dealTemplate && availableTemplates.length === 0) {
         nextStep = 3;
       }
       setFormStep(Math.min(4, nextStep));
@@ -524,8 +591,8 @@ const EditDeal = () => {
     e.preventDefault();
     if (formStep < 4) {
       let nextStep = formStep + 1;
-      // Skip step 2 if no template is available
-      if (nextStep === 2 && !dealTemplate) {
+      // Skip step 2 if no templates are available
+      if (nextStep === 2 && !dealTemplate && availableTemplates.length === 0) {
         nextStep = 3;
       }
       setFormStep(nextStep);
@@ -579,10 +646,21 @@ const EditDeal = () => {
       // Add deal template data if template exists
       if (dealTemplate && dealTemplate.id) {
         payload.deal_template_id = dealTemplate.id;
+        const filteredTemplateData: Record<string, any> = {};
+        if (dealTemplate.name) {
+          filteredTemplateData.template_name = dealTemplate.name;
+        }
         // Add template field values
         Object.entries(templateFieldsData).forEach(([key, value]) => {
-          payload[`deal_template_field_values[${key}]`] = value;
+          if (key === "template_name") return;
+          if (value !== null && value !== undefined && String(value).trim() !== "") {
+            payload[`deal_template_field_values[${key}]`] = value;
+            filteredTemplateData[normalizeTemplateDataKey(key)] = value;
+          }
         });
+        if (Object.keys(filteredTemplateData).length > 0) {
+          payload.template_data = filteredTemplateData;
+        }
       }
 
       if (formData.ticket_id) {
@@ -685,11 +763,12 @@ const EditDeal = () => {
                   width: `${(() => {
                     // Calculate progress: if no template, step 2 is skipped
                     // Map formStep to visual position (accounting for hidden step 2)
-                    const totalVisibleSteps = dealTemplate ? 5 : 4;
+                    const hasTemplateStep = dealTemplate || availableTemplates.length > 0;
+                    const totalVisibleSteps = hasTemplateStep ? 5 : 4;
                     let visualPosition = formStep;
                     // If no template and we're past step 2, adjust visual position
                     // formStep 0→0, formStep 1→1, formStep 3→2, formStep 4→3
-                    if (!dealTemplate && formStep > 2) {
+                    if (!hasTemplateStep && formStep > 2) {
                       visualPosition = formStep - 1;
                     }
                     // Progress = (current visual position + 1) / total visible steps
@@ -702,12 +781,15 @@ const EditDeal = () => {
               
               {[0, 1, 2, 3, 4].map((step) => {
                 // Hide step 2 (Characteristics) if no template is available
-                if (step === 2 && !dealTemplate) {
+                if (step === 2 && !dealTemplate && availableTemplates.length === 0) {
                   return null;
                 }
                 
                 // Calculate display number: if step 2 is hidden, adjust numbering for steps after it
-                const displayNumber = (!dealTemplate && step > 2) ? step : step + 1;
+                const displayNumber =
+                  (!dealTemplate && availableTemplates.length === 0 && step > 2)
+                    ? step
+                    : step + 1;
                 
                 return (
                   <div 
@@ -1046,24 +1128,55 @@ const EditDeal = () => {
               </Card>
             )}
 
-            {/* Step 2: Deal Characteristics - Only show if template is available */}
-            {formStep === 2 && dealTemplate && (
+            {/* Step 2: Deal Characteristics */}
+            {formStep === 2 && (dealTemplate || availableTemplates.length > 0) && (
               <Card className="mb-3 border-0 bg-light">
                 <Card.Body>
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <h5 className="fw-bold mb-0 text-info">DEAL CHARACTERISTICS</h5>
-                    {dealTemplate.name && (
+                    {dealTemplate?.name && (
                       <Badge bg="info" className="ms-2">
-                        Template: {dealTemplate.name}
+                        Template: {dealTemplate?.name}
                       </Badge>
                     )}
                   </div>
-                  {dealTemplate.description && (
+                  <Form.Group className="mb-3">
+                    <Form.Label>Deal Template</Form.Label>
+                    <Form.Select
+                      value={dealTemplate?.id || ""}
+                      onChange={(e) => handleTemplateSelectionChange(e.target.value)}
+                      disabled={loadingTemplateList}
+                    >
+                      <option value="">
+                        {loadingTemplateList ? "Loading templates..." : "Select Deal Template (Optional)"}
+                      </option>
+                      {availableTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                  {dealTemplate?.description && (
                     <div className="alert alert-info mb-4">
-                      <small>{dealTemplate.description}</small>
+                      <small>{dealTemplate?.description}</small>
                     </div>
                   )}
-                  {dealTemplate.fields && dealTemplate.fields.length > 0 ? (
+                  {Object.keys(templateFieldsData || {}).length > 0 && (
+                    <div className="alert alert-light border mb-3">
+                      <div className="fw-semibold mb-2">Template Data</div>
+                      <div className="small text-muted">
+                        {Object.entries(templateFieldsData)
+                          .filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "")
+                          .map(([key, value]) => (
+                            <div key={key}>
+                              <strong>{key}</strong>: {String(value)}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  {dealTemplate?.fields && dealTemplate.fields.length > 0 ? (
                     <Row>
                       {(() => {
                         const fieldsArray = dealTemplate.fields || [];
