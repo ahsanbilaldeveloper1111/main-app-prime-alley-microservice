@@ -792,6 +792,34 @@ const InvoiceList = () => {
     setRefreshKey((prev) => prev + 1);
   }, []);
 
+  const handleStatusFilterPillSelect = useCallback(
+    (optValue: string) => {
+      setCurrentFilters((prev) => {
+        if (!optValue) {
+          const { status, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, status: optValue };
+      });
+      applyInvoiceFiltersAndRefresh();
+    },
+    [applyInvoiceFiltersAndRefresh],
+  );
+
+  const handleInvoiceDateFromPillChange = useCallback(
+    (nextValue: string | undefined) => {
+      setCurrentFilters((prev) => {
+        if (!nextValue) {
+          const { date_from, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, date_from: nextValue };
+      });
+      applyInvoiceFiltersAndRefresh();
+    },
+    [applyInvoiceFiltersAndRefresh],
+  );
+
   // Filter pills must use GenericTable `FilterPill` shape (`showDropdown` + `dropdownContent` / `dropdownOptions`), not ad-hoc `type`/`options`.
   const invoiceFilterPills = React.useMemo<FilterPill[]>(
     () => {
@@ -836,10 +864,7 @@ const InvoiceList = () => {
             applyInvoiceFiltersAndRefresh();
           },
           dropdownContent: (
-            <div
-              style={{ minWidth: 200 }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
+            <div style={{ minWidth: 200 }}>
               {statusChoices.map((opt) => (
                 <button
                   key={opt.value || "all"}
@@ -852,16 +877,8 @@ const InvoiceList = () => {
                         ? "#f0f0f0"
                         : "transparent",
                   }}
-                  onClick={() => {
-                    setCurrentFilters((prev) => {
-                      if (!opt.value) {
-                        const { status, ...rest } = prev;
-                        return rest;
-                      }
-                      return { ...prev, status: opt.value };
-                    });
-                    applyInvoiceFiltersAndRefresh();
-                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={() => handleStatusFilterPillSelect(opt.value)}
                 >
                   {opt.label}
                 </button>
@@ -883,10 +900,7 @@ const InvoiceList = () => {
             applyInvoiceFiltersAndRefresh();
           },
           dropdownContent: (
-            <div
-              style={{ minWidth: 220, padding: "4px 0" }}
-              onMouseDown={(e) => e.stopPropagation()}
-            >
+            <div style={{ minWidth: 220, padding: "4px 0" }}>
               <input
                 type="date"
                 value={currentFilters.date_from ?? ""}
@@ -896,24 +910,22 @@ const InvoiceList = () => {
                   border: "1px solid #e5e7eb",
                   borderRadius: 4,
                 }}
-                onChange={(e) => {
-                  const next = e.target.value || undefined;
-                  setCurrentFilters((prev) => {
-                    if (!next) {
-                      const { date_from, ...rest } = prev;
-                      return rest;
-                    }
-                    return { ...prev, date_from: next };
-                  });
-                  applyInvoiceFiltersAndRefresh();
-                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onChange={(e) =>
+                  handleInvoiceDateFromPillChange(e.target.value || undefined)
+                }
               />
             </div>
           ),
         },
       ];
     },
-    [currentFilters, applyInvoiceFiltersAndRefresh],
+    [
+      currentFilters,
+      applyInvoiceFiltersAndRefresh,
+      handleStatusFilterPillSelect,
+      handleInvoiceDateFromPillChange,
+    ],
   );
 
   // Stats cards for invoices
