@@ -285,11 +285,15 @@ export interface FilterPill {
   showDropdown?: boolean;
   searchable?: boolean;
   /** Custom dropdown content (use instead of `dropdownOptions` when you need rich controls). */
-  dropdownContent?: React.ReactNode;
+  dropdownContent?:
+    | React.ReactNode
+    | ((context: { closeMenu: () => void }) => React.ReactNode);
   /** When true, pill is shown as active (filter applied) */
   active?: boolean;
   /** When filter is applied, show this label (e.g. selected owner name, "Today", "Hot Lead") */
   activeLabel?: string;
+  /** When true and activeLabel exists, show only the activeLabel instead of `label: activeLabel`. */
+  activeLabelOnly?: boolean;
   /** When filter is active, called when the clear (X) icon is clicked to remove the filter */
   onClear?: () => void;
   dropdownOptions?: Array<{
@@ -662,15 +666,23 @@ function GenericTableFilterPillMenuBody({
   pill,
   filterPillSearch,
   setFilterPillSearch,
+  closeMenu,
 }: Readonly<{
   pill: FilterPill;
   filterPillSearch: Record<string, string>;
   setFilterPillSearch: React.Dispatch<
     React.SetStateAction<Record<string, string>>
   >;
+  closeMenu: () => void;
 }>) {
   if (pill.dropdownContent) {
-    return <div className="px-2 py-2">{pill.dropdownContent}</div>;
+    return (
+      <div className="px-2 py-2">
+        {typeof pill.dropdownContent === "function"
+          ? pill.dropdownContent({ closeMenu })
+          : pill.dropdownContent}
+      </div>
+    );
   }
 
   const hasOptions = Boolean(
@@ -710,6 +722,7 @@ function GenericTableFilterPillMenuBody({
             onClick={() => {
               (option.onClick || pill.onClick)?.();
               clearPillQuery();
+              closeMenu();
             }}
           >
             {option.label}
@@ -717,9 +730,9 @@ function GenericTableFilterPillMenuBody({
         ))
       ) : (
         <>
-          <Dropdown.Item onClick={pill.onClick}>All</Dropdown.Item>
-          <Dropdown.Item onClick={pill.onClick}>Active</Dropdown.Item>
-          <Dropdown.Item onClick={pill.onClick}>Inactive</Dropdown.Item>
+          <Dropdown.Item onClick={() => { pill.onClick?.(); closeMenu(); }}>All</Dropdown.Item>
+          <Dropdown.Item onClick={() => { pill.onClick?.(); closeMenu(); }}>Active</Dropdown.Item>
+          <Dropdown.Item onClick={() => { pill.onClick?.(); closeMenu(); }}>Inactive</Dropdown.Item>
         </>
       )}
     </>
@@ -841,7 +854,7 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
     <>
       {actions.map((action, actionIndex) => {
         if (action.show && !action.show(row)) return null;
-        const actionStableKey = `gt-act-${rowStableKey}-${actionIndex}-${action.label}`;
+        const actionStableKey = `gt-act-${rowStableKey}-${action.label}`;
 
         if (action.render) {
           return (
@@ -864,7 +877,7 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
                 variant={action.variant || "link"}
                 size="sm"
                 className={action.className || ""}
-                id={`dropdown-${rowStableKey}-${actionIndex}`}
+                id={`dropdown-${rowStableKey}-${action.label}`}
               >
                 {action.icon}
               </Dropdown.Toggle>
@@ -874,7 +887,7 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
                 }}
               >
                 {visibleOptions.map((option, optionIndex) => {
-                  const optKey = `${actionStableKey}-opt-${option.label}-${optionIndex}`;
+                  const optKey = `${actionStableKey}-opt-${option.label}`;
                   const menuItem = (
                     <Dropdown.Item
                       key={optKey}
@@ -1044,6 +1057,7 @@ const GenericTable = <T extends Record<string, any>>({
 
   // Metrics visibility state (hidden by default)
   const [showMetrics, setShowMetrics] = useState(false);
+  const [openFilterPillId, setOpenFilterPillId] = useState<string | null>(null);
   const [filterPillSearch, setFilterPillSearch] = useState<
     Record<string, string>
   >({});
@@ -1526,15 +1540,25 @@ const GenericTable = <T extends Record<string, any>>({
               <div className="d-flex align-items-center gap-2 flex-wrap">
                 {toolbar.filterPills.map((pill) =>
                   pill.showDropdown ? (
-                    <Dropdown key={pill.id}>
+                    <Dropdown
+                      key={pill.id}
+                      show={openFilterPillId === pill.id}
+                      onToggle={(nextShow) =>
+                        setOpenFilterPillId(nextShow ? pill.id : null)
+                      }
+                    >
                       <Dropdown.Toggle
                         variant={pill.active ? "primary" : "outline-secondary"}
                         size="sm"
                         className={`gt-filter-pill${pill.active ? " gt-filter-pill-active" : ""}`}
                       >
                         {pill.icon && <span className="me-1">{pill.icon}</span>}
-                        <span>{pill.label}</span>
-                        {pill.active && pill.activeLabel && (
+                        <span>
+                          {pill.active && pill.activeLabel && pill.activeLabelOnly
+                            ? pill.activeLabel
+                            : pill.label}
+                        </span>
+                        {pill.active && pill.activeLabel && !pill.activeLabelOnly && (
                           <span className="gt-filter-pill-value">: {pill.activeLabel}</span>
                         )}
                         {pill.active && !pill.activeLabel && (
@@ -1557,13 +1581,14 @@ const GenericTable = <T extends Record<string, any>>({
                         )}
                       </Dropdown.Toggle>
                       <Dropdown.Menu
-                        style={{ maxHeight: "280px" }}
+                        style={{ maxHeight: "280px", overflowY: "auto" }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         <GenericTableFilterPillMenuBody
                           pill={pill}
                           filterPillSearch={filterPillSearch}
                           setFilterPillSearch={setFilterPillSearch}
+                          closeMenu={() => setOpenFilterPillId(null)}
                         />
                       </Dropdown.Menu>
                     </Dropdown>
@@ -1734,6 +1759,99 @@ const GenericTable = <T extends Record<string, any>>({
         </div>
       </div>
     );
+  };
+
+  const renderTableBodyContent = (): React.ReactNode => {
+    const colSpan =
+      (selectable ? 1 : 0) +
+      visibleColumns.length +
+      (showActions && actions.length > 0 ? 1 : 0);
+
+    if (loading) {
+      return (
+        <tr>
+          <td colSpan={colSpan} className="text-center py-4">
+            <div className="generic-table-loading">{loadingMessage}</div>
+          </td>
+        </tr>
+      );
+    }
+
+    if (sortedData.length === 0) {
+      return (
+        <tr>
+          <td colSpan={colSpan} className="text-center py-4">
+            <div className="generic-table-empty">{emptyMessage}</div>
+          </td>
+        </tr>
+      );
+    }
+
+    return sortedData.map((row, index) => {
+      const rowKey = String(row[uniqueKey as keyof T] || index);
+      const isClickable = Boolean(onRowClick || onRowDoubleClick);
+      return (
+        <tr
+          key={rowKey}
+          onClick={() => onRowClick?.(row, index)}
+          onDoubleClick={() => onRowDoubleClick?.(row, index)}
+          onMouseEnter={() => setHoveredRowIndex(index)}
+          onMouseLeave={() => setHoveredRowIndex(null)}
+          onContextMenu={(e) => {
+            if (actions.length === 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const items = getContextMenuItems(row);
+            if (items.length === 0) return;
+            setContextMenu({ x: e.clientX, y: e.clientY, row });
+          }}
+          className={`generic-table-row ${rowClassName?.(row, index) || ""} ${isClickable ? "clickable" : ""}`}
+        >
+          {selectable && (
+            <td
+              className="generic-table-td"
+              style={{ width: "40px" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Form.Check
+                type="checkbox"
+                checked={isSelected(row)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  e.stopPropagation();
+                  applyRowCheckboxChange(row, e);
+                }}
+              />
+            </td>
+          )}
+          {visibleColumns.map((col, colIdx) => (
+            <GenericTableBodyDataCell
+              key={col.key}
+              col={col}
+              row={row}
+              index={index}
+              colIdx={colIdx}
+              onFirstColumnClick={onFirstColumnClick}
+              onPreviewClick={onPreviewClick}
+              hoveredRowIndex={hoveredRowIndex}
+            />
+          ))}
+          {showActions && actions.length > 0 && (
+            <td
+              className="generic-table-td generic-table-actions-cell"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="generic-table-actions">
+                <GenericTableRowActionsCell
+                  row={row}
+                  rowStableKey={rowKey}
+                  actions={actions}
+                />
+              </div>
+            </td>
+          )}
+        </tr>
+      );
+    });
   };
 
   return (
@@ -1980,250 +2098,7 @@ const GenericTable = <T extends Record<string, any>>({
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={
-                        (selectable ? 1 : 0) +
-                        visibleColumns.length +
-                        (showActions && actions.length > 0 ? 1 : 0)
-                      }
-                      className="text-center py-4"
-                    >
-                      <div className="generic-table-loading">
-                        {loadingMessage}
-                      </div>
-                    </td>
-                  </tr>
-                ) : sortedData.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={
-                        (selectable ? 1 : 0) +
-                        visibleColumns.length +
-                        (showActions && actions.length > 0 ? 1 : 0)
-                      }
-                      className="text-center py-4"
-                    >
-                      <div className="generic-table-empty">{emptyMessage}</div>
-                    </td>
-                  </tr>
-                ) : (
-                  sortedData.map((row, index) => (
-                    <tr
-                      key={String(row[uniqueKey as keyof T] || index)}
-                      onClick={() => onRowClick?.(row, index)}
-                      onDoubleClick={() => onRowDoubleClick?.(row, index)}
-                      onMouseEnter={() => setHoveredRowIndex(index)}
-                      onMouseLeave={() => setHoveredRowIndex(null)}
-                      onContextMenu={(e) => {
-                        if (actions.length === 0) return;
-                        e.preventDefault();
-                        e.stopPropagation();
-                        const items = getContextMenuItems(row);
-                        if (items.length === 0) return;
-                        setContextMenu({ x: e.clientX, y: e.clientY, row });
-                      }}
-                      className={`generic-table-row ${rowClassName?.(row, index) || ""} ${onRowClick || onRowDoubleClick ? "clickable" : ""}`}
-                    >
-                      {selectable && (
-                        <td
-                          className="generic-table-td"
-                          style={{ width: "40px" }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Form.Check
-                            type="checkbox"
-                            checked={isSelected(row)}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              applyRowCheckboxChange(row, e as React.ChangeEvent<HTMLInputElement>);
-                            }}
-                          />
-                        </td>
-                      )}
-                      {visibleColumns.map((col, colIdx) => (
-                        <td
-                          key={col.key}
-                          className="generic-table-td"
-                          style={{
-                            textAlign: col.align || "left",
-                            position: colIdx === 0 ? "relative" : undefined,
-                          }}
-                        >
-                          <div
-                            onClick={(e) => {
-                              if (colIdx === 0 && onFirstColumnClick) {
-                                e.stopPropagation();
-                                onFirstColumnClick(row, index);
-                              }
-                            }}
-                            style={{
-                              cursor:
-                                colIdx === 0 && onFirstColumnClick
-                                  ? "pointer"
-                                  : undefined,
-                              display: "inline-block",
-                            }}
-                          >
-                            {renderGenericTableCellContent(col, row, index)}
-                          </div>
-                          {colIdx === 0 &&
-                            hoveredRowIndex === index &&
-                            onPreviewClick && (
-                              <button
-                                className="preview-button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onPreviewClick(row, index);
-                                }}
-                                style={{
-                                  position: "absolute",
-                                  right: "8px",
-                                  top: "50%",
-                                  transform: "translateY(-50%)",
-                                  fontSize: "12px",
-                                  padding: "4px 10px",
-                                  zIndex: 10,
-                                  whiteSpace: "nowrap",
-                                  backgroundColor: "#ffffff",
-                                  border: "1px solid #141414",
-                                  color: "#141414",
-                                  fontWeight: "300",
-                                  borderRadius: "4px",
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Preview
-                              </button>
-                            )}
-                        </td>
-                      ))}
-                      {showActions && actions.length > 0 && (
-                        <td className="generic-table-td generic-table-actions-cell">
-                          <div className="generic-table-actions">
-                            {actions.map((action, actionIndex) => {
-                              if (action.show && !action.show(row)) return null;
-
-                              // If action has custom render (for dropdowns, etc.)
-                              if (action.render) {
-                                return (
-                                  <div
-                                    key={actionIndex}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {action.render(row)}
-                                  </div>
-                                );
-                              }
-
-                              // If action has dropdown configuration
-                              if (action.dropdown) {
-                                const visibleOptions = getVisibleDropdownOptions(
-                                  action.dropdown.options,
-                                  row,
-                                );
-
-                                if (visibleOptions.length === 0) return null;
-
-                                return (
-                                  <div
-                                    key={actionIndex}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <Dropdown drop="down" align="end">
-                                      <Dropdown.Toggle
-                                        variant={action.variant || "link"}
-                                        size="sm"
-                                        className={action.className || ""}
-                                        id={`dropdown-${String(row[uniqueKey as keyof T])}-${actionIndex}`}
-                                      >
-                                        {action.icon}
-                                      </Dropdown.Toggle>
-                                      <Dropdown.Menu>
-                                        {visibleOptions.map(
-                                          (option, optionIndex) => {
-                                            const menuItem = (
-                                              <Dropdown.Item
-                                                key={optionIndex}
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  option.onClick(row);
-                                                }}
-                                                className={option.className}
-                                              >
-                                                {option.icon && (
-                                                  <span className="me-2">
-                                                    {option.icon}
-                                                  </span>
-                                                )}
-                                                {option.label}
-                                              </Dropdown.Item>
-                                            );
-
-                                            if (option.divider) {
-                                              return (
-                                                <React.Fragment
-                                                  key={optionIndex}
-                                                >
-                                                  {menuItem}
-                                                  <Dropdown.Divider />
-                                                </React.Fragment>
-                                              );
-                                            }
-
-                                            return menuItem;
-                                          },
-                                        )}
-                                      </Dropdown.Menu>
-                                    </Dropdown>
-                                  </div>
-                                );
-                              }
-
-                              const isDisabled = action.disabled?.(row);
-                              const buttonEl = (
-                                <Button
-                                  key={actionIndex}
-                                  variant={action.variant || "link"}
-                                  size="sm"
-                                  disabled={isDisabled}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (!isDisabled) action.onClick?.(row);
-                                  }}
-                                  className={`p-1 ${
-                                    isDisabled
-                                      ? `gt-action-disabled ${action.disabledClassName ?? ""}`
-                                      : action.className || ""
-                                  }`}
-                                  title={!isDisabled ? action.label : undefined}
-                                >
-                                  {action.icon || action.label}
-                                </Button>
-                              );
-                              if (
-                                isDisabled &&
-                                action.disabledTitle
-                              ) {
-                                return (
-                                  <span
-                                    key={actionIndex}
-                                    className="gt-action-disabled-wrapper"
-                                    title={action.disabledTitle}
-                                  >
-                                    {buttonEl}
-                                  </span>
-                                );
-                              }
-                              return buttonEl;
-                            })}
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))
-                )}
+                {renderTableBodyContent()}
               </tbody>
             </Table>
           </div>
