@@ -29,6 +29,7 @@ import { formatNumber, GlobalDateFormat } from "@utils/Helper";
 import { Package, FileText, Calendar, Plus } from "lucide-react";
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
+import { toDateInputValue } from "@utils/dateInputValue";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
@@ -158,11 +159,18 @@ const normalizeBillingCycle = (
 };
 
 const buildEditPricingItem = (row: any): CustomerProductPricingDataItem | null => {
-  console.log(row);
   const rawId = row?.product_id ?? row?.product?.id ?? row?.id;
   const id = Number(rawId);
   if (!Number.isFinite(id) || id <= 0) return null;
   const today = new Date().toISOString().slice(0, 10);
+  const start =
+    toDateInputValue(row?.renewal_start_date) ||
+    toDateInputValue(row?.renewal_start) ||
+    today;
+  const end =
+    toDateInputValue(row?.renewal_end_date) ||
+    toDateInputValue(row?.renewal_end) ||
+    today;
 
   return {
     product_id: id,
@@ -170,8 +178,8 @@ const buildEditPricingItem = (row: any): CustomerProductPricingDataItem | null =
     discount_applicability_id: row?.discount_applicability_id ?? null,
     custom_description: String(row?.custom_description ?? ""),
     is_active: Boolean(row?.is_active ?? row?.product?.is_active ?? true),
-    renewal_start_date: String(row?.renewal_start_date ?? today),
-    renewal_end_date: String(row?.renewal_end_date ?? today),
+    renewal_start_date: start,
+    renewal_end_date: end,
     status: normalizePricingStatus(row?.status),
     billing_cycle: normalizeBillingCycle(row?.billing_cycle),
     subscriptions: Math.max(0, Number(row?.subscriptions ?? 0) || 0),
