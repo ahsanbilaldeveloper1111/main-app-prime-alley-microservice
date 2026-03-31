@@ -42,6 +42,7 @@ import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import InvoiceViewModal, { InvoiceViewData } from "@components/billings/InvoiceViewModal";
+import ColumnEditorModal from "@components/ColumnEditorModal";
 import {
   AlertCircle,
   Calendar,
@@ -74,6 +75,50 @@ const PAY_NOW_ELIGIBLE_STATUSES = new Set<string>([
   STATUS_OVERDUE,
   STATUS_PARTIALLY_PAID,
 ]);
+
+const BILLING_INVOICES_COLUMN_STORAGE_KEY = "customerInvoicesSelectedColumns";
+
+const DEFAULT_INVOICE_TABLE_COLUMN_KEYS: string[] = [
+  "invoice_number",
+  "status",
+  "total_amount",
+  "amount_due",
+  "invoice_date",
+  "due_date",
+];
+
+function parseStoredInvoiceColumnKeys(
+  raw: string | null,
+  allowedKeys: readonly string[],
+): string[] | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    const allowed = new Set(allowedKeys);
+    const keys = parsed.filter(
+      (k): k is string => typeof k === "string" && allowed.has(k),
+    );
+    return keys.length > 0 ? keys : null;
+  } catch {
+    return null;
+  }
+}
+
+function loadInvoiceTableColumnsFromStorage(): string[] {
+  if (globalThis.window === undefined) {
+    return [...DEFAULT_INVOICE_TABLE_COLUMN_KEYS];
+  }
+  const stored = parseStoredInvoiceColumnKeys(
+    globalThis.window.localStorage.getItem(BILLING_INVOICES_COLUMN_STORAGE_KEY),
+    DEFAULT_INVOICE_TABLE_COLUMN_KEYS,
+  );
+  return stored ?? [...DEFAULT_INVOICE_TABLE_COLUMN_KEYS];
+}
 
 type BadgeVariant = ReturnType<
   NonNullable<NonNullable<TableColumn<InvoiceData>["badge"]>["getVariant"]>
@@ -239,6 +284,14 @@ const InvoiceList = () => {
   const [currentFilters, setCurrentFilters] = useState<InvoiceFilters>({});
   const [pendingFilters, setPendingFilters] = useState<InvoiceFilters>({});
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [selectedInvoiceTableColumns, setSelectedInvoiceTableColumns] = useState<string[]>(() => [
+    ...DEFAULT_INVOICE_TABLE_COLUMN_KEYS,
+  ]);
+
+  useEffect(() => {
+    setSelectedInvoiceTableColumns(loadInvoiceTableColumnsFromStorage());
+  }, []);
 
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
@@ -619,14 +672,7 @@ const InvoiceList = () => {
           { value: STATUS_REFUNDED, label: "Refunded" },
         ],
       },
-      {
-        id: "invoice_date_from",
-        label: "Invoice Date From",
-        type: "date",
-        value: pendingFilters.invoice_date_from ?? "",
-        onChange: (value) =>
-          setPendingFilters((prev) => ({ ...prev, invoice_date_from: value || undefined })),
-      },
+      
       {
         id: "due_date_from",
         label: "Date From",
@@ -741,59 +787,133 @@ const InvoiceList = () => {
     loadInvoices();
   }, [loadInvoices, refreshKey]);
 
-  // Filter pills for invoices
+  const applyInvoiceFiltersAndRefresh = useCallback(() => {
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  // Filter pills must use GenericTable `FilterPill` shape (`showDropdown` + `dropdownContent` / `dropdownOptions`), not ad-hoc `type`/`options`.
   const invoiceFilterPills = React.useMemo<FilterPill[]>(
-    () => [
-      {
-        id: "status",
-        label: "Status",
-        type: "select",
-        options: [
-          { value: "", label: "All Status" },
-          { value: STATUS_DRAFT, label: "Draft" },
-          { value: STATUS_SENT, label: "Sent" },
-          { value: STATUS_PAID, label: "Paid" },
-          { value: STATUS_PENDING, label: "Pending" },
-          { value: STATUS_OVERDUE, label: "Overdue" },
-          { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
-          { value: STATUS_CANCELLED, label: "Cancelled" },
-          { value: STATUS_FAILED, label: "Failed" },
-          { value: STATUS_REFUNDED, label: "Refunded" },
-        ],
-        value: currentFilters.status || "",
-        onChange: (value: string) => {
-          setCurrentFilters((prev) => {
-            if (value) {
-              return { ...prev, status: value };
-            } else {
+    () => {
+      const statusChoices: { value: string; label: string }[] = [
+        { value: "", label: "All Status" },
+        { value: STATUS_DRAFT, label: "Draft" },
+        { value: STATUS_SENT, label: "Sent" },
+        { value: STATUS_PAID, label: "Paid" },
+        { value: STATUS_PENDING, label: "Pending" },
+        { value: STATUS_OVERDUE, label: "Overdue" },
+        { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
+        { value: STATUS_CANCELLED, label: "Cancelled" },
+        { value: STATUS_FAILED, label: "Failed" },
+        { value: STATUS_REFUNDED, label: "Refunded" },
+      ];
+
+      const pillButtonStyle: React.CSSProperties = {
+        padding: "8px 12px",
+        cursor: "pointer",
+        background: "transparent",
+        borderRadius: "4px",
+        border: "none",
+        width: "100%",
+        textAlign: "left",
+        fontSize: 13,
+      };
+
+      return [
+        {
+          id: "status",
+          label: "Status",
+          showDropdown: true,
+          active: !!currentFilters.status,
+          activeLabel: currentFilters.status
+            ? getStatusLabel(currentFilters.status)
+            : undefined,
+          onClear: () => {
+            setCurrentFilters((prev) => {
               const { status, ...rest } = prev;
               return rest;
-            }
-          });
-          setPagination((prev) => ({ ...prev, currentPage: 1 }));
-          setRefreshKey((prev) => prev + 1);
+            });
+            applyInvoiceFiltersAndRefresh();
+          },
+          dropdownContent: (
+            <div
+              style={{ minWidth: 200 }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {statusChoices.map((opt) => (
+                <button
+                  key={opt.value || "all"}
+                  type="button"
+                  style={{
+                    ...pillButtonStyle,
+                    background:
+                      (opt.value === "" && !currentFilters.status) ||
+                      currentFilters.status === opt.value
+                        ? "#f0f0f0"
+                        : "transparent",
+                  }}
+                  onClick={() => {
+                    setCurrentFilters((prev) => {
+                      if (!opt.value) {
+                        const { status, ...rest } = prev;
+                        return rest;
+                      }
+                      return { ...prev, status: opt.value };
+                    });
+                    applyInvoiceFiltersAndRefresh();
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          ),
         },
-      },
-      {
-        id: "invoice_date",
-        label: "Invoice Date",
-        type: "date",
-        value: currentFilters.invoice_date_from || "",
-        onChange: (value: string) => {
-          setCurrentFilters((prev) => {
-            if (value) {
-              return { ...prev, invoice_date_from: value };
-            } else {
-              const { invoice_date_from, ...rest } = prev;
+        {
+          id: "date_from",
+          label: "Date From",
+          showDropdown: true,
+          active: !!currentFilters.date_from,
+          activeLabel: currentFilters.date_from || undefined,
+          onClear: () => {
+            setCurrentFilters((prev) => {
+              const { date_from, ...rest } = prev;
               return rest;
-            }
-          });
-          setPagination((prev) => ({ ...prev, currentPage: 1 }));
-          setRefreshKey((prev) => prev + 1);
+            });
+            applyInvoiceFiltersAndRefresh();
+          },
+          dropdownContent: (
+            <div
+              style={{ minWidth: 220, padding: "4px 0" }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <input
+                type="date"
+                value={currentFilters.date_from ?? ""}
+                style={{
+                  width: "100%",
+                  padding: "6px 12px",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 4,
+                }}
+                onChange={(e) => {
+                  const next = e.target.value || undefined;
+                  setCurrentFilters((prev) => {
+                    if (!next) {
+                      const { date_from, ...rest } = prev;
+                      return rest;
+                    }
+                    return { ...prev, date_from: next };
+                  });
+                  applyInvoiceFiltersAndRefresh();
+                }}
+              />
+            </div>
+          ),
         },
-      },
-    ],
-    [currentFilters]
+      ];
+    },
+    [currentFilters, applyInvoiceFiltersAndRefresh],
   );
 
   // Stats cards for invoices
@@ -913,7 +1033,7 @@ const InvoiceList = () => {
     onTableViewChange: () => {},
 
     showEditColumns: true,
-    onEditColumnsClick: () => {},
+    onEditColumnsClick: () => setShowColumnEditor(true),
 
     showFiltersButton: true,
     onFiltersClick: handleOpenFiltersSidebar,
@@ -966,8 +1086,10 @@ const InvoiceList = () => {
         showActions={true}
         actionsLabel="Actions"
         customizableColumns={true}
-        defaultSelectedColumns={["invoice_number", "status", "total_amount", "amount_due", "invoice_date", "due_date"]}
-        columnStorageKey="customerInvoicesSelectedColumns"
+        defaultSelectedColumns={DEFAULT_INVOICE_TABLE_COLUMN_KEYS}
+        columnStorageKey={BILLING_INVOICES_COLUMN_STORAGE_KEY}
+        selectedColumns={selectedInvoiceTableColumns}
+        onColumnChange={setSelectedInvoiceTableColumns}
         pagination={{
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
@@ -1237,6 +1359,23 @@ const InvoiceList = () => {
         invoice={selectedInvoiceForView}
         companyName={session?.user?.company_name || ""}
         companyOptions={companyOptions}
+      />
+
+      <ColumnEditorModal
+        show={showColumnEditor}
+        onHide={() => setShowColumnEditor(false)}
+        title="Customize Columns"
+        columns={tableColumns.map((c) => ({ key: c.key, label: c.label }))}
+        selectedColumnKeys={selectedInvoiceTableColumns}
+        onApply={(keys) => {
+          setSelectedInvoiceTableColumns(keys);
+          if (globalThis.window !== undefined) {
+            globalThis.window.localStorage.setItem(
+              BILLING_INVOICES_COLUMN_STORAGE_KEY,
+              JSON.stringify(keys),
+            );
+          }
+        }}
       />
     </React.Fragment>
   );
