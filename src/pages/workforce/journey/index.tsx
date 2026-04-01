@@ -24,11 +24,15 @@ interface OnboardingEmployee {
   startDate: string;
   stages: string[];
   progress: number;
-  status: "In Progress" | "On Track" | "Overdue" | "Completed";
+  status: "In Progress" | "On Track" | "Completed";
   role?: string;
   department?: string;
   total_steps_count?: string | number;
   completed_steps_count?: string | number;
+  /** From API `user_profile.contract_type` */
+  contract_type?: string;
+  /** From API `user_profile.employment_type` */
+  employment_type?: string;
 }
 
 type LookupUser = {
@@ -50,7 +54,14 @@ interface JourneyRecord {
   total_steps_count?: string | number;
   completed_steps_count?: string | number;
   steps?: { name?: string; [key: string]: unknown }[];
-  user_profile?: { id?: number; user_id?: string; job_title?: string; [key: string]: unknown };
+  user_profile?: {
+    id?: number;
+    user_id?: string;
+    job_title?: string;
+    contract_type?: string;
+    employment_type?: string;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -64,10 +75,9 @@ interface JourneysPagination {
   to?: number;
 }
 
-const STATUS_DISPLAY: Record<string, "In Progress" | "On Track" | "Overdue" | "Completed"> = {
+const STATUS_DISPLAY: Record<string, "In Progress" | "On Track" | "Completed"> = {
   in_progress: "In Progress",
   on_track: "On Track",
-  overdue: "Overdue",
   completed: "Completed",
 };
 
@@ -122,8 +132,6 @@ const getStatusColor = (status: OnboardingEmployee["status"]) => {
       return { bg: "#f3f4f6", color: "#6b7280", dot: "#9ca3af" };
     case "On Track":
       return { bg: "#fef3c7", color: "#92400e", dot: "#fbbf24" };
-    case "Overdue":
-      return { bg: "#fee2e2", color: "#991b1b", dot: "#ef4444" };
     case "Completed":
       return { bg: "#ecfdf5", color: "#065f46", dot: "#10b981" };
   }
@@ -141,6 +149,7 @@ const EmployeesOnboarding = () => {
   const [appliedUserIds, setAppliedUserIds] = useState<string[]>([]);
   const [userSearchTerm, setUserSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
   const [selectedEmployee, setSelectedEmployee] = useState<OnboardingEmployee | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -171,7 +180,7 @@ const EmployeesOnboarding = () => {
       try {
         const params: { page: number; limit: number; search?: string; employment_type?: string; contract_type?: string; user_ids?: string[] } = {
           page: currentPage,
-          limit: ITEMS_PER_PAGE,
+          limit: rowsPerPage,
         };
         if (appliedSearch?.trim()) params.search = appliedSearch.trim();
         if (appliedEmploymentType?.trim()) params.employment_type = appliedEmploymentType.trim();
@@ -190,7 +199,16 @@ const EmployeesOnboarding = () => {
       }
     };
     fetchJourneys();
-  }, [companyIdentifier, currentPage, refreshJourneysKey, appliedSearch, appliedEmploymentType, appliedContract, appliedUserIds]);
+  }, [
+    companyIdentifier,
+    currentPage,
+    rowsPerPage,
+    refreshJourneysKey,
+    appliedSearch,
+    appliedEmploymentType,
+    appliedContract,
+    appliedUserIds,
+  ]);
 
   useEffect(() => {
     if (companyIdentifier) return;
@@ -216,6 +234,9 @@ const EmployeesOnboarding = () => {
       const startDateFormatted = j.start_date
         ? new Date(j.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
         : "—";
+      const profile = j.user_profile;
+      const contractRaw = profile?.contract_type;
+      const employmentRaw = profile?.employment_type;
       return {
         id: String(j.id ?? j.user_profile_id ?? (userId || "unknown")),
         name,
@@ -224,10 +245,14 @@ const EmployeesOnboarding = () => {
         stages: stepNames,
         progress,
         status,
-        role: j.job_title ?? j.user_profile?.job_title ?? undefined,
+        role: j.job_title ?? profile?.job_title ?? undefined,
         department: j.department_name ?? undefined,
         total_steps_count: j.total_steps_count,
         completed_steps_count: j.completed_steps_count,
+        contract_type:
+          contractRaw != null && String(contractRaw).trim() !== "" ? String(contractRaw).trim() : undefined,
+        employment_type:
+          employmentRaw != null && String(employmentRaw).trim() !== "" ? String(employmentRaw).trim() : undefined,
       };
     });
   }, [journeysData, users]);
@@ -239,6 +264,17 @@ const EmployeesOnboarding = () => {
     setAppliedUserIds(selectedUserIds);
     setCurrentPage(1);
   };
+
+  const handlePaginationChange = useCallback((page: number, limit: number) => {
+    setRowsPerPage((prevLimit) => {
+      if (prevLimit !== limit) {
+        setCurrentPage(1);
+        return limit;
+      }
+      setCurrentPage(page);
+      return prevLimit;
+    });
+  }, []);
 
   const resetFilters = () => {
     setSearchTerm("");
@@ -277,6 +313,18 @@ const EmployeesOnboarding = () => {
           getInitials: (row) => getInitials(row.name),
           getColor: (row) => getAvatarColor(row.name),
         },
+      },
+      {
+        key: "contract_type",
+        label: "Contract Type",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "employment_type",
+        label: "Employment Type",
+        type: "text",
+        sortable: false,
       },
       {
         key: "startDate",
@@ -667,13 +715,13 @@ const EmployeesOnboarding = () => {
               journeysPagination
                 ? {
                     currentPage: journeysPagination.page ?? currentPage,
-                    rowsPerPage: ITEMS_PER_PAGE,
+                    rowsPerPage: journeysPagination.limit ?? rowsPerPage,
                     totalRows: journeysPagination.total ?? 0,
-                    pageSizeOptions: [ITEMS_PER_PAGE],
+                    pageSizeOptions: [15, 25, 50, 100],
                   }
                 : undefined
             }
-            onPaginationChange={(page) => setCurrentPage(page)}
+            onPaginationChange={handlePaginationChange}
             onRowClick={(row) => {
               setSelectedEmployee(row);
               setIsSidebarOpen(true);

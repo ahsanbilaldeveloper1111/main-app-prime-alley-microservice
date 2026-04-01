@@ -22,7 +22,7 @@ export interface NewRequestModalProps {
 
 /** Category with optional children (sub-categories) from API */
 type CategoryWithChildren = UserRequestCategory & {
-  children?: Array<{ id: number; name?: string | null; code?: string | null }>;
+  children?: Array<{ id: number; name?: string | null; code?: string | null; is_active?: boolean }>;
 };
 
 type CreateFormState = {
@@ -251,7 +251,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const loadCategories = useCallback(async () => {
     setLoadingCategories(true);
     try {
-      const { data } = await getUserRequestCategories({ limit: 1000 });
+      const { data } = await getUserRequestCategories({ limit: 100,is_active:true });
       const list = (data ?? []) as CategoryWithChildren[];
       setCategories(list);
       setCategoryFields({});
@@ -322,7 +322,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
   }, [effectiveCategoryId]);
 
   const topLevelCategories = categories.filter((c) => c.parent_id == null);
-  const subCategories = selectedParent?.children ?? [];
+  const subCategories = (selectedParent?.children ?? []).filter((ch) => ch.is_active === true);
   const hasSubCategories = subCategories.length > 0;
   /** Category id whose fields to show: effective (child/parent) when set, else selected parent when it has children */
   const getDisplayFieldsCategoryId = (): number | null => {
@@ -421,7 +421,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
       <Form onSubmit={handleSubmit}>
         <Modal.Body>
           <Form.Group className="mb-3">
-            <Form.Label>Category *</Form.Label>
+            <Form.Label>Category <span className="text-danger">*</span></Form.Label>
             <Form.Select
               value={selectedParentId === "" ? "" : String(selectedParentId)}
               onChange={(e) => {
@@ -429,7 +429,9 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                 const parentId = val === "" ? "" : Number(val);
                 setSelectedParentId(parentId);
                 const parent = parentId === "" ? null : categories.find((c) => c.id === parentId);
-                const hasChildren = (parent as CategoryWithChildren)?.children?.length;
+                const activeChildrenCount =
+                  (parent as CategoryWithChildren)?.children?.filter((ch) => ch.is_active === true).length ?? 0;
+                const hasChildren = activeChildrenCount > 0;
                 setForm((f) => ({
                   ...f,
                   user_request_category_id: hasChildren ? "" : parentId,
@@ -450,7 +452,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
           </Form.Group>
           {hasSubCategories && (
             <Form.Group className="mb-3">
-              <Form.Label>Sub-category</Form.Label>
+              <Form.Label>Sub-category (Optional)</Form.Label>
               <Form.Select
                 value={form.user_request_category_id === "" ? "" : String(form.user_request_category_id)}
                 onChange={(e) => {
@@ -473,7 +475,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
             </Form.Group>
           )}
           <Form.Group className="mb-3">
-            <Form.Label>Subject *</Form.Label>
+            <Form.Label>Subject <span className="text-danger">*</span></Form.Label>
             <Form.Control
               type="text"
               value={form.subject}
