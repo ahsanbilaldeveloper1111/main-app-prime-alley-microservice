@@ -191,13 +191,17 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     }
   }, []);
 
-  useEffect(() => {
-    if (show) {
-      setForm(defaultForm);
-      setAddresses([]);
-      setDepartmentUsers([]);
-    }
-  }, [show]);
+  const resetFormState = useCallback(() => {
+    setForm(defaultForm);
+    setAddresses([]);
+    setDepartmentUsers([]);
+  }, []);
+
+  /** Reset + close — only for Cancel and successful Create (not X / backdrop / Esc). */
+  const handleCancelClick = useCallback(() => {
+    resetFormState();
+    onHide();
+  }, [onHide, resetFormState]);
 
   const mainAppDepartmentOptions = useMemo(
     () => (mainAppDepartments ?? []).map((d) => ({ value: String(d.id), label: String(d.name ?? "—") })),
@@ -281,6 +285,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
         })),
       });
       toast.success("Employee created");
+      resetFormState();
       onHide();
       onSuccess?.();
     } catch {
@@ -584,7 +589,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           </div>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={onHide} type="button">
+          <Button variant="secondary" onClick={handleCancelClick} type="button">
             Cancel
           </Button>
           <Button variant="primary" type="submit" disabled={submitting}>

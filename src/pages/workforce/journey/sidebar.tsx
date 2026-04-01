@@ -61,9 +61,11 @@ interface OnboardingEmployee {
   startDate: string;
   stages: string[];
   progress: number;
-  status: 'In Progress' | 'On Track' | 'Completed';
+  status: "In Progress" | "On Track" | "Completed";
   role?: string;
   department?: string;
+  total_steps_count?: string | number;
+  completed_steps_count?: string | number;
 }
 
 interface OnboardingDetailSidebarProps {
@@ -82,7 +84,7 @@ function statusDisplayToApiValue(display: string): string {
   const map: Record<string, string> = {
     "In Progress": "in_progress",
     "On Track": "on_track",
-    Completed: "completed",
+    "Completed": "completed",
   };
   return map[display] ?? "in_progress";
 }

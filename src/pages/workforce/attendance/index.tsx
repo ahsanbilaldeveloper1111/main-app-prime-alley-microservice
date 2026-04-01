@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Layout from "@layout/index";
@@ -115,6 +116,9 @@ const AttendancePage = () => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
+  const rowsPerPageRef = useRef(rowsPerPage);
+  rowsPerPageRef.current = rowsPerPage;
   const [pagination, setPagination] = useState<{
     page: number;
     limit: number;
@@ -135,7 +139,7 @@ const AttendancePage = () => {
     try {
       const params: { page: number; limit: number; user_id?: string; date_from?: string; date_to?: string } = {
         page,
-        limit: ITEMS_PER_PAGE,
+        limit: rowsPerPage,
       };
       if (selectedUserId.trim()) params.user_id = selectedUserId.trim();
       const dateRange = getDateRangeForOption(selectedDate ?? "");
@@ -163,7 +167,16 @@ const AttendancePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedUserId, selectedDate]);
+  }, [selectedUserId, selectedDate, rowsPerPage]);
+
+  const handlePaginationChange = useCallback((page: number, limit: number) => {
+    if (rowsPerPageRef.current !== limit) {
+      setRowsPerPage(limit);
+      setCurrentPage(1);
+      return;
+    }
+    setCurrentPage(page);
+  }, []);
 
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -544,13 +557,13 @@ const AttendancePage = () => {
             pagination
               ? {
                   currentPage: pagination.page,
-                  rowsPerPage: ITEMS_PER_PAGE,
+                  rowsPerPage: pagination.limit ?? rowsPerPage,
                   totalRows: pagination.total,
-                  pageSizeOptions: [ITEMS_PER_PAGE],
+                  pageSizeOptions: [15, 25, 50, 100],
                 }
               : undefined
           }
-          onPaginationChange={(page) => setCurrentPage(page)}
+          onPaginationChange={handlePaginationChange}
           showToolbar={true}
           toolbar={attendanceToolbar}
           showToolbarActions={false}

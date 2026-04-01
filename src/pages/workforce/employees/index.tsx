@@ -17,7 +17,7 @@ import {
   type UserProfile,
   type UserProfileAddress,
 } from "@utils/staffManagement";
-import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import { useMainAppLookups, type MainAppUserLookup } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Button, Form, Modal } from "react-bootstrap";
 import GenericTable, { TableAction, TableColumn } from "@components/GenericTable";
@@ -78,6 +78,13 @@ interface MainAppUser {
   phone?: string;
   department_id?: number;
   [key: string]: unknown;
+}
+
+/** Value sent as `user_ids` in getUserProfiles — matches profile `user_id` (phone / extension). */
+function userIdForProfilePayload(u: { phone?: string | null }): string {
+  const raw = u.phone;
+  if (raw == null) return "";
+  return String(raw).trim();
 }
 
 /** Address form row with country-state-city cascade fields */
@@ -1058,7 +1065,7 @@ const Employees = () => {
             )}
           </div>
 
-          {/* Manager Filter (multi-select); API receives user_ids: ["id1", "id2"] */}
+          {/* Manager Filter (multi-select); API receives user_ids: [phone, …] (same as profile user_id) */}
           <div style={{ position: 'relative' }}>
             <button
               type="button"
@@ -1135,20 +1142,21 @@ const Employees = () => {
                     All users
                   </button>
                   {managers
-                    .filter((mgr: any) => {
+                    .filter((mgr: MainAppUserLookup) => {
+                      if (userIdForProfilePayload(mgr) === "") return false;
                       const label = hierarchyLabel(mgr);
                       return !managerSearchTerm.trim() || label.toLowerCase().includes(managerSearchTerm.trim().toLowerCase());
                     })
-                    .map((mgr: any, idx: number) => {
+                    .map((mgr: MainAppUserLookup) => {
                       const label = hierarchyLabel(mgr);
-                      const idStr = String((mgr as { id?: number }).id ?? idx);
-                      const isSelected = selectedManagerIds.includes(idStr);
+                      const userIdStr = userIdForProfilePayload(mgr);
+                      const isSelected = selectedManagerIds.includes(userIdStr);
                       return (
                         <button
                           type="button"
-                          key={idStr}
+                          key={String(mgr.id)}
                           onClick={() => {
-                            toggleSelectedManagerId(idStr, isSelected);
+                            toggleSelectedManagerId(userIdStr, isSelected);
                           }}
                           style={{
                             width: "100%",
@@ -1466,7 +1474,9 @@ const Employees = () => {
             )}
             {appliedManagerIds.length > 0 && (
               <span
-                title={appliedManagerIds.map((id) => mainAppUsers.find((u: any) => String(u.id) === id)?.name ?? id).join(", ")}
+                title={appliedManagerIds
+                  .map((uid) => mainAppUsers.find((u) => userIdForProfilePayload(u) === uid)?.name ?? uid)
+                  .join(", ")}
                 style={{
                   padding: '4px 12px',
                   backgroundColor: '#e0e7ff',
@@ -1477,7 +1487,10 @@ const Employees = () => {
                   gap: '6px'
                 }}
               >
-                Managers: {appliedManagerIds.map((id) => mainAppUsers.find((u: any) => String(u.id) === id)?.name ?? id).join(", ")}
+                Managers:{" "}
+                {appliedManagerIds
+                  .map((uid) => mainAppUsers.find((u) => userIdForProfilePayload(u) === uid)?.name ?? uid)
+                  .join(", ")}
                 <button
                   onClick={() => { setSelectedManagerIds([]); setAppliedManagerIds([]); setCurrentPage(1); loadProfilesRef.current(1); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
