@@ -349,7 +349,7 @@ const ApprovalRequest = () => {
     async () => {
       setLoadingCategories(true);
       try {
-        const { data } = await getUserRequestCategories({ limit: 1000 });
+        const { data } = await getUserRequestCategories({ limit: 100,is_active:true });
         setCategories(data ?? []);
         setCategoryFields({});
         if (data?.length) {

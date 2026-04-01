@@ -31,6 +31,7 @@ import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, GripVertical, FolderTree } from "lucide-react";
 import Select from "@components/AppSelect";
 import GenericTable from "@components/GenericTable";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 
 /** Permission key duplicated in UI checks — single source avoids typos (Sonar S1192). */
@@ -614,6 +615,7 @@ const RequestCategories = () => {
         toast.success("Category created");
       }
       setShowCategoryModal(false);
+      setShowChildrenModal(false);
       loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
       if (categoryForChildren) loadChildren(categoryForChildren.id);
     } catch (error: unknown) {
@@ -630,15 +632,26 @@ const RequestCategories = () => {
 
   const handleDeleteCategory = async () => {
     if (!categoryToDelete) return;
-    const parentId = categoryToDelete.parent_id;
-    const wasChildOfOpenParent = categoryForChildren && parentId === categoryForChildren.id;
+    const deletedId = categoryToDelete.id;
+    const deletedParentId = categoryToDelete.parent_id;
+    const openParentId = categoryForChildren?.id;
+    const parentMatchesOpenModal =
+      openParentId != null &&
+      deletedParentId != null &&
+      Number(deletedParentId) === Number(openParentId);
+    const deletedRowWasInChildrenTable =
+      showChildrenModal &&
+      openParentId != null &&
+      childrenList.some((c) => Number(c.id) === Number(deletedId));
+    const shouldRefreshChildrenList =
+      showChildrenModal && openParentId != null && (parentMatchesOpenModal || deletedRowWasInChildrenTable);
     setDeleting(true);
     try {
       await deleteUserRequestCategory(categoryToDelete.id);
       setShowDeleteModal(false);
       setCategoryToDelete(null);
-      loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
-      if (wasChildOfOpenParent && categoryForChildren) loadChildren(categoryForChildren.id);
+      await loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
+      if (shouldRefreshChildrenList) await loadChildren(openParentId);
     } catch (error: unknown) {
       consumeHandledApiError(error, "RequestCategories.handleDeleteCategory");
     } finally {
@@ -1135,54 +1148,34 @@ const RequestCategories = () => {
         </Form>
       </Modal>
 
-      {/* Delete Category Confirmation Modal */}
-      <Modal show={showDeleteModal} onHide={() => !deleting && setShowDeleteModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Delete Category</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {categoryToDelete && (
-            <p className="mb-0">
-              Are you sure you want to delete <strong>{categoryToDelete.name}</strong>? This action cannot be undone.
-            </p>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleDeleteCategory} disabled={deleting}>
-            {deleting ? "Deleting…" : "Delete"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Delete field confirmation (avoids window/globalThis.confirm) */}
-      <Modal
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          if (deleting) return;
+          setShowDeleteModal(false);
+          setCategoryToDelete(null);
+        }}
+        onConfirm={handleDeleteCategory}
+        itemName={categoryToDelete?.name?.trim() || undefined}
+        itemType="category"
+        loading={deleting}
+      />
+      <DeleteConfirmationModal
         show={showDeleteFieldModal}
-        onHide={() => !deletingField && setShowDeleteFieldModal(false)}
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Delete field</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {fieldPendingDelete && (
-            <p className="mb-0">
-              Are you sure you want to delete the field <strong>{fieldPendingDelete.label ?? fieldPendingDelete.key}</strong>? This
-              action cannot be undone.
-            </p>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteFieldModal(false)} disabled={deletingField}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleConfirmDeleteField} disabled={deletingField}>
-            {deletingField ? "Deleting…" : "Delete"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        onHide={() => {
+          if (deletingField) return;
+          setShowDeleteFieldModal(false);
+          setFieldPendingDelete(null);
+        }}
+        onConfirm={handleConfirmDeleteField}
+        itemName={
+          fieldPendingDelete
+            ? (fieldPendingDelete.label ?? fieldPendingDelete.key ?? "").trim() || undefined
+            : undefined
+        }
+        itemType="field"
+        loading={deletingField}
+      />
 
       {/* Children Modal */}
       <Modal show={showChildrenModal} onHide={() => setShowChildrenModal(false)} size="lg" centered>
