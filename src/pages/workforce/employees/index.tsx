@@ -28,6 +28,7 @@ import "@assets/scss/tabs.scss";
 import { Search, ChevronDown, Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
+import { formatPhoneForDisplay } from "@utils/phoneDisplay";
 import Select from "react-select";
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
@@ -86,7 +87,50 @@ function displayProfileName(p: UserProfile): string {
   return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
 }
 
+/** Label for department headcount chart: resolve id via main-app departments, else legacy name or placeholder */
+function departmentHeadcountDisplayName(
+  departmentId: number | null,
+  departments: MainAppDepartment[],
+  legacyName?: string | null
+): string {
+  if (departmentId != null) {
+    const match = departments.find((d) => Number(d.id) === Number(departmentId));
+    if (match?.name != null && String(match.name).trim() !== "") {
+      return String(match.name).trim();
+    }
+    return `Department ${departmentId}`;
+  }
+  if (legacyName != null && legacyName.trim() !== "") {
+    return legacyName.trim();
+  }
+  return "—";
+}
+
+interface DepartmentHeadcountRawRow {
+  departmentId: number | null;
+  count: number;
+  legacyName: string | null;
+}
+
+interface DepartmentHeadcountChartRow {
+  name: string;
+  count: number;
+  color: string;
+  rowKey: string;
+}
+
 const ITEMS_PER_PAGE = 15;
+
+const DEPARTMENT_CHART_COLORS = [
+  "#6366f1",
+  "#10b981",
+  "#f59e0b",
+  "#ec4899",
+  "#8b5cf6",
+  "#06b6d4",
+  "#84cc16",
+  "#f97316",
+];
 
 const E164_MAX_DIGITS = 15;
 
@@ -197,6 +241,7 @@ const Employees = () => {
   const [appliedContract, setAppliedContract] = useState("");
   const [appliedManagerIds, setAppliedManagerIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
   const [managerSearchTerm, setManagerSearchTerm] = useState("");
@@ -218,52 +263,65 @@ const Employees = () => {
   const [journeyForm, setJourneyForm] = useState<{ startDate: string; status: string }>({ startDate: "", status: "in_progress" });
   const [journeySubmitting, setJourneySubmitting] = useState(false);
 
-  const DEPARTMENT_CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4", "#84cc16", "#f97316"];
-
-  useEffect(() => {
-    const fetchDepartmentHeadcount = async () => {
-      try {
-        const data = await getEmployeeDashboardGraphDepartmentHeadcount();
-        let raw: unknown[] = [];
-        if (Array.isArray(data)) raw = data;
-        else if (data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data)) raw = (data as { data: unknown[] }).data;
-        const list = (raw as { name?: string; count?: number }[]).map((item, i) => ({
-          name: String(item.name ?? "—"),
-          count: Number(item.count ?? 0),
-          color: DEPARTMENT_CHART_COLORS[i % DEPARTMENT_CHART_COLORS.length],
-        }));
-        setDepartmentHeadcountData(list);
-      } catch (e) {
-        console.error("[Employees] getEmployeeDashboardGraphDepartmentHeadcount error", e);
-        setDepartmentHeadcountData([]);
-      }
-    };
-    fetchDepartmentHeadcount();
-  }, []);
-
-  useEffect(() => {
-    const fetchCounters = async () => {
-      try {
-        const data = await getEmployeeDashboardCounters();
-        setDashboardCounters((data as EmployeeDashboardCountersData) ?? null);
-      } catch (e) {
-        console.error("[Employees] getEmployeeDashboardCounters error", e);
-        setDashboardCounters(null);
-      }
-    };
-    fetchCounters();
-  }, []);
-
-  const [departmentHeadcountData, setDepartmentHeadcountData] = useState<{ name: string; count: number; color: string }[]>([]);
+  const [departmentHeadcountRaw, setDepartmentHeadcountRaw] = useState<DepartmentHeadcountRawRow[]>([]);
   const [dashboardCounters, setDashboardCounters] = useState<EmployeeDashboardCountersData | null>(null);
 
+  const fetchDepartmentHeadcount = useCallback(async () => {
+    try {
+      const data = await getEmployeeDashboardGraphDepartmentHeadcount();
+      let raw: unknown[] = [];
+      if (Array.isArray(data)) raw = data;
+      else if (data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data)) raw = (data as { data: unknown[] }).data;
+      const list: DepartmentHeadcountRawRow[] = (raw as Record<string, unknown>[]).map((item) => {
+        const idRaw = item.department_id;
+        let departmentId: number | null = null;
+        if (idRaw != null && String(idRaw).trim() !== "") {
+          const n = Number(idRaw);
+          departmentId = Number.isFinite(n) ? n : null;
+        }
+        const count = Number(item.count ?? 0);
+        const legacyName = item.name == null ? null : String(item.name);
+        return { departmentId, count, legacyName };
+      });
+      setDepartmentHeadcountRaw(list);
+    } catch (e) {
+      console.error("[Employees] getEmployeeDashboardGraphDepartmentHeadcount error", e);
+      setDepartmentHeadcountRaw([]);
+    }
+  }, []);
+
+  const departmentHeadcountData: DepartmentHeadcountChartRow[] = useMemo(() => {
+    const departments = mainAppDepartments ?? [];
+    return departmentHeadcountRaw.map((row, i) => {
+      const name = departmentHeadcountDisplayName(row.departmentId, departments, row.legacyName);
+      const color = DEPARTMENT_CHART_COLORS[i % DEPARTMENT_CHART_COLORS.length];
+      const rowKey =
+        row.departmentId == null ? `row-${i}-${row.legacyName ?? "x"}` : `dept-${row.departmentId}`;
+      return { name, count: row.count, color, rowKey };
+    });
+  }, [departmentHeadcountRaw, mainAppDepartments]);
+
+  const fetchDashboardCounters = useCallback(async () => {
+    try {
+      const data = await getEmployeeDashboardCounters();
+      setDashboardCounters((data as EmployeeDashboardCountersData) ?? null);
+    } catch (e) {
+      console.error("[Employees] getEmployeeDashboardCounters error", e);
+      setDashboardCounters(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchDepartmentHeadcount();
+    void fetchDashboardCounters();
+  }, [fetchDepartmentHeadcount, fetchDashboardCounters]);
 
   const loadProfiles = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const params: { page: number; limit: number; employment_type?: string; contract_type?: string; status?: string; location_id?: number; department_id?: number; search?: string; user_ids?: string[] } = {
         page,
-        limit: ITEMS_PER_PAGE,
+        limit: rowsPerPage,
       };
       if (appliedEmploymentType?.trim()) params.employment_type = appliedEmploymentType.trim();
       if (appliedContract?.trim()) params.contract_type = appliedContract.trim();
@@ -283,11 +341,28 @@ const Employees = () => {
     } finally {
       setLoading(false);
     }
-  }, [appliedEmploymentType, appliedContract, appliedStatus, appliedLocationId, appliedDepartment, appliedSearch, appliedManagerIds]);
+  }, [appliedEmploymentType, appliedContract, appliedStatus, appliedLocationId, appliedDepartment, appliedSearch, appliedManagerIds, rowsPerPage]);
 
   useEffect(() => {
     loadProfiles(currentPage);
-  }, [currentPage, loadProfiles]);
+  }, [currentPage, rowsPerPage, loadProfiles]);
+
+  const handlePaginationChange = useCallback((page: number, limit: number) => {
+    setRowsPerPage((prevLimit) => {
+      if (prevLimit !== limit) {
+        setCurrentPage(1);
+        return limit;
+      }
+      setCurrentPage(page);
+      return prevLimit;
+    });
+  }, []);
+
+  const refreshAfterProfileSave = useCallback(() => {
+    void loadProfiles(currentPage);
+    void fetchDepartmentHeadcount();
+    void fetchDashboardCounters();
+  }, [currentPage, loadProfiles, fetchDepartmentHeadcount, fetchDashboardCounters]);
 
   // Open sidebar when navigating from notification with ?openId= (target_id)
   useEffect(() => {
@@ -398,6 +473,7 @@ const Employees = () => {
     try {
       await createJourney(payload);
       toast.success("Journey created successfully.");
+      refreshAfterProfileSave();
       closeJourneyModal();
     } catch (err) {
       console.error("[Employees] createJourney error", err);
@@ -411,7 +487,9 @@ const Employees = () => {
   const getDisplayName = useCallback((p: UserProfile): string => {
     const userId = p.user_id ?? (p as UserProfile & { extension_number?: string }).extension_number ?? p.employee_code;
     if (userId != null && mainAppUsers.length > 0) {
-      const mainUser = mainAppUsers.find((u: any) => String(u.id) === String(userId));
+      const uid = String(userId);
+      const mainUser =
+        mainAppUsers.find((u) => String(u.phone) === uid) ?? mainAppUsers.find((u) => String(u.id) === uid);
       if (mainUser?.name) return mainUser.name;
     }
     return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
@@ -547,6 +625,7 @@ const Employees = () => {
                     alignItems: "center",
                     gap: "4px",
                     marginTop: "2px",
+                    textTransform: "capitalize",
                   }}
                 >
                   <span
@@ -564,6 +643,12 @@ const Employees = () => {
             </div>
           );
         },
+      },
+      {
+        key: "user_id",
+        label: "Extension",
+        type: "text",
+        sortable: false,
       },
       {
         key: "identification_number",
@@ -593,8 +678,11 @@ const Employees = () => {
       {
         key: "phone",
         label: "Phone",
-        type: "text",
+        type: "custom",
         sortable: false,
+        render: (profile: UserProfile) => (
+          <span style={{ fontSize: "14px", color: "#1f2937" }}>{formatPhoneForDisplay(profile.phone)}</span>
+        ),
       },
       {
         key: "status",
@@ -1410,11 +1498,11 @@ const Employees = () => {
           uniqueKey="id"
           pagination={{
             currentPage,
-            rowsPerPage: ITEMS_PER_PAGE,
+            rowsPerPage,
             totalRows: pagination?.total ?? 0,
-            pageSizeOptions: [15],
+            pageSizeOptions: [15, 25, 50, 100],
           }}
-          onPaginationChange={(page) => setCurrentPage(page)}
+          onPaginationChange={handlePaginationChange}
           onRowClick={(profile: UserProfile) => handleProfileClick(profile)}
           showToolbar={false}
         />
@@ -1469,7 +1557,7 @@ const Employees = () => {
               flexWrap: 'wrap'
             }}>
               {departmentHeadcountData.map(dept => (
-                <div key={dept.name} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div key={dept.rowKey} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{
                     width: '12px',
                     height: '12px',
@@ -1507,7 +1595,7 @@ const Employees = () => {
                   radius={[8, 8, 0, 0]}
                 >
                   {departmentHeadcountData.map((entry) => (
-                    <Cell key={`${entry.name}-${entry.color}`} fill={entry.color} />
+                    <Cell key={entry.rowKey} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>
@@ -1649,7 +1737,7 @@ const Employees = () => {
       <AddEmployeeModal
         show={showCreateModal}
         onHide={() => setShowCreateModal(false)}
-        onSuccess={() => loadProfiles(currentPage)}
+        onSuccess={refreshAfterProfileSave}
         tenantId={companyIdentifier ?? undefined}
       />
 
@@ -1713,8 +1801,8 @@ const Employees = () => {
         onHide={() => { setShowEditModal(false); setEditingProfile(null); }}
         profile={editingProfile}
         onSuccess={(id: number) => {
-          loadProfiles(currentPage);
-          if (id != null && selectedProfile?.id === id) setSelectedProfile(null);
+          refreshAfterProfileSave();
+          if (selectedProfile?.id === id) setSelectedProfile(null);
         }}
       />
 

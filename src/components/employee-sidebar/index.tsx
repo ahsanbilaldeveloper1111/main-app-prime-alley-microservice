@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { X, Phone, Mail, Calendar, ChevronDown, Video, List, Grid, ChevronRight, FileText, Archive, Lock, MapPin, Clock, Shield, AlertTriangle, User } from 'lucide-react';
+import { X, Phone, Mail, Calendar, ChevronDown, Video, List, Grid, ChevronRight, FileText, Archive, Lock, MapPin, Clock, Shield, AlertTriangle, User, IdCard } from 'lucide-react';
+import { formatPhoneForDisplay } from '@utils/phoneDisplay';
 
 interface ActivityItem {
   id: string;
@@ -55,6 +56,8 @@ interface DepartmentOption {
 interface UserOption {
   id: number;
   name: string;
+  /** When provided (e.g. main app users), match profile.user_id by phone first, then by id */
+  phone?: string;
 }
 
 export interface EmployeeDetailSidebarProps {
@@ -173,19 +176,24 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                         minWidth: '150px'
                       }}>
                         {['Last 30 days', 'Last 90 days', 'Last 180 days', 'Last 360 days'].map(period => (
-                          <div
+                          <button
+                            type="button"
                             key={period}
                             onClick={() => setShow360Dropdown(false)}
                             style={{
                               padding: '10px 16px',
                               cursor: 'pointer',
-                              fontSize: '13px'
+                              fontSize: '13px',
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              backgroundColor: 'white'
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                           >
                             {period}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -365,7 +373,8 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
               {/* Activity Items */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {activityItems.map(item => (
-                  <div
+                  <button
+                    type="button"
                     key={item.id}
                     style={{
                       display: 'flex',
@@ -374,7 +383,10 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                       backgroundColor: '#f9fafb',
                       borderRadius: '8px',
                       cursor: 'pointer',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.2s',
+                      border: 'none',
+                      width: '100%',
+                      textAlign: 'left'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
@@ -422,7 +434,7 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                       <Clock size={12} />
                       {item.timestamp}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -513,7 +525,8 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
               {/* Risk Items */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {riskItems.map(item => (
-                  <div
+                  <button
+                    type="button"
                     key={item.id}
                     style={{
                       display: 'flex',
@@ -523,7 +536,10 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                       borderRadius: '8px',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
-                      borderLeft: '3px solid #ef4444'
+                      border: 'none',
+                      borderLeft: '3px solid #ef4444',
+                      width: '100%',
+                      textAlign: 'left'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
@@ -559,7 +575,7 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                         {item.subtitle}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -651,8 +667,27 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
     }
   };
 
-  const displayName = profile ? (users.find((u) => String(u.id) === String(profile.user_id))?.name ?? String(profile.user_id ?? profile.employee_code ?? profile.id ?? "—")) : "—";
-  const departmentName = profile?.department_id != null ? (departments.find((d) => String(d.id) === String(profile.department_id))?.name ?? String(profile.department_id)) : null;
+  let displayName = "—";
+  if (profile) {
+    const userId = profile.user_id;
+    let nameFromUsers: string | undefined;
+    if (userId != null && String(userId).trim() !== "" && users.length > 0) {
+      const uid = String(userId);
+      const match =
+        users.find((u) => String(u.phone ?? "") === uid) ?? users.find((u) => String(u.id) === uid);
+      nameFromUsers = match?.name;
+    }
+    displayName = nameFromUsers ?? String(profile.user_id ?? profile.employee_code ?? profile.id ?? "—");
+  }
+
+  let departmentName: string | null = null;
+  if (profile) {
+    const deptId = profile.department_id;
+    if (deptId !== undefined && deptId !== null) {
+      const dept = departments.find((d) => String(d.id) === String(deptId));
+      departmentName = dept?.name ?? String(deptId);
+    }
+  }
 
   return (
     <div style={{
@@ -700,13 +735,19 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
               {profile?.phone != null && profile.phone !== '' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Phone size={16} color="#6b7280" />
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{String(profile.phone)}</span>
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{formatPhoneForDisplay(profile.phone)}</span>
                 </div>
               )}
               {(profile as { email?: string })?.email != null && (profile as { email?: string }).email !== '' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Mail size={16} color="#6b7280" />
                   <span style={{ fontSize: '14px', color: '#6b7280' }}>{(profile as { email?: string }).email}</span>
+                </div>
+              )}
+               {(profile as { identification_number?: string })?.identification_number != null && (profile as { identification_number?: string }).identification_number !== '' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <IdCard size={16} color="#6b7280" />
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{(profile as { identification_number?: string }).identification_number}</span>
                 </div>
               )}
             </div>
