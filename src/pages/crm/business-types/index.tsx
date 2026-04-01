@@ -248,17 +248,15 @@ const BusinessTypes = () => {
       onSearch: handleToolbarSearch,
       rightActions: (
         <div className="d-flex gap-2">
-          {session?.user?.permissions?.includes(PERMISSION_ADD) && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => handleOpenModal()}
-              className="d-flex align-items-center gap-2"
-            >
-              <PlusCircle size={16} aria-hidden />
-              Add Business Type
-            </Button>
-          )}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => handleOpenModal()}
+            className="d-flex align-items-center gap-2"
+          >
+            <PlusCircle size={16} aria-hidden />
+            Add Business Type
+          </Button>
         </div>
       ),
     }),
