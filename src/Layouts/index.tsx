@@ -35,9 +35,11 @@ import DeviceSelectionModal from '../components/DeviceSelectionModal';
 import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
 import CreateLeadModal from '@components/CreateLeadModal';
 import { CreateCompanySidebar, CompanyFormPayload } from '@components/renderCreateCompany';
+import { CreateTicketSidebar } from '@components/renderCreateTicketForm';
 import { createCompany } from '@utils/crm';
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
+import CreateTaskModal from '@components/CreatePlannerTaskSidebar';
 
 interface LayoutProps {
 	children: ReactNode;
@@ -168,6 +170,8 @@ const Layout = ({ children }: LayoutProps) => {
 	}, [searchQuery, searchableRoutes, session?.user?.permissions]);
 	const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
 	const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
+  const [showCreateTicketSidebar, setShowCreateTicketSidebar] = useState(false);
+  const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
   const [showBreezeAssistant, setShowBreezeAssistant] = useState(false);
   const [breezeMaximized, setBreezeMaximized] = useState(false);
 
@@ -1003,11 +1007,23 @@ font-weight:600;
 			text-decoration: none;
 			border-bottom: 1px solid #006162;
 			cursor: pointer;
+      border: none !important;
+      border-bottom: 1px solid #006162 !important;
+      background: transparent !important;
         }
         
         .user-dropdown-footer-link:hover {
           color: #007a8f;
           border-bottom-color: #007a8f;
+        }
+          @media (max-width: 1400px) {
+          
+          
+          .crm-prime-search-wrapper {
+            max-width: 220px !important;
+            width" 220px !important;
+          }
+          
         }
         
         @media (max-width: 991px) {
@@ -1018,9 +1034,7 @@ font-weight:600;
           .app-content-area { 
             margin-left: 0 !important; 
           }
-          .crm-prime-search-wrapper {
-            max-width: 220px;
-          }
+          
           .crm-prime-user-info {
             display: none;
           }
@@ -1193,7 +1207,7 @@ font-weight:600;
                         {session?.user?.permissions?.includes(PERMISSIONS.MANAGE_HELP_CENTER) && (
                         <button className="create-dropdown-item" onClick={() => {
                           setShowCreateDropdown(false);
-                          router.push('/help-center/my-tickets/new');
+                          setShowCreateTicketSidebar(true);
                         }}>
                         Ticket
                           </button>
@@ -1201,8 +1215,8 @@ font-weight:600;
 
                         {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
                         <button type="button" className="create-dropdown-item" onClick={() => {
-                          setShowCreateDropdown(false); /* Add Task handler */
-                          router.push('/planner/tasks');
+                          setShowCreateDropdown(false);
+                          setShowCreateTaskSidebar(true);
                         }}>
                         Task
                           </button>
@@ -1414,7 +1428,14 @@ font-weight:600;
                       <div className="user-dropdown-section">
                         
                           {session?.user?.permissions?.includes('tickets-tickets') && (
-                            <button type="button" className="user-dropdown-item" onClick={() => router.push('/crm/tickets')}>
+                            <button
+                              type="button"
+                              className="user-dropdown-item"
+                              onClick={() => {
+                                setShowUserDropdown(false);
+                                router.push('/crm/tickets');
+                              }}
+                            >
                               {/* <Ticket className="user-dropdown-item-icon" size={14} /> */}
                               <span className="user-dropdown-item-text">Raise a ticket</span>
                             </button>
@@ -1453,11 +1474,13 @@ font-weight:600;
 
                           
                         <button type="button" className="user-dropdown-item user-dropdown-credits-head">
-                         
-                            <span className="user-dropdown-item-text">CRM Prime Credits</span>
+                          <div className="d-flex align-items-center justify-content-between w-100 gap-2">
+                            <span className="user-dropdown-item-text">Prime Credits</span>
+                            <span className="user-dropdown-item-badge">New</span>
+                          </div>
                             
                           
-                          <div className="user-dropdown-credits-count">1500 of 1500 credits available</div>
+                          <div className="user-dropdown-credits-count">0 of 0 credits available</div>
                         </button>
                         <button type="button" className="user-dropdown-item">
                           {/* <Briefcase className="user-dropdown-item-icon" size={14} /> */}
@@ -1485,7 +1508,7 @@ font-weight:600;
                         <button
                           type="button"
                           className="user-dropdown-footer-link"
-                          onClick={() => router.push('/main-settings/privacy-consent')}
+                          onClick={() => router.push('/privacy-policy')}
                         >
                           Privacy policy
                         </button>
@@ -1766,6 +1789,20 @@ font-weight:600;
 				}}
 			/>
 		)}
+
+    {showCreateTicketSidebar && (
+      <CreateTicketSidebar
+        onClose={() => setShowCreateTicketSidebar(false)}
+        onSuccess={() => setShowCreateTicketSidebar(false)}
+      />
+    )}
+
+    <CreateTaskModal
+      isOpen={showCreateTaskSidebar}
+      onClose={() => setShowCreateTaskSidebar(false)}
+      onCreate={() => setShowCreateTaskSidebar(false)}
+      taskType="regular"
+    />
 		</>
 	);
 };

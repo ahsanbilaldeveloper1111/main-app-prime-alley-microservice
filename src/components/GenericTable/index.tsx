@@ -1529,6 +1529,10 @@ const GenericTable = <T extends Record<string, any>>({
 
             {/* Custom Actions */}
             {toolbar.customActions}
+
+            {/* Right-aligned actions (shown here when no tabs section is rendered) */}
+            {(!toolbar.showTabs || !toolbar.tabs || toolbar.tabs.length === 0) &&
+              toolbar.rightActions}
           </div>
         </div>
 
