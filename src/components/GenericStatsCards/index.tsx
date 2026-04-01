@@ -47,6 +47,9 @@ const StatsCards: React.FC<StatsCardsProps> = ({
       border: '1px solid #cccccc'
     }}>
       {data.map((card) => {
+        const IconComponent = card.icon;
+        const iconColor = card.iconColor || '#6366F1';
+        const iconBgColor = card.iconBgColor || '#EEF2FF';
         const cardKey = card.title + '|' + String(card.value) + '|' + (card.subtitle || '') + '|' + (card.additionalText || '');
 
         return (
@@ -59,6 +62,7 @@ const StatsCards: React.FC<StatsCardsProps> = ({
               
             }}
           >
+          
 
             {/* Title */}
             <div style={{
