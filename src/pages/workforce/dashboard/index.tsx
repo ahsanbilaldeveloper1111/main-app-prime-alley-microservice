@@ -248,7 +248,7 @@ const EmployeesDashboard = () => {
                     gap: '8px',
                     padding: '8px 14px',
                     background: '#FFFFFF',
-                    border: '1px solid #E5E7EB',
+                    border: '0px solid #E5E7EB',
                     borderRadius: '8px',
                     fontSize: '13px',
                     color: '#374151',
@@ -268,7 +268,7 @@ const EmployeesDashboard = () => {
                       left: 0,
                       marginTop: '4px',
                       background: '#FFFFFF',
-                      border: '1px solid #E5E7EB',
+                      border: 'none',
                       borderRadius: '8px',
                       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                       minWidth: '140px',
@@ -286,8 +286,17 @@ const EmployeesDashboard = () => {
                         }}
                         style={{
                           padding: '10px 14px',
+                          margin: 0,
                           cursor: 'pointer',
                           fontSize: '13px',
+                          display: 'block',
+                          width: '100%',
+                          textAlign: 'left',
+                          border: 'none',
+                          outline: 'none',
+                          boxShadow: 'none',
+                          appearance: 'none',
+                          WebkitAppearance: 'none',
                           color: periodType === option ? '#6366F1' : '#374151',
                           fontWeight: periodType === option ? '600' : '500',
                           background: periodType === option ? '#F0F9FF' : 'transparent',
@@ -379,10 +388,11 @@ const EmployeesDashboard = () => {
                 <div style={{
                   position: 'absolute',
                   top: '100%',
-                  left: 0,
+                  right: 0,
+                  left: 'auto',
                   marginTop: '4px',
                   background: '#FFFFFF',
-                  border: '1px solid #E5E7EB',
+                  border: 'none',
                   borderRadius: '8px',
                   boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
                   minWidth: '160px',
@@ -399,8 +409,17 @@ const EmployeesDashboard = () => {
                       }}
                       style={{
                         padding: '10px 14px',
+                        margin: 0,
                         cursor: 'pointer',
                         fontSize: '13px',
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'left',
+                        border: 'none',
+                        outline: 'none',
+                        boxShadow: 'none',
+                        appearance: 'none',
+                        WebkitAppearance: 'none',
                         color: selectedDays === option ? '#6366F1' : '#374151',
                         fontWeight: selectedDays === option ? '600' : '500',
                         background: selectedDays === option ? '#F0F9FF' : 'transparent',
@@ -417,7 +436,7 @@ const EmployeesDashboard = () => {
                         }
                       }}
                     >
-                      {option}
+                     Last {option} days
                     </button>
                   ))}
                 </div>

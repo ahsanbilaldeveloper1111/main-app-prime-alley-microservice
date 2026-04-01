@@ -537,7 +537,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                       checked={checked}
                       disabled={updatingBulkReports}
                       onChange={() => {
-                        void handleDirectReportToggle(uid, checked);
+                        handleDirectReportToggle(uid, checked);
                       }}
                       style={{ cursor: updatingBulkReports ? 'wait' : 'pointer' }}
                     />
