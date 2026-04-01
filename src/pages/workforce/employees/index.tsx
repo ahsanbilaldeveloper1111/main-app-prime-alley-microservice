@@ -106,6 +106,29 @@ function departmentHeadcountDisplayName(
   return "—";
 }
 
+function parseDepartmentIdFromApi(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function legacyDisplayNameFromApi(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return null;
+}
+
 interface DepartmentHeadcountRawRow {
   departmentId: number | null;
   count: number;
@@ -273,14 +296,9 @@ const Employees = () => {
       if (Array.isArray(data)) raw = data;
       else if (data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data)) raw = (data as { data: unknown[] }).data;
       const list: DepartmentHeadcountRawRow[] = (raw as Record<string, unknown>[]).map((item) => {
-        const idRaw = item.department_id;
-        let departmentId: number | null = null;
-        if (idRaw != null && String(idRaw).trim() !== "") {
-          const n = Number(idRaw);
-          departmentId = Number.isFinite(n) ? n : null;
-        }
+        const departmentId = parseDepartmentIdFromApi(item.department_id);
         const count = Number(item.count ?? 0);
-        const legacyName = item.name == null ? null : String(item.name);
+        const legacyName = legacyDisplayNameFromApi(item.name);
         return { departmentId, count, legacyName };
       });
       setDepartmentHeadcountRaw(list);
@@ -312,8 +330,8 @@ const Employees = () => {
   }, []);
 
   useEffect(() => {
-    void fetchDepartmentHeadcount();
-    void fetchDashboardCounters();
+    fetchDepartmentHeadcount();
+    fetchDashboardCounters();
   }, [fetchDepartmentHeadcount, fetchDashboardCounters]);
 
   const loadProfiles = useCallback(async (page = 1) => {
@@ -359,9 +377,9 @@ const Employees = () => {
   }, []);
 
   const refreshAfterProfileSave = useCallback(() => {
-    void loadProfiles(currentPage);
-    void fetchDepartmentHeadcount();
-    void fetchDashboardCounters();
+    loadProfiles(currentPage);
+    fetchDepartmentHeadcount();
+    fetchDashboardCounters();
   }, [currentPage, loadProfiles, fetchDepartmentHeadcount, fetchDashboardCounters]);
 
   // Open sidebar when navigating from notification with ?openId= (target_id)
