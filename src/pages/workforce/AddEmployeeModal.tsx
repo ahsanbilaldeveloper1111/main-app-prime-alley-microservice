@@ -13,6 +13,10 @@ const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "F
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
 /** Address form row with country-state-city cascade fields */
 export type AddressFormItem = UserProfileAddress & { state?: string; countryCode?: string; stateCode?: string };
+type AddressFieldKey = "name" | "zip_code" | "city" | "country" | "address" | "state" | "countryCode" | "stateCode";
+type AddressFormItemWithId = AddressFormItem & { uiId: string };
+type DepartmentUserRow = { id: number; name: string; phone: string };
+type MainAppUserApiRow = { id: number; name?: string; phone?: string | number | null; phone_no?: string | number | null };
 
 const selectStyles = {
   control: (provided: Record<string, unknown>, state: { isFocused?: boolean }) => ({
@@ -100,7 +104,24 @@ const defaultForm: Partial<UserProfilePayload> = {
   status: "active",
 };
 
-const defaultAddress: AddressFormItem = {
+/** React list key only; use cryptographically strong randomness (not Math.random). */
+let addressUiIdFallbackSeq = 0;
+function createAddressUiId(): string {
+  const { crypto: webCrypto } = globalThis;
+  if (webCrypto?.randomUUID) {
+    return webCrypto.randomUUID();
+  }
+  if (webCrypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    webCrypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  addressUiIdFallbackSeq += 1;
+  return `addr-${addressUiIdFallbackSeq}`;
+}
+
+const createDefaultAddress = (): AddressFormItemWithId => ({
+  uiId: createAddressUiId(),
   name: "",
   zip_code: "",
   city: "",
@@ -109,7 +130,13 @@ const defaultAddress: AddressFormItem = {
   state: "",
   countryCode: "",
   stateCode: "",
-};
+});
+
+function userPhoneFromRow(user: MainAppUserApiRow): string {
+  const raw = user.phone ?? user.phone_no;
+  if (raw == null) return "";
+  return String(raw).trim();
+}
 
 const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   show,
@@ -120,10 +147,10 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
 }) => {
   const { mainAppDepartments, loadingDepartments, companyIdentifier } = useMainAppLookups();
   const [form, setForm] = useState<Partial<UserProfilePayload>>(defaultForm);
-  const [addresses, setAddresses] = useState<AddressFormItem[]>([]);
+  const [addresses, setAddresses] = useState<AddressFormItemWithId[]>([]);
   const [addressCountries, setAddressCountries] = useState<{ isoCode: string; name: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [departmentUsers, setDepartmentUsers] = useState<{ id: number; name: string }[]>([]);
+  const [departmentUsers, setDepartmentUsers] = useState<DepartmentUserRow[]>([]);
   const [loadingDepartmentUsers, setLoadingDepartmentUsers] = useState(false);
 
   const companyUuid = tenantId?.trim() || companyIdentifier || null;
@@ -138,7 +165,13 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
       try {
         const usersRaw = await getMainAppUsers(companyUuid, { department_id: departmentId });
         const list = Array.isArray(usersRaw)
-          ? (usersRaw as { id: number; name?: string }[]).map((u) => ({ id: u.id, name: u.name ?? "—" }))
+          ? (usersRaw as MainAppUserApiRow[])
+              .map((u) => ({
+                id: u.id,
+                name: u.name ?? "—",
+                phone: userPhoneFromRow(u),
+              }))
+              .filter((u) => u.phone !== "")
           : [];
         setDepartmentUsers(list);
       } catch {
@@ -158,28 +191,53 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     }
   }, []);
 
-  useEffect(() => {
-    if (show) {
-      setForm(defaultForm);
-      setAddresses([]);
-      setDepartmentUsers([]);
-    }
-  }, [show]);
+  const resetFormState = useCallback(() => {
+    setForm(defaultForm);
+    setAddresses([]);
+    setDepartmentUsers([]);
+  }, []);
+
+  /** Reset + close — only for Cancel and successful Create (not X / backdrop / Esc). */
+  const handleCancelClick = useCallback(() => {
+    resetFormState();
+    onHide();
+  }, [onHide, resetFormState]);
 
   const mainAppDepartmentOptions = useMemo(
     () => (mainAppDepartments ?? []).map((d) => ({ value: String(d.id), label: String(d.name ?? "—") })),
     [mainAppDepartments]
   );
 
-  const mainAppUserOptions = useMemo(
-    () =>
-      form.department_id != null
-        ? departmentUsers.map((u) => ({ value: String(u.id), label: u.name }))
-        : [],
-    [form.department_id, departmentUsers]
+  const hasDepartmentSelected = form.department_id !== null && form.department_id !== undefined;
+  const mainAppUserOptions = useMemo(() => {
+    if (!hasDepartmentSelected) {
+      return [];
+    }
+    return departmentUsers.map((u) => ({ value: u.phone, label: `${u.name} (${u.phone})` }));
+  }, [hasDepartmentSelected, departmentUsers]);
+
+  const userOptionsLoading = hasDepartmentSelected ? loadingDepartmentUsers : false;
+  let userSelectPlaceholder = "Select user";
+  if (!hasDepartmentSelected) {
+    userSelectPlaceholder = "Select department first";
+  } else if (userOptionsLoading) {
+    userSelectPlaceholder = "Loading users…";
+  }
+
+  const removeAddressById = useCallback((addressId: string) => {
+    setAddresses((prev) => prev.filter((addr) => addr.uiId !== addressId));
+  }, []);
+
+  const updateAddressField = useCallback(
+    (addressId: string, field: AddressFieldKey, value: string) => {
+      setAddresses((prev) => prev.map((addr) => (addr.uiId === addressId ? { ...addr, [field]: value } : addr)));
+    },
+    []
   );
 
-  const userOptionsLoading = form.department_id != null ? loadingDepartmentUsers : false;
+  const updateAddressPatch = useCallback((addressId: string, patch: Partial<AddressFormItemWithId>) => {
+    setAddresses((prev) => prev.map((addr) => (addr.uiId === addressId ? { ...addr, ...patch } : addr)));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,6 +251,10 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     }
     if (!form.employment_type?.toString().trim()) {
       toast.error("Employment type is required");
+      return;
+    }
+    if (!form.contract_type?.toString().trim()) {
+      toast.error("Contract type is required");
       return;
     }
     if (!form.designation?.toString().trim()) {
@@ -214,18 +276,16 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
         contract_type: form.contract_type?.toString().trim() || null,
         phone: form.phone?.toString().trim() || null,
         status: form.status?.toString().trim() || null,
-        addresses:
-          addresses?.length > 0
-            ? addresses.map(({ name, zip_code, city, country, address }) => ({
-                name,
-                zip_code,
-                city,
-                country,
-                address,
-              }))
-            : undefined,
+        addresses: (addresses ?? []).map(({ name, zip_code, city, country, address }) => ({
+          name,
+          zip_code,
+          city,
+          country,
+          address,
+        })),
       });
       toast.success("Employee created");
+      resetFormState();
       onHide();
       onSuccess?.();
     } catch {
@@ -258,11 +318,11 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               onChange={(opt) => {
                 const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
                 setForm((f) => ({ ...f, department_id: deptId, user_id: "" }));
-                if (deptId != null) {
-                  fetchUsersByDepartment(deptId);
-                } else {
+                if (deptId == null) {
                   setDepartmentUsers([]);
+                  return;
                 }
+                fetchUsersByDepartment(deptId);
               }}
               styles={selectStyles}
             />
@@ -273,16 +333,10 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             <Select<{ value: string; label: string }>
               className="basic-single"
               classNamePrefix="select"
-              placeholder={
-                form.department_id == null
-                  ? "Select department first"
-                  : userOptionsLoading
-                    ? "Loading users…"
-                    : "Select user"
-              }
+              placeholder={userSelectPlaceholder}
               isClearable
               isSearchable
-              isDisabled={form.department_id == null || userOptionsLoading}
+              isDisabled={!hasDepartmentSelected || userOptionsLoading}
               isLoading={userOptionsLoading}
               options={mainAppUserOptions}
               value={mainAppUserOptions.find((o) => o.value === (form.user_id ?? "")) ?? null}
@@ -290,7 +344,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               onChange={(opt) => setForm((f) => ({ ...f, user_id: opt?.value ?? "" }))}
               styles={selectStyles}
             />
-            {!userOptionsLoading && form.department_id != null && mainAppUserOptions.length === 0 && (
+            {!userOptionsLoading && hasDepartmentSelected && mainAppUserOptions.length === 0 && (
               <Form.Text className="text-muted">No users available for this department.</Form.Text>
             )}
           </Form.Group>
@@ -336,10 +390,11 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             </Form.Select>
           </Form.Group>
           <Form.Group className="mb-3">
-            <Form.Label>Contract Type</Form.Label>
+            <Form.Label>Contract Type <span className="text-danger">*</span> </Form.Label>
             <Form.Select
               value={form.contract_type ?? ""}
               onChange={(e) => setForm((f) => ({ ...f, contract_type: e.target.value }))}
+              required
             >
               <option value="">Select contract type</option>
               {CONTRACT_TYPES.map((opt) => (
@@ -383,7 +438,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                   type="button"
                   variant="outline-primary"
                   size="sm"
-                  onClick={() => setAddresses((prev) => [...prev, { ...defaultAddress }])}
+                  onClick={() => setAddresses((prev) => [...prev, createDefaultAddress()])}
                 >
                   <Plus className="me-1" size={14} />
                   Add Address
@@ -407,14 +462,14 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                           }))
                         : [];
                     return (
-                      <div key={idx} className="p-3 bg-light rounded">
+                      <div key={addr.uiId} className="p-3 bg-light rounded">
                         <div className="d-flex justify-content-between align-items-center mb-2">
                           <div className="fw-semibold">Address #{idx + 1}</div>
                           <Button
                             type="button"
                             variant="outline-danger"
                             size="sm"
-                            onClick={() => setAddresses((prev) => prev.filter((_, i) => i !== idx))}
+                            onClick={() => removeAddressById(addr.uiId)}
                           >
                             <Trash2 size={14} />
                           </Button>
@@ -425,11 +480,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                               <Form.Label>Name</Form.Label>
                               <Form.Control
                                 value={addr.name ?? ""}
-                                onChange={(e) =>
-                                  setAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, name: e.target.value } : a))
-                                  )
-                                }
+                                onChange={(e) => updateAddressField(addr.uiId, "name", e.target.value)}
                                 placeholder="e.g. Head Office"
                               />
                             </Form.Group>
@@ -439,11 +490,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                               <Form.Label>Zip / Postal Code</Form.Label>
                               <Form.Control
                                 value={addr.zip_code ?? ""}
-                                onChange={(e) =>
-                                  setAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, zip_code: e.target.value } : a))
-                                  )
-                                }
+                                onChange={(e) => updateAddressField(addr.uiId, "zip_code", e.target.value)}
                                 placeholder="Zip / Postal Code"
                               />
                             </Form.Group>
@@ -462,20 +509,13 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                                   addr.countryCode ? countryOptions.find((o) => o.value === addr.countryCode) ?? null : null
                                 }
                                 onChange={(opt) =>
-                                  setAddresses((prev) =>
-                                    prev.map((a, i) =>
-                                      i === idx
-                                        ? {
-                                            ...a,
-                                            country: opt?.label ?? "",
-                                            countryCode: opt?.value ?? "",
-                                            state: "",
-                                            stateCode: "",
-                                            city: "",
-                                          }
-                                        : a
-                                    )
-                                  )
+                                  updateAddressPatch(addr.uiId, {
+                                    country: opt?.label ?? "",
+                                    countryCode: opt?.value ?? "",
+                                    state: "",
+                                    stateCode: "",
+                                    city: "",
+                                  })
                                 }
                                 styles={selectStyles}
                               />
@@ -496,13 +536,11 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                                   addr.stateCode ? stateOptions.find((o) => o.value === addr.stateCode) ?? null : null
                                 }
                                 onChange={(opt) =>
-                                  setAddresses((prev) =>
-                                    prev.map((a, i) =>
-                                      i === idx
-                                        ? { ...a, state: opt?.label ?? "", stateCode: opt?.value ?? "", city: "" }
-                                        : a
-                                    )
-                                  )
+                                  updateAddressPatch(addr.uiId, {
+                                    state: opt?.label ?? "",
+                                    stateCode: opt?.value ?? "",
+                                    city: "",
+                                  })
                                 }
                                 styles={selectStyles}
                               />
@@ -520,11 +558,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                                 placeholder="Select City"
                                 isDisabled={!addr.stateCode}
                                 value={addr.city ? cityOptions.find((o) => o.value === addr.city) ?? null : null}
-                                onChange={(opt) =>
-                                  setAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, city: opt?.value ?? "" } : a))
-                                  )
-                                }
+                                onChange={(opt) => updateAddressField(addr.uiId, "city", opt?.value ?? "")}
                                 styles={selectStyles}
                               />
                             </Form.Group>
@@ -537,11 +571,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                                 as="textarea"
                                 rows={2}
                                 value={addr.address ?? ""}
-                                onChange={(e) =>
-                                  setAddresses((prev) =>
-                                    prev.map((a, i) => (i === idx ? { ...a, address: e.target.value } : a))
-                                  )
-                                }
+                                onChange={(e) => updateAddressField(addr.uiId, "address", e.target.value)}
                                 placeholder="Street address"
                               />
                             </Form.Group>
@@ -559,7 +589,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           </div>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={onHide} type="button">
+          <Button variant="secondary" onClick={handleCancelClick} type="button">
             Cancel
           </Button>
           <Button variant="primary" type="submit" disabled={submitting}>

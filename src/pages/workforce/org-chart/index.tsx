@@ -1,27 +1,18 @@
 import "@assets/scss/datatable-style.scss";
-import React, {
-  ReactElement,
-} from "react";
+import React, { ReactElement, useState, useEffect, useMemo, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { getUserProfilesOrgChartTree } from "@utils/staffManagement";
 import { useSession } from "next-auth/react";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useUserProfilesMinified } from "@hooks/useUserProfilesMinified";
-import { 
-  Search, 
-  ChevronDown, 
-  AlertCircle,
-  ChevronRight,
-  Grid3x3,
+import {
+  ChevronDown,
   Plus,
   Users,
   Calendar,
@@ -30,10 +21,9 @@ import {
   Minimize2,
   ZoomIn,
   ZoomOut,
-  User
-} from 'lucide-react';
-import styled from 'styled-components';
-import OrgEmployeeSidebar from './sidebar';
+  User,
+} from "lucide-react";
+import OrgEmployeeSidebar from "./sidebar";
 import router from "next/router";
 
 // Dynamically import react-organizational-chart to avoid SSR issues
@@ -73,57 +63,298 @@ const Tree = dynamic(
     children?: Employee[];
   }
 
-  interface TeamMember {
-    id: string;
-    name: string;
-    title: string;
-    avatar: string;
-    status: EmployeeStatus;
-    leaveDates?: string;
+function flattenOrgChartTeam(emp: Employee | null, out: Employee[] = []): Employee[] {
+  if (!emp) return out;
+  if (emp.id !== "root") out.push(emp);
+  (emp.children ?? []).forEach((c) => flattenOrgChartTeam(c, out));
+  return out;
+}
+
+function parseOrgChartTreeResponse(raw: unknown): ApiOrgChartNode[] {
+  if (Array.isArray(raw)) return raw as ApiOrgChartNode[];
+  if (raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)) {
+    return (raw as { data: ApiOrgChartNode[] }).data;
   }
-  
-  const StyledNode = styled.div`
-    padding: 20px;
-    border-radius: 12px;
-    display: inline-block;
-    background-color: white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    border: 1px solid #e5e7eb;
-    min-width: 200px;
-    text-align: center;
-    transition: all 0.3s ease;
-    cursor: pointer;
-    
-    &:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  return [];
+}
+
+function employeeStatusFromApiNode(node: ApiOrgChartNode): EmployeeStatus {
+  if (node.is_on_leave_today) return "On Leave";
+  const rawStatus = (node.status ?? "").toString().toLowerCase();
+  if (rawStatus === "inactive") return "Inactive";
+  return "Active";
+}
+
+function formatAttendanceLabel(attStatus: string | undefined): string {
+  if (attStatus === undefined || attStatus === "" || attStatus === "none") {
+    return "No Attendance";
+  }
+  if (attStatus === "checked_in") return "Checked in";
+  if (attStatus === "checked_out") return "Checked out";
+  return attStatus.replaceAll("_", " ");
+}
+
+function getOrgChartNodeChrome(
+  isSelectedUser: boolean,
+  isChildHighlight: boolean
+): { boxShadow: string; border: string } {
+  if (isSelectedUser) {
+    return {
+      boxShadow: "0 0 0 2px #6366f1, 0 4px 12px rgba(99,102,241,0.25)",
+      border: "2px solid #6366f1",
+    };
+  }
+  if (isChildHighlight) {
+    return {
+      boxShadow: "0 0 0 1px #6366f1, 0 2px 8px rgba(99,102,241,0.12)",
+      border: "1px solid #6366f1",
+    };
+  }
+  return {
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+    border: "1px solid #e5e7eb",
+  };
+}
+
+type OrgChartEmployeeNodeProps = {
+  employee: Employee;
+  selectedUserId: string;
+  selectedUserSubtreeIds: Set<string>;
+  rawProfileById: Record<string, ApiOrgChartNode>;
+  onNodeSelect: (emp: Employee) => void;
+};
+
+type OrgChartNodeIdentityProps = Readonly<{ employee: Employee }>;
+
+function OrgChartNodeIdentity({ employee }: OrgChartNodeIdentityProps): React.ReactElement {
+  return (
+    <>
+      <div
+        style={{
+          width: "64px",
+          height: "64px",
+          borderRadius: "50%",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 12px",
+        }}
+      >
+        <User size={32} color="white" />
+      </div>
+      <h4
+        style={{
+          fontSize: "15px",
+          fontWeight: "600",
+          color: "#1f2937",
+          margin: "0 0 4px 0",
+        }}
+      >
+        {employee.name}
+      </h4>
+      <div
+        style={{
+          fontSize: "13px",
+          color: "#6b7280",
+          marginBottom: employee.status === "On Leave" ? "8px" : "0",
+        }}
+      >
+        {employee.title}
+      </div>
+    </>
+  );
+}
+
+function OrgChartNodeStatusChips({ employee }: OrgChartNodeIdentityProps): React.ReactElement {
+  return (
+    <>
+      {employee.status === "On Leave" && (
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            padding: "4px 10px",
+            backgroundColor: "#fef3c7",
+            color: "#92400e",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: "500",
+            marginTop: "8px",
+          }}
+        >
+          <Calendar size={12} color="#92400e" />
+          On Leave
+        </span>
+      )}
+      {employee.status === "Inactive" && (
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            padding: "4px 10px",
+            backgroundColor: "#f3f4f6",
+            color: "#6b7280",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: "500",
+            marginTop: "8px",
+          }}
+        >
+          Inactive
+        </span>
+      )}
+      {employee.status === "Active" && employee.id !== "1" && employee.id !== "root" && (
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+            padding: "4px 10px",
+            backgroundColor: "#d1fae5",
+            color: "#065f46",
+            borderRadius: "12px",
+            fontSize: "11px",
+            fontWeight: "500",
+            marginTop: "8px",
+          }}
+        >
+          ● Active
+        </span>
+      )}
+    </>
+  );
+}
+
+type OrgChartNodeAttendanceProps = Readonly<{
+  employeeId: string;
+  attendanceLabel: string;
+  timeStr: string;
+}>;
+
+function OrgChartNodeAttendance({ employeeId, attendanceLabel, timeStr }: OrgChartNodeAttendanceProps): React.ReactElement | null {
+  if (employeeId === "root") return null;
+  return (
+    <div style={{ marginTop: "8px", fontSize: "11px", color: "#6b7280" }}>
+      {attendanceLabel}
+      {timeStr ? ` · ${timeStr}` : ""}
+    </div>
+  );
+}
+
+function buildOrgChartNodeInteractionProps(
+  isRoot: boolean,
+  chrome: { boxShadow: string },
+  openSidebar: () => void,
+  handleKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void
+): Pick<
+  React.HTMLAttributes<HTMLDivElement>,
+  "role" | "tabIndex" | "onClick" | "onKeyDown" | "onMouseEnter" | "onMouseLeave"
+> {
+  if (isRoot) {
+    return {};
+  }
+  return {
+    role: "button",
+    tabIndex: 0,
+    onClick: openSidebar,
+    onKeyDown: handleKeyDown,
+    onMouseEnter: (e) => {
+      e.currentTarget.style.transform = "translateY(-4px)";
+      e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+    },
+    onMouseLeave: (e) => {
+      e.currentTarget.style.transform = "translateY(0)";
+      e.currentTarget.style.boxShadow = chrome.boxShadow;
+    },
+  };
+}
+
+function OrgChartEmployeeNode(props: Readonly<OrgChartEmployeeNodeProps>): React.ReactElement {
+  const { employee, selectedUserId, selectedUserSubtreeIds, rawProfileById, onNodeSelect } = props;
+  const isRoot = employee.id === "root";
+  const isSelectedUser = Boolean(selectedUserId && employee.userId === selectedUserId);
+  const isInSelectedSubtree = Boolean(selectedUserId && selectedUserSubtreeIds.has(employee.id));
+  const highlightActive =
+    Boolean(selectedUserId) && selectedUserSubtreeIds.size > 0;
+  const shouldFade = Boolean(
+    highlightActive && !isInSelectedSubtree && employee.id !== "root"
+  );
+  const isChildHighlight = isInSelectedSubtree && !isSelectedUser;
+  const chrome = getOrgChartNodeChrome(isSelectedUser, isChildHighlight);
+
+  const openSidebar = () => {
+    onNodeSelect(employee);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (isRoot) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openSidebar();
     }
-  `;
+  };
+
+  const rawNode = rawProfileById[employee.id];
+  const attendance = rawNode?.attendance as
+    | { status?: string; check_in_at?: string | null; check_out_at?: string | null }
+    | undefined;
+  const attStatus = attendance?.status;
+  const attendanceLabel = formatAttendanceLabel(attStatus);
+  const timeSource = attStatus === "checked_out" ? attendance?.check_out_at : attendance?.check_in_at;
+  const timeStr = timeSource
+    ? new Date(timeSource).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+    : "";
+
+  const interactionProps = buildOrgChartNodeInteractionProps(isRoot, chrome, openSidebar, handleKeyDown);
+
+  return (
+    <div
+      {...(employee.userId ? { "data-org-chart-user-id": employee.userId } : {})}
+      {...interactionProps}
+      style={{
+        padding: "20px",
+        borderRadius: "12px",
+        display: "inline-block",
+        backgroundColor: "white",
+        boxShadow: chrome.boxShadow,
+        border: chrome.border,
+        minWidth: "200px",
+        textAlign: "center",
+        transition: "all 0.3s ease",
+        cursor: isRoot ? "default" : "pointer",
+        opacity: shouldFade ? 0.35 : 1,
+        pointerEvents: shouldFade ? "none" : "auto",
+      }}
+    >
+      <OrgChartNodeIdentity employee={employee} />
+      <OrgChartNodeStatusChips employee={employee} />
+      <OrgChartNodeAttendance employeeId={employee.id} attendanceLabel={attendanceLabel} timeStr={timeStr} />
+    </div>
+  );
+}
 
 const OrganizationalChart = () => {
     const { data: session } = useSession();
     const { mainAppDepartments, mainAppUsers } = useMainAppLookups();
     const [activeTab, setActiveTab] = useState<'All Department' | 'Org Chart' | 'My Team'>('Org Chart');
-    const [searchTerm, setSearchTerm] = useState('');
     const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
     const [selectedDepartment, setSelectedDepartment] = useState('All Department');
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [showUserDropdown, setShowUserDropdown] = useState(false);
     const [zoomLevel, setZoomLevel] = useState(100);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [showAddDialog, setShowAddDialog] = useState(false);
-    const [newEmployee, setNewEmployee] = useState({
-      name: '',
-      title: '',
-      department: '',
-      status: 'Active' as 'Active' | 'On Leave',
-      parentId: ''
-    });
     const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
     const [showEmployeeSidebar, setShowEmployeeSidebar] = useState(false);
     const [orgChartTreeRaw, setOrgChartTreeRaw] = useState<ApiOrgChartNode[] | null>(null);
     const [loadingOrgChart, setLoadingOrgChart] = useState(true);
 
+    useEffect(() => {
+      setShowEmployeeSidebar(false);
+      setSelectedEmployee(null);
+    }, [activeTab]);
 
     const { userProfilesMinified } = useUserProfilesMinified();
 
@@ -134,14 +365,7 @@ const OrganizationalChart = () => {
         if (departmentId != null && departmentId !== '') params.department_id = departmentId;
         if (userIds != null && userIds.length > 0) params.user_ids = userIds;
         const raw = await getUserProfilesOrgChartTree(Object.keys(params).length ? params : undefined);
-        console.log("raw", raw);
-        const list: ApiOrgChartNode[] =
-          Array.isArray(raw)
-            ? (raw as ApiOrgChartNode[])
-            : raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
-              ? ((raw as { data: ApiOrgChartNode[] }).data)
-              : [];
-        setOrgChartTreeRaw(list);
+        setOrgChartTreeRaw(parseOrgChartTreeResponse(raw));
       } catch (e) {
         console.error("[OrganizationalChart] fetch org chart error:", e);
         setOrgChartTreeRaw([]);
@@ -157,14 +381,10 @@ const OrganizationalChart = () => {
             ? undefined
             : mainAppDepartments?.find((d) => d.name === dept)?.id;
         const userIds = selectedUserId ? [selectedUserId] : undefined;
-        refetchOrgChart(departmentId != null ? String(departmentId) : undefined, userIds);
+        refetchOrgChart(departmentId == null ? undefined : String(departmentId), userIds);
       },
       [mainAppDepartments, refetchOrgChart]
     );
-
-    const handleUserChange = useCallback((userId: string, _selectedDept: string) => {
-      setSelectedUserId(userId);
-    }, []);
 
     useEffect(() => {
       refetchOrgChart();
@@ -189,17 +409,13 @@ const OrganizationalChart = () => {
         return d?.name ?? departmentId;
       };
       const apiNodeToEmployee = (node: ApiOrgChartNode): Employee => {
-        const rawStatus = (node.status ?? '').toString().toLowerCase();
-        const status: EmployeeStatus = node.is_on_leave_today
-          ? 'On Leave'
-          : rawStatus === 'inactive'
-            ? 'Inactive'
-            : 'Active';
+        const status = employeeStatusFromApiNode(node);
+        const uid = node.user_id;
         return {
           id: String(node.id ?? ''),
-          userId: node.user_id != null ? String(node.user_id) : undefined,
+          userId: uid === undefined || uid === null ? undefined : String(uid),
           name: getName(node.user_id),
-          title: node.job_title ?? '—',
+          title: (node.designation as string | undefined)?.trim() === '' ? '—' : (node.designation as string | undefined)?.trim() ?? '—',
           department: getDeptName(node.department_id),
           avatar: '',
           status,
@@ -210,20 +426,28 @@ const OrganizationalChart = () => {
       };
       const roots = orgChartTreeRaw.map(apiNodeToEmployee);
       const companyName = (session?.user as { company_name?: string } | undefined)?.company_name ?? 'Organization';
+      const isChartFiltered =
+        selectedDepartment !== 'All Department' || selectedUserId !== '';
+      const syntheticRoot: Employee = {
+        id: 'root',
+        name: companyName,
+        title: '',
+        department: '',
+        avatar: '',
+        status: 'Active',
+        children: roots,
+      };
       const built: Employee =
-        roots.length === 1
-          ? roots[0]
-          : {
-              id: 'root',
-              name: companyName,
-              title: '',
-              department: '',
-              avatar: '',
-              status: 'Active',
-              children: roots,
-            };
+        roots.length === 1 && !isChartFiltered ? roots[0] : syntheticRoot;
       setOrgData(built);
-    }, [orgChartTreeRaw, mainAppUsers, mainAppDepartments, session?.user]);
+    }, [
+      orgChartTreeRaw,
+      mainAppUsers,
+      mainAppDepartments,
+      session?.user,
+      selectedDepartment,
+      selectedUserId,
+    ]);
 
     useEffect(() => {
       if (!selectedUserId) return;
@@ -260,6 +484,13 @@ const OrganizationalChart = () => {
       return set;
     }, [orgChartTreeRaw]);
 
+    useEffect(() => {
+      if (!selectedUserId || loadingOrgChart || !orgChartTreeRaw?.length) return;
+      if (!orgChartUserIds.has(selectedUserId)) {
+        setSelectedUserId("");
+      }
+    }, [loadingOrgChart, orgChartTreeRaw, orgChartUserIds, selectedUserId]);
+
     const usersInOrgChart = useMemo(
       () => (mainAppUsers ?? []).filter((u) => orgChartUserIds.has(String(u.id))),
       [mainAppUsers, orgChartUserIds]
@@ -290,162 +521,25 @@ const OrganizationalChart = () => {
       return set;
     }, [selectedUserId, orgData]);
 
-    const flattenTeam = (emp: Employee | null, out: Employee[] = []): Employee[] => {
-      if (!emp) return out;
-      if (emp.id !== 'root') out.push(emp);
-      (emp.children ?? []).forEach((c) => flattenTeam(c, out));
-      return out;
+    const myTeamEmployees = useMemo(
+      () => (orgData ? flattenOrgChartTeam(orgData) : []),
+      [orgData]
+    );
+
+    const handleOrgChartNodeSelect = (employee: Employee) => {
+      setSelectedEmployee(employee);
+      setShowEmployeeSidebar(true);
     };
-    const myTeam: TeamMember[] = (orgData ? flattenTeam(orgData) : []).map((e) => ({
-      id: e.id,
-      name: e.name,
-      title: e.title,
-      avatar: e.avatar,
-      status: (e.status ?? 'Active') as EmployeeStatus,
-      leaveDates: e.status === 'On Leave' ? '—' : undefined,
-    }));
-  
-    // Render org chart node
-    const renderNode = (employee: Employee) => {
-      const isRoot = employee.id === 'root';
-      const isSelectedUser = Boolean(selectedUserId && employee.userId === selectedUserId);
-      const isInSelectedSubtree = Boolean(selectedUserId && selectedUserSubtreeIds.has(employee.id));
-      const shouldFade = Boolean(selectedUserId && !isInSelectedSubtree);
-      const isChildHighlight = isInSelectedSubtree && !isSelectedUser;
-      return (
-        <div
-          {...(employee.userId ? { 'data-org-chart-user-id': employee.userId } : {})}
-          onClick={isRoot ? undefined : () => {
-            setSelectedEmployee(employee);
-            setShowEmployeeSidebar(true);
-          }}
-          style={{
-            padding: '20px',
-            borderRadius: '12px',
-            display: 'inline-block',
-            backgroundColor: 'white',
-            boxShadow: isSelectedUser
-              ? '0 0 0 2px #6366f1, 0 4px 12px rgba(99,102,241,0.25)'
-              : isChildHighlight
-                ? '0 0 0 1px #6366f1, 0 2px 8px rgba(99,102,241,0.12)'
-                : '0 2px 8px rgba(0,0,0,0.08)',
-            border: isSelectedUser ? '2px solid #6366f1' : isChildHighlight ? '1px solid #6366f1' : '1px solid #e5e7eb',
-            minWidth: '200px',
-            textAlign: 'center',
-            transition: 'all 0.3s ease',
-            cursor: isRoot ? 'default' : 'pointer',
-            opacity: shouldFade ? 0.35 : 1,
-            pointerEvents: shouldFade ? 'none' : 'auto',
-          }}
-          onMouseEnter={isRoot ? undefined : (e) => {
-            e.currentTarget.style.transform = 'translateY(-4px)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-          }}
-          onMouseLeave={isRoot ? undefined : (e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
-          }}
-        >
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 12px'
-          }}>
-            <User size={32} color="white" />
-          </div>
-          <h4 style={{ 
-            fontSize: '15px', 
-            fontWeight: '600', 
-            color: '#1f2937',
-            margin: '0 0 4px 0'
-          }}>
-            {employee.name}
-          </h4>
-          <div style={{ 
-            fontSize: '13px', 
-            color: '#6b7280',
-            marginBottom: employee.status === 'On Leave' ? '8px' : '0'
-          }}>
-            {employee.title}
-          </div>
-          {employee.status === 'On Leave' && (
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 10px',
-              backgroundColor: '#fef3c7',
-              color: '#92400e',
-              borderRadius: '12px',
-              fontSize: '11px',
-              fontWeight: '500',
-              marginTop: '8px'
-            }}>
-              <Calendar size={12} color="#92400e" />
-              On Leave
-            </span>
-          )}
-          {employee.status === 'Inactive' && (
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 10px',
-              backgroundColor: '#f3f4f6',
-              color: '#6b7280',
-              borderRadius: '12px',
-              fontSize: '11px',
-              fontWeight: '500',
-              marginTop: '8px'
-            }}>
-              Inactive
-            </span>
-          )}
-          {employee.status === 'Active' && employee.id !== '1' && employee.id !== 'root' && (
-            <span style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '4px 10px',
-              backgroundColor: '#d1fae5',
-              color: '#065f46',
-              borderRadius: '12px',
-              fontSize: '11px',
-              fontWeight: '500',
-              marginTop: '8px'
-            }}>
-              ● Active
-            </span>
-          )}
-          {(() => {
-            if (employee.id === 'root') return null;
-            const rawNode = rawProfileById[employee.id];
-            const attendance = rawNode?.attendance as { status?: string; check_in_at?: string | null; check_out_at?: string | null } | undefined;
-            const attStatus = attendance?.status;
-            const label =
-              !attStatus || attStatus === 'none'
-                ? 'No Attendance'
-                : attStatus === 'checked_in'
-                  ? 'Checked in'
-                  : attStatus === 'checked_out'
-                    ? 'Checked out'
-                    : attStatus.replace(/_/g, ' ');
-            const time = attStatus === 'checked_out' ? attendance?.check_out_at : attendance?.check_in_at;
-            const timeStr = time ? new Date(time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
-            return (
-              <div style={{ marginTop: '8px', fontSize: '11px', color: '#6b7280' }}>
-                {label}{timeStr ? ` · ${timeStr}` : ''}
-              </div>
-            );
-          })()}
-        </div>
-      );
-    };
+
+    const renderNode = (employee: Employee) => (
+      <OrgChartEmployeeNode
+        employee={employee}
+        selectedUserId={selectedUserId}
+        selectedUserSubtreeIds={selectedUserSubtreeIds}
+        rawProfileById={rawProfileById}
+        onNodeSelect={handleOrgChartNodeSelect}
+      />
+    );
   
     // Recursive function to render tree using react-organizational-chart
     const renderTree = (employee: Employee): React.ReactElement => {
@@ -486,69 +580,41 @@ const OrganizationalChart = () => {
       document.addEventListener('fullscreenchange', onFullscreenChange);
       return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
     }, []);
-  
-    const handleAddEmployee = () => {
-      setShowAddDialog(true);
-      setNewEmployee({
-        name: '',
-        title: '',
-        department: '',
-        status: 'Active',
-        parentId: ''
-      });
+
+    const renderOrgChartPanel = () => {
+      if (loadingOrgChart) {
+        return (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "400px", color: "#6b7280" }}>
+            Loading chart...
+          </div>
+        );
+      }
+      if (!orgData) {
+        return (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "400px", color: "#6b7280" }}>
+            No organizational data available.
+          </div>
+        );
+      }
+      return (
+        <div
+          style={{
+            transform: `scale(${zoomLevel / 100})`,
+            transformOrigin: "top center",
+            transition: "transform 0.3s ease",
+            paddingBottom: "40px",
+          }}
+        >
+          <Tree lineWidth="2px" lineColor="#d1d5db" lineBorderRadius="10px" label={renderNode(orgData)}>
+            {orgData.children?.map((child) => renderTree(child))}
+          </Tree>
+        </div>
+      );
     };
-  
-    // Recursive function to find and add employee to parent
-    const addEmployeeToTree = (tree: Employee, parentId: string, newEmp: Employee): Employee => {
-      if (tree.id === parentId) {
-        return {
-          ...tree,
-          children: [...(tree.children || []), newEmp]
-        };
-      }
-      if (tree.children) {
-        return {
-          ...tree,
-          children: tree.children.map(child => addEmployeeToTree(child, parentId, newEmp))
-        };
-      }
-      return tree;
-    };
-  
-    // Recursive function to get all employees for parent selection
-    const getAllEmployees = (employee: Employee, list: { id: string; name: string; title: string }[] = []): { id: string; name: string; title: string }[] => {
-      list.push({ id: employee.id, name: employee.name, title: employee.title });
-      if (employee.children) {
-        employee.children.forEach(child => getAllEmployees(child, list));
-      }
-      return list;
-    };
-  
-    const handleSubmitEmployee = () => {
-      if (!newEmployee.name || !newEmployee.title || !newEmployee.department || !newEmployee.parentId) {
-        alert('Please fill in all required fields');
-        return;
-      }
-      if (!orgData) return;
-      const newEmp: Employee = {
-        id: Date.now().toString(),
-        name: newEmployee.name,
-        title: newEmployee.title,
-        department: newEmployee.department,
-        avatar: '',
-        status: newEmployee.status,
-        children: []
-      };
-      const updatedTree = addEmployeeToTree(orgData, newEmployee.parentId, newEmp);
-      setOrgData(updatedTree);
-      setShowAddDialog(false);
-      setNewEmployee({
-        name: '',
-        title: '',
-        department: '',
-        status: 'Active',
-        parentId: ''
-      });
+
+    const closeEmployeeSidebar = () => {
+      setShowEmployeeSidebar(false);
+      setSelectedEmployee(null);
     };
 
   return (
@@ -615,25 +681,34 @@ const OrganizationalChart = () => {
                   zIndex: 10,
                   minWidth: '200px'
                 }}>
-                  {departments.map(dept => (
-                    <div
+                  {departments.map((dept) => (
+                    <button
                       key={dept}
+                      type="button"
                       onClick={() => {
                         setSelectedDepartment(dept);
                         setShowDepartmentDropdown(false);
                         handleDepartmentChange(dept, selectedUserId || undefined);
                       }}
                       style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        backgroundColor: selectedDepartment === dept ? '#f3f4f6' : 'white'
+                        display: "block",
+                        width: "100%",
+                        padding: "10px 16px",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        border: "none",
+                        backgroundColor: selectedDepartment === dept ? "#f3f4f6" : "white",
+                        textAlign: "left",
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = selectedDepartment === dept ? '#f3f4f6' : 'white'}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f3f4f6";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = selectedDepartment === dept ? "#f3f4f6" : "white";
+                      }}
                     >
                       {dept}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -675,45 +750,63 @@ const OrganizationalChart = () => {
                     overflowY: 'auto',
                   }}
                 >
-                  <div
+                  <button
+                    type="button"
                     onClick={() => {
-                      setSelectedUserId('');
+                      setSelectedUserId("");
                       setShowUserDropdown(false);
-                      handleUserChange('', selectedDepartment);
+                      handleDepartmentChange(selectedDepartment);
                     }}
                     style={{
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      fontSize: '14px',
-                      backgroundColor: !selectedUserId ? '#f3f4f6' : 'white',
+                      display: "block",
+                      width: "100%",
+                      padding: "10px 16px",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      border: "none",
+                      backgroundColor: selectedUserId ? "white" : "#f3f4f6",
+                      textAlign: "left",
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = !selectedUserId ? '#f3f4f6' : 'white'}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "#f3f4f6";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = selectedUserId ? "white" : "#f3f4f6";
+                    }}
                   >
                     All Users
-                  </div>
+                  </button>
                   {usersInOrgChart.map((u) => {
                     const uid = String(u.id);
                     const isSelected = selectedUserId === uid;
                     return (
-                      <div
+                      <button
                         key={u.id}
+                        type="button"
                         onClick={() => {
                           setSelectedUserId(uid);
                           setShowUserDropdown(false);
-                          handleUserChange(uid, selectedDepartment);
+                          handleDepartmentChange(selectedDepartment, uid);
                         }}
                         style={{
-                          padding: '10px 16px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          backgroundColor: isSelected ? '#f3f4f6' : 'white',
+                          display: "block",
+                          width: "100%",
+                          padding: "10px 16px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          border: "none",
+                          backgroundColor: isSelected ? "#f3f4f6" : "white",
+                          textAlign: "left",
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f6' : 'white'}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#f3f4f6";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = isSelected ? "#f3f4f6" : "white";
+                        }}
                       >
                         {u.name}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -753,43 +846,7 @@ const OrganizationalChart = () => {
             </button>
           </div>
 
-          <div style={{ position: 'relative', minWidth: '300px' }}>
-            {/* <Search 
-              size={18} 
-              style={{ 
-                position: 'absolute', 
-                left: '12px', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: '#9ca3af'
-              }} 
-            />
-            <input
-              type="text"
-              placeholder="Search person..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 40px 10px 40px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                backgroundColor: 'white'
-              }}
-            /> */}
-            {/* <ChevronDown 
-              size={18} 
-              style={{ 
-                position: 'absolute', 
-                right: '12px', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: '#9ca3af'
-              }} 
-            /> */}
-          </div>
+          <div style={{ position: "relative", minWidth: "300px" }} />
         </div>
 
         {/* Alert Banner */}
@@ -986,31 +1043,7 @@ const OrganizationalChart = () => {
                 overflow: 'auto',
                 position: 'relative'
               }}>
-              {loadingOrgChart ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', color: '#6b7280' }}>
-                  Loading chart...
-                </div>
-              ) : !orgData ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', color: '#6b7280' }}>
-                  No organizational data available.
-                </div>
-              ) : (
-              <div style={{
-                transform: `scale(${zoomLevel / 100})`,
-                transformOrigin: 'top center',
-                transition: 'transform 0.3s ease',
-                paddingBottom: '40px'
-              }}>
-                <Tree
-                  lineWidth="2px"
-                  lineColor="#d1d5db"
-                  lineBorderRadius="10px"
-                  label={renderNode(orgData)}
-                >
-                  {orgData.children?.map((child) => renderTree(child))}
-                </Tree>
-              </div>
-              )}
+              {renderOrgChartPanel()}
             </div>
           </div>
         )}
@@ -1031,10 +1064,10 @@ const OrganizationalChart = () => {
               <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Users size={18} color="#6b7280" />
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{myTeam.length}</span>
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{myTeamEmployees.length}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>{myTeam.filter((m) => m.status === 'On Leave').length}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '500', color: '#1f2937' }}>{myTeamEmployees.filter((m) => m.status === 'On Leave').length}</span>
                   <span style={{ fontSize: '14px', color: '#6b7280' }}>On Leave Today</span>
                 </div>
                 {/* <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1050,23 +1083,35 @@ const OrganizationalChart = () => {
               gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
               gap: '16px'
             }}>
-              {myTeam.map(member => (
-                <div
-                  key={member.id}
+              {myTeamEmployees.map((employee) => {
+                const onLeaveToday =
+                  rawProfileById[employee.id]?.is_on_leave_today === true;
+                const leaveTodayLabel = onLeaveToday ? "On Leave" : undefined;
+                return (
+                <button
+                  key={employee.id}
+                  type="button"
+                  onClick={() => handleOrgChartNodeSelect(employee)}
                   style={{
-                    backgroundColor: 'white',
-                    borderRadius: '12px',
-                    padding: '20px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    border: '1px solid #e5e7eb',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '16px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
+                    backgroundColor: "white",
+                    borderRadius: "12px",
+                    padding: "20px",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                    border: "1px solid #e5e7eb",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    width: "100%",
+                    textAlign: "left",
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)'}
-                  onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(0,0,0,0.15)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+                  }}
                 >
                   <div style={{
                     width: '56px',
@@ -1088,12 +1133,12 @@ const OrganizationalChart = () => {
                         color: '#1f2937',
                         margin: 0
                       }}>
-                        {member.name}
+                        {employee.name}
                       </h4>
                       <ExternalLink size={14} color="#9ca3af" style={{ cursor: 'pointer' }} />
                     </div>
                     <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '8px' }}>
-                      {member.title}
+                      {employee.title}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                       <span style={{
@@ -1108,7 +1153,7 @@ const OrganizationalChart = () => {
                         fontWeight: '500'
                       }}>
                         <Calendar size={12} color="#92400e" />
-                        {member.status}
+                        {employee.status ?? "Active"}
                       </span>
                       <div style={{ 
                         display: 'flex', 
@@ -1118,56 +1163,58 @@ const OrganizationalChart = () => {
                         color: '#6b7280'
                       }}>
                         <Calendar size={12} />
-                        {member.leaveDates}
+                        {leaveTodayLabel}
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                </button>
+              );
+              })}
             </div>
           </>
         )}
       </div>
 
-     
-
       {/* Employee Detail Sidebar */}
       {showEmployeeSidebar && selectedEmployee && (
         <div
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.4)',
+            position: "fixed",
+            inset: 0,
             zIndex: 9999,
-            display: 'flex',
-            justifyContent: 'flex-end'
-          }}
-          onClick={() => {
-            setShowEmployeeSidebar(false);
-            setSelectedEmployee(null);
+            display: "flex",
+            justifyContent: "flex-end",
           }}
         >
-          <div
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            aria-label="Close employee details"
+            onClick={closeEmployeeSidebar}
             style={{
-              position: 'relative',
-              zIndex: 1000
+              position: "absolute",
+              inset: 0,
+              border: "none",
+              margin: 0,
+              padding: 0,
+              cursor: "pointer",
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
+            }}
+          />
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              maxHeight: "100%",
             }}
           >
             <OrgEmployeeSidebar
               employee={selectedEmployee}
-              allEmployees={orgData ?? { id: 'root', name: '', title: '', department: '', avatar: '', status: 'Active', children: [] }}
+              allEmployees={orgData ?? { id: "root", name: "", title: "", department: "", avatar: "", status: "Active", children: [] }}
               rawProfile={selectedEmployee ? rawProfileById[selectedEmployee.id] : undefined}
               users={mainAppUsers}
               onRefresh={refetchOrgChart}
               userProfilesMinified={userProfilesMinified}
-              onClose={() => {
-                setShowEmployeeSidebar(false);
-                setSelectedEmployee(null);
-              }}
+              onClose={closeEmployeeSidebar}
             />
           </div>
         </div>

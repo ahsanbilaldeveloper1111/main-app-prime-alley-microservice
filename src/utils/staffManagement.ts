@@ -1258,7 +1258,7 @@ export const getMainAppUsers = async (
   params?: { department_id?: number }
 ): Promise<unknown[]> => {
   try {
-   const users = await GetMinifiedUsers({ department_id: params?.department_id });
+   const users = await GetMinifiedUsers({ department_id: params?.department_id,status: 'Active' });
    return users ?? [];
   } catch (error: unknown) {
     handleApiError(error, "Failed to fetch users");

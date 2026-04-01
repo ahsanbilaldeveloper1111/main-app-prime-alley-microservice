@@ -1,23 +1,22 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
-import { 
-  X, 
+import {
+  X,
   User,
-  Mail,
   Phone,
   Calendar,
   Briefcase,
-  MapPin,
-  ChevronRight,
   Clock,
   Building2,
   UserCheck,
-  Search
+  Search,
 } from 'lucide-react';
 import { putUserProfileParent, putUserProfileBulkReports, type UserProfileMinified } from '@utils/staffManagement';
 
 interface Employee {
   id: string;
+  /** App user id (when known from org-chart tree); used to exclude manager from subordinate pickers. */
+  userId?: string;
   name: string;
   title: string;
   department: string;
@@ -55,56 +54,97 @@ interface OrganizationEmployeeSidebarProps {
   rawProfile?: RawOrgChartProfile | null;
   /** List of users for "Reports to" dropdown (excluding current employee). */
   users?: UserOption[];
-  /** Minified user profiles; only these users are shown in the Reports to dropdown. */
+  /** Minified profiles for initial direct-report checkboxes and manager id fallback. */
   userProfilesMinified?: UserProfileMinified[];
   /** Called after parent is updated successfully (e.g. to refetch org chart). */
   onRefresh?: () => void | Promise<void>;
 }
 
+function findEmployeeParent(tree: Employee, targetId: string, parent: Employee | null = null): Employee | null {
+  if (tree.id === targetId) {
+    return parent;
+  }
+  const children = tree.children;
+  if (!children) {
+    return null;
+  }
+  for (const child of children) {
+    const result = findEmployeeParent(child, targetId, tree);
+    if (result !== null) {
+      return result;
+    }
+  }
+  return null;
+}
+
+type SidebarEmployeeStatus = Employee['status'];
+
+function getCurrentStatusVisuals(status: SidebarEmployeeStatus): {
+  panelBg: string;
+  iconBg: string;
+  text: string;
+  subtitle: string;
+} {
+  if (status === 'On Leave') {
+    return {
+      panelBg: '#fef3c7',
+      iconBg: '#fbbf24',
+      text: '#92400e',
+      subtitle: 'Currently away from office',
+    };
+  }
+  if (status === 'Inactive') {
+    return {
+      panelBg: '#f3f4f6',
+      iconBg: '#9ca3af',
+      text: '#6b7280',
+      subtitle: 'No longer active',
+    };
+  }
+  return {
+    panelBg: '#d1fae5',
+    iconBg: '#10b981',
+    text: '#065f46',
+    subtitle: 'Available and working',
+  };
+}
+
 const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = ({ employee, onClose, allEmployees, rawProfile, users = [], userProfilesMinified = [], onRefresh }) => {
   const [activeTab, setActiveTab] = useState<'Overview' | 'Reporting'>('Overview');
-  const [parentId, setParentId] = useState<string>('');
   const [updatingParent, setUpdatingParent] = useState(false);
   const [childUserIds, setChildUserIds] = useState<string[]>([]);
   const [updatingBulkReports, setUpdatingBulkReports] = useState(false);
   const [directReportSearch, setDirectReportSearch] = useState('');
 
-  const allowedUserIds = useMemo(() => new Set((userProfilesMinified ?? []).map((p) => String(p.user_id))), [userProfilesMinified]);
-  const dropdownUsers = users.filter(
-    (u) => String(u.id) !== String(rawProfile?.user_id) && allowedUserIds.has(String(u.id))
-  );
-
-  // Find parent (manager) of current employee
-  const findParent = (tree: Employee, targetId: string, parent: Employee | null = null): Employee | null => {
-    if (tree.id === targetId) {
-      return parent;
-    }
-    if (tree.children) {
-      for (const child of tree.children) {
-        const result = findParent(child, targetId, tree);
-        if (result) return result;
-      }
-    }
-    return null;
-  };
-
-  const manager = findParent(allEmployees, employee.id);
+  const manager = findEmployeeParent(allEmployees, employee.id);
   const directReports = employee.children || [];
   const totalTeamSize = directReports.length;
 
-  const managerUserId = useMemo(
-    () => (manager ? userProfilesMinified.find((p) => String(p.id) === String(manager.id))?.user_id : undefined),
-    [manager, userProfilesMinified]
+  const managerUserId = useMemo(() => {
+    if (!manager) return undefined;
+    if (manager.userId != null && String(manager.userId) !== '') {
+      return String(manager.userId);
+    }
+    const prof = userProfilesMinified.find((p) => String(p.id) === String(manager.id));
+    if (prof?.user_id == null) {
+      return undefined;
+    }
+    return String(prof.user_id);
+  }, [manager, userProfilesMinified]);
+
+  const dropdownUsers = useMemo(
+    () => users.filter((u) => String(u.id) !== String(rawProfile?.user_id)),
+    [users, rawProfile?.user_id]
   );
+
   const directReportOptionUsers = useMemo(
     () =>
-      users.filter(
-        (u) =>
-          allowedUserIds.has(String(u.id)) &&
-          String(u.id) !== String(rawProfile?.user_id) &&
-          String(u.id) !== String(managerUserId)
-      ),
-    [users, allowedUserIds, rawProfile?.user_id, managerUserId]
+      users.filter((u) => {
+        if (String(u.id) === String(rawProfile?.user_id)) return false;
+        if (managerUserId != null && String(u.id) === managerUserId) return false;
+        return true;
+      }),
+    [users, rawProfile?.user_id, managerUserId]
   );
 
   const initialChildUserIds = useMemo(
@@ -121,7 +161,9 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
     : '—';
 
   const employeeDetails = {
-    email: rawProfile?.user_id ? `${rawProfile.user_id}@company.com` : `${employee.name.toLowerCase().replace(/\s+/g, '.')}@company.com`,
+    email: rawProfile?.user_id
+      ? `${rawProfile.user_id}@company.com`
+      : `${employee.name.toLowerCase().replaceAll(/\s+/g, '.')}@company.com`,
     phone: rawProfile?.phone ?? '—',
     location: '—',
     employeeId: rawProfile?.employee_code ?? (employee.id ? `EMP-${String(employee.id).padStart(5, '0')}` : '—'),
@@ -131,6 +173,55 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
     identificationNumber: rawProfile?.identification_number ?? '—',
     attendance: rawProfile?.attendance,
   };
+
+  const statusUi = getCurrentStatusVisuals(employee.status);
+
+  const handleParentSelectChange = useCallback(
+    async (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const value = e.target.value;
+      setUpdatingParent(true);
+      try {
+        await putUserProfileParent(employee.id, { parent_id: value });
+        toast.success('Reporting manager updated');
+        await onRefresh?.();
+      } catch (error) {
+        console.error('[OrganizationEmployeeSidebar] putUserProfileParent failed:', error);
+        toast.error('Failed to update reporting manager');
+      } finally {
+        setUpdatingParent(false);
+      }
+    },
+    [employee.id, onRefresh]
+  );
+
+  const handleDirectReportToggle = useCallback(
+    async (uid: string, currentlyChecked: boolean) => {
+      const prevIds = childUserIds;
+      const newIds = currentlyChecked ? prevIds.filter((id) => id !== uid) : [...prevIds, uid];
+      setChildUserIds(newIds);
+      setUpdatingBulkReports(true);
+      try {
+        await putUserProfileBulkReports(employee.id, { child_user_ids: newIds });
+        toast.success('Direct reports updated');
+        await onRefresh?.();
+      } catch (error) {
+        console.error('[OrganizationEmployeeSidebar] putUserProfileBulkReports failed:', error);
+        toast.error('Failed to update direct reports');
+        setChildUserIds(prevIds);
+      } finally {
+        setUpdatingBulkReports(false);
+      }
+    },
+    [childUserIds, employee.id, onRefresh]
+  );
+
+  const filteredDirectReportOptionUsers = useMemo(() => {
+    const q = directReportSearch.trim().toLowerCase();
+    if (q === '') {
+      return directReportOptionUsers;
+    }
+    return directReportOptionUsers.filter((u) => u.name.toLowerCase().includes(q));
+  }, [directReportOptionUsers, directReportSearch]);
 
   const renderOverviewTab = () => (
     <>
@@ -260,7 +351,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         
         <div style={{
           padding: '16px',
-          backgroundColor: employee.status === 'On Leave' ? '#fef3c7' : employee.status === 'Inactive' ? '#f3f4f6' : '#d1fae5',
+          backgroundColor: statusUi.panelBg,
           borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
@@ -270,7 +361,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             width: '40px',
             height: '40px',
             borderRadius: '50%',
-            backgroundColor: employee.status === 'On Leave' ? '#fbbf24' : employee.status === 'Inactive' ? '#9ca3af' : '#10b981',
+            backgroundColor: statusUi.iconBg,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -279,18 +370,18 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             <UserCheck size={20} color="white" />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ 
-              fontSize: '14px', 
-              fontWeight: '600', 
-              color: employee.status === 'On Leave' ? '#92400e' : employee.status === 'Inactive' ? '#6b7280' : '#065f46'
+            <div style={{
+              fontSize: '14px',
+              fontWeight: '600',
+              color: statusUi.text
             }}>
               {employee.status || 'Active'}
             </div>
-            <div style={{ 
-              fontSize: '13px', 
-              color: employee.status === 'On Leave' ? '#92400e' : employee.status === 'Inactive' ? '#6b7280' : '#065f46'
+            <div style={{
+              fontSize: '13px',
+              color: statusUi.text
             }}>
-              {employee.status === 'On Leave' ? 'Currently away from office' : employee.status === 'Inactive' ? 'No longer active' : 'Available and working'}
+              {statusUi.subtitle}
             </div>
           </div>
         </div>
@@ -301,26 +392,34 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
   );
 
   const renderReportingTab = () => (
-    <>
       <div style={{ marginBottom: '24px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', margin: '0 0 16px 0' }}>
           Reporting Structure
         </h3>
 
         {manager && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px',
-            marginBottom: '12px',
-            cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+          <button
+            type="button"
+            style={{
+              padding: '12px',
+              backgroundColor: '#f9fafb',
+              borderRadius: '8px',
+              marginBottom: '12px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              width: '100%',
+              border: 'none',
+              textAlign: 'left',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#f9fafb';
+            }}
           >
             <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px', fontWeight: '500', marginTop: '10px' }}>
-              Reports to
+            Reports to
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
@@ -344,7 +443,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                 </div>
               </div>
             </div>
-          </div>
+          </button>
         )}
 
 
@@ -354,26 +453,11 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         {dropdownUsers.length > 0 && (
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', margin: '0 0 12px 0' }}>
-              {rawProfile?.parent_id ? 'Change Report To' : 'Set Report To'}
+              {rawProfile?.parent_id ? 'Change Head' : 'Choose Head'}
             </h3>
             <select
-              value={rawProfile?.parent_id != null ? String(rawProfile.parent_id) : ''}
-              onChange={async (e) => {
-                const value = e.target.value;
-                setParentId(value);
-                // if (!value) return;
-                setUpdatingParent(true);
-                try {
-                  await putUserProfileParent(employee.id, { parent_id: value });
-                  toast.success('Reporting manager updated');
-                  await onRefresh?.();
-                } catch (err) {
-                  toast.error('Failed to update reporting manager');
-                  setParentId(parentId);
-                } finally {
-                  setUpdatingParent(false);
-                }
-              }}
+              value={rawProfile?.parent_id == null ? '' : String(rawProfile.parent_id)}
+              onChange={handleParentSelectChange}
               disabled={updatingParent}
               style={{
                 width: '100%',
@@ -398,7 +482,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         {directReportOptionUsers.length > 0 && (
           <div style={{ marginBottom: '24px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', margin: '0 0 12px 0' }}>
-              Direct report to
+              Choose Subordinates
             </h3>
             <div style={{ position: 'relative', marginBottom: '10px' }}>
               <Search
@@ -430,9 +514,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
-              {directReportOptionUsers
-                .filter((u) => !directReportSearch.trim() || u.name.toLowerCase().includes(directReportSearch.trim().toLowerCase()))
-                .map((u) => {
+              {filteredDirectReportOptionUsers.map((u) => {
                 const uid = String(u.id);
                 const checked = childUserIds.includes(uid);
                 return (
@@ -450,26 +532,12 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                       fontSize: '14px',
                     }}
                   >
-                    
                     <input
                       type="checkbox"
                       checked={checked}
                       disabled={updatingBulkReports}
-                      onChange={async () => {
-                        const prevIds = childUserIds;
-                        const newIds = checked ? prevIds.filter((id) => id !== uid) : [...prevIds, uid];
-                        setChildUserIds(newIds);
-                        setUpdatingBulkReports(true);
-                        try {
-                          await putUserProfileBulkReports(employee.id, { child_user_ids: newIds });
-                          toast.success('Direct reports updated');
-                          await onRefresh?.();
-                        } catch (err) {
-                          toast.error('Failed to update direct reports');
-                          setChildUserIds(prevIds);
-                        } finally {
-                          setUpdatingBulkReports(false);
-                        }
+                      onChange={() => {
+                        handleDirectReportToggle(uid, checked);
                       }}
                       style={{ cursor: updatingBulkReports ? 'wait' : 'pointer' }}
                     />
@@ -488,8 +556,9 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {directReports.slice(0, 3).map((report) => (
-                <div
+                <button
                   key={report.id}
+                  type="button"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -498,10 +567,17 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                     backgroundColor: 'white',
                     borderRadius: '6px',
                     cursor: 'pointer',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    border: 'none',
+                    width: '100%',
+                    textAlign: 'left',
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f3f4f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'white';
+                  }}
                 >
                   <div style={{
                     width: '32px',
@@ -533,7 +609,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
                       Inactive
                     </div>
                   )}
-                </div>
+                </button>
               ))}
               {totalTeamSize > 3 && (
                 <div style={{ padding: '8px', textAlign: 'center', fontSize: '13px', color: '#6366f1', fontWeight: '500', cursor: 'pointer' }}>
@@ -550,7 +626,6 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
           </div>
         )}
       </div>
-    </>
   );
 
   return (
@@ -583,6 +658,8 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             Employee Details
           </h2>
           <button
+            type="button"
+            aria-label="Close employee details"
             onClick={onClose}
             style={{
               background: 'none',
@@ -626,24 +703,12 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {/* <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Mail size={14} color="#9ca3af" />
-                <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                  {employeeDetails.email}
-                </span>
-              </div> */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Phone size={14} color="#9ca3af" />
                 <span style={{ fontSize: '13px', color: '#6b7280' }}>
                   {employeeDetails.phone}
                 </span>
               </div>
-              {/* <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <MapPin size={14} color="#9ca3af" />
-                <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                  {employeeDetails.location}
-                </span>
-              </div> */}
             </div>
           </div>
         </div>
@@ -657,8 +722,9 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
         borderBottom: '1px solid #e5e7eb',
         overflowX: 'auto'
       }}>
-        {(['Overview', 'Reporting'] as const).map(tab => (
+        {(['Overview', 'Reporting'] as const).map((tab) => (
           <button
+            type="button"
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
