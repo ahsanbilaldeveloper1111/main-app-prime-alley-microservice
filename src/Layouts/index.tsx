@@ -12,7 +12,7 @@ import { getCurrentUserCompanyImage } from "@utils/company";
 import { useAuth } from '../hooks/useAuth';
 
 import { 
-	Bell, ChevronLeft, ChevronRight,ChevronDown,
+  Bell, ChevronDown, MoreVertical, 
   Phone,
   Search,
   X,
@@ -24,7 +24,6 @@ import {
   Plus,
   MonitorCheck,
     } from 'lucide-react';
-import {Button} from 'react-bootstrap';
 import { useCti } from '@hooks/useCti';
 import { useIncomingCall, type IncomingCallData } from '../contexts/IncomingCallContext';
 import { usePermissions } from '../utils/permissionUtils';
@@ -34,9 +33,8 @@ import { getStorageImageUrl } from "@utils/imageUtils";
 import DeviceSelectionModal from '../components/DeviceSelectionModal';
 import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
 import CreateLeadModal from '@components/CreateLeadModal';
-import { CreateCompanySidebar, CompanyFormPayload } from '@components/renderCreateCompany';
+import { CreateCompanySidebar } from '@components/renderCreateCompany';
 import { CreateTicketSidebar } from '@components/renderCreateTicketForm';
-import { createCompany } from '@utils/crm';
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
 import CreateTaskModal from '@components/CreatePlannerTaskSidebar';
@@ -77,6 +75,11 @@ interface CtiDialerDevice {
 	details: string;
 }
 
+interface SearchableRouteItem {
+  path: string;
+  label: string;
+}
+
 type DnsMapLike = Record<
 	string,
 	{ devices?: Record<string, CtiDnsDevice> }
@@ -93,6 +96,30 @@ function findMatchingActiveCall(
 			(call.callingAddress === incomingCall.callingAddress &&
 				call.calledAddress === incomingCall.calledAddress)
 	);
+}
+
+function findAnsweredIncomingCall(
+  activeCalls: Map<string, CtiActiveCallEntry>,
+  incomingCall: IncomingCallData
+): CtiActiveCallEntry | undefined {
+  const calls = Array.from(activeCalls.values()) as CtiActiveCallEntry[];
+  return calls.find((call) => {
+    const sameCall =
+      call.callId === incomingCall.callId ||
+      (call.callingAddress === incomingCall.callingAddress &&
+        call.calledAddress === incomingCall.calledAddress);
+    const notRinging = call.status && call.status !== 'ringing';
+    return Boolean(sameCall && notRinging);
+  });
+}
+
+function getNotificationsOverflowLabel(totalUnreadCount: number): string {
+  if (totalUnreadCount <= 0) {
+    return 'Notifications';
+  }
+
+  const countLabel = totalUnreadCount > 99 ? '99+' : String(totalUnreadCount);
+  return `Notifications (${countLabel})`;
 }
 
 function getUserDevicesFromDnsMap(
@@ -145,7 +172,9 @@ const Layout = ({ children }: LayoutProps) => {
   const [showNotificationsSidebar, setShowNotificationsSidebar] = useState(false);
 	const [showUserDropdown, setShowUserDropdown] = useState(false);
 	const [showCreateDropdown, setShowCreateDropdown] = useState(false);
+  const [showIconsDropdown, setShowIconsDropdown] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
+  const iconsDropdownRef = useRef<HTMLDivElement>(null);
 	const dialerButtonRef = useRef<HTMLButtonElement>(null);
 	const [dialerPosition, setDialerPosition] = useState({ top: 0, right: 0 });
 	const [dialedNumber, setDialedNumber] = useState('');
@@ -157,13 +186,13 @@ const Layout = ({ children }: LayoutProps) => {
 	const [searchQuery, setSearchQuery] = useState('');
 	const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
 	const searchWrapperRef = useRef<HTMLDivElement>(null);
-	const searchableRoutes = useMemo(() => getSearchableRoutes(), []);
+  const searchableRoutes = useMemo<SearchableRouteItem[]>(() => getSearchableRoutes() as SearchableRouteItem[], []);
 	const searchSuggestions = useMemo(() => {
 		const q = searchQuery.trim().toLowerCase();
 		if (!q) return [];
 		const userPerms = session?.user?.permissions;
 		return searchableRoutes.filter(
-			(r) =>
+      (r: SearchableRouteItem) =>
 				(r.path.toLowerCase().includes(q) || r.label.toLowerCase().includes(q)) &&
 				canAccessRoute(userPerms, r.path)
 		).slice(0, 10);
@@ -216,7 +245,7 @@ const Layout = ({ children }: LayoutProps) => {
 	useEffect(() => {
 		let cancelled = false;
 		getCurrentUserCompanyImage()
-			.then((blob) => {
+      .then((blob: Blob | null) => {
 				if (cancelled) return;
 				if (blob && blob.size > 0) {
 					setHeaderLogoUrl('');
@@ -245,6 +274,9 @@ const Layout = ({ children }: LayoutProps) => {
 			}
       if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
         setShowUserDropdown(false);
+      }
+      if (iconsDropdownRef.current && !iconsDropdownRef.current.contains(e.target as Node)) {
+        setShowIconsDropdown(false);
       }
 		};
 		document.addEventListener('mousedown', handleClickOutside);
@@ -317,7 +349,7 @@ const Layout = ({ children }: LayoutProps) => {
 			return false;
 		}
 		
-		const userDevices = Object.values(dnsMap[userAddress]?.devices || {});
+    const userDevices = Object.values(dnsMap[userAddress]?.devices || {}) as CtiDnsDevice[];
 		if (userDevices.length === 0) {
 			return false;
 		}
@@ -368,16 +400,11 @@ const Layout = ({ children }: LayoutProps) => {
 
 	// Close incoming call popup when the call is answered/connected (e.g. from Jabber or another device)
 	useEffect(() => {
-		if (!showIncomingCallModal || !incomingCall) return;
-		const calls = Array.from(activeCalls.values());
-		const answeredMatch = calls.find((call) => {
-			const sameCall =
-				call.callId === incomingCall.callId ||
-				(call.callingAddress === incomingCall.callingAddress &&
-					call.calledAddress === incomingCall.calledAddress);
-			const notRinging = call.status && call.status !== "ringing";
-			return Boolean(sameCall && notRinging);
-		});
+    if (!showIncomingCallModal || !incomingCall) {
+      return;
+    }
+
+    const answeredMatch = findAnsweredIncomingCall(activeCalls, incomingCall);
 		if (answeredMatch) {
 			setShowIncomingCallModal(false);
 			setIncomingCall(null);
@@ -566,6 +593,9 @@ const Layout = ({ children }: LayoutProps) => {
         .main-content-wrapper {
           transition: margin-left 0.3s ease-in-out;
         }
+          .app-content-area {
+          margin-left:65px !important
+          }
         
         /* CRM Prime-style top bar */
         .app-topbar-merged {
@@ -580,6 +610,8 @@ const Layout = ({ children }: LayoutProps) => {
           position: relative;
           width: 100%;
           max-width: 525px;
+          min-width: 220px;
+          flex: 0 1 525px;
         }
         
         .crm-prime-search-input {
@@ -592,6 +624,63 @@ const Layout = ({ children }: LayoutProps) => {
           color: #fff;
           font-size: 14px;
           transition: background 0.2s, border-color 0.2s;
+        }
+
+        .topbar-actions-group {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .topbar-actions-inline {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .topbar-actions-overflow {
+          display: none;
+          position: relative;
+        }
+
+        .topbar-overflow-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          min-width: 190px;
+          background: #ffffff;
+          border: 1px solid #dfe3e8;
+          border-radius: 6px;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+          z-index: 1050;
+          padding: 6px 0;
+        }
+
+        .topbar-overflow-item {
+          width: 100%;
+          border: none;
+          background: transparent;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          font-size: 14px;
+          color: #1f2937;
+          text-align: left;
+        }
+
+        .topbar-overflow-item:hover {
+          background: #f5f8fa;
+        }
+
+        .topbar-overflow-item:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .crm-prime-assistant-label {
+          font-size: 13px;
+          font-weight: 100;
         }
         
         .crm-prime-search-input::placeholder {
@@ -1020,23 +1109,49 @@ font-weight:600;
           
           
           .crm-prime-search-wrapper {
-            max-width: 220px !important;
-            width" 220px !important;
+            max-width: 320px;
           }
           
         }
+
+        @media (max-width: 1200px) {
+          .topbar-actions-inline {
+            display: none;
+          }
+
+          .topbar-actions-overflow {
+            display: block;
+          }
+
+          .crm-prime-assistant-label {
+            display: none;
+          }
+        }
         
         @media (max-width: 991px) {
+        .crm-prime-create-btn {
+          display: none;
+        }
           .app-topbar-merged { 
-            left: 0 !important; 
-            width: 100% !important; 
+            /*left: 0 !important; 
+            width: 100% !important; */
           }
-          .app-content-area { 
+          /*.app-content-area { 
             margin-left: 0 !important; 
-          }
+          }*/
           
           .crm-prime-user-info {
             display: none;
+          }
+
+          .crm-prime-search-wrapper {
+            width: 200px;
+            min-width: 200px;
+            max-width: 200px;
+          }
+
+          .topbar-actions-group {
+            gap: 6px;
           }
         }
 
@@ -1059,28 +1174,7 @@ font-weight:600;
 
 <div className="min-vh-100 d-flex flex-column" style={{ backgroundColor: '#f0f0f0' }}>
 
- {/* Sidebar Toggle Button (mobile) */}
- <Button
-          variant="primary"
-          className="position-fixed d-lg-none"
-          style={{
-            top: '80px',
-            left: sidebarOpen ? '270px' : '10px',
-            zIndex: 1100,
-            width: '40px',
-            height: '40px',
-            padding: '0',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '50%',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            transition: 'left 0.3s ease-in-out'
-          }}
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-        >
-          {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-        </Button>
+
 
         {/* Top bar */}
         <nav
@@ -1124,7 +1218,7 @@ font-weight:600;
                     overflowY: 'auto',
                   }}
                 >
-                  {searchSuggestions.map((r) => (
+                  {searchSuggestions.map((r: SearchableRouteItem) => (
                     <button
                       key={r.path}
                       type="button"
@@ -1231,71 +1325,163 @@ font-weight:600;
             <div className="ms-auto d-flex align-items-center" style={{ gap: '10px' }}>
               <GlobalFloatingCallBar />
 
-              {/* Dialer Button */}
-              {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
-                <button
-                  type="button"
-                  ref={dialerButtonRef}
-                  className="crm-prime-topbar-icon"
-                  disabled={!isInitialized}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (isInitialized) {
-                      openDialer();
-                    }
-                  }}
-                  title="Open Dialer"
-                >
-                  <Phone size={14} />
-                </button>
-              )}
+              <div className="topbar-actions-group">
+                <div className="topbar-actions-inline">
+                  {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
+                    <button
+                      type="button"
+                      ref={dialerButtonRef}
+                      className="crm-prime-topbar-icon"
+                      disabled={!isInitialized}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (isInitialized) {
+                          openDialer();
+                        }
+                      }}
+                      title="Open Dialer"
+                    >
+                      <Phone size={14} />
+                    </button>
+                  )}
 
-                {/* Dialer Button */}
-              {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
-                <button
-                  type="button"
-                  className="crm-prime-topbar-icon"
-                  onClick={() => {
-                    router.push('/communications/wallboards-live');
-                  }}
-                  title="Wallboards (Live)"
-                >
-                  <MonitorCheck size={14} />
-                </button>
-              )}
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
+                    <button
+                      type="button"
+                      className="crm-prime-topbar-icon"
+                      onClick={() => {
+                        router.push('/communications/wallboards-live');
+                      }}
+                      title="Wallboards (Live)"
+                    >
+                      <MonitorCheck size={14} />
+                    </button>
+                  )}
 
-              
-{/* Notifications - opens sidebar */}
-{session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
-<button
-                type="button"
-                className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
-                data-badge={totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-                onClick={() => setShowNotificationsSidebar(true)}
-                title="Notifications"
-              >
-                <Bell size={14} />
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
+                    <button
+                      type="button"
+                      className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
+                      data-badge={totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                      onClick={() => setShowNotificationsSidebar(true)}
+                      title="Notifications"
+                    >
+                      <Bell size={14} />
+                    </button>
+                  )}
+
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
+                    <button
+                      type="button"
+                      className="crm-prime-topbar-icon"
+                      title="Help"
+                      onClick={() => router.push('/help-center')}
+                    >
+                      <HelpCircle size={18} />
+                    </button>
+                  )}
+
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
+                    <button
+                      type="button"
+                      className="crm-prime-topbar-icon"
+                      title="Settings"
+                      onClick={() => router.push('/main-settings')}
+                    >
+                      <Settings size={18} />
+                    </button>
+                  )}
+                </div>
+
+                <div ref={iconsDropdownRef} className="topbar-actions-overflow">
+                  <button
+                    type="button"
+                    className="crm-prime-topbar-icon"
+                    onClick={() => setShowIconsDropdown((prev) => !prev)}
+                    title="More actions"
+                  >
+                    <MoreVertical size={16} />
                   </button>
-              )}
- {/* Help Icon */}
 
- {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
-                <button type="button" className="crm-prime-topbar-icon" title="Help"
-                onClick={() => router.push('/help-center')}
-                >
-                <HelpCircle size={18} />
-                  </button>
-              )}
+                  {showIconsDropdown && (
+                    <div className="topbar-overflow-menu">
+                      {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          disabled={!isInitialized}
+                          onClick={() => {
+                            if (!isInitialized) return;
+                            setShowIconsDropdown(false);
+                            openDialer();
+                          }}
+                        >
+                          <Phone size={16} />
+                          <span>Dialer</span>
+                        </button>
+                      )}
 
-                {/* Settings Icon */}
-              {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
-                <button type="button" className="crm-prime-topbar-icon" title="Settings"
-                onClick={() => router.push('/main-settings')}
-                >
-                <Settings size={18} />
-                  </button>
-              )}
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          onClick={() => {
+                            setShowIconsDropdown(false);
+                            router.push('/communications/wallboards-live');
+                          }}
+                        >
+                          <MonitorCheck size={16} />
+                          <span>Wallboards</span>
+                        </button>
+                      )}
+
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          onClick={() => {
+                            setShowIconsDropdown(false);
+                            setShowNotificationsSidebar(true);
+                          }}
+                        >
+                          <Bell size={16} />
+                          <span>{getNotificationsOverflowLabel(totalUnreadCount)}</span>
+                        </button>
+                      )}
+
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          onClick={() => {
+                            setShowIconsDropdown(false);
+                            router.push('/help-center');
+                          }}
+                        >
+                          <HelpCircle size={16} />
+                          <span>Help</span>
+                        </button>
+                      )}
+
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          onClick={() => {
+                            setShowIconsDropdown(false);
+                            router.push('/main-settings');
+                          }}
+                        >
+                          <Settings size={16} />
+                          <span>Settings</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Divider */}
               <div style={{ 
                 width: '1px', 
@@ -1315,7 +1501,7 @@ font-weight:600;
                 onClick={() => setShowBreezeAssistant(!showBreezeAssistant)}
               >
                 <Sparkles size={18} />
-                <span style={{ fontSize: '13px', fontWeight: 100 }}>AI Assistant</span>
+                <span className="crm-prime-assistant-label">AI Assistant</span>
                   </button>
               )}
 
@@ -1777,16 +1963,6 @@ font-weight:600;
 		{showCreateCompanySidebar && (
 			<CreateCompanySidebar
 				onClose={() => setShowCreateCompanySidebar(false)}
-				onSave={async (data: CompanyFormPayload) => {
-					try {
-						await createCompany(data);
-						setShowCreateCompanySidebar(false);
-					} catch (error) {
-						toast.error(`Failed to create company: ${getErrorMessage(error)}`, {
-							toastId: "layout_create_company_failed",
-						});
-					}
-				}}
 			/>
 		)}
 
