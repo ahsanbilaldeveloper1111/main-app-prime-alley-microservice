@@ -32,7 +32,11 @@ interface CallLogRow {
     [key: string]: any;
 }
 
-const normalizePhoneValue = (value: unknown): string => String(value ?? '').trim();
+const normalizePhoneValue = (value: unknown): string => {
+    if (typeof value === 'string') return value.trim();
+    if (typeof value === 'number' || typeof value === 'bigint') return String(value).trim();
+    return '';
+};
 
 const normalizePhoneDigits = (value: unknown): string => normalizePhoneValue(value).replaceAll(/\D/g, '');
 
