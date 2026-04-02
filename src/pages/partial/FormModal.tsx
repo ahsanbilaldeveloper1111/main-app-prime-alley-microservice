@@ -5,7 +5,7 @@ import {
   CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
   CRM_DIALOG_PRIMARY_BUTTON_STYLE,
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
-} from '../crm/crmDialogActionButtonStyles';
+} from '@components/crm/crmDialogActionButtonStyles';
 
 interface FormModalProps {
   show: boolean;

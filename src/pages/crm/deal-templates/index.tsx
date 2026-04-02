@@ -41,12 +41,12 @@ import {
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@pages/crm/crmTruncatedDescriptionCell";
+import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import {
   CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
   CRM_DIALOG_PRIMARY_BUTTON_STYLE,
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
-} from "@pages/crm/crmDialogActionButtonStyles";
+} from "@components/crm/crmDialogActionButtonStyles";
 
 const PERMISSION_ADD_DEAL_TEMPLATES = "add-crm-deal-templates";
 

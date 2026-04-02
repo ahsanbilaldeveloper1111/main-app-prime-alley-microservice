@@ -32,12 +32,12 @@ import {
 } from "lucide-react";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { CrmTruncatedDescriptionCell } from "@pages/crm/crmTruncatedDescriptionCell";
+import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import {
   CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
   CRM_DIALOG_PRIMARY_BUTTON_STYLE,
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
-} from "@pages/crm/crmDialogActionButtonStyles";
+} from "@components/crm/crmDialogActionButtonStyles";
 import { useSession } from "next-auth/react";
 
 const PERMISSION_ADD = "add-crm-business-types";

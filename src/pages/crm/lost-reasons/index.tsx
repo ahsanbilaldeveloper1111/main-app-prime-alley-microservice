@@ -3,7 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
-import CrmColorCell from "@pages/crm/crmColorCell";
+import CrmColorCell from "@components/crm/crmColorCell";
 import {
   getLostReasons,
   createLostReason,
