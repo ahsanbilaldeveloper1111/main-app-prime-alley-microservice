@@ -65,6 +65,22 @@ interface RecordingRow {
   [key: string]: any;
 }
 
+const normalizePhoneValue = (value: unknown): string => String(value ?? '').trim();
+
+const normalizePhoneDigits = (value: unknown): string => normalizePhoneValue(value).replaceAll(/\D/g, '');
+
+const isExactPhoneMatch = (candidate: unknown, target: string): boolean => {
+  const normalizedTarget = normalizePhoneValue(target);
+  if (!normalizedTarget) return true;
+
+  const normalizedCandidate = normalizePhoneValue(candidate);
+  if (normalizedCandidate === normalizedTarget) return true;
+
+  const targetDigits = normalizePhoneDigits(normalizedTarget);
+  const candidateDigits = normalizePhoneDigits(normalizedCandidate);
+  return Boolean(targetDigits) && Boolean(candidateDigits) && targetDigits === candidateDigits;
+};
+
 // ─── Filter menu components (lifted out of CallRecordings to satisfy Sonar) ──
 
 interface PhoneFilterMenuProps {
@@ -446,7 +462,16 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       if (dataFilters?.end_date) setEndDateTime(dataFilters.end_date);
     }
 
-    const rowsArray = getRowsArray(response);
+    let rowsArray = getRowsArray(response);
+
+    // Keep UI behavior consistent even if backend ignores exact-number filter keys.
+    const rawRemoteFilter = appliedFiltersRef.current?.remote_party_number;
+    const exactRemoteFilter = Array.isArray(rawRemoteFilter)
+      ? normalizePhoneValue(rawRemoteFilter[0])
+      : normalizePhoneValue(rawRemoteFilter);
+    if (exactRemoteFilter) {
+      rowsArray = rowsArray.filter((row) => isExactPhoneMatch(row.RemotePartyNumber, exactRemoteFilter));
+    }
 
     setTableData(rowsArray);
 
@@ -510,12 +535,26 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       // Convert to UTC
       formattedFilters.end_date = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     }
+
+    const normalizedRemotePartyNumber = normalizePhoneValue(formattedFilters.remote_party_number);
+    if (normalizedRemotePartyNumber) {
+      // Recordings endpoint expects an array for this filter key.
+      formattedFilters.remote_party_number = [normalizedRemotePartyNumber];
+      // Also pass an explicit exact key for backends that support it.
+      formattedFilters.remote_party_number_exact = normalizedRemotePartyNumber;
+    } else {
+      delete formattedFilters.remote_party_number;
+      delete formattedFilters.remote_party_number_exact;
+    }
     
     // Remove timezone key from payload (timezone is now included in datetime values)
     delete formattedFilters.timezone;
     
     // Update both state and ref immediately
-    setCurrentFilters(filters); // Keep input format for display
+    setCurrentFilters({
+      ...filters,
+      remote_party_number: normalizedRemotePartyNumber,
+    }); // Keep input format for display
     setAppliedFilters(formattedFilters); // Use formatted filters for API (with timezone in datetime)
     appliedFiltersRef.current = formattedFilters;
     

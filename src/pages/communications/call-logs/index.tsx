@@ -32,6 +32,22 @@ interface CallLogRow {
     [key: string]: any;
 }
 
+const normalizePhoneValue = (value: unknown): string => String(value ?? '').trim();
+
+const normalizePhoneDigits = (value: unknown): string => normalizePhoneValue(value).replaceAll(/\D/g, '');
+
+const isExactPhoneMatch = (candidate: unknown, target: string): boolean => {
+    const normalizedTarget = normalizePhoneValue(target);
+    if (!normalizedTarget) return true;
+
+    const normalizedCandidate = normalizePhoneValue(candidate);
+    if (normalizedCandidate === normalizedTarget) return true;
+
+    const targetDigits = normalizePhoneDigits(normalizedTarget);
+    const candidateDigits = normalizePhoneDigits(normalizedCandidate);
+    return Boolean(targetDigits) && Boolean(candidateDigits) && targetDigits === candidateDigits;
+};
+
 
 interface Summary {
     totalCalls: number;
@@ -308,6 +324,11 @@ const CallLogs = () => {
                 rowsArray = response.dataList;
             }
 
+            const exactPhoneFilter = normalizePhoneValue(appliedFiltersRef.current?.phone_number);
+            if (exactPhoneFilter) {
+                rowsArray = rowsArray.filter((row) => isExactPhoneMatch(row.phone_number, exactPhoneFilter));
+            }
+
             const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
             const total =
                 response?.recordsTotal ??
@@ -355,6 +376,15 @@ const CallLogs = () => {
     const handleFiltersChange = (filters: any) => {
         // Format datetime values to include seconds and timezone offset (remove timezone key)
         const formattedFilters: any = { ...filters };
+
+        const normalizedPhoneNumber = normalizePhoneValue(formattedFilters.phone_number);
+        formattedFilters.phone_number = normalizedPhoneNumber;
+        if (normalizedPhoneNumber) {
+            // Keep existing key and also pass explicit exact-match key when backend supports it.
+            formattedFilters.phone_number_exact = normalizedPhoneNumber;
+        } else {
+            delete formattedFilters.phone_number_exact;
+        }
         
         if (formattedFilters.start_datetime) {
             // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
