@@ -78,6 +78,11 @@ import {
   Download as DownloadIcon,
   SlidersHorizontal
 } from 'lucide-react';
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from '@pages/crm/crmDialogActionButtonStyles';
 import { 
   PieChart, 
   Pie, 
@@ -22400,24 +22405,33 @@ const CRMPortal = () => {
               </div>
             </Modal.Body>
 
-            <Modal.Footer style={{ borderTop: '1px solid #e5e7eb', padding: '20px 30px' }}>
-              <Button 
-                variant="outline-primary" 
-                onClick={() => {
-                  setShowProductViewModal(false);
-                  handleOpenProductModal(viewingProduct);
-                }}
-                className="d-flex align-items-center gap-2"
+            <Modal.Footer
+              className="border-0"
+              style={{ borderTop: '1px solid #e5e7eb', padding: '20px 30px' }}
+            >
+              <div
+                className="w-100 d-flex justify-content-end"
+                style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                <Edit size={16} />
-                Edit Product
-              </Button>
-              <Button 
-                variant="secondary" 
-                onClick={() => setShowProductViewModal(false)}
-              >
-                Close
-              </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setShowProductViewModal(false);
+                    handleOpenProductModal(viewingProduct);
+                  }}
+                  style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                >
+                  <Edit size={16} aria-hidden />
+                  Edit Product
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => setShowProductViewModal(false)}
+                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                >
+                  Close
+                </Button>
+              </div>
             </Modal.Footer>
           </Modal>
         )}

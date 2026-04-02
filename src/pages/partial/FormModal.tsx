@@ -1,6 +1,11 @@
-import { AlertCircle, Check,Info,X } from 'lucide-react';
+import { AlertCircle, Check, Info, X } from 'lucide-react';
 import React, { useState } from 'react';
 import { Button, Form, Modal } from 'react-bootstrap';
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from '../crm/crmDialogActionButtonStyles';
 
 interface FormModalProps {
   show: boolean;
@@ -25,6 +30,8 @@ interface FormModalProps {
   showGuidelines?: boolean;
   onEntered?: () => void;
   onExited?: () => void;
+  /** When true, use CRM stage dialog footer styling (primary blue + outlined cancel), submit before cancel. */
+  useCrmDialogFooterStyle?: boolean;
 }
 
 const FormModal: React.FC<FormModalProps> = ({
@@ -49,7 +56,8 @@ const FormModal: React.FC<FormModalProps> = ({
   guidelines,
   showGuidelines = false,
   onEntered,
-  onExited
+  onExited,
+  useCrmDialogFooterStyle = false,
 }) => {
   const [isGuidelinesExpanded, setIsGuidelinesExpanded] = useState(false);
 
@@ -127,19 +135,49 @@ const FormModal: React.FC<FormModalProps> = ({
               <span />
             )}
 
-            <div className="d-flex gap-2">
-              {showCancelButton ? (
-                <Button variant="light" onClick={handleCancel}>
-                  <X size={16} className="me-1" /> {cancelButtonText}
-                </Button>
-              ) : null}
+            <div
+              className={useCrmDialogFooterStyle ? undefined : "d-flex gap-2"}
+              style={useCrmDialogFooterStyle ? CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE : undefined}
+            >
+              {useCrmDialogFooterStyle ? (
+                <>
+                  {showSubmitButton ? (
+                    <Button
+                      variant="primary"
+                      onClick={handleSubmit}
+                      disabled={isSubmitDisabled}
+                      style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                    >
+                      <Check size={16} aria-hidden />
+                      {submitButtonText}
+                    </Button>
+                  ) : null}
+                  {showCancelButton ? (
+                    <Button
+                      variant="outline-secondary"
+                      onClick={handleCancel}
+                      style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                    >
+                      {cancelButtonText}
+                    </Button>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {showCancelButton ? (
+                    <Button variant="light" onClick={handleCancel}>
+                      <X size={16} className="me-1" /> {cancelButtonText}
+                    </Button>
+                  ) : null}
 
-              {showSubmitButton ? (
-                <Button variant={submitButtonVariant} onClick={handleSubmit} disabled={isSubmitDisabled}>
-                  <Check size={16} className="me-1" />
-                  {submitButtonText}
-                </Button>
-              ) : null}
+                  {showSubmitButton ? (
+                    <Button variant={submitButtonVariant} onClick={handleSubmit} disabled={isSubmitDisabled}>
+                      <Check size={16} className="me-1" />
+                      {submitButtonText}
+                    </Button>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
         </Modal.Footer>

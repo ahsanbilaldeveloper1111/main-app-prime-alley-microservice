@@ -27,6 +27,8 @@ import "@assets/css/GenericTable.css";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { useRouter } from "next/router";
 
+const ACTION_COLUMN_KEY = "actions";
+
 // Type definitions
 export interface TableColumn<T = any> {
   key: string;
@@ -85,6 +87,9 @@ export interface TableColumn<T = any> {
 
   // Data accessor (if different from key)
   accessor?: (row: T) => any;
+
+  /** Optional `<th>` width (e.g. `"260px"` or `"22%"`) for fixed-width columns like descriptions. */
+  width?: string;
 }
 
 export interface DropdownOption<T = any> {
@@ -475,9 +480,8 @@ function parseStoredColumnKeys(raw: string | null, defaults: string[]): string[]
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return null;
     const keys = parsed.filter((c): c is string => typeof c === "string");
-    if (keys.length === 0) return null;
-    const missing = defaults.filter((c) => !keys.includes(c));
-    return missing.length > 0 ? [...keys, ...missing] : keys;
+    const allowed = new Set(defaults);
+    return keys.filter((key) => allowed.has(key));
   } catch {
     return null;
   }
@@ -1006,12 +1010,20 @@ const GenericTable = <T extends Record<string, any>>({
 }: GenericTableProps<T>) => {
   const router = useRouter();
   const columnCustomizerHeaderId = useId();
-  const columnCustomizerActionsId = useId();
+  const columnCustomizerPlaceholderId = useId();
+  const columnCustomizerActionsHeaderId = useId();
   // Sorting state (synced from props when parent controls sort, e.g. server-side)
   const [sortColumn, setSortColumn] = useState(defaultSortColumn);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
     defaultSortDirection,
   );
+  const baseActionsEnabled = showActions && actions.length > 0;
+  const allSelectableColumnKeys = useMemo(() => {
+    const keys = columns.map((c) => c.key);
+    if (baseActionsEnabled) keys.push(ACTION_COLUMN_KEY);
+    return keys;
+  }, [columns, baseActionsEnabled]);
+
   useEffect(() => {
     setSortColumn(defaultSortColumn);
     setSortDirection(defaultSortDirection);
@@ -1019,8 +1031,8 @@ const GenericTable = <T extends Record<string, any>>({
 
   // Column selection state (uncontrolled when selectedColumns prop is not provided)
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
-    if (selectedColumnsProp && selectedColumnsProp.length > 0) return selectedColumnsProp;
-    const defaults = defaultSelectedColumns || columns.map((c) => c.key);
+    if (selectedColumnsProp !== undefined) return selectedColumnsProp;
+    const defaults = defaultSelectedColumns || allSelectableColumnKeys;
     if (columnStorageKey && globalThis.window !== undefined) {
       const stored = parseStoredColumnKeys(
         globalThis.localStorage.getItem(columnStorageKey),
@@ -1028,16 +1040,39 @@ const GenericTable = <T extends Record<string, any>>({
       );
       if (stored) return stored;
     }
-    return defaults;
+    return defaults.filter((key) => allSelectableColumnKeys.includes(key));
   });
 
   // Sync internal column selection when parent controls it (e.g. ColumnEditorModal apply)
   const effectiveSelectedColumns = selectedColumnsProp ?? selectedColumns;
+  // Keep a stable master list for the selector so hidden columns stay re-selectable.
+  const [columnCatalog, setColumnCatalog] = useState(columns);
   useEffect(() => {
-    if (selectedColumnsProp !== undefined && selectedColumnsProp.length > 0) {
-      setSelectedColumns(selectedColumnsProp);
+    setColumnCatalog((prev) => {
+      const mergedByKey = new Map(prev.map((col) => [col.key, col]));
+      columns.forEach((col) => {
+        mergedByKey.set(col.key, col);
+      });
+      return Array.from(mergedByKey.values());
+    });
+  }, [columns]);
+  useEffect(() => {
+    setSelectedColumns((prev) => {
+      const source = selectedColumnsProp ?? prev;
+      const next = source.filter((key) => allSelectableColumnKeys.includes(key));
+      return next;
+    });
+  }, [allSelectableColumnKeys, selectedColumnsProp]);
+  useEffect(() => {
+    if (selectedColumnsProp !== undefined) {
+      setSelectedColumns(
+        selectedColumnsProp.filter((key) => allSelectableColumnKeys.includes(key)),
+      );
     }
-  }, [selectedColumnsProp]);
+  }, [selectedColumnsProp, allSelectableColumnKeys]);
+  const actionsColumnVisible =
+    baseActionsEnabled &&
+    (!customizableColumns || effectiveSelectedColumns.includes(ACTION_COLUMN_KEY));
 
   // Context menu (right‑click) state
   const [contextMenu, setContextMenu] = useState<{
@@ -1099,6 +1134,12 @@ const GenericTable = <T extends Record<string, any>>({
     if (!customizableColumns) return columns;
     return columns.filter((col) => effectiveSelectedColumns.includes(col.key));
   }, [columns, effectiveSelectedColumns, customizableColumns]);
+
+  /** No data columns and no actions column: still show the picker (e.g. optional row without actions). */
+  const showColumnPickerPlaceholder =
+    customizableColumns &&
+    visibleColumns.length === 0 &&
+    !actionsColumnVisible;
 
   // Sortable columns for toolbar Sort dropdown
   const sortableColumns = useMemo(
@@ -1190,13 +1231,14 @@ const GenericTable = <T extends Record<string, any>>({
   // Handle column selection (when controlled, parent updates via onColumnChange)
   const handleColumnToggle = (columnKey: string) => {
     const current = effectiveSelectedColumns;
+    if (current.includes(columnKey) && current.length <= 1) {
+      return;
+    }
     const newSelected = current.includes(columnKey)
       ? current.filter((k) => k !== columnKey)
       : [...current, columnKey];
 
-    if (selectedColumnsProp === undefined) {
-      setSelectedColumns(newSelected);
-    }
+    setSelectedColumns(newSelected);
     if (columnStorageKey) {
       globalThis.localStorage.setItem(
         columnStorageKey,
@@ -1207,6 +1249,90 @@ const GenericTable = <T extends Record<string, any>>({
       onColumnChange(newSelected);
     }
   };
+
+  /** Escape scroll/overflow parents (short tables clip `position: absolute` menus). */
+  const columnSelectorMenuPopperConfig = useMemo(
+    () => ({ strategy: "fixed" as const }),
+    [],
+  );
+
+  const renderColumnCustomizerDropdown = (toggleId: string) => (
+    <Dropdown
+      align="end"
+      autoClose="outside"
+      onClick={(e: React.MouseEvent) => e.stopPropagation()}
+    >
+      <Dropdown.Toggle
+        variant="link"
+        size="sm"
+        className="d-inline-flex align-items-center p-1 text-secondary text-decoration-none border-0"
+        id={toggleId}
+        style={{ minWidth: "auto" }}
+      >
+        <Layers size={18} />
+      </Dropdown.Toggle>
+      <Dropdown.Menu
+        align="end"
+        className="column-selector-menu"
+        popperConfig={columnSelectorMenuPopperConfig}
+      >
+        {columnCatalog.map((c) => (
+          <Dropdown.Item key={c.key} as="div">
+            <Form.Check
+              type="checkbox"
+              label={c.label || c.key}
+              checked={effectiveSelectedColumns.includes(c.key)}
+              onChange={() => handleColumnToggle(c.key)}
+            />
+          </Dropdown.Item>
+        ))}
+        {baseActionsEnabled && (
+          <Dropdown.Item key={ACTION_COLUMN_KEY} as="div">
+            <Form.Check
+              type="checkbox"
+              label={actionsLabel}
+              checked={effectiveSelectedColumns.includes(ACTION_COLUMN_KEY)}
+              onChange={() => handleColumnToggle(ACTION_COLUMN_KEY)}
+            />
+          </Dropdown.Item>
+        )}
+        <Dropdown.Divider />
+        <Dropdown.Item
+          onClick={() => {
+            const allKeys = columnCatalog.map((c) => c.key);
+            if (baseActionsEnabled && !allKeys.includes(ACTION_COLUMN_KEY)) {
+              allKeys.push(ACTION_COLUMN_KEY);
+            }
+            if (selectedColumnsProp === undefined) setSelectedColumns(allKeys);
+            if (columnStorageKey)
+              globalThis.localStorage.setItem(
+                columnStorageKey,
+                JSON.stringify(allKeys),
+              );
+            if (onColumnChange) onColumnChange(allKeys);
+          }}
+        >
+          Select All
+        </Dropdown.Item>
+        <Dropdown.Item
+          onClick={() => {
+            const defaultKeys =
+              defaultSelectedColumns || columnCatalog.map((c) => c.key);
+            if (selectedColumnsProp === undefined)
+              setSelectedColumns(defaultKeys);
+            if (columnStorageKey)
+              globalThis.localStorage.setItem(
+                columnStorageKey,
+                JSON.stringify(defaultKeys),
+              );
+            if (onColumnChange) onColumnChange(defaultKeys);
+          }}
+        >
+          Reset to Default
+        </Dropdown.Item>
+      </Dropdown.Menu>
+    </Dropdown>
+  );
 
   // Render toolbar
   const renderToolbar = () => {
@@ -1769,7 +1895,8 @@ const GenericTable = <T extends Record<string, any>>({
     const colSpan =
       (selectable ? 1 : 0) +
       visibleColumns.length +
-      (showActions && actions.length > 0 ? 1 : 0);
+      (showColumnPickerPlaceholder ? 1 : 0) +
+      (actionsColumnVisible ? 1 : 0);
 
     if (loading) {
       return (
@@ -1802,7 +1929,7 @@ const GenericTable = <T extends Record<string, any>>({
           onMouseEnter={() => setHoveredRowIndex(index)}
           onMouseLeave={() => setHoveredRowIndex(null)}
           onContextMenu={(e) => {
-            if (actions.length === 0) return;
+            if (!actionsColumnVisible) return;
             e.preventDefault();
             e.stopPropagation();
             const items = getContextMenuItems(row);
@@ -1839,7 +1966,14 @@ const GenericTable = <T extends Record<string, any>>({
               hoveredRowIndex={hoveredRowIndex}
             />
           ))}
-          {showActions && actions.length > 0 && (
+          {showColumnPickerPlaceholder && (
+            <td
+              className="generic-table-td"
+              style={{ width: "52px" }}
+              aria-hidden
+            />
+          )}
+          {actionsColumnVisible && (
             <td
               className="generic-table-td generic-table-actions-cell"
               onClick={(e) => e.stopPropagation()}
@@ -1925,17 +2059,19 @@ const GenericTable = <T extends Record<string, any>>({
                   )}
                   {visibleColumns.map((col, colIndex) => {
                     const isLastColumn = colIndex === visibleColumns.length - 1;
-                    const hasActionsColumn = showActions && actions.length > 0;
-                    const showCustomizerInHeader =
-                      customizableColumns && isLastColumn && !hasActionsColumn;
+                    const showCustomizerInDataHeader =
+                      customizableColumns && isLastColumn && !actionsColumnVisible;
                     return (
                       <th
                         key={col.key}
                         className={`generic-table-th ${col.sortable !== false && sortable ? "sortable" : ""}`}
-                        style={{ textAlign: col.align || "left" }}
+                        style={{
+                          textAlign: col.align || "left",
+                          ...(col.width ? { width: col.width } : {}),
+                        }}
                         onClick={(e) => {
                           if (
-                            showCustomizerInHeader &&
+                            showCustomizerInDataHeader &&
                             (e.target as HTMLElement).closest(".dropdown")
                           )
                             return;
@@ -1952,150 +2088,35 @@ const GenericTable = <T extends Record<string, any>>({
                           {col.sortable !== false &&
                             sortable &&
                             renderSortIcon(col.key)}
-                          {showCustomizerInHeader && (
-                            <Dropdown
-                              align="end"
-                              autoClose="outside"
-                              onClick={(e: React.MouseEvent) =>
-                                e.stopPropagation()
-                              }
-                            >
-                              <Dropdown.Toggle
-                                variant="link"
-                                size="sm"
-                                className="d-inline-flex align-items-center p-1 text-secondary text-decoration-none border-0"
-                                id={columnCustomizerHeaderId}
-                                style={{ minWidth: "auto" }}
-                              >
-                                <Layers size={18} />
-                              </Dropdown.Toggle>
-                              <Dropdown.Menu
-                                align="end"
-                                className="column-selector-menu"
-                              >
-                                {columns.map((c) => (
-                                  <Dropdown.Item key={c.key} as="div">
-                                    <Form.Check
-                                      type="checkbox"
-                                      label={c.label || c.key}
-                                      checked={effectiveSelectedColumns.includes(c.key)}
-                                      onChange={() => handleColumnToggle(c.key)}
-                                    />
-                                  </Dropdown.Item>
-                                ))}
-                                <Dropdown.Divider />
-                                <Dropdown.Item
-                                  onClick={() => {
-                                    const allKeys = columns.map((c) => c.key);
-                                    if (selectedColumnsProp === undefined)
-                                      setSelectedColumns(allKeys);
-                                    if (columnStorageKey)
-                                      globalThis.localStorage.setItem(
-                                        columnStorageKey,
-                                        JSON.stringify(allKeys),
-                                      );
-                                    if (onColumnChange) onColumnChange(allKeys);
-                                  }}
-                                >
-                                  Select All
-                                </Dropdown.Item>
-                                <Dropdown.Item
-                                  onClick={() => {
-                                    const defaultKeys =
-                                      defaultSelectedColumns ||
-                                      columns.map((c) => c.key);
-                                    if (selectedColumnsProp === undefined)
-                                      setSelectedColumns(defaultKeys);
-                                    if (columnStorageKey)
-                                      globalThis.localStorage.setItem(
-                                        columnStorageKey,
-                                        JSON.stringify(defaultKeys),
-                                      );
-                                    if (onColumnChange)
-                                      onColumnChange(defaultKeys);
-                                  }}
-                                >
-                                  Reset to Default
-                                </Dropdown.Item>
-                              </Dropdown.Menu>
-                            </Dropdown>
-                          )}
+                          {showCustomizerInDataHeader &&
+                            renderColumnCustomizerDropdown(
+                              columnCustomizerHeaderId,
+                            )}
                         </div>
                       </th>
                     );
                   })}
-                  {showActions && actions.length > 0 && (
+                  {showColumnPickerPlaceholder && (
+                    <th
+                      className="generic-table-th"
+                      style={{ width: "52px" }}
+                      aria-label="Column visibility"
+                    >
+                      <div className="d-flex align-items-center justify-content-center">
+                        {renderColumnCustomizerDropdown(
+                          columnCustomizerPlaceholderId,
+                        )}
+                      </div>
+                    </th>
+                  )}
+                  {actionsColumnVisible && (
                     <th className="generic-table-th generic-table-actions-header">
                       <div className="d-flex align-items-center justify-content-center gap-1 w-100">
                         <span className="text-center">{actionsLabel}</span>
-                        {customizableColumns && (
-                          <Dropdown
-                            align="end"
-                            autoClose="outside"
-                            onClick={(e: React.MouseEvent) =>
-                              e.stopPropagation()
-                            }
-                          >
-                            <Dropdown.Toggle
-                              variant="link"
-                              size="sm"
-                              className="d-inline-flex align-items-center p-1 text-secondary text-decoration-none border-0"
-                              id={columnCustomizerActionsId}
-                              style={{ minWidth: "auto" }}
-                            >
-                              <Layers size={18} />
-                            </Dropdown.Toggle>
-                            <Dropdown.Menu
-                              align="end"
-                              className="column-selector-menu"
-                            >
-                              {columns.map((c) => (
-                                <Dropdown.Item key={c.key} as="div">
-                                  <Form.Check
-                                    type="checkbox"
-                                    label={c.label || c.key}
-                                    checked={effectiveSelectedColumns.includes(c.key)}
-                                    onChange={() => handleColumnToggle(c.key)}
-                                  />
-                                </Dropdown.Item>
-                              ))}
-                              <Dropdown.Divider />
-                              <Dropdown.Item
-                                onClick={() => {
-                                  const allKeys = columns.map((c) => c.key);
-                                  if (selectedColumnsProp === undefined)
-                                    setSelectedColumns(allKeys);
-                                  if (columnStorageKey)
-                                    globalThis.localStorage.setItem(
-                                      columnStorageKey,
-                                      JSON.stringify(allKeys),
-                                    );
-                                  if (onColumnChange) onColumnChange(allKeys);
-                                }}
-                              >
-                                Select All
-                              </Dropdown.Item>
-                              <Dropdown.Item
-                                onClick={() => {
-                                  const defaultKeys =
-                                    defaultSelectedColumns ||
-                                    columns.map((c) => c.key);
-                                  if (selectedColumnsProp === undefined)
-                                    setSelectedColumns(defaultKeys);
-                                  if (columnStorageKey)
-                                    globalThis.localStorage.setItem(
-                                      columnStorageKey,
-                                      JSON.stringify(defaultKeys),
-                                    );
-                                  if (onColumnChange)
-                                    onColumnChange(defaultKeys);
-                                }}
-                              >
-                                Reset to Default
-                              </Dropdown.Item>
-                            </Dropdown.Menu>
-                          </Dropdown>
-                        )}
+                        {customizableColumns &&
+                          renderColumnCustomizerDropdown(
+                            columnCustomizerActionsHeaderId,
+                          )}
                       </div>
                     </th>
                   )}

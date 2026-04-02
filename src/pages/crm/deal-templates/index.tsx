@@ -41,6 +41,12 @@ import {
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@pages/crm/crmTruncatedDescriptionCell";
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from "@pages/crm/crmDialogActionButtonStyles";
 
 const PERMISSION_ADD_DEAL_TEMPLATES = "add-crm-deal-templates";
 
@@ -349,12 +355,12 @@ const DealTemplatesPage = () => {
         label: "Description",
         sortable: false,
         type: "custom",
+        width: "260px",
         render: (template) => (
-          <div className="text-muted small">
-            {template.description || (
-              <span className="fst-italic">No description</span>
-            )}
-          </div>
+          <CrmTruncatedDescriptionCell
+            text={template.description}
+            emptyDisplay={<span className="fst-italic">No description</span>}
+          />
         ),
       },
       {
@@ -711,6 +717,7 @@ const DealTemplatesPage = () => {
           cancelButtonVariant="secondary"
           isSubmitting={submitting}
           isSubmitDisabled={submitting}
+          useCrmDialogFooterStyle
         />
 
         {/* Delete Confirmation Modal */}
@@ -759,13 +766,10 @@ const DealTemplatesPage = () => {
                 <Form.Label className="text-muted small">
                   Description
                 </Form.Label>
-                <div>
-                  {viewingTemplate.description || (
-                    <span className="text-muted fst-italic">
-                      No description
-                    </span>
-                  )}
-                </div>
+                <CrmDescriptionDetailsBlock
+                  text={viewingTemplate.description}
+                  emptyDisplay="No description"
+                />
               </div>
               <div className="mb-3">
                 <Form.Label className="text-muted small">Default</Form.Label>
@@ -829,22 +833,30 @@ const DealTemplatesPage = () => {
                 )}
               </div>
             </Modal.Body>
-            <Modal.Footer>
-              <Button
-                variant="secondary"
-                onClick={() => setShowViewModal(false)}
+            <Modal.Footer className="border-0 pt-0">
+              <div
+                className="w-100 d-flex justify-content-end"
+                style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                Close
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setShowViewModal(false);
-                  handleOpenModal(viewingTemplate);
-                }}
-              >
-                Edit
-              </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setShowViewModal(false);
+                    handleOpenModal(viewingTemplate);
+                  }}
+                  style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                >
+                  <Edit size={16} aria-hidden />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => setShowViewModal(false)}
+                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                >
+                  Close
+                </Button>
+              </div>
             </Modal.Footer>
           </Modal>
         )}
