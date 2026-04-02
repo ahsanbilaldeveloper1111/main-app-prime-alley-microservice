@@ -26,6 +26,7 @@ import { ListCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@u
 import axiosInstance from '@utils/axios';
 import { toast } from 'react-toastify';
 import { ModuleSlug, formatDuration, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData, convertDateTimeWithOffsetToLocal, formatDateTimeToLocal } from '@utils/Helper';
+import { isExactPhoneMatch, normalizePhoneValue } from '@utils/phoneMatch';
 import CircularProgressCircle from '@components/CircularProgressCircle';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
@@ -64,26 +65,6 @@ interface RecordingRow {
   imagicle?: string;
   [key: string]: any;
 }
-
-const normalizePhoneValue = (value: unknown): string => {
-  if (typeof value === 'string') return value.trim();
-  if (typeof value === 'number' || typeof value === 'bigint') return String(value).trim();
-  return '';
-};
-
-const normalizePhoneDigits = (value: unknown): string => normalizePhoneValue(value).replaceAll(/\D/g, '');
-
-const isExactPhoneMatch = (candidate: unknown, target: string): boolean => {
-  const normalizedTarget = normalizePhoneValue(target);
-  if (!normalizedTarget) return true;
-
-  const normalizedCandidate = normalizePhoneValue(candidate);
-  if (normalizedCandidate === normalizedTarget) return true;
-
-  const targetDigits = normalizePhoneDigits(normalizedTarget);
-  const candidateDigits = normalizePhoneDigits(normalizedCandidate);
-  return Boolean(targetDigits) && Boolean(candidateDigits) && targetDigits === candidateDigits;
-};
 
 // ─── Filter menu components (lifted out of CallRecordings to satisfy Sonar) ──
 

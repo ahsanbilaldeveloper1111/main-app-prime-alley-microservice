@@ -16,6 +16,7 @@ import '@assets/scss/common.scss';
 
 import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat, formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
+import { isExactPhoneMatch, normalizePhoneValue } from '@utils/phoneMatch';
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -31,27 +32,6 @@ interface CallLogRow {
     phone_number?: string;
     [key: string]: any;
 }
-
-const normalizePhoneValue = (value: unknown): string => {
-    if (typeof value === 'string') return value.trim();
-    if (typeof value === 'number' || typeof value === 'bigint') return String(value).trim();
-    return '';
-};
-
-const normalizePhoneDigits = (value: unknown): string => normalizePhoneValue(value).replaceAll(/\D/g, '');
-
-const isExactPhoneMatch = (candidate: unknown, target: string): boolean => {
-    const normalizedTarget = normalizePhoneValue(target);
-    if (!normalizedTarget) return true;
-
-    const normalizedCandidate = normalizePhoneValue(candidate);
-    if (normalizedCandidate === normalizedTarget) return true;
-
-    const targetDigits = normalizePhoneDigits(normalizedTarget);
-    const candidateDigits = normalizePhoneDigits(normalizedCandidate);
-    return Boolean(targetDigits) && Boolean(candidateDigits) && targetDigits === candidateDigits;
-};
-
 
 interface Summary {
     totalCalls: number;
