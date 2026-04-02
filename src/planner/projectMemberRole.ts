@@ -112,3 +112,52 @@ export function canManageProjectFromMembers(
   const role = getProjectMemberRoleForSessionUser(members, sessionUserPhoneOrExtension);
   return allowsTaskContributionFromResolvedRole(role);
 }
+
+/**
+ * Task row permission for edit/delete: the signed-in user's phone/extension matches the task's
+ * primary extension (see {@link resolveTaskExtensionNumberForTaskPermission}), **or** the user is a
+ * **project admin** (role `admin` / `owner` via {@link getProjectMemberRoleForSessionUser}) on the task's project.
+ * Project **member** (non-admin) cannot edit/delete tasks they do not "own" by extension.
+ */
+function resolveTaskExtensionNumberForTaskPermission(task: unknown): string {
+  if (task == null || typeof task !== "object") return "";
+  const t = task as Record<string, unknown>;
+  const direct = stringifyApiScalar(t.extension_number).trim();
+  if (direct) return direct;
+  const ownerOnTask = stringifyApiScalar(t.owner_extension_number).trim();
+  if (ownerOnTask) return ownerOnTask;
+  const extNums = t.extension_numbers;
+  if (Array.isArray(extNums) && extNums.length > 0) {
+    const first = stringifyApiScalar(extNums[0]).trim();
+    if (first) return first;
+  }
+  const assignees = t.assignees;
+  if (Array.isArray(assignees) && assignees.length > 0) {
+    const first = assignees[0];
+    if (first && typeof first === "object") {
+      const fromAssignee = stringifyApiScalar(
+        (first as Record<string, unknown>).extension_number,
+      ).trim();
+      if (fromAssignee) return fromAssignee;
+    }
+  }
+  return "";
+}
+
+export function canEditOrDeleteTaskForSessionUser(
+  task: unknown,
+  project: unknown,
+  sessionUserPhoneOrExtension: string | null | undefined,
+): boolean {
+  const needle = stringifyApiScalar(sessionUserPhoneOrExtension).trim();
+  if (!needle) return false;
+
+  const taskExt = resolveTaskExtensionNumberForTaskPermission(task);
+  if (taskExt !== "" && needle === taskExt) {
+    return true;
+  }
+
+  const members = resolveMembersFromProject(project);
+  const role = getProjectMemberRoleForSessionUser(members, sessionUserPhoneOrExtension);
+  return allowsAdministerFromResolvedRole(role);
+}

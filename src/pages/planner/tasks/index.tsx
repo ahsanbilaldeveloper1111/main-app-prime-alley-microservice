@@ -14,7 +14,7 @@ import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
 import { FiSearch } from "react-icons/fi";
-import { Plus, X, ChevronDown, Filter, MoreVertical, Settings, Trash2 } from "lucide-react";
+import { Plus, ChevronDown, Filter, MoreVertical, Settings, Trash2 } from "lucide-react";
 import GenericTable, { TableColumn, TableAction, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -29,6 +29,7 @@ import {
 } from "@utils/tasks";
 import {
   canManageProjectFromMembers,
+  canEditOrDeleteTaskForSessionUser,
   getSessionPhoneOrExtension,
 } from "@planner/projectMemberRole";
 import { useSession } from "next-auth/react";
@@ -70,6 +71,10 @@ interface ApiTask {
   } | null;
   status?: { id: number; name: string } | null;
   assignees?: Array<{ extension_number: string }>;
+  /** Creator / owner extension when API sends it (matches session `user.phone` for edit/delete). */
+  extension_number?: string;
+  owner_extension_number?: string | null;
+  extension_numbers?: string[];
   is_completed?: boolean;
   type?: string;
 }
@@ -791,9 +796,11 @@ const TasksListingPage = ({
       [isProjectScopedEmbed, sidebarProject],
     );
 
+    /** Edit/delete: task extension matches session, or user is project admin (not merely member). */
     const canEditTaskByProjectMembers = useCallback(
       (row: Task) =>
-        canManageProjectFromMembers(
+        canEditOrDeleteTaskForSessionUser(
+          row.rawData,
           resolveProjectForMemberCheck(row),
           sessionUserPhoneOrExtension,
         ),
@@ -814,19 +821,32 @@ const TasksListingPage = ({
       setShowCreate(true);
     }, [canEditTaskByProjectMembers]);
 
-    const openDeleteConfirm = useCallback((row: Task) => {
-      setToDelete(row);
-      setShowDelete(true);
-    }, []);
+    const openDeleteConfirm = useCallback(
+      (row: Task) => {
+        if (!canEditTaskByProjectMembers(row)) return;
+        setToDelete(row);
+        setShowDelete(true);
+      },
+      [canEditTaskByProjectMembers],
+    );
 
     const handleDelete = async () => {
       if (!toDelete) return;
+      if (
+        !canEditOrDeleteTaskForSessionUser(
+          toDelete.rawData,
+          resolveProjectForMemberCheck(toDelete),
+          sessionUserPhoneOrExtension,
+        )
+      ) {
+        toast.error("You cannot delete this task");
+        return;
+      }
       try {
         await deleteTaskApi(toDelete.id);
         setShowDelete(false);
         setToDelete(null);
         fetchTasks();
-        toast.success("Task deleted");
       } catch {
         toast.error("Failed to delete task");
       }
@@ -1009,7 +1029,11 @@ const TasksListingPage = ({
                   as="button"
                   type="button"
                   disabled={!canManage}
-                  title={canManage ? undefined : "You cannot edit tasks in this project"}
+                  title={
+                    canManage
+                      ? undefined
+                      : "Only the task owner (extension) or a project admin can edit"
+                  }
                   onClick={() => {
                     setOpenTaskActionsId(null);
                     openEdit(row);
@@ -1024,7 +1048,11 @@ const TasksListingPage = ({
                   type="button"
                   className="text-danger"
                   disabled={!canManage}
-                  title={canManage ? undefined : "You cannot delete tasks in this project"}
+                  title={
+                    canManage
+                      ? undefined
+                      : "Only the task owner (extension) or a project admin can delete"
+                  }
                   onClick={() => {
                     setOpenTaskActionsId(null);
                     openDeleteConfirm(row);
@@ -1311,7 +1339,7 @@ const TasksListingPage = ({
                 }}
               >
                 {tab.label}
-                {tab.id === "all" && <X size={13} color="#9ca3af" />}
+                {tab.id === "all"}
               </button>
             ))}
 

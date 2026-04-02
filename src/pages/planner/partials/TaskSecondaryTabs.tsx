@@ -13,6 +13,7 @@ import {
   deleteTaskDocument,
 } from "@utils/tasks";
 import AllActivitiesBrowserModal from "./AllActivitiesBrowserModal";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useAllActivitiesBrowserModal } from "@planner/useAllActivitiesBrowserModal";
 import type { ActivityLogExtension } from "@planner/activityLogExtension";
 import {
@@ -54,6 +55,359 @@ function documentPluralSuffix(count: number): string {
   return "s";
 }
 
+type TaskCommentRecord = {
+  id: number;
+  comment?: string;
+  extension_number?: string;
+  user?: { extension_number?: string };
+  created_at?: string;
+};
+
+type TaskDocumentRecord = {
+  id?: number | string;
+  original_name?: string;
+  name?: string;
+  file_name?: string;
+};
+
+type PendingTaskDelete =
+  | { type: "comment"; comment: { id: number; comment?: string } }
+  | { type: "document"; doc: TaskDocumentRecord };
+
+function commentTextForDeleteModal(comment: { comment?: string }): string {
+  const text = (comment.comment ?? "").trim();
+  if (!text) {
+    return "this comment";
+  }
+  if (text.length > 80) {
+    return `${text.slice(0, 80)}…`;
+  }
+  return text;
+}
+
+function getDeleteModalCopy(pending: PendingTaskDelete | null): {
+  itemName?: string;
+  itemType: string;
+} {
+  if (pending == null) {
+    return { itemType: "item" };
+  }
+  if (pending.type === "comment") {
+    return { itemName: commentTextForDeleteModal(pending.comment), itemType: "comment" };
+  }
+  const doc = pending.doc;
+  const itemName =
+    doc.original_name || doc.name || doc.file_name || "this document";
+  return { itemName, itemType: "document" };
+}
+
+interface TaskCommentCardProps {
+  comment: TaskCommentRecord;
+  extensions: ActivityLogExtension[];
+  isEditing: boolean;
+  editingCommentText: string;
+  submittingComment: boolean;
+  onCancelEdit: () => void;
+  onChangeEditText: (value: string) => void;
+  onSaveEdit: () => Promise<void>;
+  onStartEdit: () => void;
+  onRequestDelete: () => void;
+}
+
+const TaskCommentCard: React.FC<TaskCommentCardProps> = ({
+  comment,
+  extensions,
+  isEditing,
+  editingCommentText,
+  submittingComment,
+  onCancelEdit,
+  onChangeEditText,
+  onSaveEdit,
+  onStartEdit,
+  onRequestDelete,
+}) => {
+  const extNumber = comment.extension_number || comment.user?.extension_number || "";
+  const { name: extensionName, initials: extensionInitials } = getExtensionDisplay(
+    extensions,
+    String(extNumber),
+  );
+  const commentDate = formatActivityDate(comment.created_at || "");
+
+  return (
+    <div
+      style={{
+        marginBottom: "0.75rem",
+        padding: "0.75rem",
+        backgroundColor: "#f8fafc",
+        borderRadius: 6,
+      }}
+    >
+      {isEditing ? (
+        <div>
+          <Form.Control
+            as="textarea"
+            rows={3}
+            value={editingCommentText}
+            onChange={(e) => onChangeEditText(e.target.value)}
+            style={{ marginBottom: "0.5rem" }}
+          />
+          <div
+            style={{
+              display: "flex",
+              gap: "0.5rem",
+              justifyContent: "flex-end",
+            }}
+          >
+            <Button variant="light" size="sm" onClick={onCancelEdit}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                onSaveEdit().catch(() => undefined);
+              }}
+              disabled={submittingComment || !editingCommentText.trim()}
+            >
+              Save
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div
+            style={{
+              display: "flex",
+              gap: "0.75rem",
+              marginBottom: "0.5rem",
+            }}
+          >
+            <div
+              style={{
+                width: "32px",
+                height: "32px",
+                fontSize: "0.7rem",
+                flexShrink: 0,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 600,
+              }}
+            >
+              {extensionInitials}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: "0.875rem",
+                  color: "#1e293b",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                <strong>{extensionName}</strong>
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{commentDate}</div>
+            </div>
+            <div style={{ display: "flex", gap: "0.25rem" }}>
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0"
+                onClick={onStartEdit}
+                style={{ padding: "0.25rem", minWidth: "auto" }}
+              >
+                <Edit size={14} />
+              </Button>
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0"
+                onClick={onRequestDelete}
+                style={{
+                  padding: "0.25rem",
+                  minWidth: "auto",
+                  color: "#dc3545",
+                }}
+              >
+                <Trash2 size={14} />
+              </Button>
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: "0.875rem",
+              color: "#475569",
+              lineHeight: 1.6,
+            }}
+          >
+            {comment.comment}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+interface TaskDocumentsTabBodyProps {
+  loadingDocuments: boolean;
+  taskDocuments: TaskDocumentRecord[];
+  documentInputRef: React.RefObject<HTMLInputElement | null>;
+  uploadingDocument: boolean;
+  onUploadChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onPickFiles: () => void;
+  onDownload: (doc: TaskDocumentRecord) => void;
+  onRequestDeleteDocument: (doc: TaskDocumentRecord) => void;
+}
+
+const TaskDocumentsTabBody: React.FC<TaskDocumentsTabBodyProps> = ({
+  loadingDocuments,
+  taskDocuments,
+  documentInputRef,
+  uploadingDocument,
+  onUploadChange,
+  onPickFiles,
+  onDownload,
+  onRequestDeleteDocument,
+}) => {
+  if (loadingDocuments) {
+    return (
+      <div style={{ textAlign: "center", padding: "1.5rem" }}>
+        <Spinner animation="border" size="sm" />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "0.75rem",
+          flexWrap: "wrap",
+          gap: "0.5rem",
+        }}
+      >
+        <span style={{ fontSize: "0.875rem", color: "#64748b" }}>
+          {taskDocuments.length} document{documentPluralSuffix(taskDocuments.length)}
+        </span>
+        <div className="d-flex align-items-center gap-2">
+          <input
+            ref={documentInputRef}
+            type="file"
+            accept="*/*"
+            multiple
+            style={{ display: "none" }}
+            onChange={onUploadChange}
+            disabled={uploadingDocument}
+          />
+          <Button
+            variant="primary"
+            size="sm"
+            disabled={uploadingDocument}
+            onClick={onPickFiles}
+            style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
+          >
+            {uploadingDocument ? (
+              <Spinner
+                animation="border"
+                size="sm"
+                style={{ width: "14px", height: "14px" }}
+              />
+            ) : (
+              <Upload size={14} />
+            )}
+            Upload
+          </Button>
+        </div>
+      </div>
+      {taskDocuments.length === 0 ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: "1.25rem",
+            color: "#94a3b8",
+            fontSize: "0.875rem",
+          }}
+        >
+          No documents yet. Upload a file to attach it to this task.
+        </div>
+      ) : (
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {taskDocuments.map((doc, idx) => {
+            const label =
+              doc.original_name || doc.name || doc.file_name || `Document ${idx + 1}`;
+            return (
+              <li
+                key={doc.id ?? idx}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "0.5rem 0.65rem",
+                  backgroundColor: "#f8fafc",
+                  borderRadius: 6,
+                  marginBottom: "0.5rem",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    minWidth: 0,
+                    flex: 1,
+                  }}
+                >
+                  <FileText size={16} className="text-muted" style={{ flexShrink: 0 }} />
+                  <span
+                    style={{
+                      fontSize: "0.8125rem",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {label}
+                  </span>
+                </div>
+                <div style={{ display: "flex", gap: "0.25rem", flexShrink: 0 }}>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0"
+                    onClick={() => {
+                      onDownload(doc);
+                    }}
+                    title="Download"
+                    style={{ minWidth: "auto", padding: "0.25rem" }}
+                  >
+                    <Download size={15} />
+                  </Button>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0"
+                    onClick={() => onRequestDeleteDocument(doc)}
+                    title="Delete"
+                    style={{ minWidth: "auto", padding: "0.25rem", color: "#dc3545" }}
+                  >
+                    <Trash2 size={15} />
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+};
+
 const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
   taskId,
   extensions = [],
@@ -68,10 +422,12 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
   const [submittingComment, setSubmittingComment] = useState(false);
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editingCommentText, setEditingCommentText] = useState("");
-  const [taskDocuments, setTaskDocuments] = useState<any[]>([]);
+  const [taskDocuments, setTaskDocuments] = useState<TaskDocumentRecord[]>([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
   const documentInputRef = useRef<HTMLInputElement>(null);
+  const [pendingDelete, setPendingDelete] = useState<PendingTaskDelete | null>(null);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
 
   const resolvedId = taskId != null && taskId !== "" ? taskId : null;
 
@@ -88,6 +444,8 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
     setNewComment("");
     setEditingCommentId(null);
     setEditingCommentText("");
+    setPendingDelete(null);
+    setDeleteInProgress(false);
     resetActivitiesModal();
   }, [resetActivitiesModal]);
 
@@ -136,7 +494,8 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
     try {
       setLoadingDocuments(true);
       const data = await getTaskDocuments(resolvedId);
-      setTaskDocuments(Array.isArray(data) ? data : data?.data ?? []);
+      const rows = Array.isArray(data) ? data : data?.data ?? [];
+      setTaskDocuments(rows as TaskDocumentRecord[]);
     } catch (error) {
       console.error("Error fetching task documents:", error);
       setTaskDocuments([]);
@@ -171,7 +530,7 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
     }
   };
 
-  const handleDownloadDocument = async (doc: any) => {
+  const handleDownloadDocument = async (doc: TaskDocumentRecord) => {
     if (resolvedId == null || !doc?.id) return;
     try {
       const blob = await getTaskDocumentDownload(resolvedId, doc.id);
@@ -187,15 +546,28 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
     }
   };
 
-  const handleDeleteDocument = async (doc: any) => {
-    if (resolvedId == null || !doc?.id) return;
+  const handleConfirmPendingDelete = async () => {
+    if (pendingDelete == null || resolvedId == null) return;
+    setDeleteInProgress(true);
     try {
-      await deleteTaskDocument(resolvedId, doc.id);
-      await fetchTaskDocuments();
+      if (pendingDelete.type === "comment") {
+        await deleteTaskComment(resolvedId, pendingDelete.comment.id);
+        const commentsResponse = await getTaskComments(resolvedId);
+        setTaskComments(normalizeCommentsResponse(commentsResponse));
+      } else if (pendingDelete.doc?.id != null) {
+        await deleteTaskDocument(resolvedId, pendingDelete.doc.id);
+        await fetchTaskDocuments();
+      }
+      setPendingDelete(null);
     } catch (error) {
-      console.error("Error deleting document:", error);
+      console.error("Error deleting:", error);
+    } finally {
+      setDeleteInProgress(false);
     }
   };
+
+  const { itemName: deleteModalItemName, itemType: deleteModalItemType } =
+    getDeleteModalCopy(pendingDelete);
 
   if (!visible || resolvedId == null) {
     return null;
@@ -311,170 +683,49 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
                         No comments yet
                       </div>
                     ) : (
-                      taskComments.map((comment: any, idx: number) => {
-                        const extNumber =
-                          comment.extension_number || comment.user?.extension_number || "";
-                        const { name: extensionName, initials: extensionInitials } =
-                          getExtensionDisplay(extensions, String(extNumber));
-                        const commentDate = formatActivityDate(comment.created_at || "");
-                        const isEditing = editingCommentId === comment.id;
-
-                        return (
-                          <div
-                            key={comment.id ?? idx}
-                            style={{
-                              marginBottom: "0.75rem",
-                              padding: "0.75rem",
-                              backgroundColor: "#f8fafc",
-                              borderRadius: 6,
-                            }}
-                          >
-                            {isEditing ? (
-                              <div>
-                                <Form.Control
-                                  as="textarea"
-                                  rows={3}
-                                  value={editingCommentText}
-                                  onChange={(e) => setEditingCommentText(e.target.value)}
-                                  style={{ marginBottom: "0.5rem" }}
-                                />
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: "0.5rem",
-                                    justifyContent: "flex-end",
-                                  }}
-                                >
-                                  <Button
-                                    variant="light"
-                                    size="sm"
-                                    onClick={() => {
-                                      setEditingCommentId(null);
-                                      setEditingCommentText("");
-                                    }}
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    variant="primary"
-                                    size="sm"
-                                    onClick={async () => {
-                                      if (resolvedId != null && editingCommentText.trim()) {
-                                        try {
-                                          setSubmittingComment(true);
-                                          await updateTaskComment(
-                                            resolvedId,
-                                            comment.id,
-                                            editingCommentText.trim(),
-                                          );
-                                          const commentsResponse = await getTaskComments(resolvedId);
-                                          setTaskComments(normalizeCommentsResponse(commentsResponse));
-                                          setEditingCommentId(null);
-                                          setEditingCommentText("");
-                                        } catch (error) {
-                                          console.error("Error updating comment:", error);
-                                        } finally {
-                                          setSubmittingComment(false);
-                                        }
-                                      }
-                                    }}
-                                    disabled={submittingComment || !editingCommentText.trim()}
-                                  >
-                                    Save
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    gap: "0.75rem",
-                                    marginBottom: "0.5rem",
-                                  }}
-                                >
-                                  <div
-                                    style={{
-                                      width: "32px",
-                                      height: "32px",
-                                      fontSize: "0.7rem",
-                                      flexShrink: 0,
-                                      borderRadius: "50%",
-                                      background:
-                                        "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                      color: "white",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    {extensionInitials}
-                                  </div>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div
-                                      style={{
-                                        fontSize: "0.875rem",
-                                        color: "#1e293b",
-                                        marginBottom: "0.25rem",
-                                      }}
-                                    >
-                                      <strong>{extensionName}</strong>
-                                    </div>
-                                    <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-                                      {commentDate}
-                                    </div>
-                                  </div>
-                                  <div style={{ display: "flex", gap: "0.25rem" }}>
-                                    <Button
-                                      variant="link"
-                                      size="sm"
-                                      className="p-0"
-                                      onClick={() => {
-                                        setEditingCommentId(comment.id);
-                                        setEditingCommentText(comment.comment || "");
-                                      }}
-                                      style={{ padding: "0.25rem", minWidth: "auto" }}
-                                    >
-                                      <Edit size={14} />
-                                    </Button>
-                                    <Button
-                                      variant="link"
-                                      size="sm"
-                                      className="p-0"
-                                      onClick={async () => {
-                                        try {
-                                          await deleteTaskComment(resolvedId, comment.id);
-                                          const commentsResponse = await getTaskComments(resolvedId);
-                                          setTaskComments(normalizeCommentsResponse(commentsResponse));
-                                        } catch (error) {
-                                          console.error("Error deleting comment:", error);
-                                        }
-                                      }}
-                                      style={{
-                                        padding: "0.25rem",
-                                        minWidth: "auto",
-                                        color: "#dc3545",
-                                      }}
-                                    >
-                                      <Trash2 size={14} />
-                                    </Button>
-                                  </div>
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "0.875rem",
-                                    color: "#475569",
-                                    lineHeight: 1.6,
-                                  }}
-                                >
-                                  {comment.comment}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })
+                      taskComments.map((comment: TaskCommentRecord, idx: number) => (
+                        <TaskCommentCard
+                          key={comment.id ?? idx}
+                          comment={comment}
+                          extensions={extensions}
+                          isEditing={editingCommentId === comment.id}
+                          editingCommentText={editingCommentText}
+                          submittingComment={submittingComment}
+                          onCancelEdit={() => {
+                            setEditingCommentId(null);
+                            setEditingCommentText("");
+                          }}
+                          onChangeEditText={setEditingCommentText}
+                          onSaveEdit={async () => {
+                            if (resolvedId == null || !editingCommentText.trim()) {
+                              return;
+                            }
+                            try {
+                              setSubmittingComment(true);
+                              await updateTaskComment(
+                                resolvedId,
+                                comment.id,
+                                editingCommentText.trim(),
+                              );
+                              const commentsResponse = await getTaskComments(resolvedId);
+                              setTaskComments(normalizeCommentsResponse(commentsResponse));
+                              setEditingCommentId(null);
+                              setEditingCommentText("");
+                            } catch (error) {
+                              console.error("Error updating comment:", error);
+                            } finally {
+                              setSubmittingComment(false);
+                            }
+                          }}
+                          onStartEdit={() => {
+                            setEditingCommentId(comment.id);
+                            setEditingCommentText(comment.comment || "");
+                          }}
+                          onRequestDelete={() => {
+                            setPendingDelete({ type: "comment", comment });
+                          }}
+                        />
+                      ))
                     )}
                   </div>
 
@@ -536,144 +787,35 @@ const TaskSecondaryTabs: React.FC<TaskSecondaryTabsProps> = ({
                 border: "1px solid #e2e8f0",
               }}
             >
-              {loadingDocuments ? (
-                <div style={{ textAlign: "center", padding: "1.5rem" }}>
-                  <Spinner animation="border" size="sm" />
-                </div>
-              ) : (
-                <>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginBottom: "0.75rem",
-                      flexWrap: "wrap",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <span style={{ fontSize: "0.875rem", color: "#64748b" }}>
-                      {taskDocuments.length} document{documentPluralSuffix(taskDocuments.length)}
-                    </span>
-                    <div className="d-flex align-items-center gap-2">
-                      <input
-                        ref={documentInputRef}
-                        type="file"
-                        accept="*/*"
-                        multiple
-                        style={{ display: "none" }}
-                        onChange={handleUploadDocument}
-                        disabled={uploadingDocument}
-                      />
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={uploadingDocument}
-                        onClick={() => documentInputRef.current?.click()}
-                        style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}
-                      >
-                        {uploadingDocument ? (
-                          <Spinner
-                            animation="border"
-                            size="sm"
-                            style={{ width: "14px", height: "14px" }}
-                          />
-                        ) : (
-                          <Upload size={14} />
-                        )}
-                        Upload
-                      </Button>
-                    </div>
-                  </div>
-                  {taskDocuments.length === 0 ? (
-                    <div
-                      style={{
-                        textAlign: "center",
-                        padding: "1.25rem",
-                        color: "#94a3b8",
-                        fontSize: "0.875rem",
-                      }}
-                    >
-                      No documents yet. Upload a file to attach it to this task.
-                    </div>
-                  ) : (
-                    <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-                      {taskDocuments.map((doc: any, idx: number) => {
-                        const label =
-                          doc.original_name || doc.name || doc.file_name || `Document ${idx + 1}`;
-                        return (
-                          <li
-                            key={doc.id ?? idx}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              padding: "0.5rem 0.65rem",
-                              backgroundColor: "#f8fafc",
-                              borderRadius: 6,
-                              marginBottom: "0.5rem",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                                minWidth: 0,
-                                flex: 1,
-                              }}
-                            >
-                              <FileText size={16} className="text-muted" style={{ flexShrink: 0 }} />
-                              <span
-                                style={{
-                                  fontSize: "0.8125rem",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {label}
-                              </span>
-                            </div>
-                            <div style={{ display: "flex", gap: "0.25rem", flexShrink: 0 }}>
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="p-0"
-                                onClick={() => {
-                                  handleDownloadDocument(doc).catch(() => undefined);
-                                }}
-                                title="Download"
-                                style={{ minWidth: "auto", padding: "0.25rem" }}
-                              >
-                                <Download size={15} />
-                              </Button>
-                              <Button
-                                variant="link"
-                                size="sm"
-                                className="p-0"
-                                onClick={() => {
-                                  handleDeleteDocument(doc).catch(() => undefined);
-                                }}
-                                title="Delete"
-                                style={{ minWidth: "auto", padding: "0.25rem", color: "#dc3545" }}
-                              >
-                                <Trash2 size={15} />
-                              </Button>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </>
-              )}
+              <TaskDocumentsTabBody
+                loadingDocuments={loadingDocuments}
+                taskDocuments={taskDocuments}
+                documentInputRef={documentInputRef}
+                uploadingDocument={uploadingDocument}
+                onUploadChange={handleUploadDocument}
+                onPickFiles={() => documentInputRef.current?.click()}
+                onDownload={(doc) => {
+                  handleDownloadDocument(doc).catch(() => undefined);
+                }}
+                onRequestDeleteDocument={(doc) => setPendingDelete({ type: "document", doc })}
+              />
             </div>
           )}
         </div>
       </div>
 
       <AllActivitiesBrowserModal {...activitiesModalProps} />
+
+      <DeleteConfirmationModal
+        show={pendingDelete != null}
+        onHide={() => {
+          if (!deleteInProgress) setPendingDelete(null);
+        }}
+        onConfirm={handleConfirmPendingDelete}
+        itemName={deleteModalItemName}
+        itemType={deleteModalItemType}
+        loading={deleteInProgress}
+      />
     </>
   );
 };

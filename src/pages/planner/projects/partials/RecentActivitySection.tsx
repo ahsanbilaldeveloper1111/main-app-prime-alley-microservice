@@ -4,6 +4,7 @@ import { formatDateForTable } from '@utils/Helper';
 import AllActivitiesBrowserModal from '@pages/planner/partials/AllActivitiesBrowserModal';
 import { useAllActivitiesBrowserModal } from '@planner/useAllActivitiesBrowserModal';
 import type { ActivityLogExtension } from '@planner/activityLogExtension';
+import { getExtensionDisplay } from '@planner/taskActivityLogModalShared';
 
 interface RecentActivitySectionProps {
   activities: unknown[];
@@ -38,8 +39,9 @@ const RecentActivitySection: React.FC<RecentActivitySectionProps> = ({
     );
   } else {
     activityListBody = (activities as any[]).map((activity: any, index: number) => {
-      const user = activity.user || activity.action_by || 'Unknown';
-      const initials = user.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+      const extKey = String(activity.extension_number ?? activity.action_by ?? '').trim();
+      const { name: resolvedName, initials } = getExtensionDisplay(hierarchyExtensions, extKey);
+      const displayName = resolvedName || extKey || 'Unknown';
       const colors = ['#48bb78', '#f56565', '#4299e1', '#ed64a6', '#667eea', '#9f7aea', '#fc8181', '#ed8936'];
       const color = colors[index % colors.length];
 
@@ -65,7 +67,7 @@ const RecentActivitySection: React.FC<RecentActivitySectionProps> = ({
 
           <div style={styles.activityContent}>
             <div style={styles.activityText}>
-              <strong style={{ color: '#1F2937' }}>{user}</strong>
+              <strong style={{ color: '#1F2937' }}>{displayName}</strong>
               {' '}
               {activity.action || activity.activity_type || 'performed action on'}{' '}
               <strong style={{ color: '#1F2937' }}>{activity.task?.title || activity.description || 'task'}</strong>
