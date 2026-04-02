@@ -15,6 +15,34 @@ const paginationComponentOptions = {
   selectAllRowsItemText: ""
 };
 
+/** Build searchable text from a cell value without relying on Object.prototype.toString for plain objects. */
+function cellValueToSearchText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "";
+    }
+  }
+  return String(value);
+}
+
+function cellMatchesSearch(value: unknown, normalizedQuery: string): boolean {
+  const text = cellValueToSearchText(value);
+  if (!text) return false;
+  return text.toLowerCase().includes(normalizedQuery.toLowerCase());
+}
+
 const Table2 = () => {
   const columns = [
     {
@@ -64,15 +92,11 @@ const Table2 = () => {
   const tableSearchQuery = normalizeSearchQuery(searchTerm);
   const filteredData = tableSearchQuery
     ? data.filter((row: any) =>
-        Object.values(row).some(
-          (value) =>
-            value &&
-            value
-              .toString()
-              .toLowerCase()
-              .includes(tableSearchQuery.toLowerCase()),
+        Object.values(row).some((value) =>
+          cellMatchesSearch(value, tableSearchQuery),
         ),
-      ) : data;
+      )
+    : data;
 
   return (
     <React.Fragment>
