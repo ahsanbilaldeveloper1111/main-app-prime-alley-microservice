@@ -6,6 +6,8 @@ import type { Session } from "next-auth";
 
 import moment from "moment-timezone";
 
+type dateType = string | Date | null | undefined;
+
 // Cache for session data to avoid multiple fetches
 let sessionCache: { session: Session | null; timestamp: number } | null = null;
 const SESSION_CACHE_TTL = 5000; // 5 seconds cache TTL
@@ -516,7 +518,7 @@ export const GlobalDateTimeFormat = "D MMMM, YYYY hh:mm:ss A";
  * CRM tables and preview: full month name and comma before year (e.g. "30 March, 2026").
  */
 export const formatCrmPreviewDate = (
-  date: string | Date | null | undefined,
+  date: dateType,
 ): string => {
   if (!date) return "";
   try {
@@ -561,7 +563,7 @@ export const formatDateForTable = (
  * CRM preview panels with time: e.g. "30 March, 2025 at 03:45 PM"
  */
 export const formatCrmPreviewDateTime = (
-  date: string | Date | null | undefined,
+  date: dateType,
 ): string => {
   if (!date) return "";
   try {

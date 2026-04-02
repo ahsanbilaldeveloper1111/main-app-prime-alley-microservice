@@ -83,15 +83,14 @@ const FAQ = () => {
   const categories = Array.from(new Set(faqData.map(faq => faq.category)));
 
   const faqSearchQuery = normalizeSearchQuery(searchTerm);
-  const filteredFAQs = !faqSearchQuery
-    ? faqData
-    : faqData.filter(
-        (faq) =>
-          faq.question.toLowerCase().includes(faqSearchQuery.toLowerCase()) ||
-          faq.answer.toLowerCase().includes(faqSearchQuery.toLowerCase()) ||
-          faq.category.toLowerCase().includes(faqSearchQuery.toLowerCase()),
-      );
-
+  const filteredFAQs = faqSearchQuery
+  ? faqData.filter(
+    (faq) =>
+      faq.question.toLowerCase().includes(faqSearchQuery.toLowerCase()) ||
+    faq.answer.toLowerCase().includes(faqSearchQuery.toLowerCase()) ||
+    faq.category.toLowerCase().includes(faqSearchQuery.toLowerCase()),
+  ) : faqData;
+  
   const handleAccordionToggle = (eventKey: string | null | undefined) => {
     setActiveKey(activeKey === eventKey ? null : eventKey || null);
   };

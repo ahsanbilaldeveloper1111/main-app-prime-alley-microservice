@@ -62,9 +62,8 @@ const Table2 = () => {
   };
 
   const tableSearchQuery = normalizeSearchQuery(searchTerm);
-  const filteredData = !tableSearchQuery
-    ? data
-    : data.filter((row) =>
+  const filteredData = tableSearchQuery
+    ? data.filter((row: any) =>
         Object.values(row).some(
           (value) =>
             value &&
@@ -73,7 +72,7 @@ const Table2 = () => {
               .toLowerCase()
               .includes(tableSearchQuery.toLowerCase()),
         ),
-      );
+      ) : data;
 
   return (
     <React.Fragment>

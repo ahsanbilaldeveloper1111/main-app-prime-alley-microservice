@@ -156,13 +156,11 @@ import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import CrmActivitiesPanel, {
+import {
   type CrmActivitiesPanelRef,
 } from "@components/CrmActivitiesPanel";
-import RichNoteEditor from "@components/RichNoteEditor";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import {
-  CrmPhoneContainer as PhoneContainer,
   CrmKPICard as KPICard,
   CrmFilterBar as FilterBar,
 } from "@components/crm/CrmListPageUi";

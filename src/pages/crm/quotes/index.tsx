@@ -163,7 +163,6 @@ import CrmActivitiesPanel, {
 import RichNoteEditor from "@components/RichNoteEditor";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import {
-  CrmPhoneContainer as PhoneContainer,
   CrmKPICard as KPICard,
   CrmFilterBar as FilterBar,
 } from "@components/crm/CrmListPageUi";
