@@ -25,6 +25,7 @@ import { listStatuses } from "@utils/work-planner";
 import { getAutoTimezone } from "@utils/Helper";
 import RichTextEditor from "../../pages/help-center/partials/RichTextEditor";
 import TaskSecondaryTabs from "@pages/planner/partials/TaskSecondaryTabs";
+import type { PlannerTaskEditScope } from "@planner/taskRowPermissions";
 
 // ─── Types (from createtask-modal) ─────────────────────────────────────────────
 
@@ -87,6 +88,10 @@ interface CreateTaskSidebarProps {
   taskTypeChoices?: readonly PlannerTaskType[];
   /** When true (e.g. project details / board), the project dropdown is disabled — task stays on the current project. */
   lockProjectSelection?: boolean;
+  /**
+   * `limited`: non-admin / non-owner — assignees and watchers are read-only; all other fields can be saved from the form.
+   */
+  taskEditScope?: PlannerTaskEditScope;
 }
 
 /** Minimal task shape used when editing in the sidebar (API / normalized task). */
@@ -780,22 +785,29 @@ interface LinkedRecordListRowProps {
   record: LinkedRecord;
   selected: boolean;
   onToggle: (recordId: number) => void;
+  interactionDisabled?: boolean;
 }
 
 function LinkedRecordListRow({
   record,
   selected,
   onToggle,
+  interactionDisabled = false,
 }: Readonly<LinkedRecordListRowProps>) {
   return (
     <button
       type="button"
-      onClick={() => onToggle(record.id)}
+      onClick={() => {
+        if (interactionDisabled) return;
+        onToggle(record.id);
+      }}
+      aria-disabled={interactionDisabled}
       style={{
         display: "flex",
         alignItems: "center",
         padding: 12,
-        cursor: "pointer",
+        cursor: interactionDisabled ? "not-allowed" : "pointer",
+        opacity: interactionDisabled ? 0.6 : 1,
         backgroundColor: selected ? "#edf6ff" : "white",
         border: "none",
         borderBottom: "1px solid #f1f5f9",
@@ -865,23 +877,60 @@ function LinkedRecordListRow({
 function SelectedLinkedRecordChip({
   record,
   onRemove,
-}: Readonly<{ record: LinkedRecord; onRemove: (id: number) => void }>) {
+  readOnly = false,
+}: Readonly<{
+  record: LinkedRecord;
+  onRemove: (id: number) => void;
+  readOnly?: boolean;
+}>) {
+  const chipStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "6px 12px",
+    borderRadius: 6,
+    backgroundColor: "#edf6ff",
+    border: "1px solid #bfdbfe",
+    fontSize: "0.875rem",
+    font: "inherit",
+    maxWidth: "100%",
+  };
+  if (readOnly) {
+    return (
+      <div style={{ ...chipStyle, cursor: "default" }}>
+        <ListTodo size={14} color="#4e6fa5" style={{ flexShrink: 0 }} />
+        <span
+          style={{
+            color: "#141414",
+            fontWeight: 500,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            minWidth: 0,
+          }}
+          title={`${record.title}`}
+        >
+          {record.title}
+        </span>
+        <span
+          style={{
+            color: "#64748b",
+            fontSize: "0.8rem",
+            flexShrink: 0,
+          }}
+        >
+          {record.reference}
+        </span>
+      </div>
+    );
+  }
   return (
     <button
       type="button"
       onClick={() => onRemove(record.id)}
       style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "6px 12px",
-        borderRadius: 6,
-        backgroundColor: "#edf6ff",
-        border: "1px solid #bfdbfe",
-        fontSize: "0.875rem",
+        ...chipStyle,
         cursor: "pointer",
-        font: "inherit",
-        maxWidth: "100%",
       }}
     >
       <ListTodo size={14} color="#4e6fa5" style={{ flexShrink: 0 }} />
@@ -912,6 +961,18 @@ function SelectedLinkedRecordChip({
   );
 }
 
+/** Limited (non-admin, non-owner): keep baseline assignees/watchers; all other fields from the form payload. */
+function applyLimitedEditLockAssigneesAndWatchers(
+  payload: Record<string, unknown>,
+  locked: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...payload,
+    extension_numbers: locked.extension_numbers,
+    watchers: locked.watchers,
+  };
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
@@ -929,6 +990,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   taskType = "regular",
   taskTypeChoices,
   lockProjectSelection = false,
+  taskEditScope = "full",
 }) => {
   const taskTypeOptions = useMemo(
     () => normalizeTaskTypeOptions(taskTypeChoices),
@@ -1282,6 +1344,19 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const labels: Label[] = getLabelsForSelectedProject();
 
+  const isLimitedTaskEdit = Boolean(isEdit && taskEditScope === "limited");
+
+  const limitedEditBaselineForm = useMemo((): CreateTaskFormData | null => {
+    if (!isEdit || !editTask || taskEditScope !== "limited") return null;
+    const merged = mergeFormDataWithDueDateClamp(
+      buildInitialFormFromEdit(editTask, extensions),
+    );
+    return {
+      ...merged,
+      taskType: clampTaskTypeToAllowed(merged.taskType, taskTypeOptions),
+    };
+  }, [isEdit, editTask, taskEditScope, extensions, taskTypeOptions]);
+
   const mapPriorityIdToString = (priorityId: number | null): string | undefined => {
     if (!priorityId || priorityId === 0) return "";
     const priorityMap: Record<number, string> = {
@@ -1293,56 +1368,53 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     return priorityMap[priorityId] || undefined;
   };
 
-  const buildPayload = () => {
-    const taskTypeEff = clampTaskTypeToAllowed(formData.taskType, taskTypeOptions);
-    const payload: any = {
-      title: formData.title,
-      description: formData.description || "",
-      priority: mapPriorityIdToString(formData.priorityId) || undefined,
-      due_date: formData.dueDate || "",
-      start_date: formData.startDate || "",
+  const buildPayloadForForm = (fd: CreateTaskFormData) => {
+    const taskTypeEff = clampTaskTypeToAllowed(fd.taskType, taskTypeOptions);
+    const payload: Record<string, unknown> = {
+      title: fd.title,
+      description: fd.description || "",
+      priority: mapPriorityIdToString(fd.priorityId) || undefined,
+      due_date: fd.dueDate || "",
+      start_date: fd.startDate || "",
       extension_numbers:
-        formData.assigneeIds?.map((id: number) => {
+        fd.assigneeIds?.map((id: number) => {
           const extension = extensions.find((ext) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
       watchers:
-        formData.watcherIds?.map((id: number) => {
+        fd.watcherIds?.map((id: number) => {
           const extension = extensions.find((ext) => Number(ext.id) === id);
           return extension ? extension.id : String(id);
         }) || [],
       type: taskTypeEff,
     };
-    if (formData.projectId) {
-      payload.project_id = formData.projectId;
-      payload.label_ids = formData.labelIds || [];
+    if (fd.projectId) {
+      payload.project_id = fd.projectId;
+      payload.label_ids = fd.labelIds || [];
     }
-    if (formData.statusId) payload.status_id = formData.statusId;
+    if (fd.statusId) payload.status_id = fd.statusId;
     if (isEdit) {
       payload.parent_task_id =
-        formData.linkedRecordIds.length > 0
-          ? formData.linkedRecordIds[0]
-          : null;
-    } else if (formData.linkedRecordIds.length > 0) {
-      payload.parent_task_id = formData.linkedRecordIds[0];
+        fd.linkedRecordIds.length > 0 ? fd.linkedRecordIds[0] : null;
+    } else if (fd.linkedRecordIds.length > 0) {
+      payload.parent_task_id = fd.linkedRecordIds[0];
     }
     if (taskTypeEff === "recurring") {
-      payload.frequency = formData.frequency;
-      payload.repeat_interval = formData.repeatInterval;
-      if (formData.frequency === "weekly" && formData.repeatOn.trim()) {
-        payload.repeat_on = formData.repeatOn.trim().toLowerCase();
-      } else if (formData.frequency === "monthly" && formData.repeatOn.trim()) {
-        payload.repeat_on = formData.repeatOn.trim();
+      payload.frequency = fd.frequency;
+      payload.repeat_interval = fd.repeatInterval;
+      if (fd.frequency === "weekly" && fd.repeatOn.trim()) {
+        payload.repeat_on = fd.repeatOn.trim().toLowerCase();
+      } else if (fd.frequency === "monthly" && fd.repeatOn.trim()) {
+        payload.repeat_on = fd.repeatOn.trim();
       }
-      const dueTimeUtc = formatRecurringDueTimeAsUtcIso(
-        formData.startDate,
-        formData.dueTime,
-      );
+      const dueTimeUtc = formatRecurringDueTimeAsUtcIso(fd.startDate, fd.dueTime);
       if (dueTimeUtc) payload.due_time = dueTimeUtc;
-      payload.end_date = formData.dueDate || null;
+      payload.end_date = fd.dueDate || null;
     }
     return payload;
   };
+
+  const buildPayload = () => buildPayloadForForm(formData);
 
   const validateBeforeSubmit = (): boolean => {
     if (!formData.title.trim()) {
@@ -1381,8 +1453,20 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     return true;
   };
 
-  const persistTaskFromPayload = async (payload: ReturnType<typeof buildPayload>): Promise<boolean> => {
+  const persistTaskFromPayload = async (
+    payloadInput: ReturnType<typeof buildPayload>,
+  ): Promise<boolean> => {
     const taskTypeEff = clampTaskTypeToAllowed(formData.taskType, taskTypeOptions);
+    let payload: Record<string, unknown> = { ...payloadInput };
+    if (
+      isEdit &&
+      taskEditScope === "limited" &&
+      limitedEditBaselineForm &&
+      editTask?.id != null
+    ) {
+      const locked = buildPayloadForForm(limitedEditBaselineForm);
+      payload = applyLimitedEditLockAssigneesAndWatchers(payload, locked);
+    }
     if (isEdit && editTask?.id != null) {
       if (taskTypeEff === "recurring") {
         return Boolean(
@@ -1398,7 +1482,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     }
     if (taskTypeEff === "recurring") {
       const recurringPayload: Parameters<typeof createRecurringTask>[0] = {
-        ...payload,
+        ...(payload as unknown as Parameters<typeof createRecurringTask>[0]),
         status_id: formData.statusId as number,
         start_date: formData.startDate,
         end_date: formData.dueDate || null,
@@ -1755,6 +1839,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
 
+            {isLimitedTaskEdit && (
+              <p
+                className="text-muted small mb-3"
+                style={{ marginTop: -8, fontSize: 13 }}
+              >
+                <strong>Assignees</strong> and <strong>watchers</strong> cannot be changed for your
+                role; all other fields can be updated.
+              </p>
+            )}
+
             <Row>
 
               <Col xs={12}>
@@ -1853,7 +1947,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       value={searchQuery}
                       onChange={handleLinkedRecordsSearchChange}
                       className="py-2"
-                      style={{  fontSize: "14px" }}
+                      style={{ fontSize: "14px" }}
                     />
                   </div>
                   <div
@@ -1872,6 +1966,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
               <Col xs={12}>
               {formData.taskType !== "todo" && (
+              <fieldset
+                disabled={isLimitedTaskEdit}
+                style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
+              >
               <Form.Group className={groupClass}>
                 <div
                   style={{
@@ -1885,39 +1983,41 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Users size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                     Assigned To
                   </Form.Label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAssigneeDropdown(!showAssigneeDropdown);
-                      if (!showAssigneeDropdown) setAssigneeSearchQuery("");
-                    }}
-                    style={{
-                      backgroundColor: "rgb(255, 255, 255)",
-                      borderColor: "rgb(138, 138, 138)",
-                      color: "rgb(20, 20, 20)",
-                      textDecoration: "none",
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderStyle: "solid",
-                      verticalAlign: "middle",
-                      paddingBlock: "8px",
-                      paddingInline: "16px",
-                      maxWidth: "100%",
-                      fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
-                      fontSize: "12px",
-                      fontWeight: 300,
-                      letterSpacing: "0px",
-                      lineHeight: "14px",
-                      textUnderlineOffset: "24%",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Plus size={14} />
-                    Add Assignee
-                  </button>
+                  {!isLimitedTaskEdit && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAssigneeDropdown(!showAssigneeDropdown);
+                        if (!showAssigneeDropdown) setAssigneeSearchQuery("");
+                      }}
+                      style={{
+                        backgroundColor: "rgb(255, 255, 255)",
+                        borderColor: "rgb(138, 138, 138)",
+                        color: "rgb(20, 20, 20)",
+                        textDecoration: "none",
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderStyle: "solid",
+                        verticalAlign: "middle",
+                        paddingBlock: "8px",
+                        paddingInline: "16px",
+                        maxWidth: "100%",
+                        fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+                        fontSize: "12px",
+                        fontWeight: 300,
+                        letterSpacing: "0px",
+                        lineHeight: "14px",
+                        textUnderlineOffset: "24%",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Plus size={14} />
+                      Add Assignee
+                    </button>
+                  )}
                 </div>
                 <div
                   style={{
@@ -1928,32 +2028,52 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     marginBottom: 8,
                   }}
                 >
-                  {selectedAssignees.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => toggleAssignee(user.id)}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        backgroundColor: "#edf6ff",
-                        border: "1px solid #bfdbfe",
-                        fontSize: "0.875rem",
-                        cursor: "pointer",
-                        font: "inherit",
-                      }}
-                    >
-                      <span style={{ color: "#141414", fontWeight: 500 }}>
+                  {selectedAssignees.map((user) =>
+                    isLimitedTaskEdit ? (
+                      <span
+                        key={user.id}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          backgroundColor: "#edf6ff",
+                          border: "1px solid #bfdbfe",
+                          fontSize: "0.875rem",
+                          color: "#141414",
+                          fontWeight: 500,
+                        }}
+                      >
                         {user.name}
                       </span>
-                      <X size={14} style={{ color: "#64748b" }} />
-                    </button>
-                  ))}
+                    ) : (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => toggleAssignee(user.id)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          backgroundColor: "#edf6ff",
+                          border: "1px solid #bfdbfe",
+                          fontSize: "0.875rem",
+                          cursor: "pointer",
+                          font: "inherit",
+                        }}
+                      >
+                        <span style={{ color: "#141414", fontWeight: 500 }}>
+                          {user.name}
+                        </span>
+                        <X size={14} style={{ color: "#64748b" }} />
+                      </button>
+                    ),
+                  )}
                 </div>
-                {showAssigneeDropdown && (
+                {showAssigneeDropdown && !isLimitedTaskEdit && (
                   <div
                     style={{
                       border: "1px solid #e2e8f0",
@@ -2023,11 +2143,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   </div>
                 )}
               </Form.Group>
+              </fieldset>
             )}
               </Col>
 
               <Col xs={12}>
               {formData.taskType !== "todo" && (
+              <fieldset
+                disabled={isLimitedTaskEdit}
+                style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
+              >
               <Form.Group className={groupClass}>
                 <div
                   style={{
@@ -2041,39 +2166,41 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     <Eye size={16} className="me-2" style={{ verticalAlign: "middle" }} />
                     Watchers
                   </Form.Label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowWatcherDropdown(!showWatcherDropdown);
-                      if (!showWatcherDropdown) setWatcherSearchQuery("");
-                    }}
-                    style={{
-                      backgroundColor: "rgb(255, 255, 255)",
-                      borderColor: "rgb(138, 138, 138)",
-                      color: "rgb(20, 20, 20)",
-                      textDecoration: "none",
-                      borderRadius: 4,
-                      borderWidth: 1,
-                      borderStyle: "solid",
-                      verticalAlign: "middle",
-                      paddingBlock: "8px",
-                      paddingInline: "16px",
-                      maxWidth: "100%",
-                      fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
-                      fontSize: "12px",
-                      fontWeight: 300,
-                      letterSpacing: "0px",
-                      lineHeight: "14px",
-                      textUnderlineOffset: "24%",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Plus size={14} />
-                    Add Watcher
-                  </button>
+                  {!isLimitedTaskEdit && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowWatcherDropdown(!showWatcherDropdown);
+                        if (!showWatcherDropdown) setWatcherSearchQuery("");
+                      }}
+                      style={{
+                        backgroundColor: "rgb(255, 255, 255)",
+                        borderColor: "rgb(138, 138, 138)",
+                        color: "rgb(20, 20, 20)",
+                        textDecoration: "none",
+                        borderRadius: 4,
+                        borderWidth: 1,
+                        borderStyle: "solid",
+                        verticalAlign: "middle",
+                        paddingBlock: "8px",
+                        paddingInline: "16px",
+                        maxWidth: "100%",
+                        fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+                        fontSize: "12px",
+                        fontWeight: 300,
+                        letterSpacing: "0px",
+                        lineHeight: "14px",
+                        textUnderlineOffset: "24%",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Plus size={14} />
+                      Add Watcher
+                    </button>
+                  )}
                 </div>
                 <div
                   style={{
@@ -2084,32 +2211,52 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     marginBottom: 8,
                   }}
                 >
-                  {selectedWatchers.map((user) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      onClick={() => toggleWatcher(user.id)}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "6px 12px",
-                        borderRadius: 6,
-                        backgroundColor: "#f0fdf4",
-                        border: "1px solid #bbf7d0",
-                        fontSize: "0.875rem",
-                        cursor: "pointer",
-                        font: "inherit",
-                      }}
-                    >
-                      <span style={{ color: "#141414", fontWeight: 500 }}>
+                  {selectedWatchers.map((user) =>
+                    isLimitedTaskEdit ? (
+                      <span
+                        key={user.id}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          backgroundColor: "#f0fdf4",
+                          border: "1px solid #bbf7d0",
+                          fontSize: "0.875rem",
+                          color: "#141414",
+                          fontWeight: 500,
+                        }}
+                      >
                         {user.name}
                       </span>
-                      <X size={14} style={{ color: "#64748b" }} />
-                    </button>
-                  ))}
+                    ) : (
+                      <button
+                        key={user.id}
+                        type="button"
+                        onClick={() => toggleWatcher(user.id)}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "6px 12px",
+                          borderRadius: 6,
+                          backgroundColor: "#f0fdf4",
+                          border: "1px solid #bbf7d0",
+                          fontSize: "0.875rem",
+                          cursor: "pointer",
+                          font: "inherit",
+                        }}
+                      >
+                        <span style={{ color: "#141414", fontWeight: 500 }}>
+                          {user.name}
+                        </span>
+                        <X size={14} style={{ color: "#64748b" }} />
+                      </button>
+                    ),
+                  )}
                 </div>
-                {showWatcherDropdown && (
+                {showWatcherDropdown && !isLimitedTaskEdit && (
                   <div
                     style={{
                       border: "1px solid #e2e8f0",
@@ -2183,6 +2330,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   </div>
                 )}
               </Form.Group>
+              </fieldset>
             )}
 
               </Col>

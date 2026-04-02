@@ -29,9 +29,13 @@ import {
 } from "@utils/tasks";
 import {
   canManageProjectFromMembers,
-  canEditOrDeleteTaskForSessionUser,
   getSessionPhoneOrExtension,
 } from "@planner/projectMemberRole";
+import {
+  computePlannerTaskRowPermissions,
+  plannerTaskRowDeleteDeniedTitle,
+  plannerTaskRowEditDeniedTitle,
+} from "@planner/taskRowPermissions";
 import { useSession } from "next-auth/react";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug } from "@utils/Helper";
@@ -70,10 +74,11 @@ interface ApiTask {
     owner_extension_number?: string | null;
   } | null;
   status?: { id: number; name: string } | null;
-  assignees?: Array<{ extension_number: string }>;
+  assignees?: Array<{ extension_number?: string | number | null }>;
   /** Creator / owner extension when API sends it (matches session `user.phone` for edit/delete). */
   extension_number?: string;
   owner_extension_number?: string | null;
+  created_by_extension_number?: string | null;
   extension_numbers?: string[];
   is_completed?: boolean;
   type?: string;
@@ -84,6 +89,52 @@ type HierarchyExtension = {
   extension_number?: string;
   name?: string;
 };
+
+function lookupHierarchyExtensionDisplayName(
+  extNumber: string | number | null | undefined,
+  hierarchyDataExtensions: unknown[] | null | undefined,
+): string {
+  const trimmed =
+    extNumber == null || extNumber === "" ? "" : String(extNumber).trim();
+  if (!trimmed) return "";
+  if (!Array.isArray(hierarchyDataExtensions)) return trimmed;
+  const ext = hierarchyDataExtensions.find((e) => {
+    const item = e as HierarchyExtension;
+    const id = item.id == null ? "" : String(item.id).trim();
+    const en =
+      item.extension_number == null ? "" : String(item.extension_number).trim();
+    return id === trimmed || en === trimmed;
+  }) as HierarchyExtension | undefined;
+  const name = ext?.name?.trim();
+  return name && name.length > 0 ? name : trimmed;
+}
+
+/** Names for the Assigned to column from `rawData.assignees[].extension_number` + hierarchy directory. */
+function assigneeDisplayNamesForTaskRow(
+  row: Task,
+  hierarchyDataExtensions: unknown[] | null | undefined,
+): string[] {
+  const raw = row.rawData as ApiTask | undefined;
+  const assignees = raw?.assignees;
+  if (Array.isArray(assignees) && assignees.length > 0) {
+    const names = assignees
+      .map((a) =>
+        lookupHierarchyExtensionDisplayName(
+          a?.extension_number,
+          hierarchyDataExtensions,
+        ),
+      )
+      .filter((n) => n.length > 0);
+    if (names.length > 0) return names;
+  }
+  if (row.assigned_to) {
+    const resolved =
+      row.assigned_to_name ||
+      lookupHierarchyExtensionDisplayName(row.assigned_to, hierarchyDataExtensions);
+    return resolved ? [resolved] : [];
+  }
+  return [];
+}
 
 export interface TasksListingPageProps {
   /** When true (e.g. embedded on project details list tab), To-do is omitted from filters and create/edit sidebar. */
@@ -473,19 +524,16 @@ const TasksListingPage = ({
       const p = (apiTask.priority || "normal").toLowerCase();
       const priority = priorityMap[p] ?? "medium";
 
-      const findExtensionName = (extNumber: string): string => {
-        if (!extNumber || !Array.isArray(hierarchyDataExtensions)) return extNumber;
-        const ext = hierarchyDataExtensions.find((e) => {
-          const item = e as HierarchyExtension;
-          return item.id === extNumber || item.extension_number === extNumber;
-        }) as HierarchyExtension | undefined;
-        return ext?.name || extNumber;
-      };
-
       const assignees = apiTask.assignees || [];
-      const firstExt = assignees[0]?.extension_number;
-      const assigned_to = firstExt || null;
-      const assigned_to_name = firstExt ? findExtensionName(firstExt) : undefined;
+      const firstExtRaw = assignees[0]?.extension_number;
+      const firstExt =
+        firstExtRaw == null || firstExtRaw === ""
+          ? null
+          : String(firstExtRaw).trim() || null;
+      const assigned_to = firstExt;
+      const assigned_to_name = firstExt
+        ? lookupHierarchyExtensionDisplayName(firstExt, hierarchyDataExtensions)
+        : undefined;
 
       let dueDate: string | null = null;
       if (apiTask.due_date) {
@@ -623,6 +671,9 @@ const TasksListingPage = ({
     // ── Create/edit task sidebar ──────────────────────────────────────────────────
     const [showCreate, setShowCreate]   = useState(false);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [editingTaskEditScope, setEditingTaskEditScope] = useState<
+      "none" | "limited" | "full"
+    >("full");
   
     // ── Delete confirmation ──────────────────────────────────────────────────────
     const [showDelete, setShowDelete] = useState(false);
@@ -796,10 +847,9 @@ const TasksListingPage = ({
       [isProjectScopedEmbed, sidebarProject],
     );
 
-    /** Edit/delete: task extension matches session, or user is project admin (not merely member). */
-    const canEditTaskByProjectMembers = useCallback(
+    const getTaskRowPermissions = useCallback(
       (row: Task) =>
-        canEditOrDeleteTaskForSessionUser(
+        computePlannerTaskRowPermissions(
           row.rawData,
           resolveProjectForMemberCheck(row),
           sessionUserPhoneOrExtension,
@@ -815,30 +865,29 @@ const TasksListingPage = ({
       );
     }, [isProjectScopedEmbed, sidebarProject, sessionUserPhoneOrExtension]);
   
-    const openEdit = useCallback((row: Task) => {
-      if (!canEditTaskByProjectMembers(row)) return;
-      setEditingTask(row);
-      setShowCreate(true);
-    }, [canEditTaskByProjectMembers]);
+    const openEdit = useCallback(
+      (row: Task) => {
+        const perms = getTaskRowPermissions(row);
+        if (!perms.canOpenTaskEdit) return;
+        setEditingTask(row);
+        setEditingTaskEditScope(perms.taskEditScope);
+        setShowCreate(true);
+      },
+      [getTaskRowPermissions],
+    );
 
     const openDeleteConfirm = useCallback(
       (row: Task) => {
-        if (!canEditTaskByProjectMembers(row)) return;
+        if (!getTaskRowPermissions(row).canDeleteTask) return;
         setToDelete(row);
         setShowDelete(true);
       },
-      [canEditTaskByProjectMembers],
+      [getTaskRowPermissions],
     );
 
     const handleDelete = async () => {
       if (!toDelete) return;
-      if (
-        !canEditOrDeleteTaskForSessionUser(
-          toDelete.rawData,
-          resolveProjectForMemberCheck(toDelete),
-          sessionUserPhoneOrExtension,
-        )
-      ) {
+      if (!getTaskRowPermissions(toDelete).canDeleteTask) {
         toast.error("You cannot delete this task");
         return;
       }
@@ -852,33 +901,54 @@ const TasksListingPage = ({
       }
     };
 
-    const handleToggleComplete = useCallback(async (row: Task) => {
-      try {
-        if (row.status === "completed") {
-          await incompleteTask(row.id);
-        } else {
-          await completeTask(row.id);
+    const handleToggleComplete = useCallback(
+      async (row: Task) => {
+        if (!getTaskRowPermissions(row).canOpenTaskEdit) {
+          toast.error("You are not authorized to update this task");
+          return;
         }
-        fetchTasks();
-      } catch {
-        toast.error("Failed to update task");
-      }
-    }, [fetchTasks]);
+        try {
+          if (row.status === "completed") {
+            await incompleteTask(row.id);
+          } else {
+            await completeTask(row.id);
+          }
+          fetchTasks();
+        } catch {
+          toast.error("Failed to update task");
+        }
+      },
+      [fetchTasks, getTaskRowPermissions],
+    );
   
     // ── Columns ───────────────────────────────────────────────────────────────────
     const columns: TableColumn<Task>[] = useMemo(() => [
       {
         key: "complete", label: "Done", sortable: false, type: "custom",
-        render: (row) => (
+        render: (row) => {
+          const canToggleComplete = getTaskRowPermissions(row).canOpenTaskEdit;
+          let completeBtnTitle = "Mark complete";
+          if (row.status === "completed") {
+            completeBtnTitle = "Mark incomplete";
+          }
+          if (!canToggleComplete) {
+            completeBtnTitle = plannerTaskRowEditDeniedTitle(false) ?? "";
+          }
+          return (
           <button
+            type="button"
+            aria-disabled={!canToggleComplete}
             onClick={async e => {
               e.stopPropagation();
+              if (!canToggleComplete) return;
               await handleToggleComplete(row);
             }}
-            title={row.status === "completed" ? "Mark incomplete" : "Mark complete"}
+            title={completeBtnTitle}
             style={{
               background: "transparent", border: "1.5px solid #9ca3af",
-              borderRadius: "50%", width: 20, height: 20, cursor: "pointer",
+              borderRadius: "50%", width: 20, height: 20,
+              cursor: canToggleComplete ? "pointer" : "not-allowed",
+              opacity: canToggleComplete ? 1 : 0.5,
               display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
             }}
           >
@@ -889,7 +959,8 @@ const TasksListingPage = ({
               </svg>
             )}
           </button>
-        ),
+          );
+        },
       },
       {
         key: "title", label: "Title", sortable: true, type: "custom",
@@ -910,7 +981,7 @@ const TasksListingPage = ({
               {row.title}
             </a>
 
-            {canEditTaskByProjectMembers(row) && (
+            {getTaskRowPermissions(row).canOpenTaskEdit && (
               <button
                 className="task-edit-btn"
                 type="button"
@@ -938,18 +1009,24 @@ const TasksListingPage = ({
       {
         key: "assigned_to", label: "Assigned to", sortable: true, type: "custom",
         render: (row) => {
-          if (!row.assigned_to) return <span style={{ ...CELL_STYLE, color: "#9ca3af" }}>—</span>;
-          const name = row.assigned_to_name || row.assigned_to;
+          const names = assigneeDisplayNamesForTaskRow(row, hierarchyDataExtensions);
+          if (names.length === 0) {
+            return <span style={{ ...CELL_STYLE, color: "#9ca3af" }}>—</span>;
+          }
+          const display = names.join(", ");
+          const initialSource = names[0];
+          const initial =
+            initialSource.length > 0 ? initialSource.charAt(0).toUpperCase() : "?";
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <div style={{
                 width: 22, height: 22, borderRadius: "50%", background: "#10b981",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
-              }}>{name.charAt(0).toUpperCase()}</div>
+              }}>{initial}</div>
               <span style={{ ...CELL_STYLE, maxWidth: 130, overflow: "hidden",
                 textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
-                title={name}>{name}</span>
+                title={display}>{display}</span>
             </div>
           );
         },
@@ -1007,7 +1084,9 @@ const TasksListingPage = ({
         sortable: false,
         type: "custom",
         render: (row) => {
-          const canManage = canEditTaskByProjectMembers(row);
+          const perms = getTaskRowPermissions(row);
+          const canEditRow = perms.canOpenTaskEdit;
+          const canDeleteRow = perms.canDeleteTask;
           return (
             <Dropdown
               show={openTaskActionsId === row.id}
@@ -1028,13 +1107,15 @@ const TasksListingPage = ({
                 <Dropdown.Item
                   as="button"
                   type="button"
-                  disabled={!canManage}
-                  title={
-                    canManage
-                      ? undefined
-                      : "Only the task owner (extension) or a project admin can edit"
-                  }
+                  aria-disabled={!canEditRow}
+                  className={canEditRow ? undefined : "text-muted"}
+                  style={{
+                    cursor: canEditRow ? "pointer" : "not-allowed",
+                    opacity: canEditRow ? 1 : 0.65,
+                  }}
+                  title={plannerTaskRowEditDeniedTitle(canEditRow)}
                   onClick={() => {
+                    if (!canEditRow) return;
                     setOpenTaskActionsId(null);
                     openEdit(row);
                   }}
@@ -1046,14 +1127,15 @@ const TasksListingPage = ({
                 <Dropdown.Item
                   as="button"
                   type="button"
-                  className="text-danger"
-                  disabled={!canManage}
-                  title={
-                    canManage
-                      ? undefined
-                      : "Only the task owner (extension) or a project admin can delete"
-                  }
+                  aria-disabled={!canDeleteRow}
+                  className={canDeleteRow ? "text-danger" : "text-muted"}
+                  style={{
+                    cursor: canDeleteRow ? "pointer" : "not-allowed",
+                    opacity: canDeleteRow ? 1 : 0.65,
+                  }}
+                  title={plannerTaskRowDeleteDeniedTitle(perms)}
                   onClick={() => {
+                    if (!canDeleteRow) return;
                     setOpenTaskActionsId(null);
                     openDeleteConfirm(row);
                   }}
@@ -1072,8 +1154,9 @@ const TasksListingPage = ({
       handleToggleComplete,
       openEdit,
       openDeleteConfirm,
-      canEditTaskByProjectMembers,
+      getTaskRowPermissions,
       openTaskActionsId,
+      hierarchyDataExtensions,
     ]);
 
     const tableColumnsForGrid = useMemo(() => {
@@ -2021,10 +2104,12 @@ const TasksListingPage = ({
           onClose={() => {
             setShowCreate(false);
             setEditingTask(null);
+            setEditingTaskEditScope("full");
           }}
           onCreate={async () => {
             setShowCreate(false);
             setEditingTask(null);
+            setEditingTaskEditScope("full");
             await fetchTasks();
           }}
           extensions={hierarchyDataExtensions as any}
@@ -2048,6 +2133,7 @@ const TasksListingPage = ({
             omitTodoTaskType ? (["regular", "recurring"] as const) : undefined
           }
           lockProjectSelection={Boolean(sidebarProject)}
+          taskEditScope={editingTask ? editingTaskEditScope : "full"}
         />
   
         {/* ── Delete confirmation ── */}
