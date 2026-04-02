@@ -147,6 +147,8 @@ import {
   GlobalDateFormat,
   GlobalTimeFormat,
   GlobalDateTimeFormat,
+  formatCrmPreviewDate,
+  formatCrmPreviewDateTime,
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
@@ -5051,9 +5053,8 @@ const CrmQuotesManagement = () => {
                       <span>
                         Added{" "}
                         {selectedDataItem.created_at
-                          ? moment(selectedDataItem.created_at).format(
-                              "MMM DD, YYYY",
-                            )
+                          ? formatCrmPreviewDate(selectedDataItem.created_at) ||
+                            "N/A"
                           : "N/A"}
                       </span>
                       {selectedDataItem.is_viewed && (
@@ -5340,9 +5341,9 @@ const CrmQuotesManagement = () => {
                             }}
                           >
                             {selectedDataItem.created_at
-                              ? moment(selectedDataItem.created_at).format(
-                                  "MMMM DD, YYYY [at] hh:mm A",
-                                )
+                              ? formatCrmPreviewDateTime(
+                                  selectedDataItem.created_at,
+                                ) || "N/A"
                               : "N/A"}
                           </div>
                         </div>
@@ -6097,9 +6098,9 @@ const CrmQuotesManagement = () => {
                                   marginLeft: "22px",
                                 }}
                               >
-                                {moment(
+                                {formatCrmPreviewDateTime(
                                   selectedDataItem.scheduled_call_at,
-                                ).format("MMM DD, YYYY [at] hh:mm A")}
+                                )}
                               </div>
                             </div>
                           )}
@@ -7385,8 +7386,8 @@ const CrmQuotesManagement = () => {
                                     </div>
                                     <div className="text-end">
                                       <small className="text-muted">
-                                        {moment(activity.created_at).format(
-                                          "MMM DD, YYYY",
+                                        {formatCrmPreviewDate(
+                                          activity.created_at,
                                         )}
                                       </small>
                                       <br />
@@ -7637,27 +7638,24 @@ const CrmQuotesManagement = () => {
                   {
                     label: "Created Date",
                     value: selectedProspect?.created_at
-                      ? moment(selectedProspect.created_at).format(
-                          "MMM DD, YYYY",
-                        )
+                      ? formatCrmPreviewDate(selectedProspect.created_at) ||
+                        "N/A"
                       : "N/A",
                     type: "date",
                   },
                   {
                     label: "Last Updated",
                     value: selectedProspect?.updated_at
-                      ? moment(selectedProspect.updated_at).format(
-                          "MMM DD, YYYY",
-                        )
+                      ? formatCrmPreviewDate(selectedProspect.updated_at) ||
+                        "N/A"
                       : "N/A",
                     type: "date",
                   },
                   {
                     label: "Expiry Date",
                     value: selectedProspect?.expiry_date
-                      ? moment(selectedProspect.expiry_date).format(
-                          "MMM DD, YYYY",
-                        )
+                      ? formatCrmPreviewDate(selectedProspect.expiry_date) ||
+                        "N/A"
                       : "N/A",
                     type: "date",
                     show: !!selectedProspect?.expiry_date,

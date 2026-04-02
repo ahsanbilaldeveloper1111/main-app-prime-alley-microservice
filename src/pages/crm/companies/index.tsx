@@ -152,6 +152,7 @@ import {
   GlobalDateFormat,
   GlobalTimeFormat,
   GlobalDateTimeFormat,
+  formatCrmPreviewDate,
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
@@ -5599,9 +5600,8 @@ const CrmCompanyManagement = () => {
                       <span>
                         Added{" "}
                         {selectedDataItem.created_at
-                          ? moment(selectedDataItem.created_at).format(
-                              "MMM DD, YYYY",
-                            )
+                          ? formatCrmPreviewDate(selectedDataItem.created_at) ||
+                            "N/A"
                           : "N/A"}
                       </span>
                       {(selectedDataItem.data as any)?.enrichment_status && (
@@ -5842,9 +5842,7 @@ const CrmCompanyManagement = () => {
                               fontWeight: 500,
                             }}
                           >
-                            {moment(selectedDataItem.created_at).format(
-                              "MMMM DD, YYYY",
-                            )}
+                            {formatCrmPreviewDate(selectedDataItem.created_at)}
                           </div>
                         </>
                       )}
@@ -6981,8 +6979,8 @@ const CrmCompanyManagement = () => {
                                     </div>
                                     <div className="text-end">
                                       <small className="text-muted">
-                                        {moment(activity.created_at).format(
-                                          "MMM DD, YYYY",
+                                        {formatCrmPreviewDate(
+                                          activity.created_at,
                                         )}
                                       </small>
                                       <br />
@@ -7187,17 +7185,13 @@ const CrmCompanyManagement = () => {
             if (selectedCompany?.created_at)
               aboutFields.push({
                 label: "Created",
-                value: moment(selectedCompany.created_at).format(
-                  "MMM DD, YYYY",
-                ),
+                value: formatCrmPreviewDate(selectedCompany.created_at),
                 type: "date",
               });
             if (selectedCompany?.updated_at)
               aboutFields.push({
                 label: "Updated",
-                value: moment(selectedCompany.updated_at).format(
-                  "MMM DD, YYYY",
-                ),
+                value: formatCrmPreviewDate(selectedCompany.updated_at),
                 type: "date",
               });
 

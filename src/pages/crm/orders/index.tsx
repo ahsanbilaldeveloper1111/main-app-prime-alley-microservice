@@ -58,6 +58,8 @@ import {
   ModuleSlug,
   RECORD_TYPES,
   formatDateForTable,
+  formatCrmPreviewDate,
+  normalizeSearchQuery,
 } from "@utils/Helper";
 import {
   Target,
@@ -737,7 +739,8 @@ const CrmOrders = () => {
         // Orders API: include_lost, include_archived, user_extensions, assigned_to, industry,
         // order_value_min/max, order_stage_id, stage_id, order_approval_status, fulfillment_status,
         // payment_status, status, ticket_id, deal_id, date_from/to, created_at_from/to/month, search, sort_by, sort_order
-        if (currentFilters.search) params.search = currentFilters.search;
+        const ordersSearchQuery = normalizeSearchQuery(currentFilters.search);
+        if (ordersSearchQuery) params.search = ordersSearchQuery;
         if (currentFilters.include_lost !== undefined) params.include_lost = currentFilters.include_lost;
         if (currentFilters.include_archived !== undefined) params.include_archived = currentFilters.include_archived;
         if (currentFilters.user_extensions?.length) {
@@ -3297,9 +3300,12 @@ const CrmOrders = () => {
                   {
                     label: "Order Date",
                     value:
-                      selectedOrder?.order_date ||
-                      selectedOrder?.created_at ||
-                      "N/A",
+                      selectedOrder?.order_date || selectedOrder?.created_at
+                        ? formatCrmPreviewDate(
+                            selectedOrder.order_date ||
+                              selectedOrder.created_at,
+                          ) || "N/A"
+                        : "N/A",
                     type: "date",
                     show: !!(
                       selectedOrder?.order_date || selectedOrder?.created_at
@@ -3307,7 +3313,11 @@ const CrmOrders = () => {
                   },
                   {
                     label: "Expected Delivery",
-                    value: selectedOrder?.expected_delivery_date || "N/A",
+                    value: selectedOrder?.expected_delivery_date
+                      ? formatCrmPreviewDate(
+                          selectedOrder.expected_delivery_date,
+                        ) || "N/A"
+                      : "N/A",
                     type: "date",
                     show: !!selectedOrder?.expected_delivery_date,
                   },
@@ -4048,7 +4058,7 @@ const CrmOrders = () => {
                   <span>•</span>
                   <span>
                     {viewingOrder.order_date
-                      ? moment(viewingOrder.order_date).format("MMM DD, YYYY")
+                      ? formatCrmPreviewDate(viewingOrder.order_date) || "N/A"
                       : "N/A"}
                   </span>
                 </div>
@@ -4520,9 +4530,9 @@ const CrmOrders = () => {
                                   }}
                                 >
                                   {viewingOrder.order_date
-                                    ? formatDateForTable(
+                                    ? formatCrmPreviewDate(
                                         viewingOrder.order_date,
-                                      )
+                                      ) || "N/A"
                                     : "N/A"}
                                 </div>
                               </div>
@@ -4621,7 +4631,7 @@ const CrmOrders = () => {
                                       fontWeight: 500,
                                     }}
                                   >
-                                    {formatDateForTable(
+                                    {formatCrmPreviewDate(
                                       viewingOrder.expected_delivery_date,
                                     )}
                                   </div>
@@ -6763,9 +6773,7 @@ const CrmOrders = () => {
                                   fontWeight: 500,
                                 }}
                               >
-                                {moment(viewingOrder.order_date).format(
-                                  "MMM DD, YYYY",
-                                )}
+                                {formatCrmPreviewDate(viewingOrder.order_date)}
                               </div>
                             </div>
                           )}
@@ -6791,9 +6799,9 @@ const CrmOrders = () => {
                                   fontWeight: 500,
                                 }}
                               >
-                                {moment(
+                                {formatCrmPreviewDate(
                                   viewingOrder.expected_delivery_date,
-                                ).format("MMM DD, YYYY")}
+                                )}
                               </div>
                             </div>
                           )}

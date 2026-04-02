@@ -2,6 +2,7 @@ import { data } from "@common/JsonData";
 import dynamic from "next/dynamic";
 import React, { useState } from "react";
 import { Col, Row } from "react-bootstrap";
+import { normalizeSearchQuery } from "@utils/Helper";
 
 const DataTable = dynamic(() => import("react-data-table-component"), {
   ssr: false
@@ -60,13 +61,19 @@ const Table2 = () => {
     setSearchTerm(event.target.value);
   };
 
-  const filteredData = data.filter((row) =>
-    Object.values(row).some(
-      (value) =>
-        value &&
-        value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  const tableSearchQuery = normalizeSearchQuery(searchTerm);
+  const filteredData = !tableSearchQuery
+    ? data
+    : data.filter((row) =>
+        Object.values(row).some(
+          (value) =>
+            value &&
+            value
+              .toString()
+              .toLowerCase()
+              .includes(tableSearchQuery.toLowerCase()),
+        ),
+      );
 
   return (
     <React.Fragment>

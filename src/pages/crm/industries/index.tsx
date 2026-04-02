@@ -16,7 +16,7 @@ import {
   UpdateIndustryPayload,
   CrmProduct,
 } from "@utils/crm";
-import { formatDateTimeToLocal, GlobalDateFormat } from "@utils/Helper";
+import { formatDateTimeToLocal, GlobalDateFormat, formatDateForTable } from "@utils/Helper";
 import GenericTable, {
   TableColumn,
   ToolbarConfig,
@@ -429,7 +429,12 @@ const IndustriesPage = () => {
         />
 
         {/* Create/Edit Modal */}
-        <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+        <Modal
+          show={showModal}
+          onHide={() => setShowModal(false)}
+          size="lg"
+          centered
+        >
           <Modal.Header closeButton>
             <Modal.Title>
               {editingIndustry ? "Edit Product Group" : "Add New Product Group"}
@@ -465,23 +470,33 @@ const IndustriesPage = () => {
               </Form.Group>
             </Modal.Body>
             <Modal.Footer className="border-0 pt-2">
-              <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
-                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
-                  <AlertCircle size={14} />
+              <div className="d-flex justify-content-between align-items-center w-100 gap-3 flex-nowrap">
+                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 min-w-0 flex-shrink-1 pe-2">
+                  <AlertCircle size={14} className="flex-shrink-0" />
                   <span style={{ fontSize: "0.813rem" }}>
                     Fields marked with <span className="text-danger fw-bold">*</span> are required
                   </span>
                 </Form.Text>
-                <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                    flexWrap: "nowrap",
+                  }}
+                >
                   <Button
                     variant="primary"
                     type="submit"
                     disabled={submitting}
-                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                    className="d-inline-flex align-items-center justify-content-center gap-2"
+                    style={{
+                      ...CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+                      minWidth: "148px",
+                    }}
                   >
                     {submitting ? (
                       <>
-                        <Spinner size="sm" className="me-2" />
+                        <Spinner size="sm" />
                         {editingIndustry ? "Updating..." : "Creating..."}
                       </>
                     ) : (
@@ -833,23 +848,33 @@ const IndustriesPage = () => {
                 />
               </Form.Group>
 
-              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 w-100">
-                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 align-self-center">
-                  <AlertCircle size={14} />
+              <div className="d-flex justify-content-between align-items-center gap-3 flex-nowrap mt-4 w-100">
+                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 align-self-center min-w-0 flex-shrink-1 pe-2">
+                  <AlertCircle size={14} className="flex-shrink-0" />
                   <span style={{ fontSize: "0.813rem" }}>
                     Fields marked with <span className="text-danger fw-bold">*</span> are required
                   </span>
                 </Form.Text>
-                <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                    flexWrap: "nowrap",
+                  }}
+                >
                   <Button
                     variant="primary"
                     type="submit"
                     disabled={productSubmitting}
-                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                    className="d-inline-flex align-items-center justify-content-center gap-2"
+                    style={{
+                      ...CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+                      minWidth: "170px",
+                    }}
                   >
                     {productSubmitting ? (
                       <>
-                        <Spinner size="sm" className="me-2" />
+                        <Spinner size="sm" />
                         {editingProduct ? "Updating..." : "Creating..."}
                       </>
                     ) : (
@@ -1217,7 +1242,7 @@ const IndustriesPage = () => {
                   </div>
                   <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
                     <Calendar size={14} style={{ color: "#4680ff", marginRight: "6px" }} />
-                    {new Date(viewingProduct.created_at).toLocaleDateString()}
+                    {formatDateForTable(viewingProduct.created_at)}
                   </div>
                 </div>
               </div>

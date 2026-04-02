@@ -37,7 +37,7 @@ import {
   Spinner,
 } from "react-bootstrap";
 import Select from 'react-select';
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, formatCrmPreviewDate, normalizeSearchQuery } from "@utils/Helper";
 import {
   CheckCircle,
   BarChart3,
@@ -351,9 +351,9 @@ const CrmTasks = () => {
         per_page: pagination.rowsPerPage,
       };
 
-      // Add search param
-      if (currentFilters.search) {
-        params.search = currentFilters.search;
+      const searchQuery = normalizeSearchQuery(currentFilters.search);
+      if (searchQuery) {
+        params.search = searchQuery;
       }
 
       // Add urgency filter
@@ -1646,7 +1646,7 @@ const CrmTasks = () => {
               }}>Due Date</div>
               <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                 <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
-                {viewingTask && viewingTask.due_date ? moment(viewingTask.due_date).format('MMM DD, YYYY') : 'N/A'}
+                {viewingTask && viewingTask.due_date ? formatCrmPreviewDate(viewingTask.due_date) || 'N/A' : 'N/A'}
               </div>
             </div>
             {viewingTask?.time && (

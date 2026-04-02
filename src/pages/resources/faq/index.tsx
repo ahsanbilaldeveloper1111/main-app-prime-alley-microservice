@@ -10,6 +10,7 @@ import { FiChevronDown, FiChevronUp, FiSearch } from "react-icons/fi";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import { normalizeSearchQuery } from "@utils/Helper";
 
 const FAQ = () => {
   const { data: session, status } = useSession();
@@ -81,11 +82,15 @@ const FAQ = () => {
 
   const categories = Array.from(new Set(faqData.map(faq => faq.category)));
 
-  const filteredFAQs = faqData.filter(faq => 
-    faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    faq.answer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    faq.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const faqSearchQuery = normalizeSearchQuery(searchTerm);
+  const filteredFAQs = !faqSearchQuery
+    ? faqData
+    : faqData.filter(
+        (faq) =>
+          faq.question.toLowerCase().includes(faqSearchQuery.toLowerCase()) ||
+          faq.answer.toLowerCase().includes(faqSearchQuery.toLowerCase()) ||
+          faq.category.toLowerCase().includes(faqSearchQuery.toLowerCase()),
+      );
 
   const handleAccordionToggle = (eventKey: string | null | undefined) => {
     setActiveKey(activeKey === eventKey ? null : eventKey || null);

@@ -58,6 +58,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
+import { formatCrmPreviewDate, normalizeSearchQuery } from "@utils/Helper";
 
 type StageType = "lead" | "deal" | "order" | "lost_reason";
 
@@ -684,18 +685,17 @@ const StagesManagement = () => {
 
   // Filter and transform stages data (only search filter, type is filtered by API)
   const filteredStages = useMemo(() => {
-    const searchTerm = currentFilters.search || "";
+    const searchTerm = normalizeSearchQuery(currentFilters.search);
+    const query = searchTerm.toLowerCase();
 
     return stagesData.filter((stage) => {
-      // Search filter
-      if (searchTerm) {
-        const matchesSearch =
-          stage.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          stage.description?.toLowerCase().includes(searchTerm.toLowerCase());
-        if (!matchesSearch) return false;
-      }
+      if (!searchTerm) return true;
 
-      return true;
+      const nameNorm = normalizeSearchQuery(stage.name).toLowerCase();
+      const descNorm = normalizeSearchQuery(stage.description).toLowerCase();
+      const matchesSearch =
+        nameNorm.includes(query) || descNorm.includes(query);
+      return matchesSearch;
     });
   }, [stagesData, currentFilters]);
 
@@ -772,13 +772,16 @@ const StagesManagement = () => {
   }, [allStagesData]);
 
   const handleToolbarSearchChange = useCallback((value: string) => {
-    setStagesSearch(value);
-    setCurrentFilters((prev) => ({ ...prev, search: value }));
+    const normalized = normalizeSearchQuery(value);
+    setStagesSearch(normalized);
+    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
     setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, []);
 
   const handleToolbarSearchSubmit = useCallback(() => {
-    setCurrentFilters((prev) => ({ ...prev, search: stagesSearch }));
+    const normalized = normalizeSearchQuery(stagesSearch);
+    setStagesSearch(normalized);
+    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
     setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, [stagesSearch]);
 
@@ -1674,7 +1677,7 @@ const StagesManagement = () => {
                     fontWeight: 500,
                   }}
                 >
-                  {new Date(viewingStage.created_at).toLocaleDateString()}
+                  {formatCrmPreviewDate(viewingStage.created_at)}
                 </div>
               </div>
             </div>

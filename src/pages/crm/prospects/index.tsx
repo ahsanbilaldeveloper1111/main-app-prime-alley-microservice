@@ -114,6 +114,8 @@ const createCustomFieldId = () => `custom-field-${Date.now()}-${customFieldIdCou
 import {
   ModuleSlug,
   RECORD_TYPES,
+  formatCrmPreviewDate,
+  formatCrmPreviewDateTime,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import { useCti } from "../../../contexts/CtiContext";
@@ -3870,9 +3872,8 @@ const CrmProspectsManagement = () => {
                       <span>
                         Added{" "}
                         {selectedDataItem.created_at
-                          ? moment(selectedDataItem.created_at).format(
-                              "MMM DD, YYYY",
-                            )
+                          ? formatCrmPreviewDate(selectedDataItem.created_at) ||
+                            "N/A"
                           : "N/A"}
                       </span>
                       {selectedDataItem.is_viewed && (
@@ -4159,9 +4160,9 @@ const CrmProspectsManagement = () => {
                             }}
                           >
                             {selectedDataItem.created_at
-                              ? moment(selectedDataItem.created_at).format(
-                                  "MMMM DD, YYYY [at] hh:mm A",
-                                )
+                              ? formatCrmPreviewDateTime(
+                                  selectedDataItem.created_at,
+                                ) || "N/A"
                               : "N/A"}
                           </div>
                         </div>
@@ -4562,9 +4563,9 @@ const CrmProspectsManagement = () => {
                                   marginLeft: "22px",
                                 }}
                               >
-                                {moment(
+                                {formatCrmPreviewDateTime(
                                   selectedDataItem.scheduled_call_at,
-                                ).format("MMM DD, YYYY [at] hh:mm A")}
+                                )}
                               </div>
                             </div>
                           )}
@@ -5548,18 +5549,16 @@ const CrmProspectsManagement = () => {
                   {
                     label: "Created Date",
                     value: selectedProspect?.created_at
-                      ? moment(selectedProspect.created_at).format(
-                          "MMM DD, YYYY",
-                        )
+                      ? formatCrmPreviewDate(selectedProspect.created_at) ||
+                        "N/A"
                       : "N/A",
                     type: "date",
                   },
                   {
                     label: "Last Updated",
                     value: selectedProspect?.updated_at
-                      ? moment(selectedProspect.updated_at).format(
-                          "MMM DD, YYYY",
-                        )
+                      ? formatCrmPreviewDate(selectedProspect.updated_at) ||
+                        "N/A"
                       : "N/A",
                     type: "date",
                   },

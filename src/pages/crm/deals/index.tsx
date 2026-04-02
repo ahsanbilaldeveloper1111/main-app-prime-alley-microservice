@@ -100,6 +100,8 @@ import {
   ModuleSlug,
   formatDateForTable,
   checkRequiredFields,
+  formatCrmPreviewDate,
+  formatCrmPreviewDateTime,
   RECORD_TYPES,
 } from "@utils/Helper";
 import {
@@ -3624,9 +3626,9 @@ const CrmDeals = () => {
                     label: "Created Date",
                     value:
                       selectedDeal?.created_at || selectedDeal?.created
-                        ? moment(
+                        ? formatCrmPreviewDate(
                             selectedDeal.created_at || selectedDeal.created,
-                          ).format("MMM DD, YYYY")
+                          ) || "N/A"
                         : "N/A",
                     type: "date",
                   },
@@ -3634,10 +3636,10 @@ const CrmDeals = () => {
                     label: "Last Updated",
                     value:
                       selectedDeal?.updated_at || selectedDeal?.last_activity_at
-                        ? moment(
+                        ? formatCrmPreviewDate(
                             selectedDeal.updated_at ||
                               selectedDeal.last_activity_at,
-                          ).format("MMM DD, YYYY")
+                          ) || "N/A"
                         : "N/A",
                     type: "date",
                   },
@@ -4106,7 +4108,7 @@ const CrmDeals = () => {
                   <span>
                     Created{" "}
                     {viewingDeal.created_at
-                      ? moment(viewingDeal.created_at).format("MMM DD, YYYY")
+                      ? formatCrmPreviewDate(viewingDeal.created_at) || "N/A"
                       : "N/A"}
                   </span>
                 </div>
@@ -4647,9 +4649,9 @@ const CrmDeals = () => {
                                 }}
                               >
                                 {viewingDeal.created_at
-                                  ? moment(viewingDeal.created_at).format(
-                                      "MMMM DD, YYYY [at] hh:mm A",
-                                    )
+                                  ? formatCrmPreviewDateTime(
+                                      viewingDeal.created_at,
+                                    ) || "N/A"
                                   : "N/A"}
                               </div>
                             </div>

@@ -145,6 +145,8 @@ import {
   GlobalDateFormat,
   GlobalTimeFormat,
   GlobalDateTimeFormat,
+  formatCrmPreviewDate,
+  formatCrmPreviewDateTime,
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
@@ -4945,9 +4947,8 @@ const CrmContactsManagement = () => {
                       <span>
                         Added{" "}
                         {selectedDataItem.created_at
-                          ? moment(selectedDataItem.created_at).format(
-                              "MMM DD, YYYY",
-                            )
+                          ? formatCrmPreviewDate(selectedDataItem.created_at) ||
+                            "N/A"
                           : "N/A"}
                       </span>
                       {selectedDataItem.is_viewed && (
@@ -5234,9 +5235,9 @@ const CrmContactsManagement = () => {
                             }}
                           >
                             {selectedDataItem.created_at
-                              ? moment(selectedDataItem.created_at).format(
-                                  "MMMM DD, YYYY [at] hh:mm A",
-                                )
+                              ? formatCrmPreviewDateTime(
+                                  selectedDataItem.created_at,
+                                ) || "N/A"
                               : "N/A"}
                           </div>
                         </div>
@@ -5991,9 +5992,9 @@ const CrmContactsManagement = () => {
                                   marginLeft: "22px",
                                 }}
                               >
-                                {moment(
+                                {formatCrmPreviewDateTime(
                                   selectedDataItem.scheduled_call_at,
-                                ).format("MMM DD, YYYY [at] hh:mm A")}
+                                )}
                               </div>
                             </div>
                           )}
@@ -7279,8 +7280,8 @@ const CrmContactsManagement = () => {
                                     </div>
                                     <div className="text-end">
                                       <small className="text-muted">
-                                        {moment(activity.created_at).format(
-                                          "MMM DD, YYYY",
+                                        {formatCrmPreviewDate(
+                                          activity.created_at,
                                         )}
                                       </small>
                                       <br />
@@ -7508,18 +7509,16 @@ const CrmContactsManagement = () => {
                   {
                     label: "Created Date",
                     value: selectedContact?.created_at
-                      ? moment(selectedContact.created_at).format(
-                          "MMM DD, YYYY",
-                        )
+                      ? formatCrmPreviewDate(selectedContact.created_at) ||
+                        "N/A"
                       : "N/A",
                     type: "date",
                   },
                   {
                     label: "Last Updated",
                     value: selectedContact?.updated_at
-                      ? moment(selectedContact.updated_at).format(
-                          "MMM DD, YYYY",
-                        )
+                      ? formatCrmPreviewDate(selectedContact.updated_at) ||
+                        "N/A"
                       : "N/A",
                     type: "date",
                   },

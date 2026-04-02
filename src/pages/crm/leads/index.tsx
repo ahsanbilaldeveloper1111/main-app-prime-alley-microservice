@@ -72,6 +72,8 @@ import {
   formatDateForTable,
   checkRequiredFields,
   GlobalDateFormat,
+  formatCrmPreviewDate,
+  formatCrmPreviewDateTime,
   RECORD_TYPES,
 } from "@utils/Helper";
 import {
@@ -4001,9 +4003,9 @@ const CrmLeads = () => {
                     label: "Created Date",
                     value:
                       selectedLead?.created_at || selectedLead?.created
-                        ? moment(
+                        ? formatCrmPreviewDate(
                             selectedLead.created_at || selectedLead.created,
-                          ).format("MMM DD, YYYY")
+                          ) || "N/A"
                         : "N/A",
                     type: "date",
                   },
@@ -4011,10 +4013,10 @@ const CrmLeads = () => {
                     label: "Last Updated",
                     value:
                       selectedLead?.updated_at || selectedLead?.last_activity_at
-                        ? moment(
+                        ? formatCrmPreviewDate(
                             selectedLead.updated_at ||
                               selectedLead.last_activity_at,
-                          ).format("MMM DD, YYYY")
+                          ) || "N/A"
                         : "N/A",
                     type: "date",
                   },
@@ -4115,9 +4117,8 @@ const CrmLeads = () => {
                               >
                                 <span style={{ fontWeight: 600, color: "#1e293b" }}>
                                   {fu.follow_up_date
-                                    ? moment(fu.follow_up_date).format(
-                                        GlobalDateFormat,
-                                      )
+                                    ? formatCrmPreviewDate(fu.follow_up_date) ||
+                                      "-"
                                     : "-"}
                                 </span>
                                 <span style={{ color: "#64748b", fontSize: "12px" }}>
@@ -4576,7 +4577,7 @@ const CrmLeads = () => {
                   <span>
                     Created{" "}
                     {viewingLead.created_at
-                      ? moment(viewingLead.created_at).format("MMM DD, YYYY")
+                      ? formatCrmPreviewDate(viewingLead.created_at) || "N/A"
                       : "N/A"}
                   </span>
                   {viewingLead.is_lost && (
@@ -5139,9 +5140,9 @@ const CrmLeads = () => {
                                 }}
                               >
                                 {viewingLead.created_at
-                                  ? moment(viewingLead.created_at).format(
-                                      "MMMM DD, YYYY [at] hh:mm A",
-                                    )
+                                  ? formatCrmPreviewDateTime(
+                                      viewingLead.created_at,
+                                    ) || "N/A"
                                   : "N/A"}
                               </div>
                             </div>
@@ -5967,7 +5968,7 @@ const CrmLeads = () => {
                                           display: "inline",
                                         }}
                                       />
-                                      {formatDateForTable(
+                                      {formatCrmPreviewDate(
                                         viewingLead.crm_data.created_at,
                                       )}
                                     </div>
@@ -6602,9 +6603,9 @@ const CrmLeads = () => {
                                         }}
                                       >
                                         {followUp.follow_up_date
-                                          ? moment(
+                                          ? formatCrmPreviewDate(
                                               followUp.follow_up_date,
-                                            ).format("MMM DD, YYYY")
+                                            ) || "N/A"
                                           : "N/A"}
                                       </div>
                                       <Badge
@@ -6868,9 +6869,9 @@ const CrmLeads = () => {
                                         }}
                                       >
                                         {meeting.meeting_date
-                                          ? moment(meeting.meeting_date).format(
-                                              "MMM DD, YYYY",
-                                            )
+                                          ? formatCrmPreviewDate(
+                                              meeting.meeting_date,
+                                            ) || "N/A"
                                           : "N/A"}
                                       </div>
                                       {meeting.meeting_outcome && (
