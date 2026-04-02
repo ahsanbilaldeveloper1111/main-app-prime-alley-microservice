@@ -153,7 +153,29 @@ function createEmptyProjectForm(): ProjectFormState {
 
 function formatApiDateForProjectInput(value: string | null | undefined): string {
   if (value == null || value === "") return "";
-  const d = new Date(value);
+  const trimmed = String(value).trim();
+  /** `new Date("YYYY-MM-DD")` is UTC and shifts the local calendar day in many timezones. */
+  const isoDay = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+  if (isoDay) {
+    const y = Number(isoDay[1]);
+    const mo = Number(isoDay[2]);
+    const day = Number(isoDay[3]);
+    if (
+      Number.isFinite(y) &&
+      Number.isFinite(mo) &&
+      Number.isFinite(day) &&
+      mo >= 1 &&
+      mo <= 12 &&
+      day >= 1 &&
+      day <= 31
+    ) {
+      const local = new Date(y, mo - 1, day);
+      if (local.getFullYear() === y && local.getMonth() === mo - 1 && local.getDate() === day) {
+        return `${y}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
+    }
+  }
+  const d = new Date(trimmed);
   if (Number.isNaN(d.getTime())) return "";
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -220,6 +242,9 @@ export interface SubTask {
   assignee?: string;
   dueDate?: string;
   description?: string;
+  /** From API `assignees[].extension_number` when row was mapped from a nested task */
+  assigneeExtensionNumbers?: string[];
+  watcherExtensionNumbers?: string[];
 }
 
 export interface Task {
@@ -239,6 +264,10 @@ export interface Task {
   sub_task_count?: number;
   /** From API when `sub_task_count` is requested */
   completed_sub_task_count?: number;
+  /** `assignees[].extension_number` for table display */
+  assigneeExtensionNumbers?: string[];
+  /** `watchers` + optional `watcher_numbers` */
+  watcherExtensionNumbers?: string[];
 }
 
 /** Safe string for API scalar fields; avoids `[object Object]` from `String(object)`. */
@@ -276,6 +305,51 @@ function readApiNumericCount(v: unknown): number | undefined {
     return Number.isFinite(n) ? n : undefined;
   }
   return undefined;
+}
+
+function extensionStringFromApiField(value: unknown): string | null {
+  const s = stringifyApiScalar(value).trim();
+  return s === "" ? null : s;
+}
+
+function collectAssigneeExtensionNumbers(
+  assignees: Array<Record<string, unknown>> | undefined,
+): string[] {
+  if (!Array.isArray(assignees)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const row of assignees) {
+    const ext = extensionStringFromApiField(row?.extension_number);
+    if (ext != null && !seen.has(ext)) {
+      seen.add(ext);
+      out.push(ext);
+    }
+  }
+  return out;
+}
+
+function collectWatcherExtensionNumbers(api: Record<string, unknown>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (ext: string | null) => {
+    if (ext != null && !seen.has(ext)) {
+      seen.add(ext);
+      out.push(ext);
+    }
+  };
+  const watchers = api.watchers as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(watchers)) {
+    for (const w of watchers) {
+      push(extensionStringFromApiField(w?.extension_number));
+    }
+  }
+  const flat = api.watcher_numbers;
+  if (Array.isArray(flat)) {
+    for (const n of flat) {
+      push(extensionStringFromApiField(n));
+    }
+  }
+  return out;
 }
 
 function mapApiTaskToPlannerTask(
@@ -330,6 +404,9 @@ function mapApiTaskToPlannerTask(
   const assignee =
     user?.name || user?.display_name || (first?.extension_number as string | undefined);
 
+  const assigneeExtensionNumbers = collectAssigneeExtensionNumbers(assignees);
+  const watcherExtensionNumbers = collectWatcherExtensionNumbers(api);
+
   const labelObjs = (api.labels as Array<{ name?: string }> | undefined) ?? [];
   const labels = labelObjs.map((l) => l.name).filter((n): n is string => Boolean(n));
 
@@ -355,6 +432,10 @@ function mapApiTaskToPlannerTask(
     children,
     sub_task_count: readApiNumericCount(api.sub_task_count),
     completed_sub_task_count: readApiNumericCount(api.completed_sub_task_count),
+    assigneeExtensionNumbers:
+      assigneeExtensionNumbers.length > 0 ? assigneeExtensionNumbers : undefined,
+    watcherExtensionNumbers:
+      watcherExtensionNumbers.length > 0 ? watcherExtensionNumbers : undefined,
   };
 }
 
@@ -389,6 +470,27 @@ const priorityConfig = {
   urgent: { label: "Urgent", color: "#7c3aed" },
 };
 
+function ParticipantNamesCell({
+  extensionNumbers,
+  resolveExtensionDisplayName,
+}: Readonly<{
+  extensionNumbers: string[] | undefined;
+  resolveExtensionDisplayName: (extensionNumber: string) => string;
+}>) {
+  if (extensionNumbers == null || extensionNumbers.length === 0) {
+    return <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>—</span>;
+  }
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+      {extensionNumbers.map((ext) => (
+        <span key={ext} style={{ fontSize: "0.8rem", color: "#64748b" }} title={ext}>
+          {resolveExtensionDisplayName(ext)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 interface TaskRowProps {
   task: Task;
   depth?: number;
@@ -396,6 +498,7 @@ interface TaskRowProps {
   expandedTasks: Set<string>;
   onToggleTask: (taskId: string) => void;
   canPreviewEditTask: boolean;
+  resolveExtensionDisplayName: (extensionNumber: string) => string;
 }
 
 function computeOpenSubtaskCount(task: Task): number | null {
@@ -433,6 +536,8 @@ function plannerChildTasksToSubTasks(children: Task[]): SubTask[] {
     assignee: c.assignee,
     dueDate: c.dueDate,
     description: c.description,
+    assigneeExtensionNumbers: c.assigneeExtensionNumbers,
+    watcherExtensionNumbers: c.watcherExtensionNumbers,
   }));
 }
 
@@ -444,6 +549,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
   expandedTasks,
   onToggleTask,
   canPreviewEditTask,
+  resolveExtensionDisplayName,
 }) => {
   const [hovered, setHovered] = useState(false);
   const isExpanded = expandedTasks.has(task.id);
@@ -590,31 +696,20 @@ const TaskRow: React.FC<TaskRowProps> = ({
           </div>
         </td>
 
-        {/* Members */}
+        {/* Members — project-only column; empty for tasks */}
+        <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
+
         <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-          {task.assignee ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: "50%",
-                  backgroundColor: "#667eea",
-                  color: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "0.65rem",
-                  fontWeight: 600,
-                }}
-              >
-                {task.assignee.substring(0, 1).toUpperCase()}
-              </div>
-              <span style={{ fontSize: "0.8rem" }}>{task.assignee}</span>
-            </div>
-          ) : (
-            <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>—</span>
-          )}
+          <ParticipantNamesCell
+            extensionNumbers={task.assigneeExtensionNumbers}
+            resolveExtensionDisplayName={resolveExtensionDisplayName}
+          />
+        </td>
+        <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
+          <ParticipantNamesCell
+            extensionNumbers={task.watcherExtensionNumbers}
+            resolveExtensionDisplayName={resolveExtensionDisplayName}
+          />
         </td>
 
         {/* Open (subtask count as "open") */}
@@ -637,6 +732,8 @@ const TaskRow: React.FC<TaskRowProps> = ({
             ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
             : "—"}
         </td>
+
+        <td className="generic-table-actions-cell" />
       </tr>
 
       {/* Nested child task rows (API `children`) or legacy `subtasks` */}
@@ -651,6 +748,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
             expandedTasks={expandedTasks}
             onToggleTask={onToggleTask}
             canPreviewEditTask={canPreviewEditTask}
+            resolveExtensionDisplayName={resolveExtensionDisplayName}
           />
         ))}
       {isExpanded && subtasksLoaded && !hasChildTasks &&
@@ -660,6 +758,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
             subtask={sub}
             depth={depth + 1}
             canPreviewEditTask={canPreviewEditTask}
+            resolveExtensionDisplayName={resolveExtensionDisplayName}
             onPreview={() => {
               onPreview({
                 id: sub.id,
@@ -685,6 +784,7 @@ interface SubtaskRowProps {
   depth: number;
   onPreview: () => void;
   canPreviewEditTask: boolean;
+  resolveExtensionDisplayName: (extensionNumber: string) => string;
 }
 
 /** Renders a subtask row (leaf node, no further expansion) */
@@ -693,6 +793,7 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
   depth,
   onPreview,
   canPreviewEditTask,
+  resolveExtensionDisplayName,
 }) => {
   const [hovered, setHovered] = useState(false);
   const status = statusConfig[subtask.status];
@@ -764,30 +865,18 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
         </div>
       </td>
 
-      <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>
-        {subtask.assignee ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: "50%",
-                backgroundColor: "#a78bfa",
-                color: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.6rem",
-                fontWeight: 600,
-              }}
-            >
-              {subtask.assignee.substring(0, 1).toUpperCase()}
-            </div>
-            <span style={{ fontSize: "0.775rem" }}>{subtask.assignee}</span>
-          </div>
-        ) : (
-          "—"
-        )}
+      <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
+      <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
+        <ParticipantNamesCell
+          extensionNumbers={subtask.assigneeExtensionNumbers}
+          resolveExtensionDisplayName={resolveExtensionDisplayName}
+        />
+      </td>
+      <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
+        <ParticipantNamesCell
+          extensionNumbers={subtask.watcherExtensionNumbers}
+          resolveExtensionDisplayName={resolveExtensionDisplayName}
+        />
       </td>
       <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
       <td style={{ fontSize: "0.8rem" }}>
@@ -800,6 +889,7 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
           ? new Date(subtask.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
           : "—"}
       </td>
+      <td className="generic-table-actions-cell" />
     </tr>
   );
 };
@@ -1020,6 +1110,7 @@ interface ExpandableProjectTableProps {
   projects: Project[];
   loading: boolean;
   extensions: any[];
+  resolveExtensionDisplayName: (extensionNumber: string) => string;
   // Pass through all the existing table props
   onProjectClick: (project: Project) => void;
   onEditProject: (project: Project) => void;
@@ -1120,6 +1211,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   projects,
   loading,
   extensions,
+  resolveExtensionDisplayName,
   onProjectClick,
   onEditProject,
   onDeleteProject,
@@ -1249,7 +1341,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       return (
         <tbody>
           <tr>
-            <td colSpan={7} className="text-center py-5" style={{ color: "#94a3b8" }}>
+            <td colSpan={9} className="text-center py-5" style={{ color: "#94a3b8" }}>
               <Spinner animation="border" size="sm" className="me-2" />
               Loading projects...
             </td>
@@ -1262,7 +1354,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       return (
         <tbody>
           <tr>
-            <td colSpan={7} className="text-center py-5">
+            <td colSpan={9} className="text-center py-5">
               <FolderOpen size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
               <div style={{ color: "#64748b" }}>No projects found</div>
             </td>
@@ -1348,6 +1440,9 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
             <div className="member-avatar bg-primary">{project.members?.length || 0}</div>
           </td>
 
+          <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
+          <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
+
           {/* Open */}
           <td>{project.open}</td>
 
@@ -1421,7 +1516,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         if (isLoadingTasks) {
           rows.push(
             <tr key={`loading-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
+              <td colSpan={9} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
                 <Spinner animation="border" size="sm" className="me-2" style={{ color: "#94a3b8" }} />
                 <span style={{ color: "#94a3b8", fontSize: "0.875rem" }}>Loading tasks...</span>
               </td>
@@ -1430,7 +1525,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         } else if (tasks.length === 0) {
           rows.push(
             <tr key={`empty-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
+              <td colSpan={9} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
                 No tasks found for this project.
               </td>
             </tr>
@@ -1446,6 +1541,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                 expandedTasks={expandedTasks}
                 onToggleTask={handleToggleTask}
                 canPreviewEditTask={canPreviewEditTask}
+                resolveExtensionDisplayName={resolveExtensionDisplayName}
               />
             );
           });
@@ -1455,7 +1551,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         if (canManageProjectFromMembers(project, sessionUserPhoneOrExtension)) {
           rows.push(
             <tr key={`add-task-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
+              <td colSpan={9} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
                 <button
                   style={{
                     background: "none",
@@ -1587,6 +1683,11 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                   </th>
                   <th className="generic-table-th">Project Name</th>
                   <th className="generic-table-th">Members</th>
+
+                  <th className="generic-table-th">Assignees</th>
+                  <th className="generic-table-th">Watchers</th>
+
+
                   <th className="generic-table-th">Open</th>
                   <th className="generic-table-th">Overdue</th>
                   <th className="generic-table-th">Last Update</th>
@@ -2249,7 +2350,7 @@ const WorkPlannerProjects = () => {
       toast.error("Start date is required");
       return;
     }
-    if (start < today) {
+    if (!editingProject && start < today) {
       toast.error("Start date cannot be in the past");
       return;
     }
@@ -2725,6 +2826,7 @@ const WorkPlannerProjects = () => {
               projects={filteredProjects}
               loading={loading}
               extensions={(hierarchyDataExtensions as any[]) || []}
+              resolveExtensionDisplayName={getUserNameFromExtension}
               sessionUserPhoneOrExtension={sessionUserPhoneOrExtension}
               onProjectClick={handleProjectClick}
               onEditProject={handleEditProject}
@@ -2785,12 +2887,12 @@ const WorkPlannerProjects = () => {
                     <Form.Control
                       type="date"
                       required
-                      min={todayYmdLocal()}
+                      min={editingProject ? undefined : todayYmdLocal()}
                       value={projectFormData.start_date}
                       onChange={(e) => {
                         const newStart = e.target.value;
                         const today = todayYmdLocal();
-                        if (newStart && newStart < today) {
+                        if (!editingProject && newStart && newStart < today) {
                           toast.error("Start date cannot be in the past");
                           return;
                         }
@@ -2859,7 +2961,7 @@ const WorkPlannerProjects = () => {
                     submitting ||
                     !projectFormData.name.trim() ||
                     !projectFormData.start_date.trim() ||
-                    projectFormData.start_date.trim() < todayYmdLocal() ||
+                    (!editingProject && projectFormData.start_date.trim() < todayYmdLocal()) ||
                     Boolean(
                       projectFormData.end_date.trim() &&
                         projectFormData.end_date.trim() < projectFormData.start_date.trim()
