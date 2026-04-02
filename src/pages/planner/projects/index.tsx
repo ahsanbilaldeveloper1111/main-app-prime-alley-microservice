@@ -161,6 +161,15 @@ function formatApiDateForProjectInput(value: string | null | undefined): string 
   return `${y}-${m}-${day}`;
 }
 
+/** `YYYY-MM-DD` for today's local calendar date (for `<input type="date" min>`). */
+function todayYmdLocal(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function apiStatusToProjectFormStatus(api: string | undefined): ProjectFormStatus {
   const s = (api ?? "active").toLowerCase();
   if (s === "archived") return "archived";
@@ -2030,6 +2039,9 @@ type AppliedProjectFilters = {
   endDateTo: string;
 };
 
+/** Optional `page` avoids stale `pagination` when resetting to page 1 in the same tick as `fetchProjects`. */
+type ProjectListFetchParams = Partial<AppliedProjectFilters> & { page?: number };
+
 const WorkPlannerProjects = () => {
   const { data: session } = useSession();
   const sessionUserPhoneOrExtension = useMemo(
@@ -2052,14 +2064,14 @@ const WorkPlannerProjects = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, last_page: 1, from: 0, to: 0 });
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<ProjectStatusFilter>("active");
+  const [filterStatus, setFilterStatus] = useState<ProjectStatusFilter>("all");
   const [filterOwner, setFilterOwner] = useState("All Owners");
   const [filterTeam, setFilterTeam] = useState("All Teams");
   const [filterStartDateFrom, setFilterStartDateFrom] = useState("");
   const [filterEndDateTo, setFilterEndDateTo] = useState("");
   const [appliedFilters, setAppliedFilters] = useState<AppliedProjectFilters>({
     search: "",
-    status: "active",
+    status: "all",
     owner: "All Owners",
     team: "All Teams",
     startDateFrom: "",
@@ -2095,9 +2107,10 @@ const WorkPlannerProjects = () => {
     }
   }, [pagination.page, pagination.limit, hierarchyLoading]);
 
-  const fetchProjects = async (filters?: Partial<AppliedProjectFilters>) => {
+  const fetchProjects = async (filters?: ProjectListFetchParams) => {
     try {
       setLoading(true);
+      const pageForRequest = typeof filters?.page === "number" ? filters.page : pagination.page;
       const statusParam = filters?.status && filters.status !== "all" ? filters.status : undefined;
       const ownerParam = filters?.owner && filters.owner !== "All Owners" ? [filters.owner] : undefined;
       let startFrom = filters?.startDateFrom?.trim() || undefined;
@@ -2106,7 +2119,7 @@ const WorkPlannerProjects = () => {
         endTo = startFrom;
       }
       const response = await listProjects({
-        page: pagination.page,
+        page: pageForRequest,
         limit: pagination.limit,
         search: filters?.search || "",
         status: statusParam,
@@ -2231,8 +2244,13 @@ const WorkPlannerProjects = () => {
     e.preventDefault();
     const start = projectFormData.start_date.trim();
     const end = projectFormData.end_date.trim();
+    const today = todayYmdLocal();
     if (!start) {
       toast.error("Start date is required");
+      return;
+    }
+    if (start < today) {
+      toast.error("Start date cannot be in the past");
       return;
     }
     if (end && end < start) {
@@ -2333,21 +2351,22 @@ const WorkPlannerProjects = () => {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setFilterStatus("active");
+    setActiveTab("all");
+    setFilterStatus("all");
     setFilterOwner("All Owners");
     setFilterTeam("All Teams");
     setFilterStartDateFrom("");
     setFilterEndDateTo("");
     const cleared: AppliedProjectFilters = {
       search: "",
-      status: "active",
+      status: "all",
       owner: "All Owners",
       team: "All Teams",
       startDateFrom: "",
       endDateTo: "",
     };
     setAppliedFilters(cleared);
-    fetchProjects(cleared);
+    fetchProjects({ ...cleared, page: 1 });
   };
 
   const handleApplyFilters = () => {
@@ -2361,7 +2380,7 @@ const WorkPlannerProjects = () => {
       endDateTo: filterEndDateTo,
     };
     setAppliedFilters(next);
-    fetchProjects(next);
+    fetchProjects({ ...next, page: 1 });
   };
 
   const applyProjectStatusFromPill = (status: ProjectStatusFilter) => {
@@ -2376,7 +2395,7 @@ const WorkPlannerProjects = () => {
       endDateTo: filterEndDateTo,
     };
     setAppliedFilters(next);
-    fetchProjects(next);
+    fetchProjects({ ...next, page: 1 });
   };
 
   const clearDateFiltersAndRefetch = () => {
@@ -2392,7 +2411,7 @@ const WorkPlannerProjects = () => {
       endDateTo: "",
     };
     setAppliedFilters(next);
-    fetchProjects(next);
+    fetchProjects({ ...next, page: 1 });
   };
 
   const handleProjectStartDateChange = (value = "") => {
@@ -2431,8 +2450,21 @@ const WorkPlannerProjects = () => {
       completed: "completed",
       archived: "archived",
     };
-    if (statusMap[tabId]) setFilterStatus(statusMap[tabId]);
+    const status = statusMap[tabId];
+    if (!status) return;
+
+    setFilterStatus(status);
     setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status,
+      owner: filterOwner,
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
+    setAppliedFilters(next);
+    fetchProjects({ ...next, page: 1 });
   };
 
   const filteredProjects = projects.filter((project) => {
@@ -2753,9 +2785,15 @@ const WorkPlannerProjects = () => {
                     <Form.Control
                       type="date"
                       required
+                      min={todayYmdLocal()}
                       value={projectFormData.start_date}
                       onChange={(e) => {
                         const newStart = e.target.value;
+                        const today = todayYmdLocal();
+                        if (newStart && newStart < today) {
+                          toast.error("Start date cannot be in the past");
+                          return;
+                        }
                         setProjectFormData((prev) => {
                           let nextEnd = prev.end_date;
                           if (newStart && nextEnd && nextEnd < newStart) {
@@ -2772,7 +2810,7 @@ const WorkPlannerProjects = () => {
                     <Form.Label>End date</Form.Label>
                     <Form.Control
                       type="date"
-                      min={projectFormData.start_date || undefined}
+                      min={projectFormData.start_date || todayYmdLocal()}
                       value={projectFormData.end_date}
                       onChange={(e) => {
                         const v = e.target.value;
@@ -2820,7 +2858,12 @@ const WorkPlannerProjects = () => {
                   disabled={
                     submitting ||
                     !projectFormData.name.trim() ||
-                    !projectFormData.start_date.trim()
+                    !projectFormData.start_date.trim() ||
+                    projectFormData.start_date.trim() < todayYmdLocal() ||
+                    Boolean(
+                      projectFormData.end_date.trim() &&
+                        projectFormData.end_date.trim() < projectFormData.start_date.trim()
+                    )
                   }
                 >
                   {submitting ? (

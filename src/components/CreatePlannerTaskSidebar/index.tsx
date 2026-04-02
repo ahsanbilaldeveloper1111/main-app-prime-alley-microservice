@@ -1084,6 +1084,43 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     ]
   );
 
+  const handleTaskTypeChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const nextType = e.target.value as PlannerTaskType;
+      const clamped = clampTaskTypeToAllowed(nextType, taskTypeOptions);
+      if (isEdit) {
+        setFormData((prev) => ({ ...prev, taskType: clamped }));
+        return;
+      }
+      const fresh = buildInitialFormForCreate(
+        clamped,
+        propProject,
+        propStatuses,
+        selectedStatusForTask,
+      );
+      const mergedOpen = mergeFormDataWithDueDateClamp(fresh);
+      const nextForm: CreateTaskFormData = {
+        ...mergedOpen,
+        taskType: clampTaskTypeToAllowed(mergedOpen.taskType, taskTypeOptions),
+      };
+      setFormData(nextForm);
+      setSearchQuery("");
+      setAssigneeSearchQuery("");
+      setShowAssigneeDropdown(false);
+      setWatcherSearchQuery("");
+      setShowWatcherDropdown(false);
+      fetchLinkRecordsForSearch("", nextForm.projectId).catch(() => undefined);
+    },
+    [
+      isEdit,
+      taskTypeOptions,
+      propProject,
+      propStatuses,
+      selectedStatusForTask,
+      fetchLinkRecordsForSearch,
+    ],
+  );
+
   useEffect(() => {
     if (!isOpen) return;
     fetchLinkRecordsForSearch(searchQuery, formData.projectId).catch(() => undefined);
@@ -1312,6 +1349,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       toast.error("Please enter a task title");
       return false;
     }
+
+    if (!formData.priorityId || formData.priorityId === 0) {
+      toast.error("Please select a priority");
+      return false;
+    }
+
+
     const taskTypeEff = clampTaskTypeToAllowed(formData.taskType, taskTypeOptions);
     if (taskTypeEff === "recurring") {
       if (!formData.statusId) {
@@ -1740,12 +1784,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               </Form.Label>
               <Form.Select
                 value={clampTaskTypeToAllowed(formData.taskType, taskTypeOptions)}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    taskType: e.target.value as PlannerTaskType,
-                  })
-                }
+                onChange={handleTaskTypeChange}
+                disabled={isEdit}
                 className="py-2"
                 style={{ fontSize: "14px" }}
               >
@@ -2409,7 +2449,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 </Col>
               )}
 
-              {formData.taskType !== "todo" && (
+             
                 <Col xs={6} className="mb-3">
                   <Form.Group className={groupClass}>
                     <Form.Label style={labelStyle}>
@@ -2446,7 +2486,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     </Form.Select>
                   </Form.Group>
                 </Col>
-              )}
+             
 
 {formData.taskType !== "todo" && (
                 <Col xs={12} md={6}>
