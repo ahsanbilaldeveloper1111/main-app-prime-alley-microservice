@@ -13,7 +13,6 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Button,
-  Card,
   Row,
   Col,
   Form,
@@ -21,7 +20,6 @@ import {
   Spinner,
   Modal,
   Badge,
-  InputGroup,
 
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
@@ -34,7 +32,6 @@ import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import {
   FiDatabase,
-  FiSearch,
   FiFilter,
   FiEdit,
   FiUsers,
@@ -127,17 +124,7 @@ import {
   type CrmActivitiesPanelRef,
 } from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
-
-// KPI Card Component (from crm-new.tsx design)
-interface KPICardData {
-  title: string;
-  value: string | number;
-  change?: string;
-  isPositive?: boolean;
-  icon: React.ReactNode;
-  color: string;
-  onClick?: () => void;
-}
+import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 
 interface DeleteModalAdditionalInfoProps {
   mode: "single" | "bulk" | null;
@@ -186,249 +173,6 @@ const DeleteModalAdditionalInfo: React.FC<DeleteModalAdditionalInfoProps> = ({
   }
 
   return null;
-};
-
-const KPICard: React.FC<KPICardData> = ({
-  title,
-  value,
-  change,
-  isPositive,
-  icon,
-  color,
-  onClick,
-}) => {
-  return (
-    <Card
-      className={onClick ? "h-100" : ""}
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        transition: "all 0.2s ease",
-        border: "1px solid #e9ecef",
-      }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }
-      }}
-    >
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
-            <div className={`text-${color}`}>{icon}</div>
-          </div>
-          {change && (
-            <Badge
-              bg={isPositive ? "success" : "danger"}
-              className="bg-opacity-10"
-            >
-              {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-              {change}
-            </Badge>
-          )}
-        </div>
-        <h3 className="mb-1">{value}</h3>
-        <p className="text-muted mb-0 small">{title}</p>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Filter Bar Component (from crm-new.tsx design)
-interface FilterBarProps {
-  quickFilters: {
-    id: string;
-    label: string;
-    variant?: string;
-    color?: string;
-    icon?: React.ReactNode;
-  }[];
-  activeFilter?: string;
-  onFilterChange?: (filterId: string) => void;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
-  onSearch?: () => void;
-  searchPlaceholder?: string;
-  showAdvancedFilters?: boolean;
-  onToggleAdvancedFilters?: () => void;
-  advancedFilterCount?: number;
-}
-
-const FilterBar: React.FC<FilterBarProps> = ({
-  quickFilters,
-  activeFilter,
-  onFilterChange,
-  searchValue,
-  onSearchChange,
-  onSearch,
-  searchPlaceholder = "Search...",
-  showAdvancedFilters,
-  onToggleAdvancedFilters,
-  advancedFilterCount = 0,
-}) => {
-  return (
-    <Card className="border-0 shadow-sm mb-3">
-      <Card.Body className="p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          {/* Left Side: Quick Filter Buttons */}
-          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color;
-
-              // Determine button styles
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor) {
-                if (isActive) {
-                  const bgColor = filter.color;
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
-
-              return (
-                <Button
-                  key={filter.id}
-                  variant={
-                    hasCustomColor
-                      ? undefined
-                      : isActive
-                        ? filter.variant || "primary"
-                        : "outline-secondary"
-                  }
-                  onClick={() => onFilterChange && onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2 "
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  <span className="d-flex align-items-center gap-2">
-                    {filter.icon && (
-                      <span className="d-flex align-items-center">
-                        {filter.icon}
-                      </span>
-                    )}
-                    {filter.label}
-                  </span>
-                </Button>
-              );
-            })}
-          </div>
-
-          {/* Right Side: Search and Filters */}
-          {(onSearchChange || onToggleAdvancedFilters) && (
-            <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-              {onSearchChange && onSearch && (
-                <InputGroup
-                  style={{ width: "300px", minWidth: "200px" }}
-                  className="flex-shrink-0"
-                >
-                  <Form.Control
-                    style={{ height: "41px" }}
-                    type="text"
-                    placeholder={searchPlaceholder}
-                    value={searchValue || ""}
-                    onChange={(e) => onSearchChange?.(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && onSearch) {
-                        onSearch();
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="outline-secondary"
-                    onClick={() => onSearch?.()}
-                  >
-                    <FiSearch size={16} />
-                  </Button>
-                </InputGroup>
-              )}
-              {onToggleAdvancedFilters && (
-                <Button
-                  variant={
-                    showAdvancedFilters ? "primary" : "outline-secondary"
-                  }
-                  onClick={onToggleAdvancedFilters}
-                  className="d-flex align-items-center flex-shrink-0"
-                >
-                  <FiFilter size={16} className="me-2" />
-                  Filters
-                  {(advancedFilterCount ?? 0) > 0 && (
-                    <Badge bg="light" text="dark" className="ms-2">
-                      {advancedFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Helper function to get initials from name (first two words, first two letters, only a-z)
-const getInitials = (name: string): string => {
-  if (!name) return "NA";
-
-  // Split by spaces and take up to first two words
-  const words = name.trim().split(/\s+/).slice(0, 2);
-
-  // Check if we have two words and the second word has at least one letter
-  const hasSecondWord = words.length >= 2;
-  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
-
-  if (hasSecondWord && secondWordHasLetter) {
-    // First letter of first two words
-    const regex = /[a-z]/i;
-    const firstLetter1 = regex.exec(words[0])?.[0];
-    const firstLetter2 = regex.exec(words[1])?.[0];
-
-    if (firstLetter1 && firstLetter2) {
-      return (firstLetter1 + firstLetter2).toUpperCase();
-    }
-  }
-
-  // If no second word or second word is only numbers, use first two letters of first word
-  if (words[0]) {
-    const letters = words[0].match(/[a-z]/gi) || [];
-    if (letters.length >= 2) {
-      return (letters[0] + letters[1]).toUpperCase();
-    } else if (letters.length === 1) {
-      return letters[0].toUpperCase();
-    }
-  }
-
-  return "NA";
-};
-
-// Helper function to generate a random background color based on name
-const getRandomColor = (name: string): string => {
-  if (!name) return "#6c757d";
-
-  // Generate a consistent color based on the name
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
-  }
-
-  // Generate a color with good contrast (avoid too light colors)
-  const hue = Math.abs(hash) % 360;
-  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
-  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
-
-  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
 };
 
 const CrmProspectsManagement = () => {
