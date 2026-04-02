@@ -3,6 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
+import CrmColorCell from "@components/crm/crmColorCell";
 import {
   getLostReasons,
   createLostReason,
@@ -183,20 +184,7 @@ const LostReasonsManagement = () => {
         name: "Color",
         selector: (row: LostReason) => row.color,
         sortable: false,
-        cell: (props: LostReason) => (
-          <div className="d-flex align-items-center">
-            <div
-              className="me-2"
-              style={{
-                width: "20px",
-                height: "20px",
-                backgroundColor: props.color,
-                borderRadius: "4px",
-              }}
-            />
-            <span className="status-badge info">{props.color}</span>
-          </div>
-        ),
+        cell: (props: LostReason) => <CrmColorCell color={props.color} />,
       },
       {
         key: "description",

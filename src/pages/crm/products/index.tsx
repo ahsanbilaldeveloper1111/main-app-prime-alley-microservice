@@ -27,6 +27,7 @@ import {
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
 import {
+  AlertCircle,
   PlusCircle,
   Eye,
   Edit,
@@ -38,10 +39,17 @@ import {
   Building2,
   Calendar,
   CheckCircle,
+  Check,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from "@components/crm/crmDialogActionButtonStyles";
 import { useSession } from "next-auth/react";
 
 // Product interface matching UI expectations
@@ -122,9 +130,49 @@ const ProductsPage = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] =
     useState<ProductDisplayData | null>(null);
+
+  const productTableSelectableKeys = [
+    "productName",
+    "sku",
+    "price",
+    "currency",
+    "category",
+    "brand",
+    "status",
+    "description",
+    "created",
+    "actions",
+  ] as const;
+
+  const defaultProductTableColumns = [
+    "productName",
+    "sku",
+    "price",
+    "category",
+    "brand",
+    "status",
+    "actions",
+  ];
+
   const [selectedProductsColumns, setSelectedProductsColumns] = useState<
     string[]
-  >(["productName", "sku", "price", "category", "brand", "status"]);
+  >(() => {
+    if (globalThis.window === undefined)
+      return [...defaultProductTableColumns];
+    try {
+      const raw = globalThis.localStorage.getItem("productsSelectedColumns");
+      if (!raw) return [...defaultProductTableColumns];
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [...defaultProductTableColumns];
+      const allowed = new Set<string>(productTableSelectableKeys);
+      const next = parsed.filter(
+        (k): k is string => typeof k === "string" && allowed.has(k),
+      );
+      return next.length > 0 ? next : [...defaultProductTableColumns];
+    } catch {
+      return [...defaultProductTableColumns];
+    }
+  });
   const [productFormData, setProductFormData] = useState({
     productName: "",
     sku: "",
@@ -503,6 +551,7 @@ const ProductsPage = () => {
     { key: "status", label: "Status" },
     { key: "description", label: "Description" },
     { key: "created", label: "Created Date" },
+    { key: "actions", label: "Actions" },
   ];
 
   const productsTableColumns = useMemo<TableColumn<ProductDisplayData>[]>(() => {
@@ -598,10 +647,9 @@ const ProductsPage = () => {
         label: "Description",
         sortable: false,
         type: "custom",
+        width: "260px",
         render: (product) => (
-          <span className="text-muted small" style={{ maxWidth: "220px" }}>
-            {product.description || "N/A"}
-          </span>
+          <CrmTruncatedDescriptionCell text={product.description} emptyDisplay="N/A" />
         ),
       });
     }
@@ -616,53 +664,55 @@ const ProductsPage = () => {
       });
     }
 
-    cols.push({
-      key: "actions",
-      label: "Actions",
-      sortable: false,
-      type: "custom",
-      render: (product) => (
-        <div className="d-flex gap-1">
-          <Button
-            variant="link"
-            size="sm"
-            className="p-1"
-            title="View"
-            onClick={() => {
-              setViewingProduct(product);
-              setShowProductViewModal(true);
-            }}
-          >
-            <Eye size={16} />
-          </Button>
-          {session?.user?.permissions?.includes("edit-crm-products") && (
+    if (selectedProductsColumns.includes("actions")) {
+      cols.push({
+        key: "actions",
+        label: "Actions",
+        sortable: false,
+        type: "custom",
+        render: (product) => (
+          <div className="d-flex gap-1">
             <Button
               variant="link"
               size="sm"
               className="p-1"
-              title="Edit"
-              onClick={() => handleOpenProductModal(product)}
-            >
-              <Edit size={16} />
-            </Button>
-          )}
-          {session?.user?.permissions?.includes("delete-crm-products") && (
-            <Button
-              variant="link"
-              size="sm"
-              className="p-1 text-danger"
-              title="Delete"
+              title="View"
               onClick={() => {
-                setDeletingProduct(product);
-                setShowProductDeleteModal(true);
+                setViewingProduct(product);
+                setShowProductViewModal(true);
               }}
             >
-              <Trash2 size={16} />
+              <Eye size={16} />
             </Button>
-          )}
-        </div>
-      ),
-    });
+            {session?.user?.permissions?.includes("edit-crm-products") && (
+              <Button
+                variant="link"
+                size="sm"
+                className="p-1"
+                title="Edit"
+                onClick={() => handleOpenProductModal(product)}
+              >
+                <Edit size={16} />
+              </Button>
+            )}
+            {session?.user?.permissions?.includes("delete-crm-products") && (
+              <Button
+                variant="link"
+                size="sm"
+                className="p-1 text-danger"
+                title="Delete"
+                onClick={() => {
+                  setDeletingProduct(product);
+                  setShowProductDeleteModal(true);
+                }}
+              >
+                <Trash2 size={16} />
+              </Button>
+            )}
+          </div>
+        ),
+      });
+    }
 
     return cols;
   }, [selectedProductsColumns, session?.user?.permissions]);
@@ -1135,16 +1185,30 @@ const ProductsPage = () => {
                 </Form.Text>
               </Form.Group>
 
-              <div className="d-flex justify-content-end gap-2 mt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => setShowProductModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button variant="primary" type="submit">
-                  {editingProduct ? "Update Product" : "Add Product"}
-                </Button>
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 w-100">
+                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 align-self-center">
+                  <AlertCircle size={14} />
+                  <span style={{ fontSize: "0.813rem" }}>
+                    Fields marked with <span className="text-danger fw-bold">*</span> are required
+                  </span>
+                </Form.Text>
+                <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                  >
+                    <Check size={16} aria-hidden />
+                    {editingProduct ? "Update Product" : "Add Product"}
+                  </Button>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => setShowProductModal(false)}
+                    style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             </Form>
           </Modal.Body>
@@ -1641,49 +1705,41 @@ const ProductsPage = () => {
                 <FileText size={18} style={{ color: "#4680ff" }} />
                 Description
               </div>
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "20px",
-                  borderRadius: "10px",
-                  marginBottom: "30px",
-                }}
-              >
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: "15px",
-                    color: "#4b5563",
-                    lineHeight: "1.6",
-                  }}
-                >
-                  {viewingProduct.description || "No description available"}
-                </p>
-              </div>
+              <CrmDescriptionDetailsBlock
+                text={viewingProduct.description}
+                emptyDisplay="No description available"
+              />
             </Modal.Body>
 
             <Modal.Footer
+              className="border-0"
               style={{ borderTop: "1px solid #e5e7eb", padding: "20px 30px" }}
             >
-              {session?.user?.permissions?.includes("edit-crm-products") && (
-                <Button
-                  variant="outline-primary"
-                  onClick={() => {
-                    setShowProductViewModal(false);
-                    handleOpenProductModal(viewingProduct);
-                  }}
-                  className="d-flex align-items-center gap-2"
-                >
-                  <Edit size={16} />
-                  Edit Product
-                </Button>
-              )}
-              <Button
-                variant="secondary"
-                onClick={() => setShowProductViewModal(false)}
+              <div
+                className="w-100 d-flex justify-content-end"
+                style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                Close
-              </Button>
+                {session?.user?.permissions?.includes("edit-crm-products") && (
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setShowProductViewModal(false);
+                      handleOpenProductModal(viewingProduct);
+                    }}
+                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                  >
+                    <Edit size={16} aria-hidden />
+                    Edit Product
+                  </Button>
+                )}
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => setShowProductViewModal(false)}
+                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                >
+                  Close
+                </Button>
+              </div>
             </Modal.Footer>
           </Modal>
         )}

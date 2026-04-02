@@ -59,6 +59,7 @@ import {
   Briefcase,
   UserPlus,
   Plus,
+  Check,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import Select from "react-select";
@@ -72,6 +73,12 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { ModuleSlug, checkRequiredFields } from "@utils/Helper";
 import { useSession } from "next-auth/react";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from "@components/crm/crmDialogActionButtonStyles";
 import moment from "moment";
 
 function consumeHandledApiError(error: unknown, source: string): void {
@@ -1144,6 +1151,41 @@ function useCrmAssignmentCountsRefetch(
   }, [assignmentFilterCampaigns, assignmentFilterTags, calculateEntryCounts, showDataAssignmentModal, setAssignmentCounts, setRecordsToAssign]);
 }
 
+const CAMPAIGN_TABLE_COLUMN_STORAGE_KEY = "campaignsSelectedColumns";
+
+const CAMPAIGN_SELECTABLE_COLUMN_KEYS = [
+  "name",
+  "status",
+  "start_date",
+  "user_extensions",
+  "created_at",
+  "actions",
+] as const;
+
+const DEFAULT_CAMPAIGN_SELECTED_COLUMNS: string[] = [
+  "name",
+  "status",
+  "start_date",
+  "user_extensions",
+  "created_at",
+  "actions",
+];
+
+function parseSavedCampaignTableColumns(raw: string | null): string[] | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const allowed = new Set<string>(CAMPAIGN_SELECTABLE_COLUMN_KEYS);
+    const next = parsed.filter(
+      (k): k is string => typeof k === "string" && allowed.has(k),
+    );
+    return next.length > 0 ? next : null;
+  } catch {
+    return null;
+  }
+}
+
 const CrmCampaigns = () => {
   const { data: session } = useSession();
 
@@ -1166,6 +1208,16 @@ const CrmCampaigns = () => {
     sortColumn: "",
     sortDirection: "asc" as "asc" | "desc",
   });
+  const [selectedCampaignTableColumns, setSelectedCampaignTableColumns] =
+    useState<string[]>(() => {
+      if (globalThis.window === undefined) {
+        return [...DEFAULT_CAMPAIGN_SELECTED_COLUMNS];
+      }
+      const saved = parseSavedCampaignTableColumns(
+        globalThis.localStorage.getItem(CAMPAIGN_TABLE_COLUMN_STORAGE_KEY),
+      );
+      return saved ?? [...DEFAULT_CAMPAIGN_SELECTED_COLUMNS];
+    });
   const [campaignFilters, setCampaignFilters] = useState({
     status: [] as string[],
     dateFrom: null as string | null,
@@ -1664,16 +1716,15 @@ const CrmCampaigns = () => {
       label: "Campaign Name",
       sortable: true,
       type: "custom",
+      width: "min(320px, 36vw)",
       render: (campaign: any) => (
         <div>
           <div className="fw-semibold">{campaign.name || "Unnamed Campaign"}</div>
-          <div
+          <CrmTruncatedDescriptionCell
+            text={campaign.description}
+            emptyDisplay="No Description"
             className="small text-muted mt-1"
-            title={campaign.description || "No Description"}
-            style={{ maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}
-          >
-            {campaign.description || "No Description"}
-          </div>
+          />
         </div>
       ),
     },
@@ -1868,8 +1919,18 @@ const CrmCampaigns = () => {
           }}
           onPaginationChange={handleCampaignsPaginationChange}
           customizableColumns
-          defaultSelectedColumns={["name", "status", "start_date", "user_extensions", "created_at"]}
-          columnStorageKey="campaignsSelectedColumns"
+          selectedColumns={selectedCampaignTableColumns}
+          defaultSelectedColumns={DEFAULT_CAMPAIGN_SELECTED_COLUMNS}
+          onColumnChange={(cols) => {
+            const allowed = new Set<string>(CAMPAIGN_SELECTABLE_COLUMN_KEYS);
+            const filtered = cols.filter((c) => allowed.has(c));
+            setSelectedCampaignTableColumns(filtered);
+            globalThis.localStorage.setItem(
+              CAMPAIGN_TABLE_COLUMN_STORAGE_KEY,
+              JSON.stringify(filtered),
+            );
+          }}
+          columnStorageKey={CAMPAIGN_TABLE_COLUMN_STORAGE_KEY}
           showToolbar
           toolbar={toolbarConfig}
           showToolbarActions={false}
@@ -1889,7 +1950,9 @@ const CrmCampaigns = () => {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Campaign Name *</Form.Label>
+                  <Form.Label>
+                    Campaign Name <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Control type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Enter campaign name" />
                 </Form.Group>
               </Col>
@@ -1906,14 +1969,18 @@ const CrmCampaigns = () => {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Start Date *</Form.Label>
+                  <Form.Label>
+                    Start Date <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Control type="date" value={formData.start_date} onChange={handleStartDateChange} min={showEditModal ? getTodayDate(formData.start_date || "") : getTodayDate()} />
                   <Form.Text className="text-muted">{showEditModal ? "Campaign start date" : "Must be today or a future date"}</Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>End Date *</Form.Label>
+                  <Form.Label>
+                    End Date <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Control type="date" value={formData.end_date} onChange={handleEndDateChange} min={showEditModal ? undefined : getMinEndDate()} />
                   <Form.Text className="text-muted">Must be after start date</Form.Text>
                 </Form.Group>
@@ -2039,11 +2106,40 @@ const CrmCampaigns = () => {
             </div>
           </Form>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={closeCreateEditModal}>Cancel</Button>
-          <Button variant="primary" onClick={handleFormSubmit} disabled={loading}>
-            {campaignFormSubmitButtonLabel(loading, showEditModal)}
-          </Button>
+        <Modal.Footer className="border-0 pt-2">
+          <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
+            <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
+              <AlertCircle size={14} />
+              <span style={{ fontSize: "0.813rem" }}>
+                Fields marked with <span className="text-danger fw-bold">*</span> are required
+              </span>
+            </Form.Text>
+            <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
+              <Button
+                variant="primary"
+                onClick={handleFormSubmit}
+                disabled={loading}
+                style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+              >
+                {loading ? (
+                  campaignFormSubmitButtonLabel(true, showEditModal)
+                ) : (
+                  <>
+                    <Check size={16} aria-hidden />
+                    {campaignFormSubmitButtonLabel(false, showEditModal)}
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline-secondary"
+                onClick={closeCreateEditModal}
+                disabled={loading}
+                style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         </Modal.Footer>
       </Modal>
 
@@ -2089,12 +2185,11 @@ const CrmCampaigns = () => {
                   ))}
                 </div>
 
-                {selectedCampaign.description && (
-                  <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px", marginBottom: "30px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Description</div>
-                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500, wordWrap: "break-word", whiteSpace: "pre-wrap" }}>{selectedCampaign.description}</div>
-                  </div>
-                )}
+                <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Description</div>
+                <CrmDescriptionDetailsBlock
+                  text={selectedCampaign.description}
+                  emptyDisplay="No description"
+                />
 
                 <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
                   <Calendar size={18} style={{ color: "#4680ff" }} /> Date Information
@@ -2161,13 +2256,37 @@ const CrmCampaigns = () => {
                   <Alert variant="info" className="mb-4">No custom fields defined for this campaign.</Alert>
                 )}
 
-                <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", paddingTop: "20px", borderTop: "1px solid #e5e7eb" }}>
-                  <Button variant="outline-secondary" onClick={() => { setShowViewModal(false); setSelectedCampaign(null); }} style={{ borderRadius: "8px", padding: "10px 24px", fontWeight: 500 }}>Close</Button>
+                <div
+                  style={{
+                    ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                    justifyContent: "flex-end",
+                    paddingTop: "20px",
+                    borderTop: "1px solid #e5e7eb",
+                  }}
+                >
                   {session?.user?.permissions?.includes("edit-crm-campaigns") && (
-                    <Button variant="primary" onClick={() => { setShowViewModal(false); handleEditCampaign(selectedCampaign); }} style={{ borderRadius: "8px", padding: "10px 24px", fontWeight: 500, display: "flex", alignItems: "center", gap: "8px" }}>
-                      <Edit size={16} /> Edit Campaign
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        setShowViewModal(false);
+                        handleEditCampaign(selectedCampaign);
+                      }}
+                      style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                    >
+                      <Edit size={16} aria-hidden />
+                      Edit Campaign
                     </Button>
                   )}
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => {
+                      setShowViewModal(false);
+                      setSelectedCampaign(null);
+                    }}
+                    style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                  >
+                    Close
+                  </Button>
                 </div>
               </>
             )}
@@ -2232,6 +2351,12 @@ const CrmCampaigns = () => {
             </Form>
           </Modal.Body>
           <Modal.Footer>
+            <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 me-auto">
+              <AlertCircle size={14} />
+              <span style={{ fontSize: "0.813rem" }}>
+                Fields marked with <span className="text-danger fw-bold">*</span> are required
+              </span>
+            </Form.Text>
             <Button variant="secondary" onClick={() => { setShowUploadModal(false); setSelectedFile(null); setFieldTags([]); setUploadSelectedCampaigns([]); setAutoDistributeToUsers(false); }}>Cancel</Button>
             <Button variant="primary" onClick={handleUpload} disabled={uploading || !selectedFile}>
               {uploading ? (
@@ -2388,6 +2513,12 @@ const CrmCampaigns = () => {
           </Form>
         </Modal.Body>
         <Modal.Footer className="border-0 pt-0 px-4 pb-4">
+          <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 me-auto">
+            <AlertCircle size={14} />
+            <span style={{ fontSize: "0.813rem" }}>
+              Fields marked with <span className="text-danger fw-bold">*</span> are required
+            </span>
+          </Form.Text>
           <Button variant="light" onClick={handleDataAssignmentModalClose} disabled={assigningData} className="px-4 fw-semibold">Cancel</Button>
           <Button variant="primary" disabled={assigningData || !assignmentTargetType || recordsToAssign === 0 || recordsToAssign > getMaxRecords() || (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) || (assignmentTargetType === "users" && selectedUserExtensions.length === 0)} onClick={handleDataAssignmentSubmit} className="px-4 fw-semibold d-flex align-items-center gap-2">
             {assigningData ? (

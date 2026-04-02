@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { AlertCircle } from 'lucide-react';
 
@@ -22,13 +22,28 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
   loading = false,
 }) => {
   const [confirmText, setConfirmText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const prevLoadingRef = useRef(loading);
+  /** Sync guard so double Enter / double click cannot fire onConfirm before re-render */
+  const confirmLockRef = useRef(false);
 
-  // Reset confirm text when modal opens/closes
+  // Reset confirm text and submit guard when modal closes
   useEffect(() => {
     if (!show) {
       setConfirmText("");
+      setIsSubmitting(false);
+      confirmLockRef.current = false;
     }
   }, [show]);
+
+  // Allow retry after parent finishes loading (e.g. error path)
+  useEffect(() => {
+    if (prevLoadingRef.current === true && loading === false) {
+      setIsSubmitting(false);
+      confirmLockRef.current = false;
+    }
+    prevLoadingRef.current = loading;
+  }, [loading]);
 
   // Case-insensitive validation - recalculates when confirmText changes
   const isValidConfirmation = useMemo(() => {
@@ -38,14 +53,28 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
   }, [confirmText]);
 
   const handleConfirm = () => {
-    if (isValidConfirmation) {
-      onConfirm();
+    if (!isValidConfirmation || loading || isSubmitting || confirmLockRef.current) {
+      return;
     }
+    confirmLockRef.current = true;
+    setIsSubmitting(true);
+    onConfirm();
   };
 
   const handleClose = () => {
     setConfirmText("");
+    setIsSubmitting(false);
+    confirmLockRef.current = false;
     onHide();
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').trim();
+    const el = e.currentTarget;
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? 0;
+    setConfirmText((prev) => prev.slice(0, start) + pasted + prev.slice(end));
   };
 
   // Handle Enter key press to submit deletion
@@ -53,7 +82,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       e.stopPropagation();
-      if (isValidConfirmation && !loading) {
+      if (isValidConfirmation && !loading && !isSubmitting) {
         handleConfirm();
       }
     }
@@ -89,7 +118,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
           <Form
             onSubmit={(e) => {
               e.preventDefault();
-              if (isValidConfirmation && !loading) {
+              if (isValidConfirmation && !loading && !isSubmitting) {
                 handleConfirm();
               }
             }}
@@ -103,9 +132,10 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
                 placeholder="Type DELETE"
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
+                onPaste={handlePaste}
                 onKeyDown={handleKeyDown}
                 autoFocus
-                disabled={loading}
+                disabled={loading || isSubmitting}
               />
             </div>
           </Form>
@@ -121,7 +151,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
         </Button>
         <Button
           variant="danger"
-          disabled={!isValidConfirmation || loading}
+          disabled={!isValidConfirmation || loading || isSubmitting}
           onClick={handleConfirm}
         >
           {loading ? (

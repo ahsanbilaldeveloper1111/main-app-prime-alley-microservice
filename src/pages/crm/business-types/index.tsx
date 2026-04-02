@@ -24,12 +24,20 @@ import {
   Spinner,
 } from "react-bootstrap";
 import {
+  AlertCircle,
   PlusCircle,
   Edit,
   Trash2,
+  Check,
 } from "lucide-react";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from "@components/crm/crmDialogActionButtonStyles";
 import { useSession } from "next-auth/react";
 
 const PERMISSION_ADD = "add-crm-business-types";
@@ -183,9 +191,8 @@ const BusinessTypes = () => {
         label: "Description",
         sortable: false,
         type: "custom",
-        render: (bt) => (
-          <div className="text-muted small">{bt.description || "—"}</div>
-        ),
+        width: "260px",
+        render: (bt) => <CrmTruncatedDescriptionCell text={bt.description} />,
       },
       {
         key: "created_at",
@@ -323,24 +330,43 @@ const BusinessTypes = () => {
                 />
               </Form.Group>
             </Modal.Body>
-            <Modal.Footer>
-              <Button
-                variant="secondary"
-                onClick={() => setShowModal(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button variant="primary" type="submit" disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <Spinner size="sm" className="me-2" aria-hidden />
-                    {primarySubmitLabel(true, editingBusinessType)}
-                  </>
-                ) : (
-                  primarySubmitLabel(false, editingBusinessType)
-                )}
-              </Button>
+            <Modal.Footer className="border-0 pt-2">
+              <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
+                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
+                  <AlertCircle size={14} />
+                  <span style={{ fontSize: "0.813rem" }}>
+                    Fields marked with <span className="text-danger fw-bold">*</span> are required
+                  </span>
+                </Form.Text>
+                <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={submitting}
+                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                  >
+                    {submitting ? (
+                      <>
+                        <Spinner size="sm" className="me-2" aria-hidden />
+                        {primarySubmitLabel(true, editingBusinessType)}
+                      </>
+                    ) : (
+                      <>
+                        <Check size={16} aria-hidden />
+                        {primarySubmitLabel(false, editingBusinessType)}
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => setShowModal(false)}
+                    disabled={submitting}
+                    style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             </Modal.Footer>
           </Form>
         </Modal>

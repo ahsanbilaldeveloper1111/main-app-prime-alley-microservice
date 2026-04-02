@@ -9,6 +9,13 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
+import CrmColorCell from "@components/crm/crmColorCell";
+import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from "@components/crm/crmDialogActionButtonStyles";
 import {
   getStages,
   createStage,
@@ -270,14 +277,10 @@ const StagesManagement = () => {
     const normalized = (cols ?? [])
       .map((c) => map[c])
       .filter((c): c is string => Boolean(c));
-
-    const withActions = [...normalized, "actions"].reduce<string[]>((acc, value) => {
+    return normalized.reduce<string[]>((acc, value) => {
       if (!acc.includes(value)) acc.push(value);
       return acc;
     }, []);
-    return withActions.length > 1
-      ? withActions
-      : ["sequence", "name", "type", "description", "color", "actions"];
   };
 
   const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
@@ -540,8 +543,12 @@ const StagesManagement = () => {
         label: "Description",
         sortable: false,
         type: "custom",
+        width: "260px",
         render: (stage: Stage) => (
-          <span className="small text-muted">{stage.description || "No description"}</span>
+          <CrmTruncatedDescriptionCell
+            text={stage.description}
+            emptyDisplay="No description"
+          />
         ),
       });
     }
@@ -552,9 +559,7 @@ const StagesManagement = () => {
         label: "Color",
         sortable: false,
         type: "custom",
-        render: (stage: Stage) => (
-          <Badge style={{ backgroundColor: stage.color }}>{stage.color}</Badge>
-        ),
+        render: (stage: Stage) => <CrmColorCell color={stage.color} />,
       });
     }
 
@@ -1051,7 +1056,9 @@ const StagesManagement = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Stage Name *</Form.Label>
+                    <Form.Label>
+                      Stage Name <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Control
                       type="text"
                       value={formData.name}
@@ -1065,7 +1072,9 @@ const StagesManagement = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Sequence *</Form.Label>
+                    <Form.Label>
+                      Sequence <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Control
                       type="number"
                       value={formData.sequence}
@@ -1085,7 +1094,9 @@ const StagesManagement = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Type *</Form.Label>
+                    <Form.Label>
+                      Type <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Select
                       value={formData.type}
                       onChange={(e) =>
@@ -1188,6 +1199,7 @@ const StagesManagement = () => {
         onCancel={() => setShowCreateModal(false)}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        useCrmDialogFooterStyle
       />
 
       {/* Update Stage Modal */}
@@ -1202,7 +1214,9 @@ const StagesManagement = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Stage Name *</Form.Label>
+                    <Form.Label>
+                      Stage Name <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Control
                       type="text"
                       value={formData.name}
@@ -1216,7 +1230,9 @@ const StagesManagement = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Sequence *</Form.Label>
+                    <Form.Label>
+                      Sequence <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Control
                       type="number"
                       value={formData.sequence}
@@ -1236,7 +1252,9 @@ const StagesManagement = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Type *</Form.Label>
+                    <Form.Label>
+                      Type <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Select
                       value={formData.type}
                       onChange={(e) =>
@@ -1314,6 +1332,7 @@ const StagesManagement = () => {
         onCancel={handleCloseUpdateModal}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        useCrmDialogFooterStyle
       />
 
       {/* Delete Confirmation Modal */}
@@ -1347,28 +1366,35 @@ const StagesManagement = () => {
             </p>
           )}
         </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowRestoreModal(false);
-              setStageToRestore(null);
-            }}
-            disabled={restoring}
+        <Modal.Footer className="border-0 pt-0">
+          <div
+            className="w-100 d-flex justify-content-end"
+            style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
           >
-            Cancel
-          </Button>
-          <Button
-            variant="success"
-            onClick={() => {
-              handleConfirmRestore().catch((error: unknown) => {
-                consumeHandledApiError(error, "StagesManagement.restoreStageSubmit");
-              });
-            }}
-            disabled={restoring}
-          >
-            {restoring ? "Restoring…" : "Restore"}
-          </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                handleConfirmRestore().catch((error: unknown) => {
+                  consumeHandledApiError(error, "StagesManagement.restoreStageSubmit");
+                });
+              }}
+              disabled={restoring}
+              style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+            >
+              {restoring ? "Restoring…" : "Restore"}
+            </Button>
+            <Button
+              variant="outline-secondary"
+              onClick={() => {
+                setShowRestoreModal(false);
+                setStageToRestore(null);
+              }}
+              disabled={restoring}
+              style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+            >
+              Cancel
+            </Button>
+          </div>
         </Modal.Footer>
       </Modal>
 
@@ -1654,46 +1680,33 @@ const StagesManagement = () => {
             </div>
 
             {/* Description */}
-            {viewingStage.description && (
-              <>
-                <div
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                    marginBottom: "20px",
-                    paddingBottom: "10px",
-                    borderBottom: "2px solid #f8f9fa",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                >
-                  <FileText size={18} style={{ color: "#4680ff" }} />
-                  Description
-                </div>
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    marginBottom: "30px",
-                    fontSize: "14px",
-                    color: "#1f2937",
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {viewingStage.description}
-                </div>
-              </>
-            )}
+            <div
+              style={{
+                fontSize: "16px",
+                fontWeight: 600,
+                color: "#1f2937",
+                marginBottom: "20px",
+                paddingBottom: "10px",
+                borderBottom: "2px solid #f8f9fa",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <FileText size={18} style={{ color: "#4680ff" }} />
+              Description
+            </div>
+            <CrmDescriptionDetailsBlock
+              text={viewingStage.description}
+              emptyDisplay="No description"
+            />
 
             {/* Action Buttons */}
             <div
               style={{
-                display: "flex",
-                gap: "12px",
-                flexWrap: "wrap",
+                ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                width: "100%",
+                justifyContent: "flex-end",
                 paddingTop: "20px",
                 borderTop: "1px solid #e5e7eb",
               }}
@@ -1701,17 +1714,7 @@ const StagesManagement = () => {
               {session?.user?.permissions?.includes(PERMISSION_EDIT_STAGES) && (
                 <Button
                   variant="primary"
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    fontWeight: 500,
-                    fontSize: "14px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    background: "#4680ff",
-                    border: "none",
-                  }}
+                  style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
                   onClick={() => {
                     setShowViewModal(false);
                     openStageEdit(viewingStage);
@@ -1723,18 +1726,7 @@ const StagesManagement = () => {
               )}
               <Button
                 variant="outline-secondary"
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  fontWeight: 500,
-                  fontSize: "14px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  background: "white",
-                  color: "#6b7280",
-                  border: "2px solid #e5e7eb",
-                }}
+                style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
                 onClick={() => setShowViewModal(false)}
               >
                 Close
