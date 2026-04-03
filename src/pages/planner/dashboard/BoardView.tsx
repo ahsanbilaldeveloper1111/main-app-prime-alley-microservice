@@ -26,6 +26,20 @@ const TEAL = "#006162";
 const HEADER_H = 34;
 const ARROW_W = 10;
 
+/** Map key for extension lookups; avoids `String(object)` → `[object Object]`. */
+function extensionNumberToMapKey(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string') return value.trim();
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return String(value).trim();
+  }
+  return '';
+}
+
 interface BoardViewProps {
   selectedProject: any;
   hierarchyDataExtensions?: any[];
@@ -420,7 +434,7 @@ const BoardView: React.FC<BoardViewProps> = ({
 
   const getUserNameFromExtension = useCallback(
     (extensionNumber: unknown): string => {
-      const key = String(extensionNumber ?? '').trim();
+      const key = extensionNumberToMapKey(extensionNumber);
       if (!key) return '';
       return extensionNameByNumber.get(key) || key;
     },

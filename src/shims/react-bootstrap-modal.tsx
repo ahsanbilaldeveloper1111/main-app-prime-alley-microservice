@@ -5,7 +5,7 @@ import type { ModalProps } from "react-bootstrap/esm/Modal";
 
 // Stock Modal from CJS build — only `esm/Modal.js` is replaced with this file, so this import stays the real implementation.
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- avoid recursive ESM replacement in webpack
-const RBModal = require("react-bootstrap/cjs/Modal.js") as typeof import("react-bootstrap/esm/Modal").default;
+const RBModal = require("react-bootstrap/cjs/Modal.js");
 
 const Modal = React.forwardRef<HTMLDivElement, ModalProps>((props, ref) => (
   <RBModal

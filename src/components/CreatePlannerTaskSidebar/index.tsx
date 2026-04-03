@@ -1296,6 +1296,154 @@ async function persistPlannerSidebarTaskFromPayload(
   return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
 }
 
+function getSidebarInitialFormData(
+  editMode: boolean,
+  editTask: PlannerEditTask | undefined,
+  extensions: Extension[],
+  propProject: Project | undefined,
+  propStatuses: Status[],
+  selectedStatusForTask: number | null,
+): CreateTaskFormData {
+  if (editMode && editTask) {
+    return buildInitialFormFromEdit(editTask, extensions);
+  }
+  return buildInitialFormForCreate("", propProject, propStatuses, selectedStatusForTask);
+}
+
+function linkedRecordsFromListTasksForSidebar(
+  response: unknown,
+  editMode: boolean,
+  editTask: PlannerEditTask | undefined,
+): LinkedRecord[] {
+  const res = response as { data?: unknown } | null | undefined;
+  if (!res?.data || !Array.isArray(res.data)) {
+    return [];
+  }
+  const taskRows = res.data as TaskListRow[];
+  const selfIdRaw = editTask?.rawData?.id ?? editTask?.id;
+  const selfIdNum =
+    selfIdRaw != null && String(selfIdRaw).trim() !== ""
+      ? Number(selfIdRaw)
+      : Number.NaN;
+  const currentTaskId =
+    editMode && Number.isFinite(selfIdNum) && selfIdNum > 0 ? selfIdNum : null;
+  return taskRows
+    .filter((t) => currentTaskId == null || Number(t.id) !== currentTaskId)
+    .map((t) => ({
+      id: Number(t.id),
+      type: "task" as const,
+      title: t.title || "",
+      reference: t.reference || `#${t.id}`,
+    }));
+}
+
+function shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
+  editMode: boolean,
+  task: PlannerEditTask | undefined,
+  fetchedProjectsCount: number,
+  loadingProjects: boolean,
+): boolean {
+  return (
+    editMode &&
+    Boolean(task) &&
+    fetchedProjectsCount === 0 &&
+    loadingProjects
+  );
+}
+
+function mergeOpenedPlannerSidebarFormData(
+  rawInitial: CreateTaskFormData,
+  taskTypeOptions: readonly PlannerTaskType[],
+): CreateTaskFormData {
+  const mergedOpen = mergeFormDataWithDueDateClamp(rawInitial);
+  return {
+    ...mergedOpen,
+    taskType:
+      mergedOpen.taskType === ""
+        ? ""
+        : clampTaskTypeToAllowed(mergedOpen.taskType, taskTypeOptions),
+  };
+}
+
+function emptyPlannerSidebarFormWhenClosed(
+  propProject: Project | undefined,
+  selectedStatusForTask: number | null,
+  propStatuses: Status[],
+): CreateTaskFormData {
+  return {
+    title: "",
+    description: "",
+    taskType: "",
+    projectId: propProject?.id || null,
+    statusId:
+      selectedStatusForTask ||
+      (propStatuses.length > 0 ? propStatuses[0].id : null),
+    priorityId: 0,
+    assigneeIds: [],
+    watcherIds: [],
+    dueDate: "",
+    startDate: "",
+    labelIds: [],
+    linkedRecordIds: [],
+    frequency: "weekly",
+    repeatInterval: 1,
+    repeatOn: "",
+    dueTime: "",
+  };
+}
+
+type PlannerSidebarTaskTypeSelectContext = {
+  editMode: boolean;
+  taskTypeOptions: PlannerTaskType[];
+  propProject: Project | undefined;
+  propStatuses: Status[];
+  selectedStatusForTask: number | null;
+  setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  setAssigneeSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  setShowAssigneeDropdown: React.Dispatch<React.SetStateAction<boolean>>;
+  setWatcherSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  setShowWatcherDropdown: React.Dispatch<React.SetStateAction<boolean>>;
+  fetchLinkRecordsForSearch: (
+    query: string,
+    currentProjectId?: number | null,
+  ) => Promise<void>;
+};
+
+function applyPlannerSidebarTaskTypeSelectChange(
+  raw: string,
+  ctx: Readonly<PlannerSidebarTaskTypeSelectContext>,
+): void {
+  if (raw === "") {
+    if (ctx.editMode) {
+      return;
+    }
+    ctx.setFormData((prev) => ({ ...prev, taskType: "" }));
+    return;
+  }
+  const nextType = raw as PlannerTaskType;
+  const clamped = clampTaskTypeToAllowed(nextType, ctx.taskTypeOptions);
+  if (ctx.editMode) {
+    ctx.setFormData((prev) => ({ ...prev, taskType: clamped }));
+    return;
+  }
+  const fresh = buildInitialFormForCreate(
+    clamped,
+    ctx.propProject,
+    ctx.propStatuses,
+    ctx.selectedStatusForTask,
+  );
+  const mergedOpen = mergeFormDataWithDueDateClamp(fresh);
+  const nextForm: CreateTaskFormData = { ...mergedOpen, taskType: clamped };
+  ctx.setFormData(nextForm);
+  ctx.setSearchQuery("");
+  ctx.setAssigneeSearchQuery("");
+  ctx.setShowAssigneeDropdown(false);
+  ctx.setWatcherSearchQuery("");
+  ctx.setShowWatcherDropdown(false);
+  ctx.fetchLinkRecordsForSearch("", nextForm.projectId).catch(() => undefined);
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
@@ -1319,12 +1467,15 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     [taskTypeChoices],
   );
 
-  const getInitialFormData = (): CreateTaskFormData => {
-    if (isEdit && editTask) {
-      return buildInitialFormFromEdit(editTask, extensions);
-    }
-    return buildInitialFormForCreate("", propProject, propStatuses, selectedStatusForTask);
-  };
+  const getInitialFormData = (): CreateTaskFormData =>
+    getSidebarInitialFormData(
+      isEdit,
+      editTask,
+      extensions,
+      propProject,
+      propStatuses,
+      selectedStatusForTask,
+    );
 
   const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
   const [searchQuery, setSearchQuery] = useState("");
@@ -1404,30 +1555,9 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           search: query.trim() || undefined,
           ...(projectId != null && projectId > 0 ? { project_id: projectId } : {}),
         });
-        if (response?.data && Array.isArray(response.data)) {
-          const taskRows = response.data as TaskListRow[];
-          const selfIdRaw = editTask?.rawData?.id ?? editTask?.id;
-          const selfIdNum =
-            selfIdRaw != null && String(selfIdRaw).trim() !== ""
-              ? Number(selfIdRaw)
-              : Number.NaN;
-          const currentTaskId =
-            isEdit && Number.isFinite(selfIdNum) && selfIdNum > 0 ? selfIdNum : null;
-          const records: LinkedRecord[] = taskRows
-            .filter(
-              (t) =>
-                currentTaskId == null || Number(t.id) !== currentTaskId,
-            )
-            .map((t) => ({
-              id: Number(t.id),
-              type: "task" as const,
-              title: t.title || "",
-              reference: t.reference || `#${t.id}`,
-            }));
-          setLinkedRecordsFromApi(records);
-        } else {
-          setLinkedRecordsFromApi([]);
-        }
+        setLinkedRecordsFromApi(
+          linkedRecordsFromListTasksForSidebar(response, isEdit, editTask),
+        );
       } catch (error) {
         console.error("Error fetching link records:", error);
         setLinkedRecordsFromApi([]);
@@ -1446,38 +1576,20 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const handleTaskTypeChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const raw = e.target.value;
-      if (raw === "") {
-        if (isEdit) {
-          return;
-        }
-        setFormData((prev) => ({ ...prev, taskType: "" }));
-        return;
-      }
-      const nextType = raw as PlannerTaskType;
-      const clamped = clampTaskTypeToAllowed(nextType, taskTypeOptions);
-      if (isEdit) {
-        setFormData((prev) => ({ ...prev, taskType: clamped }));
-        return;
-      }
-      const fresh = buildInitialFormForCreate(
-        clamped,
+      applyPlannerSidebarTaskTypeSelectChange(e.target.value, {
+        editMode: isEdit,
+        taskTypeOptions,
         propProject,
         propStatuses,
         selectedStatusForTask,
-      );
-      const mergedOpen = mergeFormDataWithDueDateClamp(fresh);
-      const nextForm: CreateTaskFormData = {
-        ...mergedOpen,
-        taskType: clamped,
-      };
-      setFormData(nextForm);
-      setSearchQuery("");
-      setAssigneeSearchQuery("");
-      setShowAssigneeDropdown(false);
-      setWatcherSearchQuery("");
-      setShowWatcherDropdown(false);
-      fetchLinkRecordsForSearch("", nextForm.projectId).catch(() => undefined);
+        setFormData,
+        setSearchQuery,
+        setAssigneeSearchQuery,
+        setShowAssigneeDropdown,
+        setWatcherSearchQuery,
+        setShowWatcherDropdown,
+        fetchLinkRecordsForSearch,
+      });
     },
     [
       isEdit,
@@ -1498,43 +1610,27 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     if (isOpen) {
       setSearchQuery("");
       if (
-        isEdit &&
-        editTask &&
-        fetchedProjects.length === 0 &&
-        loadingProjects
+        shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
+          isEdit,
+          editTask,
+          fetchedProjects.length,
+          loadingProjects,
+        )
       ) {
         return;
       }
-      const mergedOpen = mergeFormDataWithDueDateClamp(getInitialFormData());
-      setFormData({
-        ...mergedOpen,
-        taskType:
-          mergedOpen.taskType === ""
-            ? ""
-            : clampTaskTypeToAllowed(mergedOpen.taskType, taskTypeOptions),
-      });
+      setFormData(
+        mergeOpenedPlannerSidebarFormData(getInitialFormData(), taskTypeOptions),
+      );
     } else {
       setSearchQuery("");
-      setFormData({
-        title: "",
-        description: "",
-        taskType: "",
-        projectId: propProject?.id || null,
-        statusId:
-          selectedStatusForTask ||
-          (propStatuses.length > 0 ? propStatuses[0].id : null),
-        priorityId: 0,
-        assigneeIds: [],
-        watcherIds: [],
-        dueDate: "",
-        startDate: "",
-        labelIds: [],
-        linkedRecordIds: [],
-        frequency: "weekly",
-        repeatInterval: 1,
-        repeatOn: "",
-        dueTime: "",
-      });
+      setFormData(
+        emptyPlannerSidebarFormWhenClosed(
+          propProject,
+          selectedStatusForTask,
+          propStatuses,
+        ),
+      );
     }
   }, [
     isOpen,
