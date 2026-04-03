@@ -54,17 +54,9 @@ import {
   ChevronDown,
   X,
   AlertCircle as AlertCircleIcon,
-  ArrowUp,
-  ArrowDown,
   Download,
   CheckSquare,
-  ArrowUpDown,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronLeft,
-  ChevronRight,
   Trash2,
-  MoreHorizontal,
   Phone as PhoneIcon,
   Phone,
   Mail,
@@ -84,30 +76,24 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
 import {
-  getCrmData,
   getAllCrmDataById,
   createCrmData,
   updateCrmData,
   uploadCrmDataCsv,
   assignCrmDataAdvanced,
   bulkDeleteCrmData,
-  getCrmDataTags,
   markCrmDataAsViewed,
-  getCampaigns,
   scheduleCall,
   unscheduleCall,
   CrmDataItem,
   downloadExampleCsv,
 } from "@utils/crm";
-import { GetHierarchyData } from "@utils/users";
-
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import FormModal from "@pages/partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import {
-  ModuleSlug,
   formatDuration,
   formatDateTimeToLocal,
   GlobalDateFormat,
@@ -130,10 +116,7 @@ import {
   createEmptyCrmListContactFormState,
   type CrmListContactFormState,
 } from "@utils/crmContactFormFromCrmItem";
-import {
-  CRM_LIST_PAGE_CALL_END_REASONS,
-  CRM_LIST_PAGE_STATIC_TAGS,
-} from "@utils/crmListPageStaticData";
+import { CRM_LIST_PAGE_CALL_END_REASONS } from "@utils/crmListPageStaticData";
 import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
 import { useCrmQuotesListFiltersMetricsHistorySidebarState } from "@crm/billing-quotes/useCrmQuotesListFiltersMetricsHistorySidebarState";
 import { buildCrmQuotesListStatsCards } from "@crm/billing-quotes/crmQuotesListStatsAndTable";
@@ -148,21 +131,25 @@ import {
 } from "@crm/billing-quotes/crmQuotesListToolbarFilters";
 import { useCrmQuotesListQuotesTableModel } from "@crm/billing-quotes/useCrmQuotesListQuotesTableModel";
 import { useCrmQuotesListSharedQuoteListCallbacks } from "@crm/billing-quotes/useCrmQuotesListSharedQuoteListCallbacks";
-import {
-  buildCrmListExportCrmDataParams,
-  buildCrmListTableCrmDataParams,
-  computeCrmListAdvancedFiltersApplied,
-} from "@crm/shared/crmListCrmQueryParams";
-import {
-  buildCrmListCsvContent,
-  buildCrmListExportHeaders,
-} from "@crm/shared/crmListPageExportCsv";
+import { computeCrmListAdvancedFiltersApplied } from "@crm/shared/crmListCrmQueryParams";
 import { validateCrmListUploadCsvFile } from "@crm/shared/crmListUploadCsvValidation";
 import {
   applyCrmListExportDateRangePreset,
   crmListExportDateRangePresetValue,
   CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS,
 } from "@crm/shared/crmListExportModalDateRangePresets";
+import { pruneEmptyCrmListFilterEntries } from "@crm/billing-quotes/crmQuotesListPagePruneFilters";
+import { useCrmQuotesListActiveFilterSync } from "@crm/billing-quotes/useCrmQuotesListActiveFilterSync";
+import { useCrmQuotesListFetchDummyCrmData } from "@crm/billing-quotes/useCrmQuotesListFetchDummyCrmData";
+import { useCrmQuotesListSidebarQuickActions } from "@crm/billing-quotes/useCrmQuotesListSidebarQuickActions";
+import { useCrmQuotesListExportHandlers } from "@crm/billing-quotes/useCrmQuotesListExportHandlers";
+import {
+  useCrmQuotesListCampaignsEffect,
+  useCrmQuotesListExtensionsEffect,
+  useCrmQuotesListHistoryModalEffect,
+  useCrmQuotesListTagsEffect,
+} from "@crm/billing-quotes/useCrmQuotesListResourceLoadEffects";
+import { getCrmQuotesListExtensionDisplayName } from "@crm/billing-quotes/crmQuotesListGetExtensionDisplayName";
 
 export type CrmQuotesListPageProps = {
   variant: "billing" | "crm";
@@ -172,7 +159,7 @@ export function getCrmQuotesListPageLayout(page: ReactElement) {
   return <Layout>{page}</Layout>;
 }
 
-export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
+function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
@@ -379,244 +366,41 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
     setContactFormLoading,
   });
 
-  const sidebarQuickActions = useMemo(() => {
-    const hasPhone = !!String(sidebarRecordPhone || "").trim();
-    const hasEmail = !!String(sidebarRecordEmail || "").trim();
-    return [
-      {
-        id: "qa-call",
-        label: "Call",
-        icon: Phone,
-        onClick: () => {
-          const phone = String(sidebarRecordPhone || "").trim();
-          if (!phone) {
-            toast.error("No phone number available for this entry");
-            return;
-          }
-          if (!isInitialized) {
-            toast.error("CTI not initialized. Please wait...");
-            return;
-          }
-          dialNumber(phone)
-            .then((result) => {
-              if (result.success) {
-                toast.success(`Calling ${sidebarRecordName || phone}...`);
-              } else {
-                toast.error(result.error || "Failed to make call");
-              }
-            })
-            .catch((error) => {
-              console.error("Call error:", error);
-              toast.error("Failed to make call");
-            });
-        },
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-whatsapp",
-        label: "WhatsApp",
-        icon: MessageCircle,
-        onClick: () => sidebarActivityModals.openWhatsApp(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-sms",
-        label: "SMS",
-        icon: MessageSquare,
-        onClick: () => sidebarActivityModals.openSms(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-meeting",
-        label: "Meeting",
-        icon: Calendar,
-        onClick: () => sidebarActivityModals.openMeeting(),
-      },
-      {
-        id: "qa-email",
-        label: "Email",
-        icon: Mail,
-        onClick: () => sidebarActivityModals.openEmail(),
-        disabled: !hasEmail,
-      },
-      {
-        id: "more",
-        label: "More",
-        icon: MoreHorizontal,
-        onClick: () => {
-          // Let GenericSidebar's built-in "More" submenu open (same behavior as Deals/Leads).
-        },
-        disabled: false,
-      },
-    ];
-  }, [
+  const sidebarQuickActions = useCrmQuotesListSidebarQuickActions({
     sidebarRecordPhone,
     sidebarRecordEmail,
+    sidebarRecordName,
+    sidebarRecordId,
     sidebarActivityModals,
     dialNumber,
     isInitialized,
-    sidebarRecordName,
-    sidebarRecordId,
-  ]);
+  });
 
-  const buildCrmDataParams = useCallback(
-    (overrides: { page?: number; per_page?: number } = {}) =>
-      buildCrmListTableCrmDataParams(memoizedFilters, pagination, overrides),
-    [
-      memoizedFilters,
-      pagination.currentPage,
-      pagination.rowsPerPage,
-      pagination.sortColumn,
-      pagination.sortDirection,
-    ],
+  const { handleProspectsExport } = useCrmQuotesListExportHandlers({
+    exportFileName,
+    exportFilters,
+    currentFilters,
+    showExportModal,
+    setExporting,
+    setExportFilters,
+    setExportFileName,
+    setShowExportModal,
+  });
+
+  useCrmQuotesListExtensionsEffect(setExtensions);
+  useCrmQuotesListHistoryModalEffect(showHistoryModal, fetchHistoryData);
+  useCrmQuotesListTagsEffect(refreshKey, setAvailableTags);
+  useCrmQuotesListCampaignsEffect(
+    refreshKey,
+    setAvailableCampaigns,
+    setCampaignsById,
   );
 
-  const fetchCrmDataForExport = useCallback(
-    async (filters: Record<string, any>) => {
-      const PER_PAGE = 100;
-      const allData: CrmDataItem[] = [];
-      let page = 1;
-      for (;;) {
-        const response = await getCrmData(
-          buildCrmListExportCrmDataParams(filters, {
-            page,
-            per_page: PER_PAGE,
-          }),
-        );
-        const chunk = response?.data || [];
-        allData.push(...chunk);
-        if (chunk.length < PER_PAGE) break;
-        page += 1;
-      }
-      return allData;
-    },
-    [],
+  const getNameByExtension = useCallback(
+    (extension: string) =>
+      getCrmQuotesListExtensionDisplayName(extensions, extension),
+    [extensions],
   );
-
-  const handleProspectsExport = useCallback(async () => {
-    const name =
-      exportFileName.trim() || `quotes_${moment().format("YYYY-MM-DD")}`;
-    const ext = name.endsWith(".csv") ? "" : ".csv";
-    setExporting(true);
-    try {
-      const allData = await fetchCrmDataForExport(exportFilters);
-      if (allData.length === 0) {
-        toast.info("No quotes match the selected filters.");
-        return;
-      }
-      const { headers, nestedDataKeysSet } = buildCrmListExportHeaders(allData);
-      const csvContent = buildCrmListCsvContent(
-        headers,
-        allData,
-        nestedDataKeysSet,
-      );
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name + ext;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      setShowExportModal(false);
-      toast.success(`Exported ${allData.length} rows successfully!`);
-    } catch {
-      toast.error("Failed to export");
-    } finally {
-      setExporting(false);
-    }
-  }, [exportFileName, exportFilters, fetchCrmDataForExport]);
-
-  // Initialize export filters when export modal opens (default to current table filters)
-  useEffect(() => {
-    if (showExportModal) {
-      setExportFilters({ ...currentFilters });
-      setExportFileName(`quotes_${moment().format("YYYY-MM-DD")}`);
-    }
-  }, [showExportModal, currentFilters]);
-
-  // Fetch extensions data
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        const hierarchyData = await GetHierarchyData(
-          ModuleSlug.CRM_DATA_MANAGEMENT,
-        );
-        if (hierarchyData?.extensions) {
-          setExtensions(hierarchyData.extensions);
-        }
-      } catch (error) {
-        console.error("Failed to fetch extensions:", error);
-      }
-    };
-    fetchExtensions();
-  }, []);
-
-  function getNameByExtension(extension: string) {
-    const extensionData = extensions.find((ext) => ext.id === extension);
-    return extensionData?.display_name || extensionData?.name || extension;
-  }
-
-  // Load history data when modal is opened
-  useEffect(() => {
-    if (showHistoryModal) {
-      fetchHistoryData();
-    }
-  }, [showHistoryModal, fetchHistoryData]);
-
-  // Load available tags
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const tags = await getCrmDataTags();
-        const tagOptions = tags
-        .filter((tag: any) => tag.id != null)
-        .map((tag: any) => ({
-          value: tag.name,
-          label: tag.name,
-          id: tag.id,
-        }));
-        setAvailableTags(tagOptions);
-      } catch (error) {
-        console.error("Failed to load tags:", error);
-        // Fallback to static tags
-        setAvailableTags(
-          CRM_LIST_PAGE_STATIC_TAGS.map((tag) => ({
-            value: tag.value,
-            label: tag.label,
-            id: parseInt(tag.value.replace("tag-", "")) || 0,
-          })),
-        );
-      }
-    };
-    loadTags();
-  }, [refreshKey]);
-
-  // Load available campaigns
-  useEffect(() => {
-    const loadCampaigns = async () => {
-      try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
-        const campaignOptions = campaignsResponse.data.map((campaign: any) => ({
-          value: campaign.id.toString(),
-          label: campaign.name,
-          id: campaign.id,
-        }));
-        setAvailableCampaigns(campaignOptions);
-
-        // Also populate the campaignsById map
-        const campaignsMap: Record<number, string> = {};
-        campaignsResponse.data.forEach((campaign: any) => {
-          campaignsMap[campaign.id] = campaign.name;
-        });
-        setCampaignsById(campaignsMap);
-      } catch (error) {
-        console.error("Failed to load campaigns:", error);
-        // Fallback to empty array
-        setAvailableCampaigns([]);
-      }
-    };
-    loadCampaigns();
-  }, [refreshKey]);
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
@@ -627,19 +411,7 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
   const applyTableFiltersPatch = useCallback(
     (patch: Record<string, any>) => {
       const next: Record<string, any> = { ...currentFilters, ...patch };
-
-      Object.keys(next).forEach((k) => {
-        const v = next[k];
-        if (
-          v === undefined ||
-          v === null ||
-          v === "" ||
-          (Array.isArray(v) && v.length === 0)
-        ) {
-          delete next[k];
-        }
-      });
-
+      pruneEmptyCrmListFilterEntries(next);
       handleFiltersChange(next);
       setPagination((prev) => ({ ...prev, currentPage: 1 }));
     },
@@ -670,344 +442,17 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
     [applyTableFiltersPatch, currentFilters, customSelectStyles, extensions],
   );
 
-  // Handle activeFilter changes to update currentFilters
-  useEffect(() => {
-    if (activeFilter === "all") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.expiring_soon;
-        delete newFilters.status;
-        delete newFilters.pending_approval;
-        return newFilters;
-      });
-    } else if (activeFilter === "expiring_soon") {
-      setCurrentFilters((prev) => ({ ...prev, expiring_soon: true }));
-    } else if (activeFilter === "pending_acceptance") {
-      setCurrentFilters((prev) => ({ ...prev, status: "Pending" }));
-    } else if (activeFilter === "pending_approval") {
-      setCurrentFilters((prev) => ({ ...prev, pending_approval: true }));
-    }
-    // Don't reset pagination here - it's already reset in onFilterChange
-  }, [activeFilter]);
+  useCrmQuotesListActiveFilterSync(activeFilter, setCurrentFilters);
 
-  // Helper functions for sorting and pagination
-  const handleSort = (column: string) => {
-    const newDirection =
-      pagination.sortColumn === column && pagination.sortDirection === "asc"
-        ? "desc"
-        : "asc";
-    setPagination({
-      ...pagination,
-      sortColumn: column,
-      sortDirection: newDirection,
-      currentPage: 1,
-    });
-  };
-
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
-  ): T[] => {
-    if (!sortColumn) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderSortIcon = (column: string) => {
-    if (pagination.sortColumn !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return pagination.sortDirection === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
-  };
-
-  const renderPaginationControls = () => {
-    const totalPages = getTotalPages(totalRecords, pagination.rowsPerPage);
-    const { currentPage, rowsPerPage } = pagination;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, totalRecords);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPagination({
-                ...pagination,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={15}>15</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalRecords} prospects
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() => setPagination({ ...pagination, currentPage: 1 })}
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage - 1 })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPagination({ ...pagination, currentPage: pageNum })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage + 1 })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: totalPages })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  // Fetch prospects data
-  const fetchCrmData = useCallback(async () => {
-    // Increment request ID to track the latest request
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-
-    setLoading(true);
-    try {
-      // Use dummy data for quotes instead of API call
-      const dummyQuotes = [
-        {
-          id: 1,
-          name: "John Smith",
-          phone: "+1 555-0123",
-          user_extension: "101",
-          campaign_id: 1,
-          is_viewed: true,
-          created_at: "2026-02-15T10:30:00Z",
-          updated_at: "2026-03-01T14:20:00Z",
-          title: "Website Redesign Project",
-          status: "Published",
-          amount: 15000,
-          view_count: 8,
-          signing_status: "Pending",
-          expiry_date: "2026-03-20T23:59:59Z",
-          contact_name: "John Smith",
-          contact_email: "john.smith@company.com",
-          contact_phone: "+1 555-0123",
-          description: "Complete website redesign with modern UI/UX",
-          data: {
-            email: "john.smith@company.com",
-            contact_owner: "101",
-          },
-          campaign: {
-            id: 1,
-            name: "Q1 2026 Campaign",
-          },
-        },
-        {
-          id: 2,
-          name: "Sarah Johnson",
-          phone: "+1 555-0456",
-          user_extension: "102",
-          campaign_id: 2,
-          is_viewed: true,
-          created_at: "2026-01-20T09:15:00Z",
-          updated_at: "2026-02-28T16:45:00Z",
-          title: "Annual Software License",
-          status: "Signed",
-          amount: 28500,
-          view_count: 12,
-          signing_status: "Signed",
-          expiry_date: "2026-03-10T23:59:59Z",
-          contact_name: "Sarah Johnson",
-          contact_email: "sarah.j@techcorp.com",
-          contact_phone: "+1 555-0456",
-          description: "Enterprise software license renewal",
-          data: {
-            email: "sarah.j@techcorp.com",
-            contact_owner: "102",
-          },
-          campaign: {
-            id: 2,
-            name: "Enterprise Renewals",
-          },
-        },
-        {
-          id: 3,
-          name: "Michael Brown",
-          phone: "+1 555-0789",
-          user_extension: "103",
-          campaign_id: 3,
-          is_viewed: false,
-          created_at: "2026-03-01T11:00:00Z",
-          updated_at: "2026-03-05T13:30:00Z",
-          title: "Cloud Infrastructure Setup",
-          status: "Draft",
-          amount: 42000,
-          view_count: 3,
-          signing_status: "Viewed",
-          expiry_date: "2026-03-25T23:59:59Z",
-          contact_name: "Michael Brown",
-          contact_email: "m.brown@startup.io",
-          contact_phone: "+1 555-0789",
-          description: "AWS cloud infrastructure setup and migration",
-          data: {
-            email: "m.brown@startup.io",
-            contact_owner: "103",
-          },
-          campaign: {
-            id: 3,
-            name: "Cloud Services 2026",
-          },
-        },
-      ];
-
-      const response = {
-        data: dummyQuotes,
-        pagination: { total: 3 },
-        metrics: {
-          pending_count: 1,
-          expiring_soon_count: 2,
-          pending_approval_count: 0,
-          total_value: 85500,
-          signed_count: 1,
-        },
-      };
-
-      // Only update state if this is still the latest request
-      if (currentRequestId !== requestIdRef.current) {
-        return;
-      }
-
-      setDataList(response.data || []);
-      setTotalRecords(response.pagination.total || 0);
-
-      // Keep total all quotes only when fetching without tab filter (all quotes)
-      const isAllProspects =
-        memoizedFilters.has_scheduled_calls !== true &&
-        memoizedFilters.has_tickets !== true;
-      if (isAllProspects) {
-        setTotalAllQuotes(response.pagination.total || 0);
-      }
-
-      setMetrics(
-        response.metrics || {},
-      );
-    } catch (error: any) {
-      // Only handle error if this is still the latest request
-      if (currentRequestId !== requestIdRef.current) {
-        return;
-      }
-      console.error("Failed to fetch CRM data:", error);
-      setDataList([]);
-      setTotalRecords(0);
-    } finally {
-      // Only set loading to false if this is still the current request
-      if (currentRequestId === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [buildCrmDataParams]);
+  const fetchCrmData = useCrmQuotesListFetchDummyCrmData({
+    requestIdRef,
+    memoizedFilters,
+    setLoading,
+    setDataList,
+    setTotalRecords,
+    setTotalAllQuotes,
+    setMetrics,
+  });
 
   // Load data when filters or pagination changes
   useEffect(() => {
@@ -6182,4 +5627,8 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
   )}
     </React.Fragment>
   );
-};
+}
+
+export function CrmQuotesListPage(props: CrmQuotesListPageProps) {
+  return <CrmQuotesListPageContent {...props} />;
+}

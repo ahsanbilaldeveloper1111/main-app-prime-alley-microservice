@@ -8,6 +8,108 @@ export type CrmListPaginationSlice = {
   sortDirection: "asc" | "desc";
 };
 
+function copyTruthyFilterToParam(
+  target: Record<string, any>,
+  filters: Record<string, any>,
+  filterKey: string,
+  paramKey: string,
+): void {
+  const value = filters[filterKey];
+  if (value) target[paramKey] = value;
+}
+
+function copyNonEmptyArrayFilterToParam(
+  target: Record<string, any>,
+  filters: Record<string, any>,
+  filterKey: string,
+  paramKey: string,
+): void {
+  const value = filters[filterKey];
+  if (value?.length) target[paramKey] = value;
+}
+
+function mergeUserExtensionsParam(
+  target: Record<string, any>,
+  filters: Record<string, any>,
+): void {
+  if (!filters.user_extension?.length) return;
+  target.user_extensions = Array.isArray(filters.user_extension)
+    ? filters.user_extension
+    : [filters.user_extension];
+}
+
+function mergeIsViewedParam(
+  target: Record<string, any>,
+  filters: Record<string, any>,
+): void {
+  if (filters.is_viewed === undefined || filters.is_viewed === "") return;
+  target.is_viewed = filters.is_viewed;
+}
+
+function copyDefinedFilterToSameParamKey(
+  target: Record<string, any>,
+  filters: Record<string, any>,
+  key: string,
+): void {
+  if (filters[key] === undefined) return;
+  target[key] = filters[key];
+}
+
+/** Maps shared CRM list filter fields onto getCrmData-style param objects. */
+function applySharedCrmListGetCrmDataFilters(
+  params: Record<string, any>,
+  filters: Record<string, any>,
+): void {
+  copyTruthyFilterToParam(params, filters, "search", "search");
+  copyNonEmptyArrayFilterToParam(params, filters, "campaign_id", "campaign_ids");
+  copyNonEmptyArrayFilterToParam(params, filters, "tags", "tags");
+  copyTruthyFilterToParam(
+    params,
+    filters,
+    "assignment_status",
+    "assignment_status",
+  );
+  mergeUserExtensionsParam(params, filters);
+  mergeIsViewedParam(params, filters);
+  copyTruthyFilterToParam(params, filters, "created_at_from", "date_from");
+  copyTruthyFilterToParam(params, filters, "created_at_to", "date_to");
+  copyTruthyFilterToParam(
+    params,
+    filters,
+    "last_called_at_from",
+    "last_called_at_from",
+  );
+  copyTruthyFilterToParam(
+    params,
+    filters,
+    "last_called_at_to",
+    "last_called_at_to",
+  );
+  copyDefinedFilterToSameParamKey(params, filters, "has_scheduled_calls");
+  copyDefinedFilterToSameParamKey(params, filters, "has_tickets");
+  copyTruthyFilterToParam(
+    params,
+    filters,
+    "scheduled_call_status",
+    "scheduled_call_status",
+  );
+  copyTruthyFilterToParam(
+    params,
+    filters,
+    "scheduled_call_from",
+    "scheduled_call_from",
+  );
+  copyTruthyFilterToParam(
+    params,
+    filters,
+    "scheduled_call_to",
+    "scheduled_call_to",
+  );
+  copyTruthyFilterToParam(params, filters, "source_file", "source_file");
+  copyNonEmptyArrayFilterToParam(params, filters, "tag_ids", "tag_ids");
+  copyTruthyFilterToParam(params, filters, "disposition", "disposition");
+}
+
 /** Maps table filters + pagination to `getCrmData` params for CRM list pages. */
 export function buildCrmListTableCrmDataParams(
   memoizedFilters: Record<string, any>,
@@ -19,50 +121,7 @@ export function buildCrmListTableCrmDataParams(
     per_page: pagination.rowsPerPage,
     ...overrides,
   };
-  if (memoizedFilters.search) params.search = memoizedFilters.search;
-  if (memoizedFilters.campaign_id?.length)
-    params.campaign_ids = memoizedFilters.campaign_id;
-  if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
-  if (memoizedFilters.assignment_status)
-    params.assignment_status = memoizedFilters.assignment_status;
-  if (memoizedFilters.user_extension?.length) {
-    params.user_extensions = Array.isArray(memoizedFilters.user_extension)
-      ? memoizedFilters.user_extension
-      : [memoizedFilters.user_extension];
-  }
-  if (
-    memoizedFilters.is_viewed !== undefined &&
-    memoizedFilters.is_viewed !== ""
-  )
-    params.is_viewed = memoizedFilters.is_viewed;
-  if (memoizedFilters.created_at_from)
-    params.date_from = memoizedFilters.created_at_from;
-  if (memoizedFilters.created_at_to)
-    params.date_to = memoizedFilters.created_at_to;
-  if (memoizedFilters.last_called_at_from)
-    params.last_called_at_from = memoizedFilters.last_called_at_from;
-  if (memoizedFilters.last_called_at_to)
-    params.last_called_at_to = memoizedFilters.last_called_at_to;
-  if (memoizedFilters.has_scheduled_calls !== undefined)
-    params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
-  if (memoizedFilters.has_tickets !== undefined)
-    params.has_tickets = memoizedFilters.has_tickets;
-  if (memoizedFilters.scheduled_call_status)
-    params.scheduled_call_status = memoizedFilters.scheduled_call_status;
-  if (memoizedFilters.scheduled_call_from)
-    params.scheduled_call_from = memoizedFilters.scheduled_call_from;
-  if (memoizedFilters.scheduled_call_to)
-    params.scheduled_call_to = memoizedFilters.scheduled_call_to;
-  if (memoizedFilters.source_file)
-    params.source_file = memoizedFilters.source_file;
-  if (memoizedFilters.tag_ids?.length)
-    params.tag_ids = memoizedFilters.tag_ids;
-  if (memoizedFilters.last_called_at_from)
-    params.last_called_at_from = memoizedFilters.last_called_at_from;
-  if (memoizedFilters.last_called_at_to)
-    params.last_called_at_to = memoizedFilters.last_called_at_to;
-  if (memoizedFilters.disposition)
-    params.disposition = memoizedFilters.disposition;
+  applySharedCrmListGetCrmDataFilters(params, memoizedFilters);
   if (pagination.sortColumn) {
     params.sort_column = pagination.sortColumn;
     params.sort_direction = pagination.sortDirection;
@@ -81,37 +140,7 @@ export function buildCrmListExportCrmDataParams(
     per_page: overrides.per_page ?? 100,
     ...overrides,
   };
-  if (filters.search) params.search = filters.search;
-  if (filters.campaign_id?.length)
-    params.campaign_ids = filters.campaign_id;
-  if (filters.tags?.length) params.tags = filters.tags;
-  if (filters.assignment_status)
-    params.assignment_status = filters.assignment_status;
-  if (filters.user_extension?.length)
-    params.user_extensions = Array.isArray(filters.user_extension)
-      ? filters.user_extension
-      : [filters.user_extension];
-  if (filters.is_viewed !== undefined && filters.is_viewed !== "")
-    params.is_viewed = filters.is_viewed;
-  if (filters.created_at_from) params.date_from = filters.created_at_from;
-  if (filters.created_at_to) params.date_to = filters.created_at_to;
-  if (filters.last_called_at_from)
-    params.last_called_at_from = filters.last_called_at_from;
-  if (filters.last_called_at_to)
-    params.last_called_at_to = filters.last_called_at_to;
-  if (filters.has_scheduled_calls !== undefined)
-    params.has_scheduled_calls = filters.has_scheduled_calls;
-  if (filters.has_tickets !== undefined)
-    params.has_tickets = filters.has_tickets;
-  if (filters.scheduled_call_status)
-    params.scheduled_call_status = filters.scheduled_call_status;
-  if (filters.scheduled_call_from)
-    params.scheduled_call_from = filters.scheduled_call_from;
-  if (filters.scheduled_call_to)
-    params.scheduled_call_to = filters.scheduled_call_to;
-  if (filters.source_file) params.source_file = filters.source_file;
-  if (filters.tag_ids?.length) params.tag_ids = filters.tag_ids;
-  if (filters.disposition) params.disposition = filters.disposition;
+  applySharedCrmListGetCrmDataFilters(params, filters);
   params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
   return params;
 }
