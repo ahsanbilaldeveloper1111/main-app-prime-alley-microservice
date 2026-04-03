@@ -69,6 +69,7 @@ import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListA
 import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
 import { useCrmListContactFormHandlers } from "@crm/shared/useCrmListContactFormHandlers";
 import { useCrmListSharedCallbacks } from "@crm/shared/useCrmListSharedCallbacks";
+import { CrmListCreateContactSidebar } from "@crm/shared/CrmListCreateContactSidebar";
 import { useCrmQuotesListFiltersMetricsHistorySidebarState } from "@crm/billing-quotes/useCrmQuotesListFiltersMetricsHistorySidebarState";
 import { CrmListViewDataModal } from "@crm/shared/CrmListViewDataModal";
 import { CrmListUploadModal } from "@crm/shared/CrmListUploadModal";
@@ -917,54 +918,12 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
       sourceField: "source_file",
     });
 
-  // Render Create Contact Sidebar
-  const renderCreateContactSidebar = () => {
-    if (!showCreateContactSidebar) return null;
-  
-    const isFormValid =
-      contactForm.email?.trim() &&
-      contactForm.phoneNumber?.trim() &&
-      (contactForm.firstName?.trim() || contactForm.lastName?.trim()) &&
-      contactForm.campaign_id != null;
-  
-    return (
-      <ProspectEditSidebar
-        isOpen={showCreateContactSidebar}
-        title={editingContactId ? "Edit Prospect" : "Create Prospect"}
-        isEditing={!!editingContactId}
-        isFormValid={!!isFormValid}
-        createContactLoading={createContactLoading}
-        contactForm={contactForm}
-        setContactForm={setContactForm}
-        contactFormLoading={contactFormLoading}
-        contactFormLoadError={contactFormLoadError}
-        availableCampaigns={availableCampaigns}
-        extensions={extensions}
-        availableTags={availableTags}
-        parsePhoneNumberInput={parsePhoneNumberInput}
-        onClose={() => {
-          setShowCreateContactSidebar(false);
-          setEditingContactId(null);
-          setContactFormLoadError(null);
-          setContactFormLoading(false);
-        }}
-        onSubmitPrimary={() => {
-          if (editingContactId) {
-            handleUpdateContactSubmit();
-          } else {
-            handleCreateContactSubmit(false);
-          }
-        }}
-        onCreateAndAddAnother={
-          editingContactId
-            ? undefined
-            : () => {
-                handleCreateContactSubmit(true);
-              }
-        }
-      />
-    );
-  };
+  const closeCreateContactSidebar = useCallback(() => {
+    setShowCreateContactSidebar(false);
+    setEditingContactId(null);
+    setContactFormLoadError(null);
+    setContactFormLoading(false);
+  }, []);
 
   const prospectsToolbarConfig = useCrmToolbarConfig({
     entity: "prospects",
@@ -2325,7 +2284,22 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
         </Modal.Footer>
       </Modal>
       {/* Create Contact Sidebar */}
-      {renderCreateContactSidebar()}
+      <CrmListCreateContactSidebar
+        show={showCreateContactSidebar}
+        editingContactId={editingContactId}
+        contactForm={contactForm}
+        setContactForm={setContactForm}
+        createContactLoading={createContactLoading}
+        contactFormLoading={contactFormLoading}
+        contactFormLoadError={contactFormLoadError}
+        availableCampaigns={availableCampaigns}
+        extensions={extensions}
+        availableTags={availableTags}
+        entityLabel="Prospect"
+        onClose={closeCreateContactSidebar}
+        onCreateSubmit={handleCreateContactSubmit}
+        onUpdateSubmit={handleUpdateContactSubmit}
+      />
       {/* Create Quote Sidebar */}
       {showCreateQuoteSidebar && (
     <CreateQuoteSidebar

@@ -126,6 +126,14 @@ import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
 import { useCrmListFiltersMetricsHistoryState } from "@crm/shared/useCrmListFiltersMetricsHistoryState";
 import { useCrmListContactFormHandlers } from "@crm/shared/useCrmListContactFormHandlers";
 import { useCrmListSharedCallbacks } from "@crm/shared/useCrmListSharedCallbacks";
+import { CrmListCreateContactSidebar } from "@crm/shared/CrmListCreateContactSidebar";
+import { CrmListDataAssignmentFormContent } from "@crm/shared/CrmListDataAssignmentFormContent";
+import { CrmListAfterCallFormContent } from "@crm/shared/CrmListAfterCallFormContent";
+import {
+  CrmListScheduleCallFormContent,
+  CrmListUnscheduleModal,
+} from "@crm/shared/CrmListScheduleCallModals";
+import { CrmListHistoryFormContent } from "@crm/shared/CrmListHistoryFormContent";
 import {
   applyCrmListExportDateRangePreset,
   crmListExportDateRangePresetValue,
@@ -1691,54 +1699,12 @@ const CrmContactsManagement = () => {
       sourceField: "source_file",
     });
 
-  // Render Create Contact Sidebar
-  const renderCreateContactSidebar = () => {
-    if (!showCreateContactSidebar) return null;
-  
-    const isFormValid =
-      contactForm.email?.trim() &&
-      contactForm.phoneNumber?.trim() &&
-      (contactForm.firstName?.trim() || contactForm.lastName?.trim()) &&
-      contactForm.campaign_id != null;
-  
-    return (
-      <ContactEditSidebar
-        isOpen={showCreateContactSidebar}
-        title={editingContactId ? "Edit Contact" : "Create Contact"}
-        isEditing={!!editingContactId}
-        isFormValid={!!isFormValid}
-        createContactLoading={createContactLoading}
-        contactForm={contactForm}
-        setContactForm={setContactForm}
-        contactFormLoading={contactFormLoading}
-        contactFormLoadError={contactFormLoadError}
-        availableCampaigns={availableCampaigns}
-        extensions={extensions}
-        availableTags={availableTags}
-        parsePhoneNumberInput={parsePhoneNumberInput}
-        onClose={() => {
-          setShowCreateContactSidebar(false);
-          setEditingContactId(null);
-          setContactFormLoadError(null);
-          setContactFormLoading(false);
-        }}
-        onSubmitPrimary={() => {
-          if (editingContactId) {
-            handleUpdateContactSubmit();
-          } else {
-            handleCreateContactSubmit(false);
-          }
-        }}
-        onCreateAndAddAnother={
-          editingContactId
-            ? undefined
-            : () => {
-                handleCreateContactSubmit(true);
-              }
-        }
-      />
-    );
-  };
+  const closeCreateContactSidebar = useCallback(() => {
+    setShowCreateContactSidebar(false);
+    setEditingContactId(null);
+    setContactFormLoadError(null);
+    setContactFormLoading(false);
+  }, []);
 
   const contactsToolbarConfig = useCrmToolbarConfig({
     entity: "prospects",
@@ -3561,7 +3527,7 @@ const CrmContactsManagement = () => {
             }
           />
 
-          {/* Data Assignment Success Modal */}
+          {/* Data Assignment Modal */}
           <FormModal
             show={showDataAssignmentModal}
             onHide={handleDataAssignmentModalClose}
@@ -3569,311 +3535,22 @@ const CrmContactsManagement = () => {
             desc="Please fill the details below to smart contact distribution."
             size="lg"
             formHtml={
-              <>
-                <div className="mb-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <FiFilter className="me-2 text-primary" />
-                    <h6 className="mb-0">Step 1: Filter Your Contacts</h6>
-                  </div>
-                  <p className="text-muted small mb-3">
-                    Choose which contacts to assign by filtering by tags and
-                    campaigns.
-                  </p>
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Filter by Tags</Form.Label>
-                        <CreatableSelect
-                          isMulti
-                          value={assignmentFilters.selectedTags}
-                          onChange={(selected) =>
-                            setAssignmentFilters((prev) => ({
-                              ...prev,
-                              selectedTags: selected || [],
-                            }))
-                          }
-                          options={availableTags}
-                          placeholder="Select tags to filter contacts..."
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: "#ced4da",
-                              boxShadow: "none",
-                              fontSize: "14px",
-                            }),
-                          }}
-                        />
-                        <Form.Text className="text-muted">
-                          Only contacts with these tags will be considered for
-                          assignment.
-                        </Form.Text>
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Filter by Campaigns</Form.Label>
-                        <CreatableSelect
-                          isMulti
-                          value={assignmentFilters.selectedCampaigns}
-                          onChange={(selected) =>
-                            setAssignmentFilters((prev) => ({
-                              ...prev,
-                              selectedCampaigns: selected || [],
-                            }))
-                          }
-                          options={availableCampaigns}
-                          placeholder="Select campaigns to filter contacts..."
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: "#ced4da",
-                              boxShadow: "none",
-                              fontSize: "14px",
-                            }),
-                          }}
-                        />
-                        <Form.Text className="text-muted">
-                          Only contacts from these campaigns will be considered
-                          for assignment.
-                        </Form.Text>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                </div>
-
-                <div className="mb-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <FiDatabase className="me-2 text-info" />
-                    <h6 className="mb-0">Step 2: Review Available Contacts</h6>
-                  </div>
-                  <p className="text-muted small mb-3">
-                    Based on your filters, here's what's available for
-                    assignment.
-                  </p>
-
-
-                  <Row>
-                    <Col md={12} className="text-left">
-                      <PageSummaryGrid
-                        gridColumns={3}
-                        cardHeading="h5"
-                        gridTextAlign="center"
-                        cards={[
-                          {
-                            id: "total-entries",
-                            title: "Total Contacts",
-                            value: assignmentCounts?.total || 0,
-                            description: "Matching your filters",
-                          },
-                          {
-                            id: "assigned-entries",
-                            title: "Assigned Contacts",
-                            value: assignmentCounts?.assigned || 0,
-                            description: "In use by team members",
-                          },
-                          {
-                            id: "available-entries",
-                            title: "Available Contacts",
-                            value: assignmentCounts?.unassigned || 0,
-                            description: "Ready for assignment",
-                          },
-                        ]}
-                      />
-                    </Col>
-                  </Row>
-                </div>
-
-                <div className="mb-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <FiUsers className="me-2 text-success" />
-                    <h6 className="mb-0">Step 3: Configure Assignment</h6>
-                  </div>
-                  <p className="text-muted small mb-3">
-                    You have{" "}
-                    <strong>
-                      {assignmentCounts.unassigned.toLocaleString()}
-                    </strong>{" "}
-                    contacts ready for assignment out of{" "}
-                    <strong>{assignmentCounts.total.toLocaleString()}</strong>{" "}
-                    total matching contacts.
-                  </p>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Target Campaigns *</Form.Label>
-                    <CreatableSelect
-                      isMulti
-                      value={assignmentCampaign}
-                      onChange={(selected) =>
-                        setAssignmentCampaign(selected || [])
-                      }
-                      options={availableCampaigns}
-                      placeholder="Choose which campaigns to assign contacts to..."
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          borderColor: "#ced4da",
-                          boxShadow: "none",
-                          fontSize: "14px",
-                        }),
-                      }}
-                    />
-                    <Form.Text className="text-muted">
-                      <strong>Smart Distribution:</strong> Contacts will be
-                      automatically distributed among users in the selected
-                      campaigns based on their workload and availability.
-                    </Form.Text>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Assignment Quantity</Form.Label>
-                    <Form.Control
-                      type="number"
-                      min="0"
-                      max={assignmentCounts.unassigned}
-                      value={totalEntriesToAssign}
-                      onChange={(e) =>
-                        setTotalEntriesToAssign(parseInt(e.target.value) || 0)
-                      }
-                      placeholder="How many contacts to assign?"
-                    />
-                    <Form.Text className="text-muted">
-                      <strong>Maximum:</strong>{" "}
-                      {assignmentCounts.unassigned.toLocaleString()} contacts
-                      available. Start with a smaller batch to test the
-                      assignment process.
-                    </Form.Text>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Distribution Strategy</Form.Label>
-                    <div>
-                      <Form.Check
-                        type="radio"
-                        id="equal-distribution"
-                        name="assignmentDistribution"
-                        label="Auto-balance across campaigns"
-                        value="equal"
-                        checked={assignmentDistribution === "equal"}
-                        onChange={() => setAssignmentDistribution("equal")}
-                        className="mb-2"
-                      />
-                      <Form.Check
-                        type="radio"
-                        id="custom-distribution"
-                        name="assignmentDistribution"
-                        label="Custom allocation per campaign"
-                        value="custom"
-                        checked={assignmentDistribution === "custom"}
-                        onChange={() => setAssignmentDistribution("custom")}
-                      />
-                    </div>
-                    <Form.Text className="text-muted">
-                      <strong>Auto-balance:</strong> Contacts are distributed
-                      evenly. <strong>Custom:</strong> You specify exactly how
-                      many contacts each campaign gets.
-                    </Form.Text>
-                  </Form.Group>
-
-                  {assignmentDistribution === "custom" &&
-                    assignmentCampaign.length > 0 && (
-                      <Form.Group className="mb-3">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <Form.Label className="mb-0">
-                            Custom Distribution
-                          </Form.Label>
-                          <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            onClick={() => {
-                              const equalDistribution = Math.floor(
-                                totalEntriesToAssign /
-                                  assignmentCampaign.length,
-                              );
-                              const remainder =
-                                totalEntriesToAssign %
-                                assignmentCampaign.length;
-                              const newCustomDistribution: Record<
-                                string,
-                                number
-                              > = {};
-
-                              Array.from(assignmentCampaign).forEach(
-                                (campaign: any, index: number) => {
-                                  newCustomDistribution[campaign.value] =
-                                    equalDistribution +
-                                    (index < remainder ? 1 : 0);
-                                },
-                              );
-
-                              setCustomDistribution(newCustomDistribution);
-                            }}
-                          >
-                            Auto-fill Equal
-                          </Button>
-                        </div>
-                        <div className="border rounded p-3 bg-light">
-                          <p className="small text-muted mb-3">
-                            Total to assign:{" "}
-                            <strong>{totalEntriesToAssign}</strong> | Allocated:{" "}
-                            <strong>
-                              {Object.values(customDistribution).reduce(
-                                (sum, count) => sum + count,
-                                0,
-                              )}
-                            </strong>{" "}
-                            | Remaining:{" "}
-                            <strong>
-                              {totalEntriesToAssign -
-                                Object.values(customDistribution).reduce(
-                                  (sum, count) => sum + count,
-                                  0,
-                                )}
-                            </strong>
-                          </p>
-                          {Array.from(assignmentCampaign).map(
-                            (campaign: any) => (
-                              <div key={campaign.value} className="mb-2">
-                                <Row>
-                                  <Col md={6}>
-                                    <Form.Label className="small mb-0">
-                                      {campaign.label}
-                                    </Form.Label>
-                                  </Col>
-                                  <Col md={6}>
-                                    <Form.Control
-                                      type="number"
-                                      min="0"
-                                      max={totalEntriesToAssign}
-                                      value={
-                                        customDistribution[campaign.value] || 0
-                                      }
-                                      onChange={(e) =>
-                                        setCustomDistribution((prev) => ({
-                                          ...prev,
-                                          [campaign.value]:
-                                            parseInt(e.target.value) || 0,
-                                        }))
-                                      }
-                                      size="sm"
-                                    />
-                                  </Col>
-                                </Row>
-                              </div>
-                            ),
-                          )}
-                        </div>
-                      </Form.Group>
-                    )}
-
-                  <Alert variant="info" className="mt-3">
-                    <strong>Assignment Info:</strong> Contacts will be
-                    automatically assigned to users within the selected
-                    campaigns based on their campaign user extensions. The
-                    system will distribute contacts equally among users in each
-                    campaign.
-                  </Alert>
-                </div>
-              </>
+              <CrmListDataAssignmentFormContent
+                entityLabel="Contacts"
+                assignmentFilters={assignmentFilters}
+                setAssignmentFilters={setAssignmentFilters}
+                availableTags={availableTags}
+                availableCampaigns={availableCampaigns}
+                assignmentCounts={assignmentCounts}
+                assignmentCampaign={assignmentCampaign}
+                setAssignmentCampaign={setAssignmentCampaign}
+                totalEntriesToAssign={totalEntriesToAssign}
+                setTotalEntriesToAssign={setTotalEntriesToAssign}
+                assignmentDistribution={assignmentDistribution}
+                setAssignmentDistribution={setAssignmentDistribution}
+                customDistribution={customDistribution}
+                setCustomDistribution={setCustomDistribution}
+              />
             }
             submitButtonText="OK"
             cancelButtonText="Cancel"
@@ -3888,151 +3565,10 @@ const CrmContactsManagement = () => {
             desc="Please fill the details below to record call outcomes and schedule follow-up actions."
             size="lg"
             formHtml={
-              <>
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Disposition *</Form.Label>
-                      <Form.Select
-                        value={afterCallData.disposition}
-                        onChange={(e) =>
-                          setAfterCallData({
-                            ...afterCallData,
-                            disposition: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="">Select Disposition</option>
-                        <option value="interested">Interested</option>
-                        <option value="not_interested">Not Interested</option>
-                        <option value="callback_requested">
-                          Call Back Requested
-                        </option>
-                        <option value="follow_up">Follow Up</option>
-                        <option value="do_not_call">Do Not Call</option>
-                        <option value="wrong_number">Wrong Number</option>
-                        <option value="spam">Spam</option>
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Call Status *</Form.Label>
-                      <Form.Select
-                        value={afterCallData.callStatus}
-                        onChange={(e) =>
-                          setAfterCallData({
-                            ...afterCallData,
-                            callStatus: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="">Select Call Status</option>
-                        <option value="answered">Answered</option>
-                        <option value="no_answer">No Answer</option>
-                        <option value="busy">Busy</option>
-                        <option value="voicemail">Voicemail</option>
-                        <option value="disconnected">Disconnected</option>
-                        <option value="network_error">Network Error</option>
-                      </Form.Select>
-                    </Form.Group>
-                  </Col>
-                </Row>
-
-                <Form.Group className="mb-3">
-                  <Form.Label>Call Comment *</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={4}
-                    value={afterCallData.comment}
-                    onChange={(e) =>
-                      setAfterCallData({
-                        ...afterCallData,
-                        comment: e.target.value,
-                      })
-                    }
-                    placeholder="Enter call details, client response, and any important notes..."
-                  />
-                </Form.Group>
-
-                <Form.Group className="mb-3">
-                  <Form.Label>Generate Lead *</Form.Label>
-                  <div className="d-flex gap-4">
-                    <Form.Check
-                      type="radio"
-                      id="generate-lead-yes"
-                      name="generateLead"
-                      value="yes"
-                      checked={afterCallData.generateLead === "yes"}
-                      onChange={(e) =>
-                        setAfterCallData({
-                          ...afterCallData,
-                          generateLead: e.target.value,
-                        })
-                      }
-                      label="Yes, generate lead"
-                    />
-                    <Form.Check
-                      type="radio"
-                      id="generate-lead-no"
-                      name="generateLead"
-                      value="no"
-                      checked={afterCallData.generateLead === "no"}
-                      onChange={(e) =>
-                        setAfterCallData({
-                          ...afterCallData,
-                          generateLead: e.target.value,
-                        })
-                      }
-                      label="No, do not generate lead"
-                    />
-                  </div>
-                  <Form.Text className="text-muted">
-                    Select "Yes" if this call resulted in a qualified lead that
-                    should be created in the CRM system.
-                  </Form.Text>
-                </Form.Group>
-
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Schedule Next Call (Optional)</Form.Label>
-                      <Form.Control
-                        type="date"
-                        value={afterCallData.nextCallDate}
-                        onChange={(e) =>
-                          setAfterCallData({
-                            ...afterCallData,
-                            nextCallDate: e.target.value,
-                          })
-                        }
-                        min={moment().format("YYYY-MM-DD")}
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Time (Optional)</Form.Label>
-                      <Form.Control
-                        type="time"
-                        value={afterCallData.nextCallTime}
-                        onChange={(e) =>
-                          setAfterCallData({
-                            ...afterCallData,
-                            nextCallTime: e.target.value,
-                          })
-                        }
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-
-                <Alert variant="info">
-                  <strong>Note:</strong> This dialog will be used to record call
-                  outcomes and schedule follow-up actions. All fields marked
-                  with * are required.
-                </Alert>
-              </>
+              <CrmListAfterCallFormContent
+                afterCallData={afterCallData}
+                setAfterCallData={setAfterCallData}
+              />
             }
             submitButtonText="Save Call Data"
             cancelButtonText="Cancel"
@@ -4051,82 +3587,12 @@ const CrmContactsManagement = () => {
             }
             size="lg"
             formHtml={
-              <>
-                {selectedEntryForSchedule && (
-                  <div className="mb-3">
-                    <h6>Schedule Call For:</h6>
-                    <div className="bg-light p-3 rounded">
-                      <div>
-                        <strong>Name:</strong>{" "}
-                        {selectedEntryForSchedule.name || "N/A"}
-                      </div>
-                      <div>
-                        <strong>Phone:</strong>{" "}
-                        {selectedEntryForSchedule.phone || "N/A"}
-                      </div>
-                      <div>
-                        <strong>Email:</strong>{" "}
-                        {selectedEntryForSchedule?.data?.email || "N/A"}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Date *</Form.Label>
-                      <Form.Control
-                        type="date"
-                        value={scheduleData.date}
-                        onChange={(e) =>
-                          setScheduleData({
-                            ...scheduleData,
-                            date: e.target.value,
-                          })
-                        }
-                        min={moment().format("YYYY-MM-DD")}
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Time *</Form.Label>
-                      <Form.Control
-                        type="time"
-                        value={scheduleData.time}
-                        onChange={(e) =>
-                          setScheduleData({
-                            ...scheduleData,
-                            time: e.target.value,
-                          })
-                        }
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-
-                <Form.Group className="mb-3">
-                  <Form.Label>Notes (Optional)</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={3}
-                    value={scheduleData.notes}
-                    onChange={(e) =>
-                      setScheduleData({
-                        ...scheduleData,
-                        notes: e.target.value,
-                      })
-                    }
-                    placeholder="Add any notes or reminders for this call..."
-                  />
-                </Form.Group>
-
-                <Alert variant="info">
-                  <strong>Note:</strong> The call will be scheduled and you'll
-                  receive a reminder at the selected time.
-                </Alert>
-              </>
+              <CrmListScheduleCallFormContent
+                selectedEntry={selectedEntryForSchedule}
+                isEditing={isEditingSchedule}
+                scheduleData={scheduleData}
+                setScheduleData={setScheduleData}
+              />
             }
             submitButtonText={
               isEditingSchedule ? "Update Schedule" : "Schedule Call"
@@ -4137,70 +3603,15 @@ const CrmContactsManagement = () => {
           />
 
           {/* Unschedule Confirmation Modal */}
-          <Modal
+          <CrmListUnscheduleModal
             show={showUnscheduleModal}
             onHide={() => {
               setShowUnscheduleModal(false);
               setEntryToUnschedule(null);
             }}
-            centered
-          >
-            <Modal.Header closeButton className="border-bottom">
-              <Modal.Title>Confirm Unschedule</Modal.Title>
-            </Modal.Header>
-            <Modal.Body className="p-4">
-              <div className="text-center">
-                <AlertCircleIcon size={48} className="text-warning mb-3" />
-                <p className="mb-0">
-                  Are you sure you want to unschedule the call for{" "}
-                  <strong>
-                    {entryToUnschedule
-                      ? entryToUnschedule.name ||
-                        `contact #${entryToUnschedule.id}`
-                      : "this contact"}
-                  </strong>
-                  ?
-                </p>
-                <p className="text-muted small mb-3">
-                  This action cannot be undone.
-                </p>
-
-                {entryToUnschedule && entryToUnschedule.scheduled_call_at && (
-                  <div className="alert alert-warning mb-3 text-start">
-                    <strong>Contact:</strong>{" "}
-                    {entryToUnschedule.name || `#${entryToUnschedule.id}`}
-                    <br />
-                    <strong>Phone:</strong> {entryToUnschedule.phone || "N/A"}
-                    <br />
-                    <strong>Scheduled Date:</strong>{" "}
-                    {moment(entryToUnschedule.scheduled_call_at).format(
-                      "MMM DD, YYYY HH:mm",
-                    )}
-                    {entryToUnschedule.note && (
-                      <>
-                        <br />
-                        <strong>Note:</strong> {entryToUnschedule.note}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </Modal.Body>
-            <Modal.Footer className="border-top">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setShowUnscheduleModal(false);
-                  setEntryToUnschedule(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button variant="warning" onClick={confirmUnscheduleCall}>
-                Unschedule
-              </Button>
-            </Modal.Footer>
-          </Modal>
+            entryToUnschedule={entryToUnschedule}
+            onConfirm={confirmUnscheduleCall}
+          />
 
           <FormModal
             show={showHistoryModal}
@@ -4209,321 +3620,14 @@ const CrmContactsManagement = () => {
             desc="Please fill the details below to view the activity history."
             size="lg"
             formHtml={
-              <>
-                <div className="mb-4">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h5 className="mb-1">System Activity Log</h5>
-                      <p className="text-muted mb-0">
-                        Track all user activities including CSV uploads, data
-                        assignments, and campaign management.
-                      </p>
-                    </div>
-                    <div className="text-end">
-                      <Badge bg="info" className="me-2">
-                        {historyPagination.total} Total Activities
-                      </Badge>
-                      <Badge bg="secondary">
-                        Page {historyPagination.current_page} of{" "}
-                        {historyPagination.last_page}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {historyLoading ? (
-                  <div className="text-center py-5">
-                    <Spinner animation="border" variant="primary" />
-                    <p className="mt-3 text-muted">
-                      Loading activity history...
-                    </p>
-                  </div>
-                ) : historyData.length === 0 ? (
-                  <div className="text-center py-5">
-                    <FiClock size={48} className="text-muted mb-3" />
-                    <h6 className="text-muted">No Activity Found</h6>
-                    <p className="text-muted">
-                      No activities have been recorded yet.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="timeline ">
-                    {historyData.map((activity, index) => {
-                      const getActivityIcon = (action: string) => {
-                        switch (action) {
-                          case "upload":
-                            return (
-                              <FiUpload size={18} className="text-white" />
-                            );
-                          case "assign":
-                            return <FiUsers size={18} className="text-white" />;
-                          case "schedule_call":
-                          case "reschedule_call":
-                            return (
-                              <FiCalendar size={18} className="text-white" />
-                            );
-                          case "cancel_call":
-                          case "unschedule_call":
-                            return <FiX size={18} className="text-white" />;
-                          default:
-                            return <FiUser size={18} className="text-white" />;
-                        }
-                      };
-
-                      const getActivityColor = (action: string) => {
-                        switch (action) {
-                          case "upload":
-                            return "primary";
-                          case "assign":
-                            return "success";
-                          case "schedule_call":
-                          case "reschedule_call":
-                            return "info";
-                          case "cancel_call":
-                          case "unschedule_call":
-                            return "warning";
-                          default:
-                            return "secondary";
-                        }
-                      };
-
-                      const formatActivityDetails = (activity: any) => {
-                        const details = activity.details || {};
-                        switch (activity.action) {
-                          case "upload":
-                            const campaignNames =
-                              details.campaign_ids
-                                ?.map(
-                                  (id: number) =>
-                                    campaignsById[id] || `Campaign #${id}`,
-                                )
-                                .join(", ") || "No campaigns";
-                            const tags = details.tags?.join(", ") || "No tags";
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>
-                                    Uploaded {activity.total_records || 0}{" "}
-                                    contacts
-                                  </strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Campaigns:</strong> {campaignNames}
-                                  </div>
-                                  <div>
-                                    <strong>Tags:</strong> {tags}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          case "assign":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>
-                                    Assigned {activity.total_records || 0}{" "}
-                                    contacts
-                                  </strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <strong>To:</strong>{" "}
-                                  {getNameByExtension(
-                                    activity.user_extension_done_to,
-                                  ) || "Campaign team"}
-                                </div>
-                              </div>
-                            );
-                          case "schedule_call":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>Scheduled call</strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Phone:</strong>{" "}
-                                    {details.phone || "N/A"}
-                                  </div>
-                                  <div>
-                                    <strong>Time:</strong>{" "}
-                                    {moment(details.scheduled_call_at).format(
-                                      "MMM DD, YYYY HH:mm",
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          case "reschedule_call":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>Rescheduled call</strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Phone:</strong>{" "}
-                                    {details.phone || "N/A"}
-                                  </div>
-                                  <div>
-                                    <strong>From:</strong>{" "}
-                                    {moment(
-                                      details.old_scheduled_call_at,
-                                    ).format("MMM DD, HH:mm")}
-                                  </div>
-                                  <div>
-                                    <strong>To:</strong>{" "}
-                                    {moment(
-                                      details.new_scheduled_call_at,
-                                    ).format("MMM DD, HH:mm")}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          case "cancel_call":
-                          case "unschedule_call":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>Cancelled call</strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Phone:</strong>{" "}
-                                    {details.phone || "N/A"}
-                                  </div>
-                                  <div>
-                                    <strong>Was scheduled:</strong>{" "}
-                                    {moment(
-                                      details.cancelled_scheduled_call_at ||
-                                        details.unscheduled_call_at,
-                                    ).format("MMM DD, HH:mm")}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          default:
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>
-                                    {activity.action
-                                      ?.replace("_", " ")
-                                      .replace(/\b\w/g, (l: string) =>
-                                        l.toUpperCase(),
-                                      )}
-                                  </strong>
-                                </div>
-                                <div className="small text-muted">
-                                  {activity.details?.description ||
-                                    "No details available"}
-                                </div>
-                              </div>
-                            );
-                        }
-                      };
-
-                      return (
-                        <div key={activity.id} className="timeline-item mb-4 ">
-                          <div className="d-flex">
-                            <div className="timeline-marker me-3">
-                              <div
-                                className={`bg-${getActivityColor(
-                                  activity.action,
-                                )} rounded-circle d-flex align-items-center justify-content-center shadow-sm`}
-                                style={{ width: "36px", height: "36px" }}
-                              >
-                                {getActivityIcon(activity.action)}
-                              </div>
-                            </div>
-                            <div className="timeline-content flex-grow-1">
-                              <div className="card border-0 shadow-sm">
-                                <div className="card-body p-3">
-                                  <div className="d-flex justify-content-between align-items-start mb-2">
-                                    <div className="flex-grow-1">
-                                      <h6 className="mb-1 d-flex align-items-center">
-                                        <strong className="text-primary">
-                                          {getNameByExtension(
-                                            activity.user_extension_done_by,
-                                          ) || "System"}
-                                        </strong>
-                                        <Badge
-                                          bg={getActivityColor(activity.action)}
-                                          className="ms-2 small"
-                                        >
-                                          {activity.action
-                                            ?.replace("_", " ")
-                                            .replace(/\b\w/g, (l: string) =>
-                                              l.toUpperCase(),
-                                            )}
-                                        </Badge>
-                                      </h6>
-                                      <div className="text-muted">
-                                        {formatActivityDetails(activity)}
-                                      </div>
-                                    </div>
-                                    <div className="text-end">
-                                      <small className="text-muted">
-                                        {formatCrmPreviewDate(
-                                          activity.created_at,
-                                        )}
-                                      </small>
-                                      <br />
-                                      <small className="text-muted">
-                                        {moment(activity.created_at).format(
-                                          "HH:mm:ss",
-                                        )}
-                                      </small>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="timeline-line"></div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Pagination */}
-                {!historyLoading &&
-                  historyData.length > 0 &&
-                  historyPagination.last_page > 1 && (
-                    <div className="d-flex justify-content-center mt-4">
-                      <div className="btn-group" role="group">
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          disabled={historyPagination.current_page === 1}
-                          onClick={() =>
-                            fetchHistoryData(historyPagination.current_page - 1)
-                          }
-                        >
-                          Previous
-                        </Button>
-                        <Button variant="outline-secondary" size="sm" disabled>
-                          {historyPagination.current_page} /{" "}
-                          {historyPagination.last_page}
-                        </Button>
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          disabled={
-                            historyPagination.current_page ===
-                            historyPagination.last_page
-                          }
-                          onClick={() =>
-                            fetchHistoryData(historyPagination.current_page + 1)
-                          }
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-              </>
+              <CrmListHistoryFormContent
+                historyData={historyData}
+                historyLoading={historyLoading}
+                historyPagination={historyPagination}
+                fetchHistoryData={fetchHistoryData}
+                campaignsById={campaignsById}
+                getNameByExtension={getNameByExtension}
+              />
             }
             submitButtonText="Close"
             cancelButtonText="Cancel"
@@ -5205,7 +4309,22 @@ const CrmContactsManagement = () => {
         </Modal.Footer>
       </Modal>
       {/* Create Contact Sidebar */}
-      {renderCreateContactSidebar()}
+      <CrmListCreateContactSidebar
+        show={showCreateContactSidebar}
+        editingContactId={editingContactId}
+        contactForm={contactForm}
+        setContactForm={setContactForm}
+        createContactLoading={createContactLoading}
+        contactFormLoading={contactFormLoading}
+        contactFormLoadError={contactFormLoadError}
+        availableCampaigns={availableCampaigns}
+        extensions={extensions}
+        availableTags={availableTags}
+        entityLabel="Contact"
+        onClose={closeCreateContactSidebar}
+        onCreateSubmit={handleCreateContactSubmit}
+        onUpdateSubmit={handleUpdateContactSubmit}
+      />
     </React.Fragment>
   );
 };

@@ -18,6 +18,12 @@ export type CrmListContactFormHandlersDeps = {
   sourceField: "source" | "source_file";
 };
 
+function getSourceValue(form: CrmListContactFormState): string | undefined {
+  if ("source_file" in form) return form.source_file?.trim() || undefined;
+  if ("source" in form) return form.source?.trim() || undefined;
+  return undefined;
+}
+
 function buildContactPayloadFields(contactForm: CrmListContactFormState) {
   const name = [contactForm.firstName, contactForm.lastName]
     .filter(Boolean)
@@ -96,14 +102,14 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
           campaign_id: contactForm.campaign_id ?? null,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
           company_domain: contactForm.company_domain?.trim() || undefined,
-          source: contactForm.source_file?.trim() || undefined,
+          source: getSourceValue(contactForm),
           tag_ids: contactForm.tags?.length
             ? contactForm.tags.map((t) => t.id)
             : [],
           data: dataPayload,
         });
         fetchCrmData();
-        setContactForm(createEmptyCrmListContactFormState(sourceField));
+        setContactForm(createEmptyCrmListContactFormState(sourceField as any));
         if (!addAnother) {
           setShowCreateContactSidebar(false);
         }
@@ -138,7 +144,7 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
         phone: phoneForPayload,
         campaign_id: contactForm.campaign_id ?? null,
         company_domain: contactForm.company_domain?.trim() || undefined,
-        source: contactForm.source_file?.trim() || undefined,
+        source: getSourceValue(contactForm),
         scheduled_call_at: contactForm.scheduled_call_at || undefined,
         data: dataPayload,
         tag_ids: contactForm.tags?.length
