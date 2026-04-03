@@ -695,11 +695,9 @@ const BoardView: React.FC<BoardViewProps> = ({
     column: {
       display: 'flex',
       flexDirection: 'column' as const,
-      flexShrink: 0,
-      minWidth: '280px',
       maxHeight: '100%',
       overflow: 'hidden',
-      transition: 'width .15s ease',
+      transition: 'flex-basis .15s ease, min-width .15s ease',
       backgroundColor: '#ffffff'
     },
     addButton: {
@@ -947,8 +945,19 @@ const BoardView: React.FC<BoardViewProps> = ({
               key={status.id} 
               style={{
                 ...styles.column,
-                width: isCollapsed ? '46px' : '280px',
-                minWidth: isCollapsed ? '46px' : '280px',
+                ...(isCollapsed
+                  ? {
+                      flex: '0 0 46px',
+                      width: '46px',
+                      minWidth: '46px',
+                      maxWidth: '46px',
+                    }
+                  : {
+                      flex: '1 1 280px',
+                      minWidth: '280px',
+                      width: 'auto',
+                      maxWidth: 'none',
+                    }),
                 borderRight: isCollapsed ? '1px solid #e5e7eb' : 'none'
               }}
             >
