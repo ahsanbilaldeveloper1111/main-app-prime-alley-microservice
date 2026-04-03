@@ -10,7 +10,7 @@ import {
   type UserProfilePayload,
   type UserProfileAddress,
 } from "@utils/staffManagement";
-import { buildAddressesForUserProfilePayload } from "@pages/workforce/employeeAddressPayload";
+import { buildAddressesForUserProfilePayload } from "@utils/employeeAddressPayload";
 import { isOptionalWorkforcePhoneValid } from "@utils/workforcePhoneValidation";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import PhoneInput from "react-phone-number-input";
