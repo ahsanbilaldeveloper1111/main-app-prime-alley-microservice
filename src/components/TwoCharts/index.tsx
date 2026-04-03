@@ -378,15 +378,15 @@ function SeriesDot({ cx, cy, payload, dataKey, color }: LineDotProps & { dataKey
   return <circle cx={cx} cy={cy} r={3} fill={color} stroke={color} />;
 }
 
-function CallsDot(props: LineDotProps) {
+function CallsDot(props: Readonly<LineDotProps>) {
   return <SeriesDot {...props} dataKey="calls" color="#F4A57A" />;
 }
 
-function LeadsDot(props: LineDotProps) {
+function LeadsDot(props: Readonly<LineDotProps>) {
   return <SeriesDot {...props} dataKey="leads" color="#90CAF9" />;
 }
 
-function OrdersDot(props: LineDotProps) {
+function OrdersDot(props: Readonly<LineDotProps>) {
   return <SeriesDot {...props} dataKey="orders" color="#A5D6A7" />;
 }
 
