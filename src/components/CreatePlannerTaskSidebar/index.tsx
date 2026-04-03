@@ -807,6 +807,149 @@ function primarySubmitButtonLabel(isSubmitting: boolean, isEdit: boolean): strin
   return "Create";
 }
 
+function LimitedTaskEditBanner({ visible }: { readonly visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <p
+      className="text-muted small mb-3"
+      style={{ marginTop: -8, fontSize: 13 }}
+    >
+      <strong>Assignees</strong> and <strong>watchers</strong> cannot be changed for your
+      role; all other fields can be updated.
+    </p>
+  );
+}
+
+function PlannerSidebarLinkedRecordChipsStrip({
+  records,
+  onRemove,
+}: Readonly<{
+  records: LinkedRecord[];
+  onRemove: (id: number) => void;
+}>): React.ReactNode {
+  if (records.length === 0) return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        marginBottom: 8,
+      }}
+    >
+      {records.map((r) => (
+        <SelectedLinkedRecordChip key={r.id} record={r} onRemove={onRemove} />
+      ))}
+    </div>
+  );
+}
+
+function PlannerSidebarCreateAndOpenButton({
+  isEdit,
+  isSubmitting,
+  onCreateAndOpen,
+  onSubmit,
+}: Readonly<{
+  isEdit: boolean;
+  isSubmitting: boolean;
+  onCreateAndOpen?: (data: CreateTaskFormData) => void;
+  onSubmit: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}>): React.ReactNode {
+  if (isEdit || onCreateAndOpen == null) return null;
+  return (
+    <button
+      type="button"
+      onClick={onSubmit}
+      disabled={isSubmitting}
+      style={{
+        padding: "8px 20px",
+        fontSize: 14,
+        fontWeight: 600,
+        backgroundColor: "#4f46e5",
+        border: "none",
+        borderRadius: 4,
+        color: "#fff",
+        cursor: isSubmitting ? "not-allowed" : "pointer",
+      }}
+    >
+      {isSubmitting ? "Processing..." : "Create & open"}
+    </button>
+  );
+}
+
+function PlannerSidebarRecurringRunAtReadOnlyRow({
+  visible,
+  editTask,
+  groupClass,
+  labelStyle,
+}: Readonly<{
+  visible: boolean;
+  editTask: PlannerEditTask | undefined;
+  groupClass: string;
+  labelStyle: React.CSSProperties;
+}>): React.ReactNode {
+  if (!visible) return null;
+  return (
+    <Row>
+      <Col xs={12} md={6}>
+        <Form.Group className={groupClass}>
+          <Form.Label style={labelStyle}>
+            <Calendar
+              size={16}
+              className="me-2"
+              style={{ verticalAlign: "middle" }}
+            />
+            Last run at
+          </Form.Label>
+          <div
+            className="form-control py-2"
+            style={{
+              fontSize: "14px",
+              fontWeight: 300,
+              backgroundColor: "#f8fafc",
+              color: "#374151",
+              cursor: "default",
+            }}
+            aria-readonly="true"
+          >
+            {formatDateTimeForDisplay(
+              recurringScheduleField(editTask, "last_run_at"),
+            )}
+          </div>
+        </Form.Group>
+      </Col>
+      <Col xs={12} md={6}>
+        <Form.Group className={groupClass}>
+          <Form.Label style={labelStyle}>
+            <Calendar
+              size={16}
+              className="me-2"
+              style={{ verticalAlign: "middle" }}
+            />
+            Next run at
+          </Form.Label>
+          <div
+            className="form-control py-2"
+            style={{
+              fontSize: "14px",
+              fontWeight: 300,
+              backgroundColor: "#f8fafc",
+              color: "#374151",
+              cursor: "default",
+            }}
+            aria-readonly="true"
+          >
+            {formatDateTimeForDisplay(
+              recurringScheduleField(editTask, "next_run_at"),
+            )}
+          </div>
+        </Form.Group>
+      </Col>
+    </Row>
+  );
+}
+
 interface StatusSelectOptionsProps {
   formDataProjectId: number | null;
   loadingProjects: boolean;
@@ -2059,15 +2202,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
 
-            {isLimitedTaskEdit && (
-              <p
-                className="text-muted small mb-3"
-                style={{ marginTop: -8, fontSize: 13 }}
-              >
-                <strong>Assignees</strong> and <strong>watchers</strong> cannot be changed for your
-                role; all other fields can be updated.
-              </p>
-            )}
+            <LimitedTaskEditBanner visible={isLimitedTaskEdit} />
 
             <Row>
 
@@ -2161,25 +2296,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   <Form.Label style={labelStyle}>
                     Associate with records
                   </Form.Label>
-                  {selectedLinkedRecords.length > 0 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 8,
-                      }}
-                    >
-                      {selectedLinkedRecords.map((r) => (
-                        <SelectedLinkedRecordChip
-                          key={r.id}
-                          record={r}
-                          onRemove={removeLinkedRecordById}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  <PlannerSidebarLinkedRecordChipsStrip
+                    records={selectedLinkedRecords}
+                    onRemove={removeLinkedRecordById}
+                  />
                   <div style={{ marginBottom: 8 }}>
                     <Form.Control
                       type="text"
@@ -2727,64 +2847,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     style={{ fontSize: "14px" }}
                   />
                 </Form.Group>
-                {isEdit && (
-                  <Row>
-                    <Col xs={12} md={6}>
-                      <Form.Group className={groupClass}>
-                        <Form.Label style={labelStyle}>
-                          <Calendar
-                            size={16}
-                            className="me-2"
-                            style={{ verticalAlign: "middle" }}
-                          />
-                          Last run at
-                        </Form.Label>
-                        <div
-                          className="form-control py-2"
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: 300,
-                            backgroundColor: "#f8fafc",
-                            color: "#374151",
-                            cursor: "default",
-                          }}
-                          aria-readonly="true"
-                        >
-                          {formatDateTimeForDisplay(
-                            recurringScheduleField(editTask, "last_run_at"),
-                          )}
-                        </div>
-                      </Form.Group>
-                    </Col>
-                    <Col xs={12} md={6}>
-                      <Form.Group className={groupClass}>
-                        <Form.Label style={labelStyle}>
-                          <Calendar
-                            size={16}
-                            className="me-2"
-                            style={{ verticalAlign: "middle" }}
-                          />
-                          Next run at
-                        </Form.Label>
-                        <div
-                          className="form-control py-2"
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: 300,
-                            backgroundColor: "#f8fafc",
-                            color: "#374151",
-                            cursor: "default",
-                          }}
-                          aria-readonly="true"
-                        >
-                          {formatDateTimeForDisplay(
-                            recurringScheduleField(editTask, "next_run_at"),
-                          )}
-                        </div>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                )}
+                <PlannerSidebarRecurringRunAtReadOnlyRow
+                  visible={isEdit}
+                  editTask={editTask}
+                  groupClass={groupClass}
+                  labelStyle={labelStyle}
+                />
               </>
             )}
 
@@ -3029,27 +3097,15 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           >
             Cancel
           </button>
-          {onCreateAndOpen && !isEdit && (
-            <button
-              type="button"
-              onClick={(e) => {
-                submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
-              }}
-              disabled={isSubmitting}
-              style={{
-                padding: "8px 20px",
-                fontSize: 14,
-                fontWeight: 600,
-                backgroundColor: "#4f46e5",
-                border: "none",
-                borderRadius: 4,
-                color: "#fff",
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-              }}
-            >
-              {isSubmitting ? "Processing..." : "Create & open"}
-            </button>
-          )}
+          <PlannerSidebarCreateAndOpenButton
+            isEdit={isEdit}
+            isSubmitting={isSubmitting}
+            onCreateAndOpen={onCreateAndOpen}
+            onSubmit={(e) => {
+              if (onCreateAndOpen == null) return;
+              void submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
+            }}
+          />
           <button
             type="button"
             onClick={() => handleCreate()}
