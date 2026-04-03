@@ -1,5 +1,6 @@
 import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
@@ -48,6 +49,9 @@ export interface LeaveCalendarDay {
   employees: LeaveCalendarEmployee[];
 }
 
+/** Upload modal panel: explicit px cap so layout/containment cannot clamp to ~600px. */
+const DOCUMENT_UPLOAD_MODAL_MAX_WIDTH_PX = 960;
+
 const EmployeesDashboard = () => {
     const { mainAppUsers, companyIdentifier } = useMainAppLookups();
     const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
@@ -70,6 +74,11 @@ const EmployeesDashboard = () => {
     const [rangeEndDate, setRangeEndDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [showCalendar, setShowCalendar] = useState(false);
     const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+    const [documentUploadPortalReady, setDocumentUploadPortalReady] = useState(false);
+
+    useEffect(() => {
+      setDocumentUploadPortalReady(true);
+    }, []);
     const [leaveCalendarData, setLeaveCalendarData] = useState<LeaveCalendarDay[]>([]);
     const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
     const [departmentHeadcountData, setDepartmentHeadcountData] = useState<{ name: string; count: number }[]>([]);
@@ -783,10 +792,15 @@ const EmployeesDashboard = () => {
           open
           style={{
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            inset: 0,
+            width: '100vw',
+            maxWidth: '100vw',
+            height: '100vh',
+            maxHeight: '100vh',
+            margin: 0,
+            padding: 0,
+            border: 'none',
+            boxSizing: 'border-box',
             background: 'rgba(0, 0, 0, 0.5)',
             display: 'flex',
             alignItems: 'center',
@@ -915,33 +929,45 @@ const EmployeesDashboard = () => {
         onHide={() => setShowNewRequestModal(false)}
       />
 
-      {/* Document Upload Modal */}
-      {showDocumentUpload && (
-        <dialog
-          open
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 2000
-          }}>
-          <div
+      {/* Document Upload Modal — portaled to body to avoid parent/containment width caps */}
+      {documentUploadPortalReady &&
+        showDocumentUpload &&
+        createPortal(
+          <dialog
+            open
+            aria-labelledby="workforce-document-upload-title"
             style={{
-              background: '#FFFFFF',
-              borderRadius: '16px',
-              padding: '32px',
-              maxWidth: '600px',
-              width: '90%',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+              position: 'fixed',
+              inset: 0,
+              width: '100vw',
+              maxWidth: '100vw',
+              height: '100vh',
+              maxHeight: '100vh',
+              margin: 0,
+              padding: 0,
+              border: 'none',
+              boxSizing: 'border-box',
+              background: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2000
             }}>
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: '16px',
+                padding: '32px',
+                width: '92vw',
+                maxWidth: '600px',
+                flexShrink: 0,
+                boxSizing: 'border-box',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+              }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#111827', margin: 0 }}>Upload Document</h2>
+              <h2 id="workforce-document-upload-title" style={{ fontSize: '24px', fontWeight: '600', color: '#111827', margin: 0 }}>Upload Document</h2>
               <button 
                 onClick={() => setShowDocumentUpload(false)}
                 style={{
@@ -1001,8 +1027,9 @@ const EmployeesDashboard = () => {
               </div>
             </div>
           </div>
-        </dialog>
-      )}
+          </dialog>,
+          document.body
+        )}
     </div>
 
     </React.Fragment>

@@ -4,7 +4,14 @@ import Select from "@components/AppSelect";
 import { Plus, Trash2 } from "lucide-react";
 import { Country, State, City } from "country-state-city";
 import { toast } from "react-toastify";
-import { createUserProfile, getMainAppUsers, type UserProfilePayload, type UserProfileAddress } from "@utils/staffManagement";
+import {
+  createUserProfile,
+  getMainAppUsers,
+  type UserProfilePayload,
+  type UserProfileAddress,
+} from "@utils/staffManagement";
+import { buildAddressesForUserProfilePayload } from "@utils/employeeAddressPayload";
+import { isOptionalWorkforcePhoneValid } from "@utils/workforcePhoneValidation";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -103,6 +110,26 @@ const defaultForm: Partial<UserProfilePayload> = {
   phone: "",
   status: "active",
 };
+
+/** Mirrors submit rules: all required fields present (used for Create button + handleSubmit). */
+function validateAddEmployeeRequired(form: Partial<UserProfilePayload>): { ok: true } | { ok: false; message: string } {
+  if (!form.user_id?.toString().trim()) {
+    return { ok: false, message: "User ID is required" };
+  }
+  if (!form.department_id) {
+    return { ok: false, message: "Department is required" };
+  }
+  if (!form.employment_type?.toString().trim()) {
+    return { ok: false, message: "Employment type is required" };
+  }
+  if (!form.contract_type?.toString().trim()) {
+    return { ok: false, message: "Contract type is required" };
+  }
+  if (!form.designation?.toString().trim()) {
+    return { ok: false, message: "Designation is required" };
+  }
+  return { ok: true };
+}
 
 /** React list key only; use cryptographically strong randomness (not Math.random). */
 let addressUiIdFallbackSeq = 0;
@@ -239,30 +266,24 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     setAddresses((prev) => prev.map((addr) => (addr.uiId === addressId ? { ...addr, ...patch } : addr)));
   }, []);
 
+  const requiredValidation = useMemo(() => validateAddEmployeeRequired(form), [form]);
+  const phoneFieldValid = useMemo(() => isOptionalWorkforcePhoneValid(form.phone), [form.phone]);
+  const phoneShowInvalid = Boolean(form.phone?.toString().trim()) && !phoneFieldValid;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.user_id?.toString().trim()) {
-      toast.error("User ID is required");
+    const validation = validateAddEmployeeRequired(form);
+    if (!validation.ok) {
+      toast.error(validation.message);
       return;
     }
-    if (!form.department_id) {
-      toast.error("Department is required");
-      return;
-    }
-    if (!form.employment_type?.toString().trim()) {
-      toast.error("Employment type is required");
-      return;
-    }
-    if (!form.contract_type?.toString().trim()) {
-      toast.error("Contract type is required");
-      return;
-    }
-    if (!form.designation?.toString().trim()) {
-      toast.error("Designation is required");
+    if (!phoneFieldValid) {
+      toast.error("Enter a valid phone number or clear the field.");
       return;
     }
     setSubmitting(true);
     try {
+      const addressesPayload = buildAddressesForUserProfilePayload(addresses ?? []);
       await createUserProfile({
         tenant_id: tenantId?.trim() || undefined,
         user_id: String(form.user_id).trim(),
@@ -276,13 +297,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
         contract_type: form.contract_type?.toString().trim() || null,
         phone: form.phone?.toString().trim() || null,
         status: form.status?.toString().trim() || null,
-        addresses: (addresses ?? []).map(({ name, zip_code, city, country, address }) => ({
-          name,
-          zip_code,
-          city,
-          country,
-          address,
-        })),
+        ...(addressesPayload ? { addresses: addressesPayload } : {}),
       });
       toast.success("Employee created");
       resetFormState();
@@ -415,11 +430,15 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                   setForm((f) => ({ ...f, phone: value && value.trim() !== "" ? value : "" }))
                 }
                 placeholder="Enter phone number"
+                className={phoneShowInvalid ? "is-invalid" : undefined}
               />
             </div>
             <Form.Text className="text-muted">
-              Select country (e.g. +92) then enter the phone number.
+              Select country (e.g. +92) then enter a complete phone number.
             </Form.Text>
+            {phoneShowInvalid && (
+              <Form.Text className="text-danger d-block">Enter a valid phone number for the selected country.</Form.Text>
+            )}
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>Status</Form.Label>
@@ -592,7 +611,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           <Button variant="secondary" onClick={handleCancelClick} type="button">
             Cancel
           </Button>
-          <Button variant="primary" type="submit" disabled={submitting}>
+          <Button variant="primary" type="submit" disabled={submitting || !requiredValidation.ok || !phoneFieldValid}>
             {submitting ? "Creating…" : "Create"}
           </Button>
         </Modal.Footer>
