@@ -39,6 +39,22 @@ interface CreateCompanySidebarProps {
   onSave?: (data: CompanyFormPayload, editingId?: number) => Promise<void>;
 }
 
+interface CountryOption {
+  value: string;
+  label: string;
+  isoCode: string;
+}
+
+interface StateOption {
+  value: string;
+  label: string;
+}
+
+interface CityOption {
+  value: string;
+  label: string;
+}
+
 // ─── Company Data Mapping ─────────────────────────────────────────────────────
 const companyDataMapping: Record<string, Partial<typeof initialCompanyForm>> = {
   'American Broadcasting': {
@@ -217,6 +233,21 @@ const getCities = (countryCode: string, stateCode: string) => {
   }));
 };
 
+const CountrySelectOptionLabel: React.FC<{ option: CountryOption }> = ({ option }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+    <img
+      src={getCountryFlagUrl(option.isoCode)}
+      alt={option.label}
+      style={{ width: '20px', height: '15px' }}
+    />
+    <span>{option.label}</span>
+  </div>
+);
+
+const renderCountryOptionLabel = (option: CountryOption) => (
+  <CountrySelectOptionLabel option={option} />
+);
+
 // ─── Main Sidebar Component ───────────────────────────────────────────────────
 export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
   onClose,
@@ -225,22 +256,33 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
   onSave,
 }) => {
   const [companyForm, setCompanyForm] = useState(initialCompanyForm);
+  const isEditMode = editingId !== null && editingId !== undefined;
   
   // Location state for country/state/city dropdowns
-  const [selectedCountry, setSelectedCountry] = useState<{
-    value: string;
-    label: string;
-    isoCode: string;
-  } | null>(null);
-  const [selectedState, setSelectedState] = useState<{
-    value: string;
-    label: string;
-  } | null>(null);
-  const [selectedCity, setSelectedCity] = useState<{
-    value: string;
-    label: string;
-  } | null>(null);
+  const [selectedCountry, setSelectedCountry] = useState<CountryOption | null>(null);
+  const [selectedState, setSelectedState] = useState<StateOption | null>(null);
+  const [selectedCity, setSelectedCity] = useState<CityOption | null>(null);
   const locationInitialized = useRef(false);
+
+  const findCountryOptionByName = (countryName: string): CountryOption | null => {
+    const country = Country.getAllCountries().find((c: { name: string }) => c.name === countryName);
+    if (!country) return null;
+    return {
+      value: country.isoCode,
+      label: country.name,
+      isoCode: country.isoCode,
+    };
+  };
+
+  const findStateOptionByName = (countryCode: string, stateName: string): StateOption | null => {
+    const state = getStates(countryCode).find((s: StateOption) => s.label === stateName);
+    return state ?? null;
+  };
+
+  const findCityOptionByName = (countryCode: string, stateCode: string, cityName: string): CityOption | null => {
+    const city = getCities(countryCode, stateCode).find((c: CityOption) => c.label === cityName);
+    return city ?? null;
+  };
 
   const set = (key: keyof typeof initialCompanyForm) => (val: string) =>
     setCompanyForm((prev) => ({ ...prev, [key]: val }));
@@ -283,39 +325,25 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
 
   // Initialize location from form data when country is set
   useEffect(() => {
-    if (
-      companyForm.country &&
-      !selectedCountry &&
-      !locationInitialized.current
-    ) {
-      const country = Country.getAllCountries().find(
-        (c: { name: string }) => c.name === companyForm.country
-      );
-      if (country) {
-        setSelectedCountry({
-          value: country.isoCode,
-          label: country.name,
-          isoCode: country.isoCode,
-        });
-        locationInitialized.current = true;
+    if (!companyForm.country || selectedCountry || locationInitialized.current) return;
 
-        if (companyForm.stateRegion && !selectedState) {
-          const states = getStates(country.isoCode);
-          const state = states.find((s) => s.label === companyForm.stateRegion);
-          if (state) {
-            setSelectedState(state);
+    const countryOption = findCountryOptionByName(companyForm.country);
+    if (!countryOption) return;
 
-            if (companyForm.city && !selectedCity) {
-              const cities = getCities(country.isoCode, state.value);
-              const city = cities.find((c) => c.label === companyForm.city);
-              if (city) {
-                setSelectedCity(city);
-              }
-            }
-          }
-        }
-      }
-    }
+    setSelectedCountry(countryOption);
+    locationInitialized.current = true;
+
+    if (!companyForm.stateRegion || selectedState) return;
+    const stateOption = findStateOptionByName(countryOption.isoCode, companyForm.stateRegion);
+    if (!stateOption) return;
+
+    setSelectedState(stateOption);
+
+    if (!companyForm.city || selectedCity) return;
+    const cityOption = findCityOptionByName(countryOption.isoCode, stateOption.value, companyForm.city);
+    if (!cityOption) return;
+
+    setSelectedCity(cityOption);
   }, [
     companyForm.country,
     companyForm.stateRegion,
@@ -339,15 +367,8 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
       phone: initialData.phone ?? '',
     }));
     if (initialData.country) {
-      const country = Country.getAllCountries().find(
-        (c: { name: string }) => c.name === initialData!.country
-      );
-      if (country)
-        setSelectedCountry({
-          value: country.isoCode,
-          label: country.name,
-          isoCode: country.isoCode,
-        });
+      const countryOption = findCountryOptionByName(initialData.country);
+      if (countryOption) setSelectedCountry(countryOption);
     }
   }, [initialData]);
 
@@ -403,13 +424,20 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
   return (
     <>
       {/* Overlay */}
-      <div
+      <button
+        type="button"
+        aria-label="Close create company sidebar"
         onClick={onClose}
         style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
           zIndex: 1000,
           background: 'transparent',
+          border: 'none',
+          padding: 0,
+          margin: 0,
+          width: '100%',
+          cursor: 'default',
         }}
       />
 
@@ -418,7 +446,8 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
         style={{
           position: 'fixed',
           top: 0, right: 0,
-          width: '600px',
+          width: 'min(600px, 100vw)',
+          maxWidth: '100vw',
           height: '100vh',
           backgroundColor: '#ffffff',
           boxShadow: '-2px 0 8px rgba(0,0,0,0.1)',
@@ -430,7 +459,7 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
         {/* ── Header ── */}
         <div
           style={{
-            padding: '20px 24px',
+            padding: '20px clamp(16px, 4vw, 24px)',
             borderBottom: '1px solid #eaf0f6',
             display: 'flex',
             alignItems: 'center',
@@ -438,7 +467,7 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
           }}
         >
           <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#141414', margin: 0 }}>
-            {editingId != null ? 'Edit Company' : 'Create Company'}
+            {isEditMode ? 'Edit Company' : 'Create Company'}
           </h2>
           <button
             onClick={onClose}
@@ -452,7 +481,7 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
         </div>
 
         {/* ── Scrollable Content ── */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px 40px 40px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px clamp(16px, 6vw, 40px) 40px' }}>
 
           {/* Edit this form link */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
@@ -575,16 +604,7 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
                   alignItems: 'center',
                 }),
               }}
-              formatOptionLabel={(option: any) => (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <img
-                    src={getCountryFlagUrl(option.isoCode)}
-                    alt={option.label}
-                    style={{ width: '20px', height: '15px' }}
-                  />
-                  <span>{option.label}</span>
-                </div>
-              )}
+              formatOptionLabel={renderCountryOptionLabel}
             />
           </div>
 
@@ -725,11 +745,12 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
         {/* ── Footer ── */}
         <div
           style={{
-            padding: '16px 24px',
+            padding: '16px clamp(16px, 4vw, 24px)',
             borderTop: '1px solid #eaf0f6',
             display: 'flex',
             gap: '12px',
             justifyContent: 'flex-start',
+            flexWrap: 'wrap',
           }}
         >
           <button
@@ -748,10 +769,10 @@ export const CreateCompanySidebar: React.FC<CreateCompanySidebarProps> = ({
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#2d2d2d'; }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#141414'; }}
           >
-            {editingId != null ? 'Save' : 'Create'}
+            {isEditMode ? 'Save' : 'Create'}
           </button>
 
-          {editingId == null && (
+          {!isEditMode && (
             <button
               type="button"
               onClick={handleCreateAnother}
@@ -821,17 +842,3 @@ const renderCreateCompany = (
 
 export default renderCreateCompany;
 
-/**
- * Usage:
- *
- * import renderCreateCompany, { CreateCompanySidebar } from './renderCreateCompany';
- *
- * // Option 1 — helper function (matches renderCreateContact pattern):
- * const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
- * {renderCreateCompany(showCreateCompanySidebar, setShowCreateCompanySidebar)}
- *
- * // Option 2 — component directly:
- * {showCreateCompanySidebar && (
- *   <CreateCompanySidebar onClose={() => setShowCreateCompanySidebar(false)} />
- * )}
- */

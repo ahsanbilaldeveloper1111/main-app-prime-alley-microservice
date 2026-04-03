@@ -77,25 +77,26 @@ function getWeeklyData() {
     const key = startOfWeek.getTime();
     const existing = groups.get(key);
     const dateLabel = `${startOfWeek.getDate()} ${startOfWeek.toLocaleString("en", { month: "short" })}`;
-    if (!existing) {
-      groups.set(key, {
-        date: dateLabel,
-        dateObj: startOfWeek,
-        calls: row.calls,
-        callsGoal: row.callsGoal,
-        leads: row.leads,
-        leadsGoal: row.leadsGoal,
-        orders: row.orders,
-        ordersGoal: row.ordersGoal,
-      });
-    } else {
+    if (existing) {
       existing.calls += row.calls;
       existing.callsGoal += row.callsGoal;
       existing.leads += row.leads;
       existing.leadsGoal += row.leadsGoal;
       existing.orders += row.orders;
       existing.ordersGoal += row.ordersGoal;
+      return;
     }
+
+    groups.set(key, {
+      date: dateLabel,
+      dateObj: startOfWeek,
+      calls: row.calls,
+      callsGoal: row.callsGoal,
+      leads: row.leads,
+      leadsGoal: row.leadsGoal,
+      orders: row.orders,
+      ordersGoal: row.ordersGoal,
+    });
   });
   return Array.from(groups.values())
     .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
@@ -113,25 +114,26 @@ function getMonthlyData() {
     const key = `${d.getFullYear()}-${d.getMonth()}`;
     const dateLabel = `${d.toLocaleString("en", { month: "short" })} ${d.getFullYear()}`;
     const existing = groups.get(key);
-    if (!existing) {
-      groups.set(key, {
-        date: dateLabel,
-        dateObj: new Date(d.getFullYear(), d.getMonth(), 1),
-        calls: row.calls,
-        callsGoal: row.callsGoal,
-        leads: row.leads,
-        leadsGoal: row.leadsGoal,
-        orders: row.orders,
-        ordersGoal: row.ordersGoal,
-      });
-    } else {
+    if (existing) {
       existing.calls += row.calls;
       existing.callsGoal += row.callsGoal;
       existing.leads += row.leads;
       existing.leadsGoal += row.leadsGoal;
       existing.orders += row.orders;
       existing.ordersGoal += row.ordersGoal;
+      return;
     }
+
+    groups.set(key, {
+      date: dateLabel,
+      dateObj: new Date(d.getFullYear(), d.getMonth(), 1),
+      calls: row.calls,
+      callsGoal: row.callsGoal,
+      leads: row.leads,
+      leadsGoal: row.leadsGoal,
+      orders: row.orders,
+      ordersGoal: row.ordersGoal,
+    });
   });
   return Array.from(groups.values())
     .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
@@ -187,7 +189,7 @@ function PillBadge({
 // ─── Custom tooltip for leaderboard ──────────────────────────────────────────
 
 const LeaderboardTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
+  if (active && payload?.length) {
     return (
       <div
         style={{
@@ -216,7 +218,7 @@ const LeaderboardTooltip = ({ active, payload, label }: any) => {
 // ─── Custom tooltip for calls ─────────────────────────────────────────────────
 
 const CallsTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
+  if (active && payload?.length) {
     return (
       <div
         style={{
@@ -363,6 +365,30 @@ const renderLegendDot = (color: string, filled: boolean) => (
     }}
   />
 );
+
+type LineDotProps = {
+  cx?: number;
+  cy?: number;
+  payload?: Record<string, number>;
+};
+
+function SeriesDot({ cx, cy, payload, dataKey, color }: LineDotProps & { dataKey: string; color: string }) {
+  const value = payload?.[dataKey];
+  if (!cx || !cy || !value) return <g />;
+  return <circle cx={cx} cy={cy} r={3} fill={color} stroke={color} />;
+}
+
+function CallsDot(props: LineDotProps) {
+  return <SeriesDot {...props} dataKey="calls" color="#F4A57A" />;
+}
+
+function LeadsDot(props: LineDotProps) {
+  return <SeriesDot {...props} dataKey="leads" color="#90CAF9" />;
+}
+
+function OrdersDot(props: LineDotProps) {
+  return <SeriesDot {...props} dataKey="orders" color="#A5D6A7" />;
+}
 
 // ─── Calls vs Goal Chart ──────────────────────────────────────────────────────
 
@@ -518,20 +544,7 @@ function CallsVsGoal({ scale }: Readonly<{ scale: number }>) {
             stroke="#F4A57A"
             strokeWidth={1.5}
             hide={!visible.calls}
-            dot={(props: any) => {
-              const { cx, cy, payload } = props;
-              if (payload.calls === 0) return <g key={props.key} />;
-              return (
-                <circle
-                  key={props.key}
-                  cx={cx}
-                  cy={cy}
-                  r={3}
-                  fill="#F4A57A"
-                  stroke="#F4A57A"
-                />
-              );
-            }}
+            dot={<CallsDot />}
             name="Calls"
           />
           {/* Target: Calls (dashed) */}
@@ -552,20 +565,7 @@ function CallsVsGoal({ scale }: Readonly<{ scale: number }>) {
             stroke="#90CAF9"
             strokeWidth={1.5}
             hide={!visible.leads}
-            dot={(props: any) => {
-              const { cx, cy, payload } = props;
-              if (payload.leads === 0) return <g key={props.key} />;
-              return (
-                <circle
-                  key={props.key}
-                  cx={cx}
-                  cy={cy}
-                  r={3}
-                  fill="#90CAF9"
-                  stroke="#90CAF9"
-                />
-              );
-            }}
+            dot={<LeadsDot />}
             name="Leads"
           />
           {/* Target: Leads (dashed) */}
@@ -586,20 +586,7 @@ function CallsVsGoal({ scale }: Readonly<{ scale: number }>) {
             stroke="#A5D6A7"
             strokeWidth={1.5}
             hide={!visible.orders}
-            dot={(props: any) => {
-              const { cx, cy, payload } = props;
-              if (payload.orders === 0) return <g key={props.key} />;
-              return (
-                <circle
-                  key={props.key}
-                  cx={cx}
-                  cy={cy}
-                  r={3}
-                  fill="#A5D6A7"
-                  stroke="#A5D6A7"
-                />
-              );
-            }}
+            dot={<OrdersDot />}
             name="Orders"
           />
           {/* Target: Orders (dashed) */}
@@ -622,10 +609,20 @@ function CallsVsGoal({ scale }: Readonly<{ scale: number }>) {
 // ─── Combined Export ──────────────────────────────────────────────────────────
 
 export default function ChartsRow({ scale = 1 }: Readonly<{ scale?: number }>) {
+  const [isCompact, setIsCompact] = React.useState(false);
+
+  React.useEffect(() => {
+    const updateLayout = () => setIsCompact(window.innerWidth < 1100);
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, []);
+
   return (
     <div
       style={{
         display: "flex",
+        flexDirection: isCompact ? "column" : "row",
         gap: "6px",
         width: "100%",
         fontFamily: FONT,
