@@ -791,7 +791,7 @@ const TaskDetailPage = () => {
   const [loadingAllActivities, setLoadingAllActivities] = useState(false);
   const documentInputRef = useRef<HTMLInputElement>(null);
 
-  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.WORK_PLANNER);
 
   const sidebarProjectFromTask = useMemo(() => {
     const p = task?.project;
@@ -805,10 +805,6 @@ const TaskDetailPage = () => {
       labels: Array.isArray(p.labels) ? p.labels : undefined,
     };
   }, [task?.project]);
-
-  const editSidebarTaskType = task
-    ? plannerTaskTypeFromTask(task as Record<string, unknown>)
-    : 'regular';
 
   const { data: session } = useSession();
   const sessionUserPhoneOrExtension = useMemo(
@@ -1462,7 +1458,6 @@ const TaskDetailPage = () => {
         }
         task={task ? { ...task, rawData: task } : undefined}
         isEdit={Boolean(showEditModal && task)}
-        taskType={editSidebarTaskType}
         lockProjectSelection={false}
       />
 

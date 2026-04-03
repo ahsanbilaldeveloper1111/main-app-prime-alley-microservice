@@ -39,6 +39,12 @@ const TASK_TYPE_SELECT_LABELS: Record<PlannerTaskType, string> = {
 
 const ALL_PLANNER_TASK_TYPES: PlannerTaskType[] = ["todo", "regular", "recurring"];
 
+const TASK_TITLE_MAX_LENGTH = 150;
+
+function clampTaskTitleLength(value: string): string {
+  return value.slice(0, TASK_TITLE_MAX_LENGTH);
+}
+
 function normalizeTaskTypeOptions(
   choices: readonly PlannerTaskType[] | undefined,
 ): PlannerTaskType[] {
@@ -59,6 +65,17 @@ function clampTaskTypeToAllowed(
   if (allowed.includes(current)) return current;
   if (allowed.includes("regular")) return "regular";
   return allowed[0];
+}
+
+/** Create flow: no type chosen yet (shows “Select type” in the dropdown). */
+type PlannerTaskTypeOrUnset = PlannerTaskType | "";
+
+function taskTypeSelectHtmlValue(
+  current: PlannerTaskTypeOrUnset,
+  allowed: readonly PlannerTaskType[],
+): string {
+  if (current === "") return "";
+  return clampTaskTypeToAllowed(current, allowed);
 }
 
 /** Task / parent ids as returned by the planner API (numeric or string). */
@@ -84,7 +101,6 @@ interface CreateTaskSidebarProps {
   task?: PlannerEditTask;
   isEdit?: boolean;
   selectedStatusForTask?: number | null;
-  taskType?: PlannerTaskType;
   taskTypeChoices?: readonly PlannerTaskType[];
   /** When true (e.g. project details / board), the project dropdown is disabled — task stays on the current project. */
   lockProjectSelection?: boolean;
@@ -195,7 +211,7 @@ interface TaskListRow {
 interface CreateTaskFormData {
   title: string;
   description: string;
-  taskType: PlannerTaskType;
+  taskType: PlannerTaskTypeOrUnset;
   projectId: number | null;
   statusId: number | null;
   priorityId: number | null;
@@ -623,7 +639,7 @@ function buildInitialFormFromEdit(
   const startDateRaw =
     (pickRecurringScalar(editTask, "start_date") as string | undefined) ?? editTask.start_date;
   return {
-    title: editTask.title || "",
+    title: clampTaskTitleLength(String(editTask.title ?? "")),
     description: editTask.description || "",
     taskType: taskTypeVal,
     projectId: projectIdRaw ? Number(projectIdRaw) : null,
@@ -646,7 +662,7 @@ function buildInitialFormFromEdit(
 }
 
 function buildInitialFormForCreate(
-  taskType: PlannerTaskType,
+  taskType: PlannerTaskTypeOrUnset,
   propProject: Project | undefined,
   propStatuses: Status[],
   selectedStatusForTask: number | null,
@@ -671,6 +687,24 @@ function buildInitialFormForCreate(
   };
 }
 
+function computeFrequencyChangeState(
+  prev: Pick<CreateTaskFormData, "frequency" | "repeatOn">,
+  nextFreq: string,
+): Pick<CreateTaskFormData, "frequency" | "repeatOn"> {
+  let nextRepeatOn: string;
+  if (nextFreq === "weekly") {
+    const normalized = normalizeWeeklyRepeatOnFromApi(prev.repeatOn);
+    nextRepeatOn = normalized || "monday";
+  } else if (nextFreq === "monthly") {
+    nextRepeatOn = /^\d+$/.test(prev.repeatOn.trim())
+      ? prev.repeatOn.trim()
+      : "1";
+  } else {
+    nextRepeatOn = "";
+  }
+  return { frequency: nextFreq, repeatOn: nextRepeatOn };
+}
+
 function resolveSidebarProjects(fetchedProjects: Project[], propProject: Project | undefined): Project[] {
   if (fetchedProjects.length > 0) {
     return fetchedProjects;
@@ -681,7 +715,76 @@ function resolveSidebarProjects(fetchedProjects: Project[], propProject: Project
   return [];
 }
 
-function getSidebarTitle(taskType: PlannerTaskType, isEdit: boolean): string {
+function resolveSidebarStatusesForProject(
+  projectId: number | null,
+  fetchedProjects: Project[],
+  genericStatuses: Status[],
+  fallbackPropStatuses: Status[],
+): Status[] {
+  if (projectId) {
+    const selectedProject = fetchedProjects.find((p) => p.id === projectId);
+    if (selectedProject?.statuses && Array.isArray(selectedProject.statuses)) {
+      return selectedProject.statuses.map((status) => ({
+        id: status.id,
+        name: status.name,
+        icon: "",
+        color: status.color || "#3b82f6",
+      }));
+    }
+    return [];
+  }
+  if (genericStatuses.length > 0) {
+    return genericStatuses;
+  }
+  return fallbackPropStatuses;
+}
+
+function resolveSidebarLabelsForProject(
+  projectId: number | null,
+  fetchedProjects: Project[],
+  fallbackPropLabels: Label[],
+): Label[] {
+  if (!projectId) {
+    return fallbackPropLabels;
+  }
+  const selectedProject = fetchedProjects.find((p) => p.id === projectId);
+  if (selectedProject?.labels && Array.isArray(selectedProject.labels)) {
+    return selectedProject.labels.map((label) => ({
+      id: label.id,
+      name: label.name,
+      color: label.color || "#3b82f6",
+      description: label.description || "",
+    }));
+  }
+  return fallbackPropLabels;
+}
+
+/** Normalizes `listStatuses()` responses (array or `{ data: [] }`) into sidebar `Status` rows. */
+function mapListStatusesResponseToSidebarStatuses(response: unknown): Status[] {
+  if (response && Array.isArray(response)) {
+    return response.map((status: Status) => ({
+      id: status.id,
+      name: status.name,
+      icon: "",
+      color: status.color || "#3b82f6",
+    }));
+  }
+  const withData = response as { data?: unknown } | null | undefined;
+  if (withData?.data && Array.isArray(withData.data)) {
+    return (withData.data as Status[]).map((status: Status) => ({
+      id: status.id,
+      name: status.name,
+      icon: "",
+      color: status.color || "#3b82f6",
+    }));
+  }
+  return [];
+}
+
+function getSidebarTitle(taskType: PlannerTaskTypeOrUnset, isEdit: boolean): string {
+  if (taskType === "") {
+    return isEdit ? "Edit Task" : "Create Task";
+  }
   if (taskType === "todo") {
     return isEdit ? "Edit Todo" : "Create Todo";
   }
@@ -702,6 +805,149 @@ function primarySubmitButtonLabel(isSubmitting: boolean, isEdit: boolean): strin
   if (isSubmitting) return "Processing...";
   if (isEdit) return "Update";
   return "Create";
+}
+
+function LimitedTaskEditBanner({ visible }: { readonly visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <p
+      className="text-muted small mb-3"
+      style={{ marginTop: -8, fontSize: 13 }}
+    >
+      <strong>Assignees</strong> and <strong>watchers</strong> cannot be changed for your
+      role; all other fields can be updated.
+    </p>
+  );
+}
+
+function PlannerSidebarLinkedRecordChipsStrip({
+  records,
+  onRemove,
+}: Readonly<{
+  records: LinkedRecord[];
+  onRemove: (id: number) => void;
+}>): React.ReactNode {
+  if (records.length === 0) return null;
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+        marginBottom: 8,
+      }}
+    >
+      {records.map((r) => (
+        <SelectedLinkedRecordChip key={r.id} record={r} onRemove={onRemove} />
+      ))}
+    </div>
+  );
+}
+
+function PlannerSidebarCreateAndOpenButton({
+  isEdit,
+  isSubmitting,
+  onCreateAndOpen,
+  onSubmit,
+}: Readonly<{
+  isEdit: boolean;
+  isSubmitting: boolean;
+  onCreateAndOpen?: (data: CreateTaskFormData) => void;
+  onSubmit: (e: React.MouseEvent<HTMLButtonElement>) => void;
+}>): React.ReactNode {
+  if (isEdit || onCreateAndOpen == null) return null;
+  return (
+    <button
+      type="button"
+      onClick={onSubmit}
+      disabled={isSubmitting}
+      style={{
+        padding: "8px 20px",
+        fontSize: 14,
+        fontWeight: 600,
+        backgroundColor: "#4f46e5",
+        border: "none",
+        borderRadius: 4,
+        color: "#fff",
+        cursor: isSubmitting ? "not-allowed" : "pointer",
+      }}
+    >
+      {isSubmitting ? "Processing..." : "Create & open"}
+    </button>
+  );
+}
+
+function PlannerSidebarRecurringRunAtReadOnlyRow({
+  visible,
+  editTask,
+  groupClass,
+  labelStyle,
+}: Readonly<{
+  visible: boolean;
+  editTask: PlannerEditTask | undefined;
+  groupClass: string;
+  labelStyle: React.CSSProperties;
+}>): React.ReactNode {
+  if (!visible) return null;
+  return (
+    <Row>
+      <Col xs={12} md={6}>
+        <Form.Group className={groupClass}>
+          <Form.Label style={labelStyle}>
+            <Calendar
+              size={16}
+              className="me-2"
+              style={{ verticalAlign: "middle" }}
+            />
+            Last run at
+          </Form.Label>
+          <div
+            className="form-control py-2"
+            style={{
+              fontSize: "14px",
+              fontWeight: 300,
+              backgroundColor: "#f8fafc",
+              color: "#374151",
+              cursor: "default",
+            }}
+            aria-readonly="true"
+          >
+            {formatDateTimeForDisplay(
+              recurringScheduleField(editTask, "last_run_at"),
+            )}
+          </div>
+        </Form.Group>
+      </Col>
+      <Col xs={12} md={6}>
+        <Form.Group className={groupClass}>
+          <Form.Label style={labelStyle}>
+            <Calendar
+              size={16}
+              className="me-2"
+              style={{ verticalAlign: "middle" }}
+            />
+            Next run at
+          </Form.Label>
+          <div
+            className="form-control py-2"
+            style={{
+              fontSize: "14px",
+              fontWeight: 300,
+              backgroundColor: "#f8fafc",
+              color: "#374151",
+              cursor: "default",
+            }}
+            aria-readonly="true"
+          >
+            {formatDateTimeForDisplay(
+              recurringScheduleField(editTask, "next_run_at"),
+            )}
+          </div>
+        </Form.Group>
+      </Col>
+    </Row>
+  );
 }
 
 interface StatusSelectOptionsProps {
@@ -961,6 +1207,49 @@ function SelectedLinkedRecordChip({
   );
 }
 
+function PlannerSidebarLinkedRecordsBody({
+  loadingLinkedRecords,
+  linkedRecordsForDisplay,
+  searchQuery,
+  linkedRecordIds,
+  toggleLinkedRecord,
+}: Readonly<{
+  loadingLinkedRecords: boolean;
+  linkedRecordsForDisplay: LinkedRecord[];
+  searchQuery: string;
+  linkedRecordIds: number[];
+  toggleLinkedRecord: (recordId: number) => void;
+}>) {
+  if (loadingLinkedRecords && linkedRecordsForDisplay.length === 0) {
+    return (
+      <div
+        className="p-3 text-center text-muted"
+        style={{ fontSize: "0.9rem" }}
+      >
+        Loading tasks...
+      </div>
+    );
+  }
+  if (linkedRecordsForDisplay.length === 0) {
+    return (
+      <div
+        className="p-3 text-center text-muted"
+        style={{ fontSize: "0.9rem" }}
+      >
+        {linkedRecordsEmptyMessage(Boolean(searchQuery))}
+      </div>
+    );
+  }
+  return linkedRecordsForDisplay.map((record) => (
+    <LinkedRecordListRow
+      key={record.id}
+      record={record}
+      selected={linkedRecordIds.includes(record.id)}
+      onToggle={toggleLinkedRecord}
+    />
+  ));
+}
+
 /** Limited (non-admin, non-owner): keep baseline assignees/watchers; all other fields from the form payload. */
 function applyLimitedEditLockAssigneesAndWatchers(
   payload: Record<string, unknown>,
@@ -971,6 +1260,331 @@ function applyLimitedEditLockAssigneesAndWatchers(
     extension_numbers: locked.extension_numbers,
     watchers: locked.watchers,
   };
+}
+
+function plannerPriorityIdToApiString(priorityId: number | null): string | undefined {
+  if (!priorityId || priorityId === 0) return "";
+  const priorityMap: Record<number, string> = {
+    1: "low",
+    2: "normal",
+    3: "high",
+    4: "urgent",
+  };
+  return priorityMap[priorityId] || undefined;
+}
+
+function buildPlannerSidebarPayloadRecord(
+  fd: CreateTaskFormData,
+  extensions: Extension[],
+  taskTypeOptions: readonly PlannerTaskType[],
+  isEdit: boolean,
+): Record<string, unknown> {
+  if (fd.taskType === "") {
+    throw new Error("Task type must be selected before building payload");
+  }
+  const taskTypeEff = clampTaskTypeToAllowed(fd.taskType, taskTypeOptions);
+  const payload: Record<string, unknown> = {
+    title: clampTaskTitleLength(fd.title.trim()),
+    description: fd.description || "",
+    priority: plannerPriorityIdToApiString(fd.priorityId) || undefined,
+    due_date: fd.dueDate || "",
+    start_date: fd.startDate || "",
+    extension_numbers:
+      fd.assigneeIds?.map((id: number) => {
+        const extension = extensions.find((ext) => Number(ext.id) === id);
+        return extension ? extension.id : String(id);
+      }) || [],
+    watchers:
+      fd.watcherIds?.map((id: number) => {
+        const extension = extensions.find((ext) => Number(ext.id) === id);
+        return extension ? extension.id : String(id);
+      }) || [],
+    type: taskTypeEff,
+  };
+  if (fd.projectId) {
+    payload.project_id = fd.projectId;
+    payload.label_ids = fd.labelIds || [];
+  }
+  if (fd.statusId) payload.status_id = fd.statusId;
+  if (isEdit) {
+    payload.parent_task_id =
+      fd.linkedRecordIds.length > 0 ? fd.linkedRecordIds[0] : null;
+  } else if (fd.linkedRecordIds.length > 0) {
+    payload.parent_task_id = fd.linkedRecordIds[0];
+  }
+  if (taskTypeEff === "recurring") {
+    payload.frequency = fd.frequency;
+    payload.repeat_interval = fd.repeatInterval;
+    if (fd.frequency === "weekly" && fd.repeatOn.trim()) {
+      payload.repeat_on = fd.repeatOn.trim().toLowerCase();
+    } else if (fd.frequency === "monthly" && fd.repeatOn.trim()) {
+      payload.repeat_on = fd.repeatOn.trim();
+    }
+    const dueTimeUtc = formatRecurringDueTimeAsUtcIso(fd.startDate, fd.dueTime);
+    if (dueTimeUtc) payload.due_time = dueTimeUtc;
+    payload.end_date = fd.dueDate || null;
+  }
+  return payload;
+}
+
+function validatePlannerSidebarFormForSubmit(
+  formData: CreateTaskFormData,
+  isEdit: boolean,
+  taskTypeOptions: readonly PlannerTaskType[],
+): boolean {
+  if (!formData.title.trim()) {
+    toast.error("Please enter a task title");
+    return false;
+  }
+  if (!isEdit && formData.taskType === "") {
+    toast.error("Please select a task type");
+    return false;
+  }
+  if (!formData.priorityId || formData.priorityId === 0) {
+    toast.error("Please select a priority");
+    return false;
+  }
+  const taskTypeEff = clampTaskTypeToAllowed(
+    formData.taskType as PlannerTaskType,
+    taskTypeOptions,
+  );
+  if (taskTypeEff === "recurring") {
+    if (!formData.statusId) {
+      toast.error("Recurring tasks require a status");
+      return false;
+    }
+    if (!formData.startDate) {
+      toast.error("Recurring tasks require a start date");
+      return false;
+    }
+    if (formData.frequency === "weekly" && !formData.repeatOn.trim()) {
+      toast.error("Please select a day of the week");
+      return false;
+    }
+  }
+  if (formData.dueDate.trim()) {
+    const minDue = minDueDateFromTodayAndStart(formData.startDate);
+    if (formData.dueDate < minDue) {
+      toast.error("Due date cannot be before today or before the start date");
+      return false;
+    }
+  }
+  return true;
+}
+
+type PersistPlannerSidebarContext = {
+  formData: CreateTaskFormData;
+  taskTypeOptions: readonly PlannerTaskType[];
+  isEdit: boolean;
+  taskEditScope: PlannerTaskEditScope;
+  limitedEditBaselineForm: CreateTaskFormData | null;
+  editTask: PlannerEditTask | undefined;
+  extensions: Extension[];
+};
+
+async function persistPlannerSidebarTaskFromPayload(
+  payloadInput: Record<string, unknown>,
+  ctx: PersistPlannerSidebarContext,
+): Promise<boolean> {
+  const taskTypeEff = clampTaskTypeToAllowed(
+    ctx.formData.taskType as PlannerTaskType,
+    ctx.taskTypeOptions,
+  );
+  let payload: Record<string, unknown> = { ...payloadInput };
+  if (
+    ctx.isEdit &&
+    ctx.taskEditScope === "limited" &&
+    ctx.limitedEditBaselineForm &&
+    ctx.editTask?.id != null
+  ) {
+    const locked = buildPlannerSidebarPayloadRecord(
+      ctx.limitedEditBaselineForm,
+      ctx.extensions,
+      ctx.taskTypeOptions,
+      ctx.isEdit,
+    );
+    payload = applyLimitedEditLockAssigneesAndWatchers(payload, locked);
+  }
+  if (ctx.isEdit && ctx.editTask?.id != null) {
+    if (taskTypeEff === "recurring") {
+      return Boolean(
+        await updateRecurringTask(
+          ctx.editTask.id,
+          payload as Parameters<typeof updateRecurringTask>[1],
+        ),
+      );
+    }
+    return Boolean(
+      await updateTask(
+        ctx.editTask.id,
+        payload as Parameters<typeof updateTask>[1],
+      ),
+    );
+  }
+  if (taskTypeEff === "recurring") {
+    const recurringPayload: Parameters<typeof createRecurringTask>[0] = {
+      ...(payload as unknown as Parameters<typeof createRecurringTask>[0]),
+      status_id: ctx.formData.statusId as number,
+      start_date: ctx.formData.startDate,
+      end_date: ctx.formData.dueDate || null,
+      type: "recurring",
+    };
+    if (ctx.formData.projectId != null && ctx.formData.projectId > 0) {
+      recurringPayload.project_id = ctx.formData.projectId;
+      recurringPayload.label_ids = ctx.formData.labelIds || [];
+    }
+    return Boolean(await createRecurringTask(recurringPayload));
+  }
+  const withTz = { ...payload, timezone: getAutoTimezone() };
+  return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
+}
+
+function getSidebarInitialFormData(
+  editMode: boolean,
+  editTask: PlannerEditTask | undefined,
+  extensions: Extension[],
+  propProject: Project | undefined,
+  propStatuses: Status[],
+  selectedStatusForTask: number | null,
+): CreateTaskFormData {
+  if (editMode && editTask) {
+    return buildInitialFormFromEdit(editTask, extensions);
+  }
+  return buildInitialFormForCreate("", propProject, propStatuses, selectedStatusForTask);
+}
+
+function linkedRecordsFromListTasksForSidebar(
+  response: unknown,
+  editMode: boolean,
+  editTask: PlannerEditTask | undefined,
+): LinkedRecord[] {
+  const res = response as { data?: unknown } | null | undefined;
+  if (!res?.data || !Array.isArray(res.data)) {
+    return [];
+  }
+  const taskRows = res.data as TaskListRow[];
+  const selfIdRaw = editTask?.rawData?.id ?? editTask?.id;
+  const selfIdNum =
+    selfIdRaw != null && String(selfIdRaw).trim() !== ""
+      ? Number(selfIdRaw)
+      : Number.NaN;
+  const currentTaskId =
+    editMode && Number.isFinite(selfIdNum) && selfIdNum > 0 ? selfIdNum : null;
+  return taskRows
+    .filter((t) => currentTaskId == null || Number(t.id) !== currentTaskId)
+    .map((t) => ({
+      id: Number(t.id),
+      type: "task" as const,
+      title: t.title || "",
+      reference: t.reference || `#${t.id}`,
+    }));
+}
+
+function shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
+  editMode: boolean,
+  task: PlannerEditTask | undefined,
+  fetchedProjectsCount: number,
+  loadingProjects: boolean,
+): boolean {
+  return (
+    editMode &&
+    Boolean(task) &&
+    fetchedProjectsCount === 0 &&
+    loadingProjects
+  );
+}
+
+function mergeOpenedPlannerSidebarFormData(
+  rawInitial: CreateTaskFormData,
+  taskTypeOptions: readonly PlannerTaskType[],
+): CreateTaskFormData {
+  const mergedOpen = mergeFormDataWithDueDateClamp(rawInitial);
+  return {
+    ...mergedOpen,
+    taskType:
+      mergedOpen.taskType === ""
+        ? ""
+        : clampTaskTypeToAllowed(mergedOpen.taskType, taskTypeOptions),
+  };
+}
+
+function emptyPlannerSidebarFormWhenClosed(
+  propProject: Project | undefined,
+  selectedStatusForTask: number | null,
+  propStatuses: Status[],
+): CreateTaskFormData {
+  return {
+    title: "",
+    description: "",
+    taskType: "",
+    projectId: propProject?.id || null,
+    statusId:
+      selectedStatusForTask ||
+      (propStatuses.length > 0 ? propStatuses[0].id : null),
+    priorityId: 0,
+    assigneeIds: [],
+    watcherIds: [],
+    dueDate: "",
+    startDate: "",
+    labelIds: [],
+    linkedRecordIds: [],
+    frequency: "weekly",
+    repeatInterval: 1,
+    repeatOn: "",
+    dueTime: "",
+  };
+}
+
+type PlannerSidebarTaskTypeSelectContext = {
+  editMode: boolean;
+  taskTypeOptions: PlannerTaskType[];
+  propProject: Project | undefined;
+  propStatuses: Status[];
+  selectedStatusForTask: number | null;
+  setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  setAssigneeSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  setShowAssigneeDropdown: React.Dispatch<React.SetStateAction<boolean>>;
+  setWatcherSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  setShowWatcherDropdown: React.Dispatch<React.SetStateAction<boolean>>;
+  fetchLinkRecordsForSearch: (
+    query: string,
+    currentProjectId?: number | null,
+  ) => Promise<void>;
+};
+
+function applyPlannerSidebarTaskTypeSelectChange(
+  raw: string,
+  ctx: Readonly<PlannerSidebarTaskTypeSelectContext>,
+): void {
+  if (raw === "") {
+    if (ctx.editMode) {
+      return;
+    }
+    ctx.setFormData((prev) => ({ ...prev, taskType: "" }));
+    return;
+  }
+  const nextType = raw as PlannerTaskType;
+  const clamped = clampTaskTypeToAllowed(nextType, ctx.taskTypeOptions);
+  if (ctx.editMode) {
+    ctx.setFormData((prev) => ({ ...prev, taskType: clamped }));
+    return;
+  }
+  const fresh = buildInitialFormForCreate(
+    clamped,
+    ctx.propProject,
+    ctx.propStatuses,
+    ctx.selectedStatusForTask,
+  );
+  const mergedOpen = mergeFormDataWithDueDateClamp(fresh);
+  const nextForm: CreateTaskFormData = { ...mergedOpen, taskType: clamped };
+  ctx.setFormData(nextForm);
+  ctx.setSearchQuery("");
+  ctx.setAssigneeSearchQuery("");
+  ctx.setShowAssigneeDropdown(false);
+  ctx.setWatcherSearchQuery("");
+  ctx.setShowWatcherDropdown(false);
+  ctx.fetchLinkRecordsForSearch("", nextForm.projectId).catch(() => undefined);
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -987,7 +1601,6 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   task: editTask,
   isEdit = false,
   selectedStatusForTask = null,
-  taskType = "regular",
   taskTypeChoices,
   lockProjectSelection = false,
   taskEditScope = "full",
@@ -997,17 +1610,15 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     [taskTypeChoices],
   );
 
-  const getInitialFormData = (): CreateTaskFormData => {
-    if (isEdit && editTask) {
-      return buildInitialFormFromEdit(editTask, extensions);
-    }
-    return buildInitialFormForCreate(
-      clampTaskTypeToAllowed(taskType, taskTypeOptions),
+  const getInitialFormData = (): CreateTaskFormData =>
+    getSidebarInitialFormData(
+      isEdit,
+      editTask,
+      extensions,
       propProject,
       propStatuses,
       selectedStatusForTask,
     );
-  };
 
   const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
   const [searchQuery, setSearchQuery] = useState("");
@@ -1063,25 +1674,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
       try {
         setLoadingGenericStatuses(true);
         const response = await listStatuses();
-        if (response && Array.isArray(response)) {
-          const statusesList = response.map((status: Status) => ({
-            id: status.id,
-            name: status.name,
-            icon: "",
-            color: status.color || "#3b82f6",
-          }));
-          setGenericStatuses(statusesList);
-        } else if (response?.data && Array.isArray(response.data)) {
-          const statusesList = response.data.map((status: Status) => ({
-            id: status.id,
-            name: status.name,
-            icon: "",
-            color: status.color || "#3b82f6",
-          }));
-          setGenericStatuses(statusesList);
-        } else {
-          setGenericStatuses([]);
-        }
+        setGenericStatuses(mapListStatusesResponseToSidebarStatuses(response));
       } catch (error) {
         console.error("Error fetching generic statuses:", error);
         setGenericStatuses([]);
@@ -1102,34 +1695,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
         const response = await listTasks({
           page: 1,
           limit: 30,
-          type: "regular",
           search: query.trim() || undefined,
           ...(projectId != null && projectId > 0 ? { project_id: projectId } : {}),
         });
-        if (response?.data && Array.isArray(response.data)) {
-          const taskRows = response.data as TaskListRow[];
-          const selfIdRaw = editTask?.rawData?.id ?? editTask?.id;
-          const selfIdNum =
-            selfIdRaw != null && String(selfIdRaw).trim() !== ""
-              ? Number(selfIdRaw)
-              : Number.NaN;
-          const currentTaskId =
-            isEdit && Number.isFinite(selfIdNum) && selfIdNum > 0 ? selfIdNum : null;
-          const records: LinkedRecord[] = taskRows
-            .filter(
-              (t) =>
-                currentTaskId == null || Number(t.id) !== currentTaskId,
-            )
-            .map((t) => ({
-              id: Number(t.id),
-              type: "task" as const,
-              title: t.title || "",
-              reference: t.reference || `#${t.id}`,
-            }));
-          setLinkedRecordsFromApi(records);
-        } else {
-          setLinkedRecordsFromApi([]);
-        }
+        setLinkedRecordsFromApi(
+          linkedRecordsFromListTasksForSidebar(response, isEdit, editTask),
+        );
       } catch (error) {
         console.error("Error fetching link records:", error);
         setLinkedRecordsFromApi([]);
@@ -1148,30 +1719,20 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const handleTaskTypeChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const nextType = e.target.value as PlannerTaskType;
-      const clamped = clampTaskTypeToAllowed(nextType, taskTypeOptions);
-      if (isEdit) {
-        setFormData((prev) => ({ ...prev, taskType: clamped }));
-        return;
-      }
-      const fresh = buildInitialFormForCreate(
-        clamped,
+      applyPlannerSidebarTaskTypeSelectChange(e.target.value, {
+        editMode: isEdit,
+        taskTypeOptions,
         propProject,
         propStatuses,
         selectedStatusForTask,
-      );
-      const mergedOpen = mergeFormDataWithDueDateClamp(fresh);
-      const nextForm: CreateTaskFormData = {
-        ...mergedOpen,
-        taskType: clampTaskTypeToAllowed(mergedOpen.taskType, taskTypeOptions),
-      };
-      setFormData(nextForm);
-      setSearchQuery("");
-      setAssigneeSearchQuery("");
-      setShowAssigneeDropdown(false);
-      setWatcherSearchQuery("");
-      setShowWatcherDropdown(false);
-      fetchLinkRecordsForSearch("", nextForm.projectId).catch(() => undefined);
+        setFormData,
+        setSearchQuery,
+        setAssigneeSearchQuery,
+        setShowAssigneeDropdown,
+        setWatcherSearchQuery,
+        setShowWatcherDropdown,
+        fetchLinkRecordsForSearch,
+      });
     },
     [
       isEdit,
@@ -1192,41 +1753,27 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     if (isOpen) {
       setSearchQuery("");
       if (
-        isEdit &&
-        editTask &&
-        fetchedProjects.length === 0 &&
-        loadingProjects
+        shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
+          isEdit,
+          editTask,
+          fetchedProjects.length,
+          loadingProjects,
+        )
       ) {
         return;
       }
-      const mergedOpen = mergeFormDataWithDueDateClamp(getInitialFormData());
-      setFormData({
-        ...mergedOpen,
-        taskType: clampTaskTypeToAllowed(mergedOpen.taskType, taskTypeOptions),
-      });
+      setFormData(
+        mergeOpenedPlannerSidebarFormData(getInitialFormData(), taskTypeOptions),
+      );
     } else {
       setSearchQuery("");
-      const defaultTaskType = clampTaskTypeToAllowed(taskType, taskTypeOptions);
-      setFormData({
-        title: "",
-        description: "",
-        taskType: defaultTaskType,
-        projectId: propProject?.id || null,
-        statusId:
-          selectedStatusForTask ||
-          (propStatuses.length > 0 ? propStatuses[0].id : null),
-        priorityId: 0,
-        assigneeIds: [],
-        watcherIds: [],
-        dueDate: "",
-        startDate: "",
-        labelIds: [],
-        linkedRecordIds: [],
-        frequency: "weekly",
-        repeatInterval: 1,
-        repeatOn: defaultTaskType === "recurring" ? "monday" : "",
-        dueTime: "",
-      });
+      setFormData(
+        emptyPlannerSidebarFormWhenClosed(
+          propProject,
+          selectedStatusForTask,
+          propStatuses,
+        ),
+      );
     }
   }, [
     isOpen,
@@ -1235,7 +1782,6 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     fetchedProjects.length,
     loadingProjects,
     selectedStatusForTask,
-    taskType,
     taskTypeOptions,
   ]);
 
@@ -1260,35 +1806,23 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
 
   const projects: Project[] = resolveSidebarProjects(fetchedProjects, propProject);
 
-  const getStatusesForSelectedProject = (): Status[] => {
-    if (formData.projectId) {
-      const selectedProject = fetchedProjects.find(
-        (p) => p.id === formData.projectId
-      );
-      if (
-        selectedProject?.statuses &&
-        Array.isArray(selectedProject.statuses)
-      ) {
-        return selectedProject.statuses.map((status) => ({
-          id: status.id,
-          name: status.name,
-          icon: "",
-          color: status.color || "#3b82f6",
-        }));
-      }
-      return [];
-    }
-    if (genericStatuses.length > 0) return genericStatuses;
-    return propStatuses;
-  };
-
-  const statuses: Status[] = getStatusesForSelectedProject();
+  const statuses: Status[] = resolveSidebarStatusesForProject(
+    formData.projectId,
+    fetchedProjects,
+    genericStatuses,
+    propStatuses,
+  );
 
   useEffect(() => {
     if (isEdit) return;
     if (formData.projectId && fetchedProjects.length === 0) return;
     if (!formData.projectId && loadingGenericStatuses) return;
-    const availableStatuses = getStatusesForSelectedProject();
+    const availableStatuses = resolveSidebarStatusesForProject(
+      formData.projectId,
+      fetchedProjects,
+      genericStatuses,
+      propStatuses,
+    );
     if (!formData.statusId && availableStatuses.length > 0) {
       setFormData((prev) => ({
         ...prev,
@@ -1326,23 +1860,11 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     { id: 4, name: "Urgent", icon: "🔴", color: "#ef4444" },
   ];
 
-  const getLabelsForSelectedProject = (): Label[] => {
-    if (!formData.projectId) return propLabels;
-    const selectedProject = fetchedProjects.find(
-      (p) => p.id === formData.projectId
-    );
-    if (selectedProject?.labels && Array.isArray(selectedProject.labels)) {
-      return selectedProject.labels.map((label) => ({
-        id: label.id,
-        name: label.name,
-        color: label.color || "#3b82f6",
-        description: label.description || "",
-      }));
-    }
-    return propLabels;
-  };
-
-  const labels: Label[] = getLabelsForSelectedProject();
+  const labels: Label[] = resolveSidebarLabelsForProject(
+    formData.projectId,
+    fetchedProjects,
+    propLabels,
+  );
 
   const isLimitedTaskEdit = Boolean(isEdit && taskEditScope === "limited");
 
@@ -1351,152 +1873,34 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     const merged = mergeFormDataWithDueDateClamp(
       buildInitialFormFromEdit(editTask, extensions),
     );
+    const baselineType: PlannerTaskType =
+      merged.taskType === "" ? "regular" : merged.taskType;
     return {
       ...merged,
-      taskType: clampTaskTypeToAllowed(merged.taskType, taskTypeOptions),
+      taskType: clampTaskTypeToAllowed(baselineType, taskTypeOptions),
     };
   }, [isEdit, editTask, taskEditScope, extensions, taskTypeOptions]);
 
-  const mapPriorityIdToString = (priorityId: number | null): string | undefined => {
-    if (!priorityId || priorityId === 0) return "";
-    const priorityMap: Record<number, string> = {
-      1: "low",
-      2: "normal",
-      3: "high",
-      4: "urgent",
-    };
-    return priorityMap[priorityId] || undefined;
-  };
-
-  const buildPayloadForForm = (fd: CreateTaskFormData) => {
-    const taskTypeEff = clampTaskTypeToAllowed(fd.taskType, taskTypeOptions);
-    const payload: Record<string, unknown> = {
-      title: fd.title,
-      description: fd.description || "",
-      priority: mapPriorityIdToString(fd.priorityId) || undefined,
-      due_date: fd.dueDate || "",
-      start_date: fd.startDate || "",
-      extension_numbers:
-        fd.assigneeIds?.map((id: number) => {
-          const extension = extensions.find((ext) => Number(ext.id) === id);
-          return extension ? extension.id : String(id);
-        }) || [],
-      watchers:
-        fd.watcherIds?.map((id: number) => {
-          const extension = extensions.find((ext) => Number(ext.id) === id);
-          return extension ? extension.id : String(id);
-        }) || [],
-      type: taskTypeEff,
-    };
-    if (fd.projectId) {
-      payload.project_id = fd.projectId;
-      payload.label_ids = fd.labelIds || [];
-    }
-    if (fd.statusId) payload.status_id = fd.statusId;
-    if (isEdit) {
-      payload.parent_task_id =
-        fd.linkedRecordIds.length > 0 ? fd.linkedRecordIds[0] : null;
-    } else if (fd.linkedRecordIds.length > 0) {
-      payload.parent_task_id = fd.linkedRecordIds[0];
-    }
-    if (taskTypeEff === "recurring") {
-      payload.frequency = fd.frequency;
-      payload.repeat_interval = fd.repeatInterval;
-      if (fd.frequency === "weekly" && fd.repeatOn.trim()) {
-        payload.repeat_on = fd.repeatOn.trim().toLowerCase();
-      } else if (fd.frequency === "monthly" && fd.repeatOn.trim()) {
-        payload.repeat_on = fd.repeatOn.trim();
-      }
-      const dueTimeUtc = formatRecurringDueTimeAsUtcIso(fd.startDate, fd.dueTime);
-      if (dueTimeUtc) payload.due_time = dueTimeUtc;
-      payload.end_date = fd.dueDate || null;
-    }
-    return payload;
-  };
+  const buildPayloadForForm = (fd: CreateTaskFormData) =>
+    buildPlannerSidebarPayloadRecord(fd, extensions, taskTypeOptions, isEdit);
 
   const buildPayload = () => buildPayloadForForm(formData);
 
-  const validateBeforeSubmit = (): boolean => {
-    if (!formData.title.trim()) {
-      toast.error("Please enter a task title");
-      return false;
-    }
-
-    if (!formData.priorityId || formData.priorityId === 0) {
-      toast.error("Please select a priority");
-      return false;
-    }
-
-
-    const taskTypeEff = clampTaskTypeToAllowed(formData.taskType, taskTypeOptions);
-    if (taskTypeEff === "recurring") {
-      if (!formData.statusId) {
-        toast.error("Recurring tasks require a status");
-        return false;
-      }
-      if (!formData.startDate) {
-        toast.error("Recurring tasks require a start date");
-        return false;
-      }
-      if (formData.frequency === "weekly" && !formData.repeatOn.trim()) {
-        toast.error("Please select a day of the week");
-        return false;
-      }
-    }
-    if (formData.dueDate.trim()) {
-      const minDue = minDueDateFromTodayAndStart(formData.startDate);
-      if (formData.dueDate < minDue) {
-        toast.error("Due date cannot be before today or before the start date");
-        return false;
-      }
-    }
-    return true;
-  };
+  const validateBeforeSubmit = (): boolean =>
+    validatePlannerSidebarFormForSubmit(formData, isEdit, taskTypeOptions);
 
   const persistTaskFromPayload = async (
     payloadInput: ReturnType<typeof buildPayload>,
-  ): Promise<boolean> => {
-    const taskTypeEff = clampTaskTypeToAllowed(formData.taskType, taskTypeOptions);
-    let payload: Record<string, unknown> = { ...payloadInput };
-    if (
-      isEdit &&
-      taskEditScope === "limited" &&
-      limitedEditBaselineForm &&
-      editTask?.id != null
-    ) {
-      const locked = buildPayloadForForm(limitedEditBaselineForm);
-      payload = applyLimitedEditLockAssigneesAndWatchers(payload, locked);
-    }
-    if (isEdit && editTask?.id != null) {
-      if (taskTypeEff === "recurring") {
-        return Boolean(
-          await updateRecurringTask(
-            editTask.id,
-            payload as Parameters<typeof updateRecurringTask>[1],
-          ),
-        );
-      }
-      return Boolean(
-        await updateTask(editTask.id, payload as Parameters<typeof updateTask>[1]),
-      );
-    }
-    if (taskTypeEff === "recurring") {
-      const recurringPayload: Parameters<typeof createRecurringTask>[0] = {
-        ...(payload as unknown as Parameters<typeof createRecurringTask>[0]),
-        status_id: formData.statusId as number,
-        start_date: formData.startDate,
-        end_date: formData.dueDate || null,
-        type: "recurring",
-      };
-      if (formData.projectId != null && formData.projectId > 0) {
-        recurringPayload.project_id = formData.projectId;
-        recurringPayload.label_ids = formData.labelIds || [];
-      }
-      return Boolean(await createRecurringTask(recurringPayload));
-    }
-    const withTz = { ...payload, timezone: getAutoTimezone() };
-    return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
-  };
+  ): Promise<boolean> =>
+    persistPlannerSidebarTaskFromPayload(payloadInput, {
+      formData,
+      taskTypeOptions,
+      isEdit,
+      taskEditScope,
+      limitedEditBaselineForm,
+      editTask,
+      extensions,
+    });
 
   const submitPlannerTask = async (
     e: React.MouseEvent | undefined,
@@ -1648,57 +2052,16 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     return out;
   }, [linkedRecordsForDisplay, formData.linkedRecordIds]);
 
-  const renderLinkedRecordsList = (): React.ReactNode => {
-    if (loadingLinkedRecords && linkedRecordsForDisplay.length === 0) {
-      return (
-        <div
-          className="p-3 text-center text-muted"
-          style={{ fontSize: "0.9rem" }}
-        >
-          Loading tasks...
-        </div>
-      );
-    }
-    if (linkedRecordsForDisplay.length === 0) {
-      return (
-        <div
-          className="p-3 text-center text-muted"
-          style={{ fontSize: "0.9rem" }}
-        >
-          {linkedRecordsEmptyMessage(Boolean(searchQuery))}
-        </div>
-      );
-    }
-    return linkedRecordsForDisplay.map((record) => (
-      <LinkedRecordListRow
-        key={record.id}
-        record={record}
-        selected={formData.linkedRecordIds.includes(record.id)}
-        onToggle={toggleLinkedRecord}
-      />
-    ));
-  };
-
   if (!isOpen) return null;
 
   const handleRecurringFrequencySelectChange = (
     e: React.ChangeEvent<HTMLSelectElement>,
   ) => {
     const nextFreq = e.target.value;
-    setFormData((prev) => {
-      let nextRepeatOn: string;
-      if (nextFreq === "weekly") {
-        const normalized = normalizeWeeklyRepeatOnFromApi(prev.repeatOn);
-        nextRepeatOn = normalized || "monday";
-      } else if (nextFreq === "monthly") {
-        nextRepeatOn = /^\d+$/.test(prev.repeatOn.trim())
-          ? prev.repeatOn.trim()
-          : "1";
-      } else {
-        nextRepeatOn = "";
-      }
-      return { ...prev, frequency: nextFreq, repeatOn: nextRepeatOn };
-    });
+    setFormData((prev) => ({
+      ...prev,
+      ...computeFrequencyChangeState(prev, nextFreq),
+    }));
   };
 
   const handleProjectSelectChange = (
@@ -1839,15 +2202,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           >
           <Form onSubmit={(e) => { e.preventDefault(); handleCreate(); }}>
 
-            {isLimitedTaskEdit && (
-              <p
-                className="text-muted small mb-3"
-                style={{ marginTop: -8, fontSize: 13 }}
-              >
-                <strong>Assignees</strong> and <strong>watchers</strong> cannot be changed for your
-                role; all other fields can be updated.
-              </p>
-            )}
+            <LimitedTaskEditBanner visible={isLimitedTaskEdit} />
 
             <Row>
 
@@ -1861,13 +2216,30 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 type="text"
                 placeholder="Enter task title"
                 value={formData.title}
+                maxLength={TASK_TITLE_MAX_LENGTH}
                 onChange={(e) =>
-                  setFormData({ ...formData, title: e.target.value })
+                  setFormData((prev) => ({
+                    ...prev,
+                    title: clampTaskTitleLength(e.target.value),
+                  }))
                 }
                 className="py-2"
                 style={{ fontSize: "14px" }}
                 required
               />
+              <div
+                className="d-flex justify-content-between align-items-baseline gap-2 mt-1"
+              >
+                <Form.Text className="text-muted mb-0">
+                  Maximum {TASK_TITLE_MAX_LENGTH} characters.
+                </Form.Text>
+                <Form.Text
+                  className="text-muted mb-0 small text-nowrap"
+                  aria-live="polite"
+                >
+                  {formData.title.length}/{TASK_TITLE_MAX_LENGTH}
+                </Form.Text>
+              </div>
             </Form.Group>
               </Col>
 
@@ -1877,12 +2249,15 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 Task Type <span style={{ color: "#ef4444" }}>*</span>
               </Form.Label>
               <Form.Select
-                value={clampTaskTypeToAllowed(formData.taskType, taskTypeOptions)}
+                value={taskTypeSelectHtmlValue(formData.taskType, taskTypeOptions)}
                 onChange={handleTaskTypeChange}
                 disabled={isEdit}
                 className="py-2"
                 style={{ fontSize: "14px" }}
               >
+                {isEdit ? null : (
+                  <option value="">Select type</option>
+                )}
                 {taskTypeOptions.map((opt) => (
                   <option key={opt} value={opt}>
                     {TASK_TYPE_SELECT_LABELS[opt]}
@@ -1921,25 +2296,10 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   <Form.Label style={labelStyle}>
                     Associate with records
                   </Form.Label>
-                  {selectedLinkedRecords.length > 0 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        flexWrap: "wrap",
-                        marginBottom: 8,
-                      }}
-                    >
-                      {selectedLinkedRecords.map((r) => (
-                        <SelectedLinkedRecordChip
-                          key={r.id}
-                          record={r}
-                          onRemove={removeLinkedRecordById}
-                        />
-                      ))}
-                    </div>
-                  )}
+                  <PlannerSidebarLinkedRecordChipsStrip
+                    records={selectedLinkedRecords}
+                    onRemove={removeLinkedRecordById}
+                  />
                   <div style={{ marginBottom: 8 }}>
                     <Form.Control
                       type="text"
@@ -1959,7 +2319,13 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                       borderRadius: 4,
                     }}
                   >
-                    {renderLinkedRecordsList()}
+                    <PlannerSidebarLinkedRecordsBody
+                      loadingLinkedRecords={loadingLinkedRecords}
+                      linkedRecordsForDisplay={linkedRecordsForDisplay}
+                      searchQuery={searchQuery}
+                      linkedRecordIds={formData.linkedRecordIds}
+                      toggleLinkedRecord={toggleLinkedRecord}
+                    />
                   </div>
                 </Form.Group>
               </Col>
@@ -2481,64 +2847,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     style={{ fontSize: "14px" }}
                   />
                 </Form.Group>
-                {isEdit && (
-                  <Row>
-                    <Col xs={12} md={6}>
-                      <Form.Group className={groupClass}>
-                        <Form.Label style={labelStyle}>
-                          <Calendar
-                            size={16}
-                            className="me-2"
-                            style={{ verticalAlign: "middle" }}
-                          />
-                          Last run at
-                        </Form.Label>
-                        <div
-                          className="form-control py-2"
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: 300,
-                            backgroundColor: "#f8fafc",
-                            color: "#374151",
-                            cursor: "default",
-                          }}
-                          aria-readonly="true"
-                        >
-                          {formatDateTimeForDisplay(
-                            recurringScheduleField(editTask, "last_run_at"),
-                          )}
-                        </div>
-                      </Form.Group>
-                    </Col>
-                    <Col xs={12} md={6}>
-                      <Form.Group className={groupClass}>
-                        <Form.Label style={labelStyle}>
-                          <Calendar
-                            size={16}
-                            className="me-2"
-                            style={{ verticalAlign: "middle" }}
-                          />
-                          Next run at
-                        </Form.Label>
-                        <div
-                          className="form-control py-2"
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: 300,
-                            backgroundColor: "#f8fafc",
-                            color: "#374151",
-                            cursor: "default",
-                          }}
-                          aria-readonly="true"
-                        >
-                          {formatDateTimeForDisplay(
-                            recurringScheduleField(editTask, "next_run_at"),
-                          )}
-                        </div>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                )}
+                <PlannerSidebarRecurringRunAtReadOnlyRow
+                  visible={isEdit}
+                  editTask={editTask}
+                  groupClass={groupClass}
+                  labelStyle={labelStyle}
+                />
               </>
             )}
 
@@ -2783,27 +3097,15 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
           >
             Cancel
           </button>
-          {onCreateAndOpen && !isEdit && (
-            <button
-              type="button"
-              onClick={(e) => {
-                submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
-              }}
-              disabled={isSubmitting}
-              style={{
-                padding: "8px 20px",
-                fontSize: 14,
-                fontWeight: 600,
-                backgroundColor: "#4f46e5",
-                border: "none",
-                borderRadius: 4,
-                color: "#fff",
-                cursor: isSubmitting ? "not-allowed" : "pointer",
-              }}
-            >
-              {isSubmitting ? "Processing..." : "Create & open"}
-            </button>
-          )}
+          <PlannerSidebarCreateAndOpenButton
+            isEdit={isEdit}
+            isSubmitting={isSubmitting}
+            onCreateAndOpen={onCreateAndOpen}
+            onSubmit={(e) => {
+              if (onCreateAndOpen == null) return;
+              void submitPlannerTask(e, onCreateAndOpen).catch(() => undefined);
+            }}
+          />
           <button
             type="button"
             onClick={() => handleCreate()}

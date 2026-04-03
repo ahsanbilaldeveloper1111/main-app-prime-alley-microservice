@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import {
@@ -25,6 +25,20 @@ const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 const TEAL = "#006162";
 const HEADER_H = 34;
 const ARROW_W = 10;
+
+/** Map key for extension lookups; avoids `String(object)` → `[object Object]`. */
+function extensionNumberToMapKey(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string') return value.trim();
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return String(value).trim();
+  }
+  return '';
+}
 
 interface BoardViewProps {
   selectedProject: any;
@@ -399,6 +413,13 @@ const BoardView: React.FC<BoardViewProps> = ({
   const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showFilterSidebar, setShowFilterSidebar] = useState(false);
+  /** Draft values for the filter sidebar; applied to the board only after Search (Apply). */
+  const [boardFilterDraft, setBoardFilterDraft] = useState({
+    search: '',
+    assignee: 'All Assignees',
+    priority: 'All Priorities',
+    label: 'All Labels',
+  });
   const [savingTaskMove, setSavingTaskMove] = useState(false);
 
   const extensionNameByNumber = useMemo(() => {
@@ -411,11 +432,14 @@ const BoardView: React.FC<BoardViewProps> = ({
     return map;
   }, [hierarchyDataExtensions]);
 
-  const getUserNameFromExtension = (extensionNumber: any): string => {
-    const key = String(extensionNumber || '').trim();
-    if (!key) return '';
-    return extensionNameByNumber.get(key) || key;
-  };
+  const getUserNameFromExtension = useCallback(
+    (extensionNumber: unknown): string => {
+      const key = extensionNumberToMapKey(extensionNumber);
+      if (!key) return '';
+      return extensionNameByNumber.get(key) || key;
+    },
+    [extensionNameByNumber],
+  );
 
   const getAssigneeDisplayName = (assignee: any): string => {
     if (!assignee) return '';
@@ -527,12 +551,95 @@ const BoardView: React.FC<BoardViewProps> = ({
     }
   };
 
-  const boardFilterFields: FilterField[] = useMemo(() => [
-    { id: 'search', label: 'Search', type: 'text', value: boardSearchTerm, onChange: (v: string) => setBoardSearchTerm(v ?? ''), placeholder: 'Search tasks...' },
-    { id: 'assignee', label: 'Assignee', type: 'dropdown', value: boardSelectedAssignee, onChange: (v) => setBoardSelectedAssignee(v ?? 'All Assignees'), options: [{ value: 'All Assignees', label: 'All Assignees' }, ...getAllBoardAssignees().map((a) => ({ value: a, label: a }))] },
-    { id: 'priority', label: 'Priority', type: 'dropdown', value: boardSelectedPriority, onChange: (v) => setBoardSelectedPriority(v ?? 'All Priorities'), options: [{ value: 'All Priorities', label: 'All Priorities' }, ...getAllBoardPriorities().map((p) => ({ value: p, label: p }))] },
-    { id: 'label', label: 'Label', type: 'dropdown', value: boardSelectedLabel, onChange: (v) => setBoardSelectedLabel(v ?? 'All Labels'), options: [{ value: 'All Labels', label: 'All Labels' }, ...(labels || []).map((l: any) => ({ value: l.name, label: l.name }))] },
-  ], [boardSearchTerm, boardSelectedAssignee, boardSelectedPriority, boardSelectedLabel, labels, getAllBoardAssignees, getAllBoardPriorities]);
+  const boardFilterFields: FilterField[] = useMemo(
+    () => [
+      {
+        id: 'search',
+        label: 'Search',
+        type: 'text',
+        value: boardFilterDraft.search,
+        onChange: (v: string) =>
+          setBoardFilterDraft((d) => ({ ...d, search: v ?? '' })),
+        placeholder: 'Search tasks...',
+      },
+      {
+        id: 'assignee',
+        label: 'Assignee',
+        type: 'dropdown',
+        value: boardFilterDraft.assignee,
+        onChange: (v) =>
+          setBoardFilterDraft((d) => ({ ...d, assignee: v ?? 'All Assignees' })),
+        options: [
+          { value: 'All Assignees', label: 'All Assignees' },
+          ...getAllBoardAssignees().map((ext) => ({
+            value: ext,
+            label: getUserNameFromExtension(ext) || ext,
+          })),
+        ],
+      },
+      {
+        id: 'priority',
+        label: 'Priority',
+        type: 'dropdown',
+        value: boardFilterDraft.priority,
+        onChange: (v) =>
+          setBoardFilterDraft((d) => ({ ...d, priority: v ?? 'All Priorities' })),
+        options: [
+          { value: 'All Priorities', label: 'All Priorities' },
+          ...getAllBoardPriorities().map((p) => ({ value: p, label: p })),
+        ],
+      },
+      {
+        id: 'label',
+        label: 'Label',
+        type: 'dropdown',
+        value: boardFilterDraft.label,
+        onChange: (v) =>
+          setBoardFilterDraft((d) => ({ ...d, label: v ?? 'All Labels' })),
+        options: [
+          { value: 'All Labels', label: 'All Labels' },
+          ...(labels || []).map((l: any) => ({ value: l.name, label: l.name })),
+        ],
+      },
+    ],
+    [
+      boardFilterDraft.search,
+      boardFilterDraft.assignee,
+      boardFilterDraft.priority,
+      boardFilterDraft.label,
+      labels,
+      getAllBoardAssignees,
+      getAllBoardPriorities,
+      getUserNameFromExtension,
+    ],
+  );
+
+  const handleApplyBoardFilters = useCallback(() => {
+    setBoardSearchTerm(boardFilterDraft.search);
+    setBoardSelectedAssignee(boardFilterDraft.assignee);
+    setBoardSelectedPriority(boardFilterDraft.priority);
+    setBoardSelectedLabel(boardFilterDraft.label);
+  }, [
+    boardFilterDraft.search,
+    boardFilterDraft.assignee,
+    boardFilterDraft.priority,
+    boardFilterDraft.label,
+    setBoardSearchTerm,
+    setBoardSelectedAssignee,
+    setBoardSelectedPriority,
+    setBoardSelectedLabel,
+  ]);
+
+  const handleResetBoardFilters = useCallback(() => {
+    setBoardFilterDraft({
+      search: '',
+      assignee: 'All Assignees',
+      priority: 'All Priorities',
+      label: 'All Labels',
+    });
+    onClearFilters();
+    setShowFilterSidebar(false);
+  }, [onClearFilters]);
 
   const [collapsedColumns, setCollapsedColumns] = useState<Record<number, boolean>>({});
   const [hoveredTaskId, setHoveredTaskId] = useState<number | null>(null);
@@ -709,7 +816,15 @@ const BoardView: React.FC<BoardViewProps> = ({
         </div>
         <button
           type="button"
-          onClick={() => setShowFilterSidebar(true)}
+          onClick={() => {
+            setBoardFilterDraft({
+              search: boardSearchTerm,
+              assignee: boardSelectedAssignee,
+              priority: boardSelectedPriority,
+              label: boardSelectedLabel,
+            });
+            setShowFilterSidebar(true);
+          }}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -746,13 +861,10 @@ const BoardView: React.FC<BoardViewProps> = ({
         isOpen={showFilterSidebar}
         onClose={() => setShowFilterSidebar(false)}
         title="Filters"
-        subtitle="Filter board tasks"
+        subtitle="Adjust filters, then Search to update the board"
         filters={boardFilterFields}
-        onApply={() => setShowFilterSidebar(false)}
-        onReset={() => {
-          onClearFilters();
-          setShowFilterSidebar(false);
-        }}
+        onApply={handleApplyBoardFilters}
+        onReset={handleResetBoardFilters}
         width="400px"
         showApplyButton
         showResetButton
@@ -1114,7 +1226,6 @@ const BoardView: React.FC<BoardViewProps> = ({
         }
         task={selectedTask}
         isEdit
-        taskType="regular"
         taskTypeChoices={['regular', 'recurring']}
         lockProjectSelection
       />
