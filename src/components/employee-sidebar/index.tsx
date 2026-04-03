@@ -67,6 +67,38 @@ export interface EmployeeDetailSidebarProps {
   onClose?: () => void;
 }
 
+/** Matches workforce employees table Status column styling */
+function EmployeeProfileStatusBadge({ status }: Readonly<{ status?: string | null }>) {
+  const statusText = String(status ?? "Active");
+  const isActive = statusText.toLowerCase() === "active";
+  return (
+    <span
+      style={{
+        padding: "4px 12px",
+        backgroundColor: isActive ? "#d1fae5" : "#fee2e2",
+        color: isActive ? "#065f46" : "#991b1b",
+        borderRadius: "16px",
+        fontSize: "13px",
+        fontWeight: "500",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        textTransform: "capitalize",
+      }}
+    >
+      <span
+        style={{
+          width: "6px",
+          height: "6px",
+          borderRadius: "50%",
+          backgroundColor: isActive ? "#10b981" : "#ef4444",
+        }}
+      />
+      {statusText}
+    </span>
+  );
+}
+
 const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, departments, users, onClose }) => {
   const [activeTab, setActiveTab] = useState('Job');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -622,7 +654,17 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                   <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.contract_type)}</div>
                 </div>
               )}
-              {!profile?.job_title && profile?.department_id == null && !profile?.employment_type && !profile?.contract_type && (
+              <div>
+                <span style={{ fontSize: '13px', color: '#6b7280' }}>Status</span>
+                <div style={{ marginTop: '2px' }}>
+                  <EmployeeProfileStatusBadge status={profile?.status} />
+                </div>
+              </div>
+              {!profile?.job_title &&
+                profile?.department_id == null &&
+                !(profile?.designation != null && profile.designation !== '') &&
+                !profile?.employment_type &&
+                !profile?.contract_type && (
                 <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>No job details</p>
               )}
             </div>
