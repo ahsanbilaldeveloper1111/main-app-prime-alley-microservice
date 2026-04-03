@@ -511,6 +511,24 @@ export const GlobalDateFormat = "DD MMM YYYY";
 export const GlobalTimeFormat = "hh:mm:ss A";
 export const GlobalDateTimeFormat = "DD MMM YYYY hh:mm:ss A";
 
+/** Calendar date for UI using {@link GlobalDateFormat} (e.g. `"02 Apr 2026"`). */
+export const formatDateGlobal = (
+  date: string | number | Date | null | undefined,
+): string => {
+  if (date == null || date === "") return "";
+  const m = moment(date);
+  return m.isValid() ? m.format(GlobalDateFormat) : "";
+};
+
+/** Date and time for UI using {@link GlobalDateTimeFormat}. */
+export const formatDateTimeGlobal = (
+  date: string | number | Date | null | undefined,
+): string => {
+  if (date == null || date === "") return "";
+  const m = moment(date);
+  return m.isValid() ? m.format(GlobalDateTimeFormat) : "";
+};
+
 /**
  * Format date for table display (e.g., "13 Dec, 2025")
  * @param date - The date string or Date object

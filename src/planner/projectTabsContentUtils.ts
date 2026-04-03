@@ -355,6 +355,8 @@ export type BoardTabColumnFilters = {
   selectedAssignee: string;
   selectedPriority: string;
   selectedLabel: string;
+  /** `'All Statuses'` or a project status id as string (matches `task.status_id` / `task.status.id`). */
+  selectedStatus: string;
 };
 
 /** True when this workflow column represents completed/done work (API flag or name). */
@@ -387,6 +389,66 @@ function taskStatusIdForColumnMatch(task: any): string | null {
   return String(raw);
 }
 
+function boardSearchExcludesTask(task: any, termLower: string): boolean {
+  return Boolean(termLower && !task.title?.toLowerCase().includes(termLower));
+}
+
+function boardHideCompletedExcludesTask(
+  task: any,
+  showCompletedTasks: boolean,
+  doneColumnStatusIds: Set<string>,
+): boolean {
+  if (showCompletedTasks || !task.is_completed) {
+    return false;
+  }
+  const sid = taskStatusIdForColumnMatch(task);
+  return sid == null || !doneColumnStatusIds.has(sid);
+}
+
+function taskAssigneeMatchesSelection(task: any, selected: string): boolean {
+  return Boolean(
+    task.assignees?.some((a: any) => {
+      const ext = String(a.extension_number ?? a.extension ?? a.id ?? '').trim();
+      if (ext && ext === selected) {
+        return true;
+      }
+      const assigneeName = String(a.user?.name || '').trim();
+      return assigneeName.length > 0 && assigneeName === selected;
+    }),
+  );
+}
+
+function boardAssigneeFilterExcludesTask(task: any, selectedAssignee: string): boolean {
+  if (selectedAssignee === 'All Assignees') {
+    return false;
+  }
+  const selected = String(selectedAssignee).trim();
+  return !taskAssigneeMatchesSelection(task, selected);
+}
+
+function boardPriorityFilterExcludesTask(task: any, selectedPriority: string): boolean {
+  if (selectedPriority === 'All Priorities') {
+    return false;
+  }
+  return task.priority?.toLowerCase() !== selectedPriority.toLowerCase();
+}
+
+function boardLabelFilterExcludesTask(task: any, selectedLabel: string): boolean {
+  if (selectedLabel === 'All Labels') {
+    return false;
+  }
+  const hasLabel = task.labels?.some((l: any) => l.name === selectedLabel);
+  return !hasLabel;
+}
+
+function boardStatusFilterExcludesTask(task: any, selectedStatus: string): boolean {
+  if (selectedStatus === 'All Statuses') {
+    return false;
+  }
+  const sid = taskStatusIdForColumnMatch(task);
+  return sid !== String(selectedStatus);
+}
+
 export function filterBoardTasksForColumns(
   tasks: any[],
   filters: BoardTabColumnFilters,
@@ -395,39 +457,23 @@ export function filterBoardTasksForColumns(
   const term = filters.searchTerm.toLowerCase();
   const doneColumnStatusIds = buildCompletedColumnStatusIdSet(projectStatuses);
   return tasks.filter((task: any) => {
-    if (term && !task.title?.toLowerCase().includes(term)) {
+    if (boardSearchExcludesTask(task, term)) {
       return false;
     }
-    if (!filters.showCompletedTasks && task.is_completed) {
-      const sid = taskStatusIdForColumnMatch(task);
-      if (sid == null || !doneColumnStatusIds.has(sid)) {
-        return false;
-      }
+    if (boardHideCompletedExcludesTask(task, filters.showCompletedTasks, doneColumnStatusIds)) {
+      return false;
     }
-    if (filters.selectedAssignee !== 'All Assignees') {
-      const selected = String(filters.selectedAssignee).trim();
-      const hasAssignee = task.assignees?.some((a: any) => {
-        const ext = String(a.extension_number ?? a.extension ?? a.id ?? '').trim();
-        if (ext && ext === selected) {
-          return true;
-        }
-        const assigneeName = String(a.user?.name || '').trim();
-        return assigneeName.length > 0 && assigneeName === selected;
-      });
-      if (!hasAssignee) {
-        return false;
-      }
+    if (boardAssigneeFilterExcludesTask(task, filters.selectedAssignee)) {
+      return false;
     }
-    if (filters.selectedPriority !== 'All Priorities') {
-      if (task.priority?.toLowerCase() !== filters.selectedPriority.toLowerCase()) {
-        return false;
-      }
+    if (boardPriorityFilterExcludesTask(task, filters.selectedPriority)) {
+      return false;
     }
-    if (filters.selectedLabel !== 'All Labels') {
-      const hasLabel = task.labels?.some((l: any) => l.name === filters.selectedLabel);
-      if (!hasLabel) {
-        return false;
-      }
+    if (boardLabelFilterExcludesTask(task, filters.selectedLabel)) {
+      return false;
+    }
+    if (boardStatusFilterExcludesTask(task, filters.selectedStatus)) {
+      return false;
     }
     return true;
   });
