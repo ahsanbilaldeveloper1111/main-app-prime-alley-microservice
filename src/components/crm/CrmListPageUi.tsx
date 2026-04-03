@@ -11,6 +11,16 @@ import {
 } from "react-bootstrap";
 import { FiFilter, FiSearch } from "react-icons/fi";
 import { ArrowDown, ArrowUp, Phone } from "lucide-react";
+import {
+  applyCrmKpiCardHover,
+  applyCrmPopoverCallButtonHover,
+  buildCrmQuickFilterButtonStyle,
+  crmPopoverCallButtonInlineStyle,
+  getCrmKpiCardStyle,
+  quickFilterButtonVariant,
+  resetCrmKpiCardHover,
+  resetCrmPopoverCallButtonHover,
+} from "./crmListPageUiHelpers";
 
 export type ParsedPhoneForDisplay = {
   phone: string;
@@ -115,28 +125,9 @@ export const CrmPhoneContainer: React.FC<{
             setShowPopover(false);
           }}
           className="d-flex align-items-center justify-content-center gap-2 w-100"
-          style={{
-            fontSize: "13px",
-            fontWeight: "600",
-            padding: "8px 16px",
-            borderRadius: "6px",
-            border: "1px solid #dee2e6",
-            backgroundColor: "transparent",
-            color: "#212529",
-            boxShadow: "none",
-            transition: "all 0.2s ease",
-            minHeight: "36px",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.backgroundColor = "#f8f9fa";
-            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.boxShadow = "none";
-          }}
+          style={crmPopoverCallButtonInlineStyle}
+          onMouseEnter={(e) => applyCrmPopoverCallButtonHover(e.currentTarget)}
+          onMouseLeave={(e) => resetCrmPopoverCallButtonHover(e.currentTarget)}
         >
           <Phone size={18} style={{ strokeWidth: 2.5 }} />
           <span>Call</span>
@@ -179,23 +170,13 @@ export const CrmKPICard: React.FC<CrmKPICardData> = ({
   return (
     <Card
       className={onClick ? "h-100" : ""}
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        transition: "all 0.2s ease",
-        border: "1px solid #e9ecef",
-      }}
+      style={getCrmKpiCardStyle(onClick)}
       onClick={onClick}
       onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-        }
+        if (onClick) applyCrmKpiCardHover(e.currentTarget);
       }}
       onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }
+        if (onClick) resetCrmKpiCardHover(e.currentTarget);
       }}
     >
       <Card.Body>
@@ -227,20 +208,6 @@ export interface CrmFilterBarQuickFilter {
   variant?: string;
   color?: string;
   icon?: React.ReactNode;
-}
-
-function quickFilterButtonVariant(
-  hasCustomColor: boolean,
-  isActive: boolean,
-  filter: CrmFilterBarQuickFilter,
-): string | undefined {
-  if (hasCustomColor) {
-    return undefined;
-  }
-  if (isActive) {
-    return filter.variant || "primary";
-  }
-  return "outline-secondary";
 }
 
 export interface CrmFilterBarProps {
@@ -275,33 +242,23 @@ export const CrmFilterBar: React.FC<CrmFilterBarProps> = ({
           <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
             {quickFilters.map((filter) => {
               const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color;
-
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor) {
-                if (isActive) {
-                  const bgColor = filter.color;
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
+              const hasCustomColor = Boolean(filter.color);
+              const buttonStyle = buildCrmQuickFilterButtonStyle(
+                filter,
+                isActive,
+              );
 
               return (
                 <Button
                   key={filter.id}
                   variant={quickFilterButtonVariant(
-                    Boolean(hasCustomColor),
+                    hasCustomColor,
                     isActive,
                     filter,
                   )}
                   onClick={() => onFilterChange?.(filter.id)}
                   className="d-flex align-items-center gap-2 "
-                  style={hasCustomColor ? buttonStyle : undefined}
+                  style={buttonStyle}
                 >
                   <span className="d-flex align-items-center gap-2">
                     {filter.icon ? (

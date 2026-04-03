@@ -1093,6 +1093,17 @@ export function normalizeSearchQuery(value: string | null | undefined): string {
     .trim();
 }
 
+/**
+ * Search field while typing: strip zero-width / invisible chars only.
+ * Do not trim or collapse whitespace here — trimming on each keystroke removes
+ * trailing spaces and breaks typing multi-word queries (e.g. "John Doe").
+ * Use {@link normalizeSearchQuery} when committing search (Enter / API).
+ */
+export function sanitizeSearchInputLive(value: string | null | undefined): string {
+  if (value == null) return "";
+  return String(value).replaceAll(/[\u200B-\u200D\uFEFF\u2060]/g, "");
+}
+
 export const getGlobalExcludedPaths = () => ["/auth/signin"];
 
 export enum RECORD_TYPES {

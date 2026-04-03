@@ -6,6 +6,8 @@ import React, {
   useCallback,
   useMemo,
   useRef,
+  type Dispatch,
+  type SetStateAction,
 } from "react";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -91,7 +93,6 @@ import {
   getCampaigns,
   scheduleCall,
   unscheduleCall,
-  getCrmDataHistory,
   CrmDataItem,
   downloadExampleCsv,
 } from "@utils/crm";
@@ -120,17 +121,19 @@ import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import type { CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
-import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import {
   CrmKPICard as KPICard,
   CrmFilterBar as FilterBar,
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
-import { useCrmListPageTabCreateContactAndFilter } from "@hooks/useCrmListPageTabCreateContactAndFilter";
-import { createEmptyCrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
+import {
+  createEmptyCrmListContactFormState,
+  type CrmListContactFormState,
+} from "@utils/crmContactFormFromCrmItem";
 import { CRM_LIST_PAGE_STATIC_TAGS } from "@utils/crmListPageStaticData";
+import { useCrmQuotesListDataAssignmentContactFormState } from "@crm/billing-quotes/useCrmQuotesListDataAssignmentContactFormState";
+import { useCrmQuotesListFiltersMetricsHistorySidebarState } from "@crm/billing-quotes/useCrmQuotesListFiltersMetricsHistorySidebarState";
 
 const CrmQuotesManagement = () => {
   const { data: session } = useSession();
@@ -158,94 +161,68 @@ const CrmQuotesManagement = () => {
     number | null
   >(null);
 
-  // Data assignment modal states
-  const [assignmentFilters, setAssignmentFilters] = useState({
-    selectedTags: [] as readonly any[],
-    selectedCampaigns: [] as readonly any[],
-  });
-  const [assignmentCampaign, setAssignmentCampaign] = useState<readonly any[]>(
-    [],
-  );
-  const [assignmentDistribution, setAssignmentDistribution] = useState<
-    "equal" | "custom"
-  >("equal");
-  const [totalEntriesToAssign, setTotalEntriesToAssign] = useState(0);
-  const [customDistribution, setCustomDistribution] = useState<
-    Record<string, number>
-  >({});
-  const [assignmentCounts, setAssignmentCounts] = useState({
-    total: 0,
-    assigned: 0,
-    unassigned: 0,
-  });
-  const [availableTags, setAvailableTags] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
-  >([]);
-  const [availableCampaigns, setAvailableCampaigns] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
-  >([]);
-  const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
-    {},
-  );
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-
-  // After Call modal states
-  const [afterCallData, setAfterCallData] = useState({
-    disposition: "",
-    callStatus: "",
-    comment: "",
-    nextCallDate: "",
-    nextCallTime: "",
-    generateLead: "no", // "yes" or "no"
-  });
-
-  // Schedule modal state
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [selectedEntryForSchedule, setSelectedEntryForSchedule] =
-    useState<any>(null);
-  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
-  const [scheduleData, setScheduleData] = useState({
-    date: "",
-    time: "",
-    notes: "",
-  });
-
-  // Unschedule confirmation modal state
-  const [showUnscheduleModal, setShowUnscheduleModal] = useState(false);
-  const [entryToUnschedule, setEntryToUnschedule] = useState<any>(null);
-
-  // History modal state
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-
-  // Sidebar states
-  const [showProspectSidebar, setShowProspectSidebar] = useState(false);
-  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [selectedProspect, setSelectedProspect] = useState<any>(null);
-  const sidebarProspectFetchTokenRef = useRef(0);
-  const [showFilterBar, setShowFilterBar] = useState(false);
-
-  // Add Contacts button states
-  const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
-  const [showCreateContactSidebar, setShowCreateContactSidebar] =
-    useState(false);
-  const addContactsRef = useRef<HTMLDivElement>(null);
-  const [contactForm, setContactForm] = useState(() =>
-    createEmptyCrmListContactFormState("source_file"),
-  );
-  const [createContactLoading, setCreateContactLoading] = useState(false);
-  const [editingContactId, setEditingContactId] = useState<number | null>(null);
-  const [contactFormLoadError, setContactFormLoadError] = useState<
-    string | null
-  >(null);
-  const [contactFormLoading, setContactFormLoading] = useState(false);
+  const {
+    assignmentFilters,
+    setAssignmentFilters,
+    assignmentCampaign,
+    setAssignmentCampaign,
+    assignmentDistribution,
+    setAssignmentDistribution,
+    totalEntriesToAssign,
+    setTotalEntriesToAssign,
+    customDistribution,
+    setCustomDistribution,
+    assignmentCounts,
+    setAssignmentCounts,
+    availableTags,
+    setAvailableTags,
+    availableCampaigns,
+    setAvailableCampaigns,
+    campaignsById,
+    setCampaignsById,
+    selectedItems,
+    setSelectedItems,
+    afterCallData,
+    setAfterCallData,
+    showScheduleModal,
+    setShowScheduleModal,
+    selectedEntryForSchedule,
+    setSelectedEntryForSchedule,
+    isEditingSchedule,
+    setIsEditingSchedule,
+    scheduleData,
+    setScheduleData,
+    showUnscheduleModal,
+    setShowUnscheduleModal,
+    entryToUnschedule,
+    setEntryToUnschedule,
+    showHistoryModal,
+    setShowHistoryModal,
+    showProspectSidebar,
+    setShowProspectSidebar,
+    showFiltersSidebar,
+    setShowFiltersSidebar,
+    selectedProspect,
+    setSelectedProspect,
+    sidebarProspectFetchTokenRef,
+    showFilterBar,
+    setShowFilterBar,
+    showAddContactsDropdown,
+    setShowAddContactsDropdown,
+    showCreateContactSidebar,
+    setShowCreateContactSidebar,
+    addContactsRef,
+    contactForm,
+    setContactForm,
+    createContactLoading,
+    setCreateContactLoading,
+    editingContactId,
+    setEditingContactId,
+    contactFormLoadError,
+    setContactFormLoadError,
+    contactFormLoading,
+    setContactFormLoading,
+  } = useCrmQuotesListDataAssignmentContactFormState();
 
   // Call recordings (sidebar): list is loaded elsewhere when wired to API
   const callRecordings: any[] = [];
@@ -262,68 +239,73 @@ const CrmQuotesManagement = () => {
   >({});
 
   const showProspectsAnalytics = false;
-  const [showAllProspectStats, setShowAllProspectStats] = useState(false);
 
-  // Valid filter IDs
-  const validFilters = ["all", "expiring_soon", "pending_acceptance", "pending_approval"];
-
-  // Initialize activeFilter state
-  const [activeFilter, setActiveFilter] = useState("all");
-
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [prospectsSearch, setProspectsSearch] = useState("");
-  const [showColumnEditor, setShowColumnEditor] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
-  const [exportFileName, setExportFileName] = useState("");
-  const [showTabModal, setShowTabModal] = useState(false);
-  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
-  const [prospectsFilters, setProspectsFilters] = useState({
-    assignedTo: null as string | null,
-    campaigns: null as string[] | null,
-    nextCallDateFrom: null as string | null,
-    nextCallDateTo: null as string | null,
-    sourceFile: null as string | null,
-    tags: null as string[] | null,
-  });
-  /** View mode: table or board; dropdown shows only the other option to switch */
-  const [prospectsViewMode, setProspectsViewMode] = useState<
-    "table" | "board"
-  >("table");
-
-  // Column customization and pagination states
-  const defaultSelectedColumns = [
-    "title",
-    "status",
-    "amount",
-    "view_count",
-    "signing_status",
-    "user_extension",
-    "created_at",
-  ];
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(
-    () => defaultSelectedColumns,
-  );
-
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
-  });
-  const [dataList, setDataList] = useState<CrmDataItem[]>([]);
-  const [totalRecords, setTotalRecords] = useState(0);
-  /** Total count of all quotes (unchanged when switching tabs) */
-  const [totalAllQuotes, setTotalAllQuotes] = useState(0);
-  const [loading, setLoading] = useState(false);
-
-  const { handleFilterChange } = useCrmListPageTabCreateContactAndFilter({
-    router,
+  const {
     validFilters,
+    showAllProspectStats,
+    setShowAllProspectStats,
+    activeFilter,
     setActiveFilter,
+    showAdvancedFilters,
+    setShowAdvancedFilters,
+    prospectsSearch,
+    setProspectsSearch,
+    showColumnEditor,
+    setShowColumnEditor,
+    showExportModal,
+    setShowExportModal,
+    exporting,
+    setExporting,
+    exportFilters,
+    setExportFilters,
+    exportFileName,
+    setExportFileName,
+    showTabModal,
+    setShowTabModal,
+    customTabs,
+    setCustomTabs,
+    prospectsFilters,
+    setProspectsFilters,
+    prospectsViewMode,
+    setProspectsViewMode,
+    defaultSelectedColumns,
+    selectedColumns,
+    setSelectedColumns,
+    pagination,
     setPagination,
+    dataList,
+    setDataList,
+    totalRecords,
+    setTotalRecords,
+    totalAllQuotes,
+    setTotalAllQuotes,
+    loading,
     setLoading,
+    handleFilterChange,
+    clearSelectedRows,
+    setClearSelectedRows,
+    metrics,
+    setMetrics,
+    historyData,
+    setHistoryData,
+    historyLoading,
+    setHistoryLoading,
+    historyPagination,
+    setHistoryPagination,
+    fetchCampaignsByIds,
+    fetchHistoryData,
+    memoizedFilters,
+    sidebarActivitiesPanelRef,
+    sidebarRecordId,
+    sidebarRecordName,
+    sidebarRecordPhone,
+    sidebarRecordEmail,
+    sidebarActivityModals,
+  } = useCrmQuotesListFiltersMetricsHistorySidebarState({
+    router,
+    currentFilters,
+    selectedProspect,
+    setCampaignsById,
     showAddContactsDropdown,
     setShowAddContactsDropdown,
     addContactsRef,
@@ -331,121 +313,11 @@ const CrmQuotesManagement = () => {
     setShowCreateContactSidebar,
     editingContactId,
     setEditingContactId,
-    setContactForm,
+    setContactForm: setContactForm as Dispatch<
+      SetStateAction<CrmListContactFormState>
+    >,
     setContactFormLoadError,
     setContactFormLoading,
-    sourceField: "source_file",
-    loadFailedMessage: "Failed to load prospect",
-  });
-
-  const [clearSelectedRows, setClearSelectedRows] = useState(false);
-  const [metrics, setMetrics] = useState<any>({
-    assigned_records: 0,
-    unassigned_records: 0,
-    pending_count: 0,
-    expiring_soon_count: 0,
-    pending_approval_count: 0,
-    total_value: 0,
-    signed_count: 0,
-  });
-
-  // History data state
-  const [historyData, setHistoryData] = useState<any[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyPagination, setHistoryPagination] = useState({
-    current_page: 1,
-    last_page: 1,
-    per_page: 15,
-    total: 0,
-    from: 0,
-    to: 0,
-  });
-
-  // Function to fetch campaigns by IDs
-  const fetchCampaignsByIds = useCallback(async (campaignIds: number[]) => {
-    try {
-      const campaignsMap: Record<number, string> = {};
-
-      // Fetch campaigns in batches to avoid overwhelming the API
-      const batchSize = 50;
-      for (let i = 0; i < campaignIds.length; i += batchSize) {
-        const batch = campaignIds.slice(i, i + batchSize);
-        const campaignsResponse = await getCampaigns({
-          per_page: 1000,
-          filters: { ids: batch },
-          module_slug: ModuleSlug.CRM_CAMPAIGNS,
-        });
-
-        campaignsResponse.data.forEach((campaign: any) => {
-          campaignsMap[campaign.id] = campaign.name;
-        });
-      }
-
-      setCampaignsById((prev) => ({ ...prev, ...campaignsMap }));
-      return campaignsMap;
-    } catch (error) {
-      console.error("Failed to fetch campaigns by IDs:", error);
-      return {};
-    }
-  }, []);
-
-  // Fetch history data
-  const fetchHistoryData = useCallback(
-    async (page: number = 1) => {
-      try {
-        setHistoryLoading(true);
-        const response = await getCrmDataHistory(page, 15);
-        console.log("ZE HISTORY DATA", response);
-        setHistoryData(response.data);
-        setHistoryPagination(response.pagination);
-
-        // Extract campaign IDs from history data and fetch campaign names
-        const campaignIds: number[] = [];
-        response.data.forEach((activity: any) => {
-          if (activity.details?.campaign_ids) {
-            campaignIds.push(...activity.details.campaign_ids);
-          }
-        });
-
-        if (campaignIds.length > 0) {
-          const uniqueCampaignIds = Array.from(new Set(campaignIds));
-          await fetchCampaignsByIds(uniqueCampaignIds);
-        }
-      } catch (error) {
-        console.error("Failed to fetch history data:", error);
-        setHistoryData([]);
-      } finally {
-        setHistoryLoading(false);
-      }
-    },
-    [fetchCampaignsByIds],
-  );
-
-  const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
-
-  const sidebarActivitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
-  const sidebarRecordId = Number(
-    selectedProspect?.id ?? selectedProspect?.data?.id ?? 0,
-  );
-  const sidebarRecordName = selectedProspect?.name ?? "Prospect";
-  const sidebarRecordPhone = selectedProspect?.phone ?? "";
-  const sidebarRecordEmail =
-    selectedProspect?.data?.email ??
-    selectedProspect?.data?.data?.email ??
-    selectedProspect?.email ??
-    "";
-
-  const sidebarActivityModals = useCrmActivityModals({
-    recordType: "prospect",
-    recordId: sidebarRecordId,
-    recordName: sidebarRecordName,
-    recordEmail: sidebarRecordEmail,
-    recordPhone: sidebarRecordPhone,
-    onTaskCreated: () => sidebarActivitiesPanelRef.current?.refetchTasks?.(),
-    onNoteCreated: () => sidebarActivitiesPanelRef.current?.refetchNotes?.(),
-    onEmailSent: () => sidebarActivitiesPanelRef.current?.refetchEmails?.(),
-    onMeetingScheduled: () =>
-      sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
   });
 
   const buildCrmDataParams = useCallback(

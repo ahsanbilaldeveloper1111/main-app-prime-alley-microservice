@@ -26,7 +26,7 @@ import {
 import "@assets/css/GenericTable.css";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { useRouter } from "next/router";
-import { normalizeSearchQuery } from "@utils/Helper";
+import { sanitizeSearchInputLive } from "@utils/Helper";
 
 const ACTION_COLUMN_KEY = "actions";
 
@@ -1452,14 +1452,14 @@ const GenericTable = <T extends Record<string, any>>({
                   value={toolbar.searchValue || ""}
                   onChange={(e) =>
                     toolbar.onSearchChange?.(
-                      normalizeSearchQuery(e.target.value),
+                      sanitizeSearchInputLive(e.target.value),
                     )
                   }
                   onPaste={(e) => {
                     const target = e.currentTarget;
                     globalThis.setTimeout(() => {
                       toolbar.onSearchChange?.(
-                        normalizeSearchQuery(target.value),
+                        sanitizeSearchInputLive(target.value),
                       );
                     }, 0);
                   }}

@@ -129,6 +129,28 @@ import {
   CRM_LIST_PAGE_CALL_END_REASONS,
   CRM_LIST_PAGE_STATIC_TAGS,
 } from "@utils/crmListPageStaticData";
+import { useCrmQuotesListDataAssignmentContactFormState } from "@crm/billing-quotes/useCrmQuotesListDataAssignmentContactFormState";
+import {
+  collectUniqueCampaignIdsFromHistoryActivities,
+  fetchCrmCampaignIdToNameMap,
+} from "@crm/billing-quotes/crmQuotesListPageShared";
+import {
+  buildContactsExportCrmDataParams,
+  buildContactsListCrmDataParams,
+  computeContactsAdvancedFiltersApplied,
+} from "@crm/contacts/crmContactsCrmQueryParams";
+import {
+  buildContactsCsvContent,
+  buildContactsExportHeaders,
+  buildContactsSourceFileSelectOptions,
+} from "@crm/contacts/crmContactsPageExportCsv";
+import { validateContactsUploadCsvFile } from "@crm/contacts/crmContactsCsvValidation";
+import {
+  selectCrmContactsSidebarRecordEmail,
+  selectCrmContactsSidebarRecordId,
+  selectCrmContactsSidebarRecordName,
+  selectCrmContactsSidebarRecordPhone,
+} from "@crm/contacts/crmContactsSidebarRecordSelectors";
 
 const CrmContactsManagement = () => {
   const { data: session } = useSession();
@@ -155,92 +177,68 @@ const CrmContactsManagement = () => {
     number | null
   >(null);
 
-  // Data assignment modal states
-  const [assignmentFilters, setAssignmentFilters] = useState({
-    selectedTags: [] as readonly any[],
-    selectedCampaigns: [] as readonly any[],
-  });
-  const [assignmentCampaign, setAssignmentCampaign] = useState<readonly any[]>(
-    [],
-  );
-  const [assignmentDistribution, setAssignmentDistribution] = useState<
-    "equal" | "custom"
-  >("equal");
-  const [totalEntriesToAssign, setTotalEntriesToAssign] = useState(0);
-  const [customDistribution, setCustomDistribution] = useState<
-    Record<string, number>
-  >({});
-  const [assignmentCounts, setAssignmentCounts] = useState({
-    total: 0,
-    assigned: 0,
-    unassigned: 0,
-  });
-  const [availableTags, setAvailableTags] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
-  >([]);
-  const [availableCampaigns, setAvailableCampaigns] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
-  >([]);
-  const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
-    {},
-  );
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-
-  // After Call modal states
-  const [afterCallData, setAfterCallData] = useState({
-    disposition: "",
-    callStatus: "",
-    comment: "",
-    nextCallDate: "",
-    nextCallTime: "",
-    generateLead: "no", // "yes" or "no"
-  });
-
-  // Schedule modal state
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [selectedEntryForSchedule, setSelectedEntryForSchedule] =
-    useState<any>(null);
-  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
-  const [scheduleData, setScheduleData] = useState({
-    date: "",
-    time: "",
-    notes: "",
-  });
-
-  // Unschedule confirmation modal state
-  const [showUnscheduleModal, setShowUnscheduleModal] = useState(false);
-  const [entryToUnschedule, setEntryToUnschedule] = useState<any>(null);
-
-  // History modal state
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-
-  // Sidebar states
-  const [showContactSidebar, setShowContactSidebar] = useState(false);
-  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [selectedContact, setSelectedContact] = useState<any>(null);
-  const sidebarContactFetchTokenRef = useRef(0);
-  // Add Contacts button states
-  const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
-  const [showCreateContactSidebar, setShowCreateContactSidebar] =
-    useState(false);
-  const addContactsRef = useRef<HTMLDivElement>(null);
-  const [contactForm, setContactForm] = useState(() =>
-    createEmptyCrmListContactFormState("source_file"),
-  );
-  const [createContactLoading, setCreateContactLoading] = useState(false);
-  const [editingContactId, setEditingContactId] = useState<number | null>(null);
-  const [contactFormLoadError, setContactFormLoadError] = useState<
-    string | null
-  >(null);
-  const [contactFormLoading, setContactFormLoading] = useState(false);
+  const {
+    assignmentFilters,
+    setAssignmentFilters,
+    assignmentCampaign,
+    setAssignmentCampaign,
+    assignmentDistribution,
+    setAssignmentDistribution,
+    totalEntriesToAssign,
+    setTotalEntriesToAssign,
+    customDistribution,
+    setCustomDistribution,
+    assignmentCounts,
+    setAssignmentCounts,
+    availableTags,
+    setAvailableTags,
+    availableCampaigns,
+    setAvailableCampaigns,
+    campaignsById,
+    setCampaignsById,
+    selectedItems,
+    setSelectedItems,
+    afterCallData,
+    setAfterCallData,
+    showScheduleModal,
+    setShowScheduleModal,
+    selectedEntryForSchedule,
+    setSelectedEntryForSchedule,
+    isEditingSchedule,
+    setIsEditingSchedule,
+    scheduleData,
+    setScheduleData,
+    showUnscheduleModal,
+    setShowUnscheduleModal,
+    entryToUnschedule,
+    setEntryToUnschedule,
+    showHistoryModal,
+    setShowHistoryModal,
+    showProspectSidebar: showContactSidebar,
+    setShowProspectSidebar: setShowContactSidebar,
+    showFiltersSidebar,
+    setShowFiltersSidebar,
+    selectedProspect: selectedContact,
+    setSelectedProspect: setSelectedContact,
+    sidebarProspectFetchTokenRef: sidebarContactFetchTokenRef,
+    showFilterBar: _showFilterBar,
+    setShowFilterBar: _setShowFilterBar,
+    showAddContactsDropdown,
+    setShowAddContactsDropdown,
+    showCreateContactSidebar,
+    setShowCreateContactSidebar,
+    addContactsRef,
+    contactForm,
+    setContactForm,
+    createContactLoading,
+    setCreateContactLoading,
+    editingContactId,
+    setEditingContactId,
+    contactFormLoadError,
+    setContactFormLoadError,
+    contactFormLoading,
+    setContactFormLoading,
+  } = useCrmQuotesListDataAssignmentContactFormState();
 
   // Call recordings state
   const [callRecordings] = useState<any[]>([]);
@@ -355,55 +353,20 @@ const CrmContactsManagement = () => {
     to: 0,
   });
 
-  // Function to fetch campaigns by IDs
-  const fetchCampaignsByIds = useCallback(async (campaignIds: number[]) => {
-    try {
-      const campaignsMap: Record<number, string> = {};
-
-      // Fetch campaigns in batches to avoid overwhelming the API
-      const batchSize = 50;
-      for (let i = 0; i < campaignIds.length; i += batchSize) {
-        const batch = campaignIds.slice(i, i + batchSize);
-        const campaignsResponse = await getCampaigns({
-          per_page: 1000,
-          filters: { ids: batch },
-          module_slug: ModuleSlug.CRM_CAMPAIGNS,
-        });
-
-        campaignsResponse.data.forEach((campaign: any) => {
-          campaignsMap[campaign.id] = campaign.name;
-        });
-      }
-
-      setCampaignsById((prev) => ({ ...prev, ...campaignsMap }));
-      return campaignsMap;
-    } catch (error) {
-      console.error("Failed to fetch campaigns by IDs:", error);
-      return {};
-    }
-  }, []);
-
-  // Fetch history data
   const fetchHistoryData = useCallback(
     async (page: number = 1) => {
       try {
         setHistoryLoading(true);
         const response = await getCrmDataHistory(page, 15);
-        console.log("ZE HISTORY DATA", response);
         setHistoryData(response.data);
         setHistoryPagination(response.pagination);
 
-        // Extract campaign IDs from history data and fetch campaign names
-        const campaignIds: number[] = [];
-        response.data.forEach((activity: any) => {
-          if (activity.details?.campaign_ids) {
-            campaignIds.push(...activity.details.campaign_ids);
-          }
-        });
-
-        if (campaignIds.length > 0) {
-          const uniqueCampaignIds = Array.from(new Set(campaignIds));
-          await fetchCampaignsByIds(uniqueCampaignIds);
+        const uniqueCampaignIds = collectUniqueCampaignIdsFromHistoryActivities(
+          response.data,
+        );
+        if (uniqueCampaignIds.length > 0) {
+          const map = await fetchCrmCampaignIdToNameMap(uniqueCampaignIds);
+          setCampaignsById((prev) => ({ ...prev, ...map }));
         }
       } catch (error) {
         console.error("Failed to fetch history data:", error);
@@ -412,22 +375,19 @@ const CrmContactsManagement = () => {
         setHistoryLoading(false);
       }
     },
-    [fetchCampaignsByIds],
+    [setCampaignsById],
   );
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
   const sidebarActivitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
-  const sidebarRecordId = Number(
-    selectedContact?.id ?? selectedContact?.data?.id ?? 0,
-  );
-  const sidebarRecordName = selectedContact?.name ?? "Contact";
-  const sidebarRecordPhone = selectedContact?.phone ?? "";
+  const sidebarRecordId = selectCrmContactsSidebarRecordId(selectedContact);
+  const sidebarRecordName =
+    selectCrmContactsSidebarRecordName(selectedContact);
+  const sidebarRecordPhone =
+    selectCrmContactsSidebarRecordPhone(selectedContact);
   const sidebarRecordEmail =
-    selectedContact?.data?.email ??
-    selectedContact?.data?.data?.email ??
-    selectedContact?.email ??
-    "";
+    selectCrmContactsSidebarRecordEmail(selectedContact);
 
   const sidebarActivityModals = useCrmActivityModals({
     recordType: "prospect",
@@ -443,66 +403,8 @@ const CrmContactsManagement = () => {
   });
 
   const buildCrmDataParams = useCallback(
-    (overrides: { page?: number; per_page?: number } = {}) => {
-      const params: any = {
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-        ...overrides,
-      };
-      if (memoizedFilters.search) params.search = memoizedFilters.search;
-      if (memoizedFilters.campaign_id?.length)
-        params.campaign_ids = memoizedFilters.campaign_id;
-      if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
-      if (memoizedFilters.assignment_status)
-        params.assignment_status = memoizedFilters.assignment_status;
-      if (memoizedFilters.user_extension?.length) {
-        params.user_extensions = Array.isArray(memoizedFilters.user_extension)
-          ? memoizedFilters.user_extension
-          : [memoizedFilters.user_extension];
-      }
-      if (
-        memoizedFilters.is_viewed !== undefined &&
-        memoizedFilters.is_viewed !== ""
-      )
-        params.is_viewed = memoizedFilters.is_viewed;
-      // Create date filter: backend expects date_from / date_to
-      if (memoizedFilters.created_at_from)
-        params.date_from = memoizedFilters.created_at_from;
-      if (memoizedFilters.created_at_to)
-        params.date_to = memoizedFilters.created_at_to;
-      if (memoizedFilters.last_called_at_from)
-        params.last_called_at_from = memoizedFilters.last_called_at_from;
-      if (memoizedFilters.last_called_at_to)
-        params.last_called_at_to = memoizedFilters.last_called_at_to;
-      if (memoizedFilters.has_scheduled_calls !== undefined)
-        params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
-      if (memoizedFilters.has_tickets !== undefined)
-        params.has_tickets = memoizedFilters.has_tickets;
-      if (memoizedFilters.scheduled_call_status)
-        params.scheduled_call_status = memoizedFilters.scheduled_call_status;
-      if (memoizedFilters.scheduled_call_from)
-        params.scheduled_call_from = memoizedFilters.scheduled_call_from;
-      if (memoizedFilters.scheduled_call_to)
-        params.scheduled_call_to = memoizedFilters.scheduled_call_to;
-      if (memoizedFilters.source_file)
-        params.source_file = memoizedFilters.source_file;
-      if (memoizedFilters.tag_ids?.length)
-        params.tag_ids = memoizedFilters.tag_ids;
-      // Last activity / last called filter (from filter pill)
-      if (memoizedFilters.last_called_at_from)
-        params.last_called_at_from = memoizedFilters.last_called_at_from;
-      if (memoizedFilters.last_called_at_to)
-        params.last_called_at_to = memoizedFilters.last_called_at_to;
-      // Lead status / disposition filter (from filter pill)
-      if (memoizedFilters.disposition)
-        params.disposition = memoizedFilters.disposition;
-      if (pagination.sortColumn) {
-        params.sort_column = pagination.sortColumn;
-        params.sort_direction = pagination.sortDirection;
-      }
-      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
-      return params;
-    },
+    (overrides: { page?: number; per_page?: number } = {}) =>
+      buildContactsListCrmDataParams(memoizedFilters, pagination, overrides),
     [
       memoizedFilters,
       pagination.currentPage,
@@ -512,52 +414,11 @@ const CrmContactsManagement = () => {
     ],
   );
 
-  // Build API params from arbitrary filters (for export with custom filters)
   const buildExportParams = useCallback(
     (
       filters: Record<string, any>,
       overrides: { page?: number; per_page?: number } = {},
-    ) => {
-      const params: any = {
-        page: overrides.page ?? 1,
-        per_page: overrides.per_page ?? 100,
-        ...overrides,
-      };
-      if (filters.search) params.search = filters.search;
-      if (filters.campaign_id?.length)
-        params.campaign_ids = filters.campaign_id;
-      if (filters.tags?.length) params.tags = filters.tags;
-      if (filters.assignment_status)
-        params.assignment_status = filters.assignment_status;
-      if (filters.user_extension?.length)
-        params.user_extensions = Array.isArray(filters.user_extension)
-          ? filters.user_extension
-          : [filters.user_extension];
-      if (filters.is_viewed !== undefined && filters.is_viewed !== "")
-        params.is_viewed = filters.is_viewed;
-      // Create date filter: backend expects date_from / date_to
-      if (filters.created_at_from) params.date_from = filters.created_at_from;
-      if (filters.created_at_to) params.date_to = filters.created_at_to;
-      if (filters.last_called_at_from)
-        params.last_called_at_from = filters.last_called_at_from;
-      if (filters.last_called_at_to)
-        params.last_called_at_to = filters.last_called_at_to;
-      if (filters.has_scheduled_calls !== undefined)
-        params.has_scheduled_calls = filters.has_scheduled_calls;
-      if (filters.has_tickets !== undefined)
-        params.has_tickets = filters.has_tickets;
-      if (filters.scheduled_call_status)
-        params.scheduled_call_status = filters.scheduled_call_status;
-      if (filters.scheduled_call_from)
-        params.scheduled_call_from = filters.scheduled_call_from;
-      if (filters.scheduled_call_to)
-        params.scheduled_call_to = filters.scheduled_call_to;
-      if (filters.source_file) params.source_file = filters.source_file;
-      if (filters.tag_ids?.length) params.tag_ids = filters.tag_ids;
-      if (filters.disposition) params.disposition = filters.disposition;
-      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
-      return params;
-    },
+    ) => buildContactsExportCrmDataParams(filters, overrides),
     [],
   );
 
@@ -591,68 +452,13 @@ const CrmContactsManagement = () => {
         toast.info("No contacts match the selected filters.");
         return;
       }
-      const topLevelKeys = new Set<string>();
-      const nestedDataKeys = new Set<string>();
-      for (const row of allData as any[]) {
-        if (!row || typeof row !== "object") continue;
-        for (const k of Object.keys(row)) {
-          if (k === "data" && row.data && typeof row.data === "object") {
-            for (const dk of Object.keys(row.data)) nestedDataKeys.add(dk);
-          } else if (k !== "campaign" && k !== "company") {
-            topLevelKeys.add(k);
-          }
-        }
-      }
-      const preferredTopLevelOrder = [
-        "id", "name", "phone", "user_extension", "campaign_id", "source_file",
-        "directory", "is_viewed", "scheduled_call_at", "uploaded_by", "created_by",
-        "note", "company_name", "company_domain", "company_id", "created_at",
-        "updated_at", "tags", "crm_summary",
-      ];
-      const orderedTopLevel = [
-        ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
-        ...Array.from(topLevelKeys).filter((k) => !preferredTopLevelOrder.includes(k)).sort((a, b) => a.localeCompare(b)),
-      ];
-      const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) => a.localeCompare(b));
-      const nestedDataKeysSet = new Set(orderedNestedData);
-      const headers = [
-        ...orderedTopLevel,
-        ...orderedNestedData.filter((k) => !orderedTopLevel.includes(k)),
-      ];
-      const getCellValue = (row: any, header: string) => {
-        if (header === "campaign_id") {
-          const label = row?.campaign?.name;
-          if (label != null) return label;
-          return row?.campaign_id != null ? String(row.campaign_id) : "";
-        }
-        if (header === "company_name") {
-          const name = row?.company?.name;
-          if (name != null) return name;
-          return row?.company_name != null ? String(row.company_name) : "";
-        }
-        if (header === "crm_summary") {
-          const summary = row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
-          return summary != null ? (typeof summary === "string" ? summary : String(summary)) : "";
-        }
-        const raw = nestedDataKeysSet.has(header) ? (row?.data?.[header] ?? row?.[header]) : row?.[header];
-        if (raw == null) return "";
-        if (typeof raw === "string") return raw;
-        if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
-        try {
-          return JSON.stringify(raw);
-        } catch {
-          return String(raw);
-        }
-      };
-      const escapeCsv = (val: string) => {
-        const s = String(val);
-        if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-        return s;
-      };
-      const csvContent = [
-        headers.map((h) => escapeCsv(h)).join(","),
-        ...allData.map((row) => headers.map((h) => escapeCsv(getCellValue(row, h))).join(",")),
-      ].join("\n");
+      const { headers, nestedDataKeysSet } =
+        buildContactsExportHeaders(allData);
+      const csvContent = buildContactsCsvContent(
+        headers,
+        allData,
+        nestedDataKeysSet,
+      );
       const blob = new Blob([csvContent], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -669,21 +475,10 @@ const CrmContactsManagement = () => {
     }
   }, [exportFileName, exportFilters, fetchCrmDataForExport]);
 
-  // Extract unique source_file values from dataList for creatable select
-  const uniqueSources = useMemo(() => {
-    const sources = new Set<string>();
-    dataList.forEach((item: any) => {
-      if (item.source_file && item.source_file.trim()) {
-        sources.add(item.source_file.trim());
-      }
-    });
-    return Array.from(sources)
-      .sort()
-      .map((source) => ({
-        value: source,
-        label: source,
-      }));
-  }, [dataList]);
+  const uniqueSources = useMemo(
+    () => buildContactsSourceFileSelectOptions(dataList),
+    [dataList],
+  );
 
   // Initialize export filters when export modal opens (default to current table filters)
   useEffect(() => {
@@ -805,20 +600,10 @@ const CrmContactsManagement = () => {
     [currentFilters, handleFiltersChange, setPagination],
   );
 
-  const hasAdvancedFiltersApplied = useMemo(() => {
-    const campaign = currentFilters.campaign_id;
-    const hasCampaign =
-      Array.isArray(campaign) ? campaign.length > 0 : !!campaign;
-
-    const tags = currentFilters.tags;
-    const hasTags = Array.isArray(tags) ? tags.length > 0 : !!tags;
-
-    const hasSource = !!currentFilters.source_file;
-    const hasNextCall =
-      !!currentFilters.scheduled_call_from || !!currentFilters.scheduled_call_to;
-
-    return hasCampaign || hasTags || hasSource || hasNextCall;
-  }, [currentFilters]);
+  const hasAdvancedFiltersApplied = useMemo(
+    () => computeContactsAdvancedFiltersApplied(currentFilters),
+    [currentFilters],
+  );
 
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
@@ -1175,40 +960,8 @@ const CrmContactsManagement = () => {
     }
   }, [clearSelectedRows]);
 
-  // CSV validation function
-  const validateCsvFile = (
-    file: File,
-  ): { isValid: boolean; errors: string[] } => {
-    const errors: string[] = [];
-
-    // Check file type
-    if (
-      !file.type.includes("csv") &&
-      !file.name.toLowerCase().endsWith(".csv")
-    ) {
-      errors.push("File must be a CSV file");
-    }
-
-    // Check file size (2MB max)
-    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
-    if (file.size > maxSize) {
-      errors.push("File size must be less than 2MB");
-    }
-
-    // Check if file is empty
-    if (file.size === 0) {
-      errors.push("File cannot be empty");
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
-  };
-
-  // Handle file selection
   const handleFileSelect = (file: File) => {
-    const validation = validateCsvFile(file);
+    const validation = validateContactsUploadCsvFile(file);
 
     if (validation.isValid) {
       setSelectedFile(file);
@@ -3921,7 +3674,11 @@ const CrmContactsManagement = () => {
                           }}
                           onClick={() => {
                             if (selectedDataItem) {
-                              void handleCallClick(selectedDataItem);
+                              handleCallClick(selectedDataItem).catch(
+                                (error: unknown) => {
+                                  console.error("Call error:", error);
+                                },
+                              );
                             }
                           }}
                           onMouseOver={(e) => {
@@ -3976,7 +3733,7 @@ const CrmContactsManagement = () => {
                               return;
                             }
                             window.open(
-                              `https://wa.me/${String(phone).replace(/\D/g, "")}`,
+                              `https://wa.me/${String(phone).replaceAll(/\D/g, "")}`,
                               "_blank",
                             );
                           }}

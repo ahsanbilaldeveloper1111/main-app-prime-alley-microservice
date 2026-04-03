@@ -1,6 +1,6 @@
 import React from 'react';
 import { Row, Col, Button } from 'react-bootstrap';
-import { normalizeSearchQuery } from '@utils/Helper';
+import { sanitizeSearchInputLive } from '@utils/Helper';
 
 interface PageHeaderProps {
   title: string;
@@ -51,12 +51,12 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                         placeholder={searchPlaceholder}
                         value={searchValue}
                         onChange={(e) =>
-                          onSearchChange?.(normalizeSearchQuery(e.target.value))
+                          onSearchChange?.(sanitizeSearchInputLive(e.target.value))
                         }
                         onPaste={(e) => {
                           const target = e.currentTarget;
                           globalThis.setTimeout(() => {
-                            onSearchChange?.(normalizeSearchQuery(target.value));
+                            onSearchChange?.(sanitizeSearchInputLive(target.value));
                           }, 0);
                         }}
                       />

@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import moment from "moment";
 import type { ToolbarConfig, FilterPill, TabConfig } from "@components/GenericTable";
+import { normalizeSearchQuery } from "@utils/Helper";
 
 export type CrmEntityType = "prospects" | "leads" | "deals" | "orders" | "approvals";
 
@@ -130,7 +131,6 @@ export function useCrmToolbarConfig(
     searchValue,
     searchPlaceholder,
     onSearchChange,
-    onSearch,
     currentFilters,
     handleFiltersChange,
     refresh,
@@ -418,17 +418,21 @@ export function useCrmToolbarConfig(
       searchPlaceholder,
       onSearchChange: (value: string) => {
         onSearchChange(value);
-        if (!value) {
+        if (!normalizeSearchQuery(value)) {
           handleFiltersChange({ ...currentFilters, search: undefined });
           refresh();
         }
       },
       onSearch: () => {
-        if (searchValue) {
-          handleFiltersChange({ ...currentFilters, search: searchValue });
+        const q = normalizeSearchQuery(searchValue);
+        onSearchChange(q);
+        if (q) {
+          handleFiltersChange({ ...currentFilters, search: q });
           onPaginationReset?.();
-          refresh();
+        } else {
+          handleFiltersChange({ ...currentFilters, search: undefined });
         }
+        refresh();
       },
 
       showTableViewDropdown: true,

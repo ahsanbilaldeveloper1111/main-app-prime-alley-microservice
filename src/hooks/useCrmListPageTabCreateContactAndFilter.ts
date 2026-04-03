@@ -6,11 +6,15 @@ import {
   type SetStateAction,
 } from "react";
 import type { NextRouter } from "next/router";
-import { getCrmDataById, type CrmDataItem } from "@utils/crm";
 import {
-  mapCrmDataItemToContactFormState,
-  type CrmItemForContactForm,
-} from "@utils/crmContactFormFromCrmItem";
+  buildShallowTabFilterPushArgs,
+  createAddContactsDropdownMousedownOutsideHandler,
+  isRouterQueryStringEqual,
+  loadEditableContactFormFromCrmId,
+  omitCreateContactDeepLinkQueryKeys,
+  parsePositiveIntFromQueryParam,
+  resolveTabFilterFromUrlQuery,
+} from "@hooks/crmListPageTabCreateContactAndFilterHelpers";
 
 export type UseCrmListPageTabCreateContactAndFilterParams<
   TForm,
@@ -66,46 +70,37 @@ export function useCrmListPageTabCreateContactAndFilter<
   } = params;
 
   useEffect(() => {
-    if (router.isReady && router.query.tab) {
-      const tabFromUrl = String(router.query.tab);
-      if (validFilters.includes(tabFromUrl)) {
-        setActiveFilter(tabFromUrl);
-      }
-    }
-  }, [router.isReady, router.query.tab]);
+    if (!router.isReady) return;
+    const tab = resolveTabFilterFromUrlQuery(router.query.tab, validFilters);
+    if (tab != null) setActiveFilter(tab);
+  }, [router.isReady, router.query.tab, validFilters, setActiveFilter]);
 
   useEffect(() => {
-    if (!router.isReady || router.query.createContact !== "1") return;
+    if (!router.isReady || !isRouterQueryStringEqual(router.query.createContact, "1"))
+      return;
     setShowCreateContactSidebar(true);
-    const rawEditId = router.query.editContactId;
-    const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
-    const editIdNum = editIdStr == null ? Number.NaN : Number(editIdStr);
-    if (Number.isFinite(editIdNum) && editIdNum > 0) {
-      setEditingContactId(editIdNum);
-    }
+    const editId = parsePositiveIntFromQueryParam(router.query.editContactId);
+    if (editId != null) setEditingContactId(editId);
 
-    const { createContact: _c, editContactId: _e, ...rest } = router.query;
-    router.replace({ pathname: router.pathname, query: rest }, undefined, {
-      shallow: true,
-    });
+    router.replace(
+      {
+        pathname: router.pathname,
+        query: omitCreateContactDeepLinkQueryKeys(router.query),
+      },
+      undefined,
+      { shallow: true },
+    );
   }, [router.isReady, router.query.createContact, router.query.editContactId]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        addContactsRef.current &&
-        !addContactsRef.current.contains(event.target as Node)
-      ) {
-        setShowAddContactsDropdown(false);
-      }
-    };
-
-    if (showAddContactsDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showAddContactsDropdown]);
+    if (!showAddContactsDropdown) return;
+    const handleClickOutside = createAddContactsDropdownMousedownOutsideHandler(
+      addContactsRef,
+      setShowAddContactsDropdown,
+    );
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showAddContactsDropdown, addContactsRef, setShowAddContactsDropdown]);
 
   useEffect(() => {
     if (!showCreateContactSidebar || !editingContactId) {
@@ -114,36 +109,27 @@ export function useCrmListPageTabCreateContactAndFilter<
       return;
     }
     let cancelled = false;
-    setContactFormLoadError(null);
-    setContactFormLoading(true);
-    getCrmDataById(editingContactId)
-      .then(
-        (
-          item: CrmDataItem & {
-            data?: Record<string, unknown>;
-            source_file?: string;
-            tags?: { id?: number; name?: string }[];
-          },
-        ) => {
-          if (cancelled) return;
-          const mapped = mapCrmDataItemToContactFormState(
-            item as CrmItemForContactForm,
-            sourceField,
-          );
-          setContactForm(mapped as TForm);
-          if (!cancelled) setContactFormLoading(false);
-        },
-      )
-      .catch(() => {
-        if (!cancelled) {
-          setContactFormLoadError(loadFailedMessage);
-          setContactFormLoading(false);
-        }
-      });
+    loadEditableContactFormFromCrmId({
+      editingContactId,
+      sourceField,
+      loadFailedMessage,
+      setContactForm,
+      setContactFormLoadError,
+      setContactFormLoading,
+      isCancelled: () => cancelled,
+    });
     return () => {
       cancelled = true;
     };
-  }, [showCreateContactSidebar, editingContactId]);
+  }, [
+    showCreateContactSidebar,
+    editingContactId,
+    sourceField,
+    loadFailedMessage,
+    setContactForm,
+    setContactFormLoadError,
+    setContactFormLoading,
+  ]);
 
   const handleFilterChange = useCallback(
     (filterId: string) => {
@@ -154,15 +140,17 @@ export function useCrmListPageTabCreateContactAndFilter<
       }
 
       router.push(
-        {
-          pathname: router.pathname,
-          query: { ...router.query, tab: filterId },
-        },
+        buildShallowTabFilterPushArgs(router.pathname, router.query, filterId),
         undefined,
         { shallow: true },
       );
     },
-    [router],
+    [
+      router,
+      setActiveFilter,
+      setLoading,
+      setPagination,
+    ],
   );
 
   return { handleFilterChange };
