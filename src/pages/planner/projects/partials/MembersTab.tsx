@@ -5,6 +5,7 @@ import { UserPlus, Edit, Trash2, Users, Filter } from 'lucide-react';
 import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import type { StatsCardData } from '@components/GenericStatsCards';
+import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 
 interface MembersTabProps {
   selectedProject: any;
@@ -253,6 +254,23 @@ const MembersTab: React.FC<MembersTabProps> = ({
     const label = resolved.name === extNum ? extNum : `${resolved.name} (${extNum})`;
     return { value: extNum, label };
   }, [selectedMember, allExtensionOptions]);
+
+  const removeMemberModalItemName = useMemo(() => {
+    if (selectedMember) {
+      return resolveMemberUser(selectedMember).name;
+    }
+    if (selectedItems.length > 0) {
+      return `${selectedItems.length} selected members`;
+    }
+    return undefined;
+  }, [selectedMember, selectedItems.length]);
+
+  const removeMemberModalAdditionalInfo =
+    selectedMember && String(selectedMember.extension_number || '').trim() ? (
+      <p className="text-muted small mb-0">
+        Extension <span className="font-monospace">{String(selectedMember.extension_number)}</span>
+      </p>
+    ) : undefined;
 
   const reactSelectStyles = {
     control: (base: any, state: any) => ({
@@ -763,24 +781,18 @@ const MembersTab: React.FC<MembersTabProps> = ({
         </Modal.Footer>
       </Modal>
 
-      {/* ── Remove Confirmation Modal ── */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Remove Member</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>
-            Are you sure you want to remove{' '}
-            <strong>{selectedMember?.user?.name || selectedMember?.extension_number}</strong> from this project?
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
-          <Button variant="danger" onClick={handleRemoveMember} disabled={processing}>
-            {processing ? <Spinner size="sm" animation="border" /> : 'Remove Member'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setSelectedMember(null);
+        }}
+        onConfirm={handleRemoveMember}
+        itemName={removeMemberModalItemName}
+        itemType="member"
+        additionalInfo={removeMemberModalAdditionalInfo}
+        loading={processing}
+      />
     </>
   );
 };

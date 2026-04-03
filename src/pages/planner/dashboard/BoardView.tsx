@@ -5,6 +5,7 @@ import {
   canManageProjectFromMembers,
   getSessionPhoneOrExtension,
 } from '@planner/projectMemberRole';
+import { sortStringsLocale } from '@planner/projectTabsContentUtils';
 import {
   Plus,
   ChevronLeft,
@@ -446,6 +447,16 @@ const BoardView: React.FC<BoardViewProps> = ({
     [extensionNameByNumber],
   );
 
+  /** Project members + board task assignees + hierarchy extensions (for full filter list). */
+  const boardAssigneeFilterIds = useMemo(() => {
+    const ids = new Set<string>(getAllBoardAssignees());
+    (hierarchyDataExtensions || []).forEach((ext: any) => {
+      const key = extensionNumberToMapKey(ext?.extension_number ?? ext?.id);
+      if (key) ids.add(key);
+    });
+    return Array.from(ids).sort(sortStringsLocale);
+  }, [getAllBoardAssignees, hierarchyDataExtensions]);
+
   const getAssigneeDisplayName = (assignee: any): string => {
     if (!assignee) return '';
     if (assignee.user?.name) return String(assignee.user.name);
@@ -576,7 +587,7 @@ const BoardView: React.FC<BoardViewProps> = ({
           setBoardFilterDraft((d) => ({ ...d, assignee: v ?? 'All Assignees' })),
         options: [
           { value: 'All Assignees', label: 'All Assignees' },
-          ...getAllBoardAssignees().map((ext) => ({
+          ...boardAssigneeFilterIds.map((ext) => ({
             value: ext,
             label: getUserNameFromExtension(ext) || ext,
           })),
@@ -630,7 +641,7 @@ const BoardView: React.FC<BoardViewProps> = ({
       boardFilterDraft.label,
       labels,
       statuses,
-      getAllBoardAssignees,
+      boardAssigneeFilterIds,
       getAllBoardPriorities,
       getUserNameFromExtension,
     ],
@@ -684,11 +695,9 @@ const BoardView: React.FC<BoardViewProps> = ({
     column: {
       display: 'flex',
       flexDirection: 'column' as const,
-      flexShrink: 0,
-      minWidth: '280px',
       maxHeight: '100%',
       overflow: 'hidden',
-      transition: 'width .15s ease',
+      transition: 'flex-basis .15s ease, min-width .15s ease',
       backgroundColor: '#ffffff'
     },
     addButton: {
@@ -936,8 +945,19 @@ const BoardView: React.FC<BoardViewProps> = ({
               key={status.id} 
               style={{
                 ...styles.column,
-                width: isCollapsed ? '46px' : '280px',
-                minWidth: isCollapsed ? '46px' : '280px',
+                ...(isCollapsed
+                  ? {
+                      flex: '0 0 46px',
+                      width: '46px',
+                      minWidth: '46px',
+                      maxWidth: '46px',
+                    }
+                  : {
+                      flex: '1 1 280px',
+                      minWidth: '280px',
+                      width: 'auto',
+                      maxWidth: 'none',
+                    }),
                 borderRight: isCollapsed ? '1px solid #e5e7eb' : 'none'
               }}
             >

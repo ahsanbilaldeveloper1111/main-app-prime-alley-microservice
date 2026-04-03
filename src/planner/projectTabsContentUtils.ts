@@ -55,6 +55,37 @@ export function readListTasksEnvelope(res: unknown): {
   };
 }
 
+/**
+ * Stringify extension/id-like values for Set keys and filters.
+ * Avoids `String(object)` → `[object Object]` by only accepting primitives.
+ */
+export function extensionOrIdToTrimmedString(value: unknown): string {
+  if (value == null || value === '') {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value).trim();
+  }
+  if (typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value).trim();
+  }
+  return '';
+}
+
+/** First non-empty string from candidates (same coercion as {@link extensionOrIdToTrimmedString}). */
+export function firstExtensionOrIdString(...candidates: unknown[]): string {
+  for (const c of candidates) {
+    const s = extensionOrIdToTrimmedString(c);
+    if (s) {
+      return s;
+    }
+  }
+  return '';
+}
+
 export function applyListTabFiltersToParams(
   params: ListTasksParams,
   filters: ListTabFiltersState,
@@ -348,6 +379,14 @@ export function formatOverdueTasksForUi(overdue: unknown) {
 export function sortStringsLocale(a: string, b: string): number {
   return a.localeCompare(b, undefined, { sensitivity: 'base' });
 }
+
+/** Shown in board priority filter in addition to any `task.priority` values on the board. */
+export const BOARD_FILTER_STANDARD_PRIORITIES: readonly string[] = [
+  'Low',
+  'Medium',
+  'High',
+  'Urgent',
+];
 
 export type BoardTabColumnFilters = {
   searchTerm: string;
