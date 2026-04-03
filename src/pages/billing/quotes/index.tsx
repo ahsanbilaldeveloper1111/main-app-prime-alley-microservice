@@ -33,7 +33,6 @@ import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import moment from "moment";
-import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import { CreateQuoteSidebar } from "@components/renderCreateQuoteForm";
 import InvoiceCreationPage from "@pages/billing/create-invoice";
@@ -61,12 +60,10 @@ import {
 import {
   Users,
   Calendar,
-  XCircle,
   Clock as ClockIcon,
   ChevronDown,
   X,
   AlertCircle as AlertCircleIcon,
-  UserPlus,
   Plus,
   ArrowUp,
   ArrowDown,
@@ -95,11 +92,8 @@ import {
 import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
 import GenericTable, {
-  TableColumn,
-  TableAction,
   PaginationConfig,
   ToolbarConfig,
-  FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
@@ -119,9 +113,7 @@ import {
   createCrmData,
   updateCrmData,
   uploadCrmDataCsv,
-  deleteCrmData,
   assignCrmDataAdvanced,
-  getCrmDataCounts,
   bulkDeleteCrmData,
   getCrmDataTags,
   markCrmDataAsViewed,
@@ -157,10 +149,7 @@ import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import {
-  CrmKPICard as KPICard,
-  CrmFilterBar as FilterBar,
-} from "@components/crm/CrmListPageUi";
+import { CrmFilterBar as FilterBar } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import {
@@ -173,6 +162,18 @@ import {
 } from "@utils/crmListPageStaticData";
 import { useCrmQuotesListDataAssignmentContactFormState } from "@crm/billing-quotes/useCrmQuotesListDataAssignmentContactFormState";
 import { useCrmQuotesListFiltersMetricsHistorySidebarState } from "@crm/billing-quotes/useCrmQuotesListFiltersMetricsHistorySidebarState";
+import { buildCrmQuotesListStatsCards } from "@crm/billing-quotes/crmQuotesListStatsAndTable";
+import { CrmQuotesListProspectKpiAnalyticsSection } from "@crm/billing-quotes/CrmQuotesListProspectKpiAnalyticsSection";
+import {
+  mergeCrmQuotesListProspectsToolbarConfig,
+  renderCrmQuotesListProspectsBoardCustomBody,
+} from "@crm/billing-quotes/crmQuotesListProspectsTableToolbarAndBoard";
+import {
+  buildCrmQuotesListQuoteToolbarFilterPills,
+  getCrmQuotesListProspectQuickFilters,
+} from "@crm/billing-quotes/crmQuotesListToolbarFilters";
+import { useCrmQuotesListQuotesTableModel } from "@crm/billing-quotes/useCrmQuotesListQuotesTableModel";
+import { useCrmQuotesListSharedQuoteListCallbacks } from "@crm/billing-quotes/useCrmQuotesListSharedQuoteListCallbacks";
 
 const CrmQuotesManagement = () => {
   const { data: session } = useSession();
@@ -269,6 +270,21 @@ const CrmQuotesManagement = () => {
     contactFormLoading,
     setContactFormLoading,
   } = useCrmQuotesListDataAssignmentContactFormState();
+
+  const {
+    confirmDelete,
+    handleDuplicateQuote,
+    handleSendToContact,
+    calculateEntryCounts,
+  } = useCrmQuotesListSharedQuoteListCallbacks({
+    itemToDelete,
+    setShowDeleteModal,
+    setDeleteModalMode,
+    setItemToDelete,
+    setRefreshKey,
+    router,
+    assignmentFilters,
+  });
 
   // Call recordings state
   const [callRecordings, setCallRecordings] = useState<any[]>([]);
@@ -673,22 +689,6 @@ const CrmQuotesManagement = () => {
     }
   }, [exportFileName, exportFilters, fetchCrmDataForExport]);
 
-  // Extract unique source_file values from dataList for creatable select
-  const uniqueSources = useMemo(() => {
-    const sources = new Set<string>();
-    dataList.forEach((item: any) => {
-      if (item.source_file && item.source_file.trim()) {
-        sources.add(item.source_file.trim());
-      }
-    });
-    return Array.from(sources)
-      .sort()
-      .map((source) => ({
-        value: source,
-        label: source,
-      }));
-  }, [dataList]);
-
   // Initialize export filters when export modal opens (default to current table filters)
   useEffect(() => {
     if (showExportModal) {
@@ -827,488 +827,21 @@ const CrmQuotesManagement = () => {
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
 
-  // Quote-specific filter pills
-  const quotesFilterPills = useMemo<FilterPill[]>(() => {
-    const quoteStatusValue = currentFilters.status ?? null;
-    const lastActivityDate = currentFilters.last_activity_date ?? "";
-    const quoteOwnerValue = currentFilters.quote_owner ?? null;
-    const signingStatusValue = currentFilters.signing_status ?? null;
+  const prospectQuickFilters = useMemo(
+    () => getCrmQuotesListProspectQuickFilters(),
+    [],
+  );
 
-    return [
-      {
-        id: "quote_status",
-        label: "Quote Status",
-        showDropdown: true,
-        active: !!quoteStatusValue,
-        activeLabel: quoteStatusValue ? String(quoteStatusValue) : undefined,
-        onClear: () => {
-          applyTableFiltersPatch({ status: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Select
-              options={[
-                { value: "Draft", label: "Draft" },
-                { value: "Published", label: "Published" },
-                { value: "Signed", label: "Signed" },
-              ]}
-              value={
-                quoteStatusValue
-                  ? { value: quoteStatusValue, label: String(quoteStatusValue) }
-                  : null
-              }
-              onChange={(selected) => {
-                const v = selected ? (selected as any).value : null;
-                applyTableFiltersPatch({ status: v });
-              }}
-              placeholder="Select status..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  applyTableFiltersPatch({ status: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "last_activity_date",
-        label: "Last Activity Date",
-        showDropdown: true,
-        active: !!lastActivityDate,
-        activeLabel: lastActivityDate
-          ? moment(lastActivityDate).isValid()
-            ? moment(lastActivityDate).format("MMM D, YYYY")
-            : String(lastActivityDate)
-          : undefined,
-        onClear: () => {
-          applyTableFiltersPatch({ last_activity_date: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Form.Label className="small fw-bold mb-1">
-              Last Activity Date
-            </Form.Label>
-            <Form.Control
-              type="date"
-              value={lastActivityDate || ""}
-              onChange={(e) => {
-                const v = e.target.value || null;
-                applyTableFiltersPatch({ last_activity_date: v });
-              }}
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  applyTableFiltersPatch({ last_activity_date: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "quote_owner",
-        label: "Quote Owner",
-        showDropdown: true,
-        active: !!quoteOwnerValue,
-        activeLabel: quoteOwnerValue
-          ? (() => {
-              const ext = extensions.find(
-                (e: any) => (e.id || e.extension) === quoteOwnerValue,
-              );
-              return ext
-                ? ext.display_name || ext.name || String(quoteOwnerValue)
-                : String(quoteOwnerValue);
-            })()
-          : undefined,
-        onClear: () => {
-          applyTableFiltersPatch({ quote_owner: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Select
-              options={extensions.map((ext: any) => ({
-                value: ext.id || ext.extension,
-                label:
-                  ext.display_name || ext.name || ext.id || ext.extension,
-              }))}
-              value={
-                quoteOwnerValue
-                  ? (() => {
-                      const ext = extensions.find(
-                        (e: any) => (e.id || e.extension) === quoteOwnerValue,
-                      );
-                      return ext
-                        ? {
-                            value: quoteOwnerValue,
-                            label:
-                              ext.display_name ||
-                              ext.name ||
-                              String(quoteOwnerValue),
-                          }
-                        : { value: quoteOwnerValue, label: String(quoteOwnerValue) };
-                    })()
-                  : null
-              }
-              onChange={(selected) => {
-                const v = selected ? (selected as any).value : null;
-                applyTableFiltersPatch({ quote_owner: v });
-              }}
-              placeholder="Select owner..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  applyTableFiltersPatch({ quote_owner: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "signing_status",
-        label: "Signing Status",
-        showDropdown: true,
-        active: !!signingStatusValue,
-        activeLabel: signingStatusValue
-          ? String(signingStatusValue)
-          : undefined,
-        onClear: () => {
-          applyTableFiltersPatch({ signing_status: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Select
-              options={[
-                { value: "Pending", label: "Pending" },
-                { value: "Viewed", label: "Viewed" },
-                { value: "Signed", label: "Signed" },
-              ]}
-              value={
-                signingStatusValue
-                  ? {
-                      value: signingStatusValue,
-                      label: String(signingStatusValue),
-                    }
-                  : null
-              }
-              onChange={(selected) => {
-                const v = selected ? (selected as any).value : null;
-                applyTableFiltersPatch({ signing_status: v });
-              }}
-              placeholder="Select signing status..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  applyTableFiltersPatch({ signing_status: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-    ];
-  }, [
-    applyTableFiltersPatch,
-    currentFilters,
-    customSelectStyles,
-    extensions,
-  ]);
-
-  const advancedFilterPills = useMemo<FilterPill[]>(() => {
-    const campaignIds = Array.isArray(currentFilters.campaign_id)
-      ? currentFilters.campaign_id
-      : currentFilters.campaign_id
-        ? [currentFilters.campaign_id]
-        : [];
-
-    const selectedCampaignOptions = availableCampaigns.filter((c) =>
-      campaignIds.includes(c.value),
-    );
-
-    const tagValues = Array.isArray(currentFilters.tags)
-      ? currentFilters.tags
-      : currentFilters.tags
-        ? [currentFilters.tags]
-        : [];
-    const selectedTagOptions = availableTags.filter((t) =>
-      tagValues.includes(t.value),
-    );
-
-    const sourceValue = currentFilters.source_file ?? null;
-    const nextFrom = currentFilters.scheduled_call_from ?? "";
-    const nextTo = currentFilters.scheduled_call_to ?? "";
-
-    const nextCallLabel = (() => {
-      if (!nextFrom && !nextTo) return undefined;
-      if (nextFrom && nextTo && nextFrom === nextTo) {
-        return moment(nextFrom).isValid()
-          ? moment(nextFrom).format("MMM D, YYYY")
-          : String(nextFrom);
-      }
-      const fromLabel = nextFrom
-        ? moment(nextFrom).isValid()
-          ? moment(nextFrom).format("MMM D")
-          : String(nextFrom)
-        : "…";
-      const toLabel = nextTo
-        ? moment(nextTo).isValid()
-          ? moment(nextTo).format("MMM D")
-          : String(nextTo)
-        : "…";
-      return `${fromLabel} – ${toLabel}`;
-    })();
-
-    return [
-      {
-        id: "campaigns",
-        label: "Campaigns",
-        showDropdown: true,
-        active: campaignIds.length > 0,
-        activeLabel:
-          campaignIds.length > 1
-            ? `${campaignIds.length} selected`
-            : selectedCampaignOptions[0]?.label,
-        onClear: () => {
-          setProspectsFilters((prev) => ({ ...prev, campaigns: null }));
-          applyTableFiltersPatch({ campaign_id: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Select
-              isMulti
-              options={availableCampaigns}
-              value={selectedCampaignOptions}
-              onChange={(selected) => {
-                const values = selected
-                  ? (selected as any[]).map((s: any) => s.value)
-                  : null;
-                setProspectsFilters((prev) => ({ ...prev, campaigns: values }));
-                applyTableFiltersPatch({ campaign_id: values });
-              }}
-              placeholder="Select campaigns..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({ ...prev, campaigns: null }));
-                  applyTableFiltersPatch({ campaign_id: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "source_file",
-        label: "Source",
-        showDropdown: true,
-        active: !!sourceValue,
-        activeLabel: sourceValue ? String(sourceValue) : undefined,
-        onClear: () => {
-          setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
-          applyTableFiltersPatch({ source_file: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <CreatableSelect
-              options={uniqueSources}
-              value={
-                sourceValue
-                  ? { value: sourceValue, label: String(sourceValue) }
-                  : null
-              }
-              onChange={(selected) => {
-                const v = selected ? (selected as any).value : null;
-                setProspectsFilters((prev) => ({ ...prev, sourceFile: v }));
-                applyTableFiltersPatch({ source_file: v });
-              }}
-              placeholder="Select or type a source..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
-                  applyTableFiltersPatch({ source_file: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "tags",
-        label: "Tags",
-        showDropdown: true,
-        active: tagValues.length > 0,
-        activeLabel:
-          tagValues.length > 1
-            ? `${tagValues.length} selected`
-            : selectedTagOptions[0]?.label,
-        onClear: () => {
-          setProspectsFilters((prev) => ({ ...prev, tags: null }));
-          applyTableFiltersPatch({ tags: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Select
-              isMulti
-              options={availableTags.map((t) => ({
-                value: t.value,
-                label: t.label,
-              }))}
-              value={selectedTagOptions.map((t) => ({
-                value: t.value,
-                label: t.label,
-              }))}
-              onChange={(selected) => {
-                const values = selected
-                  ? (selected as any[]).map((s: any) => s.value)
-                  : null;
-                setProspectsFilters((prev) => ({ ...prev, tags: values }));
-                applyTableFiltersPatch({ tags: values });
-              }}
-              placeholder="Select tags..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({ ...prev, tags: null }));
-                  applyTableFiltersPatch({ tags: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "next_call",
-        label: "Next Call Date",
-        showDropdown: true,
-        active: !!nextFrom || !!nextTo,
-        activeLabel: nextCallLabel,
-        onClear: () => {
-          setProspectsFilters((prev) => ({
-            ...prev,
-            nextCallDateFrom: null,
-            nextCallDateTo: null,
-          }));
-          applyTableFiltersPatch({
-            scheduled_call_from: undefined,
-            scheduled_call_to: undefined,
-          });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <div className="d-flex gap-2">
-              <div className="flex-grow-1">
-                <Form.Label className="small fw-bold mb-1">From</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={currentFilters.scheduled_call_from || ""}
-                  onChange={(e) => {
-                    const v = e.target.value || null;
-                    setProspectsFilters((prev) => ({
-                      ...prev,
-                      nextCallDateFrom: v,
-                    }));
-                    applyTableFiltersPatch({ scheduled_call_from: v });
-                  }}
-                />
-              </div>
-              <div className="flex-grow-1">
-                <Form.Label className="small fw-bold mb-1">To</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={currentFilters.scheduled_call_to || ""}
-                  onChange={(e) => {
-                    const v = e.target.value || null;
-                    setProspectsFilters((prev) => ({
-                      ...prev,
-                      nextCallDateTo: v,
-                    }));
-                    applyTableFiltersPatch({ scheduled_call_to: v });
-                  }}
-                />
-              </div>
-            </div>
-            <div className="d-flex justify-content-end gap-2 mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({
-                    ...prev,
-                    nextCallDateFrom: null,
-                    nextCallDateTo: null,
-                  }));
-                  applyTableFiltersPatch({
-                    scheduled_call_from: undefined,
-                    scheduled_call_to: undefined,
-                  });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-    ];
-  }, [
-    applyTableFiltersPatch,
-    availableCampaigns,
-    availableTags,
-    currentFilters,
-    customSelectStyles,
-    setProspectsFilters,
-    uniqueSources,
-  ]);
+  const quotesFilterPills = useMemo(
+    () =>
+      buildCrmQuotesListQuoteToolbarFilterPills({
+        currentFilters,
+        applyTableFiltersPatch,
+        customSelectStyles,
+        extensions,
+      }),
+    [applyTableFiltersPatch, currentFilters, customSelectStyles, extensions],
+  );
 
   // Handle activeFilter changes to update currentFilters
   useEffect(() => {
@@ -1946,62 +1479,6 @@ const CrmQuotesManagement = () => {
     setShowDeleteModal(true);
   }, []);
 
-  // Confirm single delete
-  const confirmDelete = useCallback(async () => {
-    if (!itemToDelete) return;
-
-    try {
-      await deleteCrmData(itemToDelete.id);
-      setShowDeleteModal(false);
-      setDeleteModalMode(null);
-      setItemToDelete(null);
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      console.error("Delete error:", error);
-    }
-  }, [itemToDelete]);
-
-  // Handle duplicate quote
-  const handleDuplicateQuote = useCallback((quote: any) => {
-    // Navigate to create quote page with duplicate data
-    router.push(`/crm/quotes/create?duplicate=${quote.id}`);
-  }, [router]);
-
-  // Handle send quote to contact
-  const handleSendToContact = useCallback((quote: any) => {
-    // For now, just show a toast - can be enhanced to open email modal
-    toast.info(`Sending quote "${quote.title || `Quote #${quote.id}`}" to contact...`);
-    // TODO: Implement email modal with quote details
-  }, []);
-
-  // Calculate filtered entry counts using API
-  const calculateEntryCounts = useCallback(async () => {
-    try {
-      const campaignIds = Array.from(assignmentFilters.selectedCampaigns).map(
-        (campaign) => parseInt(campaign.value),
-      );
-      const tags = Array.from(assignmentFilters.selectedTags).map(
-        (tag) => tag.value,
-      );
-
-      const counts = await getCrmDataCounts(campaignIds, tags);
-
-      return {
-        total: counts.summary.total_records,
-        assigned: counts.summary.assigned_records,
-        unassigned: counts.summary.unassigned_records,
-      };
-    } catch (error) {
-      console.error("Failed to get entry counts:", error);
-      // Fallback to static data
-      return {
-        total: 5000,
-        assigned: 2000,
-        unassigned: 3000,
-      };
-    }
-  }, [assignmentFilters]);
-
   // Auto-refetch counts when filter dropdowns change
   useEffect(() => {
     const refetchCounts = async () => {
@@ -2505,210 +1982,26 @@ const CrmQuotesManagement = () => {
     [router],
   );
 
-  // Stats cards data for metrics
   const prospectsStatsCards: StatsCardData[] = useMemo(
-    () => [
-      {
-        title: "Total Quotes",
-        value: totalRecords,
-        icon: FileText,
-        iconColor: "#6366F1",
-        iconBgColor: "#EEF2FF",
-      },
-      {
-        title: "Pending Acceptance",
-        value: metrics.pending_count ?? 0,
-        icon: ClockIcon,
-        iconColor: "#F59E0B",
-        iconBgColor: "#FEF3C7",
-        metric: { text: "Awaiting response", dotColor: "#F59E0B" },
-      },
-      {
-        title: "Expiring Soon",
-        value: metrics.expiring_soon_count ?? 0,
-        icon: AlertCircleIcon,
-        iconColor: "#EF4444",
-        iconBgColor: "#FEE2E2",
-        metric: { text: "Within 7 days", dotColor: "#EF4444" },
-      },
-      {
-        title: "Total Value",
-        value: `$${Number(metrics.total_value ?? 0).toLocaleString()}`,
-        icon: Target,
-        iconColor: "#10B981",
-        iconBgColor: "#D1FAE5",
-      },
-      {
-        title: "Signed Quotes",
-        value: metrics.signed_count ?? 0,
-        icon: Users,
-        iconColor: "#0EA5E9",
-        iconBgColor: "#E0F2FE",
-      },
-    ],
+    () => buildCrmQuotesListStatsCards(metrics, totalRecords),
     [metrics, totalRecords],
   );
 
-  // Define columns for GenericTable - Clean declarative definitions
-  const quotesColumns: TableColumn<any>[] = useMemo(
-    () => [
-      {
-        key: "title",
-        label: "Quote title",
-        sortable: true,
-        type: "custom",
-        render: (row) => (
-          <span
-            style={{ color: "#1d6ae5", fontWeight: 500, cursor: "pointer" }}
-            onClick={() => handleViewData(row)}
-          >
-            {row.title || `Quote #${row.id}`}
-          </span>
-        ),
-      },
-      {
-        key: "status",
-        label: "Quote Status",
-        sortable: true,
-        type: "custom",
-        render: (row) => {
-          const isPublished = row.status === "Published";
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {isPublished && (
-                <span style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e", display: "inline-block" }} />
-              )}
-              <span style={{ color: "#374151", fontSize: 13 }}>{row.status || "Draft"}</span>
-            </div>
-          );
-        },
-      },
-      {
-        key: "amount",
-        label: "Quote amount",
-        sortable: true,
-        type: "custom",
-        render: (row) => (
-          <span style={{ color: "#374151", fontSize: 13 }}>
-            {row.amount != null ? `US$${Number(row.amount).toLocaleString()}` : "--"}
-          </span>
-        ),
-      },
-      {
-        key: "view_count",
-        label: "Quote View Count",
-        sortable: true,
-        type: "custom",
-        render: (row) => (
-          <span style={{ color: "#6b7280", fontSize: 13 }}>{row.view_count ?? "--"}</span>
-        ),
-      },
-      {
-        key: "signing_status",
-        label: "Signing Status",
-        sortable: true,
-        type: "custom",
-        render: (row) => (
-          <span style={{ color: "#f97316", fontSize: 13, fontWeight: 500 }}>
-            {row.signing_status || "Not applicable"}
-          </span>
-        ),
-      },
-      {
-        key: "user_extension",
-        label: "Quote owner",
-        sortable: true,
-        type: "custom",
-        render: (row) => {
-          const name = extensions.find((e: any) => e.id?.toString() === row.user_extension?.toString())?.display_name || row.user_extension || "—";
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 24, height: 24, borderRadius: "50%", background: getRandomColor(name), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#fff" }}>
-                {getInitials(name)}
-              </div>
-              <span style={{ fontSize: 13, color: "#374151" }}>{name}</span>
-            </div>
-          );
-        },
-      },
-      {
-        key: "created_at",
-        label: "Create date (GMT+5)",
-        sortable: true,
-        type: "custom",
-        render: (row) => (
-          <span style={{ fontSize: 13, color: "#374151" }}>
-            {row.created_at ? moment(row.created_at).format("D MMM YYYY HH:mm [GMT+5]") : "--"}
-          </span>
-        ),
-      },
-    ],
-    [extensions, handleViewData],
-  );
+  const requestDeleteQuoteRow = useCallback((row: any) => {
+    setDeleteModalMode("single");
+    setItemToDelete(row);
+    setShowDeleteModal(true);
+  }, []);
 
-  // Define table actions
-  const quotesActions: TableAction<any>[] = useMemo(
-    () => [
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
-        ? [
-            {
-              label: "View",
-              icon: <Eye size={16} />,
-              onClick: (row: any) => handleViewData(row),
-              variant: "link" as const,
-            },
-          ]
-        : []),
-      ...(session?.user?.permissions?.includes("edit-crm-data-management")
-        ? [
-            {
-              label: "Edit",
-              icon: <FiEdit size={16} />,
-              onClick: (row: any) => router.push(`/crm/quotes/${row.id}/edit`),
-              variant: "link" as const,
-            },
-          ]
-        : []),
-      {
-        label: "More Actions",
-        icon: <MoreVertical size={16} />,
-        variant: "link" as const,
-        dropdown: {
-          align: "end" as const,
-          options: [
-            {
-              label: "Duplicate",
-              icon: <FiCopy size={14} />,
-              onClick: (row: any) => handleDuplicateQuote(row),
-            },
-            {
-              label: "Send to Contact",
-              icon: <Mail size={14} />,
-              onClick: (row: any) => handleSendToContact(row),
-            },
-            ...(session?.user?.permissions?.includes(
-              "delete-crm-data-management",
-            )
-              ? [
-                  {
-                    label: "Delete",
-                    icon: <Trash2 size={14} />,
-                    onClick: (row: any) => {
-                      setDeleteModalMode("single");
-                      setItemToDelete(row);
-                      setShowDeleteModal(true);
-                    },
-                    className: "text-danger",
-                    divider: true,
-                  },
-                ]
-              : []),
-          ],
-        },
-      },
-    ],
-    [session, router, handleViewData, handleDuplicateQuote, handleSendToContact],
-  );
+  const { quotesColumns, quotesActions } = useCrmQuotesListQuotesTableModel({
+    extensions,
+    handleViewData,
+    permissions: session?.user?.permissions,
+    router,
+    handleDuplicateQuote,
+    handleSendToContact,
+    onRequestDeleteSingleRow: requestDeleteQuoteRow,
+  });
 
   // Define old columns for GenericListPage (keep for backward compatibility if needed)
   const columns: Column[] = useMemo(
@@ -3679,96 +2972,15 @@ const CrmQuotesManagement = () => {
 
           <div className="container-fluid">
             {/* Analytics Section - Collapsible */}
-            {showProspectsAnalytics && (
-              <>
-                {/* Summary Stats Grid - Using KPICard design */}
-                <Row className="mb-2">
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Total Prospects"
-                      value={totalRecords}
-                      icon={<Users size={24} />}
-                      color="primary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Prospects with Calls Scheduled"
-                      value={metrics.scheduled_records}
-                      icon={<Calendar size={24} />}
-                      color="success"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Prospects with No Calls Scheduled"
-                      value={metrics.not_scheduled_records}
-                      icon={<XCircle size={24} />}
-                      color="secondary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Meetings in Next Hour"
-                      value={metrics.scheduled_next_hour_records}
-                      icon={<ClockIcon size={24} />}
-                      color="info"
-                    />
-                  </Col>
-                  {showAllProspectStats && (
-                    <>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Meetings in Next 24h"
-                          value={metrics.scheduled_next_24_hours_records}
-                          icon={<Calendar size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title=" Prospects Assigned to Team Members"
-                          value={metrics.assigned_records}
-                          icon={<UserPlus size={24} />}
-                          color="primary"
-                        />
-                      </Col>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Prospects Not Assigned to Team Members"
-                          value={metrics.unassigned_records}
-                          icon={<AlertCircleIcon size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-                    </>
-                  )}
-                </Row>
-
-                <div className="text-center mb-4">
-                  <Button
-                    variant="link"
-                    onClick={() =>
-                      setShowAllProspectStats(!showAllProspectStats)
-                    }
-                    className="text-decoration-none"
-                  >
-                    {showAllProspectStats ? (
-                      <>
-                        <ArrowUp size={16} className="me-1" />
-                        Show Less
-                      </>
-                    ) : (
-                      <>
-                        <ArrowDown size={16} className="me-1" />
-                        Show More Stats
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </>
-            )}
+            <CrmQuotesListProspectKpiAnalyticsSection
+              show={showProspectsAnalytics}
+              totalRecords={totalRecords}
+              metrics={metrics}
+              showAllProspectStats={showAllProspectStats}
+              onToggleShowAllProspectStats={() =>
+                setShowAllProspectStats(!showAllProspectStats)
+              }
+            />
 
             {/* Filter Bar */}
             {showFilterBar &&
@@ -3776,26 +2988,7 @@ const CrmQuotesManagement = () => {
                 "list-crm-data-management",
               ) && (
                 <FilterBar
-                  quickFilters={[
-                    {
-                      id: "all",
-                      label: "All Prospects",
-                      color: "#0d6efd",
-                      icon: <Users size={16} />,
-                    },
-                    {
-                      id: "scheduled",
-                      label: "Scheduled",
-                      color: "#20c997",
-                      icon: <FiCalendar size={16} />,
-                    },
-                    {
-                      id: "has_leads",
-                      label: "Converted to Leads",
-                      color: "#0dcaf0",
-                      icon: <FiTarget size={16} />,
-                    },
-                  ]}
+                  quickFilters={prospectQuickFilters}
                   activeFilter={activeFilter}
                   onFilterChange={handleFilterChange}
                   // searchValue={prospectsSearch}
@@ -3937,52 +3130,23 @@ const CrmQuotesManagement = () => {
                 maxHeight="calc(100vh - 345px)"
                 // Toolbar
                 showToolbar={true}
-                toolbar={{
-                  ...prospectsToolbarConfig,
-                  // Hide Advanced filters button while the filters sidebar is open
-                  showAdvancedFilters: !showFiltersSidebar,
-                  // Keep pills visible by default so advanced pills can appear inline
-                  showFilterPills: true,
-                  onAdvancedFiltersClick: () =>
-                    setShowAdvancedFilters((prev) => !prev),
-                  filterPills: [
-                    ...(prospectsToolbarConfig.filterPills ?? []),
-                    ...(showAdvancedFilterPills ? quotesFilterPills : []),
-                  ],
-                  showMoreFiltersButton: true,
-                }}
+                toolbar={mergeCrmQuotesListProspectsToolbarConfig(
+                  prospectsToolbarConfig,
+                  {
+                    showFiltersSidebar,
+                    setShowAdvancedFilters,
+                    showAdvancedFilterPills,
+                    quotesFilterPills,
+                  },
+                )}
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
-                // When Board View is selected, show board content instead of table
-                customBody={
-  prospectsViewMode === "board" ? (
-    <KanbanBoard
-      columns={prospectsToKanbanColumns(
-        dataList,
-        getInitials,
-        getRandomColor
-      )}
-      onCardClick={(card) => handleViewData(card.raw)}
-      onCardMove={(cardId, fromCol, toCol) => {
-        // Optionally call updateCrmData here to persist the lifecycle_stage change
-        const prospect = dataList.find(p => p.id === cardId);
-        if (prospect) {
-          updateCrmData(Number(cardId), {
-            name: prospect.name || "",
-            phone: prospect.phone || "",
-            campaign_id: prospect.campaign_id,
-            data: { ...prospect.data, lifecycle_stage: toCol },
-            scheduled_call_at: prospect.scheduled_call_at || undefined,
-            company_domain: prospect.data?.company_domain || undefined,
-            company_name: prospect.data?.company_name || undefined,
-            source: prospect.data?.source || undefined,
-          });
-        }
-      }}
-      searchValue={prospectsSearch}
-    />
-  ) : undefined
-}
+                customBody={renderCrmQuotesListProspectsBoardCustomBody({
+                  prospectsViewMode,
+                  dataList,
+                  handleViewData,
+                  prospectsSearch,
+                })}
               />
             </div>
           </div>
