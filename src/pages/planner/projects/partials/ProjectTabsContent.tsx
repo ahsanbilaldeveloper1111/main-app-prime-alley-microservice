@@ -164,8 +164,13 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     boardTasks.forEach((task: any) => {
       if (task.assignees && task.assignees.length > 0) {
         task.assignees.forEach((assignee: any) => {
-          const name = assignee.user?.name || assignee.extension_number || '';
-          if (name) assigneeSet.add(name);
+          const ext = String(assignee.extension_number ?? assignee.extension ?? assignee.id ?? '').trim();
+          if (ext) {
+            assigneeSet.add(ext);
+          } else {
+            const nameOnly = String(assignee.user?.name || '').trim();
+            if (nameOnly) assigneeSet.add(nameOnly);
+          }
         });
       }
     });
@@ -441,7 +446,6 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
           color: status.color || '',
         }))}
         selectedStatusForTask={selectedStatusForTask}
-        taskType="regular"
         taskTypeChoices={['regular', 'recurring']}
         lockProjectSelection={Boolean(selectedProject)}
       />

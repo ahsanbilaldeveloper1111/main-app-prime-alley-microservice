@@ -1977,7 +1977,6 @@ font-weight:600;
       isOpen={showCreateTaskSidebar}
       onClose={() => setShowCreateTaskSidebar(false)}
       onCreate={() => setShowCreateTaskSidebar(false)}
-      taskType="regular"
     />
 		</>
 	);

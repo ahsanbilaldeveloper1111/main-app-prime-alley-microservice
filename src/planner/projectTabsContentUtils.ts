@@ -405,9 +405,14 @@ export function filterBoardTasksForColumns(
       }
     }
     if (filters.selectedAssignee !== 'All Assignees') {
+      const selected = String(filters.selectedAssignee).trim();
       const hasAssignee = task.assignees?.some((a: any) => {
-        const assigneeName = a.user?.name || a.extension_number || '';
-        return assigneeName === filters.selectedAssignee;
+        const ext = String(a.extension_number ?? a.extension ?? a.id ?? '').trim();
+        if (ext && ext === selected) {
+          return true;
+        }
+        const assigneeName = String(a.user?.name || '').trim();
+        return assigneeName.length > 0 && assigneeName === selected;
       });
       if (!hasAssignee) {
         return false;

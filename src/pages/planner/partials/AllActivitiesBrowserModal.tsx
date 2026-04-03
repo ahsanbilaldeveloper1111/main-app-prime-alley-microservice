@@ -1,6 +1,8 @@
 import React from "react";
 import { Button, Col, Form, Modal, Row } from "react-bootstrap";
-import { AllActivitiesModalContent, ACTIVITIES_MODAL_PER_PAGE_OPTIONS } from "@planner/taskActivityLogModalShared";
+import {
+  AllActivitiesModalContent
+} from "@planner/taskActivityLogModalShared";
 import type { AllActivitiesBrowserModalProps } from "@planner/useAllActivitiesBrowserModal";
 
 const AllActivitiesBrowserModal: React.FC<AllActivitiesBrowserModalProps> = ({
@@ -14,9 +16,11 @@ const AllActivitiesBrowserModal: React.FC<AllActivitiesBrowserModalProps> = ({
   activityModalSearch,
   setActivityModalSearch,
   activityModalAction,
-  handleActivityModalActionChange,
+  setActivityModalAction,
   activitiesModalPerPage,
-  handleActivitiesModalPerPageChange,
+  setActivitiesModalPerPage,
+  activitiesModalPerPageApplied,
+  onApplyActivityFilters,
   activityModalTotalPages,
   activityModalTotalItems,
 }) => (
@@ -32,7 +36,7 @@ const AllActivitiesBrowserModal: React.FC<AllActivitiesBrowserModalProps> = ({
     </Modal.Header>
     <Modal.Body style={{ maxHeight: "75vh", overflowY: "auto" }}>
       <Row className="g-2 mb-3 align-items-end">
-        <Col xs={12} md={4}>
+        <Col xs={12} md={5}>
           <Form.Label className="small text-muted mb-1">Search</Form.Label>
           <Form.Control
             type="search"
@@ -43,12 +47,12 @@ const AllActivitiesBrowserModal: React.FC<AllActivitiesBrowserModalProps> = ({
             disabled={loadingAllActivities}
           />
         </Col>
-        <Col xs={12} md={4}>
+        <Col xs={12} md={5}>
           <Form.Label className="small text-muted mb-1">Action</Form.Label>
           <Form.Select
             className="form-select"
             value={activityModalAction}
-            onChange={handleActivityModalActionChange}
+            onChange={(e) => setActivityModalAction(e.target.value)}
             disabled={loadingAllActivities}
           >
             <option value="">All Actions</option>
@@ -62,20 +66,17 @@ const AllActivitiesBrowserModal: React.FC<AllActivitiesBrowserModalProps> = ({
             <option value="deleted">Deleted</option>
           </Form.Select>
         </Col>
-        <Col xs={12} md={4}>
-          <Form.Label className="small text-muted mb-1">Per page</Form.Label>
-          <Form.Select
-            className="form-select"
-            value={String(activitiesModalPerPage)}
-            onChange={handleActivitiesModalPerPageChange}
+        
+        <Col xs={12} md={2} className="d-flex align-items-end">
+          <Button
+            type="button"
+            variant="primary"
+            className="w-100"
+            onClick={onApplyActivityFilters}
             disabled={loadingAllActivities}
           >
-            {ACTIVITIES_MODAL_PER_PAGE_OPTIONS.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </Form.Select>
+            Apply filters
+          </Button>
         </Col>
       </Row>
       <AllActivitiesModalContent
@@ -85,7 +86,7 @@ const AllActivitiesBrowserModal: React.FC<AllActivitiesBrowserModalProps> = ({
         currentPage={activitiesModalPage}
         totalPages={activityModalTotalPages}
         totalItems={activityModalTotalItems}
-        pageSize={activitiesModalPerPage}
+        pageSize={activitiesModalPerPageApplied}
         onPageChange={setActivitiesModalPage}
       />
     </Modal.Body>

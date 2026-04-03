@@ -47,7 +47,7 @@ const WorkPlannerProjectsDetails = () => {
   const projectTabsContentRef = useRef<ProjectTabsContentRef>(null);
 
   // Fetch extensions using hierarchy API
-  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
 
   const { data: session } = useSession();
   const sessionUserPhoneOrExtension = useMemo(
@@ -264,7 +264,6 @@ const WorkPlannerProjectsDetails = () => {
         }))}
         isEdit={!!sidebarEditTask}
         task={sidebarEditTask ?? undefined}
-        taskType="regular"
         taskTypeChoices={["regular", "recurring"]}
         lockProjectSelection
       />

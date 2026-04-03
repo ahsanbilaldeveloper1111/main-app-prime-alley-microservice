@@ -566,7 +566,11 @@ function ActivityLogModalEntry({
   extensions: ActivityLogExtension[];
 }>): React.ReactElement {
   const extNumber = String(activity.extension_number || "");
-  const { initials: extensionInitials } = getExtensionDisplay(extensions, extNumber);
+  const { name: extensionDisplayName, initials: extensionInitials } = getExtensionDisplay(
+    extensions,
+    extNumber,
+  );
+  const actorBadgeText = extNumber === "system" ? "System" : extensionDisplayName;
   const actionLabel = String(activity.action || "activity");
   const createdAt = activity.created_at || "";
   const task = activity.task;
@@ -652,6 +656,7 @@ function ActivityLogModalEntry({
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
                 {extNumber ? (
                   <span
+                    title={extNumber === "system" ? undefined : `Extension: ${extNumber}`}
                     style={{
                       fontSize: "0.7rem",
                       padding: "4px 10px",
@@ -661,7 +666,7 @@ function ActivityLogModalEntry({
                       fontWeight: 500,
                     }}
                   >
-                    Ext: {extNumber}
+                    {actorBadgeText}
                   </span>
                 ) : null}
                 {taskRef ? (

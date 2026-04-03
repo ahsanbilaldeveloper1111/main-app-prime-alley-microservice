@@ -28,7 +28,7 @@ const WorkPlannerProjectsDashboard = () => {
     const projectTabsContentRef = useRef<ProjectTabsContentRef>(null);
     
     // Fetch extensions for CreateTaskModal
-    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
     
     // Fetch projects list
     useEffect(() => {
