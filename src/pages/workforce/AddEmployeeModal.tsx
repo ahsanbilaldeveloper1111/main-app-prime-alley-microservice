@@ -104,6 +104,26 @@ const defaultForm: Partial<UserProfilePayload> = {
   status: "active",
 };
 
+/** Mirrors submit rules: all required fields present (used for Create button + handleSubmit). */
+function validateAddEmployeeRequired(form: Partial<UserProfilePayload>): { ok: true } | { ok: false; message: string } {
+  if (!form.user_id?.toString().trim()) {
+    return { ok: false, message: "User ID is required" };
+  }
+  if (!form.department_id) {
+    return { ok: false, message: "Department is required" };
+  }
+  if (!form.employment_type?.toString().trim()) {
+    return { ok: false, message: "Employment type is required" };
+  }
+  if (!form.contract_type?.toString().trim()) {
+    return { ok: false, message: "Contract type is required" };
+  }
+  if (!form.designation?.toString().trim()) {
+    return { ok: false, message: "Designation is required" };
+  }
+  return { ok: true };
+}
+
 /** React list key only; use cryptographically strong randomness (not Math.random). */
 let addressUiIdFallbackSeq = 0;
 function createAddressUiId(): string {
@@ -239,26 +259,13 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     setAddresses((prev) => prev.map((addr) => (addr.uiId === addressId ? { ...addr, ...patch } : addr)));
   }, []);
 
+  const requiredValidation = useMemo(() => validateAddEmployeeRequired(form), [form]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.user_id?.toString().trim()) {
-      toast.error("User ID is required");
-      return;
-    }
-    if (!form.department_id) {
-      toast.error("Department is required");
-      return;
-    }
-    if (!form.employment_type?.toString().trim()) {
-      toast.error("Employment type is required");
-      return;
-    }
-    if (!form.contract_type?.toString().trim()) {
-      toast.error("Contract type is required");
-      return;
-    }
-    if (!form.designation?.toString().trim()) {
-      toast.error("Designation is required");
+    const validation = validateAddEmployeeRequired(form);
+    if (!validation.ok) {
+      toast.error(validation.message);
       return;
     }
     setSubmitting(true);
@@ -592,7 +599,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           <Button variant="secondary" onClick={handleCancelClick} type="button">
             Cancel
           </Button>
-          <Button variant="primary" type="submit" disabled={submitting}>
+          <Button variant="primary" type="submit" disabled={submitting || !requiredValidation.ok}>
             {submitting ? "Creating…" : "Create"}
           </Button>
         </Modal.Footer>
