@@ -167,6 +167,14 @@ import {
   CrmFilterBar as FilterBar,
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { useCrmListPageTabCreateContactAndFilter } from "@hooks/useCrmListPageTabCreateContactAndFilter";
+import { createEmptyCrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
+import {
+  CRM_LIST_PAGE_CALL_END_REASONS,
+  CRM_LIST_PAGE_STATIC_TAGS,
+  getCrmListPageMockCallHistory,
+} from "@utils/crmListPageStaticData";
 
 const CrmQuotesManagement = () => {
   const { data: session } = useSession();
@@ -280,28 +288,9 @@ const CrmQuotesManagement = () => {
   const [showCreateContactSidebar, setShowCreateContactSidebar] =
     useState(false);
   const addContactsRef = useRef<HTMLDivElement>(null);
-  const [contactForm, setContactForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone_country_code: "",
-    phoneNumber: "",
-    campaign_id: null as number | null,
-    contact_owner: null as string | null,
-    lifecycle_stage: "Lead",
-    disposition: "",
-    legal_basis: [] as string[],
-    company_domain: "",
-    scheduled_call_at: "",
-    tags: [] as Array<{ value: string; label: string; id: number }>,
-    note: "",
-    source_file: "",
-    custom_fields: [] as Array<{
-      id: string;
-      field_name: string;
-      field_value: string;
-    }>,
-  });
+  const [contactForm, setContactForm] = useState(() =>
+    createEmptyCrmListContactFormState("source_file"),
+  );
   const [createContactLoading, setCreateContactLoading] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
   const [contactFormLoadError, setContactFormLoadError] = useState<
@@ -332,178 +321,6 @@ const CrmQuotesManagement = () => {
   // Initialize activeFilter state
   const [activeFilter, setActiveFilter] = useState("all");
 
-  // Read tab from URL on mount and when router is ready
-  useEffect(() => {
-    if (router.isReady && router.query.tab) {
-      const tabFromUrl = String(router.query.tab);
-      if (validFilters.includes(tabFromUrl)) {
-        setActiveFilter(tabFromUrl);
-      }
-    }
-  }, [router.isReady, router.query.tab]);
-
-  // Open Create Contact sidebar when navigated from header (Ticket = Prospect)
-  useEffect(() => {
-    if (!router.isReady || router.query.createContact !== "1") return;
-    setShowCreateContactSidebar(true);
-    const rawEditId = router.query.editContactId;
-    const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
-    const editIdNum = editIdStr != null ? Number(editIdStr) : NaN;
-    if (Number.isFinite(editIdNum) && editIdNum > 0) {
-      setEditingContactId(editIdNum);
-    }
-
-    const { createContact: _, editContactId: __, ...rest } = router.query;
-    router.replace({ pathname: router.pathname, query: rest }, undefined, {
-      shallow: true,
-    });
-  }, [router.isReady, router.query.createContact, router.query.editContactId]);
-
-  // Close Add Contacts dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        addContactsRef.current &&
-        !addContactsRef.current.contains(event.target as Node)
-      ) {
-        setShowAddContactsDropdown(false);
-      }
-    };
-
-    if (showAddContactsDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showAddContactsDropdown]);
-
-  // Load prospect into form when sidebar opens in edit mode
-  useEffect(() => {
-    if (!showCreateContactSidebar || !editingContactId) {
-      setContactFormLoadError(null);
-      setContactFormLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setContactFormLoadError(null);
-    setContactFormLoading(true);
-    getCrmDataById(editingContactId)
-      .then((item: CrmDataItem & { data?: Record<string, any>; source_file?: string; tags?: { id?: number; name?: string }[] }) => {
-        if (cancelled) return;
-        const d = item.data || {};
-        const nameParts = (item.name || "").trim().split(/\s+/);
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-        const toDatetimeLocal = (v: string | null | undefined) => {
-          if (!v) return "";
-          const m = moment(v);
-          return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
-        };
-        const rawTags = (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
-        const tagsArray = Array.isArray(rawTags)
-          ? rawTags.map((t: any) =>
-              typeof t === "string"
-                ? { value: t, label: t }
-                : {
-                  value: t.name ?? t.value ?? String(t.id ?? ""),
-                  label: t.name ?? t.label ?? t.value ?? String(t.id ?? ""),
-                  id: Number(t.id ?? t.tag_id ?? t.pivot?.tag_id ?? 0),
-                },
-            )
-          : [];
-        // Parse phone for country code + national number (payload may be "+1 4155551234" or E.164)
-        let phoneCountryCode = "";
-        let phoneNumber = item.phone ?? "";
-        if (typeof item.phone === "string" && item.phone.trim()) {
-          try {
-            const normalized = item.phone.replace(/\s/g, "");
-            const parsed = parsePhoneNumberInput(normalized);
-            if (parsed) {
-              phoneCountryCode = `+${parsed.countryCallingCode}`;
-              phoneNumber = parsed.nationalNumber;
-            }
-          } catch {
-            // keep phoneNumber as-is, phoneCountryCode ""
-          }
-        }
-        // Custom fields = keys in data that are NOT our form fields (only these show in Custom fields section)
-        const reservedDataKeys = new Set([
-          "email",
-          "assigned_to",
-          "uploaded_by",
-          "disposition",
-          "tags",
-          "note",
-          "contact_owner",
-          "lifecycle_stage",
-          "legal_basis",
-        ]);
-        const customFieldsArray = Object.entries(d)
-          .filter(([k]) => !reservedDataKeys.has(k))
-          .map(([field_name, field_value]) => ({
-            id: `${Date.now()}-${Math.random()}-${field_name}`,
-            field_name,
-            field_value: Array.isArray(field_value)
-              ? (field_value as string[]).join(", ")
-              : String(field_value ?? "").trim(),
-          }))
-          .filter((f) => f.field_name || f.field_value);
-        setContactForm({
-          firstName,
-          lastName,
-          email: d.email ?? (item as any).email ?? "",
-          phone_country_code: phoneCountryCode,
-          phoneNumber,
-          campaign_id: item.campaign_id ?? d.campaign_id ?? null,
-          contact_owner: (item as any).user_extension ?? d.contact_owner ?? (item as any).contact_owner ?? null,
-          lifecycle_stage: d.lifecycle_stage ?? "",
-          disposition: d.disposition ?? (item as any).disposition ?? "",
-          legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          company_domain: (item as any).company_domain ?? d.company_domain ?? "",
-          scheduled_call_at: toDatetimeLocal(
-            item.scheduled_call_at ?? d.scheduled_call_at,
-          ),
-          tags: tagsArray as Array<{ value: string; label: string; id: number }>,
-          note: item.note ?? d.note ?? "",
-        source_file:
-          (item as any).source_file ?? d.source ?? (item as any).source ?? "",
-          custom_fields: customFieldsArray,
-        });
-        if (!cancelled) setContactFormLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setContactFormLoadError("Failed to load prospect");
-          setContactFormLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showCreateContactSidebar, editingContactId]);
-
-  // Handler to update filter and URL
-  const handleFilterChange = useCallback(
-    (filterId: string) => {
-      setActiveFilter(filterId);
-      setPagination((prev) => ({ ...prev, currentPage: 1 }));
-      // Prevent showing stale totalRecords on "Convert to Leads" tab until new data loads
-      if (filterId === "has_leads") {
-        setLoading(true);
-      }
-
-      // Update URL with tab query parameter
-      router.push(
-        {
-          pathname: router.pathname,
-          query: { ...router.query, tab: filterId },
-        },
-        undefined,
-        { shallow: true },
-      );
-    },
-    [router],
-  );
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [prospectsSearch, setProspectsSearch] = useState("");
   const [showColumnEditor, setShowColumnEditor] = useState(false);
@@ -551,6 +368,27 @@ const CrmQuotesManagement = () => {
   /** Total count of all quotes (unchanged when switching tabs) */
   const [totalAllQuotes, setTotalAllQuotes] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  const { handleFilterChange } = useCrmListPageTabCreateContactAndFilter({
+    router,
+    validFilters,
+    setActiveFilter,
+    setPagination,
+    setLoading,
+    showAddContactsDropdown,
+    setShowAddContactsDropdown,
+    addContactsRef,
+    showCreateContactSidebar,
+    setShowCreateContactSidebar,
+    editingContactId,
+    setEditingContactId,
+    setContactForm,
+    setContactFormLoadError,
+    setContactFormLoading,
+    sourceField: "source_file",
+    loadFailedMessage: "Failed to load prospect",
+  });
+
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<any>({
     assigned_records: 0,
@@ -561,92 +399,6 @@ const CrmQuotesManagement = () => {
     total_value: 0,
     signed_count: 0,
   });
-
-  // Static tags data
-  const staticTags = [
-    { value: "hot-lead", label: "Hot Lead" },
-    { value: "cold-lead", label: "Cold Lead" },
-    { value: "follow-up", label: "Follow Up" },
-    { value: "interested", label: "Interested" },
-    { value: "not-interested", label: "Not Interested" },
-    { value: "callback", label: "Callback" },
-    { value: "qualified", label: "Qualified" },
-    { value: "unqualified", label: "Unqualified" },
-  ];
-
-  // Static call end reasons
-  const callEndReasons = [
-    { value: "call_later", label: "Call Later", color: "warning" },
-    { value: "dont_call", label: "Don't Call", color: "danger" },
-    {
-      value: "not_reachable",
-      label: "Number Not Reachable",
-      color: "secondary",
-    },
-    { value: "dncr_blocklisted", label: "DNCR Blocklisted", color: "dark" },
-    { value: "answered", label: "Answered", color: "success" },
-    { value: "busy", label: "Busy", color: "info" },
-    { value: "no_answer", label: "No Answer", color: "light" },
-  ];
-
-  // Static call history data with varied information
-  const getCallHistory = (entryId: number) => {
-    const histories = [
-      {
-        id: 1,
-        duration: "2:34",
-        endReason: "answered",
-        disposition: "interested",
-        calledAt: "2024-01-15T10:30:00Z",
-        recordingUrl: "https://example.com/recording1.mp3",
-        comment:
-          "Client showed interest in our premium package. Asked for pricing details and wants to schedule a demo next week.",
-      },
-      {
-        id: 2,
-        duration: "0:45",
-        endReason: "busy",
-        disposition: "callback_requested",
-        calledAt: "2024-01-14T14:20:00Z",
-        recordingUrl: "https://example.com/recording2.mp3",
-        comment:
-          "Line was busy. Left voicemail with callback request for tomorrow morning.",
-      },
-      {
-        id: 3,
-        duration: "1:12",
-        endReason: "no_answer",
-        disposition: "no_answer",
-        calledAt: "2024-01-13T09:15:00Z",
-        recordingUrl: "https://example.com/recording3.mp3",
-        comment:
-          "No answer after multiple rings. Will try again later in the day.",
-      },
-      {
-        id: 4,
-        duration: "3:45",
-        endReason: "answered",
-        disposition: "not_interested",
-        calledAt: "2024-01-12T16:20:00Z",
-        recordingUrl: "https://example.com/recording4.mp3",
-        comment:
-          "Client politely declined. Not interested in our services at this time. Asked to be removed from calling list.",
-      },
-      {
-        id: 5,
-        duration: "4:12",
-        endReason: "answered",
-        disposition: "follow_up",
-        calledAt: "2024-01-11T11:30:00Z",
-        recordingUrl: "https://example.com/recording5.mp3",
-        comment:
-          "Client needs to discuss with their team. Will follow up in 2 weeks with additional information about our enterprise solutions.",
-      },
-    ];
-
-    // Return different histories based on entryId for variety
-    return histories.slice(0, (entryId % 3) + 2);
-  };
 
   // History data state
   const [historyData, setHistoryData] = useState<any[]>([]);
@@ -719,50 +471,6 @@ const CrmQuotesManagement = () => {
     },
     [fetchCampaignsByIds],
   );
-
-  // Custom select styles
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "45px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused
-        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
-        : "none",
-      "&:hover": {
-        borderColor: "#86b7fe",
-      },
-    }),
-    multiValue: (provided: any) => ({
-      ...provided,
-      backgroundColor: "#0d6efd",
-      color: "white",
-      fontSize: "0.813rem",
-    }),
-    multiValueLabel: (provided: any) => ({
-      ...provided,
-      color: "white",
-      padding: "2px 6px",
-    }),
-    multiValueRemove: (provided: any) => ({
-      ...provided,
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#0b5ed7",
-        color: "white",
-      },
-    }),
-    placeholder: (provided: any) => ({
-      ...provided,
-      color: "#6c757d",
-      fontSize: "0.875rem",
-    }),
-    singleValue: (provided: any) => ({
-      ...provided,
-      fontSize: "0.875rem",
-    }),
-  };
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -1168,7 +876,7 @@ const CrmQuotesManagement = () => {
         console.error("Failed to load tags:", error);
         // Fallback to static tags
         setAvailableTags(
-          staticTags.map((tag) => ({
+          CRM_LIST_PAGE_STATIC_TAGS.map((tag) => ({
             value: tag.value,
             label: tag.label,
             id: parseInt(tag.value.replace("tag-", "")) || 0,
@@ -3263,8 +2971,8 @@ const CrmQuotesManagement = () => {
         cell: (props: any) => {
           // Static data for now
           const endReason =
-            callEndReasons.find((r) => r.value === "answered") ||
-            callEndReasons[0];
+            CRM_LIST_PAGE_CALL_END_REASONS.find((r) => r.value === "answered") ||
+            CRM_LIST_PAGE_CALL_END_REASONS[0];
           return (
             <span className={`status-badge ${endReason.color as any}`}>
               {endReason.label}
@@ -3486,7 +3194,7 @@ const CrmQuotesManagement = () => {
       handlePlayRecording,
       extensions,
       availableCampaigns,
-      callEndReasons,
+      CRM_LIST_PAGE_CALL_END_REASONS,
       handleScheduleCall,
       handleUnscheduleCallClick,
     ],
@@ -3674,24 +3382,7 @@ const CrmQuotesManagement = () => {
           data: dataPayload,
         });
         fetchCrmData();
-        setContactForm({
-          firstName: "",
-          lastName: "",
-          email: "",
-          phone_country_code: "",
-          phoneNumber: "",
-          campaign_id: null,
-          contact_owner: null,
-          lifecycle_stage: "",
-          disposition: "",
-          legal_basis: [],
-          company_domain: "",
-          scheduled_call_at: "",
-          tags: [],
-          note: "",
-        source_file: "",
-          custom_fields: [],
-        });
+        setContactForm(createEmptyCrmListContactFormState("source_file"));
         if (!addAnother) {
           setShowCreateContactSidebar(false);
         }
@@ -5912,7 +5603,7 @@ const CrmQuotesManagement = () => {
           )}
 
           {/* Audio Player Modal */}
-          {/* {getCallHistory(selectedDataItem.id).length > 0 && (
+          {/* {getCrmListPageMockCallHistory(selectedDataItem.id).length > 0 && (
               <>
                 <div style={{
                   fontSize: '16px',
@@ -5926,7 +5617,7 @@ const CrmQuotesManagement = () => {
                   gap: '10px'
                 }}>
                   <History size={18} style={{ color: '#4680ff' }} />
-                  Call History ({getCallHistory(selectedDataItem.id).length})
+                  Call History ({getCrmListPageMockCallHistory(selectedDataItem.id).length})
                 </div>
                 <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
                   <div style={{
@@ -5938,8 +5629,8 @@ const CrmQuotesManagement = () => {
                     width: '2px',
                     background: '#e5e7eb'
                   }} />
-                  {getCallHistory(selectedDataItem.id).map((call, idx) => {
-                    const endReason = callEndReasons.find(
+                  {getCrmListPageMockCallHistory(selectedDataItem.id).map((call, idx) => {
+                    const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
                       (r) => r.value === call.endReason
                     );
                     const dispositionColors: Record<string, string> = {

@@ -24,6 +24,7 @@ import {
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
+import type { GroupBase, StylesConfig } from "react-select";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
@@ -125,6 +126,15 @@ import {
 } from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { useCrmListPageTabCreateContactAndFilter } from "@hooks/useCrmListPageTabCreateContactAndFilter";
+import { createEmptyCrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
+import {
+  CRM_LIST_PAGE_CALL_END_REASONS,
+  CRM_LIST_PAGE_STATIC_TAGS,
+} from "@utils/crmListPageStaticData";
+
+type ProspectsSourceFileOption = { value: string; label: string };
 
 interface DeleteModalAdditionalInfoProps {
   mode: "single" | "bulk" | null;
@@ -275,28 +285,9 @@ const CrmProspectsManagement = () => {
   const [showCreateContactSidebar, setShowCreateContactSidebar] =
     useState(false);
   const addContactsRef = useRef<HTMLDivElement>(null);
-  const [contactForm, setContactForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone_country_code: "",
-    phoneNumber: "",
-    campaign_id: null as number | null,
-    contact_owner: null as string | null,
-    lifecycle_stage: "Lead",
-    disposition: "",
-    legal_basis: [] as string[],
-    company_domain: "",
-    scheduled_call_at: "",
-    tags: [] as Array<{ value: string; label: string; id: number }>,
-    note: "",
-    source_file: "",
-    custom_fields: [] as Array<{
-      id: string;
-      field_name: string;
-      field_value: string;
-    }>,
-  });
+  const [contactForm, setContactForm] = useState(() =>
+    createEmptyCrmListContactFormState("source_file"),
+  );
   const [createContactLoading, setCreateContactLoading] = useState(false);
   const [editingContactId, setEditingContactId] = useState<number | null>(null);
   const [contactFormLoadError, setContactFormLoadError] = useState<
@@ -315,182 +306,6 @@ const CrmProspectsManagement = () => {
   // Initialize activeFilter state
   const [activeFilter, setActiveFilter] = useState("all");
 
-  // Read tab from URL on mount and when router is ready
-  useEffect(() => {
-    if (router.isReady && router.query.tab) {
-      const tabFromUrl = String(router.query.tab);
-      if (validFilters.includes(tabFromUrl)) {
-        setActiveFilter(tabFromUrl);
-      }
-    }
-  }, [router.isReady, router.query.tab]);
-
-  // Open Create Contact sidebar when navigated from header (Ticket = Prospect)
-  useEffect(() => {
-    if (router.isReady && router.query.createContact === "1") {
-      setShowCreateContactSidebar(true);
-      const rawEditId = router.query.editContactId;
-      const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
-      const editIdNum = Number(editIdStr);
-      if (Number.isFinite(editIdNum) && editIdNum > 0) {
-        setEditingContactId(editIdNum);
-      }
-
-      const { createContact: _, editContactId: __, ...rest } = router.query;
-      router.replace({ pathname: router.pathname, query: rest }, undefined, {
-        shallow: true,
-      });
-    }
-  }, [router.isReady, router.query.createContact, router.query.editContactId]);
-
-  // Close Add Contacts dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        addContactsRef.current &&
-        !addContactsRef.current.contains(event.target as Node)
-      ) {
-        setShowAddContactsDropdown(false);
-      }
-    };
-
-    if (showAddContactsDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [showAddContactsDropdown]);
-
-  // Load prospect into form when sidebar opens in edit mode
-  useEffect(() => {
-    if (!showCreateContactSidebar || !editingContactId) {
-      setContactFormLoadError(null);
-      setContactFormLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setContactFormLoadError(null);
-    setContactFormLoading(true);
-    getCrmDataById(editingContactId)
-      .then((item: CrmDataItem & { data?: Record<string, any>; source_file?: string; tags?: { id?: number; name?: string }[] }) => {
-        if (cancelled) return;
-        const d = item.data || {};
-        const nameParts = (item.name || "").trim().split(/\s+/);
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-        const toDatetimeLocal = (v: string | null | undefined) => {
-          if (!v) return "";
-          const m = moment(v);
-          return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
-        };
-        const rawTags = (item as any).tags ?? item?.data?.tags ?? d.tags ?? [];
-        const tagsArray = Array.isArray(rawTags)
-          ? rawTags.map((t: any) =>
-              typeof t === "string"
-                ? { value: t, label: t }
-                : {
-                  value: t.name ?? t.value ?? String(t.id ?? ""),
-                  label: t.name ?? t.label ?? t.value ?? String(t.id ?? ""),
-                  id: Number(t.id ?? t.tag_id ?? t.pivot?.tag_id ?? 0),
-                },
-            )
-          : [];
-        // Parse phone for country code + national number (payload may be "+1 4155551234" or E.164)
-        let phoneCountryCode = "";
-        let phoneNumber = item.phone ?? "";
-        if (typeof item.phone === "string" && item.phone.trim()) {
-          try {
-            const normalized = item.phone.replaceAll(" ", "");
-            const parsed = parsePhoneNumberInput(normalized);
-            if (parsed) {
-              phoneCountryCode = `+${parsed.countryCallingCode}`;
-              phoneNumber = parsed.nationalNumber;
-            }
-          } catch {
-            // keep phoneNumber as-is, phoneCountryCode ""
-          }
-        }
-        // Custom fields = keys in data that are NOT our form fields (only these show in Custom fields section)
-        const reservedDataKeys = new Set([
-          "email",
-          "assigned_to",
-          "uploaded_by",
-          "disposition",
-          "tags",
-          "note",
-          "contact_owner",
-          "lifecycle_stage",
-          "legal_basis",
-        ]);
-        const customFieldsArray = Object.entries(d)
-          .filter(([k]) => !reservedDataKeys.has(k))
-          .map(([field_name, field_value]) => ({
-            id: createCustomFieldId(),
-            field_name,
-            field_value: Array.isArray(field_value)
-              ? (field_value as string[]).join(", ")
-              : String(field_value ?? "").trim(),
-          }))
-          .filter((f) => f.field_name || f.field_value);
-        setContactForm({
-          firstName,
-          lastName,
-          email: d.email ?? (item as any).email ?? "",
-          phone_country_code: phoneCountryCode,
-          phoneNumber,
-          campaign_id: item.campaign_id ?? d.campaign_id ?? null,
-          contact_owner: (item as any).user_extension ?? d.contact_owner ?? (item as any).contact_owner ?? null,
-          lifecycle_stage: d.lifecycle_stage ?? "",
-          disposition: d.disposition ?? (item as any).disposition ?? "",
-          legal_basis: Array.isArray(d.legal_basis) ? d.legal_basis : [],
-          company_domain: (item as any).company_domain ?? d.company_domain ?? "",
-          scheduled_call_at: toDatetimeLocal(
-            item.scheduled_call_at ?? d.scheduled_call_at,
-          ),
-          tags: tagsArray as Array<{ value: string; label: string; id: number }>,
-          note: item.note ?? d.note ?? "",
-          source_file:
-            (item as any).source_file ??
-            d.source ??
-            (item as any).source ??
-            "",
-          custom_fields: customFieldsArray,
-        });
-        if (!cancelled) setContactFormLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setContactFormLoadError("Failed to load prospect");
-          setContactFormLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [showCreateContactSidebar, editingContactId]);
-
-  // Handler to update filter and URL
-  const handleFilterChange = useCallback(
-    (filterId: string) => {
-      setActiveFilter(filterId);
-      setPagination((prev) => ({ ...prev, currentPage: 1 }));
-      // Prevent showing stale totalRecords on "Convert to Leads" tab until new data loads
-      if (filterId === "has_leads") {
-        setLoading(true);
-      }
-
-      // Update URL with tab query parameter
-      router.push(
-        {
-          pathname: router.pathname,
-          query: { ...router.query, tab: filterId },
-        },
-        undefined,
-        { shallow: true },
-      );
-    },
-    [router],
-  );
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [prospectsSearch, setProspectsSearch] = useState("");
   const [showColumnEditor, setShowColumnEditor] = useState(false);
@@ -541,6 +356,27 @@ const CrmProspectsManagement = () => {
   /** Total count of all prospects (unchanged when switching to Scheduled / Convert to Leads tab) */
   const [totalAllProspects, setTotalAllProspects] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  const { handleFilterChange } = useCrmListPageTabCreateContactAndFilter({
+    router,
+    validFilters,
+    setActiveFilter,
+    setPagination,
+    setLoading,
+    showAddContactsDropdown,
+    setShowAddContactsDropdown,
+    addContactsRef,
+    showCreateContactSidebar,
+    setShowCreateContactSidebar,
+    editingContactId,
+    setEditingContactId,
+    setContactForm,
+    setContactFormLoadError,
+    setContactFormLoading,
+    sourceField: "source_file",
+    loadFailedMessage: "Failed to load prospect",
+  });
+
   const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<CrmDataMetrics>({
     assigned_records: 0,
@@ -550,33 +386,6 @@ const CrmProspectsManagement = () => {
     scheduled_next_hour_records: 0,
     scheduled_next_24_hours_records: 0,
   });
-
-  // Static tags data
-  const staticTags = [
-    { value: "hot-lead", label: "Hot Lead" },
-    { value: "cold-lead", label: "Cold Lead" },
-    { value: "follow-up", label: "Follow Up" },
-    { value: "interested", label: "Interested" },
-    { value: "not-interested", label: "Not Interested" },
-    { value: "callback", label: "Callback" },
-    { value: "qualified", label: "Qualified" },
-    { value: "unqualified", label: "Unqualified" },
-  ];
-
-  // Static call end reasons
-  const callEndReasons = [
-    { value: "call_later", label: "Call Later", color: "warning" },
-    { value: "dont_call", label: "Don't Call", color: "danger" },
-    {
-      value: "not_reachable",
-      label: "Number Not Reachable",
-      color: "secondary",
-    },
-    { value: "dncr_blocklisted", label: "DNCR Blocklisted", color: "dark" },
-    { value: "answered", label: "Answered", color: "success" },
-    { value: "busy", label: "Busy", color: "info" },
-    { value: "no_answer", label: "No Answer", color: "light" },
-  ];
 
   // History data state
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -645,50 +454,6 @@ const CrmProspectsManagement = () => {
     },
     [fetchCampaignsByIds],
   );
-
-  // Custom select styles
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "45px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused
-        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
-        : "none",
-      "&:hover": {
-        borderColor: "#86b7fe",
-      },
-    }),
-    multiValue: (provided: any) => ({
-      ...provided,
-      backgroundColor: "#0d6efd",
-      color: "white",
-      fontSize: "0.813rem",
-    }),
-    multiValueLabel: (provided: any) => ({
-      ...provided,
-      color: "white",
-      padding: "2px 6px",
-    }),
-    multiValueRemove: (provided: any) => ({
-      ...provided,
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#0b5ed7",
-        color: "white",
-      },
-    }),
-    placeholder: (provided: any) => ({
-      ...provided,
-      color: "#6c757d",
-      fontSize: "0.875rem",
-    }),
-    singleValue: (provided: any) => ({
-      ...provided,
-      fontSize: "0.875rem",
-    }),
-  };
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -1086,7 +851,7 @@ const CrmProspectsManagement = () => {
         console.error("Failed to load tags:", error);
         // Fallback to static tags
         setAvailableTags(
-          staticTags.map((tag) => ({
+          CRM_LIST_PAGE_STATIC_TAGS.map((tag) => ({
             value: tag.value,
             label: tag.label,
             id: parseInt(tag.value.replace("tag-", "")) || 0,
@@ -1283,7 +1048,7 @@ const CrmProspectsManagement = () => {
         },
         dropdownContent: (
           <div style={{ minWidth: 280 }}>
-            <CreatableSelect
+            <CreatableSelect<ProspectsSourceFileOption>
               options={uniqueSources}
               value={(() => {
                 if (!sourceValue) {
@@ -1291,13 +1056,19 @@ const CrmProspectsManagement = () => {
                 }
                 return { value: sourceValue, label: String(sourceValue) };
               })()}
-              onChange={(selected: { value: string } | null) => {
+              onChange={(selected) => {
                 const v = selected ? selected.value : null;
                 setProspectsFilters((prev) => ({ ...prev, sourceFile: v }));
                 applyTableFiltersPatch({ source_file: v });
               }}
               placeholder="Select or type a source..."
-              styles={customSelectStyles}
+              styles={
+                customSelectStyles as StylesConfig<
+                  ProspectsSourceFileOption,
+                  false,
+                  GroupBase<ProspectsSourceFileOption>
+                >
+              }
               isClearable
             />
             <div className="d-flex justify-content-end mt-2">
@@ -2468,7 +2239,7 @@ const CrmProspectsManagement = () => {
         type: "badge",
         accessor: (row) => {
           if (!row.last_call_end_reason) return null;
-          const endReason = callEndReasons.find(
+          const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
             (r) => r.value === row.last_call_end_reason,
           );
           return endReason?.label || row.last_call_end_reason;
@@ -2476,7 +2247,7 @@ const CrmProspectsManagement = () => {
         badge: {
           getVariant: (row) => {
             if (!row.last_call_end_reason) return "secondary";
-            const endReason = callEndReasons.find(
+            const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
               (r) => r.value === row.last_call_end_reason,
             );
             return (endReason?.color as any) || "secondary";
@@ -2595,7 +2366,7 @@ const CrmProspectsManagement = () => {
         ),
       },
     ],
-    [extensions, callEndReasons, handleCallClick],
+    [extensions, CRM_LIST_PAGE_CALL_END_REASONS, handleCallClick],
   );
 
   // Define table actions
@@ -2811,24 +2582,7 @@ const CrmProspectsManagement = () => {
             onClick={() => {
               setShowAddContactsDropdown(false);
               setEditingContactId(null);
-              setContactForm({
-                firstName: "",
-                lastName: "",
-                email: "",
-                phone_country_code: "",
-                phoneNumber: "",
-                campaign_id: null,
-                contact_owner: null,
-                lifecycle_stage: "Lead",
-                disposition: "",
-                legal_basis: [],
-                company_domain: "",
-                scheduled_call_at: "",
-                tags: [],
-                note: "",
-                source_file: "",
-                custom_fields: [],
-              });
+              setContactForm(createEmptyCrmListContactFormState("source_file"));
               setShowCreateContactSidebar(true);
             }}
             style={{
@@ -2941,24 +2695,7 @@ const CrmProspectsManagement = () => {
           data: dataPayload,
         });
         fetchCrmData();
-        setContactForm({
-          firstName: "",
-          lastName: "",
-          email: "",
-          phone_country_code: "",
-          phoneNumber: "",
-          campaign_id: null,
-          contact_owner: null,
-          lifecycle_stage: "",
-          disposition: "",
-          legal_basis: [],
-          company_domain: "",
-          scheduled_call_at: "",
-          tags: [],
-          note: "",
-          source_file: "",
-          custom_fields: [],
-        });
+        setContactForm(createEmptyCrmListContactFormState("source_file"));
         if (!addAnother) {
           setShowCreateContactSidebar(false);
         }

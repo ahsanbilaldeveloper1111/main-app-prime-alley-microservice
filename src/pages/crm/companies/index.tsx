@@ -98,6 +98,11 @@ import GenericTable, {
 } from "@components/GenericTable";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import { useCompanyFilterPills } from "@hooks/useCompanyFilterPills";
+import {
+  CRM_LIST_PAGE_CALL_END_REASONS,
+  CRM_LIST_PAGE_STATIC_TAGS,
+  getCrmListPageMockCallHistory,
+} from "@utils/crmListPageStaticData";
 
 import GenericSidebar, {
   QuickAction,
@@ -167,6 +172,7 @@ import {
   CrmFilterBar as FilterBar,
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 
 const labelKey = (key: string) =>
   key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
@@ -793,92 +799,6 @@ const CrmCompanyManagement = () => {
     scheduled_next_24_hours_records: 0,
   });
 
-  // Static tags data
-  const staticTags = [
-    { value: "hot-lead", label: "Hot Lead" },
-    { value: "cold-lead", label: "Cold Lead" },
-    { value: "follow-up", label: "Follow Up" },
-    { value: "interested", label: "Interested" },
-    { value: "not-interested", label: "Not Interested" },
-    { value: "callback", label: "Callback" },
-    { value: "qualified", label: "Qualified" },
-    { value: "unqualified", label: "Unqualified" },
-  ];
-
-  // Static call end reasons
-  const callEndReasons = [
-    { value: "call_later", label: "Call Later", color: "warning" },
-    { value: "dont_call", label: "Don't Call", color: "danger" },
-    {
-      value: "not_reachable",
-      label: "Number Not Reachable",
-      color: "secondary",
-    },
-    { value: "dncr_blocklisted", label: "DNCR Blocklisted", color: "dark" },
-    { value: "answered", label: "Answered", color: "success" },
-    { value: "busy", label: "Busy", color: "info" },
-    { value: "no_answer", label: "No Answer", color: "light" },
-  ];
-
-  // Static call history data with varied information
-  const getCallHistory = (entryId: number) => {
-    const histories = [
-      {
-        id: 1,
-        duration: "2:34",
-        endReason: "answered",
-        disposition: "interested",
-        calledAt: "2024-01-15T10:30:00Z",
-        recordingUrl: "https://example.com/recording1.mp3",
-        comment:
-          "Client showed interest in our premium package. Asked for pricing details and wants to schedule a demo next week.",
-      },
-      {
-        id: 2,
-        duration: "0:45",
-        endReason: "busy",
-        disposition: "callback_requested",
-        calledAt: "2024-01-14T14:20:00Z",
-        recordingUrl: "https://example.com/recording2.mp3",
-        comment:
-          "Line was busy. Left voicemail with callback request for tomorrow morning.",
-      },
-      {
-        id: 3,
-        duration: "1:12",
-        endReason: "no_answer",
-        disposition: "no_answer",
-        calledAt: "2024-01-13T09:15:00Z",
-        recordingUrl: "https://example.com/recording3.mp3",
-        comment:
-          "No answer after multiple rings. Will try again later in the day.",
-      },
-      {
-        id: 4,
-        duration: "3:45",
-        endReason: "answered",
-        disposition: "not_interested",
-        calledAt: "2024-01-12T16:20:00Z",
-        recordingUrl: "https://example.com/recording4.mp3",
-        comment:
-          "Client politely declined. Not interested in our services at this time. Asked to be removed from calling list.",
-      },
-      {
-        id: 5,
-        duration: "4:12",
-        endReason: "answered",
-        disposition: "follow_up",
-        calledAt: "2024-01-11T11:30:00Z",
-        recordingUrl: "https://example.com/recording5.mp3",
-        comment:
-          "Client needs to discuss with their team. Will follow up in 2 weeks with additional information about our enterprise solutions.",
-      },
-    ];
-
-    // Return different histories based on entryId for variety
-    return histories.slice(0, (entryId % 3) + 2);
-  };
-
   // History data state
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -950,50 +870,6 @@ const CrmCompanyManagement = () => {
     },
     [fetchCampaignsByIds],
   );
-
-  // Custom select styles
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "45px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused
-        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
-        : "none",
-      "&:hover": {
-        borderColor: "#86b7fe",
-      },
-    }),
-    multiValue: (provided: any) => ({
-      ...provided,
-      backgroundColor: "#0d6efd",
-      color: "white",
-      fontSize: "0.813rem",
-    }),
-    multiValueLabel: (provided: any) => ({
-      ...provided,
-      color: "white",
-      padding: "2px 6px",
-    }),
-    multiValueRemove: (provided: any) => ({
-      ...provided,
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#0b5ed7",
-        color: "white",
-      },
-    }),
-    placeholder: (provided: any) => ({
-      ...provided,
-      color: "#6c757d",
-      fontSize: "0.875rem",
-    }),
-    singleValue: (provided: any) => ({
-      ...provided,
-      fontSize: "0.875rem",
-    }),
-  };
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -1131,7 +1007,7 @@ const CrmCompanyManagement = () => {
         console.error("Failed to load tags:", error);
         // Fallback to static tags
         setAvailableTags(
-          staticTags.map((tag) => ({
+          CRM_LIST_PAGE_STATIC_TAGS.map((tag) => ({
             value: tag.value,
             label: tag.label,
             id: parseInt(tag.value.replace("tag-", "")) || 0,
@@ -2444,7 +2320,7 @@ const CrmCompanyManagement = () => {
         emptyValue: "—",
       },
     ],
-    [extensions, callEndReasons, handleCallClick],
+    [extensions, CRM_LIST_PAGE_CALL_END_REASONS, handleCallClick],
   );
 
   // Define table actions
@@ -2682,8 +2558,8 @@ const CrmCompanyManagement = () => {
         cell: (props: any) => {
           // Static data for now
           const endReason =
-            callEndReasons.find((r) => r.value === "answered") ||
-            callEndReasons[0];
+            CRM_LIST_PAGE_CALL_END_REASONS.find((r) => r.value === "answered") ||
+            CRM_LIST_PAGE_CALL_END_REASONS[0];
           return (
             <span className={`status-badge ${endReason.color as any}`}>
               {endReason.label}
@@ -2855,7 +2731,7 @@ const CrmCompanyManagement = () => {
       handlePlayRecording,
       extensions,
       availableCampaigns,
-      callEndReasons,
+      CRM_LIST_PAGE_CALL_END_REASONS,
       handleScheduleCall,
       handleUnscheduleCallClick,
     ],
@@ -5520,7 +5396,7 @@ const CrmCompanyManagement = () => {
           )}
 
           {/* Audio Player Modal */}
-          {/* {getCallHistory(selectedDataItem.id).length > 0 && (
+          {/* {getCrmListPageMockCallHistory(selectedDataItem.id).length > 0 && (
               <>
                 <div style={{
                   fontSize: '16px',
@@ -5534,7 +5410,7 @@ const CrmCompanyManagement = () => {
                   gap: '10px'
                 }}>
                   <History size={18} style={{ color: '#4680ff' }} />
-                  Call History ({getCallHistory(selectedDataItem.id).length})
+                  Call History ({getCrmListPageMockCallHistory(selectedDataItem.id).length})
                 </div>
                 <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
                   <div style={{
@@ -5546,8 +5422,8 @@ const CrmCompanyManagement = () => {
                     width: '2px',
                     background: '#e5e7eb'
                   }} />
-                  {getCallHistory(selectedDataItem.id).map((call, idx) => {
-                    const endReason = callEndReasons.find(
+                  {getCrmListPageMockCallHistory(selectedDataItem.id).map((call, idx) => {
+                    const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
                       (r) => r.value === call.endReason
                     );
                     const dispositionColors: Record<string, string> = {
