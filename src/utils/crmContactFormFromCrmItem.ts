@@ -113,8 +113,8 @@ function buildCustomFieldsFromData(d: Record<string, unknown>): CrmContactFormCu
       id: createNonPrngId(field_name),
       field_name,
       field_value: Array.isArray(field_value)
-        ? (field_value as string[]).join(", ")
-        : String(field_value ?? "").trim(),
+        ? field_value.map((e) => unknownToFormString(e)).join(", ")
+        : unknownToFormString(field_value).trim(),
     }))
     .filter((f) => f.field_name || f.field_value);
 }
@@ -221,12 +221,12 @@ export function mapCrmDataItemToContactFormState(
     lifecycle_stage: unknownToFormString(lifecycleRaw),
     disposition: unknownToFormString(dispositionRaw),
     legal_basis: Array.isArray(legalRaw) ? (legalRaw as string[]) : [],
-    company_domain: String(companyDomainRaw ?? ""),
+    company_domain: unknownToFormString(companyDomainRaw),
     scheduled_call_at: toDatetimeLocal(
       scheduledRaw as string | null | undefined,
     ),
     tags: tagsArray,
-    note: String(noteRaw ?? ""),
+    note: unknownToFormString(noteRaw),
     custom_fields: customFieldsArray,
   };
 

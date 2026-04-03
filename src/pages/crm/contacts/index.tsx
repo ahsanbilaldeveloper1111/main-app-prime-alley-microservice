@@ -13,7 +13,6 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Button,
-  Card,
   Row,
   Col,
   Form,
@@ -21,9 +20,6 @@ import {
   Spinner,
   Modal,
   Badge,
-  InputGroup,
-  Dropdown,
-  Table,
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
@@ -36,22 +32,15 @@ import ContactEditSidebar from "@components/ProspectEditSidebar";
 import {
   FiUpload,
   FiDatabase,
-  FiSearch,
   FiFilter,
-  FiTrash2,
-  FiEye,
   FiEdit,
   FiUser,
   FiUsers,
-  FiPhone,
-  FiMessageCircle,
   FiPlay,
   FiClock,
   FiX,
-  FiAlertCircle,
   FiCalendar,
   FiTarget,
-  FiMoreVertical,
 } from "react-icons/fi";
 import {
   Users,
@@ -61,55 +50,31 @@ import {
   ChevronDown,
   X,
   AlertCircle as AlertCircleIcon,
-  UserPlus,
-  Plus,
-  ArrowUp,
-  ArrowDown,
   Download,
-  CheckSquare,
-  ArrowUpDown,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   Trash2,
   MoreVertical,
-  MoreHorizontal,
   Phone as PhoneIcon,
-  Phone,
   Mail,
   User,
   History,
   FileText,
   Target,
-  Layers,
   MessageCircle,
-  MessageSquare,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
-import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
-  PaginationConfig,
-  ToolbarConfig,
   FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
-import GenericFilterSidebar, {
-  FilterField,
-} from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericSidebar from "@components/GenericSidebarNew";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
-  getCrmDataById,
   getAllCrmDataById,
   createCrmData,
   updateCrmData,
@@ -119,7 +84,6 @@ import {
   getCrmDataCounts,
   bulkDeleteCrmData,
   getCrmDataTags,
-  markCrmDataAsViewed,
   getCampaigns,
   scheduleCall,
   unscheduleCall,
@@ -141,13 +105,11 @@ import {
   formatDateTimeToLocal,
   GlobalDateFormat,
   GlobalTimeFormat,
-  GlobalDateTimeFormat,
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
@@ -155,15 +117,10 @@ import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import CrmActivitiesPanel, {
+import {
   type CrmActivitiesPanelRef,
 } from "@components/CrmActivitiesPanel";
-import RichNoteEditor from "@components/RichNoteEditor";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
-import {
-  CrmKPICard as KPICard,
-  CrmFilterBar as FilterBar,
-} from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import { useCrmListPageTabCreateContactAndFilter } from "@hooks/useCrmListPageTabCreateContactAndFilter";
@@ -171,7 +128,6 @@ import { createEmptyCrmListContactFormState } from "@utils/crmContactFormFromCrm
 import {
   CRM_LIST_PAGE_CALL_END_REASONS,
   CRM_LIST_PAGE_STATIC_TAGS,
-  getCrmListPageMockCallHistory,
 } from "@utils/crmListPageStaticData";
 
 const CrmContactsManagement = () => {
@@ -181,11 +137,8 @@ const CrmContactsManagement = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const requestIdRef = useRef(0);
-  const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedDataItem, setSelectedDataItem] = useState<CrmDataItem | null>(
     null,
@@ -196,11 +149,7 @@ const CrmContactsManagement = () => {
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [showAfterCallModal, setShowAfterCallModal] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
-  const [selectedCampaigns, setSelectedCampaigns] = useState<readonly any[]>(
-    [],
-  );
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
-  const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
   const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
   const [convertingContactId, setConvertingContactId] = useState<
     number | null
@@ -278,8 +227,6 @@ const CrmContactsManagement = () => {
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedContact, setSelectedContact] = useState<any>(null);
   const sidebarContactFetchTokenRef = useRef(0);
-  const [showFilterBar, setShowFilterBar] = useState(false);
-
   // Add Contacts button states
   const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
   const [showCreateContactSidebar, setShowCreateContactSidebar] =
@@ -296,9 +243,9 @@ const CrmContactsManagement = () => {
   const [contactFormLoading, setContactFormLoading] = useState(false);
 
   // Call recordings state
-  const [callRecordings, setCallRecordings] = useState<any[]>([]);
-  const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
-  const [callRecordingsTotal, setCallRecordingsTotal] = useState(0);
+  const [callRecordings] = useState<any[]>([]);
+  const [callRecordingsLoading] = useState(false);
+  const [callRecordingsTotal] = useState(0);
   const [selectedRecording, setSelectedRecording] = useState<any>(null);
   const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
     useState(false);
@@ -308,9 +255,6 @@ const CrmContactsManagement = () => {
   const [downloadProgress, setDownloadProgress] = useState<
     Record<string, number>
   >({});
-
-  const [showContactsAnalytics, setShowContactsAnalytics] = useState(false);
-  const [showAllContactStats, setShowAllContactStats] = useState(false);
 
   // Valid filter IDs
   const validFilters = ["all", "scheduled", "has_leads"];
@@ -497,86 +441,6 @@ const CrmContactsManagement = () => {
     onMeetingScheduled: () =>
       sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
   });
-
-  const sidebarQuickActions = useMemo(() => {
-    const hasPhone = !!String(sidebarRecordPhone || "").trim();
-    const hasEmail = !!String(sidebarRecordEmail || "").trim();
-    return [
-      {
-        id: "qa-call",
-        label: "Call",
-        icon: Phone,
-        onClick: () => {
-          const phone = String(sidebarRecordPhone || "").trim();
-          if (!phone) {
-            toast.error("No phone number available for this entry");
-            return;
-          }
-          if (!isInitialized) {
-            toast.error("CTI not initialized. Please wait...");
-            return;
-          }
-          dialNumber(phone)
-            .then((result) => {
-              if (result.success) {
-                toast.success(`Calling ${sidebarRecordName || phone}...`);
-              } else {
-                toast.error(result.error || "Failed to make call");
-              }
-            })
-            .catch((error) => {
-              console.error("Call error:", error);
-              toast.error("Failed to make call");
-            });
-        },
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-whatsapp",
-        label: "WhatsApp",
-        icon: MessageCircle,
-        onClick: () => sidebarActivityModals.openWhatsApp(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-sms",
-        label: "SMS",
-        icon: MessageSquare,
-        onClick: () => sidebarActivityModals.openSms(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-meeting",
-        label: "Meeting",
-        icon: Calendar,
-        onClick: () => sidebarActivityModals.openMeeting(),
-      },
-      {
-        id: "qa-email",
-        label: "Email",
-        icon: Mail,
-        onClick: () => sidebarActivityModals.openEmail(),
-        disabled: !hasEmail,
-      },
-      {
-        id: "more",
-        label: "More",
-        icon: MoreHorizontal,
-        onClick: () => {
-          // Let GenericSidebar's built-in "More" submenu open (same behavior as Deals/Leads).
-        },
-        disabled: false,
-      },
-    ];
-  }, [
-    sidebarRecordPhone,
-    sidebarRecordEmail,
-    sidebarActivityModals,
-    dialNumber,
-    isInitialized,
-    sidebarRecordName,
-    sidebarRecordId,
-  ]);
 
   const buildCrmDataParams = useCallback(
     (overrides: { page?: number; per_page?: number } = {}) => {
@@ -1254,182 +1118,6 @@ const CrmContactsManagement = () => {
     // Don't reset pagination here - it's already reset in onFilterChange
   }, [activeFilter]);
 
-  // Helper functions for sorting and pagination
-  const handleSort = (column: string) => {
-    const newDirection =
-      pagination.sortColumn === column && pagination.sortDirection === "asc"
-        ? "desc"
-        : "asc";
-    setPagination({
-      ...pagination,
-      sortColumn: column,
-      sortDirection: newDirection,
-      currentPage: 1,
-    });
-  };
-
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
-  ): T[] => {
-    if (!sortColumn) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderSortIcon = (column: string) => {
-    if (pagination.sortColumn !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return pagination.sortDirection === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
-  };
-
-  const renderPaginationControls = () => {
-    const totalPages = getTotalPages(totalRecords, pagination.rowsPerPage);
-    const { currentPage, rowsPerPage } = pagination;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, totalRecords);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPagination({
-                ...pagination,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={15}>15</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalRecords} contacts
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() => setPagination({ ...pagination, currentPage: 1 })}
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage - 1 })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPagination({ ...pagination, currentPage: pageNum })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage + 1 })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: totalPages })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
   // Fetch contacts data
   const fetchCrmData = useCallback(async () => {
     // Increment request ID to track the latest request
@@ -1529,27 +1217,6 @@ const CrmContactsManagement = () => {
     }
   };
 
-  // Handle drag and drop
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
   // Handle file input change
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -1569,21 +1236,7 @@ const CrmContactsManagement = () => {
       return;
     }
 
-    setUploading(true);
-    setUploadProgress(0);
-
     try {
-      // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
       // Extract tag values from selected options
       const tagValues = Array.from(fieldTags).map((tag) => tag.value);
 
@@ -1594,22 +1247,9 @@ const CrmContactsManagement = () => {
         true, // No auto-assignment
       );
 
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      // Parse response
       const responseData = response?.data || {};
       const processedCount = responseData.processed_count || 0;
       const validationFailures = responseData.validation_failures || 0;
-      // const errors = responseData.errors || [];
-      const message = responseData.message || "Upload completed";
-
-      // Show error messages for validation failures
-      // if (errors.length > 0) {
-      //   errors.forEach((error: string) => {
-      //     toast.warn(error);
-      //   });
-      // }
 
       // Show success message
       if (processedCount > 0) {
@@ -1640,7 +1280,6 @@ const CrmContactsManagement = () => {
       setSelectedFile(null);
       setFieldTags([]);
       setShowUploadModal(false);
-      setUploadProgress(0);
 
       // Refresh data
       setRefreshKey((prev) => prev + 1);
@@ -1651,9 +1290,6 @@ const CrmContactsManagement = () => {
         error?.message ||
         "Failed to upload file. Please try again.";
       toast.error(errorMessage);
-      setUploadProgress(0);
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -1839,22 +1475,6 @@ const CrmContactsManagement = () => {
     calculateEntryCounts,
   ]);
 
-  // Handle data assignment
-  const handleDataAssignment = useCallback(async () => {
-    try {
-      const counts = await calculateEntryCounts();
-      setAssignmentCounts(counts);
-      setTotalEntriesToAssign(counts.unassigned);
-      setShowDataAssignmentModal(true);
-    } catch (error) {
-      console.error("Failed to get entry counts:", error);
-      // Fallback to static data
-      setAssignmentCounts({ total: 5000, assigned: 2000, unassigned: 3000 });
-      setTotalEntriesToAssign(3000);
-      setShowDataAssignmentModal(true);
-    }
-  }, [calculateEntryCounts]);
-
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
@@ -1959,48 +1579,6 @@ const CrmContactsManagement = () => {
     customDistribution,
   ]);
 
-  // Handle mark as viewed
-  const handleMarkAsViewed = useCallback(async (item: CrmDataItem) => {
-    try {
-      await markCrmDataAsViewed(item.id);
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      console.error("Mark as viewed error:", error);
-    }
-  }, []);
-
-  // Handle call actions
-  const handleCallAction = useCallback((action: string, item: CrmDataItem) => {
-    const phone = item.phone;
-    if (!phone) {
-      toast.error("No phone number available for this entry");
-      return;
-    }
-
-    switch (action) {
-      case "whatsapp":
-        window.open(`https://wa.me/${phone.replace(/[^0-9]/g, "")}`, "_blank");
-        break;
-      case "phone":
-        window.open(`tel:${phone}`, "_self");
-        break;
-      case "sms":
-        window.open(`sms:${phone}`, "_self");
-        break;
-      case "facebook":
-        toast.info("Facebook calling feature coming soon");
-        break;
-      case "telegram":
-        toast.info("Telegram calling feature coming soon");
-        break;
-      case "skype":
-        toast.info("Skype calling feature coming soon");
-        break;
-      default:
-        toast.error("Unknown action");
-    }
-  }, []);
-
   const handleNoteCreate = (
     note: string,
     createTask: boolean,
@@ -2042,13 +1620,6 @@ const CrmContactsManagement = () => {
     },
     [dialNumber, isInitialized],
   );
-
-  // Handle recording playback
-  const handlePlayRecording = useCallback((recordingUrl: string) => {
-    // In a real app, this would open the recording player
-    toast.info(`Playing recording: ${recordingUrl}`);
-    console.log("Playing recording:", recordingUrl);
-  }, []);
 
   // Handle data assignment modal close
   const handleDataAssignmentModalClose = useCallback(() => {
@@ -2240,58 +1811,12 @@ const CrmContactsManagement = () => {
     }
   }, [selectedItems]);
 
-  // Handle item selection
-  const handleItemSelection = useCallback((selected: CrmDataItem[]) => {
-    setSelectedItems(selected.map((item) => item.id));
-  }, []);
-
-  // Handle contact row click
-  const handleContactClick = useCallback((contact: any) => {
-    openContactSidebar(contact);
-  }, [openContactSidebar]);
-
   // Handle close contact sidebar
   const handleCloseContactSidebar = useCallback(() => {
     sidebarContactFetchTokenRef.current += 1;
     setShowContactSidebar(false);
     setSelectedContact(null);
   }, []);
-
-  // Handle owner change from contact sidebar (Update owner dropdown)
-  const handleContactOwnerSelect = useCallback(
-    async (ownerValue: string) => {
-      const contact = selectedContact;
-      if (!contact?.id) return;
-      const name = contact.name ?? "";
-      const phone = contact.phone ?? "";
-      const campaignId =
-        contact.campaign_id ?? contact.campaign?.id ?? null;
-      const existingData = (contact.data as Record<string, unknown>) ?? {};
-      try {
-        await updateCrmData(contact.id, {
-          name,
-          phone,
-          campaign_id: campaignId,
-          data: { ...existingData, contact_owner: ownerValue || undefined },
-        });
-        fetchCrmData();
-        setSelectedContact((prev: CrmDataItem | null) =>
-          prev
-            ? {
-                ...prev,
-                data: {
-                  ...(prev.data as Record<string, unknown>),
-                  contact_owner: ownerValue || null,
-                },
-              }
-            : null,
-        );
-      } catch {
-        // Error already shown by updateCrmData
-      }
-    },
-    [selectedContact, fetchCrmData],
-  );
 
   // Handle open filters sidebar
   const handleOpenFiltersSidebar = useCallback(() => {
@@ -2715,363 +2240,6 @@ const CrmContactsManagement = () => {
     ],
   );
 
-  // Define old columns for GenericListPage (keep for backward compatibility if needed)
-  const columns: Column[] = useMemo(
-    () => [
-      {
-        key: "name",
-        name: "Name",
-        selector: (row: any) => row.name,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.name ? (
-              <span className="text-muted">{props.name}</span>
-            ) : (
-              <span className="text-muted">N/A</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "phone",
-        name: "Phone",
-        selector: (row: any) => row.phone,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.phone ? (
-              <span className="status-badge info">{props.phone}</span>
-            ) : (
-              <span className="status-badge info">N/A</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "source",
-        name: "Source",
-        selector: (row: any) => row.source_file,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.source_file ? (
-              <span className="status-badge secondary">
-                {props.source_file}
-              </span>
-            ) : (
-              <span className="text-muted">N/A</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "user_extension",
-        name: "Owner",
-        selector: (row: any) => row.user_extension,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.user_extension ? (
-              <span className="status-badge success">
-                {extensions.find(
-                  (extension: any) =>
-                    extension.id.toString() ===
-                    props.user_extension?.toString(),
-                )?.display_name || props.user_extension}
-              </span>
-            ) : (
-              <span className="status-badge default">Unassigned</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "campaign",
-        name: "Campaign",
-        selector: (row: any) => row.campaign_id,
-        sortable: true,
-        cell: (props: any) => {
-          return (
-            <div>
-              {props?.campaign ? (
-                <span className="status-badge primary">
-                  {props.campaign?.name}
-                </span>
-              ) : (
-                <span className="status-badge info">No Campaign</span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        key: "last_called_at",
-        name: "Last Called",
-        selector: (row: any) => row.last_called_at,
-        sortable: true,
-        cell: (props: any) => {
-          // Generate random date within last week
-          const now = moment();
-          const oneWeekAgo = moment().subtract(7, "days");
-          const randomDays = Math.floor(Math.random() * 7);
-          const randomHours = Math.floor(Math.random() * 24);
-          const randomMinutes = Math.floor(Math.random() * 60);
-
-          const lastCalled = oneWeekAgo
-            .add(randomDays, "days")
-            .add(randomHours, "hours")
-            .add(randomMinutes, "minutes")
-            .toISOString();
-
-          return (
-            <div className="d-flex align-items-center">
-              <span className="text-uppercase">
-                {lastCalled
-                  ? moment(lastCalled).format(GlobalDateTimeFormat)
-                  : "-"}
-              </span>
-            </div>
-          );
-        },
-      },
-      {
-        key: "last_call_end_reason",
-        name: "Last Call Status",
-        selector: (row: any) => row.last_call_end_reason,
-        sortable: true,
-        cell: (props: any) => {
-          // Static data for now
-          const endReason =
-            CRM_LIST_PAGE_CALL_END_REASONS.find((r) => r.value === "answered") ||
-            CRM_LIST_PAGE_CALL_END_REASONS[0];
-          return (
-            <span className={`status-badge ${endReason.color as any}`}>
-              {endReason.label}
-            </span>
-          );
-        },
-      },
-      {
-        key: "disposition",
-        name: "Disposition",
-        selector: (row: any) => row.disposition,
-        sortable: true,
-        cell: (props: any) => {
-          // Static disposition data for now
-          const dispositions = [
-            { value: "interested", label: "Interested", color: "success" },
-            {
-              value: "not_interested",
-              label: "Not Interested",
-              color: "danger",
-            },
-            {
-              value: "callback_requested",
-              label: "Callback Requested",
-              color: "warning",
-            },
-            { value: "no_answer", label: "No Answer", color: "warning" },
-            { value: "busy", label: "Busy", color: "info" },
-            { value: "do_not_call", label: "Do Not Call", color: "danger" },
-            { value: "wrong_number", label: "Wrong Number", color: "info" },
-            { value: "follow_up", label: "Follow Up", color: "primary" },
-          ];
-
-          // Randomly select a disposition for demo purposes
-          const randomDisposition =
-            dispositions[Math.floor(Math.random() * dispositions.length)];
-
-          return (
-            <span className={`status-badge ${randomDisposition.color as any}`}>
-              {randomDisposition.label}
-            </span>
-          );
-        },
-      },
-      {
-        key: "scheduled_call_at",
-        name: "Next Call",
-        selector: (row: any) => row.scheduled_call_at,
-        sortable: true,
-        cell: (props: any) => {
-          if (!props.scheduled_call_at) {
-            return <span className="status-badge info">Not scheduled</span>;
-          }
-
-          const isOverdue = moment(props.scheduled_call_at).isBefore(moment());
-          const isNextHour = moment(props.scheduled_call_at).isBefore(
-            moment().add(1, "hour"),
-          );
-
-          return (
-            <div className="d-flex align-items-center">
-              <span
-                className={`status-badge text-uppercase ${
-                  isOverdue ? "danger" : isNextHour ? "warning" : ""
-                }`}
-              >
-                {props.scheduled_call_at
-                  ? moment(props.scheduled_call_at).format(GlobalDateTimeFormat)
-                  : "-"}
-                {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
-                {isNextHour && !isOverdue && (
-                  <span className="ms-1 fw-bold">(Soon)</span>
-                )}
-              </span>
-            </div>
-          );
-        },
-      },
-
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
-        ? [
-            {
-              key: "view_action",
-              name: "View",
-              selector: (row: any) => row.id,
-              sortable: false,
-              cell: (props: any) => (
-                <Button
-                  variant="primary"
-                  className="app-button"
-                  size="sm"
-                  onClick={() => handleViewData(props)}
-                  title="View Details"
-                >
-                  <FiEye size={14} />
-                </Button>
-              ),
-            },
-          ]
-        : []),
-
-      {
-        key: "call_action",
-        name: "Call",
-        selector: (row: any) => row.id,
-        sortable: false,
-        cell: (props: any) => (
-          <div className="d-flex gap-1">
-            {session?.user?.permissions?.includes(
-              "call-service-crm-data-management",
-            ) && (
-              <Button
-                variant="success"
-                className="app-button"
-                size="sm"
-                onClick={() => handleCallClick(props)}
-                title="Call Now"
-              >
-                <FiPhone size={14} />
-              </Button>
-            )}
-
-            <Dropdown>
-              <Dropdown.Toggle
-                variant="outline-secondary"
-                size="sm"
-                className="app-button"
-                id={`dropdown-${props.id}`}
-              >
-                <FiMoreVertical size={14} />
-              </Dropdown.Toggle>
-              <Dropdown.Menu>
-                {session?.user?.permissions?.includes(
-                  "call-service-crm-data-management",
-                ) && (
-                  <>
-                    {props.scheduled_call_at ? (
-                      <>
-                        <Dropdown.Item
-                          onClick={() => handleScheduleCall(props)}
-                        >
-                          <FiCalendar size={14} className="me-2" />
-                          Edit Scheduled Call
-                        </Dropdown.Item>
-                        <Dropdown.Item
-                          onClick={() => handleUnscheduleCallClick(props)}
-                          className="text-danger"
-                        >
-                          <FiX size={14} className="me-2" />
-                          Unschedule Call
-                        </Dropdown.Item>
-                      </>
-                    ) : (
-                      <Dropdown.Item onClick={() => handleScheduleCall(props)}>
-                        <FiCalendar size={14} className="me-2" />
-                        Schedule Call
-                      </Dropdown.Item>
-                    )}
-                    <Dropdown.Divider />
-                  </>
-                )}
-                <Dropdown.Item
-                  onClick={() => {
-                    window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
-                  }}
-                >
-                  <FiTarget size={14} className="me-2" />
-                  Convert to Lead
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          </div>
-        ),
-      },
-
-      {
-        key: "tags",
-        name: "Tags",
-        selector: (row: any) => row.tags,
-        sortable: false,
-        cell: (props: any) => {
-          // Show hardcoded tags for now
-          const tags = props.tags;
-          return (
-            <div className="d-flex flex-wrap gap-1">
-              {tags?.map((tag: any, index: any) => (
-                <span key={index} className="status-badge info">
-                  {tag.name}
-                </span>
-              ))}
-            </div>
-          );
-        },
-      },
-      // {
-      //   key: "delete_action",
-      //   name: "Delete",
-      //   selector: (row: any) => row.id,
-      //   sortable: false,
-      //   cell: (props: any) => (
-      //     <Button
-      //       variant="danger"
-      //       className="app-button"
-      //       size="sm"
-      //       onClick={() => handleDeleteData(props)}
-      //       title="Delete Entry"
-      //     >
-      //       <FiTrash2 size={14} />
-      //     </Button>
-      //   ),
-      // },
-    ],
-    [
-      handleViewData,
-      handleMarkAsViewed,
-      handleDeleteData,
-      handleCallAction,
-      handleCallClick,
-      handlePlayRecording,
-      extensions,
-      availableCampaigns,
-      CRM_LIST_PAGE_CALL_END_REASONS,
-      handleScheduleCall,
-      handleUnscheduleCallClick,
-    ],
-  );
-
   // Render Add Contacts Button with Dropdown (and Bulk Delete when rows selected)
   const renderAddContactsButton = () => (
     <div
@@ -3253,7 +2421,6 @@ const CrmContactsManagement = () => {
         disposition: contactForm.disposition || undefined,
         note: contactForm.note || undefined,
         contact_owner: contactForm.contact_owner ?? undefined,
-        // lifecycle_stage: contactForm.lifecycle_stage || undefined,
         legal_basis: contactForm.legal_basis?.length
           ? contactForm.legal_basis
           : undefined,
@@ -3323,7 +2490,6 @@ const CrmContactsManagement = () => {
       disposition: contactForm.disposition || undefined,
       note: contactForm.note || undefined,
       contact_owner: contactForm.contact_owner ?? undefined,
-      // lifecycle_stage: contactForm.lifecycle_stage || undefined,
       legal_basis: contactForm.legal_basis?.length
         ? contactForm.legal_basis
         : undefined,
@@ -3560,310 +2726,7 @@ const CrmContactsManagement = () => {
       >
         {/* Main content area */}
         <div className="contacts-scrollable-content" style={{ flex: 1 }}>
-          {/* <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-0">
-        <div className="mb-3 mb-md-0">
-  <nav aria-label="breadcrumb">
-    <ol className="breadcrumb mb-0">
-      <li className="breadcrumb-item">
-        <a href="/dashboard" className="text-decoration-none">
-          CRM
-        </a>
-      </li>
-      <li className="breadcrumb-item active fw-bold" aria-current="page">
-        Contacts
-      </li>
-    </ol>
-  </nav>
-</div>
-        <div className="d-flex flex-wrap gap-2">
-         
-
-{session?.user?.permissions?.includes("add-crm-data-management") && (
-  <Button
-    variant="outline-secondary"
-    className=""
-    onClick={() => setShowUploadModal(true)}
-  >
-    <span className="">
-      <Download size={16} className="me-2" />
-      Import Contacts
-    </span>
-  </Button>
-)}
-
-<Button
-  variant="outline-secondary"
-  className=""
-  onClick={() => setShowFilterBar(!showFilterBar)}
->
-  <span className="">
-    <Layers size={16} className="me-2" />
-    {showFilterBar ? "Hide Tabs" : "Show Tabs"}
-  </span>
-</Button>
-
-<Button
-  variant="outline-secondary"
-  className=""
-  onClick={handleOpenFiltersSidebar}
->
-  <span className="">
-    <FiFilter size={16} className="me-2" />
-    Filters
-  </span>
-</Button>
-
-
-        </div>
-      </div> */}
-
-          {/* Stats Cards */}
-          {/* <StatsCards 
-        data={[
-          {
-            title: 'All Contacts',
-            value: totalRecords,
-            icon: Users,
-            iconColor: '#6366F1',
-            iconBgColor: '#EEF2FF',
-            subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`
-          },
-          {
-            title: 'Scheduled',
-            value: metrics.scheduled_records,
-            icon: Calendar,
-            iconColor: '#10B981',
-            iconBgColor: '#D1FAE5',
-            metric: {
-              text: `${metrics.scheduled_next_hour_records} in next hour`,
-              dotColor: '#F59E0B'
-            }
-          },
-          {
-            title: 'Convert to Leads',
-            value: totalRecords > 0 ? `${((metrics.assigned_records / totalRecords) * 100).toFixed(1)}%` : '0%',
-            icon: Target,
-            iconColor: '#8B5CF6',
-            iconBgColor: '#EDE9FE',
-            badge: {
-              text: `${metrics.assigned_records} Ready`,
-              bgColor: '#FEF3C7',
-              textColor: '#92400E'
-            }
-          },
-          {
-            title: 'All Contacts',
-            value: totalRecords,
-            icon: Users,
-            iconColor: '#6366F1',
-            iconBgColor: '#EEF2FF',
-            subtitle: `${metrics.assigned_records} Assigned / ${metrics.unassigned_records} Unassigned`
-          },
-          {
-            title: 'Scheduled',
-            value: metrics.scheduled_records,
-            icon: Calendar,
-            iconColor: '#10B981',
-            iconBgColor: '#D1FAE5',
-            metric: {
-              text: `${metrics.scheduled_next_hour_records} in next hour`,
-              dotColor: '#F59E0B'
-            }
-          },
-          {
-            title: 'Convert to Leads',
-            value: totalRecords > 0 ? `${((metrics.assigned_records / totalRecords) * 100).toFixed(1)}%` : '0%',
-            icon: Target,
-            iconColor: '#8B5CF6',
-            iconBgColor: '#EDE9FE',
-            badge: {
-              text: `${metrics.assigned_records} Ready`,
-              bgColor: '#FEF3C7',
-              textColor: '#92400E'
-            }
-          }
-        ]}
-        gridMinWidth="180px"
-      /> */}
-
           <div className="container-fluid">
-            {/* Analytics Section - Collapsible */}
-            {showContactsAnalytics && (
-              <>
-                {/* Summary Stats Grid - Using KPICard design */}
-                <Row className="mb-2">
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Total Contacts"
-                      value={totalRecords}
-                      icon={<Users size={24} />}
-                      color="primary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Contacts with Calls Scheduled"
-                      value={metrics.scheduled_records}
-                      icon={<Calendar size={24} />}
-                      color="success"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Contacts with No Calls Scheduled"
-                      value={metrics.not_scheduled_records}
-                      icon={<XCircle size={24} />}
-                      color="secondary"
-                    />
-                  </Col>
-                  <Col xl={3} lg={4} md={6} className="mb-3">
-                    <KPICard
-                      title="Meetings in Next Hour"
-                      value={metrics.scheduled_next_hour_records}
-                      icon={<ClockIcon size={24} />}
-                      color="info"
-                    />
-                  </Col>
-                  {showAllContactStats && (
-                    <>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Meetings in Next 24h"
-                          value={metrics.scheduled_next_24_hours_records}
-                          icon={<Calendar size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title=" Contacts Assigned to Team Members"
-                          value={metrics.assigned_records}
-                          icon={<UserPlus size={24} />}
-                          color="primary"
-                        />
-                      </Col>
-                      <Col xl={3} lg={4} md={6} className="mb-3">
-                        <KPICard
-                          title="Contacts Not Assigned to Team Members"
-                          value={metrics.unassigned_records}
-                          icon={<AlertCircleIcon size={24} />}
-                          color="warning"
-                        />
-                      </Col>
-                    </>
-                  )}
-                </Row>
-
-                <div className="text-center mb-4">
-                  <Button
-                    variant="link"
-                    onClick={() =>
-                      setShowAllContactStats(!showAllContactStats)
-                    }
-                    className="text-decoration-none"
-                  >
-                    {showAllContactStats ? (
-                      <>
-                        <ArrowUp size={16} className="me-1" />
-                        Show Less
-                      </>
-                    ) : (
-                      <>
-                        <ArrowDown size={16} className="me-1" />
-                        Show More Stats
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </>
-            )}
-
-            {/* Filter Bar */}
-            {showFilterBar &&
-              session?.user?.permissions?.includes(
-                "list-crm-data-management",
-              ) && (
-                <FilterBar
-                  quickFilters={[
-                    {
-                      id: "all",
-                      label: "All Contacts",
-                      color: "#0d6efd",
-                      icon: <Users size={16} />,
-                    },
-                    {
-                      id: "scheduled",
-                      label: "Scheduled",
-                      color: "#20c997",
-                      icon: <FiCalendar size={16} />,
-                    },
-                    {
-                      id: "has_leads",
-                      label: "Converted to Leads",
-                      color: "#0dcaf0",
-                      icon: <FiTarget size={16} />,
-                    },
-                  ]}
-                  activeFilter={activeFilter}
-                  onFilterChange={handleFilterChange}
-                  // searchValue={contactsSearch}
-                  // onSearchChange={(value) => {
-                  //   setContactsSearch(value);
-                  // }}
-                  // onSearch={() =>
-                  //   handleFiltersChange({
-                  //     ...currentFilters,
-                  //     search: contactsSearch,
-                  //   })
-                  // }
-                  // searchPlaceholder="Search by name or phone..."
-                  // showAdvancedFilters={showAdvancedFilters}
-                  // onToggleAdvancedFilters={() =>
-                  //   setShowAdvancedFilters(!showAdvancedFilters)
-                  // }
-                  // advancedFilterCount={
-                  //   (contactsFilters.assignedTo !== null ? 1 : 0) +
-                  //   (contactsFilters.campaigns !== null &&
-                  //   contactsFilters.campaigns.length > 0
-                  //     ? 1
-                  //     : 0) +
-                  //   (contactsFilters.sourceFile !== null ? 1 : 0) +
-                  //   (contactsFilters.tags !== null &&
-                  //   contactsFilters.tags.length > 0
-                  //     ? 1
-                  //     : 0)
-                  // }
-                />
-              )}
-
-            {/* Bulk Actions */}
-            {/* {selectedItems.length > 0 &&
-          session?.user?.permissions?.includes(
-            "delete-crm-data-management"
-          ) && (
-            <div className="d-flex justify-content-end gap-2 mb-3">
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-primary" size="sm">
-                  <CheckSquare size={16} className="me-2" />
-                  Bulk Actions ({selectedItems.length})
-                </Dropdown.Toggle>
-                <Dropdown.Menu align="end">
-                  <Dropdown.Item
-                    onClick={() => {
-                      setDeleteModalMode("bulk");
-                      setShowDeleteModal(true);
-                    }}
-                    className="d-flex align-items-center text-danger"
-                  >
-                    <Trash2 size={14} className="me-2" />
-                    Delete Selected ({selectedItems.length})
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            </div>
-          )} */}
-
             {/* Contacts Table */}
             <div
               className="contacts-table-wrapper"
@@ -3881,7 +2744,6 @@ const CrmContactsManagement = () => {
                 )}
                 actions={contactsActions}
                 showActions={false}
-                // Selection
                 selectable={session?.user?.permissions?.includes(
                   "delete-crm-data-management",
                 )}
@@ -3892,12 +2754,6 @@ const CrmContactsManagement = () => {
                   setSelectedItems(selected.map((item) => item.id));
                   setClearSelectedRows(false);
                 }}
-                // Column customization
-                // customizableColumns={true}
-                // defaultSelectedColumns={defaultSelectedColumns}
-                // columnStorageKey="crmDataSelectedColumns"
-
-                // Pagination
                 pagination={{
                   currentPage: pagination.currentPage,
                   rowsPerPage: pagination.rowsPerPage,
@@ -3911,7 +2767,6 @@ const CrmContactsManagement = () => {
                     rowsPerPage,
                   });
                 }}
-                // Sorting
                 sortable={true}
                 defaultSortColumn={pagination.sortColumn}
                 defaultSortDirection={pagination.sortDirection}
@@ -3923,7 +2778,6 @@ const CrmContactsManagement = () => {
                     currentPage: 1,
                   }));
                 }}
-                // Row interactions
                 onPreviewClick={(row) => handlePreviewClick(row)}
                 onFirstColumnClick={(row) => handleFirstColumnClick(row)}
                 onRowDoubleClick={(row) => {
@@ -3935,24 +2789,18 @@ const CrmContactsManagement = () => {
                     handleViewData(row);
                   }
                 }}
-                // Loading & styling
                 loading={loading}
                 emptyMessage="No contacts found matching your criteria"
                 loadingMessage="Loading contacts..."
                 hover={true}
                 uniqueKey="id"
-                // Fixed height mode
                 fixedHeight={true}
                 maxHeight="calc(100vh - 345px)"
-                // Toolbar
                 showToolbar={true}
                 toolbar={{
                   ...contactsToolbarConfig,
-                  // Remove the "+ More" pill on this page
                   showMoreFiltersButton: false,
-                  // Hide Advanced filters button while the filters sidebar is open
                   showAdvancedFilters: !showFiltersSidebar,
-                  // Keep pills visible by default so advanced pills can appear inline
                   showFilterPills: true,
                   onAdvancedFiltersClick: () =>
                     setShowAdvancedFilters((prev) => !prev),
@@ -3961,9 +2809,7 @@ const CrmContactsManagement = () => {
                     ...(showAdvancedFilterPills ? advancedFilterPills : []),
                   ],
                 }}
-                // Stats cards for metrics
                 statsCards={contactsStatsCards}
-                // When Board View is selected, show board content instead of table
                 customBody={
   contactsViewMode === "board" ? (
     <KanbanBoard
@@ -3974,7 +2820,6 @@ const CrmContactsManagement = () => {
       )}
       onCardClick={(card) => handleViewData(card.raw)}
       onCardMove={(cardId, fromCol, toCol) => {
-        // Optionally call updateCrmData here to persist the lifecycle_stage change
         const contact = dataList.find(p => p.id === cardId);
         if (contact) {
           updateCrmData(Number(cardId), {
@@ -5075,7 +3920,9 @@ const CrmContactsManagement = () => {
                             color: "#1f2937",
                           }}
                           onClick={() => {
-                            // Handle call action
+                            if (selectedDataItem) {
+                              void handleCallClick(selectedDataItem);
+                            }
                           }}
                           onMouseOver={(e) => {
                             e.currentTarget.style.borderColor = "#2563eb";
@@ -5121,7 +3968,17 @@ const CrmContactsManagement = () => {
                             color: "#1f2937",
                           }}
                           onClick={() => {
-                            // Handle message action
+                            const phone = selectedDataItem?.phone;
+                            if (!phone) {
+                              toast.error(
+                                "No phone number available for this contact",
+                              );
+                              return;
+                            }
+                            window.open(
+                              `https://wa.me/${String(phone).replace(/\D/g, "")}`,
+                              "_blank",
+                            );
                           }}
                           onMouseOver={(e) => {
                             e.currentTarget.style.borderColor = "#2563eb";
@@ -5480,111 +4337,6 @@ const CrmContactsManagement = () => {
             </Modal>
           )}
 
-          {/* Audio Player Modal */}
-          {/* {getCrmListPageMockCallHistory(selectedDataItem.id).length > 0 && (
-              <>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: '20px',
-                  paddingBottom: '10px',
-                  borderBottom: '2px solid #f8f9fa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <History size={18} style={{ color: '#4680ff' }} />
-                  Call History ({getCrmListPageMockCallHistory(selectedDataItem.id).length})
-                </div>
-                <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
-                  <div style={{
-                    content: '',
-                    position: 'absolute',
-                    left: '8px',
-                    top: 0,
-                    bottom: 0,
-                    width: '2px',
-                    background: '#e5e7eb'
-                  }} />
-                  {getCrmListPageMockCallHistory(selectedDataItem.id).map((call, idx) => {
-                    const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
-                      (r) => r.value === call.endReason
-                    );
-                    const dispositionColors: Record<string, string> = {
-                      interested: 'success',
-                      not_interested: 'danger',
-                      callback_requested: 'warning',
-                      no_answer: 'secondary',
-                      busy: 'info',
-                      do_not_call: 'dark',
-                      wrong_number: 'light',
-                      follow_up: 'primary',
-                    };
-                    const dispositionColor = dispositionColors[call.disposition] || 'primary';
-                    const endReasonColor = endReason?.color || 'secondary';
-                    
-                    return (
-                      <div key={call.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
-                        <div style={{
-                          content: '',
-                          position: 'absolute',
-                          left: '-26px',
-                          top: '4px',
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: endReasonColor === 'success' ? '#10b981' : '#4680ff',
-                          border: '3px solid white',
-                          boxShadow: '0 0 0 2px #e5e7eb'
-                        }} />
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '12px 16px',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start'
-                        }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
-                              {moment(call.calledAt).format("MMM DD, YYYY HH:mm")} - Duration: {call.duration}
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '8px', fontWeight: 500 }}>
-                              <Badge bg={endReasonColor as any} className="me-2">
-                                {endReason?.label || call.endReason}
-                              </Badge>
-                              <Badge bg={dispositionColor as any}>
-                                {call.disposition
-                                  ?.replace("_", " ")
-                                  .replace(/\b\w/g, (l) => l.toUpperCase())}
-                              </Badge>
-                            </div>
-                            {call.comment && (
-                              <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
-                                {call.comment}
-                              </div>
-                            )}
-                          </div>
-                          {call.recordingUrl && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-1"
-                              title="Play Recording"
-                              onClick={() => handlePlayRecording(call.recordingUrl)}
-                            >
-                              <FiPlay size={16} />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )} */}
-
           {/* Delete Confirmation Modal (single + bulk) */}
           <DeleteConfirmationModal
             show={showDeleteModal}
@@ -5725,37 +4477,6 @@ const CrmContactsManagement = () => {
                     assignment.
                   </p>
 
-                  {/* <div className="row">
-              <div className="col-md-4">
-                <div className="card bg-light border-primary">
-                  <div className="card-body text-center">
-                    <h4 className="text-primary">
-                      {assignmentCounts.total.toLocaleString()}
-                    </h4>
-                    <p className="mb-0 small">Total Entries</p>
-                    <small className="text-muted">Matching your filters</small>
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="card bg-success text-white">
-                  <div className="card-body text-center">
-                    <h4>{assignmentCounts.assigned.toLocaleString()}</h4>
-                    <p className="mb-0 small">Already Assigned</p>
-                    <small className="opacity-75">In use by team members</small>
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="card bg-warning text-white">
-                  <div className="card-body text-center">
-                    <h4>{assignmentCounts.unassigned.toLocaleString()}</h4>
-                    <p className="mb-0 small">Available</p>
-                    <small className="opacity-75">Ready for assignment</small>
-                  </div>
-                </div>
-              </div>
-            </div> */}
 
                   <Row>
                     <Col md={12} className="text-left">
@@ -6723,13 +5444,6 @@ const CrmContactsManagement = () => {
                     setShowConvertToLeadModal(true);
                   },
                 },
-                // {
-                //   label: "View History",
-                //   onClick: () => {
-                //     setShowContactSidebar(false);
-                //     setShowHistoryModal(true);
-                //   },
-                // },
                 {
                   label: "Delete",
                   onClick: () => handleDeleteData(selectedContact),

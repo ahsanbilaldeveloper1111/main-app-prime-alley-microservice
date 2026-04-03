@@ -13,7 +13,6 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Button,
-  Card,
   Row,
   Col,
   Form,
@@ -21,9 +20,6 @@ import {
   Spinner,
   Modal,
   Badge,
-  InputGroup,
-  Dropdown,
-  Table,
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
@@ -37,22 +33,15 @@ import { CreateQuoteSidebar } from "@components/renderCreateQuoteForm";
 import {
   FiUpload,
   FiDatabase,
-  FiSearch,
   FiFilter,
-  FiTrash2,
-  FiEye,
   FiEdit,
   FiUser,
   FiUsers,
-  FiPhone,
-  FiMessageCircle,
   FiPlay,
   FiClock,
   FiX,
-  FiAlertCircle,
   FiCalendar,
   FiTarget,
-  FiMoreVertical,
   FiCopy,
 } from "react-icons/fi";
 import {
@@ -64,54 +53,32 @@ import {
   X,
   AlertCircle as AlertCircleIcon,
   UserPlus,
-  Plus,
   ArrowUp,
   ArrowDown,
   Download,
-  CheckSquare,
-  ArrowUpDown,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   Trash2,
   MoreVertical,
-  MoreHorizontal,
   Phone as PhoneIcon,
-  Phone,
   Mail,
   User,
   History,
   FileText,
   Target,
-  Layers,
-  MessageCircle,
-  MessageSquare,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
-import { Column } from "@components/CustomDataTable";
 import GenericTable, {
   TableColumn,
   TableAction,
-  PaginationConfig,
-  ToolbarConfig,
   FilterPill,
   TabConfig,
 } from "@components/GenericTable";
 
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
-import GenericFilterSidebar, {
-  FilterField,
-} from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericSidebar from "@components/GenericSidebarNew";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
-  getCrmDataById,
   getAllCrmDataById,
   createCrmData,
   updateCrmData,
@@ -121,13 +88,11 @@ import {
   getCrmDataCounts,
   bulkDeleteCrmData,
   getCrmDataTags,
-  markCrmDataAsViewed,
   getCampaigns,
   scheduleCall,
   unscheduleCall,
   getCrmDataHistory,
   CrmDataItem,
-  CrmDataMetrics,
   downloadExampleCsv,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
@@ -143,13 +108,11 @@ import {
   formatDateTimeToLocal,
   GlobalDateFormat,
   GlobalTimeFormat,
-  GlobalDateTimeFormat,
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
@@ -157,10 +120,7 @@ import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import CrmActivitiesPanel, {
-  type CrmActivitiesPanelRef,
-} from "@components/CrmActivitiesPanel";
-import RichNoteEditor from "@components/RichNoteEditor";
+import type { CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import {
   CrmKPICard as KPICard,
@@ -170,11 +130,7 @@ import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import { useCrmListPageTabCreateContactAndFilter } from "@hooks/useCrmListPageTabCreateContactAndFilter";
 import { createEmptyCrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
-import {
-  CRM_LIST_PAGE_CALL_END_REASONS,
-  CRM_LIST_PAGE_STATIC_TAGS,
-  getCrmListPageMockCallHistory,
-} from "@utils/crmListPageStaticData";
+import { CRM_LIST_PAGE_STATIC_TAGS } from "@utils/crmListPageStaticData";
 
 const CrmQuotesManagement = () => {
   const { data: session } = useSession();
@@ -183,11 +139,8 @@ const CrmQuotesManagement = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
   const requestIdRef = useRef(0);
-  const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedDataItem, setSelectedDataItem] = useState<CrmDataItem | null>(
     null,
@@ -199,11 +152,7 @@ const CrmQuotesManagement = () => {
   const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
   const [showAfterCallModal, setShowAfterCallModal] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
-  const [selectedCampaigns, setSelectedCampaigns] = useState<readonly any[]>(
-    [],
-  );
   const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
-  const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
   const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
   const [convertingProspectId, setConvertingProspectId] = useState<
     number | null
@@ -298,10 +247,10 @@ const CrmQuotesManagement = () => {
   >(null);
   const [contactFormLoading, setContactFormLoading] = useState(false);
 
-  // Call recordings state
-  const [callRecordings, setCallRecordings] = useState<any[]>([]);
-  const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
-  const [callRecordingsTotal, setCallRecordingsTotal] = useState(0);
+  // Call recordings (sidebar): list is loaded elsewhere when wired to API
+  const callRecordings: any[] = [];
+  const callRecordingsLoading = false;
+  const callRecordingsTotal = 0;
   const [selectedRecording, setSelectedRecording] = useState<any>(null);
   const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
     useState(false);
@@ -312,7 +261,7 @@ const CrmQuotesManagement = () => {
     Record<string, number>
   >({});
 
-  const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
+  const showProspectsAnalytics = false;
   const [showAllProspectStats, setShowAllProspectStats] = useState(false);
 
   // Valid filter IDs
@@ -498,86 +447,6 @@ const CrmQuotesManagement = () => {
     onMeetingScheduled: () =>
       sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
   });
-
-  const sidebarQuickActions = useMemo(() => {
-    const hasPhone = !!String(sidebarRecordPhone || "").trim();
-    const hasEmail = !!String(sidebarRecordEmail || "").trim();
-    return [
-      {
-        id: "qa-call",
-        label: "Call",
-        icon: Phone,
-        onClick: () => {
-          const phone = String(sidebarRecordPhone || "").trim();
-          if (!phone) {
-            toast.error("No phone number available for this entry");
-            return;
-          }
-          if (!isInitialized) {
-            toast.error("CTI not initialized. Please wait...");
-            return;
-          }
-          dialNumber(phone)
-            .then((result) => {
-              if (result.success) {
-                toast.success(`Calling ${sidebarRecordName || phone}...`);
-              } else {
-                toast.error(result.error || "Failed to make call");
-              }
-            })
-            .catch((error) => {
-              console.error("Call error:", error);
-              toast.error("Failed to make call");
-            });
-        },
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-whatsapp",
-        label: "WhatsApp",
-        icon: MessageCircle,
-        onClick: () => sidebarActivityModals.openWhatsApp(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-sms",
-        label: "SMS",
-        icon: MessageSquare,
-        onClick: () => sidebarActivityModals.openSms(),
-        disabled: !hasPhone,
-      },
-      {
-        id: "qa-meeting",
-        label: "Meeting",
-        icon: Calendar,
-        onClick: () => sidebarActivityModals.openMeeting(),
-      },
-      {
-        id: "qa-email",
-        label: "Email",
-        icon: Mail,
-        onClick: () => sidebarActivityModals.openEmail(),
-        disabled: !hasEmail,
-      },
-      {
-        id: "more",
-        label: "More",
-        icon: MoreHorizontal,
-        onClick: () => {
-          // Let GenericSidebar's built-in "More" submenu open (same behavior as Deals/Leads).
-        },
-        disabled: false,
-      },
-    ];
-  }, [
-    sidebarRecordPhone,
-    sidebarRecordEmail,
-    sidebarActivityModals,
-    dialNumber,
-    isInitialized,
-    sidebarRecordName,
-    sidebarRecordId,
-  ]);
 
   const buildCrmDataParams = useCallback(
     (overrides: { page?: number; per_page?: number } = {}) => {
@@ -805,22 +674,6 @@ const CrmQuotesManagement = () => {
       setExporting(false);
     }
   }, [exportFileName, exportFilters, fetchCrmDataForExport]);
-
-  // Extract unique source_file values from dataList for creatable select
-  const uniqueSources = useMemo(() => {
-    const sources = new Set<string>();
-    dataList.forEach((item: any) => {
-      if (item.source_file && item.source_file.trim()) {
-        sources.add(item.source_file.trim());
-      }
-    });
-    return Array.from(sources)
-      .sort()
-      .map((source) => ({
-        value: source,
-        label: source,
-      }));
-  }, [dataList]);
 
   // Initialize export filters when export modal opens (default to current table filters)
   useEffect(() => {
@@ -1175,274 +1028,6 @@ const CrmQuotesManagement = () => {
     extensions,
   ]);
 
-  const advancedFilterPills = useMemo<FilterPill[]>(() => {
-    const campaignIds = Array.isArray(currentFilters.campaign_id)
-      ? currentFilters.campaign_id
-      : currentFilters.campaign_id
-        ? [currentFilters.campaign_id]
-        : [];
-
-    const selectedCampaignOptions = availableCampaigns.filter((c) =>
-      campaignIds.includes(c.value),
-    );
-
-    const tagValues = Array.isArray(currentFilters.tags)
-      ? currentFilters.tags
-      : currentFilters.tags
-        ? [currentFilters.tags]
-        : [];
-    const selectedTagOptions = availableTags.filter((t) =>
-      tagValues.includes(t.value),
-    );
-
-    const sourceValue = currentFilters.source_file ?? null;
-    const nextFrom = currentFilters.scheduled_call_from ?? "";
-    const nextTo = currentFilters.scheduled_call_to ?? "";
-
-    const nextCallLabel = (() => {
-      if (!nextFrom && !nextTo) return undefined;
-      if (nextFrom && nextTo && nextFrom === nextTo) {
-        return moment(nextFrom).isValid()
-          ? moment(nextFrom).format("MMM D, YYYY")
-          : String(nextFrom);
-      }
-      const fromLabel = nextFrom
-        ? moment(nextFrom).isValid()
-          ? moment(nextFrom).format("MMM D")
-          : String(nextFrom)
-        : "…";
-      const toLabel = nextTo
-        ? moment(nextTo).isValid()
-          ? moment(nextTo).format("MMM D")
-          : String(nextTo)
-        : "…";
-      return `${fromLabel} – ${toLabel}`;
-    })();
-
-    return [
-      {
-        id: "campaigns",
-        label: "Campaigns",
-        showDropdown: true,
-        active: campaignIds.length > 0,
-        activeLabel:
-          campaignIds.length > 1
-            ? `${campaignIds.length} selected`
-            : selectedCampaignOptions[0]?.label,
-        onClear: () => {
-          setProspectsFilters((prev) => ({ ...prev, campaigns: null }));
-          applyTableFiltersPatch({ campaign_id: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Select
-              isMulti
-              options={availableCampaigns}
-              value={selectedCampaignOptions}
-              onChange={(selected) => {
-                const values = selected
-                  ? (selected as any[]).map((s: any) => s.value)
-                  : null;
-                setProspectsFilters((prev) => ({ ...prev, campaigns: values }));
-                applyTableFiltersPatch({ campaign_id: values });
-              }}
-              placeholder="Select campaigns..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({ ...prev, campaigns: null }));
-                  applyTableFiltersPatch({ campaign_id: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "source_file",
-        label: "Source",
-        showDropdown: true,
-        active: !!sourceValue,
-        activeLabel: sourceValue ? String(sourceValue) : undefined,
-        onClear: () => {
-          setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
-          applyTableFiltersPatch({ source_file: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <CreatableSelect
-              options={uniqueSources}
-              value={
-                sourceValue
-                  ? { value: sourceValue, label: String(sourceValue) }
-                  : null
-              }
-              onChange={(selected) => {
-                const v = selected ? (selected as any).value : null;
-                setProspectsFilters((prev) => ({ ...prev, sourceFile: v }));
-                applyTableFiltersPatch({ source_file: v });
-              }}
-              placeholder="Select or type a source..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
-                  applyTableFiltersPatch({ source_file: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "tags",
-        label: "Tags",
-        showDropdown: true,
-        active: tagValues.length > 0,
-        activeLabel:
-          tagValues.length > 1
-            ? `${tagValues.length} selected`
-            : selectedTagOptions[0]?.label,
-        onClear: () => {
-          setProspectsFilters((prev) => ({ ...prev, tags: null }));
-          applyTableFiltersPatch({ tags: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Select
-              isMulti
-              options={availableTags.map((t) => ({
-                value: t.value,
-                label: t.label,
-              }))}
-              value={selectedTagOptions.map((t) => ({
-                value: t.value,
-                label: t.label,
-              }))}
-              onChange={(selected) => {
-                const values = selected
-                  ? (selected as any[]).map((s: any) => s.value)
-                  : null;
-                setProspectsFilters((prev) => ({ ...prev, tags: values }));
-                applyTableFiltersPatch({ tags: values });
-              }}
-              placeholder="Select tags..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({ ...prev, tags: null }));
-                  applyTableFiltersPatch({ tags: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "next_call",
-        label: "Next Call Date",
-        showDropdown: true,
-        active: !!nextFrom || !!nextTo,
-        activeLabel: nextCallLabel,
-        onClear: () => {
-          setProspectsFilters((prev) => ({
-            ...prev,
-            nextCallDateFrom: null,
-            nextCallDateTo: null,
-          }));
-          applyTableFiltersPatch({
-            scheduled_call_from: undefined,
-            scheduled_call_to: undefined,
-          });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <div className="d-flex gap-2">
-              <div className="flex-grow-1">
-                <Form.Label className="small fw-bold mb-1">From</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={currentFilters.scheduled_call_from || ""}
-                  onChange={(e) => {
-                    const v = e.target.value || null;
-                    setProspectsFilters((prev) => ({
-                      ...prev,
-                      nextCallDateFrom: v,
-                    }));
-                    applyTableFiltersPatch({ scheduled_call_from: v });
-                  }}
-                />
-              </div>
-              <div className="flex-grow-1">
-                <Form.Label className="small fw-bold mb-1">To</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={currentFilters.scheduled_call_to || ""}
-                  onChange={(e) => {
-                    const v = e.target.value || null;
-                    setProspectsFilters((prev) => ({
-                      ...prev,
-                      nextCallDateTo: v,
-                    }));
-                    applyTableFiltersPatch({ scheduled_call_to: v });
-                  }}
-                />
-              </div>
-            </div>
-            <div className="d-flex justify-content-end gap-2 mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({
-                    ...prev,
-                    nextCallDateFrom: null,
-                    nextCallDateTo: null,
-                  }));
-                  applyTableFiltersPatch({
-                    scheduled_call_from: undefined,
-                    scheduled_call_to: undefined,
-                  });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-    ];
-  }, [
-    applyTableFiltersPatch,
-    availableCampaigns,
-    availableTags,
-    currentFilters,
-    customSelectStyles,
-    setProspectsFilters,
-    uniqueSources,
-  ]);
-
   // Handle activeFilter changes to update currentFilters
   useEffect(() => {
     if (activeFilter === "all") {
@@ -1462,182 +1047,6 @@ const CrmQuotesManagement = () => {
     }
     // Don't reset pagination here - it's already reset in onFilterChange
   }, [activeFilter]);
-
-  // Helper functions for sorting and pagination
-  const handleSort = (column: string) => {
-    const newDirection =
-      pagination.sortColumn === column && pagination.sortDirection === "asc"
-        ? "desc"
-        : "asc";
-    setPagination({
-      ...pagination,
-      sortColumn: column,
-      sortDirection: newDirection,
-      currentPage: 1,
-    });
-  };
-
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
-  ): T[] => {
-    if (!sortColumn) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderSortIcon = (column: string) => {
-    if (pagination.sortColumn !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return pagination.sortDirection === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
-  };
-
-  const renderPaginationControls = () => {
-    const totalPages = getTotalPages(totalRecords, pagination.rowsPerPage);
-    const { currentPage, rowsPerPage } = pagination;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, totalRecords);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPagination({
-                ...pagination,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={15}>15</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalRecords} prospects
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() => setPagination({ ...pagination, currentPage: 1 })}
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage - 1 })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPagination({ ...pagination, currentPage: pageNum })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage + 1 })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: totalPages })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
 
   // Fetch prospects data
   const fetchCrmData = useCallback(async () => {
@@ -1836,27 +1245,6 @@ const CrmQuotesManagement = () => {
     }
   };
 
-  // Handle drag and drop
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
   // Handle file input change
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -1876,21 +1264,7 @@ const CrmQuotesManagement = () => {
       return;
     }
 
-    setUploading(true);
-    setUploadProgress(0);
-
     try {
-      // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
       // Extract tag values from selected options
       const tagValues = Array.from(fieldTags).map((tag) => tag.value);
 
@@ -1901,22 +1275,10 @@ const CrmQuotesManagement = () => {
         true, // No auto-assignment
       );
 
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
       // Parse response
       const responseData = response?.data || {};
       const processedCount = responseData.processed_count || 0;
       const validationFailures = responseData.validation_failures || 0;
-      // const errors = responseData.errors || [];
-      const message = responseData.message || "Upload completed";
-
-      // Show error messages for validation failures
-      // if (errors.length > 0) {
-      //   errors.forEach((error: string) => {
-      //     toast.warn(error);
-      //   });
-      // }
 
       // Show success message
       if (processedCount > 0) {
@@ -1947,7 +1309,6 @@ const CrmQuotesManagement = () => {
       setSelectedFile(null);
       setFieldTags([]);
       setShowUploadModal(false);
-      setUploadProgress(0);
 
       // Refresh data
       setRefreshKey((prev) => prev + 1);
@@ -1958,9 +1319,6 @@ const CrmQuotesManagement = () => {
         error?.message ||
         "Failed to upload file. Please try again.";
       toast.error(errorMessage);
-      setUploadProgress(0);
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -2159,22 +1517,6 @@ const CrmQuotesManagement = () => {
     calculateEntryCounts,
   ]);
 
-  // Handle data assignment
-  const handleDataAssignment = useCallback(async () => {
-    try {
-      const counts = await calculateEntryCounts();
-      setAssignmentCounts(counts);
-      setTotalEntriesToAssign(counts.unassigned);
-      setShowDataAssignmentModal(true);
-    } catch (error) {
-      console.error("Failed to get entry counts:", error);
-      // Fallback to static data
-      setAssignmentCounts({ total: 5000, assigned: 2000, unassigned: 3000 });
-      setTotalEntriesToAssign(3000);
-      setShowDataAssignmentModal(true);
-    }
-  }, [calculateEntryCounts]);
-
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
@@ -2279,48 +1621,6 @@ const CrmQuotesManagement = () => {
     customDistribution,
   ]);
 
-  // Handle mark as viewed
-  const handleMarkAsViewed = useCallback(async (item: CrmDataItem) => {
-    try {
-      await markCrmDataAsViewed(item.id);
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      console.error("Mark as viewed error:", error);
-    }
-  }, []);
-
-  // Handle call actions
-  const handleCallAction = useCallback((action: string, item: CrmDataItem) => {
-    const phone = item.phone;
-    if (!phone) {
-      toast.error("No phone number available for this entry");
-      return;
-    }
-
-    switch (action) {
-      case "whatsapp":
-        window.open(`https://wa.me/${phone.replace(/[^0-9]/g, "")}`, "_blank");
-        break;
-      case "phone":
-        window.open(`tel:${phone}`, "_self");
-        break;
-      case "sms":
-        window.open(`sms:${phone}`, "_self");
-        break;
-      case "facebook":
-        toast.info("Facebook calling feature coming soon");
-        break;
-      case "telegram":
-        toast.info("Telegram calling feature coming soon");
-        break;
-      case "skype":
-        toast.info("Skype calling feature coming soon");
-        break;
-      default:
-        toast.error("Unknown action");
-    }
-  }, []);
-
   const handleNoteCreate = (
     note: string,
     createTask: boolean,
@@ -2362,13 +1662,6 @@ const CrmQuotesManagement = () => {
     },
     [dialNumber, isInitialized],
   );
-
-  // Handle recording playback
-  const handlePlayRecording = useCallback((recordingUrl: string) => {
-    // In a real app, this would open the recording player
-    toast.info(`Playing recording: ${recordingUrl}`);
-    console.log("Playing recording:", recordingUrl);
-  }, []);
 
   // Handle data assignment modal close
   const handleDataAssignmentModalClose = useCallback(() => {
@@ -2433,35 +1726,6 @@ const CrmQuotesManagement = () => {
       );
     }
   }, [afterCallData, selectedDataItem, handleAfterCallModalClose]);
-
-  // Schedule/Unschedule call handlers
-  const handleScheduleCall = useCallback((entry: any) => {
-    setSelectedEntryForSchedule(entry);
-
-    // Check if entry has a scheduled call - if yes, we're editing
-    if (entry.scheduled_call_at) {
-      setIsEditingSchedule(true);
-      const scheduledDate = moment(entry.scheduled_call_at);
-      setScheduleData({
-        date: scheduledDate.format("YYYY-MM-DD"),
-        time: scheduledDate.format("HH:mm"),
-        notes: entry.note || "",
-      });
-    } else {
-      setIsEditingSchedule(false);
-      setScheduleData({
-        date: "",
-        time: "",
-        notes: "",
-      });
-    }
-    setShowScheduleModal(true);
-  }, []);
-
-  const handleUnscheduleCallClick = useCallback((entry: any) => {
-    setEntryToUnschedule(entry);
-    setShowUnscheduleModal(true);
-  }, []);
 
   const confirmUnscheduleCall = useCallback(async () => {
     if (!entryToUnschedule) return;
@@ -2560,58 +1824,12 @@ const CrmQuotesManagement = () => {
     }
   }, [selectedItems]);
 
-  // Handle item selection
-  const handleItemSelection = useCallback((selected: CrmDataItem[]) => {
-    setSelectedItems(selected.map((item) => item.id));
-  }, []);
-
-  // Handle prospect row click
-  const handleProspectClick = useCallback((prospect: any) => {
-    openProspectSidebar(prospect);
-  }, [openProspectSidebar]);
-
   // Handle close prospect sidebar
   const handleCloseProspectSidebar = useCallback(() => {
     sidebarProspectFetchTokenRef.current += 1;
     setShowProspectSidebar(false);
     setSelectedProspect(null);
   }, []);
-
-  // Handle owner change from prospect sidebar (Update owner dropdown)
-  const handleProspectOwnerSelect = useCallback(
-    async (ownerValue: string) => {
-      const prospect = selectedProspect;
-      if (!prospect?.id) return;
-      const name = prospect.name ?? "";
-      const phone = prospect.phone ?? "";
-      const campaignId =
-        prospect.campaign_id ?? prospect.campaign?.id ?? null;
-      const existingData = (prospect.data as Record<string, unknown>) ?? {};
-      try {
-        await updateCrmData(prospect.id, {
-          name,
-          phone,
-          campaign_id: campaignId,
-          data: { ...existingData, contact_owner: ownerValue || undefined },
-        });
-        fetchCrmData();
-        setSelectedProspect((prev: CrmDataItem | null) =>
-          prev
-            ? {
-                ...prev,
-                data: {
-                  ...(prev.data as Record<string, unknown>),
-                  contact_owner: ownerValue || null,
-                },
-              }
-            : null,
-        );
-      } catch {
-        // Error already shown by updateCrmData
-      }
-    },
-    [selectedProspect, fetchCrmData],
-  );
 
   // Handle open filters sidebar
   const handleOpenFiltersSidebar = useCallback(() => {
@@ -2843,363 +2061,6 @@ const CrmQuotesManagement = () => {
     [session, router, handleViewData, handleDuplicateQuote, handleSendToContact],
   );
 
-  // Define old columns for GenericListPage (keep for backward compatibility if needed)
-  const columns: Column[] = useMemo(
-    () => [
-      {
-        key: "name",
-        name: "Name",
-        selector: (row: any) => row.name,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.name ? (
-              <span className="text-muted">{props.name}</span>
-            ) : (
-              <span className="text-muted">N/A</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "phone",
-        name: "Phone",
-        selector: (row: any) => row.phone,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.phone ? (
-              <span className="status-badge info">{props.phone}</span>
-            ) : (
-              <span className="status-badge info">N/A</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "source",
-        name: "Source",
-        selector: (row: any) => row.source_file,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.source_file ? (
-              <span className="status-badge secondary">
-                {props.source_file}
-              </span>
-            ) : (
-              <span className="text-muted">N/A</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "user_extension",
-        name: "Owner",
-        selector: (row: any) => row.user_extension,
-        sortable: true,
-        cell: (props: any) => (
-          <div>
-            {props.user_extension ? (
-              <span className="status-badge success">
-                {extensions.find(
-                  (extension: any) =>
-                    extension.id.toString() ===
-                    props.user_extension?.toString(),
-                )?.display_name || props.user_extension}
-              </span>
-            ) : (
-              <span className="status-badge default">Unassigned</span>
-            )}
-          </div>
-        ),
-      },
-      {
-        key: "campaign",
-        name: "Campaign",
-        selector: (row: any) => row.campaign_id,
-        sortable: true,
-        cell: (props: any) => {
-          return (
-            <div>
-              {props?.campaign ? (
-                <span className="status-badge primary">
-                  {props.campaign?.name}
-                </span>
-              ) : (
-                <span className="status-badge info">No Campaign</span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        key: "last_called_at",
-        name: "Last Called",
-        selector: (row: any) => row.last_called_at,
-        sortable: true,
-        cell: (props: any) => {
-          // Generate random date within last week
-          const now = moment();
-          const oneWeekAgo = moment().subtract(7, "days");
-          const randomDays = Math.floor(Math.random() * 7);
-          const randomHours = Math.floor(Math.random() * 24);
-          const randomMinutes = Math.floor(Math.random() * 60);
-
-          const lastCalled = oneWeekAgo
-            .add(randomDays, "days")
-            .add(randomHours, "hours")
-            .add(randomMinutes, "minutes")
-            .toISOString();
-
-          return (
-            <div className="d-flex align-items-center">
-              <span className="text-uppercase">
-                {lastCalled
-                  ? moment(lastCalled).format(GlobalDateTimeFormat)
-                  : "-"}
-              </span>
-            </div>
-          );
-        },
-      },
-      {
-        key: "last_call_end_reason",
-        name: "Last Call Status",
-        selector: (row: any) => row.last_call_end_reason,
-        sortable: true,
-        cell: (props: any) => {
-          // Static data for now
-          const endReason =
-            CRM_LIST_PAGE_CALL_END_REASONS.find((r) => r.value === "answered") ||
-            CRM_LIST_PAGE_CALL_END_REASONS[0];
-          return (
-            <span className={`status-badge ${endReason.color as any}`}>
-              {endReason.label}
-            </span>
-          );
-        },
-      },
-      {
-        key: "disposition",
-        name: "Disposition",
-        selector: (row: any) => row.disposition,
-        sortable: true,
-        cell: (props: any) => {
-          // Static disposition data for now
-          const dispositions = [
-            { value: "interested", label: "Interested", color: "success" },
-            {
-              value: "not_interested",
-              label: "Not Interested",
-              color: "danger",
-            },
-            {
-              value: "callback_requested",
-              label: "Callback Requested",
-              color: "warning",
-            },
-            { value: "no_answer", label: "No Answer", color: "warning" },
-            { value: "busy", label: "Busy", color: "info" },
-            { value: "do_not_call", label: "Do Not Call", color: "danger" },
-            { value: "wrong_number", label: "Wrong Number", color: "info" },
-            { value: "follow_up", label: "Follow Up", color: "primary" },
-          ];
-
-          // Randomly select a disposition for demo purposes
-          const randomDisposition =
-            dispositions[Math.floor(Math.random() * dispositions.length)];
-
-          return (
-            <span className={`status-badge ${randomDisposition.color as any}`}>
-              {randomDisposition.label}
-            </span>
-          );
-        },
-      },
-      {
-        key: "scheduled_call_at",
-        name: "Next Call",
-        selector: (row: any) => row.scheduled_call_at,
-        sortable: true,
-        cell: (props: any) => {
-          if (!props.scheduled_call_at) {
-            return <span className="status-badge info">Not scheduled</span>;
-          }
-
-          const isOverdue = moment(props.scheduled_call_at).isBefore(moment());
-          const isNextHour = moment(props.scheduled_call_at).isBefore(
-            moment().add(1, "hour"),
-          );
-
-          return (
-            <div className="d-flex align-items-center">
-              <span
-                className={`status-badge text-uppercase ${
-                  isOverdue ? "danger" : isNextHour ? "warning" : ""
-                }`}
-              >
-                {props.scheduled_call_at
-                  ? moment(props.scheduled_call_at).format(GlobalDateTimeFormat)
-                  : "-"}
-                {isOverdue && <span className="ms-1 fw-bold">(Overdue)</span>}
-                {isNextHour && !isOverdue && (
-                  <span className="ms-1 fw-bold">(Soon)</span>
-                )}
-              </span>
-            </div>
-          );
-        },
-      },
-
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
-        ? [
-            {
-              key: "view_action",
-              name: "View",
-              selector: (row: any) => row.id,
-              sortable: false,
-              cell: (props: any) => (
-                <Button
-                  variant="primary"
-                  className="app-button"
-                  size="sm"
-                  onClick={() => handleViewData(props)}
-                  title="View Details"
-                >
-                  <FiEye size={14} />
-                </Button>
-              ),
-            },
-          ]
-        : []),
-
-      {
-        key: "call_action",
-        name: "Call",
-        selector: (row: any) => row.id,
-        sortable: false,
-        cell: (props: any) => (
-          <div className="d-flex gap-1">
-            {session?.user?.permissions?.includes(
-              "call-service-crm-data-management",
-            ) && (
-              <Button
-                variant="success"
-                className="app-button"
-                size="sm"
-                onClick={() => handleCallClick(props)}
-                title="Call Now"
-              >
-                <FiPhone size={14} />
-              </Button>
-            )}
-
-            <Dropdown>
-              <Dropdown.Toggle
-                variant="outline-secondary"
-                size="sm"
-                className="app-button"
-                id={`dropdown-${props.id}`}
-              >
-                <FiMoreVertical size={14} />
-              </Dropdown.Toggle>
-              <Dropdown.Menu>
-                {session?.user?.permissions?.includes(
-                  "call-service-crm-data-management",
-                ) && (
-                  <>
-                    {props.scheduled_call_at ? (
-                      <>
-                        <Dropdown.Item
-                          onClick={() => handleScheduleCall(props)}
-                        >
-                          <FiCalendar size={14} className="me-2" />
-                          Edit Scheduled Call
-                        </Dropdown.Item>
-                        <Dropdown.Item
-                          onClick={() => handleUnscheduleCallClick(props)}
-                          className="text-danger"
-                        >
-                          <FiX size={14} className="me-2" />
-                          Unschedule Call
-                        </Dropdown.Item>
-                      </>
-                    ) : (
-                      <Dropdown.Item onClick={() => handleScheduleCall(props)}>
-                        <FiCalendar size={14} className="me-2" />
-                        Schedule Call
-                      </Dropdown.Item>
-                    )}
-                    <Dropdown.Divider />
-                  </>
-                )}
-                <Dropdown.Item
-                  onClick={() => {
-                    window.location.href = `/crm/leads/create?crm_data_id=${props.id}`;
-                  }}
-                >
-                  <FiTarget size={14} className="me-2" />
-                  Convert to Lead
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
-          </div>
-        ),
-      },
-
-      {
-        key: "tags",
-        name: "Tags",
-        selector: (row: any) => row.tags,
-        sortable: false,
-        cell: (props: any) => {
-          // Show hardcoded tags for now
-          const tags = props.tags;
-          return (
-            <div className="d-flex flex-wrap gap-1">
-              {tags?.map((tag: any, index: any) => (
-                <span key={index} className="status-badge info">
-                  {tag.name}
-                </span>
-              ))}
-            </div>
-          );
-        },
-      },
-      // {
-      //   key: "delete_action",
-      //   name: "Delete",
-      //   selector: (row: any) => row.id,
-      //   sortable: false,
-      //   cell: (props: any) => (
-      //     <Button
-      //       variant="danger"
-      //       className="app-button"
-      //       size="sm"
-      //       onClick={() => handleDeleteData(props)}
-      //       title="Delete Entry"
-      //     >
-      //       <FiTrash2 size={14} />
-      //     </Button>
-      //   ),
-      // },
-    ],
-    [
-      handleViewData,
-      handleMarkAsViewed,
-      handleDeleteData,
-      handleCallAction,
-      handleCallClick,
-      handlePlayRecording,
-      extensions,
-      availableCampaigns,
-      CRM_LIST_PAGE_CALL_END_REASONS,
-      handleScheduleCall,
-      handleUnscheduleCallClick,
-    ],
-  );
-
   // Render Add Contacts Button with Dropdown (and Bulk Delete when rows selected)
   const renderCreateQuoteButton = () => (
     <div
@@ -3248,7 +2109,6 @@ const CrmQuotesManagement = () => {
       <div style={{ width: "146px" }}>
         <button
           onClick={() => {
-            //setShowAddContactsDropdown(!showAddContactsDropdown);
             setShowCreateQuoteSidebar(true);
           }}
           style={{
@@ -3930,62 +2790,8 @@ const CrmQuotesManagement = () => {
                   ]}
                   activeFilter={activeFilter}
                   onFilterChange={handleFilterChange}
-                  // searchValue={prospectsSearch}
-                  // onSearchChange={(value) => {
-                  //   setProspectsSearch(value);
-                  // }}
-                  // onSearch={() =>
-                  //   handleFiltersChange({
-                  //     ...currentFilters,
-                  //     search: prospectsSearch,
-                  //   })
-                  // }
-                  // searchPlaceholder="Search by name or phone..."
-                  // showAdvancedFilters={showAdvancedFilters}
-                  // onToggleAdvancedFilters={() =>
-                  //   setShowAdvancedFilters(!showAdvancedFilters)
-                  // }
-                  // advancedFilterCount={
-                  //   (prospectsFilters.assignedTo !== null ? 1 : 0) +
-                  //   (prospectsFilters.campaigns !== null &&
-                  //   prospectsFilters.campaigns.length > 0
-                  //     ? 1
-                  //     : 0) +
-                  //   (prospectsFilters.sourceFile !== null ? 1 : 0) +
-                  //   (prospectsFilters.tags !== null &&
-                  //   prospectsFilters.tags.length > 0
-                  //     ? 1
-                  //     : 0)
-                  // }
                 />
               )}
-
-            {/* Bulk Actions */}
-            {/* {selectedItems.length > 0 &&
-          session?.user?.permissions?.includes(
-            "delete-crm-data-management"
-          ) && (
-            <div className="d-flex justify-content-end gap-2 mb-3">
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-primary" size="sm">
-                  <CheckSquare size={16} className="me-2" />
-                  Bulk Actions ({selectedItems.length})
-                </Dropdown.Toggle>
-                <Dropdown.Menu align="end">
-                  <Dropdown.Item
-                    onClick={() => {
-                      setDeleteModalMode("bulk");
-                      setShowDeleteModal(true);
-                    }}
-                    className="d-flex align-items-center text-danger"
-                  >
-                    <Trash2 size={14} className="me-2" />
-                    Delete Selected ({selectedItems.length})
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            </div>
-          )} */}
 
             {/* Prospects Table */}
             <div
@@ -5601,111 +4407,6 @@ const CrmQuotesManagement = () => {
               </div>
             </Modal>
           )}
-
-          {/* Audio Player Modal */}
-          {/* {getCrmListPageMockCallHistory(selectedDataItem.id).length > 0 && (
-              <>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: '20px',
-                  paddingBottom: '10px',
-                  borderBottom: '2px solid #f8f9fa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <History size={18} style={{ color: '#4680ff' }} />
-                  Call History ({getCrmListPageMockCallHistory(selectedDataItem.id).length})
-                </div>
-                <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
-                  <div style={{
-                    content: '',
-                    position: 'absolute',
-                    left: '8px',
-                    top: 0,
-                    bottom: 0,
-                    width: '2px',
-                    background: '#e5e7eb'
-                  }} />
-                  {getCrmListPageMockCallHistory(selectedDataItem.id).map((call, idx) => {
-                    const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
-                      (r) => r.value === call.endReason
-                    );
-                    const dispositionColors: Record<string, string> = {
-                      interested: 'success',
-                      not_interested: 'danger',
-                      callback_requested: 'warning',
-                      no_answer: 'secondary',
-                      busy: 'info',
-                      do_not_call: 'dark',
-                      wrong_number: 'light',
-                      follow_up: 'primary',
-                    };
-                    const dispositionColor = dispositionColors[call.disposition] || 'primary';
-                    const endReasonColor = endReason?.color || 'secondary';
-                    
-                    return (
-                      <div key={call.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
-                        <div style={{
-                          content: '',
-                          position: 'absolute',
-                          left: '-26px',
-                          top: '4px',
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: endReasonColor === 'success' ? '#10b981' : '#4680ff',
-                          border: '3px solid white',
-                          boxShadow: '0 0 0 2px #e5e7eb'
-                        }} />
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '12px 16px',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start'
-                        }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
-                              {moment(call.calledAt).format("MMM DD, YYYY HH:mm")} - Duration: {call.duration}
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '8px', fontWeight: 500 }}>
-                              <Badge bg={endReasonColor as any} className="me-2">
-                                {endReason?.label || call.endReason}
-                              </Badge>
-                              <Badge bg={dispositionColor as any}>
-                                {call.disposition
-                                  ?.replace("_", " ")
-                                  .replace(/\b\w/g, (l) => l.toUpperCase())}
-                              </Badge>
-                            </div>
-                            {call.comment && (
-                              <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
-                                {call.comment}
-                              </div>
-                            )}
-                          </div>
-                          {call.recordingUrl && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-1"
-                              title="Play Recording"
-                              onClick={() => handlePlayRecording(call.recordingUrl)}
-                            >
-                              <FiPlay size={16} />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )} */}
 
           {/* Delete Confirmation Modal (single + bulk) */}
           <DeleteConfirmationModal
