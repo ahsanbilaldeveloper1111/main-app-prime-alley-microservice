@@ -1,6 +1,6 @@
 import React from "react";
 import { Row, Col, Form, Alert } from "react-bootstrap";
-import moment from "moment";
+import { CrmListDateTimeRow } from "./CrmListDateTimeRow";
 
 export interface AfterCallData {
   disposition: string;
@@ -102,29 +102,14 @@ export function CrmListAfterCallFormContent({
         </Form.Text>
       </Form.Group>
 
-      <Row>
-        <Col md={6}>
-          <Form.Group className="mb-3">
-            <Form.Label>Schedule Next Call (Optional)</Form.Label>
-            <Form.Control
-              type="date"
-              value={afterCallData.nextCallDate}
-              onChange={(e) => update({ nextCallDate: e.target.value })}
-              min={moment().format("YYYY-MM-DD")}
-            />
-          </Form.Group>
-        </Col>
-        <Col md={6}>
-          <Form.Group className="mb-3">
-            <Form.Label>Time (Optional)</Form.Label>
-            <Form.Control
-              type="time"
-              value={afterCallData.nextCallTime}
-              onChange={(e) => update({ nextCallTime: e.target.value })}
-            />
-          </Form.Group>
-        </Col>
-      </Row>
+      <CrmListDateTimeRow
+        dateLabel="Schedule Next Call (Optional)"
+        timeLabel="Time (Optional)"
+        dateValue={afterCallData.nextCallDate}
+        timeValue={afterCallData.nextCallTime}
+        onDateChange={(v) => update({ nextCallDate: v })}
+        onTimeChange={(v) => update({ nextCallTime: v })}
+      />
 
       <Alert variant="info">
         <strong>Note:</strong> This dialog will be used to record call outcomes

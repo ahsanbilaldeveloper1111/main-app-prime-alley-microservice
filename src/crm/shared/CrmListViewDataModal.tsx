@@ -455,51 +455,75 @@ function SectionDot({ gradient }: { gradient: string }) {
   );
 }
 
+const SECTION_BOX_STYLE: React.CSSProperties = {
+  background: "#f9fafb",
+  border: "1px solid #e5e7eb",
+  borderRadius: "12px",
+  padding: "20px",
+};
+
+function ContentSection({
+  title,
+  gradient = "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
+  marginBottom = "28px",
+  boxStyle,
+  badge,
+  children,
+}: {
+  title: string;
+  gradient?: string;
+  marginBottom?: string;
+  boxStyle?: React.CSSProperties;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom }}>
+      <h5 style={SECTION_HEADING_STYLE}>
+        <SectionDot gradient={gradient} />
+        {title}
+        {badge}
+      </h5>
+      <div style={{ ...SECTION_BOX_STYLE, ...boxStyle }}>{children}</div>
+    </div>
+  );
+}
+
 function ContactDetailsSection({
   selectedDataItem,
 }: {
   selectedDataItem: CrmDataItem;
 }) {
   return (
-    <div style={{ marginBottom: "28px" }}>
-      <h5 style={SECTION_HEADING_STYLE}>
-        <SectionDot gradient="linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)" />
-        Contact Details
-      </h5>
+    <ContentSection
+      title="Contact Details"
+      gradient="linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)"
+    >
       <div
         style={{
-          background: "#f9fafb",
-          border: "1px solid #e5e7eb",
-          borderRadius: "12px",
-          padding: "20px",
+          display: "grid",
+          gridTemplateColumns: "140px 1fr",
+          gap: "16px",
         }}
       >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "140px 1fr",
-            gap: "16px",
-          }}
-        >
-          <DetailRow
-            icon={<PhoneIcon size={16} style={{ color: "#2563eb" }} />}
-            label="Phone"
-            value={selectedDataItem.phone || "N/A"}
-          />
-          <DetailRow
-            icon={<Calendar size={16} style={{ color: "#2563eb" }} />}
-            label="Created"
-            value={
-              selectedDataItem.created_at
-                ? moment(selectedDataItem.created_at).format(
-                    "MMMM DD, YYYY [at] hh:mm A",
-                  )
-                : "N/A"
-            }
-          />
-        </div>
+        <DetailRow
+          icon={<PhoneIcon size={16} style={{ color: "#2563eb" }} />}
+          label="Phone"
+          value={selectedDataItem.phone || "N/A"}
+        />
+        <DetailRow
+          icon={<Calendar size={16} style={{ color: "#2563eb" }} />}
+          label="Created"
+          value={
+            selectedDataItem.created_at
+              ? moment(selectedDataItem.created_at).format(
+                  "MMMM DD, YYYY [at] hh:mm A",
+                )
+              : "N/A"
+          }
+        />
       </div>
-    </div>
+    </ContentSection>
   );
 }
 
@@ -536,43 +560,25 @@ function DetailRow({
 
 function CallNotesSection({ note }: { note: string }) {
   return (
-    <div style={{ marginBottom: "28px" }}>
-      <h5 style={SECTION_HEADING_STYLE}>
-        <SectionDot gradient="linear-gradient(135deg, #2563eb 0%, #764ba2 100%)" />
-        Call Notes
-      </h5>
-      <div
-        style={{
-          background: "#fffbeb",
-          border: "1px solid #fcd34d",
-          borderRadius: "12px",
-          padding: "16px 20px",
-          fontSize: "14px",
-          color: "#78350f",
-          lineHeight: "1.6",
-        }}
-      >
-        {note}
-      </div>
-    </div>
+    <ContentSection
+      title="Call Notes"
+      boxStyle={{
+        background: "#fffbeb",
+        border: "1px solid #fcd34d",
+        padding: "16px 20px",
+        fontSize: "14px",
+        color: "#78350f",
+        lineHeight: "1.6",
+      }}
+    >
+      {note}
+    </ContentSection>
   );
 }
 
 function CustomDataFieldsSection({ data }: { data: Record<string, any> }) {
   return (
-    <div style={{ marginBottom: "28px" }}>
-      <h5 style={SECTION_HEADING_STYLE}>
-        <SectionDot gradient="linear-gradient(135deg, #2563eb 0%, #764ba2 100%)" />
-        Additional Information
-      </h5>
-      <div
-        style={{
-          background: "#f9fafb",
-          border: "1px solid #e5e7eb",
-          borderRadius: "12px",
-          padding: "20px",
-        }}
-      >
+    <ContentSection title="Additional Information">
         <div
           style={{
             display: "grid",
@@ -613,8 +619,7 @@ function CustomDataFieldsSection({ data }: { data: Record<string, any> }) {
             </div>
           ))}
         </div>
-      </div>
-    </div>
+    </ContentSection>
   );
 }
 
@@ -645,25 +650,28 @@ function CallRecordingsSection({
   onPlayCallRecording: (recording: any) => void;
   onDownloadCallRecording: (recording: any) => void;
 }) {
-  return (
-    <div style={{ marginBottom: "20px" }}>
-      <h5 style={SECTION_HEADING_STYLE}>
-        <SectionDot gradient="linear-gradient(135deg, #2563eb 0%, #764ba2 100%)" />
-        Call Recordings
-        <Badge
-          bg="secondary"
-          style={{
-            marginLeft: "8px",
-            fontSize: "11px",
-            fontWeight: 600,
-            padding: "4px 10px",
-            borderRadius: "6px",
-          }}
-        >
-          {callRecordingsTotal > 0 ? callRecordingsTotal : callRecordings.length}
-        </Badge>
-      </h5>
+  const badge = (
+    <Badge
+      bg="secondary"
+      style={{
+        marginLeft: "8px",
+        fontSize: "11px",
+        fontWeight: 600,
+        padding: "4px 10px",
+        borderRadius: "6px",
+      }}
+    >
+      {callRecordingsTotal > 0 ? callRecordingsTotal : callRecordings.length}
+    </Badge>
+  );
 
+  return (
+    <ContentSection
+      title="Call Recordings"
+      marginBottom="20px"
+      badge={badge}
+      boxStyle={{ padding: 0, background: "transparent", border: "none" }}
+    >
       {callRecordingsLoading ? (
         <div
           style={{
@@ -753,7 +761,7 @@ function CallRecordingsSection({
           </div>
         </div>
       )}
-    </div>
+    </ContentSection>
   );
 }
 

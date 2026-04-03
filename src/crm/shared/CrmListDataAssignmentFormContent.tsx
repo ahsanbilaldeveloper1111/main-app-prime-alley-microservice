@@ -33,6 +33,15 @@ export interface CrmListDataAssignmentFormContentProps {
   >;
 }
 
+const CREATABLE_SELECT_STYLES = {
+  control: (base: any) => ({
+    ...base,
+    borderColor: "#ced4da",
+    boxShadow: "none",
+    fontSize: "14px",
+  }),
+};
+
 export function CrmListDataAssignmentFormContent({
   entityLabel,
   assignmentFilters,
@@ -81,14 +90,7 @@ export function CrmListDataAssignmentFormContent({
                 }
                 options={availableTags}
                 placeholder={`Select tags to filter ${entityLabel.toLowerCase()}...`}
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#ced4da",
-                    boxShadow: "none",
-                    fontSize: "14px",
-                  }),
-                }}
+                styles={CREATABLE_SELECT_STYLES}
               />
               <Form.Text className="text-muted">
                 Only {entityLabel.toLowerCase()} with these tags will be
@@ -110,14 +112,7 @@ export function CrmListDataAssignmentFormContent({
                 }
                 options={availableCampaigns}
                 placeholder={`Select campaigns to filter ${entityLabel.toLowerCase()}...`}
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: "#ced4da",
-                    boxShadow: "none",
-                    fontSize: "14px",
-                  }),
-                }}
+                styles={CREATABLE_SELECT_STYLES}
               />
               <Form.Text className="text-muted">
                 Only {entityLabel.toLowerCase()} from these campaigns will be
@@ -193,14 +188,7 @@ export function CrmListDataAssignmentFormContent({
             onChange={(selected) => setAssignmentCampaign(selected || [])}
             options={availableCampaigns}
             placeholder={`Choose which campaigns to assign ${entityLabel.toLowerCase()} to...`}
-            styles={{
-              control: (base) => ({
-                ...base,
-                borderColor: "#ced4da",
-                boxShadow: "none",
-                fontSize: "14px",
-              }),
-            }}
+            styles={CREATABLE_SELECT_STYLES}
           />
           <Form.Text className="text-muted">
             <strong>Smart Distribution:</strong> {entityLabel} will be

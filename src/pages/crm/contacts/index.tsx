@@ -74,18 +74,12 @@ import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
-  getAllCrmDataById,
-  createCrmData,
   updateCrmData,
   uploadCrmDataCsv,
   deleteCrmData,
-  assignCrmDataAdvanced,
   getCrmDataCounts,
-  bulkDeleteCrmData,
   getCrmDataTags,
   getCampaigns,
-  scheduleCall,
-  unscheduleCall,
   CrmDataItem,
   CrmDataMetrics,
   downloadExampleCsv,
@@ -108,7 +102,6 @@ import {
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
@@ -131,6 +124,8 @@ import {
 import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
 import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
 import { useCrmListFiltersMetricsHistoryState } from "@crm/shared/useCrmListFiltersMetricsHistoryState";
+import { useCrmListContactFormHandlers } from "@crm/shared/useCrmListContactFormHandlers";
+import { useCrmListSharedCallbacks } from "@crm/shared/useCrmListSharedCallbacks";
 import {
   applyCrmListExportDateRangePreset,
   crmListExportDateRangePresetValue,
@@ -354,6 +349,56 @@ const CrmContactsManagement = () => {
     setContactFormLoading,
     sourceField: "source_file",
     loadFailedMessage: "Failed to load contact",
+  });
+
+  const contactsCalculateEntryCounts = useCallback(async () => {
+    try {
+      const campaignIds = Array.from(assignmentFilters.selectedCampaigns).map(
+        (campaign) => parseInt(campaign.value),
+      );
+      const tags = Array.from(assignmentFilters.selectedTags).map(
+        (tag) => tag.value,
+      );
+      const counts = await getCrmDataCounts(campaignIds, tags);
+      return {
+        total: counts.summary.total_records,
+        assigned: counts.summary.assigned_records,
+        unassigned: counts.summary.unassigned_records,
+      };
+    } catch (error) {
+      console.error("Failed to get entry counts:", error);
+      return { total: 5000, assigned: 2000, unassigned: 3000 };
+    }
+  }, [assignmentFilters]);
+
+  const {
+    showSuccessfulModal, setShowSuccessfulModal,
+    successModalTitle, setSuccessModalTitle,
+    successModalDescription, setSuccessModalDescription,
+    handleDataAssignment, handleDataAssignmentSubmit, handleDataAssignmentModalClose,
+    handleAfterCallModalClose, handleAfterCallSubmit,
+    handleScheduleCall, handleUnscheduleCallClick, confirmUnscheduleCall,
+    handleScheduleModalClose, handleScheduleSubmit,
+    handleCallClick, handleBulkDelete, handleDeleteData,
+    openSidebar: openContactSidebar, handleViewData,
+    handlePlayCallRecording, handleDownloadCallRecording, handleItemSelection,
+  } = useCrmListSharedCallbacks({
+    session, setRefreshKey, selectedDataItem, setSelectedDataItem,
+    setShowDataAssignmentModal, setShowAfterCallModal, setShowDeleteModal, setItemToDelete,
+    dialNumber, isInitialized,
+    assignmentFilters, setAssignmentFilters, assignmentCampaign, setAssignmentCampaign,
+    assignmentDistribution, setAssignmentDistribution, totalEntriesToAssign, setTotalEntriesToAssign,
+    customDistribution, setCustomDistribution, setAssignmentCounts,
+    afterCallData, setAfterCallData,
+    setShowScheduleModal, setSelectedEntryForSchedule, isEditingSchedule, setIsEditingSchedule,
+    scheduleData, setScheduleData, selectedEntryForSchedule,
+    setShowUnscheduleModal, entryToUnschedule, setEntryToUnschedule,
+    selectedItems, setSelectedItems, clearSelectedRows, setClearSelectedRows, setDeleteModalMode,
+    sidebarFetchTokenRef: sidebarContactFetchTokenRef,
+    setSelectedRecord: setSelectedContact,
+    setShowSidebar: setShowContactSidebar,
+    setSelectedRecording, setShowRecordingPlayerModal, setDownloadingRecordings, setDownloadProgress,
+    calculateEntryCounts: contactsCalculateEntryCounts,
   });
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
@@ -1024,120 +1069,18 @@ const CrmContactsManagement = () => {
     }
   };
 
-  const openContactSidebar = useCallback((item: CrmDataItem | any) => {
-    setSelectedDataItem(item);
-    setSelectedContact(item);
-    setShowContactSidebar(true);
-
-    const id = Number(item?.id);
-    if (!Number.isFinite(id) || id <= 0) return;
-
-    const token = ++sidebarContactFetchTokenRef.current;
-    getAllCrmDataById(id)
-      .then((full: any) => {
-        if (sidebarContactFetchTokenRef.current !== token) return;
-        const record = full?.data ?? null;
-        if (!record) return;
-
-        // Attach audit trail (top-level on the full response) onto the record so
-        // CrmActivitiesPanel can pick it up consistently.
-        const hydrated = {
-          ...record,
-          audit_trail: full?.audit_trail ?? full?.audit_trails ?? undefined,
-          leads: full?.leads ?? undefined,
-          deals: full?.deals ?? undefined,
-        };
-
-        setSelectedContact((prev: any) => {
-          const prevId = Number(prev?.id);
-          if (!Number.isFinite(prevId) || prevId !== id) return prev;
-          return { ...prev, ...hydrated };
-        });
-      })
-      .catch(() => {
-        // getAllCrmDataById already toasts on error; keep sidebar usable with base row data
-      });
-  }, []);
-
-  // Backwards-compatible alias used throughout the file
-  const handleViewData = useCallback(
-    (item: CrmDataItem) => openContactSidebar(item),
-    [openContactSidebar],
-  );
-
-  // Handle play call recording
-  const handlePlayCallRecording = useCallback((recording: any) => {
-    setSelectedRecording(recording);
-    setShowRecordingPlayerModal(true);
-  }, []);
-
-  // Handle download call recording
-  const handleDownloadCallRecording = useCallback(async (recording: any) => {
-    const { Id, AgentExtension } = recording;
-
-    // Add to downloading set and initialize progress
-    setDownloadingRecordings((prev) => new Set(prev).add(Id));
-    setDownloadProgress((prev) => ({ ...prev, [Id]: 0 }));
-
-    try {
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-        setDownloadProgress((prev) => {
-          const currentProgress = prev[Id] || 0;
-          if (currentProgress < 90) {
-            return { ...prev, [Id]: currentProgress + Math.random() * 15 };
-          }
-          return prev;
-        });
-      }, 200);
-
-      await DownloadCallRecording(
-        Id,
-        AgentExtension,
-        "call-logs/recordings/download",
-        recording.imagicle,
-      );
-
-      // Complete the progress
-      clearInterval(progressInterval);
-      setDownloadProgress((prev) => ({ ...prev, [Id]: 100 }));
-
-      // Show completion briefly before hiding
-      setTimeout(() => {
-        setDownloadingRecordings((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(Id);
-          return newSet;
-        });
-        setDownloadProgress((prev) => {
-          const newProgress = { ...prev };
-          delete newProgress[Id];
-          return newProgress;
-        });
-      }, 1000);
-    } catch (error) {
-      console.error("Download error:", error);
-      toast.error("Download failed");
-
-      // Remove from downloading set on error
-      setDownloadingRecordings((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(Id);
-        return newSet;
-      });
-      setDownloadProgress((prev) => {
-        const newProgress = { ...prev };
-        delete newProgress[Id];
-        return newProgress;
-      });
-    }
-  }, []);
-
-  // Handle delete data item
-  const handleDeleteData = useCallback((item: CrmDataItem) => {
-    setItemToDelete(item);
-    setShowDeleteModal(true);
-  }, []);
+  const handleNoteCreate = (
+    note: string,
+    createTask: boolean,
+    taskDueDate?: string,
+  ) => {
+    console.log("Note created:", {
+      contactId: selectedContact.id,
+      note,
+      createTask,
+      taskDueDate,
+    });
+  };
 
   // Confirm single delete
   const confirmDelete = useCallback(async () => {
@@ -1155,393 +1098,13 @@ const CrmContactsManagement = () => {
   }, [itemToDelete]);
 
   // Calculate filtered entry counts using API
-  const calculateEntryCounts = useCallback(async () => {
-    try {
-      const campaignIds = Array.from(assignmentFilters.selectedCampaigns).map(
-        (campaign) => parseInt(campaign.value),
-      );
-      const tags = Array.from(assignmentFilters.selectedTags).map(
-        (tag) => tag.value,
-      );
-
-      const counts = await getCrmDataCounts(campaignIds, tags);
-
-      return {
-        total: counts.summary.total_records,
-        assigned: counts.summary.assigned_records,
-        unassigned: counts.summary.unassigned_records,
-      };
-    } catch (error) {
-      console.error("Failed to get entry counts:", error);
-      // Fallback to static data
-      return {
-        total: 5000,
-        assigned: 2000,
-        unassigned: 3000,
-      };
-    }
-  }, [assignmentFilters]);
-
-  // Auto-refetch counts when filter dropdowns change
-  useEffect(() => {
-    const refetchCounts = async () => {
-      if (
-        assignmentFilters.selectedCampaigns.length > 0 ||
-        assignmentFilters.selectedTags.length > 0
-      ) {
-        try {
-          const counts = await calculateEntryCounts();
-          setAssignmentCounts(counts);
-          setTotalEntriesToAssign(counts.unassigned);
-        } catch (error) {
-          console.error("Failed to refetch counts:", error);
-        }
-      }
-    };
-
-    refetchCounts();
-  }, [
-    assignmentFilters.selectedCampaigns,
-    assignmentFilters.selectedTags,
-    calculateEntryCounts,
-  ]);
-
-  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
-  const [successModalTitle, setSuccessModalTitle] = useState("");
-  const [successModalDescription, setSuccessModalDescription] = useState("");
 
   // Handle data assignment directly (no second dialog)
-  const handleDataAssignmentSubmit = useCallback(async () => {
-    if (assignmentCampaign.length === 0) {
-      toast.error("Please select at least one campaign to assign entries to");
-      return;
-    }
-
-    if (totalEntriesToAssign === 0) {
-      toast.error("Please specify how many entries to assign");
-      return;
-    }
-
-    // Validate custom distribution if in custom mode
-    if (assignmentDistribution === "custom") {
-      const totalCustomAllocation = Object.values(customDistribution).reduce(
-        (sum, count) => sum + count,
-        0,
-      );
-      if (totalCustomAllocation !== totalEntriesToAssign) {
-        toast.error(
-          `Custom allocation must equal total entries to assign (${totalEntriesToAssign}). Current total: ${totalCustomAllocation}`,
-        );
-        return;
-      }
-    }
-
-    try {
-      const campaignFilterIds = Array.from(
-        assignmentFilters.selectedCampaigns,
-      ).map((campaign) => parseInt(campaign.value));
-      console.log(assignmentFilters.selectedTags, "ZEZA");
-      const tagIds = Array.from(assignmentFilters.selectedTags).map((tag) =>
-        parseInt(tag.id),
-      );
-
-      const campaignIds = Array.from(assignmentCampaign).map((campaign) =>
-        parseInt(campaign.value),
-      );
-
-      let result;
-
-      if (assignmentDistribution === "equal") {
-        // Equal distribution - single API call
-        result = await assignCrmDataAdvanced(
-          campaignIds,
-          totalEntriesToAssign,
-          campaignFilterIds,
-          tagIds,
-          "equal",
-        );
-      } else {
-        // Custom distribution - single API call with campaign distribution
-        const campaignDistribution: Record<number, number> = {};
-        Array.from(assignmentCampaign).forEach((campaign: any) => {
-          const campaignId = parseInt(campaign.value);
-          const countForThisCampaign = customDistribution[campaign.value] || 0;
-          if (countForThisCampaign > 0) {
-            campaignDistribution[campaignId] = countForThisCampaign;
-          }
-        });
-
-        result = await assignCrmDataAdvanced(
-          campaignIds,
-          totalEntriesToAssign,
-          campaignFilterIds,
-          tagIds,
-          "custom",
-          campaignDistribution,
-        );
-      }
-
-      console.log("Assignment result:", result);
-
-      // Close modal and reset state
-      setShowDataAssignmentModal(false);
-      setAssignmentFilters({
-        selectedTags: [],
-        selectedCampaigns: [],
-      });
-      setAssignmentCampaign([]);
-      setAssignmentDistribution("equal");
-      setTotalEntriesToAssign(0);
-      setCustomDistribution({});
-
-      setShowSuccessfulModal(true);
-      setSuccessModalTitle("Data Assignment Successful!");
-      setSuccessModalDescription("The data has been successfully assigned.");
-
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      console.error("Assign error:", error);
-    }
-  }, [
-    assignmentCampaign,
-    totalEntriesToAssign,
-    assignmentFilters,
-    assignmentDistribution,
-    customDistribution,
-  ]);
-
-  const handleNoteCreate = (
-    note: string,
-    createTask: boolean,
-    taskDueDate?: string,
-  ) => {
-    console.log("Note created:", {
-      contactId: selectedContact.id,
-      note,
-      createTask,
-      taskDueDate,
-    });
-  };
   // Handle call button click
-  const handleCallClick = useCallback(
-    async (item: CrmDataItem) => {
-      const phone = item.phone;
-      if (!phone) {
-        toast.error("No phone number available for this entry");
-        return;
-      }
-
-      if (!isInitialized) {
-        toast.error("CTI not initialized. Please wait...");
-        return;
-      }
-
-      try {
-        const result = await dialNumber(phone);
-
-        if (result.success) {
-          toast.success(`Calling ${item.name || phone}...`);
-        } else {
-          toast.error(result.error || "Failed to make call");
-        }
-      } catch (error) {
-        console.error("Call error:", error);
-        toast.error("Failed to make call");
-      }
-    },
-    [dialNumber, isInitialized],
-  );
-
   // Handle data assignment modal close
-  const handleDataAssignmentModalClose = useCallback(() => {
-    setShowDataAssignmentModal(false);
-    setAssignmentFilters({
-      selectedTags: [],
-      selectedCampaigns: [],
-    });
-    setAssignmentCampaign([]);
-    setAssignmentDistribution("equal");
-    setTotalEntriesToAssign(0);
-    setCustomDistribution({});
-  }, []);
-
-  // After Call modal handlers
-  const handleAfterCallModalClose = useCallback(() => {
-    setShowAfterCallModal(false);
-    setAfterCallData({
-      disposition: "",
-      callStatus: "",
-      comment: "",
-      nextCallDate: "",
-      nextCallTime: "",
-      generateLead: "no",
-    });
-  }, []);
-
-  const handleAfterCallSubmit = useCallback(() => {
-    if (!afterCallData.disposition) {
-      toast.error("Please select a disposition");
-      return;
-    }
-    if (!afterCallData.callStatus) {
-      toast.error("Please select a call status");
-      return;
-    }
-    if (!afterCallData.comment.trim()) {
-      toast.error("Please add a comment");
-      return;
-    }
-    if (!afterCallData.generateLead) {
-      toast.error("Please select whether to generate a lead");
-      return;
-    }
-
-    // Close the dialog
-    handleAfterCallModalClose();
-
-    // If lead generation is selected, redirect to create lead page with contact data
-    if (afterCallData.generateLead === "yes" && selectedDataItem) {
-      // Show success message and navigate to create lead page
-      toast.success(
-        "Redirecting to create lead page with pre-filled contact data...",
-      );
-      window.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
-    } else {
-      toast.success("After call data saved successfully! No lead generated.");
-      setShowSuccessfulModal(true);
-      setSuccessModalTitle("After Call Successful!");
-      setSuccessModalDescription(
-        "The after call data has been successfully saved.",
-      );
-    }
-  }, [afterCallData, selectedDataItem, handleAfterCallModalClose]);
-
   // Schedule/Unschedule call handlers
-  const handleScheduleCall = useCallback((entry: any) => {
-    setSelectedEntryForSchedule(entry);
-
-    // Check if entry has a scheduled call - if yes, we're editing
-    if (entry.scheduled_call_at) {
-      setIsEditingSchedule(true);
-      const scheduledDate = moment(entry.scheduled_call_at);
-      setScheduleData({
-        date: scheduledDate.format("YYYY-MM-DD"),
-        time: scheduledDate.format("HH:mm"),
-        notes: entry.note || "",
-      });
-    } else {
-      setIsEditingSchedule(false);
-      setScheduleData({
-        date: "",
-        time: "",
-        notes: "",
-      });
-    }
-    setShowScheduleModal(true);
-  }, []);
-
-  const handleUnscheduleCallClick = useCallback((entry: any) => {
-    setEntryToUnschedule(entry);
-    setShowUnscheduleModal(true);
-  }, []);
-
-  const confirmUnscheduleCall = useCallback(async () => {
-    if (!entryToUnschedule) return;
-
-    try {
-      const userExtension = (session?.user as any)?.extension || "default";
-      await unscheduleCall(entryToUnschedule.id, userExtension);
-      setRefreshKey((prev) => prev + 1);
-      setShowUnscheduleModal(false);
-      setEntryToUnschedule(null);
-      toast.success("Call unscheduled successfully");
-    } catch (error) {
-      console.error("Failed to unschedule call:", error);
-    }
-  }, [entryToUnschedule, session]);
-
   // Schedule modal handlers
-  const handleScheduleModalClose = useCallback(() => {
-    setShowScheduleModal(false);
-    setSelectedEntryForSchedule(null);
-    setIsEditingSchedule(false);
-    setScheduleData({
-      date: "",
-      time: "",
-      notes: "",
-    });
-  }, []);
-
-  const handleScheduleSubmit = useCallback(async () => {
-    if (!scheduleData.date) {
-      toast.error("Please select a date");
-      return;
-    }
-    if (!scheduleData.time) {
-      toast.error("Please select a time");
-      return;
-    }
-
-    try {
-      const userExtension = (session?.user as any)?.extension || "default";
-      const scheduledDateTime = moment(
-        `${scheduleData.date} ${scheduleData.time}`,
-      ).toISOString();
-
-      await scheduleCall(
-        selectedEntryForSchedule.id,
-        scheduledDateTime,
-        userExtension,
-        scheduleData.notes,
-      );
-      setRefreshKey((prev) => prev + 1);
-      handleScheduleModalClose();
-      setShowSuccessfulModal(true);
-      setSuccessModalTitle(
-        isEditingSchedule
-          ? "Call Schedule Updated!"
-          : "Schedule Call Successful!",
-      );
-      setSuccessModalDescription(
-        isEditingSchedule
-          ? "The call schedule has been successfully updated."
-          : "The call has been successfully scheduled.",
-      );
-    } catch (error) {
-      console.error(
-        isEditingSchedule
-          ? "Failed to update scheduled call:"
-          : "Failed to schedule call:",
-        error,
-      );
-    }
-  }, [
-    scheduleData,
-    selectedEntryForSchedule,
-    handleScheduleModalClose,
-    session,
-    isEditingSchedule,
-  ]);
-
   // Handle bulk delete
-  const handleBulkDelete = useCallback(async () => {
-    if (selectedItems.length === 0) {
-      toast.error("Please select items to delete");
-      return;
-    }
-
-    try {
-      await bulkDeleteCrmData(selectedItems);
-      setShowDeleteModal(false);
-      setDeleteModalMode(null);
-      setRefreshKey((prev) => prev + 1);
-      setSelectedItems([]);
-      setClearSelectedRows(!clearSelectedRows);
-    } catch (error: any) {
-      console.error("Bulk delete error:", error);
-    }
-  }, [selectedItems]);
-
   // Handle close contact sidebar
   const handleCloseContactSidebar = useCallback(() => {
     sidebarContactFetchTokenRef.current += 1;
@@ -2115,142 +1678,18 @@ const CrmContactsManagement = () => {
     </div>
   );
 
-  // Create contact (contact) API submit - POST crm/crm-data { name, phone, data }
-  const handleCreateContactSubmit = useCallback(
-    async (addAnother: boolean) => {
-      const name = [contactForm.firstName, contactForm.lastName]
-        .filter(Boolean)
-        .join(" ")
-        .trim();
-      if (!name || !contactForm.email || !contactForm.phoneNumber?.trim()) {
-        toast.error("Name, email and phone are required");
-        return;
-      }
-      if (contactForm.campaign_id == null) {
-        toast.error("Campaign is required");
-        return;
-      }
-      const sessionUser = session?.user as any;
-      const userExtension = String(sessionUser?.phone ?? "");
-      const assignedTo = userExtension;
-      const uploadedBy = userExtension;
-
-      const phoneForPayload =
-        contactForm.phone_country_code && contactForm.phoneNumber?.trim()
-          ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
-          : contactForm.phoneNumber?.trim() ?? "";
-      const customFieldsForPayload = (contactForm.custom_fields ?? [])
-        .map((f) => ({
-          field_name: String(f.field_name ?? "").trim(),
-          field_value: String(f.field_value ?? "").trim(),
-        }))
-        .filter((f) => f.field_name || f.field_value);
-      const dataPayload: Record<string, any> = {
-        email: contactForm.email.trim(),
-        assigned_to: assignedTo,
-        uploaded_by: uploadedBy,
-        disposition: contactForm.disposition || undefined,
-        note: contactForm.note || undefined,
-        contact_owner: contactForm.contact_owner ?? undefined,
-        legal_basis: contactForm.legal_basis?.length
-          ? contactForm.legal_basis
-          : undefined,
-      };
-      customFieldsForPayload.forEach((f) => {
-        dataPayload[f.field_name] = f.field_value;
-      });
-      setCreateContactLoading(true);
-      try {
-        await createCrmData({
-          name,
-          phone: phoneForPayload,
-          user_extension: userExtension,
-          campaign_id: contactForm.campaign_id ?? null,
-          scheduled_call_at: contactForm.scheduled_call_at || undefined,
-          company_domain: contactForm.company_domain?.trim() || undefined,
-          source: contactForm.source_file?.trim() || undefined,
-          tag_ids: contactForm.tags?.length
-          ? contactForm.tags.map((t) => t.id)
-          : [],
-          data: dataPayload,
-        });
-        fetchCrmData();
-        setContactForm(createEmptyCrmListContactFormState("source_file"));
-        if (!addAnother) {
-          setShowCreateContactSidebar(false);
-        }
-      } catch {
-        // Error already shown by createCrmData
-      } finally {
-        setCreateContactLoading(false);
-      }
-    },
-    [contactForm, fetchCrmData, session?.user],
-  );
-
-  const handleUpdateContactSubmit = useCallback(async () => {
-    if (editingContactId == null) return;
-    const name = [contactForm.firstName, contactForm.lastName]
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-    if (
-      !name ||
-      !contactForm.email?.trim() ||
-      !contactForm.phoneNumber?.trim()
-    ) {
-      toast.error("Name, email and phone are required");
-      return;
-    }
-    if (contactForm.campaign_id == null) {
-      toast.error("Campaign is required");
-      return;
-    }
-    const phoneForPayload =
-      contactForm.phone_country_code && contactForm.phoneNumber?.trim()
-        ? `${contactForm.phone_country_code} ${contactForm.phoneNumber.trim()}`
-        : contactForm.phoneNumber?.trim() ?? "";
-    const customFieldsForPayload = (contactForm.custom_fields ?? [])
-      .map((f) => ({
-        field_name: String(f.field_name ?? "").trim(),
-        field_value: String(f.field_value ?? "").trim(),
-      }))
-      .filter((f) => f.field_name || f.field_value);
-    const dataPayload: Record<string, any> = {
-      email: contactForm.email.trim(),
-      disposition: contactForm.disposition || undefined,
-      note: contactForm.note || undefined,
-      contact_owner: contactForm.contact_owner ?? undefined,
-      legal_basis: contactForm.legal_basis?.length
-        ? contactForm.legal_basis
-        : undefined,
-    };
-    customFieldsForPayload.forEach((f) => {
-      dataPayload[f.field_name] = f.field_value;
+  const { handleCreateContactSubmit, handleUpdateContactSubmit } =
+    useCrmListContactFormHandlers({
+      session,
+      contactForm,
+      setContactForm,
+      setCreateContactLoading,
+      setShowCreateContactSidebar,
+      editingContactId,
+      setEditingContactId,
+      fetchCrmData,
+      sourceField: "source_file",
     });
-    setCreateContactLoading(true);
-    try {
-      await updateCrmData(editingContactId, {
-        name,
-        phone: phoneForPayload,
-        campaign_id: contactForm.campaign_id ?? null,
-        company_domain: contactForm.company_domain?.trim() || undefined,
-        source: contactForm.source_file?.trim() || undefined,
-        scheduled_call_at: contactForm.scheduled_call_at || undefined,
-        data: dataPayload,
-        tag_ids: contactForm.tags?.length
-          ? contactForm.tags.map((t) => t.id)
-          : [],
-      });
-      fetchCrmData();
-      setShowCreateContactSidebar(false);
-      setEditingContactId(null);
-    } catch {
-      // Error already shown by updateCrmData
-    } finally {
-      setCreateContactLoading(false);
-    }
-  }, [editingContactId, contactForm, fetchCrmData]);
 
   // Render Create Contact Sidebar
   const renderCreateContactSidebar = () => {

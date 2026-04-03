@@ -1,7 +1,8 @@
 import React from "react";
-import { Row, Col, Form, Alert, Modal, Button } from "react-bootstrap";
+import { Form, Alert, Modal, Button } from "react-bootstrap";
 import { AlertCircle as AlertCircleIcon } from "lucide-react";
 import moment from "moment";
+import { CrmListDateTimeRow } from "./CrmListDateTimeRow";
 
 /* ---------- Schedule Call Form Content ---------- */
 
@@ -47,29 +48,14 @@ export function CrmListScheduleCallFormContent({
         </div>
       )}
 
-      <Row>
-        <Col md={6}>
-          <Form.Group className="mb-3">
-            <Form.Label>Date *</Form.Label>
-            <Form.Control
-              type="date"
-              value={scheduleData.date}
-              onChange={(e) => update({ date: e.target.value })}
-              min={moment().format("YYYY-MM-DD")}
-            />
-          </Form.Group>
-        </Col>
-        <Col md={6}>
-          <Form.Group className="mb-3">
-            <Form.Label>Time *</Form.Label>
-            <Form.Control
-              type="time"
-              value={scheduleData.time}
-              onChange={(e) => update({ time: e.target.value })}
-            />
-          </Form.Group>
-        </Col>
-      </Row>
+      <CrmListDateTimeRow
+        dateLabel="Date *"
+        timeLabel="Time *"
+        dateValue={scheduleData.date}
+        timeValue={scheduleData.time}
+        onDateChange={(v) => update({ date: v })}
+        onTimeChange={(v) => update({ time: v })}
+      />
 
       <Form.Group className="mb-3">
         <Form.Label>Notes (Optional)</Form.Label>
