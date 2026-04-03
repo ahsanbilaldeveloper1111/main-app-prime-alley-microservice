@@ -15,7 +15,6 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Button,
-  Card,
   Row,
   Col,
   Form,
@@ -23,9 +22,7 @@ import {
   Spinner,
   Modal,
   Badge,
-  InputGroup,
   Dropdown,
-  Table,
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
@@ -35,27 +32,20 @@ import { useRouter } from "next/router";
 import moment from "moment";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import { CreateQuoteSidebar } from "@components/renderCreateQuoteForm";
-import InvoiceCreationPage from "@pages/billing/create-invoice";
 import {
   FiUpload,
   FiDatabase,
-  FiSearch,
   FiFilter,
-  FiTrash2,
   FiEye,
-  FiEdit,
   FiUser,
   FiUsers,
   FiPhone,
-  FiMessageCircle,
   FiPlay,
   FiClock,
   FiX,
-  FiAlertCircle,
   FiCalendar,
   FiTarget,
   FiMoreVertical,
-  FiCopy,
 } from "react-icons/fi";
 import {
   Users,
@@ -64,7 +54,6 @@ import {
   ChevronDown,
   X,
   AlertCircle as AlertCircleIcon,
-  Plus,
   ArrowUp,
   ArrowDown,
   Download,
@@ -74,9 +63,7 @@ import {
   ChevronsRight,
   ChevronLeft,
   ChevronRight,
-  Eye,
   Trash2,
-  MoreVertical,
   MoreHorizontal,
   Phone as PhoneIcon,
   Phone,
@@ -91,24 +78,13 @@ import {
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
 import { Column } from "@components/CustomDataTable";
-import GenericTable, {
-  PaginationConfig,
-  ToolbarConfig,
-  TabConfig,
-} from "@components/GenericTable";
+import GenericTable from "@components/GenericTable";
 
-import GenericSidebar, {
-  SidebarSection,
-  QuickAction,
-  SidebarField,
-} from "@components/GenericSidebarNew";
-import GenericFilterSidebar, {
-  FilterField,
-} from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import GenericSidebar from "@components/GenericSidebarNew";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
-  getCrmDataById,
   getAllCrmDataById,
   createCrmData,
   updateCrmData,
@@ -121,7 +97,6 @@ import {
   scheduleCall,
   unscheduleCall,
   CrmDataItem,
-  CrmDataMetrics,
   downloadExampleCsv,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
@@ -141,7 +116,6 @@ import {
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import DatatableActionButton from "@components/DatatableActionButton";
 import { useCti } from "../../contexts/CtiContext";
 import { DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
@@ -160,7 +134,7 @@ import {
   CRM_LIST_PAGE_CALL_END_REASONS,
   CRM_LIST_PAGE_STATIC_TAGS,
 } from "@utils/crmListPageStaticData";
-import { useCrmQuotesListDataAssignmentContactFormState } from "@crm/billing-quotes/useCrmQuotesListDataAssignmentContactFormState";
+import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
 import { useCrmQuotesListFiltersMetricsHistorySidebarState } from "@crm/billing-quotes/useCrmQuotesListFiltersMetricsHistorySidebarState";
 import { buildCrmQuotesListStatsCards } from "@crm/billing-quotes/crmQuotesListStatsAndTable";
 import { CrmQuotesListProspectKpiAnalyticsSection } from "@crm/billing-quotes/CrmQuotesListProspectKpiAnalyticsSection";
@@ -174,7 +148,21 @@ import {
 } from "@crm/billing-quotes/crmQuotesListToolbarFilters";
 import { useCrmQuotesListQuotesTableModel } from "@crm/billing-quotes/useCrmQuotesListQuotesTableModel";
 import { useCrmQuotesListSharedQuoteListCallbacks } from "@crm/billing-quotes/useCrmQuotesListSharedQuoteListCallbacks";
-import { computeCrmListAdvancedFiltersApplied } from "@crm/shared/crmListCrmQueryParams";
+import {
+  buildCrmListExportCrmDataParams,
+  buildCrmListTableCrmDataParams,
+  computeCrmListAdvancedFiltersApplied,
+} from "@crm/shared/crmListCrmQueryParams";
+import {
+  buildCrmListCsvContent,
+  buildCrmListExportHeaders,
+} from "@crm/shared/crmListPageExportCsv";
+import { validateCrmListUploadCsvFile } from "@crm/shared/crmListUploadCsvValidation";
+import {
+  applyCrmListExportDateRangePreset,
+  crmListExportDateRangePresetValue,
+  CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS,
+} from "@crm/shared/crmListExportModalDateRangePresets";
 
 export type CrmQuotesListPageProps = {
   variant: "billing" | "crm";
@@ -278,7 +266,7 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
     setContactFormLoadError,
     contactFormLoading,
     setContactFormLoading,
-  } = useCrmQuotesListDataAssignmentContactFormState();
+  } = useCrmListAssignmentContactSidebarState();
 
   const {
     confirmDelete,
@@ -472,66 +460,8 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
   ]);
 
   const buildCrmDataParams = useCallback(
-    (overrides: { page?: number; per_page?: number } = {}) => {
-      const params: any = {
-        page: pagination.currentPage,
-        per_page: pagination.rowsPerPage,
-        ...overrides,
-      };
-      if (memoizedFilters.search) params.search = memoizedFilters.search;
-      if (memoizedFilters.campaign_id?.length)
-        params.campaign_ids = memoizedFilters.campaign_id;
-      if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
-      if (memoizedFilters.assignment_status)
-        params.assignment_status = memoizedFilters.assignment_status;
-      if (memoizedFilters.user_extension?.length) {
-        params.user_extensions = Array.isArray(memoizedFilters.user_extension)
-          ? memoizedFilters.user_extension
-          : [memoizedFilters.user_extension];
-      }
-      if (
-        memoizedFilters.is_viewed !== undefined &&
-        memoizedFilters.is_viewed !== ""
-      )
-        params.is_viewed = memoizedFilters.is_viewed;
-      // Create date filter: backend expects date_from / date_to
-      if (memoizedFilters.created_at_from)
-        params.date_from = memoizedFilters.created_at_from;
-      if (memoizedFilters.created_at_to)
-        params.date_to = memoizedFilters.created_at_to;
-      if (memoizedFilters.last_called_at_from)
-        params.last_called_at_from = memoizedFilters.last_called_at_from;
-      if (memoizedFilters.last_called_at_to)
-        params.last_called_at_to = memoizedFilters.last_called_at_to;
-      if (memoizedFilters.has_scheduled_calls !== undefined)
-        params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
-      if (memoizedFilters.has_tickets !== undefined)
-        params.has_tickets = memoizedFilters.has_tickets;
-      if (memoizedFilters.scheduled_call_status)
-        params.scheduled_call_status = memoizedFilters.scheduled_call_status;
-      if (memoizedFilters.scheduled_call_from)
-        params.scheduled_call_from = memoizedFilters.scheduled_call_from;
-      if (memoizedFilters.scheduled_call_to)
-        params.scheduled_call_to = memoizedFilters.scheduled_call_to;
-      if (memoizedFilters.source_file)
-        params.source_file = memoizedFilters.source_file;
-      if (memoizedFilters.tag_ids?.length)
-        params.tag_ids = memoizedFilters.tag_ids;
-      // Last activity / last called filter (from filter pill)
-      if (memoizedFilters.last_called_at_from)
-        params.last_called_at_from = memoizedFilters.last_called_at_from;
-      if (memoizedFilters.last_called_at_to)
-        params.last_called_at_to = memoizedFilters.last_called_at_to;
-      // Lead status / disposition filter (from filter pill)
-      if (memoizedFilters.disposition)
-        params.disposition = memoizedFilters.disposition;
-      if (pagination.sortColumn) {
-        params.sort_column = pagination.sortColumn;
-        params.sort_direction = pagination.sortDirection;
-      }
-      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
-      return params;
-    },
+    (overrides: { page?: number; per_page?: number } = {}) =>
+      buildCrmListTableCrmDataParams(memoizedFilters, pagination, overrides),
     [
       memoizedFilters,
       pagination.currentPage,
@@ -541,55 +471,6 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
     ],
   );
 
-  // Build API params from arbitrary filters (for export with custom filters)
-  const buildExportParams = useCallback(
-    (
-      filters: Record<string, any>,
-      overrides: { page?: number; per_page?: number } = {},
-    ) => {
-      const params: any = {
-        page: overrides.page ?? 1,
-        per_page: overrides.per_page ?? 100,
-        ...overrides,
-      };
-      if (filters.search) params.search = filters.search;
-      if (filters.campaign_id?.length)
-        params.campaign_ids = filters.campaign_id;
-      if (filters.tags?.length) params.tags = filters.tags;
-      if (filters.assignment_status)
-        params.assignment_status = filters.assignment_status;
-      if (filters.user_extension?.length)
-        params.user_extensions = Array.isArray(filters.user_extension)
-          ? filters.user_extension
-          : [filters.user_extension];
-      if (filters.is_viewed !== undefined && filters.is_viewed !== "")
-        params.is_viewed = filters.is_viewed;
-      // Create date filter: backend expects date_from / date_to
-      if (filters.created_at_from) params.date_from = filters.created_at_from;
-      if (filters.created_at_to) params.date_to = filters.created_at_to;
-      if (filters.last_called_at_from)
-        params.last_called_at_from = filters.last_called_at_from;
-      if (filters.last_called_at_to)
-        params.last_called_at_to = filters.last_called_at_to;
-      if (filters.has_scheduled_calls !== undefined)
-        params.has_scheduled_calls = filters.has_scheduled_calls;
-      if (filters.has_tickets !== undefined)
-        params.has_tickets = filters.has_tickets;
-      if (filters.scheduled_call_status)
-        params.scheduled_call_status = filters.scheduled_call_status;
-      if (filters.scheduled_call_from)
-        params.scheduled_call_from = filters.scheduled_call_from;
-      if (filters.scheduled_call_to)
-        params.scheduled_call_to = filters.scheduled_call_to;
-      if (filters.source_file) params.source_file = filters.source_file;
-      if (filters.tag_ids?.length) params.tag_ids = filters.tag_ids;
-      if (filters.disposition) params.disposition = filters.disposition;
-      params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
-      return params;
-    },
-    [],
-  );
-
   const fetchCrmDataForExport = useCallback(
     async (filters: Record<string, any>) => {
       const PER_PAGE = 100;
@@ -597,7 +478,10 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
       let page = 1;
       for (;;) {
         const response = await getCrmData(
-          buildExportParams(filters, { page, per_page: PER_PAGE }),
+          buildCrmListExportCrmDataParams(filters, {
+            page,
+            per_page: PER_PAGE,
+          }),
         );
         const chunk = response?.data || [];
         allData.push(...chunk);
@@ -606,82 +490,26 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
       }
       return allData;
     },
-    [buildExportParams],
+    [],
   );
 
   const handleProspectsExport = useCallback(async () => {
     const name =
-      exportFileName.trim() || `prospects_${moment().format("YYYY-MM-DD")}`;
+      exportFileName.trim() || `quotes_${moment().format("YYYY-MM-DD")}`;
     const ext = name.endsWith(".csv") ? "" : ".csv";
     setExporting(true);
     try {
       const allData = await fetchCrmDataForExport(exportFilters);
       if (allData.length === 0) {
-        toast.info("No prospects match the selected filters.");
+        toast.info("No quotes match the selected filters.");
         return;
       }
-      const topLevelKeys = new Set<string>();
-      const nestedDataKeys = new Set<string>();
-      for (const row of allData as any[]) {
-        if (!row || typeof row !== "object") continue;
-        for (const k of Object.keys(row)) {
-          if (k === "data" && row.data && typeof row.data === "object") {
-            for (const dk of Object.keys(row.data)) nestedDataKeys.add(dk);
-          } else if (k !== "campaign" && k !== "company") {
-            topLevelKeys.add(k);
-          }
-        }
-      }
-      const preferredTopLevelOrder = [
-        "id", "name", "phone", "user_extension", "campaign_id", "source_file",
-        "directory", "is_viewed", "scheduled_call_at", "uploaded_by", "created_by",
-        "note", "company_name", "company_domain", "company_id", "created_at",
-        "updated_at", "tags", "crm_summary",
-      ];
-      const orderedTopLevel = [
-        ...preferredTopLevelOrder.filter((k) => topLevelKeys.has(k)),
-        ...Array.from(topLevelKeys).filter((k) => !preferredTopLevelOrder.includes(k)).sort((a, b) => a.localeCompare(b)),
-      ];
-      const orderedNestedData = Array.from(nestedDataKeys).sort((a, b) => a.localeCompare(b));
-      const nestedDataKeysSet = new Set(orderedNestedData);
-      const headers = [
-        ...orderedTopLevel,
-        ...orderedNestedData.filter((k) => !orderedTopLevel.includes(k)),
-      ];
-      const getCellValue = (row: any, header: string) => {
-        if (header === "campaign_id") {
-          const label = row?.campaign?.name;
-          if (label != null) return label;
-          return row?.campaign_id != null ? String(row.campaign_id) : "";
-        }
-        if (header === "company_name") {
-          const name = row?.company?.name;
-          if (name != null) return name;
-          return row?.company_name != null ? String(row.company_name) : "";
-        }
-        if (header === "crm_summary") {
-          const summary = row?.crm_summary?.summary ?? row?.data?.crm_summary?.summary;
-          return summary != null ? (typeof summary === "string" ? summary : String(summary)) : "";
-        }
-        const raw = nestedDataKeysSet.has(header) ? (row?.data?.[header] ?? row?.[header]) : row?.[header];
-        if (raw == null) return "";
-        if (typeof raw === "string") return raw;
-        if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
-        try {
-          return JSON.stringify(raw);
-        } catch {
-          return String(raw);
-        }
-      };
-      const escapeCsv = (val: string) => {
-        const s = String(val);
-        if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-        return s;
-      };
-      const csvContent = [
-        headers.map((h) => escapeCsv(h)).join(","),
-        ...allData.map((row) => headers.map((h) => escapeCsv(getCellValue(row, h))).join(",")),
-      ].join("\n");
+      const { headers, nestedDataKeysSet } = buildCrmListExportHeaders(allData);
+      const csvContent = buildCrmListCsvContent(
+        headers,
+        allData,
+        nestedDataKeysSet,
+      );
       const blob = new Blob([csvContent], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -690,9 +518,9 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
       a.click();
       window.URL.revokeObjectURL(url);
       setShowExportModal(false);
-      toast.success(`Exported ${allData.length} prospects successfully!`);
-    } catch (err) {
-      toast.error("Failed to export prospects");
+      toast.success(`Exported ${allData.length} rows successfully!`);
+    } catch {
+      toast.error("Failed to export");
     } finally {
       setExporting(false);
     }
@@ -702,7 +530,7 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
   useEffect(() => {
     if (showExportModal) {
       setExportFilters({ ...currentFilters });
-      setExportFileName(`prospects_${moment().format("YYYY-MM-DD")}`);
+      setExportFileName(`quotes_${moment().format("YYYY-MM-DD")}`);
     }
   }, [showExportModal, currentFilters]);
 
@@ -1193,40 +1021,9 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
     }
   }, [clearSelectedRows]);
 
-  // CSV validation function
-  const validateCsvFile = (
-    file: File,
-  ): { isValid: boolean; errors: string[] } => {
-    const errors: string[] = [];
-
-    // Check file type
-    if (
-      !file.type.includes("csv") &&
-      !file.name.toLowerCase().endsWith(".csv")
-    ) {
-      errors.push("File must be a CSV file");
-    }
-
-    // Check file size (2MB max)
-    const maxSize = 2 * 1024 * 1024; // 2MB in bytes
-    if (file.size > maxSize) {
-      errors.push("File size must be less than 2MB");
-    }
-
-    // Check if file is empty
-    if (file.size === 0) {
-      errors.push("File cannot be empty");
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
-  };
-
   // Handle file selection
   const handleFileSelect = (file: File) => {
-    const validation = validateCsvFile(file);
+    const validation = validateCrmListUploadCsvFile(file);
 
     if (validation.isValid) {
       setSelectedFile(file);
@@ -6270,104 +6067,32 @@ export function CrmQuotesListPage({ variant }: CrmQuotesListPageProps) {
             </Col>
           </Row>
           <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Create date</Form.Label>
-                <Form.Select
-                  value={(() => {
-                    const from = exportFilters.created_at_from;
-                    const to = exportFilters.created_at_to;
-                    if (!from || !to) return "all";
-                    const days = moment(to).diff(moment(from), "days");
-                    if (days === 0) return "today";
-                    if (days >= 6 && days <= 8) return "week";
-                    if (days >= 28 && days <= 31) return "month";
-                    return "all";
-                  })()}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v === "all") {
-                        delete next.created_at_from;
-                        delete next.created_at_to;
-                      } else {
-                        const today = moment().format("YYYY-MM-DD");
-                        if (v === "today") {
-                          next.created_at_from = today;
-                          next.created_at_to = today;
-                        } else if (v === "week") {
-                          next.created_at_from = moment()
-                            .subtract(7, "days")
-                            .format("YYYY-MM-DD");
-                          next.created_at_to = today;
-                        } else {
-                          next.created_at_from = moment()
-                            .subtract(30, "days")
-                            .format("YYYY-MM-DD");
-                          next.created_at_to = today;
-                        }
-                      }
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="all">All time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">Last 30 days</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Last activity date</Form.Label>
-                <Form.Select
-                  value={(() => {
-                    const from = exportFilters.last_called_at_from;
-                    const to = exportFilters.last_called_at_to;
-                    if (!from || !to) return "all";
-                    const days = moment(to).diff(moment(from), "days");
-                    if (days === 0) return "today";
-                    if (days >= 6 && days <= 8) return "week";
-                    if (days >= 28 && days <= 31) return "month";
-                    return "all";
-                  })()}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v === "all") {
-                        delete next.last_called_at_from;
-                        delete next.last_called_at_to;
-                      } else {
-                        const today = moment().format("YYYY-MM-DD");
-                        if (v === "today") {
-                          next.last_called_at_from = today;
-                          next.last_called_at_to = today;
-                        } else if (v === "week") {
-                          next.last_called_at_from = moment()
-                            .subtract(7, "days")
-                            .format("YYYY-MM-DD");
-                          next.last_called_at_to = today;
-                        } else {
-                          next.last_called_at_from = moment()
-                            .subtract(30, "days")
-                            .format("YYYY-MM-DD");
-                          next.last_called_at_to = today;
-                        }
-                      }
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="all">All time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">Last 30 days</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
+            {CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS.map(
+              ({ label, keys }) => (
+                <Col md={6} key={keys.from}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>{label}</Form.Label>
+                    <Form.Select
+                      value={crmListExportDateRangePresetValue(
+                        exportFilters,
+                        keys,
+                      )}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setExportFilters((prev) =>
+                          applyCrmListExportDateRangePreset(prev, v, keys),
+                        );
+                      }}
+                    >
+                      <option value="all">All time</option>
+                      <option value="today">Today</option>
+                      <option value="week">Last 7 days</option>
+                      <option value="month">Last 30 days</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              ),
+            )}
           </Row>
           <Form.Group className="mb-0">
             <Form.Label>Search (optional)</Form.Label>

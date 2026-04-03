@@ -129,7 +129,12 @@ import {
   CRM_LIST_PAGE_CALL_END_REASONS,
   CRM_LIST_PAGE_STATIC_TAGS,
 } from "@utils/crmListPageStaticData";
-import { useCrmQuotesListDataAssignmentContactFormState } from "@crm/billing-quotes/useCrmQuotesListDataAssignmentContactFormState";
+import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
+import {
+  applyCrmListExportDateRangePreset,
+  crmListExportDateRangePresetValue,
+  CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS,
+} from "@crm/shared/crmListExportModalDateRangePresets";
 import {
   collectUniqueCampaignIdsFromHistoryActivities,
   fetchCrmCampaignIdToNameMap,
@@ -238,7 +243,7 @@ const CrmContactsManagement = () => {
     setContactFormLoadError,
     contactFormLoading,
     setContactFormLoading,
-  } = useCrmQuotesListDataAssignmentContactFormState();
+  } = useCrmListAssignmentContactSidebarState();
 
   // Call recordings state
   const [callRecordings] = useState<any[]>([]);
@@ -5683,104 +5688,32 @@ const CrmContactsManagement = () => {
             </Col>
           </Row>
           <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Create date</Form.Label>
-                <Form.Select
-                  value={(() => {
-                    const from = exportFilters.created_at_from;
-                    const to = exportFilters.created_at_to;
-                    if (!from || !to) return "all";
-                    const days = moment(to).diff(moment(from), "days");
-                    if (days === 0) return "today";
-                    if (days >= 6 && days <= 8) return "week";
-                    if (days >= 28 && days <= 31) return "month";
-                    return "all";
-                  })()}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v === "all") {
-                        delete next.created_at_from;
-                        delete next.created_at_to;
-                      } else {
-                        const today = moment().format("YYYY-MM-DD");
-                        if (v === "today") {
-                          next.created_at_from = today;
-                          next.created_at_to = today;
-                        } else if (v === "week") {
-                          next.created_at_from = moment()
-                            .subtract(7, "days")
-                            .format("YYYY-MM-DD");
-                          next.created_at_to = today;
-                        } else {
-                          next.created_at_from = moment()
-                            .subtract(30, "days")
-                            .format("YYYY-MM-DD");
-                          next.created_at_to = today;
-                        }
-                      }
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="all">All time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">Last 30 days</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Last activity date</Form.Label>
-                <Form.Select
-                  value={(() => {
-                    const from = exportFilters.last_called_at_from;
-                    const to = exportFilters.last_called_at_to;
-                    if (!from || !to) return "all";
-                    const days = moment(to).diff(moment(from), "days");
-                    if (days === 0) return "today";
-                    if (days >= 6 && days <= 8) return "week";
-                    if (days >= 28 && days <= 31) return "month";
-                    return "all";
-                  })()}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v === "all") {
-                        delete next.last_called_at_from;
-                        delete next.last_called_at_to;
-                      } else {
-                        const today = moment().format("YYYY-MM-DD");
-                        if (v === "today") {
-                          next.last_called_at_from = today;
-                          next.last_called_at_to = today;
-                        } else if (v === "week") {
-                          next.last_called_at_from = moment()
-                            .subtract(7, "days")
-                            .format("YYYY-MM-DD");
-                          next.last_called_at_to = today;
-                        } else {
-                          next.last_called_at_from = moment()
-                            .subtract(30, "days")
-                            .format("YYYY-MM-DD");
-                          next.last_called_at_to = today;
-                        }
-                      }
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="all">All time</option>
-                  <option value="today">Today</option>
-                  <option value="week">Last 7 days</option>
-                  <option value="month">Last 30 days</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
+            {CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS.map(
+              ({ label, keys }) => (
+                <Col md={6} key={keys.from}>
+                  <Form.Group className="mb-3">
+                    <Form.Label>{label}</Form.Label>
+                    <Form.Select
+                      value={crmListExportDateRangePresetValue(
+                        exportFilters,
+                        keys,
+                      )}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setExportFilters((prev) =>
+                          applyCrmListExportDateRangePreset(prev, v, keys),
+                        );
+                      }}
+                    >
+                      <option value="all">All time</option>
+                      <option value="today">Today</option>
+                      <option value="week">Last 7 days</option>
+                      <option value="month">Last 30 days</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              ),
+            )}
           </Row>
           <Form.Group className="mb-0">
             <Form.Label>Search (optional)</Form.Label>

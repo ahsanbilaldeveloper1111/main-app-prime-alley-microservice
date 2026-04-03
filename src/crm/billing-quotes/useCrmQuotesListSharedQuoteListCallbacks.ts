@@ -7,7 +7,7 @@ import {
   type CrmDataItem,
 } from "@utils/crm";
 
-/** Shape of `assignmentFilters` from `useCrmQuotesListDataAssignmentContactFormState`. */
+/** Shape of `assignmentFilters` from `useCrmListAssignmentContactSidebarState`. */
 export type CrmQuotesListAssignmentFiltersForCounts = Readonly<{
   selectedCampaigns: readonly { value: unknown }[];
   selectedTags: readonly { value: unknown }[];
