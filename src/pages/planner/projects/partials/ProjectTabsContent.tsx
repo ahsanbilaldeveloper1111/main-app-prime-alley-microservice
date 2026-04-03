@@ -15,6 +15,7 @@ import {
 } from '@planner/projectMemberRole';
 import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
 import {
+  BOARD_FILTER_STANDARD_PRIORITIES,
   filterBoardTasksForColumns,
   sliceBoardTasksByStatusId,
   sortStringsLocale,
@@ -176,14 +177,20 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
         });
       }
     });
+    (assignees || []).forEach((row: { extension_number?: string; id?: unknown }) => {
+      const ext = String(row.extension_number ?? row.id ?? '').trim();
+      if (ext) assigneeSet.add(ext);
+    });
     return Array.from(assigneeSet).sort(sortStringsLocale);
   };
 
   const getAllBoardPriorities = (): string[] => {
-    const prioritySet = new Set<string>();
+    const prioritySet = new Set<string>(BOARD_FILTER_STANDARD_PRIORITIES);
     boardTasks.forEach((task: any) => {
       if (task.priority) {
-        prioritySet.add(task.priority.charAt(0).toUpperCase() + task.priority.slice(1));
+        const label =
+          task.priority.charAt(0).toUpperCase() + task.priority.slice(1).toLowerCase();
+        prioritySet.add(label);
       }
     });
     return Array.from(prioritySet).sort(sortStringsLocale);

@@ -349,6 +349,14 @@ export function sortStringsLocale(a: string, b: string): number {
   return a.localeCompare(b, undefined, { sensitivity: 'base' });
 }
 
+/** Shown in board priority filter in addition to any `task.priority` values on the board. */
+export const BOARD_FILTER_STANDARD_PRIORITIES: readonly string[] = [
+  'Low',
+  'Medium',
+  'High',
+  'Urgent',
+];
+
 export type BoardTabColumnFilters = {
   searchTerm: string;
   showCompletedTasks: boolean;
