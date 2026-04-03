@@ -12,6 +12,8 @@ import {
   type UserProfilePayload,
   type UserProfileAddress,
 } from "@utils/staffManagement";
+import { buildAddressesForUserProfilePayload } from "@pages/workforce/employeeAddressPayload";
+import { isOptionalWorkforcePhoneValid } from "@utils/workforcePhoneValidation";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -290,6 +292,9 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
     );
   }, []);
 
+  const phoneFieldValid = useMemo(() => isOptionalWorkforcePhoneValid(form.phone), [form.phone]);
+  const phoneShowInvalid = Boolean(form.phone?.toString().trim()) && !phoneFieldValid;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
@@ -314,10 +319,14 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       toast.error("Department is required");
       return;
     }
-
+    if (!phoneFieldValid) {
+      toast.error("Enter a valid phone number or clear the field.");
+      return;
+    }
 
     setSubmitting(true);
     try {
+      const addressesPayload = buildAddressesForUserProfilePayload(addresses ?? []);
       await updateUserProfile(profile.id, {
         tenant_id: companyUuid?.trim() || undefined,
         user_id: form.user_id?.toString().trim() || null,
@@ -331,13 +340,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
         contract_type: form.contract_type?.toString().trim() || null,
         phone: form.phone?.toString().trim() || null,
         status: form.status?.toString().trim() || null,
-        addresses: (addresses ?? []).map(({ name, zip_code, city, country, address }) => ({
-          name,
-          zip_code,
-          city,
-          country,
-          address,
-        })),
+        ...(addressesPayload ? { addresses: addressesPayload } : {}),
       });
       toast.success("Employee updated");
       onHide();
@@ -451,8 +454,15 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                   setForm((f) => ({ ...f, phone: value && value.trim() !== "" ? value : "" }))
                 }
                 placeholder="Enter phone number"
+                className={phoneShowInvalid ? "is-invalid" : undefined}
               />
             </div>
+            <Form.Text className="text-muted">
+              Select country then enter a complete phone number.
+            </Form.Text>
+            {phoneShowInvalid && (
+              <Form.Text className="text-danger d-block">Enter a valid phone number for the selected country.</Form.Text>
+            )}
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>Status</Form.Label>
@@ -597,7 +607,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={onHide} type="button">Cancel</Button>
-          <Button variant="primary" type="submit" disabled={submitting}>{submitting ? "Saving…" : "Save"}</Button>
+          <Button variant="primary" type="submit" disabled={submitting || !phoneFieldValid}>{submitting ? "Saving…" : "Save"}</Button>
         </Modal.Footer>
       </Form>
     </Modal>
