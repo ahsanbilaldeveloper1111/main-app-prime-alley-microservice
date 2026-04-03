@@ -46,7 +46,12 @@ import {
 } from "@planner/projectMemberRole";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
-import { ModuleSlug, getAutoTimezone } from "@utils/Helper";
+import {
+  ModuleSlug,
+  getAutoTimezone,
+  formatDateGlobal,
+  formatDateTimeGlobal,
+} from "@utils/Helper";
 import { toast } from "react-toastify";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { StatsCardData } from "@components/GenericStatsCards";
@@ -188,16 +193,15 @@ function formatApiDateForProjectInput(value: string | null | undefined): string 
 }
 
 /**
- * Formats API date strings for the project detail sidebar (native `Date` only; no moment).
+ * Formats API date strings for the project detail sidebar (`formatDateGlobal` / `GlobalDateFormat`).
  * Returns `null` when missing or invalid so callers can show "—".
  */
 function formatProjectSidebarDate(iso: string | null | undefined): string | null {
   if (iso == null) return null;
   const s = String(iso).trim();
   if (s === "") return null;
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const formatted = formatDateGlobal(s);
+  return formatted === "" ? null : formatted;
 }
 
 /** `YYYY-MM-DD` for today's local calendar date (for `<input type="date" min>`). */
@@ -724,9 +728,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
 
         {/* Due date */}
         <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-          {task.dueDate
-            ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-            : "—"}
+          {task.dueDate ? formatDateGlobal(task.dueDate) || "—" : "—"}
         </td>
 
         <td className="generic-table-actions-cell" />
@@ -869,9 +871,7 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
         ) : "—"}
       </td>
       <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>
-        {subtask.dueDate
-          ? new Date(subtask.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-          : "—"}
+        {subtask.dueDate ? formatDateGlobal(subtask.dueDate) || "—" : "—"}
       </td>
       <td className="generic-table-actions-cell" />
     </tr>
@@ -998,9 +998,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
             <DetailBox label="Due Date">
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                 <Calendar size={14} style={{ color: "#6b7280" }} />
-                {task.dueDate
-                  ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  : "No due date"}
+                {task.dueDate ? formatDateGlobal(task.dueDate) || "No due date" : "No due date"}
               </div>
             </DetailBox>
           </Col>
@@ -1988,11 +1986,7 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
                 <Calendar size={16} className="me-2 text-muted" />
                 <span>
                   {selectedProjectDetails?.updated_at
-                    ? new Date(selectedProjectDetails.updated_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
+                    ? formatDateGlobal(selectedProjectDetails.updated_at) || selectedProject.lastUpdate
                     : selectedProject.lastUpdate}
                 </span>
               </div>
@@ -2341,7 +2335,7 @@ const WorkPlannerProjects = () => {
     });
 
     const lastUpdate = apiProject.updated_at
-      ? new Date(apiProject.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      ? formatDateGlobal(apiProject.updated_at) || "N/A"
       : "N/A";
 
     type IconComponent = typeof Folder;
@@ -2491,11 +2485,10 @@ const WorkPlannerProjects = () => {
     if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
     if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
-    return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return formatDateGlobal(dateString);
   };
 
-  const formatDateTime = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  const formatDateTime = (dateString: string) => formatDateTimeGlobal(dateString);
 
   const getUserNameFromExtension = (extensionNumber: string): string => {
     if (!extensionNumber || !hierarchyDataExtensions || hierarchyDataExtensions.length === 0) return extensionNumber || "Unknown";

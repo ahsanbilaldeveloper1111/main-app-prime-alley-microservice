@@ -118,6 +118,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   const [boardSelectedAssignee, setBoardSelectedAssignee] = useState('All Assignees');
   const [boardSelectedPriority, setBoardSelectedPriority] = useState('All Priorities');
   const [boardSelectedLabel, setBoardSelectedLabel] = useState('All Labels');
+  const [boardSelectedStatus, setBoardSelectedStatus] = useState('All Statuses');
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
 
   useEffect(() => {
@@ -153,6 +154,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
         selectedAssignee: boardSelectedAssignee,
         selectedPriority: boardSelectedPriority,
         selectedLabel: boardSelectedLabel,
+        selectedStatus: boardSelectedStatus,
       },
       statuses,
     );
@@ -304,6 +306,8 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             setBoardSelectedPriority={setBoardSelectedPriority}
             boardSelectedLabel={boardSelectedLabel}
             setBoardSelectedLabel={setBoardSelectedLabel}
+            boardSelectedStatus={boardSelectedStatus}
+            setBoardSelectedStatus={setBoardSelectedStatus}
             showCompletedTasks={showCompletedTasks}
             setShowCompletedTasks={setShowCompletedTasks}
             onCreateTask={(statusId) => {

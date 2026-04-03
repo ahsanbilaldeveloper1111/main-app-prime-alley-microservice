@@ -55,6 +55,8 @@ interface BoardViewProps {
   setBoardSelectedPriority: (priority: string) => void;
   boardSelectedLabel: string;
   setBoardSelectedLabel: (label: string) => void;
+  boardSelectedStatus: string;
+  setBoardSelectedStatus: (status: string) => void;
   showCompletedTasks: boolean;
   setShowCompletedTasks: (show: boolean) => void;
   onClearFilters: () => void;
@@ -386,6 +388,8 @@ const BoardView: React.FC<BoardViewProps> = ({
   setBoardSelectedPriority,
   boardSelectedLabel,
   setBoardSelectedLabel,
+  boardSelectedStatus,
+  setBoardSelectedStatus,
   showCompletedTasks,
   setShowCompletedTasks,
   onClearFilters,
@@ -418,6 +422,7 @@ const BoardView: React.FC<BoardViewProps> = ({
     search: '',
     assignee: 'All Assignees',
     priority: 'All Priorities',
+    status: 'All Statuses',
     label: 'All Labels',
   });
   const [savingTaskMove, setSavingTaskMove] = useState(false);
@@ -590,6 +595,21 @@ const BoardView: React.FC<BoardViewProps> = ({
         ],
       },
       {
+        id: 'status',
+        label: 'Status',
+        type: 'dropdown',
+        value: boardFilterDraft.status,
+        onChange: (v) =>
+          setBoardFilterDraft((d) => ({ ...d, status: v ?? 'All Statuses' })),
+        options: [
+          { value: 'All Statuses', label: 'All Statuses' },
+          ...(statuses || []).map((s: any) => ({
+            value: String(s.id),
+            label: String(s.name ?? s.id),
+          })),
+        ],
+      },
+      {
         id: 'label',
         label: 'Label',
         type: 'dropdown',
@@ -606,8 +626,10 @@ const BoardView: React.FC<BoardViewProps> = ({
       boardFilterDraft.search,
       boardFilterDraft.assignee,
       boardFilterDraft.priority,
+      boardFilterDraft.status,
       boardFilterDraft.label,
       labels,
+      statuses,
       getAllBoardAssignees,
       getAllBoardPriorities,
       getUserNameFromExtension,
@@ -618,15 +640,18 @@ const BoardView: React.FC<BoardViewProps> = ({
     setBoardSearchTerm(boardFilterDraft.search);
     setBoardSelectedAssignee(boardFilterDraft.assignee);
     setBoardSelectedPriority(boardFilterDraft.priority);
+    setBoardSelectedStatus(boardFilterDraft.status);
     setBoardSelectedLabel(boardFilterDraft.label);
   }, [
     boardFilterDraft.search,
     boardFilterDraft.assignee,
     boardFilterDraft.priority,
+    boardFilterDraft.status,
     boardFilterDraft.label,
     setBoardSearchTerm,
     setBoardSelectedAssignee,
     setBoardSelectedPriority,
+    setBoardSelectedStatus,
     setBoardSelectedLabel,
   ]);
 
@@ -635,6 +660,7 @@ const BoardView: React.FC<BoardViewProps> = ({
       search: '',
       assignee: 'All Assignees',
       priority: 'All Priorities',
+      status: 'All Statuses',
       label: 'All Labels',
     });
     onClearFilters();
@@ -821,6 +847,7 @@ const BoardView: React.FC<BoardViewProps> = ({
               search: boardSearchTerm,
               assignee: boardSelectedAssignee,
               priority: boardSelectedPriority,
+              status: boardSelectedStatus,
               label: boardSelectedLabel,
             });
             setShowFilterSidebar(true);
