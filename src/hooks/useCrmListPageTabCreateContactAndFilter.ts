@@ -79,7 +79,7 @@ export function useCrmListPageTabCreateContactAndFilter<
     setShowCreateContactSidebar(true);
     const rawEditId = router.query.editContactId;
     const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
-    const editIdNum = editIdStr != null ? Number(editIdStr) : NaN;
+    const editIdNum = editIdStr == null ? Number.NaN : Number(editIdStr);
     if (Number.isFinite(editIdNum) && editIdNum > 0) {
       setEditingContactId(editIdNum);
     }

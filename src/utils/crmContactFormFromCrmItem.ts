@@ -1,6 +1,7 @@
 import moment from "moment";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import type { CrmDataItem } from "@utils/crm";
+import { createNonPrngId } from "@utils/id";
 
 const RESERVED_DATA_KEYS = new Set([
   "email",
@@ -52,18 +53,27 @@ function toDatetimeLocal(v: string | null | undefined): string {
   return m.isValid() ? m.format("YYYY-MM-DDTHH:mm") : "";
 }
 
+function unknownToFormString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (typeof value === "bigint") return String(value);
+  return "";
+}
+
 function resolveSourceFieldValue(
   item: CrmItemForContactForm,
   d: Record<string, unknown>,
 ): string {
-  const anyItem = item as Record<string, unknown>;
+  const anyItem = item as unknown as Record<string, unknown>;
   const raw =
     anyItem.source_file ??
     d.source_file ??
     d.source ??
-    anyItem.source ??
-    "";
-  return String(raw ?? "");
+    anyItem.source;
+  return unknownToFormString(raw);
 }
 
 function mapTagsArray(
@@ -100,7 +110,7 @@ function buildCustomFieldsFromData(d: Record<string, unknown>): CrmContactFormCu
   return Object.entries(d)
     .filter(([k]) => !RESERVED_DATA_KEYS.has(k))
     .map(([field_name, field_value]) => ({
-      id: `${Date.now()}-${Math.random()}-${field_name}`,
+      id: createNonPrngId(field_name),
       field_name,
       field_value: Array.isArray(field_value)
         ? (field_value as string[]).join(", ")
@@ -117,7 +127,7 @@ function splitPhoneCountryAndNational(item: CrmItemForContactForm): {
   let phoneNumber = item.phone ?? "";
   if (typeof item.phone === "string" && item.phone.trim()) {
     try {
-      const normalized = item.phone.replace(/\s/g, "");
+      const normalized = item.phone.replaceAll(/\s/g, "");
       const parsed = parsePhoneNumberInput(normalized);
       if (parsed) {
         phoneCountryCode = `+${parsed.countryCallingCode}`;
@@ -186,7 +196,7 @@ export function mapCrmDataItemToContactFormState(
   const { phone_country_code, phoneNumber } = splitPhoneCountryAndNational(item);
   const tagsArray = mapTagsArray(item, d);
   const customFieldsArray = buildCustomFieldsFromData(d);
-  const anyItem = item as Record<string, unknown>;
+  const anyItem = item as unknown as Record<string, unknown>;
   const emailRaw = d.email ?? anyItem.email ?? "";
   const lifecycleRaw = d.lifecycle_stage ?? "";
   const dispositionRaw = d.disposition ?? anyItem.disposition ?? "";
@@ -200,7 +210,7 @@ export function mapCrmDataItemToContactFormState(
   const base: ContactFormBase = {
     firstName,
     lastName,
-    email: String(emailRaw ?? ""),
+    email: unknownToFormString(emailRaw),
     phone_country_code,
     phoneNumber,
     campaign_id: (item.campaign_id ?? d.campaign_id ?? null) as number | null,
@@ -208,8 +218,8 @@ export function mapCrmDataItemToContactFormState(
       d.contact_owner ??
       anyItem.contact_owner ??
       null) as string | null,
-    lifecycle_stage: String(lifecycleRaw ?? ""),
-    disposition: String(dispositionRaw ?? ""),
+    lifecycle_stage: unknownToFormString(lifecycleRaw),
+    disposition: unknownToFormString(dispositionRaw),
     legal_basis: Array.isArray(legalRaw) ? (legalRaw as string[]) : [],
     company_domain: String(companyDomainRaw ?? ""),
     scheduled_call_at: toDatetimeLocal(
