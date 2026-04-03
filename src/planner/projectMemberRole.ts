@@ -1,4 +1,4 @@
-function stringifyApiScalar(value: unknown, fallback = ""): string {
+export function stringifyApiScalar(value: unknown, fallback = ""): string {
   if (value == null) return fallback;
   if (typeof value === "string") return value;
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
@@ -13,7 +13,7 @@ export type ProjectMemberRoleRow = {
   role?: string | null;
 };
 
-function resolveMembersFromProject(project: unknown): ProjectMemberRoleRow[] | undefined {
+export function resolveMembersFromProject(project: unknown): ProjectMemberRoleRow[] | undefined {
   if (project == null || typeof project !== "object") return undefined;
   const p = project as Record<string, unknown>;
   const apiData = p.apiData as { members?: ProjectMemberRoleRow[] } | null | undefined;
@@ -113,51 +113,34 @@ export function canManageProjectFromMembers(
   return allowsTaskContributionFromResolvedRole(role);
 }
 
-/**
- * Task row permission for edit/delete: the signed-in user's phone/extension matches the task's
- * primary extension (see {@link resolveTaskExtensionNumberForTaskPermission}), **or** the user is a
- * **project admin** (role `admin` / `owner` via {@link getProjectMemberRoleForSessionUser}) on the task's project.
- * Project **member** (non-admin) cannot edit/delete tasks they do not "own" by extension.
- */
-function resolveTaskExtensionNumberForTaskPermission(task: unknown): string {
-  if (task == null || typeof task !== "object") return "";
-  const t = task as Record<string, unknown>;
-  const direct = stringifyApiScalar(t.extension_number).trim();
-  if (direct) return direct;
-  const ownerOnTask = stringifyApiScalar(t.owner_extension_number).trim();
-  if (ownerOnTask) return ownerOnTask;
-  const extNums = t.extension_numbers;
-  if (Array.isArray(extNums) && extNums.length > 0) {
-    const first = stringifyApiScalar(extNums[0]).trim();
-    if (first) return first;
-  }
-  const assignees = t.assignees;
-  if (Array.isArray(assignees) && assignees.length > 0) {
-    const first = assignees[0];
-    if (first && typeof first === "object") {
-      const fromAssignee = stringifyApiScalar(
-        (first as Record<string, unknown>).extension_number,
-      ).trim();
-      if (fromAssignee) return fromAssignee;
-    }
-  }
-  return "";
+function nonEmptyTrimmedScalar(value: unknown): string {
+  return stringifyApiScalar(value).trim();
 }
 
-export function canEditOrDeleteTaskForSessionUser(
-  task: unknown,
-  project: unknown,
-  sessionUserPhoneOrExtension: string | null | undefined,
-): boolean {
-  const needle = stringifyApiScalar(sessionUserPhoneOrExtension).trim();
-  if (!needle) return false;
+function firstExtensionFromScalarArray(arr: unknown): string {
+  if (!Array.isArray(arr) || arr.length === 0) return "";
+  return nonEmptyTrimmedScalar(arr[0]);
+}
 
-  const taskExt = resolveTaskExtensionNumberForTaskPermission(task);
-  if (taskExt !== "" && needle === taskExt) {
-    return true;
-  }
+function firstAssigneeExtensionFromList(assignees: unknown): string {
+  if (!Array.isArray(assignees) || assignees.length === 0) return "";
+  const row = assignees[0];
+  if (row == null || typeof row !== "object") return "";
+  return nonEmptyTrimmedScalar((row as Record<string, unknown>).extension_number);
+}
 
-  const members = resolveMembersFromProject(project);
-  const role = getProjectMemberRoleForSessionUser(members, sessionUserPhoneOrExtension);
-  return allowsAdministerFromResolvedRole(role);
+/**
+ * Resolves a single extension string to treat as the task "owner" for permissions (API may send
+ * `extension_number`, `owner_extension_number`, `created_by_extension_number`, `extension_numbers[0]`, or first assignee).
+ */
+export function resolveTaskExtensionNumberForTaskPermission(task: unknown): string {
+  if (task == null || typeof task !== "object") return "";
+  const t = task as Record<string, unknown>;
+  return (
+    nonEmptyTrimmedScalar(t.extension_number) ||
+    nonEmptyTrimmedScalar(t.owner_extension_number) ||
+    nonEmptyTrimmedScalar(t.created_by_extension_number) ||
+    firstExtensionFromScalarArray(t.extension_numbers) ||
+    firstAssigneeExtensionFromList(t.assignees)
+  );
 }

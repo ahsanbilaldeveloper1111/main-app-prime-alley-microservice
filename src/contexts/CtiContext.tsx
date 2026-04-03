@@ -1012,9 +1012,9 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       calledAddress: callEntry.calledAddress,
       callingDeviceType: callEntry.callingDeviceType || '',
       callingDeviceName: callEntry.callingDeviceName || '',
-      controllerAddress,
-      controllerDeviceName: controllerDevice.callingDeviceName,
-      controllerDeviceType: controllerDevice.callingDeviceType,
+      controllerAddress : transferInitiatorAddress,
+      controllerDeviceName: transferInitiatorDeviceName,
+      controllerDeviceType: transferInitiatorDeviceType,
     });
     if (!holdResult.success) {
       return holdResult;
