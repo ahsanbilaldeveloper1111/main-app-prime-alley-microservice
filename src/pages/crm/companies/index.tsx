@@ -28,8 +28,6 @@ import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
 import type { GroupBase, StylesConfig } from "react-select";
 import { toast } from "react-toastify";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/router";
 import moment from "moment";
 import {
   FiUpload,
@@ -157,7 +155,7 @@ import {
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { useCti } from "../../../contexts/CtiContext";
+import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
 import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
@@ -438,35 +436,51 @@ const CompanyViewEnrichmentBlock = ({ data }: { data: EnrichmentData }) => {
 };
 
 const CrmCompanyManagement = () => {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const { dialNumber, isInitialized } = useCti();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
-  const requestIdRef = useRef(0);
-  const [uploading, setUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedDataItem, setSelectedDataItem] = useState<CrmDataItem | null>(
-    null,
-  );
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
-  const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
-  const [showAfterCallModal, setShowAfterCallModal] = useState(false);
-  const [extensions, setExtensions] = useState<any[]>([]);
-  const [selectedCampaigns, setSelectedCampaigns] = useState<readonly any[]>(
-    [],
-  );
-  const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
-  const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
-  const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
-  const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(
-    null,
-  );
+  const {
+    session,
+    router,
+    dialNumber,
+    isInitialized,
+    refreshKey,
+    setRefreshKey,
+    currentFilters,
+    setCurrentFilters,
+    requestIdRef,
+    uploading,
+    setUploading,
+    selectedFile,
+    setSelectedFile,
+    dragActive,
+    setDragActive,
+    showUploadModal,
+    setShowUploadModal,
+    uploadProgress,
+    setUploadProgress,
+    showViewModal,
+    setShowViewModal,
+    selectedDataItem,
+    setSelectedDataItem,
+    showDeleteModal,
+    setShowDeleteModal,
+    itemToDelete,
+    setItemToDelete,
+    showDataAssignmentModal,
+    setShowDataAssignmentModal,
+    showAfterCallModal,
+    setShowAfterCallModal,
+    extensions,
+    setExtensions,
+    selectedCampaigns,
+    setSelectedCampaigns,
+    fieldTags,
+    setFieldTags,
+    assignToCampaignUsers,
+    setAssignToCampaignUsers,
+    showConvertToLeadModal,
+    setShowConvertToLeadModal,
+    convertingToLeadCrmRecordId,
+    setConvertingToLeadCrmRecordId,
+  } = useCrmListPageCoreState();
 
   // Data assignment modal states
   const [assignmentFilters, setAssignmentFilters] = useState({
@@ -2407,7 +2421,7 @@ const CrmCompanyManagement = () => {
                     label: "Convert to Lead",
                     icon: <FiTarget size={14} />,
                     onClick: (row: any) => {
-                      setConvertingCompanyId(row.id);
+                      setConvertingToLeadCrmRecordId(row.id);
                       setShowConvertToLeadModal(true);
                     },
                     show: () => false,
@@ -6824,7 +6838,7 @@ const CrmCompanyManagement = () => {
                     {
                       label: "Convert to Lead",
                       onClick: () => {
-                        setConvertingCompanyId(selectedCompany?.id ?? null);
+                        setConvertingToLeadCrmRecordId(selectedCompany?.id ?? null);
                         setShowConvertToLeadModal(true);
                       },
                     },
@@ -7067,14 +7081,14 @@ const CrmCompanyManagement = () => {
       </div>{" "}
       {/* End flex container */}
       {/* Convert to Lead Modal */}
-      {convertingCompanyId && (
+      {convertingToLeadCrmRecordId && (
         <ConvertToLeadModal
           show={showConvertToLeadModal}
           onHide={() => {
             setShowConvertToLeadModal(false);
-            setConvertingCompanyId(null);
+            setConvertingToLeadCrmRecordId(null);
           }}
-          prospectId={convertingCompanyId}
+          prospectId={convertingToLeadCrmRecordId}
           onSuccess={() => {
             setRefreshKey((prev) => prev + 1);
             toast.success("Company converted to lead successfully!");

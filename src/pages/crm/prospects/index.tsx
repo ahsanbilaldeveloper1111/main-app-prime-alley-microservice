@@ -6,6 +6,8 @@ import React, {
   useCallback,
   useMemo,
   useRef,
+  type Dispatch,
+  type SetStateAction,
 } from "react";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -26,8 +28,6 @@ import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
 import type { GroupBase, StylesConfig } from "react-select";
 import { toast } from "react-toastify";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/router";
 import moment from "moment";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
@@ -72,7 +72,6 @@ import GenericTable, {
   TableColumn,
   TableAction,
   FilterPill,
-  TabConfig,
 } from "@components/GenericTable";
 
 import GenericSidebar from "@components/GenericSidebarNew";
@@ -80,7 +79,6 @@ import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
 import {
   getCrmData,
-  getCrmDataById,
   getAllCrmDataById,
   createCrmData,
   updateCrmData,
@@ -93,7 +91,6 @@ import {
   getCampaigns,
   scheduleCall,
   unscheduleCall,
-  getCrmDataHistory,
   CrmDataItem,
   CrmDataMetrics,
   downloadExampleCsv,
@@ -116,7 +113,6 @@ import {
   formatCrmPreviewDateTime,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
-import { useCti } from "../../../contexts/CtiContext";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
@@ -127,21 +123,23 @@ import {
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
-import { useCrmListPageTabCreateContactAndFilter } from "@hooks/useCrmListPageTabCreateContactAndFilter";
-import { createEmptyCrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
+import {
+  createEmptyCrmListContactFormState,
+  type CrmListContactFormState,
+} from "@utils/crmContactFormFromCrmItem";
 import {
   CRM_LIST_PAGE_CALL_END_REASONS,
   CRM_LIST_PAGE_STATIC_TAGS,
 } from "@utils/crmListPageStaticData";
 import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
+import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
+import { useCrmListFiltersMetricsHistoryState } from "@crm/shared/useCrmListFiltersMetricsHistoryState";
 import {
   applyCrmListExportDateRangePreset,
   crmListExportDateRangePresetValue,
   CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS,
 } from "@crm/shared/crmListExportModalDateRangePresets";
 import {
-  collectUniqueCampaignIdsFromHistoryActivities,
-  fetchCrmCampaignIdToNameMap,
   selectCrmQuotesSidebarRecordEmail,
   selectCrmQuotesSidebarRecordId,
   selectCrmQuotesSidebarRecordName,
@@ -210,28 +208,44 @@ const DeleteModalAdditionalInfo: React.FC<DeleteModalAdditionalInfoProps> = ({
 };
 
 const CrmProspectsManagement = () => {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const { dialNumber, isInitialized } = useCti();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
-  const requestIdRef = useRef(0);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedDataItem, setSelectedDataItem] = useState<CrmDataItem | null>(
-    null,
-  );
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteModalMode, setDeleteModalMode] = useState<"single" | "bulk" | null>(null);
-  const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
-  const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
-  const [showAfterCallModal, setShowAfterCallModal] = useState(false);
-  const [extensions, setExtensions] = useState<any[]>([]);
-  const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
-  const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
-  const [convertingProspectId, setConvertingProspectId] = useState<
-    number | null
+  const {
+    session,
+    router,
+    dialNumber,
+    isInitialized,
+    refreshKey,
+    setRefreshKey,
+    currentFilters,
+    setCurrentFilters,
+    requestIdRef,
+    selectedFile,
+    setSelectedFile,
+    showUploadModal,
+    setShowUploadModal,
+    showViewModal,
+    setShowViewModal,
+    selectedDataItem,
+    setSelectedDataItem,
+    showDeleteModal,
+    setShowDeleteModal,
+    itemToDelete,
+    setItemToDelete,
+    showDataAssignmentModal,
+    setShowDataAssignmentModal,
+    showAfterCallModal,
+    setShowAfterCallModal,
+    extensions,
+    setExtensions,
+    fieldTags,
+    setFieldTags,
+    showConvertToLeadModal,
+    setShowConvertToLeadModal,
+    convertingToLeadCrmRecordId,
+    setConvertingToLeadCrmRecordId,
+  } = useCrmListPageCoreState();
+
+  const [deleteModalMode, setDeleteModalMode] = useState<
+    "single" | "bulk" | null
   >(null);
 
   const {
@@ -302,69 +316,72 @@ const CrmProspectsManagement = () => {
   const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
     useState(false);
 
-  // Valid filter IDs
-  const validFilters = ["all", "scheduled", "has_leads"];
-
-  // Initialize activeFilter state
-  const [activeFilter, setActiveFilter] = useState("all");
-
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [prospectsSearch, setProspectsSearch] = useState("");
-  const [showColumnEditor, setShowColumnEditor] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
-  const [exportFileName, setExportFileName] = useState("");
-  const [showTabModal, setShowTabModal] = useState(false);
-  const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
-  const [prospectsFilters, setProspectsFilters] = useState({
-    assignedTo: null as string | null,
-    campaigns: null as string[] | null,
-    nextCallDateFrom: null as string | null,
-    nextCallDateTo: null as string | null,
-    sourceFile: null as string | null,
-    tags: null as string[] | null,
-  });
-  /** View mode: table or board; dropdown shows only the other option to switch */
-  const [prospectsViewMode, setProspectsViewMode] = useState<
-    "table" | "board"
-  >("table");
-
-  // Column customization and pagination states
-  const defaultSelectedColumns = [
-    "name",
-    "phone",
-    "source_file",
-    "user_extension",
-    "campaign",
-    "last_called_at",
-    "last_call_end_reason",
-    "disposition",
-    "scheduled_call_at",
-    "tags",
-  ];
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(
-    () => defaultSelectedColumns,
-  );
-
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
-  });
-  const [dataList, setDataList] = useState<CrmDataItem[]>([]);
-  const [totalRecords, setTotalRecords] = useState(0);
-  /** Total count of all prospects (unchanged when switching to Scheduled / Convert to Leads tab) */
-  const [totalAllProspects, setTotalAllProspects] = useState(0);
-  const [loading, setLoading] = useState(false);
-
-  const { handleFilterChange } = useCrmListPageTabCreateContactAndFilter({
-    router,
+  const {
     validFilters,
+    activeFilter,
     setActiveFilter,
+    showAdvancedFilters,
+    setShowAdvancedFilters,
+    search: prospectsSearch,
+    setSearch: setProspectsSearch,
+    showColumnEditor,
+    setShowColumnEditor,
+    showExportModal,
+    setShowExportModal,
+    exporting,
+    setExporting,
+    exportFilters,
+    setExportFilters,
+    exportFileName,
+    setExportFileName,
+    showTabModal,
+    setShowTabModal,
+    customTabs,
+    setCustomTabs,
+    pageFilters: prospectsFilters,
+    setPageFilters: setProspectsFilters,
+    viewMode: prospectsViewMode,
+    setViewMode: setProspectsViewMode,
+    defaultSelectedColumns,
+    selectedColumns,
+    setSelectedColumns,
+    pagination,
     setPagination,
+    dataList,
+    setDataList,
+    totalRecords,
+    setTotalRecords,
+    totalAll: totalAllProspects,
+    setTotalAll: setTotalAllProspects,
+    loading,
     setLoading,
+    handleFilterChange,
+    clearSelectedRows,
+    setClearSelectedRows,
+    metrics,
+    setMetrics,
+    historyLoading,
+    setHistoryLoading,
+    historyPagination,
+    setHistoryPagination,
+    fetchHistoryData,
+  } = useCrmListFiltersMetricsHistoryState<CrmDataMetrics>({
+    router,
+    validFilters: ["all", "scheduled", "has_leads"],
+    defaultColumnIds: [
+      "name", "phone", "source_file", "user_extension", "campaign",
+      "last_called_at", "last_call_end_reason", "disposition",
+      "scheduled_call_at", "tags",
+    ],
+    initialMetrics: {
+      assigned_records: 0,
+      unassigned_records: 0,
+      scheduled_records: 0,
+      not_scheduled_records: 0,
+      scheduled_next_hour_records: 0,
+      scheduled_next_24_hours_records: 0,
+    },
+    setCampaignsById,
     showAddContactsDropdown,
     setShowAddContactsDropdown,
     addContactsRef,
@@ -372,53 +389,14 @@ const CrmProspectsManagement = () => {
     setShowCreateContactSidebar,
     editingContactId,
     setEditingContactId,
-    setContactForm,
+    setContactForm: setContactForm as Dispatch<
+      SetStateAction<CrmListContactFormState>
+    >,
     setContactFormLoadError,
     setContactFormLoading,
     sourceField: "source_file",
     loadFailedMessage: "Failed to load prospect",
   });
-
-  const [clearSelectedRows, setClearSelectedRows] = useState(false);
-  const [metrics, setMetrics] = useState<CrmDataMetrics>({
-    assigned_records: 0,
-    unassigned_records: 0,
-    scheduled_records: 0,
-    not_scheduled_records: 0,
-    scheduled_next_hour_records: 0,
-    scheduled_next_24_hours_records: 0,
-  });
-
-  // History data state
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyPagination, setHistoryPagination] = useState({
-    current_page: 1,
-    last_page: 1,
-    per_page: 15,
-    total: 0,
-    from: 0,
-    to: 0,
-  });
-
-  const fetchHistoryData = useCallback(async (page: number = 1) => {
-    try {
-      setHistoryLoading(true);
-      const response = await getCrmDataHistory(page, 15);
-      console.log("ZE HISTORY DATA", response);
-      setHistoryPagination(response.pagination);
-
-      const uniqueCampaignIds = collectUniqueCampaignIdsFromHistoryActivities(
-        response.data,
-      );
-      if (uniqueCampaignIds.length > 0) {
-        await fetchCrmCampaignIdToNameMap(uniqueCampaignIds);
-      }
-    } catch (error) {
-      console.error("Failed to fetch history data:", error);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -2129,7 +2107,7 @@ const CrmProspectsManagement = () => {
                     label: "Convert to Lead",
                     icon: <FiTarget size={14} />,
                     onClick: (row: any) => {
-                      setConvertingProspectId(row.id);
+                      setConvertingToLeadCrmRecordId(row.id);
                       setShowConvertToLeadModal(true);
                     },
                   },
@@ -4633,7 +4611,7 @@ const CrmProspectsManagement = () => {
                   label: "Convert to Lead",
                   onClick: () => {
                     setShowProspectSidebar(false);
-                    setConvertingProspectId(selectedProspect?.id);
+                    setConvertingToLeadCrmRecordId(selectedProspect?.id);
                     setShowConvertToLeadModal(true);
                   },
                 },
@@ -5020,17 +4998,17 @@ const CrmProspectsManagement = () => {
         show={showConvertToLeadModal}
         onHide={() => {
           setShowConvertToLeadModal(false);
-          setConvertingProspectId(null);
+          setConvertingToLeadCrmRecordId(null);
         }}
         onSuccess={() => {
           setShowConvertToLeadModal(false);
-          setConvertingProspectId(null);
+          setConvertingToLeadCrmRecordId(null);
           setRefreshKey((prev) => prev + 1);
           toast.success("Prospect converted to lead successfully!");
         }}
         showSuccessToast={false}
         type="lead"
-        crmDataId={convertingProspectId ?? undefined}
+        crmDataId={convertingToLeadCrmRecordId ?? undefined}
       />
       {/* Column Editor Modal */}
       <ColumnEditorModal
