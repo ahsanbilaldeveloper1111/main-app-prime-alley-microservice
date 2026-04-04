@@ -78,6 +78,13 @@ const StatusFormColorPicker: React.FC<StatusFormColorPickerProps> = ({
   </>
 );
 
+const DEFAULT_STATUS_FORM = {
+  name: '',
+  color: '#4680FF',
+  is_completed: false,
+  is_default: false,
+};
+
 function arrayMove<T>(arr: T[], from: number, to: number): T[] {
   const next = [...arr];
   const [moved] = next.splice(from, 1);
@@ -493,7 +500,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   const [showEditModal, setShowEditModal]   = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<any>(null);
-  const [formData, setFormData]             = useState({ name: '', color: '#4680FF' });
+  const [formData, setFormData]             = useState(() => ({ ...DEFAULT_STATUS_FORM }));
   const [processing, setProcessing]         = useState(false);
 
   // Pagination and search states
@@ -514,9 +521,14 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
     if (!canManageProject || !selectedProject?.id || !formData.name) return;
     try {
       setProcessing(true);
-      await createStatus(selectedProject.id, { name: formData.name, color: formData.color } as any);
+      await createStatus(selectedProject.id, {
+        name: formData.name,
+        color: formData.color,
+        is_completed: formData.is_completed,
+        is_default: formData.is_default,
+      });
       setShowAddModal(false);
-      setFormData({ name: '', color: '#4680FF' });
+      setFormData({ ...DEFAULT_STATUS_FORM });
       onRefresh();
     } catch (error) {
       console.error('Error adding status:', error);
@@ -529,10 +541,15 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
     if (!canManageProject || !selectedProject?.id || !selectedStatus || !formData.name) return;
     try {
       setProcessing(true);
-      await updateStatus(selectedProject.id, selectedStatus.id, { name: formData.name, color: formData.color } as any);
+      await updateStatus(selectedProject.id, selectedStatus.id, {
+        name: formData.name,
+        color: formData.color,
+        is_completed: formData.is_completed,
+        is_default: formData.is_default,
+      });
       setShowEditModal(false);
       setSelectedStatus(null);
-      setFormData({ name: '', color: '#4680FF' });
+      setFormData({ ...DEFAULT_STATUS_FORM });
       onRefresh();
     } catch (error) {
       console.error('Error updating status:', error);
@@ -558,7 +575,12 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
 
   const openEditModal = (status: any) => {
     setSelectedStatus(status);
-    setFormData({ name: status.name || '', color: status.color || '#4680FF' });
+    setFormData({
+      name: status.name || '',
+      color: status.color || '#4680FF',
+      is_completed: status.is_completed === true,
+      is_default: status.is_default === true,
+    });
     setShowEditModal(true);
   };
 
@@ -724,7 +746,10 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       )}
       {isAllow && (
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => {
+            setFormData({ ...DEFAULT_STATUS_FORM });
+            setShowAddModal(true);
+          }}
           style={{
             padding: "9px 13px",
             backgroundColor: "#000000",
@@ -1054,6 +1079,34 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
                 }
               />
             </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="checkbox"
+                id="add-status-is-completed"
+                label="Marks this as a completed status"
+                checked={formData.is_completed}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, is_completed: e.target.checked }))
+                }
+              />
+              <Form.Text className="text-muted d-block">
+                When this status is selected, the task will be marked as completed.
+              </Form.Text>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="checkbox"
+                id="add-status-is-default"
+                label="Marks this as a default status"
+                checked={formData.is_default}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, is_default: e.target.checked }))
+                }
+              />
+              <Form.Text className="text-muted d-block">
+                When no other default is set, this status will be used for new tasks.
+              </Form.Text>
+            </Form.Group>
           </Form>
         </Modal.Body>
         <Modal.Footer>
@@ -1086,6 +1139,28 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
                 color={formData.color}
                 onColorChange={(next) =>
                   setFormData((prev) => ({ ...prev, color: next }))
+                }
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="checkbox"
+                id="edit-status-is-completed"
+                label="Completed status"
+                checked={formData.is_completed}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, is_completed: e.target.checked }))
+                }
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="checkbox"
+                id="edit-status-is-default"
+                label="Default status"
+                checked={formData.is_default}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, is_default: e.target.checked }))
                 }
               />
             </Form.Group>

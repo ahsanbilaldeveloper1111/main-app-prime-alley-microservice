@@ -145,6 +145,7 @@ interface PlannerEditTask {
   due_time?: unknown;
   last_run_at?: string;
   next_run_at?: string;
+  is_active?: boolean;
 }
 
 interface UserType {
@@ -186,6 +187,8 @@ interface Status {
   name: string;
   icon: string;
   color: string;
+  /** From project or list-statuses API; drives default dropdown selection when creating. */
+  is_default?: boolean;
 }
 
 interface Priority {
@@ -226,6 +229,8 @@ interface CreateTaskFormData {
   repeatInterval: number;
   repeatOn: string;
   dueTime: string;
+  /** Recurring tasks only; maps to API `is_active`. */
+  recurringIsActive: boolean;
 }
 
 function mapPriorityStringToId(priority: string | null | undefined): number {
@@ -609,6 +614,16 @@ function resolveParentTaskLinkFromEditTask(editTask: PlannerEditTask): LinkedRec
   };
 }
 
+function readRecurringIsActiveFromEditTask(editTask: PlannerEditTask): boolean {
+  const top = (editTask as Record<string, unknown>).is_active;
+  if (top === false) return false;
+  if (top === true) return true;
+  const nested = pickRecurringScalar(editTask, "is_active");
+  if (nested === false) return false;
+  if (nested === true) return true;
+  return true;
+}
+
 function buildInitialFormFromEdit(
   editTask: PlannerEditTask,
   extensions: Extension[],
@@ -658,6 +673,7 @@ function buildInitialFormFromEdit(
     repeatInterval,
     repeatOn,
     dueTime,
+    recurringIsActive: readRecurringIsActiveFromEditTask(editTask),
   };
 }
 
@@ -672,7 +688,7 @@ function buildInitialFormForCreate(
     description: "",
     taskType,
     projectId: propProject?.id ?? null,
-    statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
+    statusId: resolvePreferredStatusId(propStatuses, selectedStatusForTask),
     priorityId: 0,
     assigneeIds: [],
     watcherIds: [],
@@ -684,6 +700,7 @@ function buildInitialFormForCreate(
     repeatInterval: 1,
     repeatOn: taskType === "recurring" ? "monday" : "",
     dueTime: "",
+    recurringIsActive: true,
   };
 }
 
@@ -703,6 +720,30 @@ function computeFrequencyChangeState(
     nextRepeatOn = "";
   }
   return { frequency: nextFreq, repeatOn: nextRepeatOn };
+}
+
+/** Normalize API flag (handles occasional `is_deefault` typo in responses). */
+function readIsDefaultFromApiStatusRow(row: unknown): boolean {
+  if (row == null || typeof row !== "object") return false;
+  const o = row as Record<string, unknown>;
+  return o.is_default === true || o.is_deefault === true;
+}
+
+/**
+ * Board column / explicit `selectedStatusForTask` wins; else first status with `is_default`;
+ * else first in list.
+ */
+function resolvePreferredStatusId(
+  statuses: Status[],
+  selectedStatusForTask: number | null,
+): number | null {
+  if (statuses.length === 0) return null;
+  if (selectedStatusForTask != null) {
+    return selectedStatusForTask;
+  }
+  const def = statuses.find((s) => s.is_default === true);
+  if (def) return def.id;
+  return statuses[0].id;
 }
 
 function resolveSidebarProjects(fetchedProjects: Project[], propProject: Project | undefined): Project[] {
@@ -729,6 +770,7 @@ function resolveSidebarStatusesForProject(
         name: status.name,
         icon: "",
         color: status.color || "#3b82f6",
+        is_default: readIsDefaultFromApiStatusRow(status),
       }));
     }
     return [];
@@ -767,6 +809,7 @@ function mapListStatusesResponseToSidebarStatuses(response: unknown): Status[] {
       name: status.name,
       icon: "",
       color: status.color || "#3b82f6",
+      is_default: readIsDefaultFromApiStatusRow(status),
     }));
   }
   const withData = response as { data?: unknown } | null | undefined;
@@ -776,6 +819,7 @@ function mapListStatusesResponseToSidebarStatuses(response: unknown): Status[] {
       name: status.name,
       icon: "",
       color: status.color || "#3b82f6",
+      is_default: readIsDefaultFromApiStatusRow(status),
     }));
   }
   return [];
@@ -1323,6 +1367,7 @@ function buildPlannerSidebarPayloadRecord(
     const dueTimeUtc = formatRecurringDueTimeAsUtcIso(fd.startDate, fd.dueTime);
     if (dueTimeUtc) payload.due_time = dueTimeUtc;
     payload.end_date = fd.dueDate || null;
+    payload.is_active = fd.recurringIsActive;
   }
   return payload;
 }
@@ -1518,9 +1563,7 @@ function emptyPlannerSidebarFormWhenClosed(
     description: "",
     taskType: "",
     projectId: propProject?.id || null,
-    statusId:
-      selectedStatusForTask ||
-      (propStatuses.length > 0 ? propStatuses[0].id : null),
+    statusId: resolvePreferredStatusId(propStatuses, selectedStatusForTask),
     priorityId: 0,
     assigneeIds: [],
     watcherIds: [],
@@ -1532,6 +1575,7 @@ function emptyPlannerSidebarFormWhenClosed(
     repeatInterval: 1,
     repeatOn: "",
     dueTime: "",
+    recurringIsActive: true,
   };
 }
 
@@ -1814,28 +1858,49 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   );
 
   useEffect(() => {
-    if (isEdit) return;
+    if (!isOpen || isEdit) return;
     if (formData.projectId && fetchedProjects.length === 0) return;
     if (!formData.projectId && loadingGenericStatuses) return;
+
     const availableStatuses = resolveSidebarStatusesForProject(
       formData.projectId,
       fetchedProjects,
       genericStatuses,
       propStatuses,
     );
-    if (!formData.statusId && availableStatuses.length > 0) {
-      setFormData((prev) => ({
-        ...prev,
-        statusId: selectedStatusForTask || availableStatuses[0].id,
-      }));
-    }
+    if (availableStatuses.length === 0) return;
+
+    const idInList = (id: number | null): boolean =>
+      id != null &&
+      availableStatuses.some((s) => String(s.id) === String(id));
+
+    setFormData((prev) => {
+      if (
+        selectedStatusForTask != null &&
+        idInList(selectedStatusForTask)
+      ) {
+        if (prev.statusId === selectedStatusForTask) return prev;
+        return { ...prev, statusId: selectedStatusForTask };
+      }
+
+      if (idInList(prev.statusId)) {
+        return prev;
+      }
+
+      const preferred = resolvePreferredStatusId(availableStatuses, null);
+      if (preferred == null || prev.statusId === preferred) return prev;
+      return { ...prev, statusId: preferred };
+    });
   }, [
+    isOpen,
     formData.projectId,
+    formData.taskType,
     fetchedProjects,
     genericStatuses,
     loadingGenericStatuses,
     isEdit,
     selectedStatusForTask,
+    propStatuses,
   ]);
 
   useEffect(() => {
@@ -2847,6 +2912,23 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                     style={{ fontSize: "14px" }}
                   />
                 </Form.Group>
+                <Form.Group className={groupClass}>
+                  <Form.Label style={labelStyle}>Is Active</Form.Label>
+                  <Form.Select
+                    value={formData.recurringIsActive ? "true" : "false"}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        recurringIsActive: e.target.value === "true",
+                      }))
+                    }
+                    className="py-2"
+                    style={{ fontSize: "14px" }}
+                  >
+                    <option value="true">Active</option>
+                    <option value="false">Not Active</option>
+                  </Form.Select>
+                </Form.Group>
                 <PlannerSidebarRecurringRunAtReadOnlyRow
                   visible={isEdit}
                   editTask={editTask}
@@ -3053,6 +3135,8 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                 </Form.Group>
                 </Col>
             )}
+
+                
 
              
               
