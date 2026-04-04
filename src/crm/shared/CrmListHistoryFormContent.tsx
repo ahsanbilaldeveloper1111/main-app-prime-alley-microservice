@@ -35,6 +35,39 @@ export function CrmListHistoryFormContent({
   campaignsById,
   getNameByExtension,
 }: CrmListHistoryFormContentProps) {
+  let historySection: React.ReactNode;
+  if (historyLoading) {
+    historySection = (
+      <div className="text-center py-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-3 text-muted">Loading activity history...</p>
+      </div>
+    );
+  } else if (historyData.length === 0) {
+    historySection = (
+      <div className="text-center py-5">
+        <FiClock size={48} className="text-muted mb-3" />
+        <h6 className="text-muted">No Activity Found</h6>
+        <p className="text-muted">
+          No activities have been recorded yet.
+        </p>
+      </div>
+    );
+  } else {
+    historySection = (
+      <div className="timeline">
+        {historyData.map((activity) => (
+          <HistoryTimelineItem
+            key={activity.id}
+            activity={activity}
+            campaignsById={campaignsById}
+            getNameByExtension={getNameByExtension}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="mb-4">
@@ -58,65 +91,47 @@ export function CrmListHistoryFormContent({
         </div>
       </div>
 
-      {historyLoading ? (
-        <div className="text-center py-5">
-          <Spinner animation="border" variant="primary" />
-          <p className="mt-3 text-muted">Loading activity history...</p>
-        </div>
-      ) : historyData.length === 0 ? (
-        <div className="text-center py-5">
-          <FiClock size={48} className="text-muted mb-3" />
-          <h6 className="text-muted">No Activity Found</h6>
-          <p className="text-muted">
-            No activities have been recorded yet.
-          </p>
-        </div>
-      ) : (
-        <div className="timeline">
-          {historyData.map((activity) => (
-            <HistoryTimelineItem
-              key={activity.id}
-              activity={activity}
-              campaignsById={campaignsById}
-              getNameByExtension={getNameByExtension}
-            />
-          ))}
-        </div>
-      )}
+      {historySection}
 
       {/* Pagination */}
       {!historyLoading &&
         historyData.length > 0 &&
         historyPagination.last_page > 1 && (
           <div className="d-flex justify-content-center mt-4">
-            <div className="btn-group" role="group">
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                disabled={historyPagination.current_page === 1}
-                onClick={() =>
-                  fetchHistoryData(historyPagination.current_page - 1)
-                }
-              >
-                Previous
-              </Button>
-              <Button variant="outline-secondary" size="sm" disabled>
-                {historyPagination.current_page} / {historyPagination.last_page}
-              </Button>
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                disabled={
-                  historyPagination.current_page ===
-                  historyPagination.last_page
-                }
-                onClick={() =>
-                  fetchHistoryData(historyPagination.current_page + 1)
-                }
-              >
-                Next
-              </Button>
-            </div>
+            <fieldset className="border-0 p-0 m-0 min-w-0">
+              <legend className="visually-hidden">
+                Activity history pagination
+              </legend>
+              <div className="btn-group">
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  disabled={historyPagination.current_page === 1}
+                  onClick={() =>
+                    fetchHistoryData(historyPagination.current_page - 1)
+                  }
+                >
+                  Previous
+                </Button>
+                <Button variant="outline-secondary" size="sm" disabled>
+                  {historyPagination.current_page} /{" "}
+                  {historyPagination.last_page}
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  disabled={
+                    historyPagination.current_page ===
+                    historyPagination.last_page
+                  }
+                  onClick={() =>
+                    fetchHistoryData(historyPagination.current_page + 1)
+                  }
+                >
+                  Next
+                </Button>
+              </div>
+            </fieldset>
           </div>
         )}
     </>

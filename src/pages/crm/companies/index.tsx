@@ -144,7 +144,6 @@ import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListA
 import { CrmListUnscheduleModal } from "@crm/shared/CrmListScheduleCallModals";
 import { CrmListDataAssignmentFormContent } from "@crm/shared/CrmListDataAssignmentFormContent";
 import { CrmListHistoryFormContent } from "@crm/shared/CrmListHistoryFormContent";
-import { useCrmListSortPagination } from "@crm/shared/useCrmListSortPagination";
 import { CrmListPageScopedLayoutStyles } from "@crm/shared/CrmListPageScopedLayoutStyles";
 import { getCrmListExtensionDisplayName } from "@crm/shared/crmListExtensionDisplayName";
 import { useCrmListActiveTabFiltersEffect } from "@crm/shared/crmListActiveTabFiltersEffect";
@@ -446,15 +445,12 @@ const CrmCompanyManagement = () => {
     currentFilters,
     setCurrentFilters,
     requestIdRef,
-    uploading,
     setUploading,
     selectedFile,
     setSelectedFile,
-    dragActive,
     setDragActive,
     showUploadModal,
     setShowUploadModal,
-    uploadProgress,
     setUploadProgress,
     showViewModal,
     setShowViewModal,
@@ -470,12 +466,8 @@ const CrmCompanyManagement = () => {
     setShowAfterCallModal,
     extensions,
     setExtensions,
-    selectedCampaigns,
-    setSelectedCampaigns,
     fieldTags,
     setFieldTags,
-    assignToCampaignUsers,
-    setAssignToCampaignUsers,
     showConvertToLeadModal,
     setShowConvertToLeadModal,
     convertingToLeadCrmRecordId,
@@ -506,7 +498,7 @@ const CrmCompanyManagement = () => {
     showFiltersSidebar, setShowFiltersSidebar,
     selectedProspect: selectedCompany,
     setSelectedProspect: setSelectedCompany,
-    showFilterBar, setShowFilterBar,
+    showFilterBar,
     showAddContactsDropdown, setShowAddContactsDropdown,
     showCreateContactSidebar, setShowCreateContactSidebar,
     addContactsRef,
@@ -965,14 +957,6 @@ const CrmCompanyManagement = () => {
   });
 
   useCrmListActiveTabFiltersEffect(activeFilter, setCurrentFilters);
-
-  const { handleSort, renderSortIcon, renderPaginationControls } =
-    useCrmListSortPagination({
-      pagination,
-      setPagination,
-      totalRecords,
-      entityName: "companies",
-    });
 
   // Map CompanyData to table shape (CrmDataItem-like)
   const mapCompanyToRow = useCallback((c: CompanyData): CrmDataItem => {

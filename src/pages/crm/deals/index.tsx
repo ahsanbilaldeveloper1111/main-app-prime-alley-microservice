@@ -23,29 +23,9 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
 import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { CreateDealSidebar } from "@components/renderCreateDealForm";
-import {
-  FiUpload,
-  FiDatabase,
-  FiSearch,
-  FiFilter,
-  FiTrash2,
-  FiEye,
-  FiUser,
-  FiUsers,
-  FiPhone,
-  FiMessageCircle,
-  FiPlay,
-  FiClock,
-  FiX,
-  FiAlertCircle,
-  FiCalendar,
-  FiTarget,
-  FiMoreVertical,
-} from "react-icons/fi";
-import { ChevronDown } from "lucide-react";
 import {
   getDeals,
   getStages,
@@ -62,16 +42,7 @@ import {
   markDealLost,
   getLead,
   updateDeal,
-  getCrmProducts,
-  getCampaignById,
-  getIndustries,
   getBusinessTypes,
-  createEstimate,
-  CrmProduct,
-  StageData,
-  IndustryData,
-  DealTemplateData,
-  DealTemplateField,
   BusinessTypeData,
   PDFDownloadDeal,
   getDealFollowUps,

@@ -205,7 +205,7 @@ export function CrmListDataAssignmentFormContent({
             max={assignmentCounts.unassigned}
             value={totalEntriesToAssign}
             onChange={(e) =>
-              setTotalEntriesToAssign(parseInt(e.target.value) || 0)
+              setTotalEntriesToAssign(Number.parseInt(e.target.value, 10) || 0)
             }
             placeholder={`How many ${entityLabel.toLowerCase()} to assign?`}
           />
@@ -298,7 +298,7 @@ export function CrmListDataAssignmentFormContent({
                             setCustomDistribution((prev) => ({
                               ...prev,
                               [campaign.value]:
-                                parseInt(e.target.value) || 0,
+                                Number.parseInt(e.target.value, 10) || 0,
                             }))
                           }
                           size="sm"

@@ -86,12 +86,22 @@ export function buildCrmQuotesListTableColumns(
       sortable: true,
       type: "custom",
       render: (row) => (
-        <span
-          style={{ color: "#1d6ae5", fontWeight: 500, cursor: "pointer" }}
+        <button
+          type="button"
+          style={{
+            color: "#1d6ae5",
+            fontWeight: 500,
+            cursor: "pointer",
+            background: "none",
+            border: "none",
+            padding: 0,
+            font: "inherit",
+            textAlign: "inherit",
+          }}
           onClick={() => handleViewData(row)}
         >
           {row.title || `Quote #${row.id}`}
-        </span>
+        </button>
       ),
     },
     {

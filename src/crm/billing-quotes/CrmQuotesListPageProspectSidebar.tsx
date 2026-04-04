@@ -89,7 +89,7 @@ export function CrmQuotesListPageProspectSidebar({
             sp?.id ??
               sp?.data?.id ??
               (sp as any)?.data?.data?.id ??
-              NaN,
+              Number.NaN,
           );
           if (!Number.isFinite(quoteId) || quoteId <= 0) return;
           onClose();

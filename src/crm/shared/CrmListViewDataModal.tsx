@@ -425,6 +425,16 @@ function CallNotesSection({ note }: { note: string }) {
   );
 }
 
+function formatCustomFieldDisplayValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "N/A";
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
 function CustomDataFieldsSection({ data }: { data: Record<string, any> }) {
   return (
     <CrmListViewModalContentSection title="Additional Information">
@@ -459,11 +469,7 @@ function CustomDataFieldsSection({ data }: { data: Record<string, any> }) {
                   wordBreak: "break-word",
                 }}
               >
-                {value !== null && value !== undefined
-                  ? typeof value === "object"
-                    ? JSON.stringify(value)
-                    : String(value)
-                  : "N/A"}
+                {formatCustomFieldDisplayValue(value)}
               </div>
             </div>
           ))}
@@ -504,6 +510,103 @@ function CallRecordingsSection({
     </Badge>
   );
 
+  let recordingsBody: React.ReactNode;
+  if (callRecordingsLoading) {
+    recordingsBody = (
+      <div
+        style={{
+          padding: "48px 20px",
+          background: "#f9fafb",
+          borderRadius: "12px",
+          textAlign: "center",
+        }}
+      >
+        <Spinner
+          animation="border"
+          variant="primary"
+          size="sm"
+          style={{ marginBottom: "12px" }}
+        />
+        <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>
+          Loading recordings...
+        </p>
+      </div>
+    );
+  } else if (callRecordings.length === 0) {
+    recordingsBody = (
+      <div
+        style={{
+          padding: "48px 20px",
+          background: "#f9fafb",
+          border: "2px dashed #d1d5db",
+          borderRadius: "12px",
+          textAlign: "center",
+        }}
+      >
+        <History
+          size={40}
+          style={{ color: "#9ca3af", marginBottom: "12px" }}
+        />
+        <p
+          className="mb-0"
+          style={{ color: "#6b7280", fontSize: "14px", fontWeight: 500 }}
+        >
+          No call recordings found
+        </p>
+      </div>
+    );
+  } else {
+    recordingsBody = (
+      <div
+        style={{
+          background: "white",
+          border: "1px solid #e5e7eb",
+          borderRadius: "12px",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr
+                style={{
+                  background: "#f9fafb",
+                  borderBottom: "1px solid #e5e7eb",
+                }}
+              >
+                <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Date &amp; Time</th>
+                <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Extension</th>
+                <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Direction</th>
+                <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Duration</th>
+                <th
+                  style={{
+                    ...CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE,
+                    textAlign: "center",
+                    width: "100px",
+                  }}
+                >
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {callRecordings.map((recording: any, index: number) => (
+                <RecordingRow
+                  key={recording.Id || index}
+                  recording={recording}
+                  isDownloading={downloadingRecordings.has(recording.Id)}
+                  progress={downloadProgress[recording.Id] || 0}
+                  onPlay={onPlayCallRecording}
+                  onDownload={onDownloadCallRecording}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <CrmListViewModalContentSection
       title="Call Recordings"
@@ -511,95 +614,7 @@ function CallRecordingsSection({
       badge={badge}
       boxStyle={{ padding: 0, background: "transparent", border: "none" }}
     >
-      {callRecordingsLoading ? (
-        <div
-          style={{
-            padding: "48px 20px",
-            background: "#f9fafb",
-            borderRadius: "12px",
-            textAlign: "center",
-          }}
-        >
-          <Spinner
-            animation="border"
-            variant="primary"
-            size="sm"
-            style={{ marginBottom: "12px" }}
-          />
-          <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>
-            Loading recordings...
-          </p>
-        </div>
-      ) : callRecordings.length === 0 ? (
-        <div
-          style={{
-            padding: "48px 20px",
-            background: "#f9fafb",
-            border: "2px dashed #d1d5db",
-            borderRadius: "12px",
-            textAlign: "center",
-          }}
-        >
-          <History
-            size={40}
-            style={{ color: "#9ca3af", marginBottom: "12px" }}
-          />
-          <p
-            className="mb-0"
-            style={{ color: "#6b7280", fontSize: "14px", fontWeight: 500 }}
-          >
-            No call recordings found
-          </p>
-        </div>
-      ) : (
-        <div
-          style={{
-            background: "white",
-            border: "1px solid #e5e7eb",
-            borderRadius: "12px",
-            overflow: "hidden",
-          }}
-        >
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr
-                  style={{
-                    background: "#f9fafb",
-                    borderBottom: "1px solid #e5e7eb",
-                  }}
-                >
-                  <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Date &amp; Time</th>
-                  <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Extension</th>
-                  <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Direction</th>
-                  <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Duration</th>
-                  <th
-                    style={{
-                      ...CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE,
-                      textAlign: "center",
-                      width: "100px",
-                    }}
-                  >
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {callRecordings.map((recording: any, index: number) => (
-                  <RecordingRow
-                    key={recording.Id || index}
-                    recording={recording}
-                    isDownloading={downloadingRecordings.has(recording.Id)}
-                    progress={downloadProgress[recording.Id] || 0}
-                    onPlay={onPlayCallRecording}
-                    onDownload={onDownloadCallRecording}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {recordingsBody}
     </CrmListViewModalContentSection>
   );
 }
@@ -618,7 +633,7 @@ function RecordingRow({
   onDownload: (r: any) => void;
 }) {
   const duration =
-    parseInt(recording.Duration?.toString() || "0") / 10000000 || 0;
+    Number.parseInt(recording.Duration?.toString() || "0", 10) / 10000000 || 0;
   const isOutgoing = recording.Direction === "CALL_OUTGOING";
 
   return (

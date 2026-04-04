@@ -236,7 +236,6 @@ export function CrmProspectsContactsListPage({
   >({});
 
   const {
-    validFilters,
     activeFilter,
     setActiveFilter,
     showAdvancedFilters,
@@ -261,7 +260,6 @@ export function CrmProspectsContactsListPage({
     setPageFilters: setProspectsFilters,
     viewMode: prospectsViewMode,
     setViewMode: setProspectsViewMode,
-    defaultSelectedColumns,
     selectedColumns,
     setSelectedColumns,
     pagination,
@@ -281,9 +279,7 @@ export function CrmProspectsContactsListPage({
     setMetrics,
     historyData,
     historyLoading,
-    setHistoryLoading,
     historyPagination,
-    setHistoryPagination,
     fetchHistoryData,
   } = useCrmListFiltersMetricsHistoryState<CrmDataMetrics>({
     router,
@@ -331,13 +327,13 @@ export function CrmProspectsContactsListPage({
     showSuccessfulModal, setShowSuccessfulModal,
     successModalTitle, setSuccessModalTitle,
     successModalDescription, setSuccessModalDescription,
-    handleDataAssignment, handleDataAssignmentSubmit, handleDataAssignmentModalClose,
-    handleAfterCallModalClose, handleAfterCallSubmit,
+    handleDataAssignmentSubmit, handleDataAssignmentModalClose,
+    handleAfterCallSubmit,
     handleScheduleCall, handleUnscheduleCallClick, confirmUnscheduleCall,
     handleScheduleModalClose, handleScheduleSubmit,
     handleCallClick, handleBulkDelete, handleDeleteData,
     openSidebar: openProspectSidebar, handleViewData,
-    handlePlayCallRecording, handleDownloadCallRecording, handleItemSelection,
+    handlePlayCallRecording, handleDownloadCallRecording,
   } = useCrmListSharedCallbacks({
     session, setRefreshKey, selectedDataItem, setSelectedDataItem,
     setShowDataAssignmentModal, setShowAfterCallModal, setShowDeleteModal, setItemToDelete,
@@ -437,7 +433,6 @@ export function CrmProspectsContactsListPage({
   const {
     fetchCrmData,
     handleExport: handleProspectsExport,
-    handleFileSelect,
     handleFileInputChange,
     handleUpload,
     confirmDelete,
@@ -1389,11 +1384,10 @@ export function CrmProspectsContactsListPage({
               label: "Next Call Date (From)",
               type: "date",
               value: prospectsFilters.nextCallDateFrom || "",
-              onChange: (value) => {
-                const dateValue = value || null;
+              onChange: (value = null) => {
                 setProspectsFilters((prev) => ({
                   ...prev,
-                  nextCallDateFrom: dateValue,
+                  nextCallDateFrom: value || null,
                 }));
               },
               placeholder: "From date",
@@ -1403,11 +1397,10 @@ export function CrmProspectsContactsListPage({
               label: "Next Call Date (To)",
               type: "date",
               value: prospectsFilters.nextCallDateTo || "",
-              onChange: (value) => {
-                const dateValue = value || null;
+              onChange: (value = null) => {
                 setProspectsFilters((prev) => ({
                   ...prev,
-                  nextCallDateTo: dateValue,
+                  nextCallDateTo: value || null,
                 }));
               },
               placeholder: "To date",

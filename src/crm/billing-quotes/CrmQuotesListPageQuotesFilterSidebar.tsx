@@ -108,10 +108,9 @@ export function CrmQuotesListPageQuotesFilterSidebar({
           type: "date",
           value: prospectsFilters.nextCallDateFrom || "",
           onChange: (value) => {
-            const dateValue = value || null;
             setProspectsFilters((prev: any) => ({
               ...prev,
-              nextCallDateFrom: dateValue,
+              nextCallDateFrom: value,
             }));
           },
           placeholder: "Filter by last activity date",

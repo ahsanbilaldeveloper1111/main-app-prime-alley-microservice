@@ -176,9 +176,6 @@ export function useCrmToolbarConfig(
       entity === "approvals"
         ? "Owner"
         : "Associate with";
-    const ownerFilterKey = isProspectsLikeEntity(entity)
-      ? "user_extension"
-      : "assigned_to";
 
     const isOwnerArray = isProspectsLikeEntity(entity);
     const hasOwnerFilter = isOwnerArray

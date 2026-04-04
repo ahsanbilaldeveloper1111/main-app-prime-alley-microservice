@@ -8,7 +8,6 @@ import React, {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -21,7 +20,6 @@ import {
 } from "react-bootstrap";
 import Select from "react-select";
 import { toast } from "react-toastify";
-import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import { CreateQuoteSidebar } from "@components/renderCreateQuoteForm";
 import {
   FiCalendar,
@@ -72,7 +70,6 @@ import {
 import { pruneEmptyCrmListFilterEntries } from "@crm/billing-quotes/crmQuotesListPagePruneFilters";
 import { useCrmListFilterActions } from "@crm/shared/useCrmListFilterActions";
 import { useCrmListNavigationHandlers } from "@crm/shared/useCrmListNavigationHandlers";
-import { useCrmListCallAndViewActions } from "@crm/shared/useCrmListCallAndViewActions";
 import {
   CRM_LIST_DELETE_BUTTON_STYLE,
   CRM_LIST_PRIMARY_BUTTON_STYLE,
@@ -84,7 +81,6 @@ import {
 } from "@crm/shared/crmListActionButtonStyles";
 import { useCrmQuotesListActiveFilterSync } from "@crm/billing-quotes/useCrmQuotesListActiveFilterSync";
 import { useCrmQuotesListFetchDummyCrmData } from "@crm/billing-quotes/useCrmQuotesListFetchDummyCrmData";
-import { useCrmQuotesListSidebarQuickActions } from "@crm/billing-quotes/useCrmQuotesListSidebarQuickActions";
 import { useCrmQuotesListExportHandlers } from "@crm/billing-quotes/useCrmQuotesListExportHandlers";
 import {
   useCrmQuotesListCampaignsEffect,
@@ -119,14 +115,12 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     currentFilters,
     setCurrentFilters,
     requestIdRef,
-    uploading,
     setUploading,
     selectedFile,
     setSelectedFile,
     setDragActive,
     showUploadModal,
     setShowUploadModal,
-    uploadProgress,
     setUploadProgress,
     showViewModal,
     setShowViewModal,
@@ -142,12 +136,8 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     setShowAfterCallModal,
     extensions,
     setExtensions,
-    selectedCampaigns,
-    setSelectedCampaigns,
     fieldTags,
     setFieldTags,
-    assignToCampaignUsers,
-    setAssignToCampaignUsers,
     showConvertToLeadModal,
     setShowConvertToLeadModal,
     convertingToLeadCrmRecordId,
@@ -204,7 +194,6 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     setSelectedProspect,
     sidebarProspectFetchTokenRef,
     showFilterBar,
-    setShowFilterBar,
     showAddContactsDropdown,
     setShowAddContactsDropdown,
     showCreateContactSidebar,
@@ -237,10 +226,10 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     assignmentFilters,
   });
 
-  // Call recordings state
-  const [callRecordings, setCallRecordings] = useState<any[]>([]);
-  const [callRecordingsLoading, setCallRecordingsLoading] = useState(false);
-  const [callRecordingsTotal, setCallRecordingsTotal] = useState(0);
+  // Call recordings state (values passed to view modal; list is populated elsewhere when wired)
+  const [callRecordings] = useState<any[]>([]);
+  const [callRecordingsLoading] = useState(false);
+  const [callRecordingsTotal] = useState(0);
   const [selectedRecording, setSelectedRecording] = useState<any>(null);
   const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
     useState(false);
@@ -251,10 +240,9 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     Record<string, number>
   >({});
 
-  const [showProspectsAnalytics, setShowProspectsAnalytics] = useState(false);
+  const [showProspectsAnalytics] = useState(false);
 
   const {
-    validFilters,
     showAllProspectStats,
     setShowAllProspectStats,
     activeFilter,
@@ -281,7 +269,6 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     setProspectsFilters,
     prospectsViewMode,
     setProspectsViewMode,
-    defaultSelectedColumns,
     selectedColumns,
     setSelectedColumns,
     pagination,
@@ -300,19 +287,10 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     metrics,
     setMetrics,
     historyData,
-    setHistoryData,
     historyLoading,
-    setHistoryLoading,
     historyPagination,
-    setHistoryPagination,
-    fetchCampaignsByIds,
     fetchHistoryData,
     memoizedFilters,
-    sidebarActivitiesPanelRef,
-    sidebarRecordId,
-    sidebarRecordName,
-    sidebarRecordPhone,
-    sidebarRecordEmail,
     sidebarActivityModals,
   } = useCrmQuotesListFiltersMetricsHistorySidebarState({
     router,
@@ -331,16 +309,6 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     >,
     setContactFormLoadError,
     setContactFormLoading,
-  });
-
-  const sidebarQuickActions = useCrmQuotesListSidebarQuickActions({
-    sidebarRecordPhone,
-    sidebarRecordEmail,
-    sidebarRecordName,
-    sidebarRecordId,
-    sidebarActivityModals,
-    dialNumber,
-    isInitialized,
   });
 
   const { handleProspectsExport } = useCrmQuotesListExportHandlers({
@@ -367,13 +335,13 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     showSuccessfulModal, setShowSuccessfulModal,
     successModalTitle, setSuccessModalTitle,
     successModalDescription, setSuccessModalDescription,
-    handleDataAssignment, handleDataAssignmentSubmit, handleDataAssignmentModalClose,
-    handleAfterCallModalClose, handleAfterCallSubmit,
-    handleScheduleCall, handleUnscheduleCallClick, confirmUnscheduleCall,
+    handleDataAssignmentSubmit, handleDataAssignmentModalClose,
+    handleAfterCallSubmit,
+    confirmUnscheduleCall,
     handleScheduleModalClose, handleScheduleSubmit,
     handleCallClick, handleBulkDelete, handleDeleteData,
     openSidebar: openProspectSidebar, handleViewData,
-    handlePlayCallRecording, handleDownloadCallRecording, handleItemSelection,
+    handlePlayCallRecording, handleDownloadCallRecording,
   } = useCrmListSharedCallbacks({
     session, setRefreshKey, selectedDataItem, setSelectedDataItem,
     setShowDataAssignmentModal, setShowAfterCallModal, setShowDeleteModal, setItemToDelete,
@@ -466,9 +434,6 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     setShowSuccessfulModal,
   });
 
-  const { handleMarkAsViewed, handleCallAction } =
-    useCrmListCallAndViewActions(setRefreshKey);
-
   const handleNoteCreate = (
     note: string,
     createTask: boolean,
@@ -481,13 +446,6 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
       taskDueDate,
     });
   };
-  // Handle call button click
-  // Handle recording playback
-  const handlePlayRecording = useCallback((recordingUrl: string) => {
-    // In a real app, this would open the recording player
-    toast.info(`Playing recording: ${recordingUrl}`);
-    console.log("Playing recording:", recordingUrl);
-  }, []);
 
   const {
     handleCloseSidebar: handleCloseProspectSidebar,

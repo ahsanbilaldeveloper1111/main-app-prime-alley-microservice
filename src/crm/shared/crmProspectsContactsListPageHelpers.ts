@@ -12,7 +12,7 @@ export async function fetchCrmProspectsEntryCountsForFilters(
 ): Promise<{ total: number; assigned: number; unassigned: number }> {
   try {
     const campaignIds = Array.from(assignmentFilters.selectedCampaigns).map(
-      (campaign) => parseInt(campaign.value, 10),
+      (campaign) => Number.parseInt(campaign.value, 10),
     );
     const tags = Array.from(assignmentFilters.selectedTags).map(
       (tag) => tag.value,

@@ -107,7 +107,7 @@ export function CrmListUnscheduleModal({
                   `prospect #${entryToUnschedule.id}`
                 : "this prospect"}
             </strong>
-            ?
+            {"?"}
           </p>
           <p className="text-muted small mb-3">
             This action cannot be undone.

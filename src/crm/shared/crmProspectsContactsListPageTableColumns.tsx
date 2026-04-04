@@ -188,7 +188,9 @@ export function buildCrmProspectsContactsTableColumns(
           const isNextHour = moment(row.scheduled_call_at).isBefore(
             moment().add(1, "hour"),
           );
-          return isOverdue ? "danger" : isNextHour ? "warning" : "info";
+          if (isOverdue) return "danger";
+          if (isNextHour) return "warning";
+          return "info";
         },
       },
     },
@@ -200,7 +202,7 @@ export function buildCrmProspectsContactsTableColumns(
       render: (row) => (
         <div className="d-flex gap-1 flex-wrap">
           {(row.tags || []).map((tag: any, idx: number) => (
-            <span key={idx} className="gt-badge gt-badge-secondary">
+            <span key={`${tag.name}-${idx}`} className="gt-badge gt-badge-secondary">
               {tag.name || tag}
             </span>
           ))}
