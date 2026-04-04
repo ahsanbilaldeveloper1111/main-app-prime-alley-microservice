@@ -2,7 +2,7 @@ import React from "react";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
 
-export interface CrmListCreateContactSidebarProps {
+export type CrmListCreateContactSidebarProps = Readonly<{
   show: boolean;
   editingContactId: number | null;
   contactForm: any;
@@ -17,7 +17,7 @@ export interface CrmListCreateContactSidebarProps {
   onClose: () => void;
   onCreateSubmit: (addAnother: boolean) => void;
   onUpdateSubmit: () => void;
-}
+}>;
 
 export function CrmListCreateContactSidebar({
   show,
@@ -34,7 +34,7 @@ export function CrmListCreateContactSidebar({
   onClose,
   onCreateSubmit,
   onUpdateSubmit,
-}: CrmListCreateContactSidebarProps) {
+}: Readonly<CrmListCreateContactSidebarProps>) {
   if (!show) return null;
 
   const isFormValid =

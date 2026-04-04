@@ -4,7 +4,7 @@ import CreatableSelect from "react-select/creatable";
 import { AlertCircle as AlertCircleIcon, Download } from "lucide-react";
 import { downloadExampleCsv } from "@utils/crm";
 
-export interface CrmListUploadModalProps {
+export type CrmListUploadModalProps = Readonly<{
   show: boolean;
   onHide: () => void;
   title: string;
@@ -13,7 +13,7 @@ export interface CrmListUploadModalProps {
   availableTags: Array<{ value: string; label: string; id: number }>;
   onFileInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onUpload: () => void;
-}
+}>;
 
 export function CrmListUploadModal({
   show,
@@ -24,7 +24,7 @@ export function CrmListUploadModal({
   availableTags,
   onFileInputChange,
   onUpload,
-}: CrmListUploadModalProps) {
+}: Readonly<CrmListUploadModalProps>) {
   return (
     <Modal show={show} onHide={onHide} size="lg" centered>
       <Modal.Header closeButton className="border-bottom bg-light">

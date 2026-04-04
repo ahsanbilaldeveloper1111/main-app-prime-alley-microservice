@@ -4,7 +4,7 @@ import CreatableSelect from "react-select/creatable";
 import { FiFilter, FiDatabase, FiUsers } from "react-icons/fi";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 
-export interface CrmListDataAssignmentFormContentProps {
+export type CrmListDataAssignmentFormContentProps = Readonly<{
   entityLabel: string;
   assignmentFilters: {
     selectedTags: readonly any[];
@@ -31,7 +31,7 @@ export interface CrmListDataAssignmentFormContentProps {
   setCustomDistribution: React.Dispatch<
     React.SetStateAction<Record<string, number>>
   >;
-}
+}>;
 
 const CREATABLE_SELECT_STYLES = {
   control: (base: any) => ({
@@ -57,7 +57,7 @@ export function CrmListDataAssignmentFormContent({
   setAssignmentDistribution,
   customDistribution,
   setCustomDistribution,
-}: CrmListDataAssignmentFormContentProps) {
+}: Readonly<CrmListDataAssignmentFormContentProps>) {
   const totalAllocated = Object.values(customDistribution).reduce(
     (sum, count) => sum + count,
     0,

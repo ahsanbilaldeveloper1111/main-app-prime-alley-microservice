@@ -11,7 +11,7 @@ import {
 import moment from "moment";
 import { formatCrmPreviewDate } from "@utils/Helper";
 
-export interface CrmListHistoryFormContentProps {
+export type CrmListHistoryFormContentProps = Readonly<{
   historyData: any[];
   historyLoading: boolean;
   historyPagination: {
@@ -25,7 +25,7 @@ export interface CrmListHistoryFormContentProps {
   fetchHistoryData: (page: number) => void;
   campaignsById: Record<number, string>;
   getNameByExtension: (extension: string) => string;
-}
+}>;
 
 export function CrmListHistoryFormContent({
   historyData,
@@ -34,7 +34,7 @@ export function CrmListHistoryFormContent({
   fetchHistoryData,
   campaignsById,
   getNameByExtension,
-}: CrmListHistoryFormContentProps) {
+}: Readonly<CrmListHistoryFormContentProps>) {
   let historySection: React.ReactNode;
   if (historyLoading) {
     historySection = (
@@ -285,7 +285,7 @@ function formatActivityDetails(
           <div className="mb-1">
             <strong>
               {activity.action
-                ?.replace("_", " ")
+                ?.replaceAll("_", " ")
                 .replace(/\b\w/g, (l: string) => l.toUpperCase())}
             </strong>
           </div>
@@ -297,15 +297,17 @@ function formatActivityDetails(
   }
 }
 
+type HistoryTimelineItemProps = Readonly<{
+  activity: any;
+  campaignsById: Record<number, string>;
+  getNameByExtension: (ext: string) => string;
+}>;
+
 function HistoryTimelineItem({
   activity,
   campaignsById,
   getNameByExtension,
-}: {
-  activity: any;
-  campaignsById: Record<number, string>;
-  getNameByExtension: (ext: string) => string;
-}) {
+}: HistoryTimelineItemProps) {
   return (
     <div className="timeline-item mb-4">
       <div className="d-flex">
@@ -333,7 +335,7 @@ function HistoryTimelineItem({
                       className="ms-2 small"
                     >
                       {activity.action
-                        ?.replace("_", " ")
+                        ?.replaceAll("_", " ")
                         .replace(/\b\w/g, (l: string) =>
                           l.toUpperCase(),
                         )}

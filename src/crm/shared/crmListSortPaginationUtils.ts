@@ -1,3 +1,19 @@
+function sortComparableString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "";
+    }
+  }
+  return String(value);
+}
+
 export function sortData<T extends Record<string, unknown>>(
   data: T[],
   sortColumn: string,
@@ -7,8 +23,8 @@ export function sortData<T extends Record<string, unknown>>(
 
   const factor = sortDirection === "asc" ? 1 : -1;
   return [...data].sort((a, b) => {
-    const aStr = String(a[sortColumn] ?? "").toLowerCase();
-    const bStr = String(b[sortColumn] ?? "").toLowerCase();
+    const aStr = sortComparableString(a[sortColumn]).toLowerCase();
+    const bStr = sortComparableString(b[sortColumn]).toLowerCase();
     return aStr.localeCompare(bStr) * factor;
   });
 }

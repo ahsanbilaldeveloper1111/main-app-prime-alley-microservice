@@ -37,18 +37,18 @@ import {
 } from "@crm/shared/CrmListViewDataModalPrimitives";
 
 export interface CrmListViewDataModalProps {
-  show: boolean;
-  onHide: () => void;
-  selectedDataItem: CrmDataItem | null;
-  extensions: any[];
-  availableCampaigns: Array<{ value: string; label: string; id: number }>;
-  callRecordings?: any[];
-  callRecordingsLoading?: boolean;
-  callRecordingsTotal?: number;
-  downloadingRecordings?: Set<string>;
-  downloadProgress?: Record<string, number>;
-  onPlayCallRecording?: (recording: any) => void;
-  onDownloadCallRecording?: (recording: any) => void;
+  readonly show: boolean;
+  readonly onHide: () => void;
+  readonly selectedDataItem: CrmDataItem | null;
+  readonly extensions: any[];
+  readonly availableCampaigns: Array<{ value: string; label: string; id: number }>;
+  readonly callRecordings?: any[];
+  readonly callRecordingsLoading?: boolean;
+  readonly callRecordingsTotal?: number;
+  readonly downloadingRecordings?: Set<string>;
+  readonly downloadProgress?: Record<string, number>;
+  readonly onPlayCallRecording?: (recording: any) => void;
+  readonly onDownloadCallRecording?: (recording: any) => void;
 }
 
 const EMPTY_SET = new Set<string>();
@@ -68,7 +68,7 @@ export function CrmListViewDataModal({
   downloadProgress = EMPTY_PROGRESS,
   onPlayCallRecording = noop,
   onDownloadCallRecording = noop,
-}: CrmListViewDataModalProps) {
+}: Readonly<CrmListViewDataModalProps>) {
   if (!selectedDataItem) return null;
 
   return (
@@ -115,7 +115,15 @@ export function CrmListViewDataModal({
             e.currentTarget.style.background = "rgba(255,255,255,0.25)";
             e.currentTarget.style.transform = "scale(1.05)";
           }}
+          onFocus={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+            e.currentTarget.style.transform = "scale(1.05)";
+          }}
           onMouseOut={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+          onBlur={(e) => {
             e.currentTarget.style.background = "rgba(255,255,255,0.15)";
             e.currentTarget.style.transform = "scale(1)";
           }}
@@ -310,11 +318,11 @@ function QuickInfoCards({
   selectedDataItem,
   extensions,
   availableCampaigns,
-}: {
+}: Readonly<{
   selectedDataItem: CrmDataItem;
   extensions: any[];
   availableCampaigns: Array<{ value: string; label: string; id: number }>;
-}) {
+}>) {
   const agentLabel = selectedDataItem.user_extension
     ? extensions.find(
         (ext: any) =>
@@ -371,9 +379,9 @@ function QuickInfoCards({
 
 function ContactDetailsSection({
   selectedDataItem,
-}: {
+}: Readonly<{
   selectedDataItem: CrmDataItem;
-}) {
+}>) {
   return (
     <CrmListViewModalContentSection
       title="Contact Details"
@@ -407,7 +415,7 @@ function ContactDetailsSection({
   );
 }
 
-function CallNotesSection({ note }: { note: string }) {
+function CallNotesSection({ note }: Readonly<{ note: string }>) {
   return (
     <CrmListViewModalContentSection
       title="Call Notes"
@@ -429,13 +437,35 @@ function formatCustomFieldDisplayValue(value: unknown): string {
   if (value === null || value === undefined) {
     return "N/A";
   }
-  if (typeof value === "object") {
-    return JSON.stringify(value);
+  if (typeof value === "string") {
+    return value;
   }
-  return String(value);
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  if (typeof value === "symbol") {
+    return value.description ?? value.toString();
+  }
+  if (typeof value === "function") {
+    return "[Function]";
+  }
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "[Unable to display]";
+    }
+  }
+  return "N/A";
 }
 
-function CustomDataFieldsSection({ data }: { data: Record<string, any> }) {
+function CustomDataFieldsSection({
+  data,
+}: Readonly<{ data: Record<string, any> }>) {
   return (
     <CrmListViewModalContentSection title="Additional Information">
         <div
@@ -458,8 +488,8 @@ function CustomDataFieldsSection({ data }: { data: Record<string, any> }) {
                 }}
               >
                 {key
-                  .replace(/_/g, " ")
-                  .replace(/\b\w/g, (l) => l.toUpperCase())}
+                  .replaceAll("_", " ")
+                  .replaceAll(/\b\w/g, (l) => l.toUpperCase())}
               </div>
               <div
                 style={{
@@ -486,7 +516,7 @@ function CallRecordingsSection({
   downloadProgress,
   onPlayCallRecording,
   onDownloadCallRecording,
-}: {
+}: Readonly<{
   callRecordings: any[];
   callRecordingsLoading: boolean;
   callRecordingsTotal: number;
@@ -494,7 +524,7 @@ function CallRecordingsSection({
   downloadProgress: Record<string, number>;
   onPlayCallRecording: (recording: any) => void;
   onDownloadCallRecording: (recording: any) => void;
-}) {
+}>) {
   const badge = (
     <Badge
       bg="secondary"
@@ -625,13 +655,13 @@ function RecordingRow({
   progress,
   onPlay,
   onDownload,
-}: {
+}: Readonly<{
   recording: any;
   isDownloading: boolean;
   progress: number;
   onPlay: (r: any) => void;
   onDownload: (r: any) => void;
-}) {
+}>) {
   const duration =
     Number.parseInt(recording.Duration?.toString() || "0", 10) / 10000000 || 0;
   const isOutgoing = recording.Direction === "CALL_OUTGOING";
@@ -645,7 +675,13 @@ function RecordingRow({
       onMouseOver={(e) => {
         e.currentTarget.style.background = "#f9fafb";
       }}
+      onFocus={(e) => {
+        e.currentTarget.style.background = "#f9fafb";
+      }}
       onMouseOut={(e) => {
+        e.currentTarget.style.background = "white";
+      }}
+      onBlur={(e) => {
         e.currentTarget.style.background = "white";
       }}
     >
@@ -737,10 +773,10 @@ function RecordingRow({
 function RightPanel({
   selectedDataItem,
   callRecordings,
-}: {
+}: Readonly<{
   selectedDataItem: CrmDataItem;
   callRecordings: any[];
-}) {
+}>) {
   return (
     <div
       style={{
@@ -820,10 +856,10 @@ function QuickActionsPanel() {
 function StatusOverviewPanel({
   selectedDataItem,
   callRecordingsCount,
-}: {
+}: Readonly<{
   selectedDataItem: CrmDataItem;
   callRecordingsCount: number;
-}) {
+}>) {
   return (
     <div>
       <h6 style={CRM_LIST_VIEW_MODAL_PANEL_HEADING_STYLE}>Status Overview</h6>
@@ -902,10 +938,10 @@ function StatusOverviewPanel({
 function StatusRow({
   label,
   children,
-}: {
+}: Readonly<{
   label: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div
       style={{
@@ -924,9 +960,9 @@ function StatusRow({
 
 function ActivityTimelinePanel({
   callRecordings,
-}: {
+}: Readonly<{
   callRecordings: any[];
-}) {
+}>) {
   return (
     <div style={{ flex: 1 }}>
       <h6 style={CRM_LIST_VIEW_MODAL_PANEL_HEADING_STYLE}>Recent Activity</h6>

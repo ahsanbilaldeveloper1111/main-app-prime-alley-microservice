@@ -12,19 +12,19 @@ export interface ScheduleData {
   notes: string;
 }
 
-export interface CrmListScheduleCallFormContentProps {
+export type CrmListScheduleCallFormContentProps = Readonly<{
   selectedEntry: any;
   isEditing: boolean;
   scheduleData: ScheduleData;
   setScheduleData: React.Dispatch<React.SetStateAction<ScheduleData>>;
-}
+}>;
 
 export function CrmListScheduleCallFormContent({
   selectedEntry,
   isEditing,
   scheduleData,
   setScheduleData,
-}: CrmListScheduleCallFormContentProps) {
+}: Readonly<CrmListScheduleCallFormContentProps>) {
   const update = (patch: Partial<ScheduleData>) =>
     setScheduleData((prev) => ({ ...prev, ...patch }));
 
@@ -78,19 +78,19 @@ export function CrmListScheduleCallFormContent({
 
 /* ---------- Unschedule Confirmation Modal ---------- */
 
-export interface CrmListUnscheduleModalProps {
+export type CrmListUnscheduleModalProps = Readonly<{
   show: boolean;
   onHide: () => void;
   entryToUnschedule: any;
   onConfirm: () => void;
-}
+}>;
 
 export function CrmListUnscheduleModal({
   show,
   onHide,
   entryToUnschedule,
   onConfirm,
-}: CrmListUnscheduleModalProps) {
+}: Readonly<CrmListUnscheduleModalProps>) {
   return (
     <Modal show={show} onHide={onHide} centered>
       <Modal.Header closeButton className="border-bottom">

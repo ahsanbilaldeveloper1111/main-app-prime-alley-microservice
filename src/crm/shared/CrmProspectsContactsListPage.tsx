@@ -1387,7 +1387,7 @@ export function CrmProspectsContactsListPage({
               onChange: (value = null) => {
                 setProspectsFilters((prev) => ({
                   ...prev,
-                  nextCallDateFrom: value || null,
+                  nextCallDateFrom: value ?? null,
                 }));
               },
               placeholder: "From date",
@@ -1400,7 +1400,7 @@ export function CrmProspectsContactsListPage({
               onChange: (value = null) => {
                 setProspectsFilters((prev) => ({
                   ...prev,
-                  nextCallDateTo: value || null,
+                  nextCallDateTo: value ?? null,
                 }));
               },
               placeholder: "To date",
@@ -1661,7 +1661,7 @@ export function CrmProspectsContactsListPage({
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find((t) => t.id === "scheduled")) {
+                if (!customTabs.some((t) => t.id === "scheduled")) {
                   setCustomTabs([
                     ...customTabs,
                     {
@@ -1683,7 +1683,7 @@ export function CrmProspectsContactsListPage({
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find((t) => t.id === "has_leads")) {
+                if (!customTabs.some((t) => t.id === "has_leads")) {
                   setCustomTabs([
                     ...customTabs,
                     {

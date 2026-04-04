@@ -214,7 +214,7 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
 
     if (afterCallData.generateLead === "yes" && selectedDataItem) {
       toast.success("Redirecting to create lead page with pre-filled data...");
-      window.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
+      globalThis.location.href = `/crm/leads/create?crm_data_id=${selectedDataItem.id}`;
     } else {
       toast.success("After call data saved successfully! No lead generated.");
       showSuccess("After Call Successful!", "The after call data has been successfully saved.");
@@ -246,7 +246,7 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
   const confirmUnscheduleCall = useCallback(async () => {
     if (!entryToUnschedule) return;
     try {
-      const userExtension = (session?.user as any)?.extension || "default";
+      const userExtension = session?.user?.extension ?? "default";
       await unscheduleCall(entryToUnschedule.id, userExtension);
       setRefreshKey((prev) => prev + 1);
       setShowUnscheduleModal(false);
@@ -269,7 +269,7 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
     if (!scheduleData.time) { toast.error("Please select a time"); return; }
 
     try {
-      const userExtension = (session?.user as any)?.extension || "default";
+      const userExtension = session?.user?.extension ?? "default";
       const scheduledDateTime = moment(`${scheduleData.date} ${scheduleData.time}`).toISOString();
       await scheduleCall(selectedEntryForSchedule.id, scheduledDateTime, userExtension, scheduleData.notes);
       setRefreshKey((prev) => prev + 1);
@@ -319,7 +319,7 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
     setShowDeleteModal(true);
   }, [setItemToDelete, setShowDeleteModal]);
 
-  const openSidebar = useCallback((item: CrmDataItem | any) => {
+  const openSidebar = useCallback((item: CrmDataItem) => {
     setSelectedDataItem(item);
     setSelectedRecord(item);
     setShowSidebar(true);

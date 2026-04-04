@@ -77,8 +77,9 @@ export function buildCrmProspectsContactsTableActions({
           },
         ]
       : []),
-    ...(activeFilter !== "has_leads"
-      ? [
+    ...(activeFilter === "has_leads"
+      ? []
+      : [
           {
             label: "More Actions",
             icon: <MoreVertical size={16} />,
@@ -124,15 +125,14 @@ export function buildCrmProspectsContactsTableActions({
                   label: "Send Email",
                   icon: <Mail size={14} />,
                   onClick: (row: any) => {
-                    window.location.href = `mailto:${row.email}`;
+                    globalThis.location.href = `mailto:${row.email}`;
                   },
                   show: (row: any) => !!row.email,
                 },
               ],
             },
           },
-        ]
-      : []),
+        ]),
     ...(session?.user?.permissions?.includes("delete-crm-data-management")
       ? [
           {

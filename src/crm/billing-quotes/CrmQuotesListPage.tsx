@@ -96,15 +96,15 @@ import { CrmQuotesListPageDeleteConfirmationBlock } from "@crm/billing-quotes/Cr
 import { CrmQuotesListPageProspectSidebar } from "@crm/billing-quotes/CrmQuotesListPageProspectSidebar";
 import { CrmQuotesListPageQuotesFilterSidebar } from "@crm/billing-quotes/CrmQuotesListPageQuotesFilterSidebar";
 
-export type CrmQuotesListPageProps = {
+export type CrmQuotesListPageProps = Readonly<{
   variant: "billing" | "crm";
-};
+}>;
 
 export function getCrmQuotesListPageLayout(page: ReactElement) {
   return <Layout>{page}</Layout>;
 }
 
-function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
+function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>) {
   const {
     session,
     router,
@@ -1145,8 +1145,8 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
         selectedColumnKeys={selectedColumns}
         onApply={(keys) => {
           setSelectedColumns(keys);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
+          if (typeof globalThis.window !== "undefined") {
+            globalThis.window.localStorage.setItem(
               "crmDataSelectedColumns",
               JSON.stringify(keys),
             );
@@ -1289,7 +1289,7 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find((t) => t.id === "scheduled")) {
+                if (!customTabs.some((t) => t.id === "scheduled")) {
                   setCustomTabs([
                     ...customTabs,
                     {
@@ -1311,7 +1311,7 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
             <Button
               variant="outline-primary"
               onClick={() => {
-                if (!customTabs.find((t) => t.id === "has_leads")) {
+                if (!customTabs.some((t) => t.id === "has_leads")) {
                   setCustomTabs([
                     ...customTabs,
                     {
@@ -1365,6 +1365,6 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
   );
 }
 
-export function CrmQuotesListPage(props: CrmQuotesListPageProps) {
+export function CrmQuotesListPage(props: Readonly<CrmQuotesListPageProps>) {
   return <CrmQuotesListPageContent {...props} />;
 }

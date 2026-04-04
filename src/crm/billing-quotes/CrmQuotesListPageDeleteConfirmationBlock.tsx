@@ -69,7 +69,7 @@ function renderDeleteQuotesModalAdditionalInfo({
   return undefined;
 }
 
-export type CrmQuotesListPageDeleteConfirmationBlockProps = {
+export type CrmQuotesListPageDeleteConfirmationBlockProps = Readonly<{
   show: boolean;
   onHide: () => void;
   deleteModalMode: "single" | "bulk" | null;
@@ -78,7 +78,7 @@ export type CrmQuotesListPageDeleteConfirmationBlockProps = {
   extensions: any[];
   handleBulkDelete: () => void;
   confirmDelete: () => void;
-};
+}>;
 
 export function CrmQuotesListPageDeleteConfirmationBlock({
   show,
@@ -89,7 +89,7 @@ export function CrmQuotesListPageDeleteConfirmationBlock({
   extensions,
   handleBulkDelete,
   confirmDelete,
-}: CrmQuotesListPageDeleteConfirmationBlockProps) {
+}: Readonly<CrmQuotesListPageDeleteConfirmationBlockProps>) {
   return (
     <DeleteConfirmationModal
       show={show}

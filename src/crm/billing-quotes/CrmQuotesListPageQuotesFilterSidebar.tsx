@@ -4,7 +4,7 @@ import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmLi
 import { buildCrmQuotesListFiltersFromProspectsSidebar } from "@crm/billing-quotes/crmQuotesListPageBuildProspectSidebarFilters";
 import { crmQuotesListExtensionToSelectValue } from "@crm/billing-quotes/crmQuotesListPageExtensionSelectOption";
 
-export type CrmQuotesListPageQuotesFilterSidebarProps = {
+export type CrmQuotesListPageQuotesFilterSidebarProps = Readonly<{
   isOpen: boolean;
   onClose: () => void;
   prospectsSearch: string;
@@ -18,7 +18,7 @@ export type CrmQuotesListPageQuotesFilterSidebarProps = {
   setRefreshKey: (fn: (prev: number) => number) => void;
   setShowFiltersSidebar: (v: boolean) => void;
   setCurrentFilters: React.Dispatch<React.SetStateAction<any>>;
-};
+}>;
 
 export function CrmQuotesListPageQuotesFilterSidebar({
   isOpen,
@@ -34,7 +34,7 @@ export function CrmQuotesListPageQuotesFilterSidebar({
   setRefreshKey,
   setShowFiltersSidebar,
   setCurrentFilters,
-}: CrmQuotesListPageQuotesFilterSidebarProps) {
+}: Readonly<CrmQuotesListPageQuotesFilterSidebarProps>) {
   return (
     <GenericFilterSidebar
       isOpen={isOpen}

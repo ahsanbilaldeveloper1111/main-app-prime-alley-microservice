@@ -138,9 +138,9 @@ export function buildCrmQuotesListTableColumns(
       type: "custom",
       render: (row) => (
         <span style={{ color: "#374151", fontSize: 13 }}>
-          {row.amount != null
-            ? `US$${Number(row.amount).toLocaleString()}`
-            : "--"}
+          {row.amount === null || row.amount === undefined
+            ? "--"
+            : `US$${Number(row.amount).toLocaleString()}`}
         </span>
       ),
     },

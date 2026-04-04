@@ -4,13 +4,11 @@ import {
   type CrmListPageScopedLayoutStylesConfig,
 } from "@crm/shared/crmListPageScopedLayoutCss";
 
-export type { CrmListPageScopedLayoutStylesConfig };
+export type { CrmListPageScopedLayoutStylesConfig } from "@crm/shared/crmListPageScopedLayoutCss";
 
 export function CrmListPageScopedLayoutStyles({
   config,
-}: {
-  config: CrmListPageScopedLayoutStylesConfig;
-}) {
+}: Readonly<{ config: CrmListPageScopedLayoutStylesConfig }>) {
   return (
     <style
       dangerouslySetInnerHTML={{

@@ -85,8 +85,7 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
         toast.error("Campaign is required");
         return;
       }
-      const sessionUser = session?.user as any;
-      const userExtension = String(sessionUser?.phone ?? "");
+      const userExtension = String(session?.user?.phone ?? "");
 
       const dataPayload = buildDataPayload(contactForm, customFieldsForPayload, {
         assigned_to: userExtension,

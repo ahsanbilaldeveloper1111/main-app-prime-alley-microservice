@@ -14,7 +14,7 @@ type SessionUser =
   | { name?: string | null; email?: string | null }
   | undefined;
 
-export type CrmQuotesListPageProspectSidebarProps = {
+export type CrmQuotesListPageProspectSidebarProps = Readonly<{
   show: boolean;
   onClose: () => void;
   selectedProspect: any;
@@ -30,7 +30,7 @@ export type CrmQuotesListPageProspectSidebarProps = {
   onSendToContact: (quote: any) => void;
   onDeleteData: (item: any) => void;
   onCallClick: (item: any) => void;
-};
+}>;
 
 export function CrmQuotesListPageProspectSidebar({
   show,
@@ -44,7 +44,7 @@ export function CrmQuotesListPageProspectSidebar({
   onSendToContact,
   onDeleteData,
   onCallClick,
-}: CrmQuotesListPageProspectSidebarProps) {
+}: Readonly<CrmQuotesListPageProspectSidebarProps>) {
   if (!show) {
     return null;
   }
@@ -79,17 +79,14 @@ export function CrmQuotesListPageProspectSidebar({
       crmSummary={
         sp?.crm_summary ??
         sp?.data?.crm_summary ??
-        (sp as any)?.data?.data?.crm_summary ??
+        sp?.data?.data?.crm_summary ??
         undefined
       }
       recordLink={{
         label: "View quote details",
         onClick: () => {
           const quoteId = Number(
-            sp?.id ??
-              sp?.data?.id ??
-              (sp as any)?.data?.data?.id ??
-              Number.NaN,
+            sp?.id ?? sp?.data?.id ?? sp?.data?.data?.id ?? Number.NaN,
           );
           if (!Number.isFinite(quoteId) || quoteId <= 0) return;
           onClose();
@@ -155,9 +152,9 @@ export function CrmQuotesListPageProspectSidebar({
             {
               label: "Amount",
               value:
-                sp?.amount != null
-                  ? `US$${Number(sp.amount).toLocaleString()}`
-                  : "N/A",
+                sp?.amount === null || sp?.amount === undefined
+                  ? "N/A"
+                  : `US$${Number(sp.amount).toLocaleString()}`,
               copyable: true,
             },
             {
@@ -171,7 +168,9 @@ export function CrmQuotesListPageProspectSidebar({
             {
               label: "View Count",
               value:
-                sp?.view_count != null ? String(sp.view_count) : "0",
+                sp?.view_count === null || sp?.view_count === undefined
+                  ? "0"
+                  : String(sp.view_count),
             },
             {
               label: "Contact Name",

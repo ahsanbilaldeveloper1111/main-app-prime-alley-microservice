@@ -34,7 +34,7 @@ export function formatCrmListExportRawValue(raw: unknown): string {
 
 export function escapeCrmListCsvCell(val: string): string {
   const s = String(val);
-  if (/[,"\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  if (/[,"\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
   return s;
 }
 

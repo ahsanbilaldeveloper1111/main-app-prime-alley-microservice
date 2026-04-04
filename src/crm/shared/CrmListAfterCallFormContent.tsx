@@ -1,10 +1,7 @@
 import React from "react";
 import { Row, Col, Form, Alert } from "react-bootstrap";
 import { CrmListDateTimeRow } from "./CrmListDateTimeRow";
-import {
-  CRM_LIST_AFTER_CALL_DISPOSITION_SELECT_OPTIONS,
-  CRM_LIST_AFTER_CALL_STATUS_SELECT_OPTIONS,
-} from "./crmListAfterCallFormOptions";
+import { CRM_LIST_AFTER_CALL_STATUS_SELECT_OPTIONS } from "./crmListAfterCallFormOptions";
 
 export interface AfterCallData {
   disposition: string;
@@ -15,10 +12,10 @@ export interface AfterCallData {
   generateLead: string;
 }
 
-export interface CrmListAfterCallFormContentProps {
+export type CrmListAfterCallFormContentProps = Readonly<{
   afterCallData: AfterCallData;
   setAfterCallData: React.Dispatch<React.SetStateAction<AfterCallData>>;
-}
+}>;
 
 const GENERATE_LEAD_OPTIONS = [
   { id: "generate-lead-yes", value: "yes", label: "Yes, generate lead" },
@@ -28,7 +25,7 @@ const GENERATE_LEAD_OPTIONS = [
 export function CrmListAfterCallFormContent({
   afterCallData,
   setAfterCallData,
-}: CrmListAfterCallFormContentProps) {
+}: Readonly<CrmListAfterCallFormContentProps>) {
   const update = (patch: Partial<AfterCallData>) =>
     setAfterCallData((prev) => ({ ...prev, ...patch }));
 

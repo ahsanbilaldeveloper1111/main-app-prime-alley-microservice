@@ -2,14 +2,14 @@ import React from "react";
 import { Row, Col, Form } from "react-bootstrap";
 import moment from "moment";
 
-export interface CrmListDateTimeRowProps {
+export type CrmListDateTimeRowProps = Readonly<{
   dateLabel: string;
   timeLabel: string;
   dateValue: string;
   timeValue: string;
   onDateChange: (value: string) => void;
   onTimeChange: (value: string) => void;
-}
+}>;
 
 export function CrmListDateTimeRow({
   dateLabel,
@@ -18,7 +18,7 @@ export function CrmListDateTimeRow({
   timeValue,
   onDateChange,
   onTimeChange,
-}: CrmListDateTimeRowProps) {
+}: Readonly<CrmListDateTimeRowProps>) {
   return (
     <Row>
       <Col md={6}>

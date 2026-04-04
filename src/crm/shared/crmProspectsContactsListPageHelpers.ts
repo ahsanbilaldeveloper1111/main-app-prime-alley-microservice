@@ -116,7 +116,7 @@ export function persistCrmDataSelectedColumns(
     }
     return;
   }
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem("crmDataSelectedColumns", serialized);
+  if (typeof globalThis !== "undefined") {
+    globalThis.localStorage?.setItem("crmDataSelectedColumns", serialized);
   }
 }

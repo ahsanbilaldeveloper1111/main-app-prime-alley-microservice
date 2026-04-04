@@ -22,10 +22,10 @@ export const crmListViewModalCardHoverLift = {
 export function CrmListViewModalIconBox({
   color,
   children,
-}: {
+}: Readonly<{
   color: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div
       style={{
@@ -47,10 +47,10 @@ export function CrmListViewModalIconBox({
 export function CrmListViewModalSectionLabel({
   color,
   children,
-}: {
+}: Readonly<{
   color: string;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div
       style={{
@@ -69,9 +69,9 @@ export function CrmListViewModalSectionLabel({
 
 export function CrmListViewModalFieldValue({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div
       style={{
@@ -98,7 +98,9 @@ export const CRM_LIST_VIEW_MODAL_SECTION_HEADING_STYLE: React.CSSProperties = {
   gap: "8px",
 };
 
-export function CrmListViewModalSectionDot({ gradient }: { gradient: string }) {
+export function CrmListViewModalSectionDot({
+  gradient,
+}: Readonly<{ gradient: string }>) {
   return (
     <div
       style={{
@@ -125,14 +127,14 @@ export function CrmListViewModalContentSection({
   boxStyle,
   badge,
   children,
-}: {
+}: Readonly<{
   title: string;
   gradient?: string;
   marginBottom?: string;
   boxStyle?: React.CSSProperties;
   badge?: React.ReactNode;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div style={{ marginBottom }}>
       <h5 style={CRM_LIST_VIEW_MODAL_SECTION_HEADING_STYLE}>
@@ -151,11 +153,11 @@ export function CrmListViewModalDetailRow({
   icon,
   label,
   value,
-}: {
+}: Readonly<{
   icon: React.ReactNode;
   label: string;
   value: string;
-}) {
+}>) {
   return (
     <>
       <div
@@ -230,11 +232,11 @@ export function CrmListViewModalIconButton({
   title,
   onClick,
   children,
-}: {
+}: Readonly<{
   title: string;
   onClick: () => void;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <button
       type="button"
@@ -256,6 +258,12 @@ export function CrmListViewModalIconButton({
         e.currentTarget.style.background = "#ede9fe";
       }}
       onMouseOut={(e) => {
+        e.currentTarget.style.background = "transparent";
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.background = "#ede9fe";
+      }}
+      onBlur={(e) => {
         e.currentTarget.style.background = "transparent";
       }}
     >
