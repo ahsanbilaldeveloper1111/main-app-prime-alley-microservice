@@ -1577,14 +1577,18 @@ function applyPlannerSidebarTaskTypeSelectChange(
     ctx.selectedStatusForTask,
   );
   const mergedOpen = mergeFormDataWithDueDateClamp(fresh);
-  const nextForm: CreateTaskFormData = { ...mergedOpen, taskType: clamped };
-  ctx.setFormData(nextForm);
+  ctx.setFormData((prev) => ({
+    ...mergedOpen,
+    taskType: clamped,
+    title: prev.title,
+    priorityId: prev.priorityId,
+  }));
   ctx.setSearchQuery("");
   ctx.setAssigneeSearchQuery("");
   ctx.setShowAssigneeDropdown(false);
   ctx.setWatcherSearchQuery("");
   ctx.setShowWatcherDropdown(false);
-  ctx.fetchLinkRecordsForSearch("", nextForm.projectId).catch(() => undefined);
+  ctx.fetchLinkRecordsForSearch("", mergedOpen.projectId).catch(() => undefined);
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────

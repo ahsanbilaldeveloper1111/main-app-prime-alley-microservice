@@ -3,7 +3,8 @@
 import * as React from "react";
 import type { ModalProps } from "react-bootstrap/esm/Modal";
 
-// Stock Modal from CJS build — only `esm/Modal.js` is replaced with this file, so this import stays the real implementation.
+// Stock Modal from CJS build — only `esm/Modal.js` is replaced with this file (see next.config.ts).
+// Defaults: static backdrop + keyboard off. Pass `backdrop` / `keyboard` explicitly to opt in to stock behavior.
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- avoid recursive ESM replacement in webpack
 const RBModal = require("react-bootstrap/cjs/Modal.js");
 
@@ -11,7 +12,8 @@ const Modal = React.forwardRef<HTMLDivElement, ModalProps>((props, ref) => (
   <RBModal
     ref={ref}
     {...props}
-    backdrop={props.backdrop === undefined ? "static" : props.backdrop}
+    backdrop="static"
+    keyboard={false}
   />
 ));
 
