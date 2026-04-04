@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
@@ -51,6 +51,7 @@ import {
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
 } from "@components/crm/crmDialogActionButtonStyles";
 import { useSession } from "next-auth/react";
+import { formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
 
 // Product interface matching UI expectations
 interface ProductDisplayData {
@@ -277,7 +278,7 @@ const ProductsPage = () => {
       brand: product.brand || "",
       status: product.active ? "Active" : "Inactive",
       description: product.description || "",
-      created: new Date(product.created_at).toLocaleDateString(),
+      created: formatDateForTable(product.created_at),
       industry: (product as any).industry || null,
       industry_id: normalizedIndustryId,
     };
@@ -292,8 +293,9 @@ const ProductsPage = () => {
         per_page: productsPagination.rowsPerPage,
       };
 
-      if (currentFilters.search) {
-        params.search = currentFilters.search;
+      const searchQuery = normalizeSearchQuery(currentFilters.search);
+      if (searchQuery) {
+        params.search = searchQuery;
       }
 
       // Active filter (active/inactive)
@@ -343,6 +345,21 @@ const ProductsPage = () => {
     activeFilter,
     productsFilters,
   ]);
+
+  const handleProductsSearchChange = useCallback((value: string) => {
+    const normalized = normalizeSearchQuery(value);
+    setProductsSearch(normalized);
+    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
+    setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const handleProductsSearchSubmit = useCallback(() => {
+    setCurrentFilters((prev) => ({
+      ...prev,
+      search: normalizeSearchQuery(productsSearch),
+    }));
+    setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, [productsSearch]);
 
   // Convert products to display data (no filtering - done by API)
   const displayProducts = useMemo(() => {
@@ -722,11 +739,8 @@ const ProductsPage = () => {
       showSearch: true,
       searchValue: productsSearch,
       searchPlaceholder: "Search by product name or SKU...",
-      onSearchChange: setProductsSearch,
-      onSearch: () => {
-        setCurrentFilters({ ...currentFilters, search: productsSearch });
-        setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
-      },
+      onSearchChange: handleProductsSearchChange,
+      onSearch: handleProductsSearchSubmit,
       showTabs: true,
       showFilterPills: true,
       filterPills: productFilterPills,
@@ -777,7 +791,8 @@ const ProductsPage = () => {
       productFilterPills,
       productsSearch,
       activeFilter,
-      currentFilters,
+      handleProductsSearchChange,
+      handleProductsSearchSubmit,
       session?.user?.permissions,
     ],
   );

@@ -24,6 +24,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
+import { formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
 
 interface LostReason {
   id: number;
@@ -60,13 +61,15 @@ const LostReasonsManagement = () => {
     async (page = 1, perPage = 15, search = "") => {
       try {
         const reasonsData = await getLostReasons();
-        const searchTerm = currentFilters.search || search;
+        const searchTerm = normalizeSearchQuery(
+          currentFilters.search || search,
+        );
+        const query = searchTerm.toLowerCase();
         const filteredReasons = reasonsData.filter((reason) => {
           if (!searchTerm) return true;
-          return (
-            !!reason.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            !!reason.description?.toLowerCase().includes(searchTerm.toLowerCase())
-          );
+          const nameNorm = normalizeSearchQuery(reason.name).toLowerCase();
+          const descNorm = normalizeSearchQuery(reason.description).toLowerCase();
+          return nameNorm.includes(query) || descNorm.includes(query);
         });
 
         return {
@@ -204,7 +207,7 @@ const LostReasonsManagement = () => {
         sortable: true,
         cell: (props: LostReason) => (
           <p>
-            {new Date(props.created_at).toLocaleDateString()}
+            {formatDateForTable(props.created_at)}
           </p>
         ),
       },

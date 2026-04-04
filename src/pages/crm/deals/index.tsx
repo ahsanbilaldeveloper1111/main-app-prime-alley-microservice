@@ -23,29 +23,9 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
+import { StatsCardData } from "@components/GenericStatsCards";
 import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { CreateDealSidebar } from "@components/renderCreateDealForm";
-import {
-  FiUpload,
-  FiDatabase,
-  FiSearch,
-  FiFilter,
-  FiTrash2,
-  FiEye,
-  FiUser,
-  FiUsers,
-  FiPhone,
-  FiMessageCircle,
-  FiPlay,
-  FiClock,
-  FiX,
-  FiAlertCircle,
-  FiCalendar,
-  FiTarget,
-  FiMoreVertical,
-} from "react-icons/fi";
-import { ChevronDown } from "lucide-react";
 import {
   getDeals,
   getStages,
@@ -62,16 +42,7 @@ import {
   markDealLost,
   getLead,
   updateDeal,
-  getCrmProducts,
-  getCampaignById,
-  getIndustries,
   getBusinessTypes,
-  createEstimate,
-  CrmProduct,
-  StageData,
-  IndustryData,
-  DealTemplateData,
-  DealTemplateField,
   BusinessTypeData,
   PDFDownloadDeal,
   getDealFollowUps,
@@ -100,6 +71,8 @@ import {
   ModuleSlug,
   formatDateForTable,
   checkRequiredFields,
+  formatCrmPreviewDate,
+  formatCrmPreviewDateTime,
   RECORD_TYPES,
 } from "@utils/Helper";
 import {
@@ -181,6 +154,7 @@ import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { useCti } from "@hooks/useCti";
+import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 
 const ignoredKeys = ["stage_id"];
 // Phone Container Component (with Badge for tables)
@@ -2687,45 +2661,6 @@ const CrmDeals = () => {
     );
   }, [filterCounts]);
 
-  // Custom select styles
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "45px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused
-        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
-        : "none",
-      "&:hover": {
-        borderColor: "#86b7fe",
-      },
-    }),
-    multiValue: (provided: any) => ({
-      ...provided,
-      backgroundColor: "#0d6efd",
-      color: "white",
-      fontSize: "0.813rem",
-    }),
-    multiValueLabel: (provided: any) => ({
-      ...provided,
-      color: "white",
-      padding: "2px 6px",
-    }),
-    multiValueRemove: (provided: any) => ({
-      ...provided,
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#0b5ed7",
-        color: "white",
-      },
-    }),
-    menu: (provided: any) => ({
-      ...provided,
-      fontSize: "0.875rem",
-    }),
-  };
-
   // Define stats cards for GenericTable
   const dealsStatsCards: StatsCardData[] = useMemo(
     () => {
@@ -3624,9 +3559,9 @@ const CrmDeals = () => {
                     label: "Created Date",
                     value:
                       selectedDeal?.created_at || selectedDeal?.created
-                        ? moment(
+                        ? formatCrmPreviewDate(
                             selectedDeal.created_at || selectedDeal.created,
-                          ).format("MMM DD, YYYY")
+                          ) || "N/A"
                         : "N/A",
                     type: "date",
                   },
@@ -3634,10 +3569,10 @@ const CrmDeals = () => {
                     label: "Last Updated",
                     value:
                       selectedDeal?.updated_at || selectedDeal?.last_activity_at
-                        ? moment(
+                        ? formatCrmPreviewDate(
                             selectedDeal.updated_at ||
                               selectedDeal.last_activity_at,
-                          ).format("MMM DD, YYYY")
+                          ) || "N/A"
                         : "N/A",
                     type: "date",
                   },
@@ -4106,7 +4041,7 @@ const CrmDeals = () => {
                   <span>
                     Created{" "}
                     {viewingDeal.created_at
-                      ? moment(viewingDeal.created_at).format("MMM DD, YYYY")
+                      ? formatCrmPreviewDate(viewingDeal.created_at) || "N/A"
                       : "N/A"}
                   </span>
                 </div>
@@ -4647,9 +4582,9 @@ const CrmDeals = () => {
                                 }}
                               >
                                 {viewingDeal.created_at
-                                  ? moment(viewingDeal.created_at).format(
-                                      "MMMM DD, YYYY [at] hh:mm A",
-                                    )
+                                  ? formatCrmPreviewDateTime(
+                                      viewingDeal.created_at,
+                                    ) || "N/A"
                                   : "N/A"}
                               </div>
                             </div>

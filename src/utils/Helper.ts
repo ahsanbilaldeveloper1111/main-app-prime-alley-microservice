@@ -6,6 +6,8 @@ import type { Session } from "next-auth";
 
 import moment from "moment-timezone";
 
+type dateType = string | Date | null | undefined;
+
 // Cache for session data to avoid multiple fetches
 let sessionCache: { session: Session | null; timestamp: number } | null = null;
 const SESSION_CACHE_TTL = 5000; // 5 seconds cache TTL
@@ -507,9 +509,10 @@ export const debugTimezoneConversion = (date: string, time: string) => {
   };
 };
 
-export const GlobalDateFormat = "DD MMM YYYY";
+/** Moment format: full month and comma before year (e.g. "30 March, 2026"). */
+export const GlobalDateFormat = "D MMMM, YYYY";
 export const GlobalTimeFormat = "hh:mm:ss A";
-export const GlobalDateTimeFormat = "DD MMM YYYY hh:mm:ss A";
+export const GlobalDateTimeFormat = "D MMMM, YYYY hh:mm:ss A";
 
 /** Calendar date for UI using {@link GlobalDateFormat} (e.g. `"02 Apr 2026"`). */
 export const formatDateGlobal = (
@@ -530,40 +533,63 @@ export const formatDateTimeGlobal = (
 };
 
 /**
- * Format date for table display (e.g., "13 Dec, 2025")
- * @param date - The date string or Date object
- * @returns Formatted date string (e.g., "13 Dec, 2025")
+ * CRM tables and preview: full month name and comma before year (e.g. "30 March, 2026").
  */
-export const formatDateForTable = (
-  date: string | Date | null | undefined,
+export const formatCrmPreviewDate = (
+  date: dateType,
 ): string => {
   if (!date) return "";
-
   try {
     const dateObj = typeof date === "string" ? new Date(date) : date;
-    if (isNaN(dateObj.getTime())) return "";
+    if (Number.isNaN(dateObj.getTime())) return "";
 
     const day = dateObj.getDate();
     const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
+      "January",
+      "February",
+      "March",
+      "April",
       "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ];
     const month = monthNames[dateObj.getMonth()];
     const year = dateObj.getFullYear();
 
-    return `${day} ${month} ${year}`;
+    return `${day} ${month}, ${year}`;
   } catch (error) {
-    console.error("Error formatting date:", error);
+    console.error("Error formatting CRM preview date:", error);
+    return "";
+  }
+};
+
+/**
+ * Format date for table display (same as {@link formatCrmPreviewDate}: e.g. "30 March, 2026").
+ */
+export const formatDateForTable = (
+  date: string | Date | null | undefined,
+): string => {
+  return formatCrmPreviewDate(date);
+};
+
+/**
+ * CRM preview panels with time: e.g. "30 March, 2025 at 03:45 PM"
+ */
+export const formatCrmPreviewDateTime = (
+  date: dateType,
+): string => {
+  if (!date) return "";
+  try {
+    const m = moment(date);
+    if (!m.isValid()) return "";
+    return m.format("D MMMM, YYYY [at] hh:mm A");
+  } catch (error) {
+    console.error("Error formatting CRM preview datetime:", error);
     return "";
   }
 };
@@ -1074,6 +1100,26 @@ function isValide164PhoneNumber(value: unknown): boolean {
     return phoneNumber?.isValid() ?? false;
   }
   return false;
+}
+
+/** Toolbar/search text: strip invisible chars, collapse whitespace, trim. */
+export function normalizeSearchQuery(value: string | null | undefined): string {
+  if (value == null) return "";
+  return String(value)
+    .replaceAll(/[\u200B-\u200D\uFEFF\u2060]/g, "")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Search field while typing: strip zero-width / invisible chars only.
+ * Do not trim or collapse whitespace here — trimming on each keystroke removes
+ * trailing spaces and breaks typing multi-word queries (e.g. "John Doe").
+ * Use {@link normalizeSearchQuery} when committing search (Enter / API).
+ */
+export function sanitizeSearchInputLive(value: string | null | undefined): string {
+  if (value == null) return "";
+  return String(value).replaceAll(/[\u200B-\u200D\uFEFF\u2060]/g, "");
 }
 
 export const getGlobalExcludedPaths = () => ["/auth/signin"];

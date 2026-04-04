@@ -37,6 +37,7 @@
       "@services/*": ["src/services/*"],
       "@models/*": ["src/Models/*"],
       "@hooks/*": ["src/hooks/*"],
+      "@crm/*": ["src/crm/*"],
       "@types/*": ["src/types/*"],
       "@typings/*": ["src/types/*"],
       "@constants/*": ["src/constants/*"],
