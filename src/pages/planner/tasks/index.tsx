@@ -38,6 +38,7 @@ import {
   plannerTaskRowDeleteDeniedTitle,
   plannerTaskRowEditDeniedTitle,
 } from "@planner/taskRowPermissions";
+import { extensionOrIdToTrimmedString } from "@planner/projectTabsContentUtils";
 import { useSession } from "next-auth/react";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug } from "@utils/Helper";
@@ -191,8 +192,7 @@ function normalizePlannerStatusesFromApi(raw: unknown): PlannerWorkflowStatusRow
     const o = item as Record<string, unknown>;
     const idNum = typeof o.id === "number" ? o.id : Number(o.id);
     if (!Number.isFinite(idNum)) continue;
-    const nameRaw = o.name;
-    const name = typeof nameRaw === "string" ? nameRaw.trim() : String(nameRaw ?? "").trim();
+    const name = extensionOrIdToTrimmedString(o.name);
     out.push({ id: idNum, name: name || String(idNum) });
   }
   return out;
