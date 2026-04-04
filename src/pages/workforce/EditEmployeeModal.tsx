@@ -7,7 +7,6 @@ import { toast } from "react-toastify";
 import {
   getUserProfile,
   updateUserProfile,
-  getMainAppUsers,
   type UserProfile,
   type UserProfilePayload,
   type UserProfileAddress,
@@ -17,15 +16,19 @@ import { isOptionalWorkforcePhoneValid } from "@utils/workforcePhoneValidation";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
-
-const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
-const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
-/** Employee code, CNIC / ID, and similar short profile text fields. */
-const WORKFORCE_PROFILE_SHORT_TEXT_MAX = 50;
-const DESIGNATION_MAX_LENGTH = 100;
-const ADDRESS_NAME_MAX_LENGTH = 150;
-const ADDRESS_ZIP_CODE_MAX_LENGTH = 50;
-const ADDRESS_STREET_MAX_LENGTH = 200;
+import {
+  ADDRESS_NAME_MAX_LENGTH,
+  ADDRESS_STREET_MAX_LENGTH,
+  ADDRESS_ZIP_CODE_MAX_LENGTH,
+  CONTRACT_TYPES,
+  DESIGNATION_MAX_LENGTH,
+  EMPLOYMENT_TYPES,
+  employeeModalReactSelectStyles,
+  fetchDepartmentUserRowsForModal,
+  validateEmployeeModalAddressRows,
+  WORKFORCE_PROFILE_SHORT_TEXT_MAX,
+  type DepartmentUserRow,
+} from "./employeeModalShared";
 
 export type AddressFormItem = UserProfileAddress & {
   state?: string;
@@ -33,8 +36,6 @@ export type AddressFormItem = UserProfileAddress & {
   stateCode?: string;
   localId: string;
 };
-type DepartmentUserRow = { id: number; name: string; phone: string };
-type MainAppUserApiRow = { id: number; name?: string; phone?: string | number | null; phone_no?: string | number | null };
 
 const defaultAddress: AddressFormItem = {
   name: "",
@@ -46,28 +47,6 @@ const defaultAddress: AddressFormItem = {
   countryCode: "",
   stateCode: "",
   localId: "",
-};
-
-const selectStyles = {
-  control: (provided: Record<string, unknown>, state: { isFocused?: boolean }) => ({
-    ...provided,
-    minHeight: "48px",
-    height: "48px",
-    fontSize: "0.875rem",
-    borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-    boxShadow: state.isFocused ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)" : "none",
-    borderRadius: "0.375rem",
-    "&:hover": { borderColor: state.isFocused ? "#86b7fe" : "#DBE0E5" },
-  }),
-  valueContainer: (provided: Record<string, unknown>) => ({ ...provided, height: "48px", padding: "0 8px" }),
-  input: (provided: Record<string, unknown>) => ({ ...provided, margin: "0px", padding: "0px" }),
-  indicatorSeparator: () => ({ display: "none" }),
-  indicatorsContainer: (provided: Record<string, unknown>) => ({ ...provided, height: "48px" }),
-  placeholder: (provided: Record<string, unknown>) => ({ ...provided, color: "#6c757d", fontSize: "0.875rem" }),
-  singleValue: (provided: Record<string, unknown>) => ({ ...provided, fontSize: "0.875rem", lineHeight: "1.5" }),
-  multiValue: (provided: Record<string, unknown>) => ({ ...provided, backgroundColor: "#e7f1ff", borderRadius: "0.25rem" }),
-  multiValueLabel: (provided: Record<string, unknown>) => ({ ...provided, color: "#0d6efd", fontSize: "0.875rem", padding: "2px 6px" }),
-  multiValueRemove: (provided: Record<string, unknown>) => ({ ...provided, color: "#0d6efd", "&:hover": { backgroundColor: "#b6d4fe", color: "#0d6efd" } }),
 };
 
 function mapProfileToAddressFormItem(a: UserProfileAddress): AddressFormItem {
@@ -104,27 +83,6 @@ function mapProfileToAddressFormItem(a: UserProfileAddress): AddressFormItem {
   };
 }
 
-function userPhoneFromRow(user: MainAppUserApiRow): string {
-  const raw = user.phone ?? user.phone_no;
-  if (raw == null) return "";
-  return String(raw).trim();
-}
-
-function validateAddressRowsRequiredForEdit(
-  rows: AddressFormItem[],
-): { ok: true } | { ok: false; message: string } {
-  for (let i = 0; i < rows.length; i += 1) {
-    const row = rows[i];
-    if (!(row.name ?? "").trim()) {
-      return { ok: false, message: `Address #${i + 1}: name is required.` };
-    }
-    if (!(row.address ?? "").trim()) {
-      return { ok: false, message: `Address #${i + 1}: street address is required.` };
-    }
-  }
-  return { ok: true };
-}
-
 function isEditEmployeeReadyToSubmit(
   form: Partial<UserProfilePayload>,
   addresses: AddressFormItem[],
@@ -136,7 +94,7 @@ function isEditEmployeeReadyToSubmit(
   if (!form.employment_type?.toString().trim()) return false;
   if (!form.contract_type?.toString().trim()) return false;
   if (!form.department_id) return false;
-  return validateAddressRowsRequiredForEdit(addresses).ok;
+  return validateEmployeeModalAddressRows(addresses).ok;
 }
 
 export interface EditEmployeeModalProps {
@@ -207,24 +165,13 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       }
       setLoadingDepartmentUsers(true);
       try {
-        const usersRaw = await getMainAppUsers(companyUuid, { department_id: departmentId });
-        const list = Array.isArray(usersRaw)
-          ? (usersRaw as MainAppUserApiRow[])
-              .map((u) => ({
-                id: u.id,
-                name: u.name ?? "—",
-                phone: userPhoneFromRow(u),
-              }))
-              .filter((u) => u.phone !== "")
-          : [];
+        const list = await fetchDepartmentUserRowsForModal(companyUuid, departmentId);
         setDepartmentUsers(list);
-      } catch {
-        setDepartmentUsers([]);
       } finally {
         setLoadingDepartmentUsers(false);
       }
     },
-    [companyUuid]
+    [companyUuid],
   );
 
   useEffect(() => {
@@ -362,7 +309,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       toast.error("Enter a valid phone number or clear the field.");
       return;
     }
-    const addressValidation = validateAddressRowsRequiredForEdit(addresses);
+    const addressValidation = validateEmployeeModalAddressRows(addresses);
     if (!addressValidation.ok) {
       toast.error(addressValidation.message);
       return;
@@ -431,7 +378,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
               value={selectedUserOption}
               resetSearchOnValueChange={show}
               onChange={(opt) => setForm((f) => ({ ...f, user_id: opt?.value ?? "" }))}
-              styles={selectStyles}
+              styles={employeeModalReactSelectStyles}
             />
             {!userOptionsLoading && form.department_id != null && userOptions.length === 0 && (
               <Form.Text className="text-muted">No users available for this department.</Form.Text>
@@ -668,7 +615,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                                 placeholder="Select Country"
                                 value={addr.countryCode ? countryOptions.find((o) => o.value === addr.countryCode) ?? null : null}
                                 onChange={(opt) => updateAddressCountry(addr.localId, opt)}
-                                styles={selectStyles}
+                                styles={employeeModalReactSelectStyles}
                               />
                             </Form.Group>
                           </div>
@@ -685,7 +632,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                                 isDisabled={!addr.countryCode}
                                 value={addr.stateCode ? stateOptions.find((o) => o.value === addr.stateCode) ?? null : null}
                                 onChange={(opt) => updateAddressState(addr.localId, opt)}
-                                styles={selectStyles}
+                                styles={employeeModalReactSelectStyles}
                               />
                             </Form.Group>
                           </div>
@@ -702,7 +649,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                                 isDisabled={!addr.stateCode}
                                 value={addr.city ? (cityOptions.find((o) => o.value === addr.city) ?? { value: addr.city, label: addr.city }) : null}
                                 onChange={(opt) => updateAddressField(addr.localId, "city", opt?.value ?? "")}
-                                styles={selectStyles}
+                                styles={employeeModalReactSelectStyles}
                               />
                             </Form.Group>
                           </div>
