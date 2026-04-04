@@ -26,7 +26,9 @@ $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@300;
 [data-nextjs-portal] {
   display: none !important;
 }
-
+.contact-sidebar-container,.create-lead-sidebar-container{
+   width: min(600px, 100vw) !important;
+}
 .pc-sidebar{
     background-color:#ffffff !important;
 }
