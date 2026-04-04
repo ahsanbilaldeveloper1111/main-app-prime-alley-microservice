@@ -1014,7 +1014,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       callingDeviceName: callEntry.callingDeviceName || '',
       controllerAddress : transferInitiatorAddress,
       controllerDeviceName: transferInitiatorDeviceName,
-      controllerDeviceType: transferInitiatorDeviceType,
+      controllerDeviceType: transferInitiatorDeviceType == "SOFT" ? "SOFT_HARD" : transferInitiatorDeviceType,
     });
     if (!holdResult.success) {
       return holdResult;

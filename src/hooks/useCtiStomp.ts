@@ -697,7 +697,9 @@ export default function useCtiStomp(
     }
     // Helper function to fully close and cleanup all connections
     const fullyCloseConnection = async (
-      preserveReconnecting: boolean = false
+      preserveReconnecting: boolean = false,
+      /** When true, do not clear token/userAddress/teams/extensions refs (used after getBearerToken, before connectViaSSE). */
+      preserveConnectAuthSnapshot: boolean = false,
     ) => {
       const currentInstanceId = instanceIdRef.current;
       console.log(
@@ -755,10 +757,12 @@ export default function useCtiStomp(
       }
 
       // Clear token, userAddress, userTeams, and userDataExtensions refs to force fresh token on next connection
-      tokenRef.current = null;
-      userAddressRef.current = null;
-      userTeamsRef.current = null;
-      userDataExtensionsRef.current = null;
+      if (!preserveConnectAuthSnapshot) {
+        tokenRef.current = null;
+        userAddressRef.current = null;
+        userTeamsRef.current = null;
+        userDataExtensionsRef.current = null;
+      }
 
       // Reset UI state
       setIsInitialized(false);
@@ -863,9 +867,10 @@ export default function useCtiStomp(
     ) => {
       const currentInstanceId = instanceIdRef.current;
 
-      // If force reconnect, fully close everything first
+      // If force reconnect, tear down transports/timers but keep auth snapshot from getBearerToken()
+      // (a second full close would null userTeamsRef/userDataExtensionsRef; connectViaSSE does not restore them).
       if (forceReconnect) {
-        await fullyCloseConnection();
+        await fullyCloseConnection(false,true);
       } else {
         // Always close existing connection first to ensure fresh connection
         if (eventSourceRef.current) {
