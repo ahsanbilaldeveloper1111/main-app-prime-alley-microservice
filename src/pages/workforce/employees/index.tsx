@@ -248,6 +248,28 @@ function hierarchyLabel(item: unknown): string {
   return "—";
 }
 
+/** Local calendar date as YYYY-MM-DD for `<input type="date" min>` and comparisons */
+function localDateIsoToday(): string {
+  return moment().format("YYYY-MM-DD");
+}
+
+/**
+ * Earliest allowed journey start: not before the employee record's `created_at` (local calendar day)
+ * and not before today.
+ */
+function journeyStartDateMinIso(profile: UserProfile | null | undefined): string {
+  const today = localDateIsoToday();
+  if (profile == null) return today;
+  const raw = profile["created_at"];
+  if (typeof raw !== "string" || raw.trim() === "") return today;
+  const createdDay = moment(raw);
+  if (!createdDay.isValid()) return today;
+  const createdIso = createdDay.format("YYYY-MM-DD");
+  const todayM = moment(today, "YYYY-MM-DD");
+  const createdM = moment(createdIso, "YYYY-MM-DD");
+  return moment.max(todayM, createdM).format("YYYY-MM-DD");
+}
+
 const Employees = () => {
   const router = useRouter();
   const { data: session } = useSession();
@@ -460,7 +482,7 @@ const Employees = () => {
     e?.stopPropagation();
     setJourneyModalProfile(profile);
     setJourneyForm({
-      startDate: moment().format("YYYY-MM-DD"),
+      startDate: journeyStartDateMinIso(profile),
       status: "in_progress",
     });
     setShowJourneyModal(true);
@@ -477,6 +499,11 @@ const Employees = () => {
     const startDate = journeyForm.startDate.trim();
     if (startDate === "") {
       toast.warn("Please select a start date.");
+      return;
+    }
+    const minStart = journeyStartDateMinIso(journeyModalProfile);
+    if (startDate < minStart) {
+      toast.warn("Start date cannot be before the employee was created or before today.");
       return;
     }
     const departmentId = journeyModalProfile.department_id;
@@ -684,6 +711,18 @@ const Employees = () => {
       {
         key: "designation",
         label: "Designation",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "employment_type",
+        label: "Employment Type",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "contract_type",
+        label: "Contract Type",
         type: "text",
         sortable: false,
       },
@@ -1783,22 +1822,25 @@ const Employees = () => {
               <Form.Group className="mb-3">
                 {/* <Form.Label className="text-muted small">Employee</Form.Label> */}
                 <div style={{ fontWeight: 600, color: "#1f2937", marginBottom: "2px" }}>
-                  {getDisplayName(journeyModalProfile)}
+                  Create journey for: {getDisplayName(journeyModalProfile)}
                 </div>
-                <div className="text-muted small">
-                  Phone: {journeyModalProfile.extension_number ?? journeyModalProfile.phone ?? "—"}
-                </div>
-                <div className="text-muted small">
-                  Department: {mainAppDepartments.find((d: MainAppDepartment) => Number(d.id) === Number(journeyModalProfile.department_id))?.name ?? "—"}
-                </div>
+               
               </Form.Group>
               <Form.Group className="mb-3">
                 <Form.Label>Start Date</Form.Label>
                 <Form.Control
                   type="date"
+                  min={journeyStartDateMinIso(journeyModalProfile)}
                   value={journeyForm.startDate}
-                  onChange={(e) => setJourneyForm((f) => ({ ...f, startDate: e.target.value }))}
-                  
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    const minStart = journeyStartDateMinIso(journeyModalProfile);
+                    if (next !== "" && next < minStart) {
+                      toast.warn("Start date cannot be before the employee was created or before today.");
+                      return;
+                    }
+                    setJourneyForm((f) => ({ ...f, startDate: next }));
+                  }}
                 />
               </Form.Group>
               <Form.Group className="mb-3">

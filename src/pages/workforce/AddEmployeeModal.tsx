@@ -18,6 +18,12 @@ import "react-phone-number-input/style.css";
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
+/** Employee code, CNIC / ID, and similar short profile text fields. */
+const WORKFORCE_PROFILE_SHORT_TEXT_MAX = 50;
+const DESIGNATION_MAX_LENGTH = 100;
+const ADDRESS_NAME_MAX_LENGTH = 150;
+const ADDRESS_ZIP_CODE_MAX_LENGTH = 50;
+const ADDRESS_STREET_MAX_LENGTH = 200;
 /** Address form row with country-state-city cascade fields */
 export type AddressFormItem = UserProfileAddress & { state?: string; countryCode?: string; stateCode?: string };
 type AddressFieldKey = "name" | "zip_code" | "city" | "country" | "address" | "state" | "countryCode" | "stateCode";
@@ -127,6 +133,21 @@ function validateAddEmployeeRequired(form: Partial<UserProfilePayload>): { ok: t
   }
   if (!form.designation?.toString().trim()) {
     return { ok: false, message: "Designation is required" };
+  }
+  return { ok: true };
+}
+
+function validateAddressRowsRequired(
+  rows: AddressFormItemWithId[],
+): { ok: true } | { ok: false; message: string } {
+  for (let i = 0; i < rows.length; i += 1) {
+    const row = rows[i];
+    if (!(row.name ?? "").trim()) {
+      return { ok: false, message: `Address #${i + 1}: name is required.` };
+    }
+    if (!(row.address ?? "").trim()) {
+      return { ok: false, message: `Address #${i + 1}: street address is required.` };
+    }
   }
   return { ok: true };
 }
@@ -267,6 +288,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   }, []);
 
   const requiredValidation = useMemo(() => validateAddEmployeeRequired(form), [form]);
+  const addressRowsValidation = useMemo(() => validateAddressRowsRequired(addresses), [addresses]);
   const phoneFieldValid = useMemo(() => isOptionalWorkforcePhoneValid(form.phone), [form.phone]);
   const phoneShowInvalid = Boolean(form.phone?.toString().trim()) && !phoneFieldValid;
 
@@ -279,6 +301,11 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     }
     if (!phoneFieldValid) {
       toast.error("Enter a valid phone number or clear the field.");
+      return;
+    }
+    const addressValidation = validateAddressRowsRequired(addresses);
+    if (!addressValidation.ok) {
+      toast.error(addressValidation.message);
       return;
     }
     setSubmitting(true);
@@ -366,28 +393,73 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           <Form.Group className="mb-3">
             <Form.Label>Employee Code</Form.Label>
             <Form.Control
+              type="text"
+              maxLength={WORKFORCE_PROFILE_SHORT_TEXT_MAX}
               value={form.employee_code ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, employee_code: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  employee_code: e.target.value.slice(0, WORKFORCE_PROFILE_SHORT_TEXT_MAX),
+                }))
+              }
               placeholder="Employee code"
             />
+            <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+              <Form.Text className="text-muted mb-0">
+                Maximum {WORKFORCE_PROFILE_SHORT_TEXT_MAX} characters allowed.
+              </Form.Text>
+              <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
+                {(form.employee_code ?? "").length}/{WORKFORCE_PROFILE_SHORT_TEXT_MAX}
+              </Form.Text>
+            </div>
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>Identification Number (CNIC)</Form.Label>
             <Form.Control
+              type="text"
+              maxLength={WORKFORCE_PROFILE_SHORT_TEXT_MAX}
               value={form.identification_number ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, identification_number: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  identification_number: e.target.value.slice(0, WORKFORCE_PROFILE_SHORT_TEXT_MAX),
+                }))
+              }
               placeholder="CNIC / ID"
             />
+            <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+              <Form.Text className="text-muted mb-0">
+                Maximum {WORKFORCE_PROFILE_SHORT_TEXT_MAX} characters allowed.
+              </Form.Text>
+              <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
+                {(form.identification_number ?? "").length}/{WORKFORCE_PROFILE_SHORT_TEXT_MAX}
+              </Form.Text>
+            </div>
           </Form.Group>
           
           <Form.Group className="mb-3">
             <Form.Label>Designation <span className="text-danger">*</span> </Form.Label>
             <Form.Control
+              type="text"
+              maxLength={DESIGNATION_MAX_LENGTH}
               value={form.designation ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, designation: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  designation: e.target.value.slice(0, DESIGNATION_MAX_LENGTH),
+                }))
+              }
               placeholder="Designation"
               required
             />
+            <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+              <Form.Text className="text-muted mb-0">
+                Maximum {DESIGNATION_MAX_LENGTH} characters allowed.
+              </Form.Text>
+              <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
+                {(form.designation ?? "").length}/{DESIGNATION_MAX_LENGTH}
+              </Form.Text>
+            </div>
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>Employment Type <span className="text-danger">*</span> </Form.Label>
@@ -496,22 +568,57 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                         <div className="row g-3">
                           <div className="col-md-6">
                             <Form.Group>
-                              <Form.Label>Name</Form.Label>
+                              <Form.Label>
+                                Name <span className="text-danger">*</span>
+                              </Form.Label>
                               <Form.Control
+                                type="text"
+                                maxLength={ADDRESS_NAME_MAX_LENGTH}
                                 value={addr.name ?? ""}
-                                onChange={(e) => updateAddressField(addr.uiId, "name", e.target.value)}
+                                onChange={(e) =>
+                                  updateAddressField(
+                                    addr.uiId,
+                                    "name",
+                                    e.target.value.slice(0, ADDRESS_NAME_MAX_LENGTH),
+                                  )
+                                }
                                 placeholder="e.g. Head Office"
+                                required
                               />
+                              <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+                                <Form.Text className="text-muted mb-0">
+                                  Maximum {ADDRESS_NAME_MAX_LENGTH} characters allowed.
+                                </Form.Text>
+                                <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
+                                  {(addr.name ?? "").length}/{ADDRESS_NAME_MAX_LENGTH}
+                                </Form.Text>
+                              </div>
                             </Form.Group>
                           </div>
                           <div className="col-md-6">
                             <Form.Group>
                               <Form.Label>Zip / Postal Code</Form.Label>
                               <Form.Control
+                                type="text"
+                                maxLength={ADDRESS_ZIP_CODE_MAX_LENGTH}
                                 value={addr.zip_code ?? ""}
-                                onChange={(e) => updateAddressField(addr.uiId, "zip_code", e.target.value)}
+                                onChange={(e) =>
+                                  updateAddressField(
+                                    addr.uiId,
+                                    "zip_code",
+                                    e.target.value.slice(0, ADDRESS_ZIP_CODE_MAX_LENGTH),
+                                  )
+                                }
                                 placeholder="Zip / Postal Code"
                               />
+                              <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+                                <Form.Text className="text-muted mb-0">
+                                  Maximum {ADDRESS_ZIP_CODE_MAX_LENGTH} characters allowed.
+                                </Form.Text>
+                                <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
+                                  {(addr.zip_code ?? "").length}/{ADDRESS_ZIP_CODE_MAX_LENGTH}
+                                </Form.Text>
+                              </div>
                             </Form.Group>
                           </div>
                           <div className="col-md-6">
@@ -585,14 +692,32 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                           <div className="col-md-6" />
                           <div className="col-12">
                             <Form.Group>
-                              <Form.Label>Address</Form.Label>
+                              <Form.Label>
+                                Address <span className="text-danger">*</span>
+                              </Form.Label>
                               <Form.Control
                                 as="textarea"
                                 rows={2}
+                                maxLength={ADDRESS_STREET_MAX_LENGTH}
                                 value={addr.address ?? ""}
-                                onChange={(e) => updateAddressField(addr.uiId, "address", e.target.value)}
+                                onChange={(e) =>
+                                  updateAddressField(
+                                    addr.uiId,
+                                    "address",
+                                    e.target.value.slice(0, ADDRESS_STREET_MAX_LENGTH),
+                                  )
+                                }
                                 placeholder="Street address"
+                                required
                               />
+                              <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+                                <Form.Text className="text-muted mb-0">
+                                  Maximum {ADDRESS_STREET_MAX_LENGTH} characters allowed.
+                                </Form.Text>
+                                <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
+                                  {(addr.address ?? "").length}/{ADDRESS_STREET_MAX_LENGTH}
+                                </Form.Text>
+                              </div>
                             </Form.Group>
                           </div>
                         </div>
@@ -611,7 +736,16 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
           <Button variant="secondary" onClick={handleCancelClick} type="button">
             Cancel
           </Button>
-          <Button variant="primary" type="submit" disabled={submitting || !requiredValidation.ok || !phoneFieldValid}>
+          <Button
+            variant="primary"
+            type="submit"
+            disabled={
+              submitting ||
+              !requiredValidation.ok ||
+              !addressRowsValidation.ok ||
+              !phoneFieldValid
+            }
+          >
             {submitting ? "Creating…" : "Create"}
           </Button>
         </Modal.Footer>

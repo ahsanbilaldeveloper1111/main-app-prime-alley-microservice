@@ -12,6 +12,13 @@ import {
   Search,
 } from 'lucide-react';
 import { putUserProfileParent, putUserProfileBulkReports, type UserProfileMinified } from '@utils/staffManagement';
+import { formatPhoneForDisplay } from '@utils/phoneDisplay';
+import {
+  filterOrgChartUsersWithMinifiedProfile,
+  mainAppUserMatchesOrgChartUserId,
+  mainAppUserRowKeyForSelection,
+  normalizeOrgChartUserKey,
+} from './orgChartMainAppUserMatch';
 
 interface Employee {
   id: string;
@@ -29,6 +36,9 @@ interface Employee {
 interface RawOrgChartProfile {
   id?: number;
   user_id?: string;
+  /** Org-chart API may send profile id; `putUserProfileParent` expects manager extension (`user_id`). */
+  parent_id?: number | string | null;
+  parent_profile_id?: number | null;
   employee_code?: string;
   identification_number?: string;
   job_title?: string;
@@ -45,6 +55,8 @@ interface RawOrgChartProfile {
 interface UserOption {
   id: number;
   name: string;
+  /** Extension; org-chart `user_id` matches this (not necessarily `id`). */
+  phone?: string | null;
 }
 
 interface OrganizationEmployeeSidebarProps {
@@ -75,6 +87,38 @@ function findEmployeeParent(tree: Employee, targetId: string, parent: Employee |
     }
   }
   return null;
+}
+
+/**
+ * Value for `<select>` when options use extension (`phone`) as `value`.
+ * Resolves numeric profile `parent_id` / `parent_profile_id` via minified profiles.
+ */
+function parentProfileFieldToManagerExtensionForSelect(
+  rawProfile: RawOrgChartProfile | null | undefined,
+  profiles: UserProfileMinified[],
+): string {
+  if (rawProfile == null) return "";
+  const pid = rawProfile.parent_id ?? rawProfile.parent_profile_id;
+  if (pid == null || pid === "") return "";
+
+  if (typeof pid === "number" && Number.isFinite(pid)) {
+    const prof = profiles.find((p) => Number(p.id) === pid);
+    if (prof?.user_id == null) return "";
+    return normalizeOrgChartUserKey(prof.user_id);
+  }
+
+  const trimmed = String(pid).trim();
+  if (trimmed === "") return "";
+  const asNum = Number(trimmed);
+  if (Number.isNaN(asNum) || !Number.isFinite(asNum) || String(asNum) !== trimmed) {
+    return normalizeOrgChartUserKey(trimmed);
+  }
+  const profByNumericString = profiles.find((p) => Number(p.id) === asNum);
+  if (profByNumericString?.user_id != null) {
+    const ext = normalizeOrgChartUserKey(profByNumericString.user_id);
+    if (ext !== "") return ext;
+  }
+  return normalizeOrgChartUserKey(trimmed);
 }
 
 type SidebarEmployeeStatus = Employee['status'];
@@ -133,18 +177,25 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
   }, [manager, userProfilesMinified]);
 
   const dropdownUsers = useMemo(
-    () => users.filter((u) => String(u.id) !== String(rawProfile?.user_id)),
-    [users, rawProfile?.user_id]
+    () =>
+      filterOrgChartUsersWithMinifiedProfile(
+        users.filter((u) => !mainAppUserMatchesOrgChartUserId(u, rawProfile?.user_id)),
+        userProfilesMinified,
+      ),
+    [users, rawProfile?.user_id, userProfilesMinified],
   );
 
   const directReportOptionUsers = useMemo(
     () =>
-      users.filter((u) => {
-        if (String(u.id) === String(rawProfile?.user_id)) return false;
-        if (managerUserId != null && String(u.id) === managerUserId) return false;
-        return true;
-      }),
-    [users, rawProfile?.user_id, managerUserId]
+      filterOrgChartUsersWithMinifiedProfile(
+        users.filter((u) => {
+          if (mainAppUserMatchesOrgChartUserId(u, rawProfile?.user_id)) return false;
+          if (managerUserId != null && mainAppUserMatchesOrgChartUserId(u, managerUserId)) return false;
+          return true;
+        }),
+        userProfilesMinified,
+      ),
+    [users, rawProfile?.user_id, managerUserId, userProfilesMinified],
   );
 
   const initialChildUserIds = useMemo(
@@ -156,6 +207,11 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
     setChildUserIds(initialChildUserIds);
   }, [initialChildUserIds]);
 
+  const parentSelectValue = useMemo(
+    () => parentProfileFieldToManagerExtensionForSelect(rawProfile, userProfilesMinified),
+    [rawProfile, userProfilesMinified],
+  );
+
   const joinDateFormatted = rawProfile?.created_at
     ? new Date(rawProfile.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
     : '—';
@@ -164,7 +220,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
     email: rawProfile?.user_id
       ? `${rawProfile.user_id}@company.com`
       : `${employee.name.toLowerCase().replaceAll(/\s+/g, '.')}@company.com`,
-    phone: rawProfile?.phone ?? '—',
+    phone: rawProfile?.phone,
     location: '—',
     employeeId: rawProfile?.employee_code ?? (employee.id ? `EMP-${String(employee.id).padStart(5, '0')}` : '—'),
     joinDate: joinDateFormatted,
@@ -456,7 +512,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
               {rawProfile?.parent_id ? 'Change Head' : 'Choose Head'}
             </h3>
             <select
-              value={rawProfile?.parent_id == null ? '' : String(rawProfile.parent_id)}
+              value={parentSelectValue}
               onChange={handleParentSelectChange}
               disabled={updatingParent}
               style={{
@@ -471,7 +527,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             >
               <option value="">Select manager</option>
               {dropdownUsers.map((u) => (
-                <option key={u.id} value={String(u.id)}>
+                <option key={u.id} value={mainAppUserRowKeyForSelection(u)}>
                   {u.name}
                 </option>
               ))}
@@ -515,7 +571,7 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '200px', overflowY: 'auto' }}>
               {filteredDirectReportOptionUsers.map((u) => {
-                const uid = String(u.id);
+                const uid = mainAppUserRowKeyForSelection(u);
                 const checked = childUserIds.includes(uid);
                 return (
                   <label
@@ -705,8 +761,8 @@ const OrganizationEmployeeSidebar: React.FC<OrganizationEmployeeSidebarProps> = 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Phone size={14} color="#9ca3af" />
-                <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                  {employeeDetails.phone}
+                <span style={{ fontSize: '14px', color: '#1f2937' }}>
+                  {formatPhoneForDisplay(employeeDetails.phone)}
                 </span>
               </div>
             </div>

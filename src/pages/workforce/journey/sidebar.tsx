@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   X,
   Briefcase,
@@ -26,6 +26,7 @@ import { Form, Modal } from "react-bootstrap";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment";
+import { JOURNEY_STATUS_OPTIONS as STATUS_OPTIONS } from "./journeyStatusOptions";
 
 /** API journey step shape */
 interface JourneyStepRecord {
@@ -74,12 +75,6 @@ interface OnboardingDetailSidebarProps {
   onRefreshJourneys?: () => void;
 }
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "in_progress", label: "In Progress" },
-  { value: "on_track", label: "On Track" },
-  { value: "completed", label: "Completed (End Journey)" },
-];
-
 function statusDisplayToApiValue(display: string): string {
   const map: Record<string, string> = {
     "In Progress": "in_progress",
@@ -104,6 +99,25 @@ function formatJourneyStepStatusForDisplay(status: string): string {
 
 function logJourneySidebarError(context: string, error: unknown): void {
   console.error(`[OnboardingDetailSidebar] ${context}`, error);
+}
+
+/** `journey.start_date` (ISO) → `YYYY-MM-DD` for `<input type="date" min>` (UTC calendar date). */
+function journeyStartDateToInputMin(iso: string | null | undefined): string | undefined {
+  if (iso == null || String(iso).trim() === "") return undefined;
+  const trimmed = String(iso).trim();
+  if (Number.isNaN(Date.parse(trimmed))) return undefined;
+  return moment.utc(trimmed).format("YYYY-MM-DD");
+}
+
+function readJourneyStartDateFromPayload(data: unknown): string | null {
+  if (data == null || typeof data !== "object") return null;
+  const s = (data as { start_date?: unknown }).start_date;
+  return typeof s === "string" && s.trim() !== "" ? s.trim() : null;
+}
+
+function clampDueDateToJourneyMin(due: string, min: string | undefined): string {
+  if (min == null || min === "") return due;
+  return due < min ? min : due;
 }
 
 const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ employee, onClose, onRefreshJourneys }) => {
@@ -141,29 +155,43 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
   const [showDeleteJourneyModal, setShowDeleteJourneyModal] = useState(false);
   const [showDeleteStepModal, setShowDeleteStepModal] = useState(false);
   const [stepPendingDelete, setStepPendingDelete] = useState<JourneyStepRecord | null>(null);
+  const [journeyStartDateIso, setJourneyStartDateIso] = useState<string | null>(null);
 
   useEffect(() => {
     setStatusValue(statusDisplayToApiValue(employee.status));
   }, [employee.id, employee.status]);
+
+  const isJourneyCompleted = useMemo(
+    () => statusValue === "completed" || isEmployeeJourneyDisplayCompleted(employee.status),
+    [statusValue, employee.status],
+  );
+
+  const journeyDueDateMin = useMemo(
+    () => journeyStartDateToInputMin(journeyStartDateIso),
+    [journeyStartDateIso],
+  );
 
   const journeyId = Number(employee.id);
   const canUpdateJourney = Number.isInteger(journeyId) && journeyId > 0;
 
   useEffect(() => {
     if (!canUpdateJourney) return;
+    setJourneyStartDateIso(null);
     let cancelled = false;
     setStepsLoading(true);
     getJourney(journeyId)
       .then((data) => {
         if (cancelled) return;
-        const raw = data as { steps?: JourneyStepRecord[] };
+        const raw = data as { steps?: JourneyStepRecord[]; start_date?: string };
         const list = Array.isArray(raw?.steps) ? raw.steps : [];
         setJourneySteps(list);
+        setJourneyStartDateIso(readJourneyStartDateFromPayload(raw));
       })
       .catch((error: unknown) => {
         if (!cancelled) {
           logJourneySidebarError("getJourney failed", error);
           setJourneySteps([]);
+          setJourneyStartDateIso(null);
         }
       })
       .finally(() => {
@@ -174,11 +202,26 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
     };
   }, [journeyId, canUpdateJourney]);
 
+  useEffect(() => {
+    if (!showAddStepForm || journeyDueDateMin == null) return;
+    setAddStepForm((f) =>
+      f.due_date < journeyDueDateMin ? { ...f, due_date: journeyDueDateMin } : f,
+    );
+  }, [showAddStepForm, journeyDueDateMin]);
+
   const handleAddStepSubmit = async () => {
     if (!canUpdateJourney) return;
 
     if(!addStepForm.title.trim()) {
       toast.error("Task is required");
+      return;
+    }
+    if (
+      journeyDueDateMin != null &&
+      addStepForm.due_date !== "" &&
+      addStepForm.due_date < journeyDueDateMin
+    ) {
+      toast.error("Due date cannot be before the journey start date.");
       return;
     }
     setAddStepSubmitting(true);
@@ -194,11 +237,15 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
       });
       toast.success("Step added.");
       setShowAddStepForm(false);
+      const nextDue = clampDueDateToJourneyMin(
+        new Date().toISOString().slice(0, 10),
+        journeyDueDateMin,
+      );
       setAddStepForm({
         stage: "",
         title: "",
         description: "",
-        due_date: new Date().toISOString().slice(0, 10),
+        due_date: nextDue,
         status: "pending",
         sort_order: journeySteps.length,
       });
@@ -214,9 +261,10 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
   };
 
   const openEditStep = (step: JourneyStepRecord) => {
-    const due = step.due_date
+    const dueRaw = step.due_date
       ? moment(step.due_date).format("YYYY-MM-DD")
       : new Date().toISOString().slice(0, 10);
+    const due = clampDueDateToJourneyMin(dueRaw, journeyDueDateMin);
     setEditingStep(step);
     setEditStepForm({
       stage: step.stage ?? "",
@@ -230,6 +278,14 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
 
   const handleEditStepSubmit = async () => {
     if (!editingStep?.id || !canUpdateJourney) return;
+    if (
+      journeyDueDateMin != null &&
+      editStepForm.due_date !== "" &&
+      editStepForm.due_date < journeyDueDateMin
+    ) {
+      toast.error("Due date cannot be before the journey start date.");
+      return;
+    }
     setEditStepSubmitting(true);
     try {
       await updateJourneyStep(journeyId, editingStep.id, {
@@ -305,7 +361,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
 
   const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
-    if (!canUpdateJourney) return;
+    if (!canUpdateJourney || isJourneyCompleted) return;
     setStatusUpdating(true);
     try {
       await updateJourney(journeyId, { status: newStatus });
@@ -848,16 +904,16 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
             className="form-select"
             value={statusValue}
             onChange={handleStatusChange}
-            disabled={statusUpdating}
+            disabled={statusUpdating || isJourneyCompleted}
             style={{
               width: "100%",
               padding: "10px 12px",
               fontSize: "14px",
               border: "1px solid #e5e7eb",
               borderRadius: "8px",
-              backgroundColor: "white",
+              backgroundColor: isJourneyCompleted ? "#f9fafb" : "white",
               color: "#1f2937",
-              cursor: statusUpdating ? "not-allowed" : "pointer",
+              cursor: statusUpdating || isJourneyCompleted ? "not-allowed" : "pointer",
             }}
           >
             {STATUS_OPTIONS.map((opt) => (
@@ -877,11 +933,16 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
         <div style={{ padding: "16px 24px", borderTop: "1px solid #e9d5ff", flex: 1, overflow: "auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
             <span style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>Steps</span>
+           
             {!isEmployeeJourneyDisplayCompleted(employee.status) && (
               <button
                 type="button"
                 onClick={() => {
-                  setAddStepForm((f) => ({ ...f, sort_order: journeySteps.length }));
+                  setAddStepForm((f) => ({
+                    ...f,
+                    sort_order: journeySteps.length,
+                    due_date: clampDueDateToJourneyMin(f.due_date, journeyDueDateMin),
+                  }));
                   setShowAddStepForm(true);
                 }}
                 style={{
@@ -1006,7 +1067,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                   />
                 </Form.Group>
                 <Form.Group className="mb-3">
-                  <Form.Label>Task</Form.Label>
+                  <Form.Label>Task <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="text"
                     placeholder="Type the task"
@@ -1028,8 +1089,14 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                   <Form.Label>Due Date</Form.Label>
                   <Form.Control
                     type="date"
+                    min={journeyDueDateMin}
                     value={addStepForm.due_date}
-                    onChange={(e) => setAddStepForm((f) => ({ ...f, due_date: e.target.value }))}
+                    onChange={(e) =>
+                      setAddStepForm((f) => ({
+                        ...f,
+                        due_date: clampDueDateToJourneyMin(e.target.value, journeyDueDateMin),
+                      }))
+                    }
                   />
                 </Form.Group>
                 {/* <Form.Group className="mb-3">
@@ -1131,8 +1198,14 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                 <Form.Label>Due Date</Form.Label>
                 <Form.Control
                   type="date"
+                  min={journeyDueDateMin}
                   value={editStepForm.due_date}
-                  onChange={(e) => setEditStepForm((f) => ({ ...f, due_date: e.target.value }))}
+                  onChange={(e) =>
+                    setEditStepForm((f) => ({
+                      ...f,
+                      due_date: clampDueDateToJourneyMin(e.target.value, journeyDueDateMin),
+                    }))
+                  }
                 />
               </Form.Group>
               <Form.Group className="mb-3">
