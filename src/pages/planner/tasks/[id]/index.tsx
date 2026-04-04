@@ -1448,11 +1448,18 @@ const TaskDetailPage = () => {
         project={sidebarProjectFromTask}
         statuses={
           sidebarProjectFromTask?.statuses?.map(
-            (s: { id: number; name: string; color?: string }) => ({
+            (s: {
+              id: number;
+              name: string;
+              color?: string;
+              is_default?: boolean;
+              is_deefault?: boolean;
+            }) => ({
               id: s.id,
               name: s.name,
               icon: '',
               color: s.color || '#3b82f6',
+              is_default: s.is_default === true || s.is_deefault === true,
             }),
           ) ?? []
         }

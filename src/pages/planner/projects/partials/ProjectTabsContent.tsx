@@ -461,6 +461,8 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
           name: status.name,
           icon: '',
           color: status.color || '',
+          is_default:
+            status.is_default === true || status.is_deefault === true,
         }))}
         selectedStatusForTask={selectedStatusForTask}
         taskTypeChoices={['regular', 'recurring']}

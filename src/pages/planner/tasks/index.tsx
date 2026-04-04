@@ -22,11 +22,13 @@ import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import {
   listTasks,
   listProjects,
+  getProject,
   deleteTask as deleteTaskApi,
   completeTask,
   incompleteTask,
   type ListTasksSummary,
 } from "@utils/tasks";
+import { listStatuses } from "@utils/work-planner";
 import {
   canManageProjectFromMembers,
   getSessionPhoneOrExtension,
@@ -176,14 +178,28 @@ const PRIORITY_OPTIONS = [
   { value: "urgent", label: "Urgent" },
 ];
 
-const STATUS_OPTIONS = [
-  { value: "All Status", label: "All Status" },
-  { value: "To Do", label: "To Do" },
-  { value: "In Progress", label: "In Progress" },
-  { value: "In Review", label: "In Review" },
-  { value: "Overdue", label: "Overdue" },
-  { value: "Completed", label: "Completed" },
-];
+const ALL_STATUS_VALUE = "All Status";
+
+/** Planner workflow status from GET /statuses */
+type PlannerWorkflowStatusRow = { id: number; name: string };
+
+function normalizePlannerStatusesFromApi(raw: unknown): PlannerWorkflowStatusRow[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PlannerWorkflowStatusRow[] = [];
+  for (const item of raw) {
+    if (item == null || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const idNum = typeof o.id === "number" ? o.id : Number(o.id);
+    if (!Number.isFinite(idNum)) continue;
+    const nameRaw = o.name;
+    const name = typeof nameRaw === "string" ? nameRaw.trim() : String(nameRaw ?? "").trim();
+    out.push({ id: idNum, name: name || String(idNum) });
+  }
+  return out;
+}
+
+/** Relations for GET /projects/:id — statuses for filter dropdown. */
+const PROJECT_DETAILS_STATUS_WITH = ["statuses", "statuses.tasks"] as const;
 
 const PRIORITY_COLOR: Record<string, string> = {
   low: "#22c55e",
@@ -201,7 +217,7 @@ const INITIAL_FILTER_FORM = {
   due_date_to: "",
   project: "All Projects",
   assignee: [] as string[],
-  status: "All Status",
+  status: ALL_STATUS_VALUE,
 };
 
 const TASKS_TABLE_COLUMN_STORAGE_KEY = "planner-tasks-listing-visible-columns-v1";
@@ -351,7 +367,6 @@ function applyFiltersToParams(
   params: Record<string, any>,
   filters: Record<string, any>,
   allProjects: Array<{ id: number; name: string }>,
-  currentTasks: Task[]
 ) {
   if (filters.priority) {
     const priorityMap: Record<string, string> = {
@@ -382,9 +397,11 @@ function applyFiltersToParams(
     params.type = taskTypeFilter;
   }
 
-  if (filters.status && filters.status !== "All Status") {
-    const statusId = currentTasks.find((t) => t.rawData?.status?.name === filters.status)?.rawData?.status?.id;
-    if (statusId) params.status_id = statusId;
+  if (filters.status && filters.status !== ALL_STATUS_VALUE) {
+    const statusId = Number(filters.status);
+    if (Number.isFinite(statusId)) {
+      params.status_id = statusId;
+    }
   }
 }
 
@@ -665,6 +682,7 @@ const TasksListingPage = ({
     const [showSidebar, setShowSidebar]   = useState(false);
     const [allProjects, setAllProjects]  = useState<Array<{ id: number; name: string }>>([]);
     const [fForm, setFForm] = useState(INITIAL_FILTER_FORM);
+    const [workflowStatuses, setWorkflowStatuses] = useState<PlannerWorkflowStatusRow[]>([]);
     const [openQuickFilter, setOpenQuickFilter] = useState<string | null>(null);
     const quickFilterRef = useRef<HTMLDivElement | null>(null);
   
@@ -683,9 +701,6 @@ const TasksListingPage = ({
     const [visibleTaskColumnKeys, setVisibleTaskColumnKeys] = useState<string[]>(
       () => [...DEFAULT_TASK_TABLE_COLUMN_KEYS],
     );
-
-    const tasksRef = useRef<Task[]>([]);
-    useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
     useLayoutEffect(() => {
       const fromStorage = readVisibleTaskColumnKeysFromStorage();
@@ -748,6 +763,55 @@ const TasksListingPage = ({
       ? embeddedProjectsForFilters
       : allProjects;
 
+    /** Project used for task list context: embed uses sidebar; otherwise filter project when not "All Projects". */
+    const resolvedProjectIdForStatuses = useMemo((): number | null => {
+      if (sidebarProject?.id != null) {
+        const n = Number(sidebarProject.id);
+        return Number.isFinite(n) ? n : null;
+      }
+      if (fForm.project === "All Projects") return null;
+      const match = allProjects.find((p) => p.name === fForm.project);
+      if (match == null) return null;
+      const n = Number(match.id);
+      return Number.isFinite(n) ? n : null;
+    }, [sidebarProject?.id, fForm.project, allProjects]);
+
+    useEffect(() => {
+      let cancelled = false;
+      const load = async () => {
+        try {
+          if (resolvedProjectIdForStatuses != null) {
+            const data = await getProject(resolvedProjectIdForStatuses, [...PROJECT_DETAILS_STATUS_WITH]);
+            if (cancelled) return;
+            const statuses = (data as { statuses?: unknown } | null)?.statuses;
+            setWorkflowStatuses(normalizePlannerStatusesFromApi(statuses));
+            return;
+          }
+          const raw = await listStatuses();
+          if (cancelled) return;
+          setWorkflowStatuses(normalizePlannerStatusesFromApi(raw));
+        } catch {
+          if (!cancelled) setWorkflowStatuses([]);
+        }
+      };
+      void load();
+      return () => {
+        cancelled = true;
+      };
+    }, [resolvedProjectIdForStatuses]);
+
+    useEffect(() => {
+      if (fForm.status === ALL_STATUS_VALUE) return;
+      const stillValid = workflowStatuses.some((s) => String(s.id) === fForm.status);
+      if (stillValid) return;
+      setFForm((prev) => ({ ...prev, status: ALL_STATUS_VALUE }));
+      setFilters((prev) => {
+        const next = { ...prev };
+        delete next.status;
+        return next;
+      });
+    }, [workflowStatuses, fForm.status]);
+
     // ── Fetch ─────────────────────────────────────────────────────────────────────
     const fetchTasks = useCallback(async () => {
       setLoading(true);
@@ -764,7 +828,7 @@ const TasksListingPage = ({
           withRelations: ["project", "status", "assignees"],
         };
 
-        applyFiltersToParams(params, filters, projectsForApplyFilters, tasksRef.current);
+        applyFiltersToParams(params, filters, projectsForApplyFilters);
         applyTabToParams(params, activeTab, { today, yesterday, tomorrow });
 
         if (sidebarProject?.id) {
@@ -1200,6 +1264,19 @@ const TasksListingPage = ({
       ...allProjects.map(p => ({ value: p.name, label: p.name })),
     ], [allProjects]);
 
+    const statusFilterOptions = useMemo(
+      () => [
+        { value: ALL_STATUS_VALUE, label: ALL_STATUS_VALUE },
+        ...workflowStatuses.map((s) => ({ value: String(s.id), label: s.name })),
+      ],
+      [workflowStatuses],
+    );
+
+    const statusFilterPillLabel = useMemo(() => {
+      if (fForm.status === ALL_STATUS_VALUE) return ALL_STATUS_VALUE;
+      return statusFilterOptions.find((o) => o.value === fForm.status)?.label ?? fForm.status;
+    }, [fForm.status, statusFilterOptions]);
+
     useEffect(() => {
       const onDocClick = (event: MouseEvent) => {
         if (!quickFilterRef.current) return;
@@ -1222,8 +1299,8 @@ const TasksListingPage = ({
         onChange: (opts: Array<{ value: string; label: string }>) => setFForm(p => ({ ...p, assignee: opts?.length ? opts.map(o => o.value) : [] })),
         options: assigneeOptions, placeholder: "Select assignees...", isClearable: true },
       { id: "status", label: "Status", type: "dropdown", value: fForm.status,
-        onChange: v => setFForm(p => ({ ...p, status: v ?? "All Status" })),
-        options: STATUS_OPTIONS },
+        onChange: v => setFForm(p => ({ ...p, status: v ?? ALL_STATUS_VALUE })),
+        options: statusFilterOptions },
       { id: "task_type", label: "Task Type", type: "select", value: fForm.task_type,
         onChange: v => setFForm(p => ({ ...p, task_type: v })),
         options: taskTypeFilterOptions, placeholder: "Select task type...", isClearable: true },
@@ -1263,7 +1340,7 @@ const TasksListingPage = ({
       },
       {
         id: "status",
-        label: fForm.status,
+        label: statusFilterPillLabel,
         icon: <ChevronDown size={12} />,
         showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "status" ? null : "status")),
@@ -1761,14 +1838,14 @@ const TasksListingPage = ({
                         boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
                         padding: 6,
                       }}>
-                        {STATUS_OPTIONS.map((option) => (
+                        {statusFilterOptions.map((option) => (
                           <button
                             key={option.value}
                             onClick={() => {
                               setFForm({ ...fForm, status: option.value });
 
                               const nextFilters = { ...filters };
-                              if (option.value === "All Status") delete nextFilters.status;
+                              if (option.value === ALL_STATUS_VALUE) delete nextFilters.status;
                               else nextFilters.status = option.value;
                               setFilters(nextFilters);
 
@@ -2080,7 +2157,7 @@ const TasksListingPage = ({
             const f: Record<string, any> = {};
             if (fForm.project && fForm.project !== "All Projects") f.project = fForm.project;
             if (fForm.assignee?.length) f.assignee = fForm.assignee;
-            if (fForm.status && fForm.status !== "All Status") f.status = fForm.status;
+            if (fForm.status && fForm.status !== ALL_STATUS_VALUE) f.status = fForm.status;
             if (fForm.task_type)    f.task_type    = fForm.task_type.value;
             if (fForm.priority)     f.priority     = fForm.priority.value;
             if (fForm.due_date_from) f.due_date_from = fForm.due_date_from;

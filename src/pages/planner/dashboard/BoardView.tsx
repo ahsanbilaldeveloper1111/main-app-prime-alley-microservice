@@ -1258,6 +1258,8 @@ const BoardView: React.FC<BoardViewProps> = ({
           name: status.name,
           icon: '',
           color: status.color || '',
+          is_default:
+            status.is_default === true || status.is_deefault === true,
         }))}
         project={
           selectedProject
