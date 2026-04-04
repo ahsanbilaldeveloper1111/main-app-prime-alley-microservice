@@ -1,4 +1,4 @@
-import { getMainAppUsers } from "@utils/staffManagement";
+import { getMainAppUsers, type UserProfilePayload } from "@utils/staffManagement";
 
 export const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 export const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
@@ -126,4 +126,43 @@ export function validateEmployeeModalAddressRows(
     }
   }
   return { ok: true };
+}
+
+/** Shared required-field rules for create + update employee profile. */
+export function validateEmployeeModalCoreRequiredFields(
+  form: Partial<UserProfilePayload>,
+): { ok: true } | { ok: false; message: string } {
+  if (!form.user_id?.toString().trim()) {
+    return { ok: false, message: "User ID is required" };
+  }
+  if (!form.department_id) {
+    return { ok: false, message: "Department is required" };
+  }
+  if (!form.employment_type?.toString().trim()) {
+    return { ok: false, message: "Employment type is required" };
+  }
+  if (!form.contract_type?.toString().trim()) {
+    return { ok: false, message: "Contract type is required" };
+  }
+  if (!form.designation?.toString().trim()) {
+    return { ok: false, message: "Designation is required" };
+  }
+  return { ok: true };
+}
+
+/** React list key only; use cryptographically strong randomness (not Math.random). */
+let addressUiIdFallbackSeq = 0;
+
+export function createEmployeeModalAddressUiId(): string {
+  const { crypto: webCrypto } = globalThis;
+  if (webCrypto?.randomUUID) {
+    return webCrypto.randomUUID();
+  }
+  if (webCrypto?.getRandomValues) {
+    const bytes = new Uint8Array(16);
+    webCrypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  addressUiIdFallbackSeq += 1;
+  return `addr-${addressUiIdFallbackSeq}`;
 }

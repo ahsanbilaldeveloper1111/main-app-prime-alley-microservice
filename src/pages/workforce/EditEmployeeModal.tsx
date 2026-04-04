@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Form, Modal } from "react-bootstrap";
 import Select from "@components/AppSelect";
-import { Plus, Trash2 } from "lucide-react";
-import { Country, State, City } from "country-state-city";
+import { Country } from "country-state-city";
 import { toast } from "react-toastify";
 import {
   getUserProfile,
@@ -12,32 +11,24 @@ import {
   type UserProfileAddress,
 } from "@utils/staffManagement";
 import { buildAddressesForUserProfilePayload } from "@utils/employeeAddressPayload";
+import { mapUserProfileAddressToModalFields, type EmployeeModalAddressBase } from "@utils/employeeModalAddressMap";
 import { isOptionalWorkforcePhoneValid } from "@utils/workforcePhoneValidation";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
-import PhoneInput from "react-phone-number-input";
-import "react-phone-number-input/style.css";
+import EmployeeModalAddressSection, {
+  type EmployeeModalAddressFieldKey,
+} from "@components/workforce/EmployeeModalAddressSection";
+import EmployeeModalProfileFields from "@components/workforce/EmployeeModalProfileFields";
 import {
-  ADDRESS_NAME_MAX_LENGTH,
-  ADDRESS_STREET_MAX_LENGTH,
-  ADDRESS_ZIP_CODE_MAX_LENGTH,
-  CONTRACT_TYPES,
-  DESIGNATION_MAX_LENGTH,
-  EMPLOYMENT_TYPES,
   employeeModalReactSelectStyles,
   fetchDepartmentUserRowsForModal,
   validateEmployeeModalAddressRows,
-  WORKFORCE_PROFILE_SHORT_TEXT_MAX,
+  validateEmployeeModalCoreRequiredFields,
   type DepartmentUserRow,
-} from "./employeeModalShared";
+} from "@utils/workforce/employeeModalShared";
 
-export type AddressFormItem = UserProfileAddress & {
-  state?: string;
-  countryCode?: string;
-  stateCode?: string;
-  localId: string;
-};
+export type AddressFormItem = EmployeeModalAddressBase & { localId: string };
 
-const defaultAddress: AddressFormItem = {
+const defaultAddressTemplate: Omit<AddressFormItem, "localId"> = {
   name: "",
   zip_code: "",
   city: "",
@@ -46,42 +37,7 @@ const defaultAddress: AddressFormItem = {
   state: "",
   countryCode: "",
   stateCode: "",
-  localId: "",
 };
-
-function mapProfileToAddressFormItem(a: UserProfileAddress): AddressFormItem {
-  const countryName = a.country ?? "";
-  let stateName = a.state ?? "";
-  const cityName = (a.city ?? "").trim();
-  const countries = Country.getAllCountries();
-  const country = countries.find((c) => c.name === countryName);
-  const countryCode = country?.isoCode ?? "";
-  const states = countryCode ? State.getStatesOfCountry(countryCode) : [];
-  let stateCode = states.find((s) => s.name === stateName)?.isoCode ?? "";
-  // When API returns city/country but no state, resolve state from city via country-state-city
-  if (countryCode && cityName && !stateCode) {
-    for (const s of states) {
-      const cities = City.getCitiesOfState(countryCode, s.isoCode);
-      const match = cities.find((c) => (c.name ?? "").trim() === cityName || (c.name ?? "").toLowerCase() === cityName.toLowerCase());
-      if (match) {
-        stateName = s.name;
-        stateCode = s.isoCode;
-        break;
-      }
-    }
-  }
-  return {
-    name: a.name ?? "",
-    zip_code: a.zip_code ?? "",
-    city: a.city ?? "",
-    country: countryName,
-    address: a.address ?? "",
-    state: stateName,
-    countryCode,
-    stateCode,
-    localId: "",
-  };
-}
 
 function isEditEmployeeReadyToSubmit(
   form: Partial<UserProfilePayload>,
@@ -89,11 +45,7 @@ function isEditEmployeeReadyToSubmit(
   phoneFieldValid: boolean,
 ): boolean {
   if (!phoneFieldValid) return false;
-  if (!form.user_id?.toString().trim()) return false;
-  if (!form.designation?.toString().trim()) return false;
-  if (!form.employment_type?.toString().trim()) return false;
-  if (!form.contract_type?.toString().trim()) return false;
-  if (!form.department_id) return false;
+  if (!validateEmployeeModalCoreRequiredFields(form).ok) return false;
   return validateEmployeeModalAddressRows(addresses).ok;
 }
 
@@ -133,7 +85,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   const toAddressFormItem = useCallback((address: UserProfileAddress): AddressFormItem => {
     addressIdRef.current += 1;
     return {
-      ...mapProfileToAddressFormItem(address),
+      ...mapUserProfileAddressToModalFields(address),
       localId: `addr-${addressIdRef.current}`,
     };
   }, []);
@@ -141,7 +93,7 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   const createDefaultAddress = useCallback((): AddressFormItem => {
     addressIdRef.current += 1;
     return {
-      ...defaultAddress,
+      ...defaultAddressTemplate,
       localId: `addr-${addressIdRef.current}`,
     };
   }, []);
@@ -251,12 +203,9 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
     setAddresses((prev) => prev.filter((a) => a.localId !== localId));
   }, []);
 
-  const updateAddressField = useCallback(
-    <K extends keyof AddressFormItem>(localId: string, key: K, value: AddressFormItem[K]) => {
-      setAddresses((prev) => prev.map((a) => (a.localId === localId ? { ...a, [key]: value } : a)));
-    },
-    []
-  );
+  const updateAddressField = useCallback((localId: string, key: EmployeeModalAddressFieldKey, value: string) => {
+    setAddresses((prev) => prev.map((a) => (a.localId === localId ? { ...a, [key]: value } : a)));
+  }, []);
 
   const updateAddressCountry = useCallback((localId: string, opt: { value: string; label: string } | null) => {
     setAddresses((prev) =>
@@ -284,25 +233,9 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
-    if (!form.user_id?.toString().trim()) {
-      toast.error("User ID is required");
-      return;
-    }
-
-    if (!form.designation?.toString().trim()) {
-      toast.error("Designation is required");
-      return;
-    }
-    if (!form.employment_type?.toString().trim()) {
-      toast.error("Employment type is required");
-      return;
-    }
-    if (!form.contract_type?.toString().trim()) {
-      toast.error("Contract type is required");
-      return;
-    }
-    if (!form.department_id) {
-      toast.error("Department is required");
+    const coreValidation = validateEmployeeModalCoreRequiredFields(form);
+    if (!coreValidation.ok) {
+      toast.error(coreValidation.message);
       return;
     }
     if (!phoneFieldValid) {
@@ -353,7 +286,10 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       <Form onSubmit={handleSubmit}>
         <Modal.Body>
           <Form.Group className="mb-3">
-            <Form.Label>Department <span className="text-danger">*</span> </Form.Label>
+            <Form.Label>
+              {"Department "}
+              <span className="text-danger">*</span>
+            </Form.Label>
             <Form.Select value={form.department_id ?? ""} disabled>
               <option value="">Select department</option>
               {departments.map((d) => (
@@ -362,10 +298,12 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                 </option>
               ))}
             </Form.Select>
-           
           </Form.Group>
           <Form.Group className="mb-3">
-            <Form.Label>User <span className="text-danger">*</span> </Form.Label>
+            <Form.Label>
+              {"User "}
+              <span className="text-danger">*</span>
+            </Form.Label>
             <Select<{ value: string; label: string }>
               className="basic-single"
               classNamePrefix="select"
@@ -384,315 +322,26 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
               <Form.Text className="text-muted">No users available for this department.</Form.Text>
             )}
           </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Employee Code</Form.Label>
-            <Form.Control
-              type="text"
-              maxLength={WORKFORCE_PROFILE_SHORT_TEXT_MAX}
-              value={form.employee_code ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  employee_code: e.target.value.slice(0, WORKFORCE_PROFILE_SHORT_TEXT_MAX),
-                }))
-              }
-              placeholder="Employee code"
-            />
-            <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
-              <Form.Text className="text-muted mb-0">
-                Maximum {WORKFORCE_PROFILE_SHORT_TEXT_MAX} characters allowed.
-              </Form.Text>
-              <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
-                {(form.employee_code ?? "").length}/{WORKFORCE_PROFILE_SHORT_TEXT_MAX}
-              </Form.Text>
-            </div>
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Identification Number (CNIC)</Form.Label>
-            <Form.Control
-              type="text"
-              maxLength={WORKFORCE_PROFILE_SHORT_TEXT_MAX}
-              value={form.identification_number ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  identification_number: e.target.value.slice(0, WORKFORCE_PROFILE_SHORT_TEXT_MAX),
-                }))
-              }
-              placeholder="CNIC / ID"
-            />
-            <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
-              <Form.Text className="text-muted mb-0">
-                Maximum {WORKFORCE_PROFILE_SHORT_TEXT_MAX} characters allowed.
-              </Form.Text>
-              <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
-                {(form.identification_number ?? "").length}/{WORKFORCE_PROFILE_SHORT_TEXT_MAX}
-              </Form.Text>
-            </div>
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Designation <span className="text-danger">*</span> </Form.Label>
-            <Form.Control
-              type="text"
-              maxLength={DESIGNATION_MAX_LENGTH}
-              value={form.designation ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  designation: e.target.value.slice(0, DESIGNATION_MAX_LENGTH),
-                }))
-              }
-              placeholder="Designation"
-              required
-            />
-            <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
-              <Form.Text className="text-muted mb-0">
-                Maximum {DESIGNATION_MAX_LENGTH} characters allowed.
-              </Form.Text>
-              <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
-                {(form.designation ?? "").length}/{DESIGNATION_MAX_LENGTH}
-              </Form.Text>
-            </div>
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Employment Type <span className="text-danger">*</span> </Form.Label>
-            <Form.Select
-              value={form.employment_type ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, employment_type: e.target.value }))}
-            >
-              <option value="">Select employment type</option>
-              {EMPLOYMENT_TYPES.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Contract Type <span className="text-danger">*</span> </Form.Label>
-            <Form.Select
-              value={form.contract_type ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, contract_type: e.target.value }))}
-              required
-            >
-              <option value="">Select contract type</option>
-              {CONTRACT_TYPES.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Phone</Form.Label>
-            <div className="phone-input-wrapper">
-              <PhoneInput
-                international
-                defaultCountry="PK"
-                value={form.phone && form.phone.trim() !== "" ? form.phone : undefined}
-                onChange={(value: string | undefined) =>
-                  setForm((f) => ({ ...f, phone: value && value.trim() !== "" ? value : "" }))
-                }
-                placeholder="Enter phone number"
-                className={phoneShowInvalid ? "is-invalid" : undefined}
-              />
-            </div>
-            <Form.Text className="text-muted">
-              Select country then enter a complete phone number.
-            </Form.Text>
-            {phoneShowInvalid && (
-              <Form.Text className="text-danger d-block">Enter a valid phone number for the selected country.</Form.Text>
-            )}
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Status</Form.Label>
-            <Form.Select value={form.status ?? "active"} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </Form.Select>
-          </Form.Group>
+          <EmployeeModalProfileFields
+            form={form}
+            setForm={setForm}
+            phoneShowInvalid={phoneShowInvalid}
+            phoneDefaultCountry="PK"
+            phoneHelpText="Select country then enter a complete phone number."
+            employmentSelectRequired={false}
+          />
 
-          <div className="card em-card mb-3">
-            <div className="card-body">
-              <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
-                <div className="em-section-title mb-0">Addresses</div>
-                <Button
-                  type="button"
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={() => setAddresses((prev) => [...prev, createDefaultAddress()])}
-                >
-                  <Plus className="me-1" size={14} />
-                  Add Address
-                </Button>
-              </div>
-              <div className="d-flex flex-column gap-3">
-                {addresses.length === 0 ? (
-                  <div className="text-muted small">No addresses added. Click &quot;Add Address&quot; to add one.</div>
-                ) : (
-                  addresses.map((addr, idx) => {
-                    const countryOptions = addressCountries.map((c) => ({ value: c.isoCode, label: c.name }));
-                    const stateOptions = (addr.countryCode ? State.getStatesOfCountry(addr.countryCode) : []).map((s) => ({ value: s.isoCode, label: s.name }));
-                    const cityOptions =
-                      addr.countryCode && addr.stateCode
-                        ? City.getCitiesOfState(addr.countryCode, addr.stateCode).map((c) => ({ value: c.name, label: c.name }))
-                        : [];
-                    return (
-                      <div key={addr.localId} className="p-3 bg-light rounded">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <div className="fw-semibold">Address #{idx + 1}</div>
-                          <Button
-                            type="button"
-                            variant="outline-danger"
-                            size="sm"
-                           
-                            onClick={() => removeAddressById(addr.localId)}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
-                        </div>
-                        <div className="row g-3">
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>
-                                Name <span className="text-danger">*</span>
-                              </Form.Label>
-                              <Form.Control
-                                type="text"
-                                maxLength={ADDRESS_NAME_MAX_LENGTH}
-                                value={addr.name ?? ""}
-                                onChange={(e) =>
-                                  updateAddressField(
-                                    addr.localId,
-                                    "name",
-                                    e.target.value.slice(0, ADDRESS_NAME_MAX_LENGTH),
-                                  )
-                                }
-                                placeholder="e.g. Head Office"
-                                required
-                              />
-                              <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
-                                <Form.Text className="text-muted mb-0">
-                                  Maximum {ADDRESS_NAME_MAX_LENGTH} characters allowed.
-                                </Form.Text>
-                                <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
-                                  {(addr.name ?? "").length}/{ADDRESS_NAME_MAX_LENGTH}
-                                </Form.Text>
-                              </div>
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>Zip / Postal Code</Form.Label>
-                              <Form.Control
-                                type="text"
-                                maxLength={ADDRESS_ZIP_CODE_MAX_LENGTH}
-                                value={addr.zip_code ?? ""}
-                                onChange={(e) =>
-                                  updateAddressField(
-                                    addr.localId,
-                                    "zip_code",
-                                    e.target.value.slice(0, ADDRESS_ZIP_CODE_MAX_LENGTH),
-                                  )
-                                }
-                                placeholder="Zip / Postal Code"
-                              />
-                              <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
-                                <Form.Text className="text-muted mb-0">
-                                  Maximum {ADDRESS_ZIP_CODE_MAX_LENGTH} characters allowed.
-                                </Form.Text>
-                                <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
-                                  {(addr.zip_code ?? "").length}/{ADDRESS_ZIP_CODE_MAX_LENGTH}
-                                </Form.Text>
-                              </div>
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>Country</Form.Label>
-                              <Select<{ value: string; label: string }>
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable
-                                isSearchable
-                                options={countryOptions}
-                                placeholder="Select Country"
-                                value={addr.countryCode ? countryOptions.find((o) => o.value === addr.countryCode) ?? null : null}
-                                onChange={(opt) => updateAddressCountry(addr.localId, opt)}
-                                styles={employeeModalReactSelectStyles}
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>State</Form.Label>
-                              <Select<{ value: string; label: string }>
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable
-                                isSearchable
-                                options={stateOptions}
-                                placeholder="Select State"
-                                isDisabled={!addr.countryCode}
-                                value={addr.stateCode ? stateOptions.find((o) => o.value === addr.stateCode) ?? null : null}
-                                onChange={(opt) => updateAddressState(addr.localId, opt)}
-                                styles={employeeModalReactSelectStyles}
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6">
-                            <Form.Group>
-                              <Form.Label>City</Form.Label>
-                              <Select<{ value: string; label: string }>
-                                className="basic-single"
-                                classNamePrefix="select"
-                                isClearable
-                                isSearchable
-                                options={cityOptions}
-                                placeholder="Select City"
-                                isDisabled={!addr.stateCode}
-                                value={addr.city ? (cityOptions.find((o) => o.value === addr.city) ?? { value: addr.city, label: addr.city }) : null}
-                                onChange={(opt) => updateAddressField(addr.localId, "city", opt?.value ?? "")}
-                                styles={employeeModalReactSelectStyles}
-                              />
-                            </Form.Group>
-                          </div>
-                          <div className="col-md-6" />
-                          <div className="col-12">
-                            <Form.Group>
-                              <Form.Label>
-                                Address <span className="text-danger">*</span>
-                              </Form.Label>
-                              <Form.Control
-                                as="textarea"
-                                rows={2}
-                                maxLength={ADDRESS_STREET_MAX_LENGTH}
-                                value={addr.address ?? ""}
-                                onChange={(e) =>
-                                  updateAddressField(
-                                    addr.localId,
-                                    "address",
-                                    e.target.value.slice(0, ADDRESS_STREET_MAX_LENGTH),
-                                  )
-                                }
-                                placeholder="Street address"
-                                required
-                              />
-                              <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
-                                <Form.Text className="text-muted mb-0">
-                                  Maximum {ADDRESS_STREET_MAX_LENGTH} characters allowed.
-                                </Form.Text>
-                                <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
-                                  {(addr.address ?? "").length}/{ADDRESS_STREET_MAX_LENGTH}
-                                </Form.Text>
-                              </div>
-                            </Form.Group>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              <div className="text-muted small mt-2">Addresses are stored as multiple Location records linked to this employee profile.</div>
-            </div>
-          </div>
+          <EmployeeModalAddressSection
+            addresses={addresses}
+            addressCountries={addressCountries}
+            getRowId={(a) => a.localId}
+            onAddAddress={() => setAddresses((prev) => [...prev, createDefaultAddress()])}
+            onRemoveRow={removeAddressById}
+            onUpdateField={updateAddressField}
+            onCountryChange={(rowId, opt) => updateAddressCountry(rowId, opt)}
+            onStateChange={(rowId, opt) => updateAddressState(rowId, opt)}
+            allowAdHocCityOption
+          />
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={onHide} type="button">Cancel</Button>
