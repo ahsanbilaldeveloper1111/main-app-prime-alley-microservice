@@ -110,7 +110,7 @@ export function useCrmListSortPagination({
             <ChevronLeft size={14} />
           </Button>
 
-          {[...new Array(totalPages)].map((_, index) => {
+          {Array.from({ length: totalPages }, (_, index) => {
             const pageNum = index + 1;
             if (
               pageNum === 1 ||
@@ -131,7 +131,8 @@ export function useCrmListSortPagination({
                   {pageNum}
                 </Button>
               );
-            } else if (
+            }
+            if (
               pageNum === currentPage - 2 ||
               pageNum === currentPage + 2
             ) {

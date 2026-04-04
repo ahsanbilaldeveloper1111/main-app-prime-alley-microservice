@@ -6,12 +6,16 @@ function sortComparableString(value: unknown): string {
   }
   if (typeof value === "object") {
     try {
-      return JSON.stringify(value);
+      const serialized = JSON.stringify(value);
+      return serialized ?? "";
     } catch {
       return "";
     }
   }
-  return String(value);
+  if (typeof value === "bigint") {
+    return String(value);
+  }
+  return "";
 }
 
 export function sortData<T extends Record<string, unknown>>(

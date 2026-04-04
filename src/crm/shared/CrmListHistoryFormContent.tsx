@@ -286,7 +286,7 @@ function formatActivityDetails(
             <strong>
               {activity.action
                 ?.replaceAll("_", " ")
-                .replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                .replaceAll(/\b\w/g, (l: string) => l.toUpperCase())}
             </strong>
           </div>
           <div className="small text-muted">
@@ -336,7 +336,7 @@ function HistoryTimelineItem({
                     >
                       {activity.action
                         ?.replaceAll("_", " ")
-                        .replace(/\b\w/g, (l: string) =>
+                        .replaceAll(/\b\w/g, (l: string) =>
                           l.toUpperCase(),
                         )}
                     </Badge>

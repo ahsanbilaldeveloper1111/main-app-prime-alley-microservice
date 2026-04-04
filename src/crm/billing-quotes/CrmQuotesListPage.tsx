@@ -835,33 +835,6 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                 />
               )}
 
-            {/* Bulk Actions */}
-            {/* {selectedItems.length > 0 &&
-          session?.user?.permissions?.includes(
-            "delete-crm-data-management"
-          ) && (
-            <div className="d-flex justify-content-end gap-2 mb-3">
-              <Dropdown>
-                <Dropdown.Toggle variant="outline-primary" size="sm">
-                  <CheckSquare size={16} className="me-2" />
-                  Bulk Actions ({selectedItems.length})
-                </Dropdown.Toggle>
-                <Dropdown.Menu align="end">
-                  <Dropdown.Item
-                    onClick={() => {
-                      setDeleteModalMode("bulk");
-                      setShowDeleteModal(true);
-                    }}
-                    className="d-flex align-items-center text-danger"
-                  >
-                    <Trash2 size={14} className="me-2" />
-                    Delete Selected ({selectedItems.length})
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown>
-            </div>
-          )} */}
-
             {/* Prospects Table */}
             <div
               className="prospects-table-wrapper"
@@ -1145,7 +1118,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
         selectedColumnKeys={selectedColumns}
         onApply={(keys) => {
           setSelectedColumns(keys);
-          if (typeof globalThis.window !== "undefined") {
+          if (globalThis.window !== undefined) {
             globalThis.window.localStorage.setItem(
               "crmDataSelectedColumns",
               JSON.stringify(keys),
