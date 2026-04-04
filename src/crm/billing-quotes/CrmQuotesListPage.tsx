@@ -122,7 +122,9 @@ import {
   useCrmQuotesListHistoryModalEffect,
   useCrmQuotesListTagsEffect,
 } from "@crm/billing-quotes/useCrmQuotesListResourceLoadEffects";
-import { getCrmQuotesListExtensionDisplayName } from "@crm/billing-quotes/crmQuotesListGetExtensionDisplayName";
+import { getCrmListExtensionDisplayName } from "@crm/shared/crmListExtensionDisplayName";
+import { CrmListPageScopedLayoutStyles } from "@crm/shared/CrmListPageScopedLayoutStyles";
+import { useCrmListClearSelectedRowsEffect } from "@crm/shared/crmListClearSelectedRowsEffect";
 
 export type CrmQuotesListPageProps = {
   variant: "billing" | "crm";
@@ -420,7 +422,7 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
 
   const getNameByExtension = useCallback(
     (extension: string) =>
-      getCrmQuotesListExtensionDisplayName(extensions, extension),
+      getCrmListExtensionDisplayName(extensions, extension),
     [extensions],
   );
 
@@ -470,12 +472,7 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     fetchCrmData();
   }, [fetchCrmData, refreshKey]);
 
-  // Clear selection after bulk delete or when clearSelectedRows changes
-  useEffect(() => {
-    if (clearSelectedRows) {
-      setSelectedItems([]);
-    }
-  }, [clearSelectedRows]);
+  useCrmListClearSelectedRowsEffect(clearSelectedRows, setSelectedItems);
 
   // Handle file selection
   const handleFileSelect = (file: File) => {
@@ -813,94 +810,13 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
 
   return (
     <React.Fragment>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .prospects-table-wrapper {
-          width: 100%;
-          overflow: hidden;
-        }
-        .prospects-table-wrapper .table-responsive {
-          width: 100%;
-          overflow-x: auto;
-          overflow-y: visible;
-          -webkit-overflow-scrolling: touch;
-        }
-        .prospects-table-wrapper .table-responsive table {
-          width: 100%;
-          table-layout: auto;
-          margin-bottom: 0;
-        }
-        .prospects-table-wrapper .table-responsive table th,
-        .prospects-table-wrapper .table-responsive table td {
-          padding: 12px 16px;
-          vertical-align: middle;
-        }
-        .prospects-table-wrapper .table-responsive table td:last-child,
-        .prospects-table-wrapper .table-responsive table th:last-child {
-          max-width: none;
-        }
-        .prospects-table-wrapper .table-responsive table td[style*="width"],
-        .prospects-table-wrapper .table-responsive table th[style*="width"] {
-          max-width: none;
-        }
-        .timeline-line {
-          position: relative;
-          height: 2px;
-          background: #e9ecef;
-          margin-top: 10px;
-        }
-        .timeline-line::after {
-          content: "";
-          position: absolute;
-          top: -8px;
-          left: 0;
-          width: 2px;
-          height: 18px;
-          background: #e9ecef;
-        }
-        .timeline-item:last-child .timeline-line {
-          display: none;
-        }
-        .generic-table-row.clickable {
-          cursor: pointer;
-        }
-        
-        
-        /* Page layout for full height */
-        .prospects-page-container {
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 100px);
-          overflow: hidden;
-        }
-        
-        .prospects-content-area {
-          flex: 1;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .prospects-scrollable-content {
-          flex: 1;
-          overflow-y: auto;
-          overflow-x: hidden;
-        }
-        /* Phone input: match other form fields - border like text inputs, no blue focus glow */
-        .contact-form-phone-input-wrapper .PhoneInput {
-          border: 1px solid #8a8a8a !important;
-          border-radius: 4px;
-          padding: 10px 12px;
-          font-size: 14px;
-          box-shadow: none !important;
-        }
-        .contact-form-phone-input-wrapper .PhoneInput:focus-within {
-          border-color: #0091ae !important;
-          outline: none;
-          box-shadow: none !important;
-        }
-      `,
+      <CrmListPageScopedLayoutStyles
+        config={{
+          tableWrapperClass: "prospects-table-wrapper",
+          scrollableContentClass: "prospects-scrollable-content",
+          pageContainerClass: "prospects-page-container",
+          contentAreaClass: "prospects-content-area",
+          includePhoneInputStyles: true,
         }}
       />
       <BreadcrumbItem

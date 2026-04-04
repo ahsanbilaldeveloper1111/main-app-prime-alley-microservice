@@ -21,6 +21,20 @@ import {
 } from "@utils/Helper";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 import type { CrmDataItem } from "@utils/crm";
+import {
+  CRM_LIST_VIEW_MODAL_INFO_CARD_BASE_STYLE,
+  CRM_LIST_VIEW_MODAL_PANEL_HEADING_STYLE,
+  CRM_LIST_VIEW_MODAL_QUICK_ACTION_BUTTON_STYLE,
+  CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE,
+  CrmListViewModalContentSection,
+  CrmListViewModalDetailRow,
+  CrmListViewModalFieldValue,
+  CrmListViewModalIconBox,
+  CrmListViewModalIconButton,
+  CrmListViewModalSectionLabel,
+  crmListViewModalCardHoverLift,
+  crmListViewModalQuickActionHover,
+} from "@crm/shared/CrmListViewDataModalPrimitives";
 
 export interface CrmListViewDataModalProps {
   show: boolean;
@@ -292,25 +306,6 @@ export function CrmListViewDataModal({
 
 /* ---------- Sub-components ---------- */
 
-const INFO_CARD_BASE_STYLE: React.CSSProperties = {
-  background: "#f9fafb",
-  border: "1px solid #e5e7eb",
-  padding: "20px",
-  borderRadius: "12px",
-  transition: "all 0.3s ease",
-};
-
-const hoverLift = {
-  onMouseOver: (e: React.MouseEvent<HTMLDivElement>) => {
-    e.currentTarget.style.transform = "translateY(-4px)";
-    e.currentTarget.style.boxShadow = "0 8px 16px rgba(102, 126, 234, 0.15)";
-  },
-  onMouseOut: (e: React.MouseEvent<HTMLDivElement>) => {
-    e.currentTarget.style.transform = "translateY(0)";
-    e.currentTarget.style.boxShadow = "none";
-  },
-};
-
 function QuickInfoCards({
   selectedDataItem,
   extensions,
@@ -341,154 +336,35 @@ function QuickInfoCards({
         marginBottom: "28px",
       }}
     >
-      <div style={INFO_CARD_BASE_STYLE} {...hoverLift}>
+      <div style={CRM_LIST_VIEW_MODAL_INFO_CARD_BASE_STYLE} {...crmListViewModalCardHoverLift}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <IconBox color="#2563eb">
+          <CrmListViewModalIconBox color="#2563eb">
             <User size={20} style={{ color: "white" }} />
-          </IconBox>
+          </CrmListViewModalIconBox>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <SectionLabel color="#2563eb">Assigned Agent</SectionLabel>
-            <FieldValue>{agentLabel}</FieldValue>
+            <CrmListViewModalSectionLabel color="#2563eb">Assigned Agent</CrmListViewModalSectionLabel>
+            <CrmListViewModalFieldValue>{agentLabel}</CrmListViewModalFieldValue>
           </div>
         </div>
       </div>
 
       <div
-        style={{ ...INFO_CARD_BASE_STYLE, border: "1px solid #f093fb30" }}
-        {...hoverLift}
+        style={{
+          ...CRM_LIST_VIEW_MODAL_INFO_CARD_BASE_STYLE,
+          border: "1px solid #f093fb30",
+        }}
+        {...crmListViewModalCardHoverLift}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <IconBox color="#0284c7">
+          <CrmListViewModalIconBox color="#0284c7">
             <Target size={20} style={{ color: "white" }} />
-          </IconBox>
+          </CrmListViewModalIconBox>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <SectionLabel color="#f5576c">Campaign</SectionLabel>
-            <FieldValue>{campaignLabel}</FieldValue>
+            <CrmListViewModalSectionLabel color="#f5576c">Campaign</CrmListViewModalSectionLabel>
+            <CrmListViewModalFieldValue>{campaignLabel}</CrmListViewModalFieldValue>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function IconBox({
-  color,
-  children,
-}: {
-  color: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      style={{
-        width: "44px",
-        height: "44px",
-        borderRadius: "10px",
-        background: color,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function SectionLabel({
-  color,
-  children,
-}: {
-  color: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      style={{
-        fontSize: "11px",
-        fontWeight: 700,
-        color,
-        textTransform: "uppercase",
-        letterSpacing: "0.8px",
-        marginBottom: "4px",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function FieldValue({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: "15px",
-        color: "#1f2937",
-        fontWeight: 600,
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-const SECTION_HEADING_STYLE: React.CSSProperties = {
-  fontSize: "15px",
-  fontWeight: 700,
-  color: "#1f2937",
-  marginBottom: "16px",
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-};
-
-function SectionDot({ gradient }: { gradient: string }) {
-  return (
-    <div
-      style={{
-        width: "4px",
-        height: "18px",
-        background: gradient,
-        borderRadius: "2px",
-      }}
-    />
-  );
-}
-
-const SECTION_BOX_STYLE: React.CSSProperties = {
-  background: "#f9fafb",
-  border: "1px solid #e5e7eb",
-  borderRadius: "12px",
-  padding: "20px",
-};
-
-function ContentSection({
-  title,
-  gradient = "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-  marginBottom = "28px",
-  boxStyle,
-  badge,
-  children,
-}: {
-  title: string;
-  gradient?: string;
-  marginBottom?: string;
-  boxStyle?: React.CSSProperties;
-  badge?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div style={{ marginBottom }}>
-      <h5 style={SECTION_HEADING_STYLE}>
-        <SectionDot gradient={gradient} />
-        {title}
-        {badge}
-      </h5>
-      <div style={{ ...SECTION_BOX_STYLE, ...boxStyle }}>{children}</div>
     </div>
   );
 }
@@ -499,7 +375,7 @@ function ContactDetailsSection({
   selectedDataItem: CrmDataItem;
 }) {
   return (
-    <ContentSection
+    <CrmListViewModalContentSection
       title="Contact Details"
       gradient="linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)"
     >
@@ -510,12 +386,12 @@ function ContactDetailsSection({
           gap: "16px",
         }}
       >
-        <DetailRow
+        <CrmListViewModalDetailRow
           icon={<PhoneIcon size={16} style={{ color: "#2563eb" }} />}
           label="Phone"
           value={selectedDataItem.phone || "N/A"}
         />
-        <DetailRow
+        <CrmListViewModalDetailRow
           icon={<Calendar size={16} style={{ color: "#2563eb" }} />}
           label="Created"
           value={
@@ -527,44 +403,13 @@ function ContactDetailsSection({
           }
         />
       </div>
-    </ContentSection>
-  );
-}
-
-function DetailRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          color: "#6b7280",
-          fontSize: "14px",
-          fontWeight: 600,
-        }}
-      >
-        {icon}
-        {label}
-      </div>
-      <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
-        {value}
-      </div>
-    </>
+    </CrmListViewModalContentSection>
   );
 }
 
 function CallNotesSection({ note }: { note: string }) {
   return (
-    <ContentSection
+    <CrmListViewModalContentSection
       title="Call Notes"
       boxStyle={{
         background: "#fffbeb",
@@ -576,13 +421,13 @@ function CallNotesSection({ note }: { note: string }) {
       }}
     >
       {note}
-    </ContentSection>
+    </CrmListViewModalContentSection>
   );
 }
 
 function CustomDataFieldsSection({ data }: { data: Record<string, any> }) {
   return (
-    <ContentSection title="Additional Information">
+    <CrmListViewModalContentSection title="Additional Information">
         <div
           style={{
             display: "grid",
@@ -623,19 +468,9 @@ function CustomDataFieldsSection({ data }: { data: Record<string, any> }) {
             </div>
           ))}
         </div>
-    </ContentSection>
+    </CrmListViewModalContentSection>
   );
 }
-
-const RECORDING_TH_STYLE: React.CSSProperties = {
-  padding: "12px 16px",
-  textAlign: "left",
-  fontSize: "11px",
-  fontWeight: 700,
-  color: "#6b7280",
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
-};
 
 function CallRecordingsSection({
   callRecordings,
@@ -670,7 +505,7 @@ function CallRecordingsSection({
   );
 
   return (
-    <ContentSection
+    <CrmListViewModalContentSection
       title="Call Recordings"
       marginBottom="20px"
       badge={badge}
@@ -734,13 +569,13 @@ function CallRecordingsSection({
                     borderBottom: "1px solid #e5e7eb",
                   }}
                 >
-                  <th style={RECORDING_TH_STYLE}>Date &amp; Time</th>
-                  <th style={RECORDING_TH_STYLE}>Extension</th>
-                  <th style={RECORDING_TH_STYLE}>Direction</th>
-                  <th style={RECORDING_TH_STYLE}>Duration</th>
+                  <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Date &amp; Time</th>
+                  <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Extension</th>
+                  <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Direction</th>
+                  <th style={CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE}>Duration</th>
                   <th
                     style={{
-                      ...RECORDING_TH_STYLE,
+                      ...CRM_LIST_VIEW_MODAL_RECORDING_TH_STYLE,
                       textAlign: "center",
                       width: "100px",
                     }}
@@ -765,7 +600,7 @@ function CallRecordingsSection({
           </div>
         </div>
       )}
-    </ContentSection>
+    </CrmListViewModalContentSection>
   );
 }
 
@@ -857,9 +692,9 @@ function RecordingRow({
             justifyContent: "center",
           }}
         >
-          <IconButton title="Play Recording" onClick={() => onPlay(recording)}>
+          <CrmListViewModalIconButton title="Play Recording" onClick={() => onPlay(recording)}>
             <FiPlay size={16} />
-          </IconButton>
+          </CrmListViewModalIconButton>
           {isDownloading ? (
             <CircularProgressCircle
               progress={progress}
@@ -871,53 +706,16 @@ function RecordingRow({
               className="circular-progress-inline"
             />
           ) : (
-            <IconButton
+            <CrmListViewModalIconButton
               title="Download Recording"
               onClick={() => onDownload(recording)}
             >
               <Download size={16} />
-            </IconButton>
+            </CrmListViewModalIconButton>
           )}
         </div>
       </td>
     </tr>
-  );
-}
-
-function IconButton({
-  title,
-  onClick,
-  children,
-}: {
-  title: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      style={{
-        background: "transparent",
-        border: "none",
-        color: "#2563eb",
-        cursor: "pointer",
-        padding: "6px",
-        borderRadius: "6px",
-        transition: "all 0.2s ease",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-      title={title}
-      onClick={onClick}
-      onMouseOver={(e) => {
-        e.currentTarget.style.background = "#ede9fe";
-      }}
-      onMouseOut={(e) => {
-        e.currentTarget.style.background = "transparent";
-      }}
-    >
-      {children}
-    </button>
   );
 }
 
@@ -950,49 +748,16 @@ function RightPanel({
   );
 }
 
-const PANEL_HEADING_STYLE: React.CSSProperties = {
-  fontSize: "13px",
-  fontWeight: 700,
-  color: "#6b7280",
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
-  marginBottom: "14px",
-};
-
-const QUICK_ACTION_BUTTON_STYLE: React.CSSProperties = {
-  background: "white",
-  border: "1px solid #e5e7eb",
-  borderRadius: "10px",
-  padding: "12px 16px",
-  cursor: "pointer",
-  transition: "all 0.2s ease",
-  display: "flex",
-  alignItems: "center",
-  gap: "12px",
-  fontSize: "14px",
-  fontWeight: 500,
-  color: "#1f2937",
-};
-
-const quickActionHover = {
-  onMouseOver: (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.borderColor = "#2563eb";
-    e.currentTarget.style.background = "#eff6ff";
-    e.currentTarget.style.transform = "translateX(4px)";
-  },
-  onMouseOut: (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.currentTarget.style.borderColor = "#e5e7eb";
-    e.currentTarget.style.background = "white";
-    e.currentTarget.style.transform = "translateX(0)";
-  },
-};
-
 function QuickActionsPanel() {
   return (
     <div>
-      <h6 style={PANEL_HEADING_STYLE}>Quick Actions</h6>
+      <h6 style={CRM_LIST_VIEW_MODAL_PANEL_HEADING_STYLE}>Quick Actions</h6>
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        <button style={QUICK_ACTION_BUTTON_STYLE} {...quickActionHover}>
+        <button
+          type="button"
+          style={CRM_LIST_VIEW_MODAL_QUICK_ACTION_BUTTON_STYLE}
+          {...crmListViewModalQuickActionHover}
+        >
           <div
             style={{
               width: "32px",
@@ -1010,7 +775,11 @@ function QuickActionsPanel() {
           Call Prospect
         </button>
 
-        <button style={QUICK_ACTION_BUTTON_STYLE} {...quickActionHover}>
+        <button
+          type="button"
+          style={CRM_LIST_VIEW_MODAL_QUICK_ACTION_BUTTON_STYLE}
+          {...crmListViewModalQuickActionHover}
+        >
           <div
             style={{
               width: "32px",
@@ -1042,7 +811,7 @@ function StatusOverviewPanel({
 }) {
   return (
     <div>
-      <h6 style={PANEL_HEADING_STYLE}>Status Overview</h6>
+      <h6 style={CRM_LIST_VIEW_MODAL_PANEL_HEADING_STYLE}>Status Overview</h6>
       <div
         style={{
           background: "white",
@@ -1145,7 +914,7 @@ function ActivityTimelinePanel({
 }) {
   return (
     <div style={{ flex: 1 }}>
-      <h6 style={PANEL_HEADING_STYLE}>Recent Activity</h6>
+      <h6 style={CRM_LIST_VIEW_MODAL_PANEL_HEADING_STYLE}>Recent Activity</h6>
       <div
         style={{
           background: "white",

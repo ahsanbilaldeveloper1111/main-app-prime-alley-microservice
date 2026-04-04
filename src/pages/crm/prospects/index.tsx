@@ -24,8 +24,6 @@ import {
 
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
-import Select from "react-select";
-import type { GroupBase, StylesConfig } from "react-select";
 import { toast } from "react-toastify";
 import moment from "moment";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
@@ -63,7 +61,6 @@ import CreateLeadModal from "@components/CreateLeadModal";
 import GenericTable, {
   TableColumn,
   TableAction,
-  FilterPill,
 } from "@components/GenericTable";
 
 import GenericSidebar from "@components/GenericSidebarNew";
@@ -72,7 +69,6 @@ import { StatsCardData } from "@components/GenericStatsCards";
 import {
   updateCrmData,
   getCrmDataCounts,
-  CrmDataItem,
   CrmDataMetrics,
   downloadExampleCsv,
 } from "@utils/crm";
@@ -115,7 +111,6 @@ import { useCrmListFiltersMetricsHistoryState } from "@crm/shared/useCrmListFilt
 import { useCrmListContactFormHandlers } from "@crm/shared/useCrmListContactFormHandlers";
 import { useCrmListSharedCallbacks } from "@crm/shared/useCrmListSharedCallbacks";
 import { useCrmListSideEffects } from "@crm/shared/useCrmListSideEffects";
-import { useCrmListSortPagination } from "@crm/shared/useCrmListSortPagination";
 import { useCrmListFilterActions } from "@crm/shared/useCrmListFilterActions";
 import { useCrmListDataOperations } from "@crm/shared/useCrmListDataOperations";
 import { useCrmListNavigationHandlers } from "@crm/shared/useCrmListNavigationHandlers";
@@ -149,57 +144,10 @@ import {
   buildProspectsCsvContent,
   buildProspectsExportHeaders,
   buildProspectsSourceFileSelectOptions,
-  type ProspectSourceFileOption as ProspectsSourceFileOption,
 } from "@crm/prospects/crmProspectsPageExportCsv";
-
-interface DeleteModalAdditionalInfoProps {
-  mode: "single" | "bulk" | null;
-  itemToDelete: CrmDataItem | null;
-  selectedCount: number;
-  extensions: any[];
-}
-
-const DeleteModalAdditionalInfo: React.FC<DeleteModalAdditionalInfoProps> = ({
-  mode,
-  itemToDelete,
-  selectedCount,
-  extensions,
-}) => {
-  if (mode === "single" && itemToDelete) {
-    const assignedTo =
-      itemToDelete.user_extension
-        ? extensions.find(
-            (extension: any) =>
-              extension.id.toString() ===
-              itemToDelete.user_extension?.toString(),
-          )?.display_name || itemToDelete.user_extension
-        : "Unassigned";
-
-    return (
-      <div className="alert alert-warning mb-3">
-        <strong>Entry ID:</strong> #{itemToDelete.id}
-        <br />
-        <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
-        <br />
-        <strong>Assigned To:</strong> {assignedTo}
-        <br />
-        <strong>Created:</strong>{" "}
-        {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
-      </div>
-    );
-  }
-
-  if (mode === "bulk") {
-    return (
-      <div className="alert alert-warning mb-3">
-        <strong>Warning:</strong> This action cannot be undone. All{" "}
-        {selectedCount} selected entries will be permanently deleted.
-      </div>
-    );
-  }
-
-  return null;
-};
+import { CrmListDeleteModalAdditionalInfo } from "@crm/shared/CrmListDeleteModalAdditionalInfo";
+import { CrmListPageScopedLayoutStyles } from "@crm/shared/CrmListPageScopedLayoutStyles";
+import { useCrmListAdvancedFilterPills } from "@crm/shared/useCrmListAdvancedFilterPills";
 
 const CrmProspectsManagement = () => {
   const {
@@ -580,302 +528,15 @@ const CrmProspectsManagement = () => {
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
 
-  const advancedFilterPills = useMemo<FilterPill[]>(() => {
-    const campaignIds: string[] = [];
-    if (Array.isArray(currentFilters.campaign_id)) {
-      campaignIds.push(...currentFilters.campaign_id);
-    } else if (currentFilters.campaign_id) {
-      campaignIds.push(currentFilters.campaign_id);
-    }
-
-    const selectedCampaignOptions = availableCampaigns.filter((c) =>
-      campaignIds.includes(c.value),
-    );
-
-    let tagValues: string[] = [];
-    if (Array.isArray(currentFilters.tags)) {
-      tagValues = currentFilters.tags;
-    } else if (currentFilters.tags) {
-      tagValues = [currentFilters.tags];
-    }
-    const selectedTagOptions = availableTags.filter((t) =>
-      tagValues.includes(t.value),
-    );
-
-    const sourceValue = currentFilters.source_file ?? null;
-    const nextFrom = currentFilters.scheduled_call_from ?? "";
-    const nextTo = currentFilters.scheduled_call_to ?? "";
-
-    const nextCallLabel = (() => {
-      if (!nextFrom && !nextTo) return undefined;
-      if (nextFrom && nextTo && nextFrom === nextTo) {
-        if (moment(nextFrom).isValid()) {
-          return moment(nextFrom).format("MMM D, YYYY");
-        }
-        return String(nextFrom);
-      }
-
-      let fromLabel = "…";
-      if (nextFrom) {
-        fromLabel = moment(nextFrom).isValid()
-          ? moment(nextFrom).format("MMM D")
-          : String(nextFrom);
-      }
-
-      let toLabel = "…";
-      if (nextTo) {
-        toLabel = moment(nextTo).isValid()
-          ? moment(nextTo).format("MMM D")
-          : String(nextTo);
-      }
-      return `${fromLabel} – ${toLabel}`;
-    })();
-
-    return [
-      {
-        id: "campaigns",
-        label: "Campaigns",
-        showDropdown: true,
-        active: campaignIds.length > 0,
-        activeLabel:
-          campaignIds.length > 1
-            ? `${campaignIds.length} selected`
-            : selectedCampaignOptions[0]?.label,
-        onClear: () => {
-          setProspectsFilters((prev) => ({ ...prev, campaigns: null }));
-          applyTableFiltersPatch({ campaign_id: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Select
-              isMulti
-              options={availableCampaigns}
-              value={selectedCampaignOptions}
-              onChange={(selected) => {
-                const values = selected
-                  ? (selected as any[]).map((s: any) => s.value)
-                  : null;
-                setProspectsFilters((prev) => ({ ...prev, campaigns: values }));
-                applyTableFiltersPatch({ campaign_id: values });
-              }}
-              placeholder="Select campaigns..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({ ...prev, campaigns: null }));
-                  applyTableFiltersPatch({ campaign_id: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "source_file",
-        label: "Source",
-        showDropdown: true,
-        active: !!sourceValue,
-        activeLabel: (() => {
-          if (!sourceValue) {
-            return undefined;
-          }
-          return String(sourceValue);
-        })(),
-        onClear: () => {
-          setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
-          applyTableFiltersPatch({ source_file: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <CreatableSelect<ProspectsSourceFileOption>
-              options={uniqueSources}
-              value={(() => {
-                if (!sourceValue) {
-                  return null;
-                }
-                return { value: sourceValue, label: String(sourceValue) };
-              })()}
-              onChange={(selected) => {
-                const v = selected ? selected.value : null;
-                setProspectsFilters((prev) => ({ ...prev, sourceFile: v }));
-                applyTableFiltersPatch({ source_file: v });
-              }}
-              placeholder="Select or type a source..."
-              styles={
-                customSelectStyles as StylesConfig<
-                  ProspectsSourceFileOption,
-                  false,
-                  GroupBase<ProspectsSourceFileOption>
-                >
-              }
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({ ...prev, sourceFile: null }));
-                  applyTableFiltersPatch({ source_file: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "tags",
-        label: "Tags",
-        showDropdown: true,
-        active: tagValues.length > 0,
-        activeLabel: (() => {
-          if (tagValues.length > 1) {
-            return `${tagValues.length} selected`;
-          }
-          return selectedTagOptions[0]?.label;
-        })(),
-        onClear: () => {
-          setProspectsFilters((prev) => ({ ...prev, tags: null }));
-          applyTableFiltersPatch({ tags: undefined });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <Select
-              isMulti
-              options={availableTags.map((t) => ({
-                value: t.value,
-                label: t.label,
-              }))}
-              value={selectedTagOptions.map((t) => ({
-                value: t.value,
-                label: t.label,
-              }))}
-              onChange={(selected) => {
-                const values = selected
-                  ? (selected as any[]).map((s: any) => s.value)
-                  : null;
-                setProspectsFilters((prev) => ({ ...prev, tags: values }));
-                applyTableFiltersPatch({ tags: values });
-              }}
-              placeholder="Select tags..."
-              styles={customSelectStyles}
-              isClearable
-            />
-            <div className="d-flex justify-content-end mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({ ...prev, tags: null }));
-                  applyTableFiltersPatch({ tags: undefined });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "next_call",
-        label: "Next Call Date",
-        showDropdown: true,
-        active: !!nextFrom || !!nextTo,
-        activeLabel: nextCallLabel,
-        onClear: () => {
-          setProspectsFilters((prev) => ({
-            ...prev,
-            nextCallDateFrom: null,
-            nextCallDateTo: null,
-          }));
-          applyTableFiltersPatch({
-            scheduled_call_from: undefined,
-            scheduled_call_to: undefined,
-          });
-        },
-        dropdownContent: (
-          <div style={{ minWidth: 280 }}>
-            <div className="d-flex gap-2">
-              <div className="flex-grow-1">
-                <Form.Label className="small fw-bold mb-1">From</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={currentFilters.scheduled_call_from || ""}
-                  onChange={(e) => {
-                    const v = e.target.value || null;
-                    setProspectsFilters((prev) => ({
-                      ...prev,
-                      nextCallDateFrom: v,
-                    }));
-                    applyTableFiltersPatch({ scheduled_call_from: v });
-                  }}
-                />
-              </div>
-              <div className="flex-grow-1">
-                <Form.Label className="small fw-bold mb-1">To</Form.Label>
-                <Form.Control
-                  type="date"
-                  value={currentFilters.scheduled_call_to || ""}
-                  onChange={(e) => {
-                    const v = e.target.value || null;
-                    setProspectsFilters((prev) => ({
-                      ...prev,
-                      nextCallDateTo: v,
-                    }));
-                    applyTableFiltersPatch({ scheduled_call_to: v });
-                  }}
-                />
-              </div>
-            </div>
-            <div className="d-flex justify-content-end gap-2 mt-2">
-              <Button
-                size="sm"
-                variant="outline-secondary"
-                onClick={() => {
-                  setProspectsFilters((prev) => ({
-                    ...prev,
-                    nextCallDateFrom: null,
-                    nextCallDateTo: null,
-                  }));
-                  applyTableFiltersPatch({
-                    scheduled_call_from: undefined,
-                    scheduled_call_to: undefined,
-                  });
-                }}
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-        ),
-      },
-    ];
-  }, [
+  const advancedFilterPills = useCrmListAdvancedFilterPills({
+    currentFilters,
     applyTableFiltersPatch,
+    setPageFilters: setProspectsFilters,
     availableCampaigns,
     availableTags,
-    currentFilters,
-    customSelectStyles,
-    setProspectsFilters,
     uniqueSources,
-  ]);
-
-  const { handleSort, renderSortIcon, renderPaginationControls } =
-    useCrmListSortPagination({
-      pagination,
-      setPagination,
-      totalRecords,
-      entityName: "prospects",
-    });
+    customSelectStyles,
+  });
 
   const handleNoteCreate = (
     note: string,
@@ -1502,94 +1163,13 @@ const CrmProspectsManagement = () => {
 
   return (
     <React.Fragment>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .prospects-table-wrapper {
-          width: 100%;
-          overflow: hidden;
-        }
-        .prospects-table-wrapper .table-responsive {
-          width: 100%;
-          overflow-x: auto;
-          overflow-y: visible;
-          -webkit-overflow-scrolling: touch;
-        }
-        .prospects-table-wrapper .table-responsive table {
-          width: 100%;
-          table-layout: auto;
-          margin-bottom: 0;
-        }
-        .prospects-table-wrapper .table-responsive table th,
-        .prospects-table-wrapper .table-responsive table td {
-          padding: 12px 16px;
-          vertical-align: middle;
-        }
-        .prospects-table-wrapper .table-responsive table td:last-child,
-        .prospects-table-wrapper .table-responsive table th:last-child {
-          max-width: none;
-        }
-        .prospects-table-wrapper .table-responsive table td[style*="width"],
-        .prospects-table-wrapper .table-responsive table th[style*="width"] {
-          max-width: none;
-        }
-        .timeline-line {
-          position: relative;
-          height: 2px;
-          background: #e9ecef;
-          margin-top: 10px;
-        }
-        .timeline-line::after {
-          content: "";
-          position: absolute;
-          top: -8px;
-          left: 0;
-          width: 2px;
-          height: 18px;
-          background: #e9ecef;
-        }
-        .timeline-item:last-child .timeline-line {
-          display: none;
-        }
-        .generic-table-row.clickable {
-          cursor: pointer;
-        }
-        
-        
-        /* Page layout for full height */
-        .prospects-page-container {
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 100px);
-          overflow: hidden;
-        }
-        
-        .prospects-content-area {
-          flex: 1;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .prospects-scrollable-content {
-          flex: 1;
-          overflow-y: auto;
-          overflow-x: hidden;
-        }
-        /* Phone input: match other form fields - border like text inputs, no blue focus glow */
-        .contact-form-phone-input-wrapper .PhoneInput {
-          border: 1px solid #8a8a8a !important;
-          border-radius: 4px;
-          padding: 10px 12px;
-          font-size: 14px;
-          box-shadow: none !important;
-        }
-        .contact-form-phone-input-wrapper .PhoneInput:focus-within {
-          border-color: #0091ae !important;
-          outline: none;
-          box-shadow: none !important;
-        }
-      `,
+      <CrmListPageScopedLayoutStyles
+        config={{
+          tableWrapperClass: "prospects-table-wrapper",
+          scrollableContentClass: "prospects-scrollable-content",
+          pageContainerClass: "prospects-page-container",
+          contentAreaClass: "prospects-content-area",
+          includePhoneInputStyles: true,
         }}
       />
       <BreadcrumbItem
@@ -1897,7 +1477,7 @@ const CrmProspectsManagement = () => {
               deleteModalMode === "bulk" ? "prospect entries" : "prospect entry"
             }
             additionalInfo={
-              <DeleteModalAdditionalInfo
+              <CrmListDeleteModalAdditionalInfo
                 mode={deleteModalMode}
                 itemToDelete={itemToDelete}
                 selectedCount={selectedItems.length}

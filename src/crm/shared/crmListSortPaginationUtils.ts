@@ -1,23 +1,15 @@
-export function sortData<T extends Record<string, any>>(
+export function sortData<T extends Record<string, unknown>>(
   data: T[],
   sortColumn: string,
   sortDirection: "asc" | "desc",
 ): T[] {
   if (!sortColumn) return data;
 
+  const factor = sortDirection === "asc" ? 1 : -1;
   return [...data].sort((a, b) => {
-    let aVal = a[sortColumn];
-    let bVal = b[sortColumn];
-
-    if (aVal === undefined) aVal = "";
-    if (bVal === undefined) bVal = "";
-
-    const aStr = String(aVal).toLowerCase();
-    const bStr = String(bVal).toLowerCase();
-
-    if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-    if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
-    return 0;
+    const aStr = String(a[sortColumn] ?? "").toLowerCase();
+    const bStr = String(b[sortColumn] ?? "").toLowerCase();
+    return aStr.localeCompare(bStr) * factor;
   });
 }
 

@@ -1,6 +1,10 @@
 import React from "react";
 import { Row, Col, Form, Alert } from "react-bootstrap";
 import { CrmListDateTimeRow } from "./CrmListDateTimeRow";
+import {
+  CRM_LIST_AFTER_CALL_DISPOSITION_SELECT_OPTIONS,
+  CRM_LIST_AFTER_CALL_STATUS_SELECT_OPTIONS,
+} from "./crmListAfterCallFormOptions";
 
 export interface AfterCallData {
   disposition: string;
@@ -57,12 +61,11 @@ export function CrmListAfterCallFormContent({
               onChange={(e) => update({ callStatus: e.target.value })}
             >
               <option value="">Select Call Status</option>
-              <option value="answered">Answered</option>
-              <option value="no_answer">No Answer</option>
-              <option value="busy">Busy</option>
-              <option value="voicemail">Voicemail</option>
-              <option value="disconnected">Disconnected</option>
-              <option value="network_error">Network Error</option>
+              {CRM_LIST_AFTER_CALL_STATUS_SELECT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </Form.Select>
           </Form.Group>
         </Col>

@@ -86,10 +86,7 @@ import GenericTable, {
 } from "@components/GenericTable";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import { useCompanyFilterPills } from "@hooks/useCompanyFilterPills";
-import {
-  CRM_LIST_PAGE_CALL_END_REASONS,
-  CRM_LIST_PAGE_STATIC_TAGS,
-} from "@utils/crmListPageStaticData";
+import { CRM_LIST_PAGE_CALL_END_REASONS } from "@utils/crmListPageStaticData";
 
 import GenericSidebar, {
   QuickAction,
@@ -109,7 +106,6 @@ import {
   assignCrmDataAdvanced,
   getCrmDataCounts,
   bulkDeleteCrmData,
-  getCrmDataTags,
   markCrmDataAsViewed,
   getCampaigns,
   scheduleCall,
@@ -126,8 +122,6 @@ import {
   type CompanyData,
   type EnrichmentData,
 } from "@utils/crm";
-import { GetHierarchyData } from "@utils/users";
-
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -151,6 +145,15 @@ import { CrmListUnscheduleModal } from "@crm/shared/CrmListScheduleCallModals";
 import { CrmListDataAssignmentFormContent } from "@crm/shared/CrmListDataAssignmentFormContent";
 import { CrmListHistoryFormContent } from "@crm/shared/CrmListHistoryFormContent";
 import { useCrmListSortPagination } from "@crm/shared/useCrmListSortPagination";
+import { CrmListPageScopedLayoutStyles } from "@crm/shared/CrmListPageScopedLayoutStyles";
+import { getCrmListExtensionDisplayName } from "@crm/shared/crmListExtensionDisplayName";
+import { useCrmListActiveTabFiltersEffect } from "@crm/shared/crmListActiveTabFiltersEffect";
+import {
+  useCrmListCampaignsOnRefreshEffect,
+  useCrmListExtensionsLoadEffect,
+  useCrmListHistoryModalOpenEffect,
+  useCrmListTagsOnRefreshEffect,
+} from "@crm/shared/crmListResourceLoadEffects";
 import { downloadCallRecordingWithProgress } from "@crm/shared/crmListDownloadRecordingUtils";
 import { handleCrmListUploadResponse } from "@crm/shared/crmListUploadResponseUtils";
 import { ListCallLogs } from "@utils/calls";
@@ -931,87 +934,23 @@ const CrmCompanyManagement = () => {
     if (showColumnEditor) setDraftSelectedColumns([...selectedColumns]);
   }, [showColumnEditor]);
 
-  // Fetch extensions data
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        const hierarchyData = await GetHierarchyData(
-          ModuleSlug.CRM_DATA_MANAGEMENT,
-        );
-        if (hierarchyData?.extensions) {
-          setExtensions(hierarchyData.extensions);
-        }
-      } catch (error) {
-        console.error("Failed to fetch extensions:", error);
-      }
-    };
-    fetchExtensions();
-  }, []);
+  useCrmListExtensionsLoadEffect(setExtensions);
+  useCrmListHistoryModalOpenEffect(showHistoryModal, fetchHistoryData);
+  useCrmListTagsOnRefreshEffect(refreshKey, setAvailableTags, {
+    mapMode: "includeAll",
+  });
+  useCrmListCampaignsOnRefreshEffect(
+    refreshKey,
+    setAvailableCampaigns,
+    setCampaignsById,
+    "replace",
+  );
 
-  function getNameByExtension(extension: string) {
-    const extensionData = extensions.find((ext) => ext.id === extension);
-    return extensionData?.display_name || extensionData?.name || extension;
-  }
-
-  // Load history data when modal is opened
-  useEffect(() => {
-    if (showHistoryModal) {
-      fetchHistoryData();
-    }
-  }, [showHistoryModal, fetchHistoryData]);
-
-  // Load available tags
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const tags = await getCrmDataTags();
-        const tagOptions = tags.map((tag: any) => ({
-          value: tag.name,
-          label: tag.name,
-          id: tag.id,
-        }));
-        setAvailableTags(tagOptions);
-      } catch (error) {
-        console.error("Failed to load tags:", error);
-        // Fallback to static tags
-        setAvailableTags(
-          CRM_LIST_PAGE_STATIC_TAGS.map((tag) => ({
-            value: tag.value,
-            label: tag.label,
-            id: parseInt(tag.value.replace("tag-", "")) || 0,
-          })),
-        );
-      }
-    };
-    loadTags();
-  }, [refreshKey]);
-
-  // Load available campaigns
-  useEffect(() => {
-    const loadCampaigns = async () => {
-      try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
-        const campaignOptions = campaignsResponse.data.map((campaign: any) => ({
-          value: campaign.id.toString(),
-          label: campaign.name,
-          id: campaign.id,
-        }));
-        setAvailableCampaigns(campaignOptions);
-
-        // Also populate the campaignsById map
-        const campaignsMap: Record<number, string> = {};
-        campaignsResponse.data.forEach((campaign: any) => {
-          campaignsMap[campaign.id] = campaign.name;
-        });
-        setCampaignsById(campaignsMap);
-      } catch (error) {
-        console.error("Failed to load campaigns:", error);
-        // Fallback to empty array
-        setAvailableCampaigns([]);
-      }
-    };
-    loadCampaigns();
-  }, [refreshKey]);
+  const getNameByExtension = useCallback(
+    (extension: string) =>
+      getCrmListExtensionDisplayName(extensions, extension),
+    [extensions],
+  );
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
@@ -1025,32 +964,7 @@ const CrmCompanyManagement = () => {
     extensions,
   });
 
-  // Handle activeFilter changes to update currentFilters
-  useEffect(() => {
-    if (activeFilter === "all") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.has_scheduled_calls;
-        delete newFilters.has_tickets;
-        return newFilters;
-      });
-    } else if (activeFilter === "scheduled") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.has_tickets;
-        newFilters.has_scheduled_calls = true;
-        return newFilters;
-      });
-    } else if (activeFilter === "has_leads") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.has_scheduled_calls;
-        newFilters.has_tickets = true;
-        return newFilters;
-      });
-    }
-    // Don't reset pagination here - it's already reset in onFilterChange
-  }, [activeFilter]);
+  useCrmListActiveTabFiltersEffect(activeFilter, setCurrentFilters);
 
   const { handleSort, renderSortIcon, renderPaginationControls } =
     useCrmListSortPagination({
@@ -3637,81 +3551,13 @@ const CrmCompanyManagement = () => {
 
   return (
     <React.Fragment>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .companies-table-wrapper {
-          width: 100%;
-          overflow: hidden;
-        }
-        .companies-table-wrapper .table-responsive {
-          width: 100%;
-          overflow-x: auto;
-          overflow-y: visible;
-          -webkit-overflow-scrolling: touch;
-        }
-        .companies-table-wrapper .table-responsive table {
-          width: 100%;
-          table-layout: auto;
-          margin-bottom: 0;
-        }
-        .companies-table-wrapper .table-responsive table th,
-        .companies-table-wrapper .table-responsive table td {
-          padding: 12px 16px;
-          vertical-align: middle;
-        }
-        .companies-table-wrapper .table-responsive table td:last-child,
-        .companies-table-wrapper .table-responsive table th:last-child {
-          max-width: none;
-        }
-        .companies-table-wrapper .table-responsive table td[style*="width"],
-        .companies-table-wrapper .table-responsive table th[style*="width"] {
-          max-width: none;
-        }
-        .timeline-line {
-          position: relative;
-          height: 2px;
-          background: #e9ecef;
-          margin-top: 10px;
-        }
-        .timeline-line::after {
-          content: "";
-          position: absolute;
-          top: -8px;
-          left: 0;
-          width: 2px;
-          height: 18px;
-          background: #e9ecef;
-        }
-        .timeline-item:last-child .timeline-line {
-          display: none;
-        }
-        .generic-table-row.clickable {
-          cursor: pointer;
-        }
-        
-        
-        /* Page layout for full height */
-        .prospects-page-container {
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 100px);
-          overflow: hidden;
-        }
-        
-        .prospects-content-area {
-          flex: 1;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .prospects-scrollable-content {
-          flex: 1;
-          overflow-y: auto;
-          overflow-x: hidden;
-        }
-      `,
+      <CrmListPageScopedLayoutStyles
+        config={{
+          tableWrapperClass: "companies-table-wrapper",
+          scrollableContentClass: "prospects-scrollable-content",
+          pageContainerClass: "prospects-page-container",
+          contentAreaClass: "prospects-content-area",
+          includePhoneInputStyles: false,
         }}
       />
       <BreadcrumbItem
