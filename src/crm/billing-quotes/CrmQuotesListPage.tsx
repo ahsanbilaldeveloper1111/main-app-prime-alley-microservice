@@ -21,45 +21,23 @@ import {
 } from "react-bootstrap";
 import Select from "react-select";
 import { toast } from "react-toastify";
-import moment from "moment";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
 import { CreateQuoteSidebar } from "@components/renderCreateQuoteForm";
 import {
   FiCalendar,
   FiTarget,
 } from "react-icons/fi";
-import {
-  ChevronDown,
-  Trash2,
-  History,
-  FileText,
-  Target,
-} from "lucide-react";
+import { ChevronDown, Trash2 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
 import GenericTable from "@components/GenericTable";
 
-import GenericSidebar from "@components/GenericSidebarNew";
-import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
-import {
-  updateCrmData,
-  uploadCrmDataCsv,
-  CrmDataItem,
-} from "@utils/crm";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import FormModal from "@pages/partial/FormModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import {
-  RECORD_TYPES,
-} from "@utils/Helper";
-import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
 import { CrmFilterBar as FilterBar } from "@components/crm/CrmListPageUi";
-import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import {
   type CrmListContactFormState,
@@ -72,13 +50,7 @@ import { CrmListCreateContactSidebar } from "@crm/shared/CrmListCreateContactSid
 import { useCrmQuotesListFiltersMetricsHistorySidebarState } from "@crm/billing-quotes/useCrmQuotesListFiltersMetricsHistorySidebarState";
 import { CrmListViewDataModal } from "@crm/shared/CrmListViewDataModal";
 import { CrmListUploadModal } from "@crm/shared/CrmListUploadModal";
-import { CrmListDataAssignmentFormContent } from "@crm/shared/CrmListDataAssignmentFormContent";
-import { CrmListAfterCallFormContent } from "@crm/shared/CrmListAfterCallFormContent";
-import {
-  CrmListScheduleCallFormContent,
-  CrmListUnscheduleModal,
-} from "@crm/shared/CrmListScheduleCallModals";
-import { CrmListHistoryFormContent } from "@crm/shared/CrmListHistoryFormContent";
+import { CrmListPipelineModals } from "@crm/shared/CrmListPipelineModals";
 import { buildCrmQuotesListStatsCards } from "@crm/billing-quotes/crmQuotesListStatsAndTable";
 import { CrmQuotesListProspectKpiAnalyticsSection } from "@crm/billing-quotes/CrmQuotesListProspectKpiAnalyticsSection";
 import {
@@ -92,7 +64,6 @@ import {
 import { useCrmQuotesListQuotesTableModel } from "@crm/billing-quotes/useCrmQuotesListQuotesTableModel";
 import { useCrmQuotesListSharedQuoteListCallbacks } from "@crm/billing-quotes/useCrmQuotesListSharedQuoteListCallbacks";
 import { computeCrmListAdvancedFiltersApplied } from "@crm/shared/crmListCrmQueryParams";
-import { validateCrmListUploadCsvFile } from "@crm/shared/crmListUploadCsvValidation";
 import {
   applyCrmListExportDateRangePreset,
   crmListExportDateRangePresetValue,
@@ -102,7 +73,6 @@ import { pruneEmptyCrmListFilterEntries } from "@crm/billing-quotes/crmQuotesLis
 import { useCrmListFilterActions } from "@crm/shared/useCrmListFilterActions";
 import { useCrmListNavigationHandlers } from "@crm/shared/useCrmListNavigationHandlers";
 import { useCrmListCallAndViewActions } from "@crm/shared/useCrmListCallAndViewActions";
-import { handleCrmListUploadResponse } from "@crm/shared/crmListUploadResponseUtils";
 import {
   CRM_LIST_DELETE_BUTTON_STYLE,
   CRM_LIST_PRIMARY_BUTTON_STYLE,
@@ -125,6 +95,10 @@ import {
 import { getCrmListExtensionDisplayName } from "@crm/shared/crmListExtensionDisplayName";
 import { CrmListPageScopedLayoutStyles } from "@crm/shared/CrmListPageScopedLayoutStyles";
 import { useCrmListClearSelectedRowsEffect } from "@crm/shared/crmListClearSelectedRowsEffect";
+import { useCrmQuotesListPageUploadHandlers } from "@crm/billing-quotes/useCrmQuotesListPageUploadHandlers";
+import { CrmQuotesListPageDeleteConfirmationBlock } from "@crm/billing-quotes/CrmQuotesListPageDeleteConfirmationBlock";
+import { CrmQuotesListPageProspectSidebar } from "@crm/billing-quotes/CrmQuotesListPageProspectSidebar";
+import { CrmQuotesListPageQuotesFilterSidebar } from "@crm/billing-quotes/CrmQuotesListPageQuotesFilterSidebar";
 
 export type CrmQuotesListPageProps = {
   variant: "billing" | "crm";
@@ -149,7 +123,6 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     setUploading,
     selectedFile,
     setSelectedFile,
-    dragActive,
     setDragActive,
     showUploadModal,
     setShowUploadModal,
@@ -474,99 +447,24 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
 
   useCrmListClearSelectedRowsEffect(clearSelectedRows, setSelectedItems);
 
-  // Handle file selection
-  const handleFileSelect = (file: File) => {
-    const validation = validateCrmListUploadCsvFile(file);
-
-    if (validation.isValid) {
-      setSelectedFile(file);
-    } else {
-      validation.errors.forEach((error) => toast.error(error));
-    }
-  };
-
-  // Handle drag and drop
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
-  // Handle file input change
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFileSelect(e.target.files[0]);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!session?.user?.permissions?.includes("add-crm-data-management")) {
-      toast.error("You don't have permission to upload data");
-      return;
-    }
-    if (!selectedFile) {
-      toast.error("Please select a file to upload");
-      return;
-    }
-
-    setUploading(true);
-    setUploadProgress(0);
-
-    const progressInterval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return prev;
-        }
-        return prev + 10;
-      });
-    }, 200);
-
-    try {
-      const tagValues = Array.from(fieldTags).map((tag) => tag.value);
-      const response: any = await uploadCrmDataCsv(selectedFile, [], tagValues, true);
-
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      handleCrmListUploadResponse(response, "prospects", {
-        setSuccessModalTitle,
-        setSuccessModalDescription,
-        setShowSuccessfulModal,
-      });
-
-      setSelectedFile(null);
-      setFieldTags([]);
-      setShowUploadModal(false);
-      setUploadProgress(0);
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to upload file. Please try again.";
-      toast.error(errorMessage);
-      setUploadProgress(0);
-    } finally {
-      setUploading(false);
-    }
-  };
-
+  const {
+    handleFileInputChange,
+    handleUpload,
+  } = useCrmQuotesListPageUploadHandlers({
+    session,
+    selectedFile,
+    setSelectedFile,
+    setDragActive,
+    fieldTags,
+    setFieldTags,
+    setUploading,
+    setUploadProgress,
+    setShowUploadModal,
+    setRefreshKey,
+    setSuccessModalTitle,
+    setSuccessModalDescription,
+    setShowSuccessfulModal,
+  });
 
   const { handleMarkAsViewed, handleCallAction } =
     useCrmListCallAndViewActions(setRefreshKey);
@@ -607,41 +505,6 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     buildDetailUrl: (prospect: any) =>
       `/crm/detailspage?type=prospect&id=${prospect?.id ?? ""}`,
   });
-
-  const handleProspectOwnerSelect = useCallback(
-    async (ownerValue: string) => {
-      const prospect = selectedProspect;
-      if (!prospect?.id) return;
-      const name = prospect.name ?? "";
-      const phone = prospect.phone ?? "";
-      const campaignId =
-        prospect.campaign_id ?? prospect.campaign?.id ?? null;
-      const existingData = (prospect.data as Record<string, unknown>) ?? {};
-      try {
-        await updateCrmData(prospect.id, {
-          name,
-          phone,
-          campaign_id: campaignId,
-          data: { ...existingData, contact_owner: ownerValue || undefined },
-        });
-        fetchCrmData();
-        setSelectedProspect((prev: CrmDataItem | null) =>
-          prev
-            ? {
-                ...prev,
-                data: {
-                  ...(prev.data as Record<string, unknown>),
-                  contact_owner: ownerValue || null,
-                },
-              }
-            : null,
-        );
-      } catch {
-        // Error already shown by updateCrmData
-      }
-    },
-    [selectedProspect, fetchCrmData],
-  );
 
   const prospectsStatsCards: StatsCardData[] = useMemo(
     () => buildCrmQuotesListStatsCards(metrics, totalRecords),
@@ -1174,631 +1037,128 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
             onDownloadCallRecording={handleDownloadCallRecording}
           />
 
-          {/* Delete Confirmation Modal (single + bulk) */}
-          <DeleteConfirmationModal
+          <CrmQuotesListPageDeleteConfirmationBlock
             show={showDeleteModal}
             onHide={() => {
               setShowDeleteModal(false);
               setDeleteModalMode(null);
               setItemToDelete(null);
             }}
-            onConfirm={
-              deleteModalMode === "bulk" ? handleBulkDelete : confirmDelete
-            }
-            itemName={
-              deleteModalMode === "single" && itemToDelete
-                ? `prospect entry #${itemToDelete.id}`
-                : deleteModalMode === "bulk"
-                  ? `${selectedItems.length} selected prospects`
-                  : undefined
-            }
-            itemType={
-              deleteModalMode === "bulk" ? "prospect entries" : "prospect entry"
-            }
-            additionalInfo={
-              deleteModalMode === "single" && itemToDelete ? (
-                <div className="alert alert-warning mb-3">
-                  <strong>Entry ID:</strong> #{itemToDelete.id}
-                  <br />
-                  <strong>Phone:</strong> {itemToDelete.phone || "N/A"}
-                  <br />
-                  <strong>Assigned To:</strong>{" "}
-                  {itemToDelete.user_extension
-                    ? extensions.find(
-                        (extension: any) =>
-                          extension.id.toString() ===
-                          itemToDelete.user_extension?.toString(),
-                      )?.display_name || itemToDelete.user_extension
-                    : "Unassigned"}
-                  <br />
-                  <strong>Created:</strong>{" "}
-                  {moment(itemToDelete.created_at).format("MMM DD, YYYY HH:mm")}
-                </div>
-              ) : deleteModalMode === "bulk" ? (
-                <div className="alert alert-warning mb-3">
-                  <strong>Warning:</strong> This action cannot be undone. All{" "}
-                  {selectedItems.length} selected entries will be permanently
-                  deleted.
-                </div>
-              ) : undefined
-            }
+            deleteModalMode={deleteModalMode}
+            itemToDelete={itemToDelete}
+            selectedItems={selectedItems}
+            extensions={extensions}
+            handleBulkDelete={handleBulkDelete}
+            confirmDelete={confirmDelete}
           />
 
-          {/* Data Assignment Modal */}
-          <FormModal
-            show={showDataAssignmentModal}
-            onHide={handleDataAssignmentModalClose}
-            title="Smart Prospect Distribution"
-            desc="Please fill the details below to smart prospect distribution."
-            size="lg"
-            formHtml={
-              <CrmListDataAssignmentFormContent
-                entityLabel="Prospects"
-                assignmentFilters={assignmentFilters}
-                setAssignmentFilters={setAssignmentFilters}
-                availableTags={availableTags}
-                availableCampaigns={availableCampaigns}
-                assignmentCounts={assignmentCounts}
-                assignmentCampaign={assignmentCampaign}
-                setAssignmentCampaign={setAssignmentCampaign}
-                totalEntriesToAssign={totalEntriesToAssign}
-                setTotalEntriesToAssign={setTotalEntriesToAssign}
-                assignmentDistribution={assignmentDistribution}
-                setAssignmentDistribution={setAssignmentDistribution}
-                customDistribution={customDistribution}
-                setCustomDistribution={setCustomDistribution}
-              />
-            }
-            submitButtonText="OK"
-            cancelButtonText="Cancel"
-            onSubmit={handleDataAssignmentSubmit}
-            onCancel={handleDataAssignmentModalClose}
-          />
-
-          <FormModal
-            show={showAfterCallModal}
-            onHide={() => setShowAfterCallModal(false)}
-            title="After Call Dialog"
-            desc="Please fill the details below to record call outcomes and schedule follow-up actions."
-            size="lg"
-            formHtml={
-              <CrmListAfterCallFormContent
-                afterCallData={afterCallData}
-                setAfterCallData={setAfterCallData}
-              />
-            }
-            submitButtonText="Save Call Data"
-            cancelButtonText="Cancel"
-            onSubmit={() => handleAfterCallSubmit()}
-            onCancel={() => setShowAfterCallModal(false)}
-          />
-
-          <FormModal
-            show={showScheduleModal}
-            onHide={() => setShowScheduleModal(false)}
-            title={isEditingSchedule ? "Edit Scheduled Call" : "Schedule Call"}
-            desc={
-              isEditingSchedule
-                ? "Please update the details below to modify the scheduled call."
-                : "Please fill the details below to schedule a call."
-            }
-            size="lg"
-            formHtml={
-              <CrmListScheduleCallFormContent
-                selectedEntry={selectedEntryForSchedule}
-                isEditing={isEditingSchedule}
-                scheduleData={scheduleData}
-                setScheduleData={setScheduleData}
-              />
-            }
-            submitButtonText={
-              isEditingSchedule ? "Update Schedule" : "Schedule Call"
-            }
-            cancelButtonText="Cancel"
-            onSubmit={() => handleScheduleSubmit()}
-            onCancel={() => handleScheduleModalClose()}
-          />
-
-          {/* Unschedule Confirmation Modal */}
-          <CrmListUnscheduleModal
-            show={showUnscheduleModal}
-            onHide={() => {
-              setShowUnscheduleModal(false);
-              setEntryToUnschedule(null);
+          <CrmListPipelineModals
+            assignment={{
+              show: showDataAssignmentModal,
+              onHide: handleDataAssignmentModalClose,
+              title: "Smart Prospect Distribution",
+              desc: "Please fill the details below to smart prospect distribution.",
+              onSubmit: handleDataAssignmentSubmit,
+              onCancel: handleDataAssignmentModalClose,
             }}
-            entryToUnschedule={entryToUnschedule}
-            onConfirm={confirmUnscheduleCall}
-          />
-
-          <FormModal
-            show={showHistoryModal}
-            onHide={() => setShowHistoryModal(false)}
-            title="Activity History"
-            desc="Please fill the details below to view the activity history."
-            size="lg"
-            formHtml={
-              <CrmListHistoryFormContent
-                historyData={historyData}
-                historyLoading={historyLoading}
-                historyPagination={historyPagination}
-                fetchHistoryData={fetchHistoryData}
-                campaignsById={campaignsById}
-                getNameByExtension={getNameByExtension}
-              />
-            }
-            submitButtonText="Close"
-            cancelButtonText="Cancel"
-            onSubmit={() => setShowHistoryModal(false)}
-            onCancel={() => setShowHistoryModal(false)}
-          />
-
-          <SuccessfulModal
-            show={showSuccessfulModal}
-            onHide={() => setShowSuccessfulModal(false)}
-            title={successModalTitle}
-            description={successModalDescription}
-          />
-
-          {/* Call Recording Player Modal */}
-          <CallRecordingPlayerModal
-            show={showRecordingPlayerModal}
-            onHide={() => {
-              setShowRecordingPlayerModal(false);
-              setSelectedRecording(null);
+            assignmentForm={{
+              entityLabel: "Prospects",
+              assignmentFilters,
+              setAssignmentFilters,
+              availableTags,
+              availableCampaigns,
+              assignmentCounts,
+              assignmentCampaign,
+              setAssignmentCampaign,
+              totalEntriesToAssign,
+              setTotalEntriesToAssign,
+              assignmentDistribution,
+              setAssignmentDistribution,
+              customDistribution,
+              setCustomDistribution,
             }}
-            recording={selectedRecording}
+            afterCall={{
+              show: showAfterCallModal,
+              onHide: () => setShowAfterCallModal(false),
+              onSubmit: handleAfterCallSubmit,
+              afterCallData,
+              setAfterCallData,
+            }}
+            schedule={{
+              show: showScheduleModal,
+              onHide: () => setShowScheduleModal(false),
+              isEditingSchedule,
+              selectedEntryForSchedule,
+              scheduleData,
+              setScheduleData,
+              onSubmit: handleScheduleSubmit,
+              onCancel: handleScheduleModalClose,
+            }}
+            unschedule={{
+              show: showUnscheduleModal,
+              onHide: () => {
+                setShowUnscheduleModal(false);
+                setEntryToUnschedule(null);
+              },
+              entryToUnschedule,
+              onConfirm: confirmUnscheduleCall,
+            }}
+            history={{
+              show: showHistoryModal,
+              onHide: () => setShowHistoryModal(false),
+              onClose: () => setShowHistoryModal(false),
+              historyData,
+              historyLoading,
+              historyPagination,
+              fetchHistoryData,
+              campaignsById,
+              getNameByExtension,
+            }}
+            success={{
+              show: showSuccessfulModal,
+              onHide: () => setShowSuccessfulModal(false),
+              title: successModalTitle,
+              description: successModalDescription,
+            }}
+            recording={{
+              show: showRecordingPlayerModal,
+              onHide: () => {
+                setShowRecordingPlayerModal(false);
+                setSelectedRecording(null);
+              },
+              recording: selectedRecording,
+            }}
           />
         </div>{" "}
         {/* End main content area */}
-        {/* Prospect Detail Sidebar */}
-        {showProspectSidebar && (
-          <GenericSidebar
-            isOpen={showProspectSidebar}
-            onClose={handleCloseProspectSidebar}
-            title={selectedProspect?.title || `Quote #${selectedProspect?.id}` || "Quote Details"}
-            subtitle={selectedProspect?.contact_name || selectedProspect?.contact_email || ""}
-            email={selectedProspect?.contact_email || selectedProspect?.data?.email}
-            phone={selectedProspect?.contact_phone || selectedProspect?.phone}
-            senderName={session?.user?.name || ""}
-            senderEmail={session?.user?.email || ""}
-            record={{
-              id: selectedProspect?.id,
-              type: RECORD_TYPES.PROSPECT,
-            }}
-            avatar={{
-              initials: getInitials(selectedProspect?.title || selectedProspect?.contact_name || "Q"),
-              name: selectedProspect?.title || selectedProspect?.contact_name || "Quote",
-              gradient: getRandomColor(selectedProspect?.title || ""),
-            }}
-            recordType="prospect"
-            recordId={
-              selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
-            }
-            resolveUserLabel={getNameByExtension}
-            onNoteCreate={handleNoteCreate}
-            crmSummary={
-              selectedProspect?.crm_summary ??
-              selectedProspect?.data?.crm_summary ??
-              (selectedProspect as any)?.data?.data?.crm_summary ??
-              undefined
-            }
-            recordLink={{
-              label: "View quote details",
-              onClick: () => {
-                const quoteId = Number(
-                  selectedProspect?.id ??
-                    selectedProspect?.data?.id ??
-                    (selectedProspect as any)?.data?.data?.id ??
-                    NaN,
-                );
-                if (!Number.isFinite(quoteId) || quoteId <= 0) return;
-                handleCloseProspectSidebar();
-                router.push(
-                  `/crm/quotes/${quoteId}`,
-                );
-              },
-            }}
-            actionsDropdown={{
-              label: "Actions",
-              items: [
-                {
-                  label: "Edit Quote",
-                  onClick: () => {
-                    const id = selectedProspect?.id;
-                    if (!id) return;
-                    setShowProspectSidebar(false);
-                    router.push(`/crm/quotes/${id}/edit`);
-                  },
-                },
-                {
-                  label: "Duplicate Quote",
-                  onClick: () => {
-                    setShowProspectSidebar(false);
-                    handleDuplicateQuote(selectedProspect);
-                  },
-                },
-                {
-                  label: "Send to Contact",
-                  onClick: () => {
-                    setShowProspectSidebar(false);
-                    handleSendToContact(selectedProspect);
-                  },
-                },
-                {
-                  label: "Delete",
-                  onClick: () => handleDeleteData(selectedProspect),
-                },
-              ],
-            }}
-            sections={[
-              {
-                id: "about-quote",
-                title: "About this quote",
-                icon: Target,
-                collapsible: true,
-                defaultExpanded: true,
-                actions: [
-                  {
-                    label: "Edit all properties",
-                    onClick: () => {
-                      const id = selectedProspect?.id;
-                      if (!id) return;
-                      setShowProspectSidebar(false);
-                      router.push(`/crm/quotes/${id}/edit`);
-                    },
-                  },
-                ],
-                fields: [
-                  {
-                    label: "Quote Title",
-                    value: selectedProspect?.title || `Quote #${selectedProspect?.id}` || "N/A",
-                    copyable: true,
-                  },
-                  {
-                    label: "Amount",
-                    value: selectedProspect?.amount != null 
-                      ? `US$${Number(selectedProspect.amount).toLocaleString()}` 
-                      : "N/A",
-                    copyable: true,
-                  },
-                  {
-                    label: "Status",
-                    value: selectedProspect?.status || "N/A",
-                  },
-                  {
-                    label: "Signing Status",
-                    value: selectedProspect?.signing_status || "N/A",
-                  },
-                  {
-                    label: "View Count",
-                    value: selectedProspect?.view_count != null 
-                      ? String(selectedProspect.view_count) 
-                      : "0",
-                  },
-                  {
-                    label: "Contact Name",
-                    value: selectedProspect?.contact_name || "N/A",
-                    copyable: true,
-                    show: !!selectedProspect?.contact_name,
-                  },
-                  {
-                    label: "Contact Email",
-                    value: selectedProspect?.contact_email || selectedProspect?.data?.email || "N/A",
-                    type: "email",
-                    copyable: true,
-                    externalLink: (selectedProspect?.contact_email || selectedProspect?.data?.email)
-                      ? `mailto:${selectedProspect?.contact_email || selectedProspect?.data?.email}`
-                      : undefined,
-                    show: !!(selectedProspect?.contact_email || selectedProspect?.data?.email),
-                  },
-                  {
-                    label: "Contact Phone",
-                    value: selectedProspect?.contact_phone || selectedProspect?.phone || "N/A",
-                    type: "phone",
-                    copyable: true,
-                    externalLink: (selectedProspect?.contact_phone || selectedProspect?.phone)
-                      ? `tel:${selectedProspect?.contact_phone || selectedProspect?.phone}`
-                      : undefined,
-                    show: !!(selectedProspect?.contact_phone || selectedProspect?.phone),
-                  },
-                  {
-                    label: "Quote Owner",
-                    value: selectedProspect?.user_extension
-                      ? getNameByExtension(selectedProspect.user_extension)
-                      : "—",
-                    hasDetails: true,
-                    onDetailsClick: () => console.log("Show user details"),
-                  },
-                  {
-                    label: "Description",
-                    value: selectedProspect?.description || "N/A",
-                    show: !!selectedProspect?.description,
-                  },
-                  {
-                    label: "Created Date",
-                    value: selectedProspect?.created_at
-                      ? moment(selectedProspect.created_at).format(
-                          "MMM DD, YYYY",
-                        )
-                      : "N/A",
-                    type: "date",
-                  },
-                  {
-                    label: "Last Updated",
-                    value: selectedProspect?.updated_at
-                      ? moment(selectedProspect.updated_at).format(
-                          "MMM DD, YYYY",
-                        )
-                      : "N/A",
-                    type: "date",
-                  },
-                  {
-                    label: "Expiry Date",
-                    value: selectedProspect?.expiry_date
-                      ? moment(selectedProspect.expiry_date).format(
-                          "MMM DD, YYYY",
-                        )
-                      : "N/A",
-                    type: "date",
-                    show: !!selectedProspect?.expiry_date,
-                  },
-                ],
-              },
-              {
-                id: "recent-activities",
-                title: "Recent activities",
-                icon: History,
-                collapsible: true,
-                defaultExpanded: true,
-                count: 0,
-                emptyState: {
-                  icon: History,
-                  message: "No recent activities for this quote.",
-                  action: {
-                    label: "Log activity",
-                    onClick: () => {
-                      const id = selectedProspect?.id ?? selectedProspect?.data?.id ?? "";
-                      if (id) {
-                        router.push(`/crm/quotes/${id}`);
-                        handleCloseProspectSidebar();
-                      }
-                    },
-                  },
-                },
-              },
-              {
-                id: "quote-history",
-                title: "Quote History",
-                icon: FileText,
-                collapsible: true,
-                defaultExpanded: true,
-                emptyState: {
-                  icon: FileText,
-                  message: "No history available for this quote.",
-                  action: {
-                    label: "View details",
-                    onClick: () =>
-                      selectedProspect?.id &&
-                      handleCallClick(selectedProspect),
-                  },
-                },
-              },
-              {
-                id: "notes",
-                title: "Notes",
-                icon: FileText,
-                collapsible: true,
-                defaultExpanded: true,
-                count: 0,
-                emptyState: {
-                  icon: FileText,
-                  message: "No notes added yet.",
-                  action: {
-                    label: "Add note",
-                    onClick: () => console.log("Add note"),
-                  },
-                },
-              }
-            ]}
-          />
-        )}
+        <CrmQuotesListPageProspectSidebar
+          show={showProspectSidebar}
+          onClose={handleCloseProspectSidebar}
+          selectedProspect={selectedProspect}
+          sessionUser={session?.user}
+          getNameByExtension={getNameByExtension}
+          onNoteCreate={handleNoteCreate}
+          router={router}
+          onDuplicateQuote={handleDuplicateQuote}
+          onSendToContact={handleSendToContact}
+          onDeleteData={handleDeleteData}
+          onCallClick={handleCallClick}
+        />
         {sidebarActivityModals.modals}
-        {/* Filters Sidebar */}
-        <GenericFilterSidebar
+        <CrmQuotesListPageQuotesFilterSidebar
           isOpen={showFiltersSidebar}
           onClose={handleCloseFiltersSidebar}
-          title="Filters"
-          subtitle="Filter quotes by various criteria"
-          width="400px"
-          filters={[
-            {
-              id: "search",
-              label: "Search",
-              type: "text",
-              value: prospectsSearch,
-              onChange: (value) => setProspectsSearch(value),
-              placeholder: "Search by quote title...",
-            },
-            {
-              id: "assignedTo",
-              label: "Owner",
-              type: "select",
-              value: prospectsFilters.assignedTo
-                ? (() => {
-                    const assignedToId = prospectsFilters.assignedTo;
-                    const ext = extensions.find(
-                      (e: any) => (e.id || e.extension) === assignedToId,
-                    );
-                    return ext
-                      ? {
-                          value: assignedToId,
-                          label: ext.display_name || ext.name || assignedToId,
-                        }
-                      : { value: assignedToId, label: assignedToId };
-                  })()
-                : null,
-              onChange: (selected) => {
-                const assignedToValue = selected ? selected.value : null;
-                setProspectsFilters((prev) => ({
-                  ...prev,
-                  assignedTo: assignedToValue,
-                }));
-                setActiveFilter("all");
-              },
-              options: extensions.map((ext: any) => ({
-                value: ext.id || ext.extension,
-                label: ext.display_name || ext.name || ext.id || ext.extension,
-              })),
-              placeholder: "Search and select owner...",
-              isClearable: true,
-              styles: customSelectStyles,
-            },
-            {
-              id: "quote_status",
-              label: "Quote Status",
-              type: "select",
-              value: prospectsFilters.campaigns
-                ? { value: prospectsFilters.campaigns, label: prospectsFilters.campaigns }
-                : null,
-              onChange: (selected) => {
-                const statusValue = selected ? selected.value : null;
-                setProspectsFilters((prev) => ({
-                  ...prev,
-                  campaigns: statusValue,
-                }));
-                setActiveFilter("all");
-              },
-              options: [
-                { value: "Draft", label: "Draft" },
-                { value: "Published", label: "Published" },
-                { value: "Signed", label: "Signed" },
-              ],
-              placeholder: "Select status...",
-              isClearable: true,
-              styles: customSelectStyles,
-            },
-            {
-              id: "last_activity_date",
-              label: "Last Activity Date",
-              type: "date",
-              value: prospectsFilters.nextCallDateFrom || "",
-              onChange: (value) => {
-                const dateValue = value || null;
-                setProspectsFilters((prev) => ({
-                  ...prev,
-                  nextCallDateFrom: dateValue,
-                }));
-              },
-              placeholder: "Filter by last activity date",
-            },
-            {
-              id: "quote_owner",
-              label: "Quote Owner",
-              type: "select",
-              value: prospectsFilters.sourceFile
-                ? (() => {
-                    const ownerId = prospectsFilters.sourceFile;
-                    const ext = extensions.find(
-                      (e: any) => (e.id || e.extension) === ownerId,
-                    );
-                    return ext
-                      ? {
-                          value: ownerId,
-                          label: ext.display_name || ext.name || ownerId,
-                        }
-                      : { value: ownerId, label: ownerId };
-                  })()
-                : null,
-              onChange: (selected) => {
-                const ownerValue = selected ? selected.value : null;
-                setProspectsFilters((prev) => ({
-                  ...prev,
-                  sourceFile: ownerValue,
-                }));
-                setActiveFilter("all");
-              },
-              options: extensions.map((ext: any) => ({
-                value: ext.id || ext.extension,
-                label: ext.display_name || ext.name || ext.id || ext.extension,
-              })),
-              placeholder: "Select quote owner...",
-              isClearable: true,
-              styles: customSelectStyles,
-            },
-            {
-              id: "signing_status",
-              label: "Signing Status",
-              type: "select",
-              value: prospectsFilters.tags
-                ? { value: prospectsFilters.tags, label: prospectsFilters.tags }
-                : null,
-              onChange: (selected) => {
-                const signingValue = selected ? selected.value : null;
-                setProspectsFilters((prev) => ({
-                  ...prev,
-                  tags: signingValue,
-                }));
-                setActiveFilter("all");
-              },
-              options: [
-                { value: "Pending", label: "Pending" },
-                { value: "Viewed", label: "Viewed" },
-                { value: "Signed", label: "Signed" },
-              ],
-              placeholder: "Select signing status...",
-              isClearable: true,
-              styles: customSelectStyles,
-            },
-          ]}
-          onApply={() => {
-            const filtersToApply: Record<string, any> = {};
-
-            if (prospectsSearch) {
-              filtersToApply.search = prospectsSearch;
-            }
-            if (prospectsFilters.assignedTo) {
-              filtersToApply.user_extension = [prospectsFilters.assignedTo];
-            }
-            if (prospectsFilters.campaigns) {
-              filtersToApply.status = prospectsFilters.campaigns;
-            }
-            if (prospectsFilters.nextCallDateFrom) {
-              filtersToApply.last_activity_date = prospectsFilters.nextCallDateFrom;
-            }
-            if (prospectsFilters.sourceFile) {
-              filtersToApply.quote_owner = prospectsFilters.sourceFile;
-            }
-            if (prospectsFilters.tags) {
-              filtersToApply.signing_status = prospectsFilters.tags;
-            }
-
-            handleFiltersChange(filtersToApply);
-            setPagination((prev) => ({
-              ...prev,
-              currentPage: 1,
-            }));
-            setRefreshKey((prev) => prev + 1);
-            setShowFiltersSidebar(false);
-          }}
-          onReset={() => {
-            setProspectsSearch("");
-            setProspectsFilters({
-              assignedTo: null,
-              campaigns: null,
-              nextCallDateFrom: null,
-              nextCallDateTo: null,
-              sourceFile: null,
-              tags: null,
-            });
-            handleFiltersChange({});
-            setCurrentFilters({});
-            setActiveFilter("all");
-            setPagination((prev) => ({
-              ...prev,
-              currentPage: 1,
-            }));
-            setRefreshKey((prev) => prev + 1);
-          }}
+          prospectsSearch={prospectsSearch}
+          setProspectsSearch={setProspectsSearch}
+          prospectsFilters={prospectsFilters}
+          setProspectsFilters={setProspectsFilters}
+          extensions={extensions}
+          setActiveFilter={setActiveFilter}
+          handleFiltersChange={handleFiltersChange}
+          setPagination={setPagination}
+          setRefreshKey={setRefreshKey}
+          setShowFiltersSidebar={setShowFiltersSidebar}
+          setCurrentFilters={setCurrentFilters}
         />
       </div>{" "}
       {/* End flex container */}

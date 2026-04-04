@@ -17,44 +17,27 @@ import {
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import { toast } from "react-toastify";
-import moment from "moment";
-import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
-import {
-  FiEdit,
-  FiX,
-  FiCalendar,
-  FiTarget,
-} from "react-icons/fi";
+import { FiCalendar, FiTarget } from "react-icons/fi";
 import {
   Users,
   Calendar,
   XCircle,
   Clock as ClockIcon,
-  ChevronDown,
   AlertCircle as AlertCircleIcon,
   Download,
-  Eye,
-  Trash2,
-  MoreVertical,
   Phone as PhoneIcon,
-  Mail,
   History,
   FileText,
   Target,
   MessageCircle,
 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
-import GenericTable, {
-  TableColumn,
-  TableAction,
-} from "@components/GenericTable";
+import GenericTable from "@components/GenericTable";
 
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
 import {
-  updateCrmData,
-  getCrmDataCounts,
   CrmDataMetrics,
   downloadExampleCsv,
 } from "@utils/crm";
@@ -62,14 +45,14 @@ import {
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import FormModal from "@pages/partial/FormModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import {
   RECORD_TYPES,
   formatCrmPreviewDate,
 } from "@utils/Helper";
-import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
-import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import {
+  useCrmToolbarConfig,
+  type CrmEntityType,
+} from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
 import {
@@ -78,13 +61,7 @@ import {
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
-import {
-  createEmptyCrmListContactFormState,
-  type CrmListContactFormState,
-} from "@utils/crmContactFormFromCrmItem";
-import {
-  CRM_LIST_PAGE_CALL_END_REASONS,
-} from "@utils/crmListPageStaticData";
+import { type CrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
 import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
 import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
 import { useCrmListFiltersMetricsHistoryState } from "@crm/shared/useCrmListFiltersMetricsHistoryState";
@@ -95,13 +72,7 @@ import { useCrmListFilterActions } from "@crm/shared/useCrmListFilterActions";
 import { useCrmListDataOperations } from "@crm/shared/useCrmListDataOperations";
 import { useCrmListNavigationHandlers } from "@crm/shared/useCrmListNavigationHandlers";
 import { CrmListCreateContactSidebar } from "@crm/shared/CrmListCreateContactSidebar";
-import { CrmListDataAssignmentFormContent } from "@crm/shared/CrmListDataAssignmentFormContent";
-import { CrmListAfterCallFormContent } from "@crm/shared/CrmListAfterCallFormContent";
-import {
-  CrmListScheduleCallFormContent,
-  CrmListUnscheduleModal,
-} from "@crm/shared/CrmListScheduleCallModals";
-import { CrmListHistoryFormContent } from "@crm/shared/CrmListHistoryFormContent";
+import { CrmListPipelineModals } from "@crm/shared/CrmListPipelineModals";
 import { CrmListViewDataModal } from "@crm/shared/CrmListViewDataModal";
 import {
   applyCrmListExportDateRangePreset,
@@ -112,6 +83,19 @@ import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspect
 import { CrmListDeleteModalAdditionalInfo } from "@crm/shared/CrmListDeleteModalAdditionalInfo";
 import { CrmListPageScopedLayoutStyles } from "@crm/shared/CrmListPageScopedLayoutStyles";
 import { useCrmListAdvancedFilterPills } from "@crm/shared/useCrmListAdvancedFilterPills";
+import { buildCrmProspectsContactsTableColumns } from "@crm/shared/crmProspectsContactsListPageTableColumns";
+import { buildCrmProspectsContactsTableActions } from "@crm/shared/crmProspectsContactsListPageTableActions";
+import { CrmProspectsContactsAddContactsButton } from "@crm/shared/CrmProspectsContactsAddContactsButton";
+import {
+  buildProspectsContactsAppliedFiltersPayload,
+  fetchCrmProspectsEntryCountsForFilters,
+  getProspectsContactsDeleteModalItemName,
+  mergeCrmProspectsToolbarFilterPills,
+  persistCrmDataSelectedColumns,
+  resetActiveFilterIfRemovedTabMatches,
+} from "@crm/shared/crmProspectsContactsListPageHelpers";
+import { renderCrmProspectsKanbanTableCustomBody } from "@crm/shared/crmProspectsContactsListPageKanbanCustomBody";
+import { prospectsTableRowDoubleClick } from "@crm/shared/crmProspectsContactsListPageTableRowHandlers";
 
 export function CrmProspectsContactsListPage({
   config,
@@ -221,6 +205,22 @@ export function CrmProspectsContactsListPage({
     setContactFormLoading,
   } = useCrmListAssignmentContactSidebarState();
 
+  const deleteModalItemName = useMemo(
+    () =>
+      getProspectsContactsDeleteModalItemName(
+        deleteModalMode,
+        itemToDelete,
+        selectedItems.length,
+        config.deleteModalCopy,
+      ),
+    [
+      deleteModalMode,
+      itemToDelete,
+      selectedItems.length,
+      config.deleteModalCopy,
+    ],
+  );
+
   // Call recordings state (used when view modal passes recording props)
   const [callRecordings] = useState<any[]>([]);
   const [callRecordingsLoading] = useState(false);
@@ -319,24 +319,13 @@ export function CrmProspectsContactsListPage({
   });
 
   const prospectsCalculateEntryCounts = useCallback(async () => {
-    try {
-      const campaignIds = Array.from(assignmentFilters.selectedCampaigns).map(
-        (campaign) => parseInt(campaign.value),
-      );
-      const tags = Array.from(assignmentFilters.selectedTags).map(
-        (tag) => tag.value,
-      );
-      const counts = await getCrmDataCounts(campaignIds, tags);
-      return {
-        total: counts.summary.total_records,
-        assigned: counts.summary.assigned_records,
-        unassigned: counts.summary.unassigned_records,
-      };
-    } catch (error) {
-      console.error("Failed to get entry counts:", error);
-      return { total: 5000, assigned: 2000, unassigned: 3000 };
-    }
+    return fetchCrmProspectsEntryCountsForFilters(assignmentFilters);
   }, [assignmentFilters]);
+
+  const callRecordingDownloadProgressProps =
+    config.callRecordingExtras.passDownloadProgressToSharedCallbacks
+      ? { setDownloadingRecordings, setDownloadProgress }
+      : {};
 
   const {
     showSuccessfulModal, setShowSuccessfulModal,
@@ -365,9 +354,7 @@ export function CrmProspectsContactsListPage({
     setSelectedRecord: setSelectedProspect,
     setShowSidebar: setShowProspectSidebar,
     setSelectedRecording, setShowRecordingPlayerModal,
-    ...(config.callRecordingExtras.passDownloadProgressToSharedCallbacks
-      ? { setDownloadingRecordings, setDownloadProgress }
-      : {}),
+    ...callRecordingDownloadProgressProps,
     calculateEntryCounts: prospectsCalculateEntryCounts,
   });
 
@@ -602,323 +589,28 @@ export function CrmProspectsContactsListPage({
     [config.stats, metrics],
   );
 
-  // Define columns for GenericTable - Clean declarative definitions
-  const prospectsColumns: TableColumn<any>[] = useMemo(
-    () => config.augmentTableColumns([
-      {
-        key: "name",
-        label: "Name",
-        sortable: true,
-        type: "avatar",
-        avatar: {
-          getInitials: (row) => getInitials(row.name),
-          getColor: (row) => getRandomColor(row.name),
-        },
-        emptyValue: "N/A",
-      },
-      {
-        key: "phone",
-        label: "Phone",
-        sortable: true,
-        type: "custom",
-        align: "left",
-      },
-      {
-        key: "source_file",
-        label: "Source",
-        sortable: true,
-        type: "badge",
-        badge: {
-          getVariant: () => "secondary",
-        },
-        emptyValue: "N/A",
-      },
-      {
-        key: "user_extension",
-        label: "Owner",
-        sortable: true,
-        type: "badge",
-        accessor: (row) => {
-          const extension = extensions.find(
-            (ext: any) => ext.id.toString() === row.user_extension?.toString(),
-          );
-          return row.user_extension
-            ? extension?.display_name || row.user_extension
-            : "Unassigned";
-        },
-        badge: {
-          getVariant: (row) => (row.user_extension ? "success" : "secondary"),
-          showDot: () => true,
-        },
-      },
-      {
-        key: "campaign",
-        label: "Campaign",
-        sortable: true,
-        type: "badge",
-        accessor: (row) => row.campaign?.name || "No Campaign",
-        badge: {
-          getVariant: (row) => (row.campaign ? "primary" : "info"),
-        },
-      },
-      {
-        key: "last_called_at",
-        label: "Last Called",
-        sortable: true,
-        type: "text",
-        accessor: (row) =>
-          row.last_called_at
-            ? moment(row.last_called_at).format("MMM DD, HH:mm")
-            : "-",
-      },
-      {
-        key: "last_call_end_reason",
-        label: "Last Call Status",
-        sortable: true,
-        type: "badge",
-        accessor: (row) => {
-          if (!row.last_call_end_reason) return null;
-          const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
-            (r) => r.value === row.last_call_end_reason,
-          );
-          return endReason?.label || row.last_call_end_reason;
-        },
-        badge: {
-          getVariant: (row) => {
-            if (!row.last_call_end_reason) return "secondary";
-            const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
-              (r) => r.value === row.last_call_end_reason,
-            );
-            return (endReason?.color as any) || "secondary";
-          },
-        },
-        emptyValue: "-",
-      },
-      {
-        key: "disposition",
-        label: "Disposition",
-        sortable: true,
-        type: "badge",
-        accessor: (row) => {
-          if (!row.disposition) return null;
-          const dispositions = [
-            { value: "interested", label: "Interested", color: "success" },
-            {
-              value: "not_interested",
-              label: "Not Interested",
-              color: "danger",
-            },
-            {
-              value: "callback_requested",
-              label: "Callback Requested",
-              color: "warning",
-            },
-            { value: "no_answer", label: "No Answer", color: "warning" },
-            { value: "busy", label: "Busy", color: "info" },
-            { value: "do_not_call", label: "Do Not Call", color: "danger" },
-            { value: "wrong_number", label: "Wrong Number", color: "info" },
-            { value: "follow_up", label: "Follow Up", color: "primary" },
-          ];
-          const disposition = dispositions.find(
-            (d) => d.value === row.disposition,
-          );
-          if (disposition) return disposition.label;
-          // Fallback to random for demo
-          const randomDisposition =
-            dispositions[Math.floor(Math.random() * dispositions.length)];
-          return randomDisposition.label;
-        },
-        badge: {
-          getVariant: (row) => {
-            if (!row.disposition) return "secondary";
-            const dispositions = [
-              { value: "interested", color: "success" },
-              { value: "not_interested", color: "danger" },
-              { value: "callback_requested", color: "warning" },
-              { value: "no_answer", color: "warning" },
-              { value: "busy", color: "info" },
-              { value: "do_not_call", color: "danger" },
-              { value: "wrong_number", color: "info" },
-              { value: "follow_up", color: "primary" },
-            ];
-            const disposition = dispositions.find(
-              (d) => d.value === row.disposition,
-            );
-            if (disposition) return disposition.color as any;
-            // Fallback to random for demo
-            const randomColors = [
-              "success",
-              "danger",
-              "warning",
-              "info",
-              "primary",
-            ];
-            return randomColors[
-              Math.floor(Math.random() * randomColors.length)
-            ] as any;
-          },
-        },
-        emptyValue: "-",
-      },
-      {
-        key: "scheduled_call_at",
-        label: "Next Call",
-        sortable: true,
-        type: "badge",
-        accessor: (row) => {
-          if (!row.scheduled_call_at) return "Not scheduled";
-          const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
-          const isNextHour = moment(row.scheduled_call_at).isBefore(
-            moment().add(1, "hour"),
-          );
-          const formatted = moment(row.scheduled_call_at).format(
-            "MMM DD, HH:mm",
-          );
-          if (isOverdue) return `${formatted} (Overdue)`;
-          if (isNextHour) return `${formatted} (Soon)`;
-          return formatted;
-        },
-        badge: {
-          getVariant: (row) => {
-            if (!row.scheduled_call_at) return "info";
-            const isOverdue = moment(row.scheduled_call_at).isBefore(moment());
-            const isNextHour = moment(row.scheduled_call_at).isBefore(
-              moment().add(1, "hour"),
-            );
-            return isOverdue ? "danger" : isNextHour ? "warning" : "info";
-          },
-        },
-      },
-      {
-        key: "tags",
-        label: "Tags",
-        sortable: false,
-        type: "custom",
-        render: (row) => (
-          <div className="d-flex gap-1 flex-wrap">
-            {(row.tags || []).map((tag: any, idx: number) => (
-              <span key={idx} className="gt-badge gt-badge-secondary">
-                {tag.name || tag}
-              </span>
-            ))}
-          </div>
-        ),
-      },
-    ]),
-    [config, extensions, CRM_LIST_PAGE_CALL_END_REASONS, handleCallClick],
+  const prospectsColumns = useMemo(
+    () => buildCrmProspectsContactsTableColumns(config, extensions),
+    [config, extensions],
   );
 
-  // Define table actions
-  const prospectsActions: TableAction<any>[] = useMemo(
-    () => [
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
-        ? [
-            {
-              label: "View",
-              icon: <Eye size={16} />,
-              onClick: (row: any) => handleViewData(row),
-              variant: "link" as const,
-            },
-          ]
-        : []),
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
-        ? [
-            {
-              label: "Edit",
-              icon: <FiEdit size={16} />,
-              onClick: (row: any) => {
-                setEditingContactId(row.id);
-                setShowCreateContactSidebar(true);
-              },
-              variant: "link" as const,
-            },
-          ]
-        : []),
-      ...(session?.user?.permissions?.includes(
-        "call-service-crm-data-management",
-      )
-        ? [
-            {
-              label: "Call",
-              icon: <PhoneIcon size={16} />,
-              onClick: (row: any) => handleCallClick(row),
-              variant: "link" as const,
-              className: "text-success",
-            },
-          ]
-        : []),
-      ...(activeFilter !== "has_leads"
-        ? [
-            {
-              label: "More Actions",
-              icon: <MoreVertical size={16} />,
-              variant: "link" as const,
-              dropdown: {
-                align: "end" as const,
-                options: [
-                  ...(session?.user?.permissions?.includes(
-                    "call-service-crm-data-management",
-                  )
-                    ? [
-                        {
-                          label: "Schedule Call",
-                          icon: <FiCalendar size={14} />,
-                          onClick: (row: any) => handleScheduleCall(row),
-                          show: (row: any) => !row.scheduled_call_at,
-                        },
-                        {
-                          label: "Edit Scheduled Call",
-                          icon: <FiCalendar size={14} />,
-                          onClick: (row: any) => handleScheduleCall(row),
-                          show: (row: any) => !!row.scheduled_call_at,
-                        },
-                        {
-                          label: "Unschedule Call",
-                          icon: <FiX size={14} />,
-                          onClick: (row: any) => handleUnscheduleCallClick(row),
-                          className: "text-danger",
-                          show: (row: any) => !!row.scheduled_call_at,
-                          divider: true,
-                        },
-                      ]
-                    : []),
-                  {
-                    label: "Convert to Lead",
-                    icon: <FiTarget size={14} />,
-                    onClick: (row: any) => {
-                      setConvertingToLeadCrmRecordId(row.id);
-                      setShowConvertToLeadModal(true);
-                    },
-                  },
-                  {
-                    label: "Send Email",
-                    icon: <Mail size={14} />,
-                    onClick: (row: any) => {
-                      window.location.href = `mailto:${row.email}`;
-                    },
-                    show: (row: any) => !!row.email,
-                  },
-                ],
-              },
-            },
-          ]
-        : []),
-      ...(session?.user?.permissions?.includes("delete-crm-data-management")
-        ? [
-            {
-              label: "Delete",
-              icon: <Trash2 size={16} />,
-              onClick: (row: any) => {
-                setDeleteModalMode("single");
-                setItemToDelete(row);
-                setShowDeleteModal(true);
-              },
-              variant: "link" as const,
-              className: "text-danger",
-            },
-          ]
-        : []),
-    ],
+  const prospectsActions = useMemo(
+    () =>
+      buildCrmProspectsContactsTableActions({
+        session,
+        activeFilter,
+        handleViewData,
+        handleCallClick,
+        handleScheduleCall,
+        handleUnscheduleCallClick,
+        setEditingContactId,
+        setShowCreateContactSidebar,
+        setConvertingToLeadCrmRecordId,
+        setShowConvertToLeadModal,
+        setDeleteModalMode,
+        setItemToDelete,
+        setShowDeleteModal,
+      }),
     [
       session,
       activeFilter,
@@ -926,151 +618,14 @@ export function CrmProspectsContactsListPage({
       handleCallClick,
       handleScheduleCall,
       handleUnscheduleCallClick,
+      setEditingContactId,
+      setShowCreateContactSidebar,
+      setConvertingToLeadCrmRecordId,
+      setShowConvertToLeadModal,
+      setDeleteModalMode,
+      setItemToDelete,
+      setShowDeleteModal,
     ],
-  );
-
-  // Render Add Contacts Button with Dropdown (and Bulk Delete when rows selected)
-  const renderAddContactsButton = () => (
-    <div
-      style={{
-        position: "absolute",
-        right: "19px",
-        top: "18px",
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-      }}
-      ref={addContactsRef}
-    >
-      {session?.user?.permissions?.includes("delete-crm-data-management") &&
-        selectedItems.length > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteModalMode("bulk");
-              setShowDeleteModal(true);
-            }}
-            style={{
-              padding: "9px 13px",
-              backgroundColor: "#dc3545",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "4px",
-              fontSize: "12px",
-              fontWeight: "500",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#c82333";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#dc3545";
-            }}
-          >
-            <Trash2 size={16} />
-            Delete ({selectedItems.length})
-          </button>
-        )}
-      <div style={{ width: "146px" }}>
-        <button
-          onClick={() => setShowAddContactsDropdown(!showAddContactsDropdown)}
-          style={{
-            padding: "9px 13px",
-            backgroundColor: "#000000",
-            color: "#ffffff",
-            border: "none",
-            borderRadius: "4px",
-            fontSize: "12px",
-            fontWeight: "500",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
-        >
-          {config.addMenuButtonLabel}
-          <ChevronDown size={16} />
-        </button>
-
-      {showAddContactsDropdown && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            marginTop: "4px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #e2e8f0",
-            borderRadius: "5px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-            minWidth: "160px",
-            zIndex: 1000,
-            overflow: "hidden",
-          }}
-        >
-          <button
-            onClick={() => {
-              setShowAddContactsDropdown(false);
-              setEditingContactId(null);
-              setContactForm(createEmptyCrmListContactFormState("source_file"));
-              setShowCreateContactSidebar(true);
-            }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#141414",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Create new
-          </button>
-          <button
-            onClick={() => {
-              setShowAddContactsDropdown(false);
-              setShowUploadModal(true);
-            }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#d97706",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
-          >
-            Import
-          </button>
-        </div>
-      )}
-      </div>
-    </div>
   );
 
   const { handleCreateContactSubmit, handleUpdateContactSubmit } =
@@ -1094,7 +649,7 @@ export function CrmProspectsContactsListPage({
   }, []);
 
   const prospectsToolbarConfig = useCrmToolbarConfig({
-    entity: config.toolbar.entity,
+    entity: config.toolbar.entity as CrmEntityType,
     searchValue: prospectsSearch,
     searchPlaceholder: config.toolbar.searchPlaceholder,
     onSearchChange: setProspectsSearch,
@@ -1116,7 +671,7 @@ export function CrmProspectsContactsListPage({
     onTabAdd: () => setShowTabModal(true),
     onTabRemove: (tabId) => {
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
-      if (activeFilter === tabId) handleFilterChange("all");
+      resetActiveFilterIfRemovedTabMatches(tabId, activeFilter, handleFilterChange);
     },
     tabsDropdownLabel: config.toolbar.tabsDropdownLabel,
     onFiltersClick: handleOpenFiltersSidebar,
@@ -1129,7 +684,24 @@ export function CrmProspectsContactsListPage({
     extensions,
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
-    rightActions: renderAddContactsButton(),
+    rightActions: (
+      <CrmProspectsContactsAddContactsButton
+        addContactsRef={addContactsRef}
+        session={session}
+        config={config}
+        selectedItems={selectedItems}
+        showAddContactsDropdown={showAddContactsDropdown}
+        setShowAddContactsDropdown={setShowAddContactsDropdown}
+        setEditingContactId={setEditingContactId}
+        setContactForm={
+          setContactForm as Dispatch<SetStateAction<CrmListContactFormState>>
+        }
+        setShowCreateContactSidebar={setShowCreateContactSidebar}
+        setShowUploadModal={setShowUploadModal}
+        setDeleteModalMode={setDeleteModalMode}
+        setShowDeleteModal={setShowDeleteModal}
+      />
+    ),
     prospectsTabCountOverrides: {
       loading,
       totalRecords,
@@ -1224,15 +796,9 @@ export function CrmProspectsContactsListPage({
                 // Row interactions
                 onPreviewClick={(row) => handlePreviewClick(row)}
                 onFirstColumnClick={(row) => handleFirstColumnClick(row)}
-                onRowDoubleClick={(row) => {
-                  if (
-                    session?.user?.permissions?.includes(
-                      "view-crm-data-management",
-                    )
-                  ) {
-                    handleViewData(row);
-                  }
-                }}
+                onRowDoubleClick={(row) =>
+                  prospectsTableRowDoubleClick(session, handleViewData, row)
+                }
                 // Loading & styling
                 loading={loading}
                 emptyMessage={config.tableCopy.emptyMessage}
@@ -1254,44 +820,22 @@ export function CrmProspectsContactsListPage({
                   showFilterPills: true,
                   onAdvancedFiltersClick: () =>
                     setShowAdvancedFilters((prev) => !prev),
-                  filterPills: [
-                    ...(prospectsToolbarConfig.filterPills ?? []),
-                    ...(showAdvancedFilterPills ? advancedFilterPills : []),
-                  ],
+                  filterPills: mergeCrmProspectsToolbarFilterPills(
+                    prospectsToolbarConfig.filterPills,
+                    showAdvancedFilterPills,
+                    advancedFilterPills,
+                  ),
                 }}
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
                 // When Board View is selected, show board content instead of table
-                customBody={
-  prospectsViewMode === "board" ? (
-    <KanbanBoard
-      columns={prospectsToKanbanColumns(
-        dataList,
-        getInitials,
-        getRandomColor
-      )}
-      cardActions={prospectsActions}
-      onCardClick={(card) => handleViewData(card.raw)}
-      onCardMove={(cardId, fromCol, toCol) => {
-        // Optionally call updateCrmData here to persist the lifecycle_stage change
-        const prospect = dataList.find(p => p.id === cardId);
-        if (prospect) {
-          updateCrmData(Number(cardId), {
-            name: prospect.name || "",
-            phone: prospect.phone || "",
-            campaign_id: prospect.campaign_id,
-            data: { ...prospect.data, lifecycle_stage: toCol },
-            scheduled_call_at: prospect.scheduled_call_at || undefined,
-            company_domain: prospect.data?.company_domain || undefined,
-            company_name: prospect.data?.company_name || undefined,
-            source: prospect.data?.source || undefined,
-          });
-        }
-      }}
-      searchValue={prospectsSearch}
-    />
-  ) : undefined
-}
+                customBody={renderCrmProspectsKanbanTableCustomBody({
+                  prospectsViewMode,
+                  dataList,
+                  prospectsActions,
+                  handleViewData,
+                  prospectsSearch,
+                })}
               />
             </div>
           </div>
@@ -1447,15 +991,7 @@ export function CrmProspectsContactsListPage({
             onConfirm={
               deleteModalMode === "bulk" ? handleBulkDelete : confirmDelete
             }
-            itemName={(() => {
-              if (deleteModalMode === "single" && itemToDelete) {
-                return `${config.deleteModalCopy.singleNamePrefix} #${itemToDelete.id}`;
-              }
-              if (deleteModalMode === "bulk") {
-                return `${selectedItems.length} ${config.deleteModalCopy.bulkSelectedLabel}`;
-              }
-              return undefined;
-            })()}
+            itemName={deleteModalItemName}
             itemType={
               deleteModalMode === "bulk"
                 ? config.deleteModalCopy.itemTypeBulk
@@ -1471,129 +1007,82 @@ export function CrmProspectsContactsListPage({
             }
           />
 
-          {/* Data Assignment Modal */}
-          <FormModal
-            show={showDataAssignmentModal}
-            onHide={handleDataAssignmentModalClose}
-            title={config.assignmentModal.title}
-            desc={config.assignmentModal.desc}
-            size="lg"
-            formHtml={
-              <CrmListDataAssignmentFormContent
-                entityLabel={config.assignmentModal.entityLabel}
-                assignmentFilters={assignmentFilters}
-                setAssignmentFilters={setAssignmentFilters}
-                availableTags={availableTags}
-                availableCampaigns={availableCampaigns}
-                assignmentCounts={assignmentCounts}
-                assignmentCampaign={assignmentCampaign}
-                setAssignmentCampaign={setAssignmentCampaign}
-                totalEntriesToAssign={totalEntriesToAssign}
-                setTotalEntriesToAssign={setTotalEntriesToAssign}
-                assignmentDistribution={assignmentDistribution}
-                setAssignmentDistribution={setAssignmentDistribution}
-                customDistribution={customDistribution}
-                setCustomDistribution={setCustomDistribution}
-              />
-            }
-            submitButtonText="OK"
-            cancelButtonText="Cancel"
-            onSubmit={handleDataAssignmentSubmit}
-            onCancel={handleDataAssignmentModalClose}
-          />
-
-          <FormModal
-            show={showAfterCallModal}
-            onHide={() => setShowAfterCallModal(false)}
-            title="After Call Dialog"
-            desc="Please fill the details below to record call outcomes and schedule follow-up actions."
-            size="lg"
-            formHtml={
-              <CrmListAfterCallFormContent
-                afterCallData={afterCallData}
-                setAfterCallData={setAfterCallData}
-              />
-            }
-            submitButtonText="Save Call Data"
-            cancelButtonText="Cancel"
-            onSubmit={() => handleAfterCallSubmit()}
-            onCancel={() => setShowAfterCallModal(false)}
-          />
-
-          <FormModal
-            show={showScheduleModal}
-            onHide={() => setShowScheduleModal(false)}
-            title={isEditingSchedule ? "Edit Scheduled Call" : "Schedule Call"}
-            desc={
-              isEditingSchedule
-                ? "Please update the details below to modify the scheduled call."
-                : "Please fill the details below to schedule a call."
-            }
-            size="lg"
-            formHtml={
-              <CrmListScheduleCallFormContent
-                selectedEntry={selectedEntryForSchedule}
-                isEditing={isEditingSchedule}
-                scheduleData={scheduleData}
-                setScheduleData={setScheduleData}
-              />
-            }
-            submitButtonText={
-              isEditingSchedule ? "Update Schedule" : "Schedule Call"
-            }
-            cancelButtonText="Cancel"
-            onSubmit={() => handleScheduleSubmit()}
-            onCancel={() => handleScheduleModalClose()}
-          />
-
-          {/* Unschedule Confirmation Modal */}
-          <CrmListUnscheduleModal
-            show={showUnscheduleModal}
-            onHide={() => {
-              setShowUnscheduleModal(false);
-              setEntryToUnschedule(null);
+          <CrmListPipelineModals
+            assignment={{
+              show: showDataAssignmentModal,
+              onHide: handleDataAssignmentModalClose,
+              title: config.assignmentModal.title,
+              desc: config.assignmentModal.desc,
+              onSubmit: handleDataAssignmentSubmit,
+              onCancel: handleDataAssignmentModalClose,
             }}
-            entryToUnschedule={entryToUnschedule}
-            onConfirm={confirmUnscheduleCall}
-          />
-
-          <FormModal
-            show={showHistoryModal}
-            onHide={() => setShowHistoryModal(false)}
-            title="Activity History"
-            desc="Please fill the details below to view the activity history."
-            size="lg"
-            formHtml={
-              <CrmListHistoryFormContent
-                historyData={historyData}
-                historyLoading={historyLoading}
-                historyPagination={historyPagination}
-                fetchHistoryData={fetchHistoryData}
-                campaignsById={campaignsById}
-                getNameByExtension={getNameByExtension}
-              />
-            }
-            submitButtonText="Close"
-            cancelButtonText="Cancel"
-            onSubmit={() => setShowHistoryModal(false)}
-            onCancel={() => setShowHistoryModal(false)}
-          />
-
-          <SuccessfulModal
-            show={showSuccessfulModal}
-            onHide={() => setShowSuccessfulModal(false)}
-            title={successModalTitle}
-            description={successModalDescription}
-          />
-
-          {/* Call Recording Player Modal */}
-          <CallRecordingPlayerModal
-            show={showRecordingPlayerModal}
-            onHide={() => {
-              setShowRecordingPlayerModal(false);
-              setSelectedRecording(null);
+            assignmentForm={{
+              entityLabel: config.assignmentModal.entityLabel,
+              assignmentFilters,
+              setAssignmentFilters,
+              availableTags,
+              availableCampaigns,
+              assignmentCounts,
+              assignmentCampaign,
+              setAssignmentCampaign,
+              totalEntriesToAssign,
+              setTotalEntriesToAssign,
+              assignmentDistribution,
+              setAssignmentDistribution,
+              customDistribution,
+              setCustomDistribution,
             }}
-            recording={selectedRecording}
+            afterCall={{
+              show: showAfterCallModal,
+              onHide: () => setShowAfterCallModal(false),
+              onSubmit: handleAfterCallSubmit,
+              afterCallData,
+              setAfterCallData,
+            }}
+            schedule={{
+              show: showScheduleModal,
+              onHide: () => setShowScheduleModal(false),
+              isEditingSchedule,
+              selectedEntryForSchedule,
+              scheduleData,
+              setScheduleData,
+              onSubmit: handleScheduleSubmit,
+              onCancel: handleScheduleModalClose,
+            }}
+            unschedule={{
+              show: showUnscheduleModal,
+              onHide: () => {
+                setShowUnscheduleModal(false);
+                setEntryToUnschedule(null);
+              },
+              entryToUnschedule,
+              onConfirm: confirmUnscheduleCall,
+            }}
+            history={{
+              show: showHistoryModal,
+              onHide: () => setShowHistoryModal(false),
+              onClose: () => setShowHistoryModal(false),
+              historyData,
+              historyLoading,
+              historyPagination,
+              fetchHistoryData,
+              campaignsById,
+              getNameByExtension,
+            }}
+            success={{
+              show: showSuccessfulModal,
+              onHide: () => setShowSuccessfulModal(false),
+              title: successModalTitle,
+              description: successModalDescription,
+            }}
+            recording={{
+              show: showRecordingPlayerModal,
+              onHide: () => {
+                setShowRecordingPlayerModal(false);
+                setSelectedRecording(null);
+              },
+              recording: selectedRecording,
+            }}
           />
         </div>{" "}
         {/* End main content area */}
@@ -1980,37 +1469,11 @@ export function CrmProspectsContactsListPage({
             },
           ]}
           onApply={() => {
-            const filtersToApply: Record<string, any> = {};
-
-            if (prospectsSearch) {
-              filtersToApply.search = prospectsSearch;
-            }
-            if (prospectsFilters.assignedTo) {
-              filtersToApply.user_extension = [prospectsFilters.assignedTo];
-            }
-            if (
-              prospectsFilters.campaigns &&
-              prospectsFilters.campaigns.length > 0
-            ) {
-              filtersToApply.campaign_id = prospectsFilters.campaigns;
-            }
-            if (prospectsFilters.sourceFile) {
-              filtersToApply.source_file = prospectsFilters.sourceFile;
-            }
-            if (prospectsFilters.tags && prospectsFilters.tags.length > 0) {
-              filtersToApply.tags = prospectsFilters.tags;
-            }
-
-            // Next Call Date (From)/(To) -> scheduled_call_from / scheduled_call_to
-            if (prospectsFilters.nextCallDateFrom) {
-              filtersToApply.scheduled_call_from =
-                prospectsFilters.nextCallDateFrom;
-            }
-            if (prospectsFilters.nextCallDateTo) {
-              filtersToApply.scheduled_call_to = prospectsFilters.nextCallDateTo;
-            }
-
-            handleFiltersChange(filtersToApply);
+            const filtersToApply = buildProspectsContactsAppliedFiltersPayload(
+              prospectsSearch,
+              prospectsFilters,
+            );
+            handleFiltersChange(filtersToApply as Record<string, any>);
             setPagination((prev) => ({
               ...prev,
               currentPage: 1,
@@ -2066,19 +1529,7 @@ export function CrmProspectsContactsListPage({
         selectedColumnKeys={selectedColumns}
         onApply={(keys) => {
           setSelectedColumns(keys);
-          if (config.columnEditorLocalStorage === "globalThis") {
-            if (typeof globalThis !== "undefined" && globalThis.window) {
-              globalThis.window.localStorage.setItem(
-                "crmDataSelectedColumns",
-                JSON.stringify(keys),
-              );
-            }
-          } else if (typeof window !== "undefined") {
-            window.localStorage.setItem(
-              "crmDataSelectedColumns",
-              JSON.stringify(keys),
-            );
-          }
+          persistCrmDataSelectedColumns(config.columnEditorLocalStorage, keys);
         }}
       />
       {/* Export Modal */}

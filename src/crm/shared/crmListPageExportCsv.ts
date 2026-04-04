@@ -148,6 +148,6 @@ export function buildCrmListSourceFileSelectOptions(
     if (sf) sources.add(sf);
   }
   return Array.from(sources)
-    .sort()
+    .sort((a, b) => a.localeCompare(b))
     .map((source) => ({ value: source, label: source }));
 }

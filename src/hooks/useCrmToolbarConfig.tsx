@@ -3,7 +3,17 @@ import moment from "moment";
 import type { ToolbarConfig, FilterPill, TabConfig } from "@components/GenericTable";
 import { normalizeSearchQuery } from "@utils/Helper";
 
-export type CrmEntityType = "prospects" | "leads" | "deals" | "orders" | "approvals";
+export type CrmEntityType =
+  | "prospects"
+  | "contacts"
+  | "leads"
+  | "deals"
+  | "orders"
+  | "approvals";
+
+function isProspectsLikeEntity(entity: CrmEntityType): boolean {
+  return entity === "prospects" || entity === "contacts";
+}
 
 export interface UseCrmToolbarConfigOptions {
   entity: CrmEntityType;
@@ -159,16 +169,18 @@ export function useCrmToolbarConfig(
 
     // Owner / Associate pill (all entities)
     const ownerLabel =
-      entity === "prospects" ||
+      isProspectsLikeEntity(entity) ||
       entity === "leads" ||
       entity === "deals" ||
       entity === "orders" ||
       entity === "approvals"
         ? "Owner"
         : "Associate with";
-    const ownerFilterKey = entity === "prospects" ? "user_extension" : "assigned_to";
+    const ownerFilterKey = isProspectsLikeEntity(entity)
+      ? "user_extension"
+      : "assigned_to";
 
-    const isOwnerArray = entity === "prospects";
+    const isOwnerArray = isProspectsLikeEntity(entity);
     const hasOwnerFilter = isOwnerArray
       ? currentFilters.user_extension &&
         (Array.isArray(currentFilters.user_extension)
@@ -177,7 +189,7 @@ export function useCrmToolbarConfig(
       : !!currentFilters.assigned_to;
 
     const ownerActiveLabel = (() => {
-      if (entity === "prospects") {
+      if (isProspectsLikeEntity(entity)) {
         const extId = Array.isArray(currentFilters.user_extension)
           ? currentFilters.user_extension[0]
           : currentFilters.user_extension;
@@ -192,7 +204,7 @@ export function useCrmToolbarConfig(
     })();
 
     const clearOwner = () => {
-      if (entity === "prospects") {
+      if (isProspectsLikeEntity(entity)) {
         handleFiltersChange({ ...currentFilters, user_extension: undefined });
       } else {
         handleFiltersChange({ ...currentFilters, assigned_to: undefined });
@@ -205,7 +217,7 @@ export function useCrmToolbarConfig(
       label: ownerLabel,
       showDropdown: true,
       searchable:
-        entity === "prospects" ||
+        isProspectsLikeEntity(entity) ||
         entity === "leads" ||
         entity === "deals" ||
         entity === "orders" ||
@@ -215,7 +227,7 @@ export function useCrmToolbarConfig(
       onClear: clearOwner,
       dropdownOptions: [
         {
-          label: entity === "prospects" ? "All Owners" : "All Owners",
+          label: "All Owners",
           value: "all",
           onClick: clearOwner,
         },
@@ -223,7 +235,7 @@ export function useCrmToolbarConfig(
           label: ext.display_name || ext.name || ext.extension || String(ext.id ?? ext.extension ?? ""),
           value: String(ext.id ?? ext.extension),
           onClick: () => {
-            if (entity === "prospects") {
+            if (isProspectsLikeEntity(entity)) {
               handleFiltersChange({
                 ...currentFilters,
                 user_extension: [ext.id || ext.extension],
@@ -240,10 +252,14 @@ export function useCrmToolbarConfig(
       ],
     });
 
-    // Create date pill (prospects, leads)
-    if (entity === "prospects" || entity === "leads") {
-      const fromKey = entity === "prospects" ? "created_at_from" : "date_from";
-      const toKey = entity === "prospects" ? "created_at_to" : "date_to";
+    // Create date pill (prospects, contacts, leads)
+    if (isProspectsLikeEntity(entity) || entity === "leads") {
+      const fromKey = isProspectsLikeEntity(entity)
+        ? "created_at_from"
+        : "date_from";
+      const toKey = isProspectsLikeEntity(entity)
+        ? "created_at_to"
+        : "date_to";
       const hasDate = !!(currentFilters[fromKey] || currentFilters[toKey]);
       pills.push({
         id: "create_date",
@@ -269,8 +285,8 @@ export function useCrmToolbarConfig(
       });
     }
 
-    // Last activity date pill (prospects only)
-    if (entity === "prospects") {
+    // Last activity date pill (prospects / contacts)
+    if (isProspectsLikeEntity(entity)) {
       const fromKey = "last_called_at_from";
       const toKey = "last_called_at_to";
       const hasDate = !!(currentFilters[fromKey] || currentFilters[toKey]);
@@ -391,7 +407,7 @@ export function useCrmToolbarConfig(
   ]);
 
   const resolvedTabs = useMemo((): TabConfig[] => {
-    if (entity !== "prospects" || !prospectsTabCountOverrides) return tabs;
+    if (!isProspectsLikeEntity(entity) || !prospectsTabCountOverrides) return tabs;
     const { loading, totalRecords, activeFilter } = prospectsTabCountOverrides;
     return tabs.map((tab) => {
       if (tab.id === "has_leads" && activeFilter === "has_leads" && !loading && totalRecords != null) {
