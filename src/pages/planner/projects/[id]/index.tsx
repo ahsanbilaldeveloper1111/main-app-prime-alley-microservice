@@ -261,6 +261,7 @@ const WorkPlannerProjectsDetails = () => {
           name: s.name,
           icon: "",
           color: s.color || "",
+          is_default: s.is_default === true || s.is_deefault === true,
         }))}
         isEdit={!!sidebarEditTask}
         task={sidebarEditTask ?? undefined}

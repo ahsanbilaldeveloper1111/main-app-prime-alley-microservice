@@ -1,5 +1,4 @@
 import "@assets/scss/datatable-style.scss";
-import parsePhoneNumber from "libphonenumber-js";
 import { useRouter } from "next/router";
 import React, {
   ReactElement,
@@ -57,8 +56,6 @@ import {
   Form,
   Card,
   Modal,
-  Popover,
-  OverlayTrigger,
   Spinner,
 } from "react-bootstrap";
 import Select from "react-select";
@@ -72,6 +69,8 @@ import {
   formatDateForTable,
   checkRequiredFields,
   GlobalDateFormat,
+  formatCrmPreviewDate,
+  formatCrmPreviewDateTime,
   RECORD_TYPES,
 } from "@utils/Helper";
 import {
@@ -86,16 +85,12 @@ import {
   X,
   Users,
   Clock,
-  Filter,
   Layers,
   Calendar,
-  ArrowUp,
-  ArrowDown,
   ChevronLeft,
   ChevronRight,
   Mail,
   Phone as PhoneIcon,
-  Phone,
   ChartLine,
   Building2,
   User,
@@ -132,6 +127,13 @@ import { useSession } from "next-auth/react";
 import { useCti } from "../../../contexts/CtiContext";
 import type { StatsCardData } from "@components/GenericStatsCards";
 import CreateLeadModal from "@components/CreateLeadModal";
+import {
+  CrmPhoneDisplay as PhoneDisplay,
+  CrmKPICard as KPICard,
+  CrmFilterBar as FilterBar,
+} from "@components/crm/CrmListPageUi";
+import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 
 import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
 import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
@@ -182,32 +184,6 @@ const DEFAULT_MEETING_FORM = {
   extensions: [] as string[],
 };
 
-function formatPhoneWithCountry(phone: string) {
-  if (!phone) {
-    return {
-      phone: "N/A",
-      countryCode: "",
-    };
-  }
-  try {
-    const parsedPhone = parsePhoneNumber(phone);
-    return {
-      phone: parsedPhone?.formatInternational() || phone,
-      countryCode: parsedPhone?.country || "",
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      phone,
-      countryCode: "",
-    };
-  }
-}
-
-function getFlagImgSrc(countryCode: string) {
-  return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-}
-
 function leadsToKanbanColumns(
   leads: LeadData[],
   stages: Array<{ id: number | string; name: string }>
@@ -243,350 +219,6 @@ function leadsToKanbanColumns(
     cards: buckets[String(stage.id)] ?? [],
   }));
 }
-// Phone Container Component (with Badge for tables)
-const PhoneContainer = ({
-  phone,
-  onClick,
-}: {
-  phone: string;
-  onClick?: () => void;
-}) => {
-  const [showPopover, setShowPopover] = useState(false);
-  const phoneNumber = useMemo(() => {
-    return formatPhoneWithCountry(phone);
-  }, [phone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-
-  const phoneBadge = (
-    <Badge
-      bg="info"
-      className="bg-opacity-10 text-dark"
-      style={{ cursor: onClick ? "pointer" : "default" }}
-      onMouseEnter={() => setShowPopover(true)}
-      onMouseLeave={() => setShowPopover(false)}
-    >
-      <div className="d-flex align-items-center gap-2">
-        {phoneNumber?.countryCode && (
-          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-        )}
-        {phoneNumber.phone}
-      </div>
-    </Badge>
-  );
-
-  if (!onClick) {
-    return phoneBadge;
-  }
-
-  const popover = (
-    <Popover
-      id={`phone-popover-${phone}`}
-      style={{
-        maxWidth: "160px",
-        pointerEvents: "auto",
-        border: "none",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-        borderRadius: "8px",
-      }}
-      onMouseEnter={() => setShowPopover(true)}
-      onMouseLeave={() => setShowPopover(false)}
-    >
-      <Popover.Body
-        className="p-0"
-        style={{
-          padding: "8px",
-          borderRadius: "8px",
-        }}
-      >
-        <Button
-          variant="default"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-            setShowPopover(false);
-          }}
-          className="d-flex align-items-center justify-content-center gap-2 w-100"
-          style={{
-            fontSize: "13px",
-            fontWeight: "600",
-            padding: "8px 16px",
-            borderRadius: "6px",
-            border: "1px solid #dee2e6",
-            backgroundColor: "transparent",
-            color: "#212529",
-            boxShadow: "none",
-            transition: "all 0.2s ease",
-            minHeight: "36px",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.backgroundColor = "#f8f9fa";
-            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.boxShadow = "none";
-          }}
-        >
-          <Phone size={18} style={{ strokeWidth: 2.5 }} />
-          <span>Call</span>
-        </Button>
-      </Popover.Body>
-    </Popover>
-  );
-
-  return (
-    <OverlayTrigger
-      show={showPopover}
-      placement="top"
-      overlay={popover}
-      trigger={[]}
-    >
-      <span style={{ display: "inline-block" }}>{phoneBadge}</span>
-    </OverlayTrigger>
-  );
-};
-
-// Phone Display Component (without Badge for view dialogs)
-const PhoneDisplay = ({ phone }: { phone: string }) => {
-  const phoneNumber = useMemo(() => {
-    return formatPhoneWithCountry(phone);
-  }, [phone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-  return (
-    <div className="d-flex align-items-center gap-2">
-      {phoneNumber?.countryCode && (
-        <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-      )}
-      {phoneNumber.phone}
-    </div>
-  );
-};
-
-// Helper function to get initials from name (first two words, first two letters, only a-z)
-const getInitials = (name: string): string => {
-  if (!name) return "NA";
-
-  // Split by spaces and take up to first two words
-  const words = name.trim().split(/\s+/).slice(0, 2);
-
-  // Check if we have two words and the second word has at least one letter
-  const hasSecondWord = words.length >= 2;
-  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
-
-  if (hasSecondWord && secondWordHasLetter) {
-    // First letter of first two words
-    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
-    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
-
-    if (firstLetter1 && firstLetter2) {
-      return (firstLetter1 + firstLetter2).toUpperCase();
-    }
-  }
-
-  // If no second word or second word is only numbers, use first two letters of first word
-  if (words[0]) {
-    const letters = words[0].match(/[a-z]/gi) || [];
-    if (letters.length >= 2) {
-      return (letters[0] + letters[1]).toUpperCase();
-    } else if (letters.length === 1) {
-      return letters[0].toUpperCase();
-    }
-  }
-
-  return "NA";
-};
-
-// Helper function to generate a random background color based on name
-const getRandomColor = (name: string): string => {
-  if (!name) return "#6c757d";
-
-  // Generate a consistent color based on the name
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
-  }
-
-  // Generate a color with good contrast (avoid too light colors)
-  const hue = Math.abs(hash) % 360;
-  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
-  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
-
-  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
-};
-
-// KPI Card Component
-interface KPICardData {
-  title: string;
-  value: string;
-  change?: string;
-  isPositive?: boolean;
-  icon: React.ReactNode;
-  color: string;
-  onClick?: () => void;
-}
-
-const KPICard: React.FC<KPICardData> = ({
-  title,
-  value,
-  change,
-  isPositive,
-  icon,
-  color,
-  onClick,
-}) => {
-  return (
-    <Card
-      className={onClick ? "h-100" : ""}
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        transition: "all 0.2s ease",
-        border: "1px solid #e9ecef",
-      }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }
-      }}
-    >
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
-            <div className={`text-${color}`}>{icon}</div>
-          </div>
-          {change && (
-            <Badge
-              bg={isPositive ? "success" : "danger"}
-              className="bg-opacity-10"
-            >
-              {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-              {change}
-            </Badge>
-          )}
-        </div>
-        <h3 className="mb-1">{value}</h3>
-        <p className="text-muted mb-0 small">{title}</p>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Filter Bar Component
-interface FilterBarProps {
-  quickFilters: {
-    id: string;
-    label: string;
-    count: number;
-    variant?: string;
-    color?: string;
-    icon?: React.ReactNode;
-  }[];
-  activeFilter?: string;
-  onFilterChange?: (filterId: string) => void;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
-  onSearch?: () => void;
-  searchPlaceholder?: string;
-  showAdvancedFilters?: boolean;
-  onToggleAdvancedFilters?: () => void;
-  advancedFilterCount?: number;
-}
-
-const FilterBar: React.FC<FilterBarProps> = ({
-  quickFilters,
-  activeFilter,
-  onFilterChange,
-  searchValue,
-  onSearchChange,
-  onSearch,
-  searchPlaceholder = "Search...",
-  showAdvancedFilters,
-  onToggleAdvancedFilters,
-  advancedFilterCount = 0,
-}) => {
-  return (
-    <Card className="border-0 shadow-sm mb-3">
-      <Card.Body className="p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color;
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor) {
-                if (isActive) {
-                  const bgColor = filter.color;
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
-
-              return (
-                <Button
-                  key={filter.id}
-                  variant={
-                    hasCustomColor
-                      ? undefined
-                      : isActive
-                        ? filter.variant || "primary"
-                        : "outline-secondary"
-                  }
-                  onClick={() => onFilterChange && onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2"
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  {filter.icon && (
-                    <span className="d-flex align-items-center">
-                      {filter.icon}
-                    </span>
-                  )}
-                  {filter.label}
-                </Button>
-              );
-            })}
-          </div>
-
-          <div className="d-flex gap-2 align-items-center flex-shrink-0">
-            {onToggleAdvancedFilters && (
-              <Button
-                variant={
-                  advancedFilterCount > 0 ? "primary" : "outline-secondary"
-                }
-                onClick={onToggleAdvancedFilters}
-                className="d-flex align-items-center gap-2"
-              >
-                <Filter size={16} />
-                Filters
-                {advancedFilterCount > 0 && (
-                  <Badge bg="light" text="dark" className="ms-1">
-                    {advancedFilterCount}
-                  </Badge>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
 
 const CrmLeads = () => {
   const { data: session } = useSession();
@@ -2594,45 +2226,6 @@ const CrmLeads = () => {
     [leadMetrics],
   );
 
-  // Custom select styles
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "45px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused
-        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
-        : "none",
-      "&:hover": {
-        borderColor: "#86b7fe",
-      },
-    }),
-    multiValue: (provided: any) => ({
-      ...provided,
-      backgroundColor: "#0d6efd",
-      color: "white",
-      fontSize: "0.813rem",
-    }),
-    multiValueLabel: (provided: any) => ({
-      ...provided,
-      color: "white",
-      padding: "2px 6px",
-    }),
-    multiValueRemove: (provided: any) => ({
-      ...provided,
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#0b5ed7",
-        color: "white",
-      },
-    }),
-    menu: (provided: any) => ({
-      ...provided,
-      fontSize: "0.875rem",
-    }),
-  };
-
   // Transform leads data (no client-side filtering - API handles it)
   const filteredLeads = useMemo(() => {
     return leadsData.map(transformLeadData);
@@ -4001,9 +3594,9 @@ const CrmLeads = () => {
                     label: "Created Date",
                     value:
                       selectedLead?.created_at || selectedLead?.created
-                        ? moment(
+                        ? formatCrmPreviewDate(
                             selectedLead.created_at || selectedLead.created,
-                          ).format("MMM DD, YYYY")
+                          ) || "N/A"
                         : "N/A",
                     type: "date",
                   },
@@ -4011,10 +3604,10 @@ const CrmLeads = () => {
                     label: "Last Updated",
                     value:
                       selectedLead?.updated_at || selectedLead?.last_activity_at
-                        ? moment(
+                        ? formatCrmPreviewDate(
                             selectedLead.updated_at ||
                               selectedLead.last_activity_at,
-                          ).format("MMM DD, YYYY")
+                          ) || "N/A"
                         : "N/A",
                     type: "date",
                   },
@@ -4115,9 +3708,8 @@ const CrmLeads = () => {
                               >
                                 <span style={{ fontWeight: 600, color: "#1e293b" }}>
                                   {fu.follow_up_date
-                                    ? moment(fu.follow_up_date).format(
-                                        GlobalDateFormat,
-                                      )
+                                    ? formatCrmPreviewDate(fu.follow_up_date) ||
+                                      "-"
                                     : "-"}
                                 </span>
                                 <span style={{ color: "#64748b", fontSize: "12px" }}>
@@ -4576,7 +4168,7 @@ const CrmLeads = () => {
                   <span>
                     Created{" "}
                     {viewingLead.created_at
-                      ? moment(viewingLead.created_at).format("MMM DD, YYYY")
+                      ? formatCrmPreviewDate(viewingLead.created_at) || "N/A"
                       : "N/A"}
                   </span>
                   {viewingLead.is_lost && (
@@ -5139,9 +4731,9 @@ const CrmLeads = () => {
                                 }}
                               >
                                 {viewingLead.created_at
-                                  ? moment(viewingLead.created_at).format(
-                                      "MMMM DD, YYYY [at] hh:mm A",
-                                    )
+                                  ? formatCrmPreviewDateTime(
+                                      viewingLead.created_at,
+                                    ) || "N/A"
                                   : "N/A"}
                               </div>
                             </div>
@@ -5967,7 +5559,7 @@ const CrmLeads = () => {
                                           display: "inline",
                                         }}
                                       />
-                                      {formatDateForTable(
+                                      {formatCrmPreviewDate(
                                         viewingLead.crm_data.created_at,
                                       )}
                                     </div>
@@ -6602,9 +6194,9 @@ const CrmLeads = () => {
                                         }}
                                       >
                                         {followUp.follow_up_date
-                                          ? moment(
+                                          ? formatCrmPreviewDate(
                                               followUp.follow_up_date,
-                                            ).format("MMM DD, YYYY")
+                                            ) || "N/A"
                                           : "N/A"}
                                       </div>
                                       <Badge
@@ -6868,9 +6460,9 @@ const CrmLeads = () => {
                                         }}
                                       >
                                         {meeting.meeting_date
-                                          ? moment(meeting.meeting_date).format(
-                                              "MMM DD, YYYY",
-                                            )
+                                          ? formatCrmPreviewDate(
+                                              meeting.meeting_date,
+                                            ) || "N/A"
                                           : "N/A"}
                                       </div>
                                       {meeting.meeting_outcome && (

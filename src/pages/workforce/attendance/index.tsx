@@ -11,7 +11,6 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
   FilterPill,
-  TableAction,
   TableColumn,
   ToolbarConfig,
 } from "@components/GenericTable";
@@ -31,7 +30,7 @@ import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
-import { Calendar, Clock, LogIn, LogOut, Trash2 } from "lucide-react";
+import { Calendar, Clock, LogIn, LogOut } from "lucide-react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -237,11 +236,6 @@ const AttendancePage = () => {
     }
   };
 
-  const openDeleteModal = useCallback((record: AttendanceRecord) => {
-    setRecordToDelete(record);
-    setShowDeleteModal(true);
-  }, []);
-
   const handleConfirmDelete = async () => {
     if (!recordToDelete) return;
     setDeleting(true);
@@ -371,19 +365,6 @@ const AttendancePage = () => {
     [getDisplayName],
   );
 
-  const attendanceActions = useMemo<TableAction<AttendanceRecord>[]>(
-    () => [
-      {
-        label: "Delete",
-        icon: <Trash2 size={16} />,
-        onClick: (row) => openDeleteModal(row),
-        variant: "link",
-        className: "text-danger",
-      },
-    ],
-    [openDeleteModal],
-  );
-
   const attendanceToolbar = useMemo<ToolbarConfig>(
     () => ({
       showFilterPills: true,
@@ -472,40 +453,44 @@ const AttendancePage = () => {
           </div>
           {session?.user?.permissions?.includes("check-in-out-attendence-staff-management") && (
           <div style={{ display: "flex", gap: "10px" }}>
-            <Button
-              variant="success"
-              size="sm"
-              disabled={statusLoading || checkInOutLoading || isCheckedIn}
-              onClick={handleCheckIn}
-              style={{
-                fontWeight: "600",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <LogIn size={18} />
-              {checkInOutLoading ? "…" : "Check In"}
-            </Button>
-            <Button
-              variant="warning"
-              size="sm"
-              disabled={statusLoading || checkInOutLoading || !isCheckedIn}
-              onClick={handleCheckOut}
-              style={{
-                fontWeight: "600",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <LogOut size={18} />
-              {checkInOutLoading ? "…" : "Check Out"}
-            </Button>
+            {!isCheckedIn && (
+              <Button
+                variant="success"
+                size="sm"
+                disabled={statusLoading || checkInOutLoading}
+                onClick={handleCheckIn}
+                style={{
+                  fontWeight: "600",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <LogIn size={18} />
+                {checkInOutLoading ? "…" : "Check In"}
+              </Button>
+            )}
+            {isCheckedIn && (
+              <Button
+                variant="warning"
+                size="sm"
+                disabled={statusLoading || checkInOutLoading}
+                onClick={handleCheckOut}
+                style={{
+                  fontWeight: "600",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <LogOut size={18} />
+                {checkInOutLoading ? "…" : "Check Out"}
+              </Button>
+            )}
           </div>
           )}
 
@@ -545,7 +530,6 @@ const AttendancePage = () => {
         <GenericTable<AttendanceRecord>
           data={records}
           columns={attendanceColumns}
-          actions={attendanceActions}
           showActions={true}
           actionsLabel="Actions"
           loading={loading}

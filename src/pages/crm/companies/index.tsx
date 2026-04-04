@@ -1,13 +1,10 @@
 import "@assets/scss/datatable-style.scss";
-import parsePhoneNumber from "libphonenumber-js";
-
 import React, {
   ReactElement,
   useState,
   useEffect,
   useCallback,
   useMemo,
-  useRef,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -25,29 +22,21 @@ import {
   InputGroup,
   Dropdown,
   Table,
-  Popover,
-  OverlayTrigger,
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import Select from "react-select";
+import type { GroupBase, StylesConfig } from "react-select";
 import { toast } from "react-toastify";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/router";
 import moment from "moment";
 import {
-  FiUpload,
   FiDatabase,
   FiSearch,
   FiFilter,
   FiTrash2,
   FiEye,
   FiEdit,
-  FiUser,
-  FiUsers,
   FiPhone,
   FiMessageCircle,
-  FiPlay,
-  FiClock,
   FiX,
   FiAlertCircle,
   FiCalendar,
@@ -67,11 +56,6 @@ import {
   ArrowDown,
   Download,
   CheckSquare,
-  ArrowUpDown,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   Trash2,
   MoreVertical,
@@ -102,6 +86,7 @@ import GenericTable, {
 } from "@components/GenericTable";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import { useCompanyFilterPills } from "@hooks/useCompanyFilterPills";
+import { CRM_LIST_PAGE_CALL_END_REASONS } from "@utils/crmListPageStaticData";
 
 import GenericSidebar, {
   QuickAction,
@@ -121,7 +106,6 @@ import {
   assignCrmDataAdvanced,
   getCrmDataCounts,
   bulkDeleteCrmData,
-  getCrmDataTags,
   markCrmDataAsViewed,
   getCampaigns,
   scheduleCall,
@@ -138,8 +122,6 @@ import {
   type CompanyData,
   type EnrichmentData,
 } from "@utils/crm";
-import { GetHierarchyData } from "@utils/users";
-
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -152,406 +134,48 @@ import {
   GlobalDateFormat,
   GlobalTimeFormat,
   GlobalDateTimeFormat,
+  formatCrmPreviewDate,
   RECORD_TYPES,
 } from "@utils/Helper";
 import PageSummaryGrid from "@components/PageSummaryGrid";
 import DatatableActionButton from "@components/DatatableActionButton";
-import { useCti } from "../../../contexts/CtiContext";
-import { ListCallLogs, DownloadCallRecording } from "@utils/calls";
+import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
+import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
+import { CrmListUnscheduleModal } from "@crm/shared/CrmListScheduleCallModals";
+import { CrmListDataAssignmentFormContent } from "@crm/shared/CrmListDataAssignmentFormContent";
+import { CrmListHistoryFormContent } from "@crm/shared/CrmListHistoryFormContent";
+import { CrmListPageScopedLayoutStyles } from "@crm/shared/CrmListPageScopedLayoutStyles";
+import { getCrmListExtensionDisplayName } from "@crm/shared/crmListExtensionDisplayName";
+import { useCrmListActiveTabFiltersEffect } from "@crm/shared/crmListActiveTabFiltersEffect";
+import {
+  useCrmListCampaignsOnRefreshEffect,
+  useCrmListExtensionsLoadEffect,
+  useCrmListHistoryModalOpenEffect,
+  useCrmListTagsOnRefreshEffect,
+} from "@crm/shared/crmListResourceLoadEffects";
+import { downloadCallRecordingWithProgress } from "@crm/shared/crmListDownloadRecordingUtils";
+import { handleCrmListUploadResponse } from "@crm/shared/crmListUploadResponseUtils";
+import { ListCallLogs } from "@utils/calls";
 import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 
 import renderCreateCompany, {
   type CompanyFormPayload,
 } from "@components/renderCreateCompany";
+import {
+  CrmPhoneContainer as PhoneContainer,
+  CrmKPICard as KPICard,
+  CrmFilterBar as FilterBar,
+} from "@components/crm/CrmListPageUi";
+import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 
-// KPI Card Component (from crm-new.tsx design)
-interface KPICardData {
-  title: string;
+type CompanyAssignedToSelectOption = {
   value: string | number;
-  change?: string;
-  isPositive?: boolean;
-  icon: React.ReactNode;
-  color: string;
-  onClick?: () => void;
-}
-
-const PhoneContainer = ({
-  phone,
-  onClick,
-}: {
-  phone: string;
-  onClick?: () => void;
-}) => {
-  const [showPopover, setShowPopover] = useState(false);
-
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
-  const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-
-  const phoneBadge = (
-    <Badge
-      bg="info"
-      className="bg-opacity-10 text-dark"
-      style={{ cursor: onClick ? "pointer" : "default" }}
-      onMouseEnter={() => setShowPopover(true)}
-      onMouseLeave={() => setShowPopover(false)}
-    >
-      <div className="d-flex align-items-center gap-2">
-        {phoneNumber?.countryCode && (
-          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-        )}
-        {phoneNumber.phone}
-      </div>
-    </Badge>
-  );
-
-  if (!onClick) {
-    return phoneBadge;
-  }
-
-  const popover = (
-    <Popover
-      id={`phone-popover-${phone}`}
-      style={{
-        maxWidth: "160px",
-        pointerEvents: "auto",
-        border: "none",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-        borderRadius: "8px",
-      }}
-      onMouseEnter={() => setShowPopover(true)}
-      onMouseLeave={() => setShowPopover(false)}
-    >
-      <Popover.Body
-        className="p-0"
-        style={{
-          padding: "8px",
-          borderRadius: "8px",
-        }}
-      >
-        <Button
-          variant="default"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-            setShowPopover(false);
-          }}
-          className="d-flex align-items-center justify-content-center gap-2 w-100"
-          style={{
-            fontSize: "13px",
-            fontWeight: "600",
-            padding: "8px 16px",
-            borderRadius: "6px",
-            border: "1px solid #dee2e6",
-            backgroundColor: "transparent",
-            color: "#212529",
-            boxShadow: "none",
-            transition: "all 0.2s ease",
-            minHeight: "36px",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.backgroundColor = "#f8f9fa";
-            e.currentTarget.style.boxShadow = "0 2px 4px rgba(0, 0, 0, 0.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.backgroundColor = "transparent";
-            e.currentTarget.style.boxShadow = "none";
-          }}
-        >
-          <Phone size={18} style={{ strokeWidth: 2.5 }} />
-          <span>Call</span>
-        </Button>
-      </Popover.Body>
-    </Popover>
-  );
-
-  return (
-    <OverlayTrigger
-      show={showPopover}
-      placement="top"
-      overlay={popover}
-      trigger={[]}
-    >
-      <span style={{ display: "inline-block" }}>{phoneBadge}</span>
-    </OverlayTrigger>
-  );
+  label: string | number;
 };
 
-const KPICard: React.FC<KPICardData> = ({
-  title,
-  value,
-  change,
-  isPositive,
-  icon,
-  color,
-  onClick,
-}) => {
-  return (
-    <Card
-      className={onClick ? "h-100" : ""}
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        transition: "all 0.2s ease",
-        border: "1px solid #e9ecef",
-      }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }
-      }}
-    >
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
-            <div className={`text-${color}`}>{icon}</div>
-          </div>
-          {change && (
-            <Badge
-              bg={isPositive ? "success" : "danger"}
-              className="bg-opacity-10"
-            >
-              {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-              {change}
-            </Badge>
-          )}
-        </div>
-        <h3 className="mb-1">{value}</h3>
-        <p className="text-muted mb-0 small">{title}</p>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Filter Bar Component (from crm-new.tsx design)
-interface FilterBarProps {
-  quickFilters: {
-    id: string;
-    label: string;
-    variant?: string;
-    color?: string;
-    icon?: React.ReactNode;
-  }[];
-  activeFilter?: string;
-  onFilterChange?: (filterId: string) => void;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
-  onSearch?: () => void;
-  searchPlaceholder?: string;
-  showAdvancedFilters?: boolean;
-  onToggleAdvancedFilters?: () => void;
-  advancedFilterCount?: number;
-}
-
-const FilterBar: React.FC<FilterBarProps> = ({
-  quickFilters,
-  activeFilter,
-  onFilterChange,
-  searchValue,
-  onSearchChange,
-  onSearch,
-  searchPlaceholder = "Search...",
-  showAdvancedFilters,
-  onToggleAdvancedFilters,
-  advancedFilterCount = 0,
-}) => {
-  return (
-    <Card className="border-0 shadow-sm mb-3">
-      <Card.Body className="p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          {/* Left Side: Quick Filter Buttons */}
-          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color;
-
-              // Determine button styles
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor) {
-                if (isActive) {
-                  const bgColor = filter.color;
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
-
-              return (
-                <Button
-                  key={filter.id}
-                  variant={
-                    hasCustomColor
-                      ? undefined
-                      : isActive
-                        ? filter.variant || "primary"
-                        : "outline-secondary"
-                  }
-                  onClick={() => onFilterChange && onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2 "
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  <span className="d-flex align-items-center gap-2">
-                    {filter.icon && (
-                      <span className="d-flex align-items-center">
-                        {filter.icon}
-                      </span>
-                    )}
-                    {filter.label}
-                  </span>
-                </Button>
-              );
-            })}
-          </div>
-
-          {/* Right Side: Search and Filters */}
-          {(onSearchChange || onToggleAdvancedFilters) && (
-            <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-              {onSearchChange && onSearch && (
-                <InputGroup
-                  style={{ width: "300px", minWidth: "200px" }}
-                  className="flex-shrink-0"
-                >
-                  <Form.Control
-                    style={{ height: "41px" }}
-                    type="text"
-                    placeholder={searchPlaceholder}
-                    value={searchValue || ""}
-                    onChange={(e) => onSearchChange?.(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter" && onSearch) {
-                        onSearch();
-                      }
-                    }}
-                  />
-                  <Button
-                    variant="outline-secondary"
-                    onClick={() => onSearch?.()}
-                  >
-                    <FiSearch size={16} />
-                  </Button>
-                </InputGroup>
-              )}
-              {onToggleAdvancedFilters && (
-                <Button
-                  variant={
-                    showAdvancedFilters ? "primary" : "outline-secondary"
-                  }
-                  onClick={onToggleAdvancedFilters}
-                  className="d-flex align-items-center flex-shrink-0"
-                >
-                  <FiFilter size={16} className="me-2" />
-                  Filters
-                  {(advancedFilterCount ?? 0) > 0 && (
-                    <Badge bg="light" text="dark" className="ms-2">
-                      {advancedFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Helper function to get initials from name (first two words, first two letters, only a-z)
-const getInitials = (name: string): string => {
-  if (!name) return "NA";
-
-  // Split by spaces and take up to first two words
-  const words = name.trim().split(/\s+/).slice(0, 2);
-
-  // Check if we have two words and the second word has at least one letter
-  const hasSecondWord = words.length >= 2;
-  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
-
-  if (hasSecondWord && secondWordHasLetter) {
-    // First letter of first two words
-    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
-    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
-
-    if (firstLetter1 && firstLetter2) {
-      return (firstLetter1 + firstLetter2).toUpperCase();
-    }
-  }
-
-  // If no second word or second word is only numbers, use first two letters of first word
-  if (words[0]) {
-    const letters = words[0].match(/[a-z]/gi) || [];
-    if (letters.length >= 2) {
-      return (letters[0] + letters[1]).toUpperCase();
-    } else if (letters.length === 1) {
-      return letters[0].toUpperCase();
-    }
-  }
-
-  return "NA";
-};
-
-// Helper function to generate a random background color based on name
-const getRandomColor = (name: string): string => {
-  if (!name) return "#6c757d";
-
-  // Generate a consistent color based on the name
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
-  }
-
-  // Generate a color with good contrast (avoid too light colors)
-  const hue = Math.abs(hash) % 360;
-  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
-  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
-
-  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
-};
+type CompanySourceFileSelectOption = { value: string; label: string };
 
 const labelKey = (key: string) =>
   key.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
@@ -811,109 +435,98 @@ const CompanyViewEnrichmentBlock = ({ data }: { data: EnrichmentData }) => {
 };
 
 const CrmCompanyManagement = () => {
-  const { data: session } = useSession();
-  const router = useRouter();
-  const { dialNumber, isInitialized } = useCti();
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
-  const requestIdRef = useRef(0);
-  const [uploading, setUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [selectedDataItem, setSelectedDataItem] = useState<CrmDataItem | null>(
-    null,
-  );
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<CrmDataItem | null>(null);
-  const [showDataAssignmentModal, setShowDataAssignmentModal] = useState(false);
-  const [showAfterCallModal, setShowAfterCallModal] = useState(false);
-  const [extensions, setExtensions] = useState<any[]>([]);
-  const [selectedCampaigns, setSelectedCampaigns] = useState<readonly any[]>(
-    [],
-  );
-  const [fieldTags, setFieldTags] = useState<readonly any[]>([]);
-  const [assignToCampaignUsers, setAssignToCampaignUsers] = useState(false);
-  const [showConvertToLeadModal, setShowConvertToLeadModal] = useState(false);
-  const [convertingCompanyId, setConvertingCompanyId] = useState<number | null>(
-    null,
-  );
+  const {
+    session,
+    router,
+    dialNumber,
+    isInitialized,
+    refreshKey,
+    setRefreshKey,
+    currentFilters,
+    setCurrentFilters,
+    requestIdRef,
+    setUploading,
+    selectedFile,
+    setSelectedFile,
+    setDragActive,
+    showUploadModal,
+    setShowUploadModal,
+    setUploadProgress,
+    showViewModal,
+    setShowViewModal,
+    selectedDataItem,
+    setSelectedDataItem,
+    showDeleteModal,
+    setShowDeleteModal,
+    itemToDelete,
+    setItemToDelete,
+    showDataAssignmentModal,
+    setShowDataAssignmentModal,
+    showAfterCallModal,
+    setShowAfterCallModal,
+    extensions,
+    setExtensions,
+    fieldTags,
+    setFieldTags,
+    showConvertToLeadModal,
+    setShowConvertToLeadModal,
+    convertingToLeadCrmRecordId,
+    setConvertingToLeadCrmRecordId,
+  } = useCrmListPageCoreState();
 
-  // Data assignment modal states
-  const [assignmentFilters, setAssignmentFilters] = useState({
-    selectedTags: [] as readonly any[],
-    selectedCampaigns: [] as readonly any[],
-  });
-  const [assignmentCampaign, setAssignmentCampaign] = useState<readonly any[]>(
-    [],
-  );
-  const [assignmentDistribution, setAssignmentDistribution] = useState<
-    "equal" | "custom"
-  >("equal");
-  const [totalEntriesToAssign, setTotalEntriesToAssign] = useState(0);
-  const [customDistribution, setCustomDistribution] = useState<
-    Record<string, number>
-  >({});
-  const [assignmentCounts, setAssignmentCounts] = useState({
-    total: 0,
-    assigned: 0,
-    unassigned: 0,
-  });
-  const [availableTags, setAvailableTags] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
-  >([]);
-  const [availableCampaigns, setAvailableCampaigns] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
-  >([]);
-  const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
-    {},
-  );
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
+  const {
+    assignmentFilters, setAssignmentFilters,
+    assignmentCampaign, setAssignmentCampaign,
+    assignmentDistribution, setAssignmentDistribution,
+    totalEntriesToAssign, setTotalEntriesToAssign,
+    customDistribution, setCustomDistribution,
+    assignmentCounts, setAssignmentCounts,
+    availableTags, setAvailableTags,
+    availableCampaigns, setAvailableCampaigns,
+    campaignsById, setCampaignsById,
+    selectedItems, setSelectedItems,
+    afterCallData, setAfterCallData,
+    showScheduleModal, setShowScheduleModal,
+    selectedEntryForSchedule, setSelectedEntryForSchedule,
+    isEditingSchedule, setIsEditingSchedule,
+    scheduleData, setScheduleData,
+    showUnscheduleModal, setShowUnscheduleModal,
+    entryToUnschedule, setEntryToUnschedule,
+    showHistoryModal, setShowHistoryModal,
+    showProspectSidebar: showCompanySidebar,
+    setShowProspectSidebar: setShowCompanySidebar,
+    showFiltersSidebar, setShowFiltersSidebar,
+    selectedProspect: selectedCompany,
+    setSelectedProspect: setSelectedCompany,
+    showFilterBar,
+    showAddContactsDropdown, setShowAddContactsDropdown,
+    showCreateContactSidebar, setShowCreateContactSidebar,
+    addContactsRef,
+    createContactLoading, setCreateContactLoading,
+    editingContactId, setEditingContactId,
+    contactFormLoadError, setContactFormLoadError,
+    contactFormLoading, setContactFormLoading,
+  } = useCrmListAssignmentContactSidebarState();
+
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
-
-  // After Call modal states
-  const [afterCallData, setAfterCallData] = useState({
+  const [contactForm, setContactForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneNumber: "",
+    campaign_id: null as number | null,
+    contact_owner: null as string | null,
+    lifecycle_stage: "Lead",
     disposition: "",
-    callStatus: "",
-    comment: "",
-    nextCallDate: "",
-    nextCallTime: "",
-    generateLead: "no", // "yes" or "no"
+    legal_basis: [] as string[],
+    last_called: "",
+    last_call_status: "",
+    next_call: "",
+    scheduled_call_at: "",
+    tags: [] as Array<{ value: string; label: string; id?: number }>,
+    note: "",
+    is_viewed: false,
   });
-
-  // Schedule modal state
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [selectedEntryForSchedule, setSelectedEntryForSchedule] =
-    useState<any>(null);
-  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
-  const [scheduleData, setScheduleData] = useState({
-    date: "",
-    time: "",
-    notes: "",
-  });
-
-  // Unschedule confirmation modal state
-  const [showUnscheduleModal, setShowUnscheduleModal] = useState(false);
-  const [entryToUnschedule, setEntryToUnschedule] = useState<any>(null);
-
-  // History modal state
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-
-  // Sidebar states
-  const [showCompanySidebar, setShowCompanySidebar] = useState(false);
-  const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<any>(null);
-  const [showFilterBar, setShowFilterBar] = useState(false);
 
   // First phone: company + enrichment (structured_data.phones, raw_data.phones) for modals and Call button
   const companySidebarPhone =
@@ -936,40 +549,11 @@ const CrmCompanyManagement = () => {
     recordPhone: companySidebarPhone,
   });
 
-  // Add Contacts button states
-  const [showAddContactsDropdown, setShowAddContactsDropdown] = useState(false);
-  const [showCreateContactSidebar, setShowCreateContactSidebar] =
-    useState(false);
   const [showCreateCompanySidebar, setShowCreateCompanySidebar] =
     useState(false);
   const [editingCompanyId, setEditingCompanyId] = useState<number | null>(null);
   const [editingCompanyData, setEditingCompanyData] =
     useState<CompanyFormPayload | null>(null);
-  const addContactsRef = useRef<HTMLDivElement>(null);
-  const [contactForm, setContactForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phoneNumber: "",
-    campaign_id: null as number | null,
-    contact_owner: null as string | null,
-    lifecycle_stage: "Lead",
-    disposition: "",
-    legal_basis: [] as string[],
-    last_called: "",
-    last_call_status: "",
-    next_call: "",
-    scheduled_call_at: "",
-    tags: [] as Array<{ value: string; label: string; id?: number }>,
-    note: "",
-    is_viewed: false,
-  });
-  const [createContactLoading, setCreateContactLoading] = useState(false);
-  const [editingContactId, setEditingContactId] = useState<number | null>(null);
-  const [contactFormLoadError, setContactFormLoadError] = useState<
-    string | null
-  >(null);
-  const [contactFormLoading, setContactFormLoading] = useState(false);
 
   // Call recordings state
   const [callRecordings, setCallRecordings] = useState<any[]>([]);
@@ -1178,92 +762,6 @@ const CrmCompanyManagement = () => {
     scheduled_next_24_hours_records: 0,
   });
 
-  // Static tags data
-  const staticTags = [
-    { value: "hot-lead", label: "Hot Lead" },
-    { value: "cold-lead", label: "Cold Lead" },
-    { value: "follow-up", label: "Follow Up" },
-    { value: "interested", label: "Interested" },
-    { value: "not-interested", label: "Not Interested" },
-    { value: "callback", label: "Callback" },
-    { value: "qualified", label: "Qualified" },
-    { value: "unqualified", label: "Unqualified" },
-  ];
-
-  // Static call end reasons
-  const callEndReasons = [
-    { value: "call_later", label: "Call Later", color: "warning" },
-    { value: "dont_call", label: "Don't Call", color: "danger" },
-    {
-      value: "not_reachable",
-      label: "Number Not Reachable",
-      color: "secondary",
-    },
-    { value: "dncr_blocklisted", label: "DNCR Blocklisted", color: "dark" },
-    { value: "answered", label: "Answered", color: "success" },
-    { value: "busy", label: "Busy", color: "info" },
-    { value: "no_answer", label: "No Answer", color: "light" },
-  ];
-
-  // Static call history data with varied information
-  const getCallHistory = (entryId: number) => {
-    const histories = [
-      {
-        id: 1,
-        duration: "2:34",
-        endReason: "answered",
-        disposition: "interested",
-        calledAt: "2024-01-15T10:30:00Z",
-        recordingUrl: "https://example.com/recording1.mp3",
-        comment:
-          "Client showed interest in our premium package. Asked for pricing details and wants to schedule a demo next week.",
-      },
-      {
-        id: 2,
-        duration: "0:45",
-        endReason: "busy",
-        disposition: "callback_requested",
-        calledAt: "2024-01-14T14:20:00Z",
-        recordingUrl: "https://example.com/recording2.mp3",
-        comment:
-          "Line was busy. Left voicemail with callback request for tomorrow morning.",
-      },
-      {
-        id: 3,
-        duration: "1:12",
-        endReason: "no_answer",
-        disposition: "no_answer",
-        calledAt: "2024-01-13T09:15:00Z",
-        recordingUrl: "https://example.com/recording3.mp3",
-        comment:
-          "No answer after multiple rings. Will try again later in the day.",
-      },
-      {
-        id: 4,
-        duration: "3:45",
-        endReason: "answered",
-        disposition: "not_interested",
-        calledAt: "2024-01-12T16:20:00Z",
-        recordingUrl: "https://example.com/recording4.mp3",
-        comment:
-          "Client politely declined. Not interested in our services at this time. Asked to be removed from calling list.",
-      },
-      {
-        id: 5,
-        duration: "4:12",
-        endReason: "answered",
-        disposition: "follow_up",
-        calledAt: "2024-01-11T11:30:00Z",
-        recordingUrl: "https://example.com/recording5.mp3",
-        comment:
-          "Client needs to discuss with their team. Will follow up in 2 weeks with additional information about our enterprise solutions.",
-      },
-    ];
-
-    // Return different histories based on entryId for variety
-    return histories.slice(0, (entryId % 3) + 2);
-  };
-
   // History data state
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -1335,50 +833,6 @@ const CrmCompanyManagement = () => {
     },
     [fetchCampaignsByIds],
   );
-
-  // Custom select styles
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "45px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused
-        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
-        : "none",
-      "&:hover": {
-        borderColor: "#86b7fe",
-      },
-    }),
-    multiValue: (provided: any) => ({
-      ...provided,
-      backgroundColor: "#0d6efd",
-      color: "white",
-      fontSize: "0.813rem",
-    }),
-    multiValueLabel: (provided: any) => ({
-      ...provided,
-      color: "white",
-      padding: "2px 6px",
-    }),
-    multiValueRemove: (provided: any) => ({
-      ...provided,
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#0b5ed7",
-        color: "white",
-      },
-    }),
-    placeholder: (provided: any) => ({
-      ...provided,
-      color: "#6c757d",
-      fontSize: "0.875rem",
-    }),
-    singleValue: (provided: any) => ({
-      ...provided,
-      fontSize: "0.875rem",
-    }),
-  };
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
@@ -1472,87 +926,23 @@ const CrmCompanyManagement = () => {
     if (showColumnEditor) setDraftSelectedColumns([...selectedColumns]);
   }, [showColumnEditor]);
 
-  // Fetch extensions data
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        const hierarchyData = await GetHierarchyData(
-          ModuleSlug.CRM_DATA_MANAGEMENT,
-        );
-        if (hierarchyData?.extensions) {
-          setExtensions(hierarchyData.extensions);
-        }
-      } catch (error) {
-        console.error("Failed to fetch extensions:", error);
-      }
-    };
-    fetchExtensions();
-  }, []);
+  useCrmListExtensionsLoadEffect(setExtensions);
+  useCrmListHistoryModalOpenEffect(showHistoryModal, fetchHistoryData);
+  useCrmListTagsOnRefreshEffect(refreshKey, setAvailableTags, {
+    mapMode: "includeAll",
+  });
+  useCrmListCampaignsOnRefreshEffect(
+    refreshKey,
+    setAvailableCampaigns,
+    setCampaignsById,
+    "replace",
+  );
 
-  function getNameByExtension(extension: string) {
-    const extensionData = extensions.find((ext) => ext.id === extension);
-    return extensionData?.display_name || extensionData?.name || extension;
-  }
-
-  // Load history data when modal is opened
-  useEffect(() => {
-    if (showHistoryModal) {
-      fetchHistoryData();
-    }
-  }, [showHistoryModal, fetchHistoryData]);
-
-  // Load available tags
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const tags = await getCrmDataTags();
-        const tagOptions = tags.map((tag: any) => ({
-          value: tag.name,
-          label: tag.name,
-          id: tag.id,
-        }));
-        setAvailableTags(tagOptions);
-      } catch (error) {
-        console.error("Failed to load tags:", error);
-        // Fallback to static tags
-        setAvailableTags(
-          staticTags.map((tag) => ({
-            value: tag.value,
-            label: tag.label,
-            id: parseInt(tag.value.replace("tag-", "")) || 0,
-          })),
-        );
-      }
-    };
-    loadTags();
-  }, [refreshKey]);
-
-  // Load available campaigns
-  useEffect(() => {
-    const loadCampaigns = async () => {
-      try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
-        const campaignOptions = campaignsResponse.data.map((campaign: any) => ({
-          value: campaign.id.toString(),
-          label: campaign.name,
-          id: campaign.id,
-        }));
-        setAvailableCampaigns(campaignOptions);
-
-        // Also populate the campaignsById map
-        const campaignsMap: Record<number, string> = {};
-        campaignsResponse.data.forEach((campaign: any) => {
-          campaignsMap[campaign.id] = campaign.name;
-        });
-        setCampaignsById(campaignsMap);
-      } catch (error) {
-        console.error("Failed to load campaigns:", error);
-        // Fallback to empty array
-        setAvailableCampaigns([]);
-      }
-    };
-    loadCampaigns();
-  }, [refreshKey]);
+  const getNameByExtension = useCallback(
+    (extension: string) =>
+      getCrmListExtensionDisplayName(extensions, extension),
+    [extensions],
+  );
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
@@ -1566,208 +956,7 @@ const CrmCompanyManagement = () => {
     extensions,
   });
 
-  // Handle activeFilter changes to update currentFilters
-  useEffect(() => {
-    if (activeFilter === "all") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.has_scheduled_calls;
-        delete newFilters.has_tickets;
-        return newFilters;
-      });
-    } else if (activeFilter === "scheduled") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.has_tickets;
-        newFilters.has_scheduled_calls = true;
-        return newFilters;
-      });
-    } else if (activeFilter === "has_leads") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.has_scheduled_calls;
-        newFilters.has_tickets = true;
-        return newFilters;
-      });
-    }
-    // Don't reset pagination here - it's already reset in onFilterChange
-  }, [activeFilter]);
-
-  // Helper functions for sorting and pagination
-  const handleSort = (column: string) => {
-    const newDirection =
-      pagination.sortColumn === column && pagination.sortDirection === "asc"
-        ? "desc"
-        : "asc";
-    setPagination({
-      ...pagination,
-      sortColumn: column,
-      sortDirection: newDirection,
-      currentPage: 1,
-    });
-  };
-
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
-  ): T[] => {
-    if (!sortColumn) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderSortIcon = (column: string) => {
-    if (pagination.sortColumn !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return pagination.sortDirection === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
-  };
-
-  const renderPaginationControls = () => {
-    const totalPages = getTotalPages(totalRecords, pagination.rowsPerPage);
-    const { currentPage, rowsPerPage } = pagination;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, totalRecords);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPagination({
-                ...pagination,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={15}>15</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalRecords} companies
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() => setPagination({ ...pagination, currentPage: 1 })}
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage - 1 })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPagination({ ...pagination, currentPage: pageNum })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage + 1 })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: totalPages })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
+  useCrmListActiveTabFiltersEffect(activeFilter, setCurrentFilters);
 
   // Map CompanyData to table shape (CrmDataItem-like)
   const mapCompanyToRow = useCallback((c: CompanyData): CrmDataItem => {
@@ -1954,45 +1143,11 @@ const CrmCompanyManagement = () => {
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      // Parse response
-      const responseData = response?.data || {};
-      const processedCount = responseData.processed_count || 0;
-      const validationFailures = responseData.validation_failures || 0;
-      // const errors = responseData.errors || [];
-      const message = responseData.message || "Upload completed";
-
-      // Show error messages for validation failures
-      // if (errors.length > 0) {
-      //   errors.forEach((error: string) => {
-      //     toast.warn(error);
-      //   });
-      // }
-
-      // Show success message
-      if (processedCount > 0) {
-        let successMessage = `Successfully processed ${processedCount} record${
-          processedCount !== 1 ? "s" : ""
-        }`;
-
-        if (validationFailures > 0) {
-          successMessage += ` with ${validationFailures} validation failure${
-            validationFailures !== 1 ? "s" : ""
-          }`;
-        }
-
-        setSuccessModalTitle("Upload Successful");
-        setSuccessModalDescription(successMessage);
-        setShowSuccessfulModal(true);
-      } else if (validationFailures > 0) {
-        // All records failed validation
-        toast.error(
-          `Upload failed: All ${validationFailures} record${
-            validationFailures !== 1 ? "s" : ""
-          } failed validation`,
-        );
-      } else {
-        toast.error("Upload completed but no companies were processed");
-      }
+      handleCrmListUploadResponse(response, "companies", {
+        setSuccessModalTitle,
+        setSuccessModalDescription,
+        setShowSuccessfulModal,
+      });
 
       setSelectedFile(null);
       setFieldTags([]);
@@ -2089,66 +1244,11 @@ const CrmCompanyManagement = () => {
     setShowRecordingPlayerModal(true);
   }, []);
 
-  // Handle download call recording
   const handleDownloadCallRecording = useCallback(async (recording: any) => {
-    const { Id, AgentExtension } = recording;
-
-    // Add to downloading set and initialize progress
-    setDownloadingRecordings((prev) => new Set(prev).add(Id));
-    setDownloadProgress((prev) => ({ ...prev, [Id]: 0 }));
-
-    try {
-      // Simulate progress updates
-      const progressInterval = setInterval(() => {
-        setDownloadProgress((prev) => {
-          const currentProgress = prev[Id] || 0;
-          if (currentProgress < 90) {
-            return { ...prev, [Id]: currentProgress + Math.random() * 15 };
-          }
-          return prev;
-        });
-      }, 200);
-
-      await DownloadCallRecording(
-        Id,
-        AgentExtension,
-        "call-logs/recordings/download",
-        recording.imagicle,
-      );
-
-      // Complete the progress
-      clearInterval(progressInterval);
-      setDownloadProgress((prev) => ({ ...prev, [Id]: 100 }));
-
-      // Show completion briefly before hiding
-      setTimeout(() => {
-        setDownloadingRecordings((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(Id);
-          return newSet;
-        });
-        setDownloadProgress((prev) => {
-          const newProgress = { ...prev };
-          delete newProgress[Id];
-          return newProgress;
-        });
-      }, 1000);
-    } catch (error) {
-      console.error("Download error:", error);
-      toast.error("Download failed");
-
-      // Remove from downloading set on error
-      setDownloadingRecordings((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(Id);
-        return newSet;
-      });
-      setDownloadProgress((prev) => {
-        const newProgress = { ...prev };
-        delete newProgress[Id];
-        return newProgress;
-      });
-    }
+    await downloadCallRecordingWithProgress(recording, {
+      setDownloadingRecordings,
+      setDownloadProgress,
+    });
   }, []);
 
   // Handle delete data item
@@ -2829,7 +1929,7 @@ const CrmCompanyManagement = () => {
         emptyValue: "—",
       },
     ],
-    [extensions, callEndReasons, handleCallClick],
+    [extensions, CRM_LIST_PAGE_CALL_END_REASONS, handleCallClick],
   );
 
   // Define table actions
@@ -2910,7 +2010,7 @@ const CrmCompanyManagement = () => {
                     label: "Convert to Lead",
                     icon: <FiTarget size={14} />,
                     onClick: (row: any) => {
-                      setConvertingCompanyId(row.id);
+                      setConvertingToLeadCrmRecordId(row.id);
                       setShowConvertToLeadModal(true);
                     },
                     show: () => false,
@@ -3067,8 +2167,8 @@ const CrmCompanyManagement = () => {
         cell: (props: any) => {
           // Static data for now
           const endReason =
-            callEndReasons.find((r) => r.value === "answered") ||
-            callEndReasons[0];
+            CRM_LIST_PAGE_CALL_END_REASONS.find((r) => r.value === "answered") ||
+            CRM_LIST_PAGE_CALL_END_REASONS[0];
           return (
             <span className={`status-badge ${endReason.color as any}`}>
               {endReason.label}
@@ -3240,7 +2340,7 @@ const CrmCompanyManagement = () => {
       handlePlayRecording,
       extensions,
       availableCampaigns,
-      callEndReasons,
+      CRM_LIST_PAGE_CALL_END_REASONS,
       handleScheduleCall,
       handleUnscheduleCallClick,
     ],
@@ -4435,81 +3535,13 @@ const CrmCompanyManagement = () => {
 
   return (
     <React.Fragment>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-        .companies-table-wrapper {
-          width: 100%;
-          overflow: hidden;
-        }
-        .companies-table-wrapper .table-responsive {
-          width: 100%;
-          overflow-x: auto;
-          overflow-y: visible;
-          -webkit-overflow-scrolling: touch;
-        }
-        .companies-table-wrapper .table-responsive table {
-          width: 100%;
-          table-layout: auto;
-          margin-bottom: 0;
-        }
-        .companies-table-wrapper .table-responsive table th,
-        .companies-table-wrapper .table-responsive table td {
-          padding: 12px 16px;
-          vertical-align: middle;
-        }
-        .companies-table-wrapper .table-responsive table td:last-child,
-        .companies-table-wrapper .table-responsive table th:last-child {
-          max-width: none;
-        }
-        .companies-table-wrapper .table-responsive table td[style*="width"],
-        .companies-table-wrapper .table-responsive table th[style*="width"] {
-          max-width: none;
-        }
-        .timeline-line {
-          position: relative;
-          height: 2px;
-          background: #e9ecef;
-          margin-top: 10px;
-        }
-        .timeline-line::after {
-          content: "";
-          position: absolute;
-          top: -8px;
-          left: 0;
-          width: 2px;
-          height: 18px;
-          background: #e9ecef;
-        }
-        .timeline-item:last-child .timeline-line {
-          display: none;
-        }
-        .generic-table-row.clickable {
-          cursor: pointer;
-        }
-        
-        
-        /* Page layout for full height */
-        .prospects-page-container {
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 100px);
-          overflow: hidden;
-        }
-        
-        .prospects-content-area {
-          flex: 1;
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .prospects-scrollable-content {
-          flex: 1;
-          overflow-y: auto;
-          overflow-x: hidden;
-        }
-      `,
+      <CrmListPageScopedLayoutStyles
+        config={{
+          tableWrapperClass: "companies-table-wrapper",
+          scrollableContentClass: "prospects-scrollable-content",
+          pageContainerClass: "prospects-page-container",
+          contentAreaClass: "prospects-content-area",
+          includePhoneInputStyles: false,
         }}
       />
       <BreadcrumbItem
@@ -4772,7 +3804,7 @@ const CrmCompanyManagement = () => {
                         <Form.Label className="small fw-bold mb-2">
                           Assigned To
                         </Form.Label>
-                        <Select
+                        <Select<CompanyAssignedToSelectOption>
                           options={extensions.map((ext: any) => ({
                             value: ext.id || ext.extension,
                             label:
@@ -4807,7 +3839,7 @@ const CrmCompanyManagement = () => {
                           }
                           onChange={(selected) => {
                             const assignedToValue = selected
-                              ? selected.value
+                              ? String(selected.value)
                               : null;
                             setCompanyFilters((prev) => ({
                               ...prev,
@@ -4817,7 +3849,13 @@ const CrmCompanyManagement = () => {
                             setActiveFilter("all");
                           }}
                           placeholder="Select user..."
-                          styles={customSelectStyles}
+                          styles={
+                            customSelectStyles as StylesConfig<
+                              CompanyAssignedToSelectOption,
+                              false,
+                              GroupBase<CompanyAssignedToSelectOption>
+                            >
+                          }
                           isClearable
                         />
                       </Col>
@@ -4933,7 +3971,7 @@ const CrmCompanyManagement = () => {
                         <Form.Label className="small fw-bold mb-2">
                           Source Name
                         </Form.Label>
-                        <CreatableSelect
+                        <CreatableSelect<CompanySourceFileSelectOption>
                           options={uniqueSources}
                           value={
                             companyFilters.sourceFile
@@ -4954,7 +3992,13 @@ const CrmCompanyManagement = () => {
                             setActiveFilter("all");
                           }}
                           placeholder="Select or create source..."
-                          styles={customSelectStyles}
+                          styles={
+                            customSelectStyles as StylesConfig<
+                              CompanySourceFileSelectOption,
+                              false,
+                              GroupBase<CompanySourceFileSelectOption>
+                            >
+                          }
                           isClearable
                         />
                       </Col>
@@ -5599,9 +4643,8 @@ const CrmCompanyManagement = () => {
                       <span>
                         Added{" "}
                         {selectedDataItem.created_at
-                          ? moment(selectedDataItem.created_at).format(
-                              "MMM DD, YYYY",
-                            )
+                          ? formatCrmPreviewDate(selectedDataItem.created_at) ||
+                            "N/A"
                           : "N/A"}
                       </span>
                       {(selectedDataItem.data as any)?.enrichment_status && (
@@ -5842,9 +4885,7 @@ const CrmCompanyManagement = () => {
                               fontWeight: 500,
                             }}
                           >
-                            {moment(selectedDataItem.created_at).format(
-                              "MMMM DD, YYYY",
-                            )}
+                            {formatCrmPreviewDate(selectedDataItem.created_at)}
                           </div>
                         </>
                       )}
@@ -5907,111 +4948,6 @@ const CrmCompanyManagement = () => {
             </Modal>
           )}
 
-          {/* Audio Player Modal */}
-          {/* {getCallHistory(selectedDataItem.id).length > 0 && (
-              <>
-                <div style={{
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#1f2937',
-                  marginBottom: '20px',
-                  paddingBottom: '10px',
-                  borderBottom: '2px solid #f8f9fa',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}>
-                  <History size={18} style={{ color: '#4680ff' }} />
-                  Call History ({getCallHistory(selectedDataItem.id).length})
-                </div>
-                <div style={{ position: 'relative', paddingLeft: '30px', marginBottom: '30px' }}>
-                  <div style={{
-                    content: '',
-                    position: 'absolute',
-                    left: '8px',
-                    top: 0,
-                    bottom: 0,
-                    width: '2px',
-                    background: '#e5e7eb'
-                  }} />
-                  {getCallHistory(selectedDataItem.id).map((call, idx) => {
-                    const endReason = callEndReasons.find(
-                      (r) => r.value === call.endReason
-                    );
-                    const dispositionColors: Record<string, string> = {
-                      interested: 'success',
-                      not_interested: 'danger',
-                      callback_requested: 'warning',
-                      no_answer: 'secondary',
-                      busy: 'info',
-                      do_not_call: 'dark',
-                      wrong_number: 'light',
-                      follow_up: 'primary',
-                    };
-                    const dispositionColor = dispositionColors[call.disposition] || 'primary';
-                    const endReasonColor = endReason?.color || 'secondary';
-                    
-                    return (
-                      <div key={call.id || idx} style={{ position: 'relative', paddingBottom: '20px' }}>
-                        <div style={{
-                          content: '',
-                          position: 'absolute',
-                          left: '-26px',
-                          top: '4px',
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: endReasonColor === 'success' ? '#10b981' : '#4680ff',
-                          border: '3px solid white',
-                          boxShadow: '0 0 0 2px #e5e7eb'
-                        }} />
-                        <div style={{
-                          background: '#f8f9fa',
-                          padding: '12px 16px',
-                          borderRadius: '8px',
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'flex-start'
-                        }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '12px', color: '#6b7280', fontWeight: 600, marginBottom: '4px' }}>
-                              {moment(call.calledAt).format("MMM DD, YYYY HH:mm")} - Duration: {call.duration}
-                            </div>
-                            <div style={{ fontSize: '14px', color: '#1f2937', marginBottom: '8px', fontWeight: 500 }}>
-                              <Badge bg={endReasonColor as any} className="me-2">
-                                {endReason?.label || call.endReason}
-                              </Badge>
-                              <Badge bg={dispositionColor as any}>
-                                {call.disposition
-                                  ?.replace("_", " ")
-                                  .replace(/\b\w/g, (l) => l.toUpperCase())}
-                              </Badge>
-                            </div>
-                            {call.comment && (
-                              <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '8px' }}>
-                                {call.comment}
-                              </div>
-                            )}
-                          </div>
-                          {call.recordingUrl && (
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-1"
-                              title="Play Recording"
-                              onClick={() => handlePlayRecording(call.recordingUrl)}
-                            >
-                              <FiPlay size={16} />
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )} */}
-
           {/* Delete Confirmation Modal */}
           <DeleteConfirmationModal
             show={showDeleteModal}
@@ -6055,342 +4991,22 @@ const CrmCompanyManagement = () => {
             desc="Please fill the details below to smart company distribution."
             size="lg"
             formHtml={
-              <>
-                <div className="mb-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <FiFilter className="me-2 text-primary" />
-                    <h6 className="mb-0">Step 1: Filter Your Prospects</h6>
-                  </div>
-                  <p className="text-muted small mb-3">
-                    Choose which prospects to assign by filtering by tags and
-                    campaigns.
-                  </p>
-                  <Row>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Filter by Tags</Form.Label>
-                        <CreatableSelect
-                          isMulti
-                          value={assignmentFilters.selectedTags}
-                          onChange={(selected) =>
-                            setAssignmentFilters((prev) => ({
-                              ...prev,
-                              selectedTags: selected || [],
-                            }))
-                          }
-                          options={availableTags}
-                          placeholder="Select tags to filter prospects..."
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: "#ced4da",
-                              boxShadow: "none",
-                              fontSize: "14px",
-                            }),
-                          }}
-                        />
-                        <Form.Text className="text-muted">
-                          Only prospects with these tags will be considered for
-                          assignment.
-                        </Form.Text>
-                      </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                      <Form.Group className="mb-3">
-                        <Form.Label>Filter by Campaigns</Form.Label>
-                        <CreatableSelect
-                          isMulti
-                          value={assignmentFilters.selectedCampaigns}
-                          onChange={(selected) =>
-                            setAssignmentFilters((prev) => ({
-                              ...prev,
-                              selectedCampaigns: selected || [],
-                            }))
-                          }
-                          options={availableCampaigns}
-                          placeholder="Select campaigns to filter prospects..."
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              borderColor: "#ced4da",
-                              boxShadow: "none",
-                              fontSize: "14px",
-                            }),
-                          }}
-                        />
-                        <Form.Text className="text-muted">
-                          Only prospects from these campaigns will be considered
-                          for assignment.
-                        </Form.Text>
-                      </Form.Group>
-                    </Col>
-                  </Row>
-                </div>
-
-                <div className="mb-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <FiDatabase className="me-2 text-info" />
-                    <h6 className="mb-0">Step 2: Review Available Prospects</h6>
-                  </div>
-                  <p className="text-muted small mb-3">
-                    Based on your filters, here's what's available for
-                    assignment.
-                  </p>
-
-                  {/* <div className="row">
-              <div className="col-md-4">
-                <div className="card bg-light border-primary">
-                  <div className="card-body text-center">
-                    <h4 className="text-primary">
-                      {assignmentCounts.total.toLocaleString()}
-                    </h4>
-                    <p className="mb-0 small">Total Entries</p>
-                    <small className="text-muted">Matching your filters</small>
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="card bg-success text-white">
-                  <div className="card-body text-center">
-                    <h4>{assignmentCounts.assigned.toLocaleString()}</h4>
-                    <p className="mb-0 small">Already Assigned</p>
-                    <small className="opacity-75">In use by team members</small>
-                  </div>
-                </div>
-              </div>
-              <div className="col-md-4">
-                <div className="card bg-warning text-white">
-                  <div className="card-body text-center">
-                    <h4>{assignmentCounts.unassigned.toLocaleString()}</h4>
-                    <p className="mb-0 small">Available</p>
-                    <small className="opacity-75">Ready for assignment</small>
-                  </div>
-                </div>
-              </div>
-            </div> */}
-
-                  <Row>
-                    <Col md={12} className="text-left">
-                      <PageSummaryGrid
-                        gridColumns={3}
-                        cardHeading="h5"
-                        gridTextAlign="center"
-                        cards={[
-                          {
-                            id: "total-entries",
-                            title: "Total Prospects",
-                            value: assignmentCounts?.total || 0,
-                            description: "Matching your filters",
-                          },
-                          {
-                            id: "assigned-entries",
-                            title: "Assigned Prospects",
-                            value: assignmentCounts?.assigned || 0,
-                            description: "In use by team members",
-                          },
-                          {
-                            id: "available-entries",
-                            title: "Available Prospects",
-                            value: assignmentCounts?.unassigned || 0,
-                            description: "Ready for assignment",
-                          },
-                        ]}
-                      />
-                    </Col>
-                  </Row>
-                </div>
-
-                <div className="mb-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <FiUsers className="me-2 text-success" />
-                    <h6 className="mb-0">Step 3: Configure Assignment</h6>
-                  </div>
-                  <p className="text-muted small mb-3">
-                    You have{" "}
-                    <strong>
-                      {assignmentCounts.unassigned.toLocaleString()}
-                    </strong>{" "}
-                    prospects ready for assignment out of{" "}
-                    <strong>{assignmentCounts.total.toLocaleString()}</strong>{" "}
-                    total matching prospects.
-                  </p>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Target Campaigns *</Form.Label>
-                    <CreatableSelect
-                      isMulti
-                      value={assignmentCampaign}
-                      onChange={(selected) =>
-                        setAssignmentCampaign(selected || [])
-                      }
-                      options={availableCampaigns}
-                      placeholder="Choose which campaigns to assign prospects to..."
-                      styles={{
-                        control: (base) => ({
-                          ...base,
-                          borderColor: "#ced4da",
-                          boxShadow: "none",
-                          fontSize: "14px",
-                        }),
-                      }}
-                    />
-                    <Form.Text className="text-muted">
-                      <strong>Smart Distribution:</strong> Prospects will be
-                      automatically distributed among users in the selected
-                      campaigns based on their workload and availability.
-                    </Form.Text>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Assignment Quantity</Form.Label>
-                    <Form.Control
-                      type="number"
-                      min="0"
-                      max={assignmentCounts.unassigned}
-                      value={totalEntriesToAssign}
-                      onChange={(e) =>
-                        setTotalEntriesToAssign(parseInt(e.target.value) || 0)
-                      }
-                      placeholder="How many prospects to assign?"
-                    />
-                    <Form.Text className="text-muted">
-                      <strong>Maximum:</strong>{" "}
-                      {assignmentCounts.unassigned.toLocaleString()} prospects
-                      available. Start with a smaller batch to test the
-                      assignment process.
-                    </Form.Text>
-                  </Form.Group>
-
-                  <Form.Group className="mb-3">
-                    <Form.Label>Distribution Strategy</Form.Label>
-                    <div>
-                      <Form.Check
-                        type="radio"
-                        id="equal-distribution"
-                        name="assignmentDistribution"
-                        label="Auto-balance across campaigns"
-                        value="equal"
-                        checked={assignmentDistribution === "equal"}
-                        onChange={() => setAssignmentDistribution("equal")}
-                        className="mb-2"
-                      />
-                      <Form.Check
-                        type="radio"
-                        id="custom-distribution"
-                        name="assignmentDistribution"
-                        label="Custom allocation per campaign"
-                        value="custom"
-                        checked={assignmentDistribution === "custom"}
-                        onChange={() => setAssignmentDistribution("custom")}
-                      />
-                    </div>
-                    <Form.Text className="text-muted">
-                      <strong>Auto-balance:</strong> Prospects are distributed
-                      evenly. <strong>Custom:</strong> You specify exactly how
-                      many prospects each campaign gets.
-                    </Form.Text>
-                  </Form.Group>
-
-                  {assignmentDistribution === "custom" &&
-                    assignmentCampaign.length > 0 && (
-                      <Form.Group className="mb-3">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <Form.Label className="mb-0">
-                            Custom Distribution
-                          </Form.Label>
-                          <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            onClick={() => {
-                              const equalDistribution = Math.floor(
-                                totalEntriesToAssign /
-                                  assignmentCampaign.length,
-                              );
-                              const remainder =
-                                totalEntriesToAssign %
-                                assignmentCampaign.length;
-                              const newCustomDistribution: Record<
-                                string,
-                                number
-                              > = {};
-
-                              Array.from(assignmentCampaign).forEach(
-                                (campaign: any, index: number) => {
-                                  newCustomDistribution[campaign.value] =
-                                    equalDistribution +
-                                    (index < remainder ? 1 : 0);
-                                },
-                              );
-
-                              setCustomDistribution(newCustomDistribution);
-                            }}
-                          >
-                            Auto-fill Equal
-                          </Button>
-                        </div>
-                        <div className="border rounded p-3 bg-light">
-                          <p className="small text-muted mb-3">
-                            Total to assign:{" "}
-                            <strong>{totalEntriesToAssign}</strong> | Allocated:{" "}
-                            <strong>
-                              {Object.values(customDistribution).reduce(
-                                (sum, count) => sum + count,
-                                0,
-                              )}
-                            </strong>{" "}
-                            | Remaining:{" "}
-                            <strong>
-                              {totalEntriesToAssign -
-                                Object.values(customDistribution).reduce(
-                                  (sum, count) => sum + count,
-                                  0,
-                                )}
-                            </strong>
-                          </p>
-                          {Array.from(assignmentCampaign).map(
-                            (campaign: any) => (
-                              <div key={campaign.value} className="mb-2">
-                                <Row>
-                                  <Col md={6}>
-                                    <Form.Label className="small mb-0">
-                                      {campaign.label}
-                                    </Form.Label>
-                                  </Col>
-                                  <Col md={6}>
-                                    <Form.Control
-                                      type="number"
-                                      min="0"
-                                      max={totalEntriesToAssign}
-                                      value={
-                                        customDistribution[campaign.value] || 0
-                                      }
-                                      onChange={(e) =>
-                                        setCustomDistribution((prev) => ({
-                                          ...prev,
-                                          [campaign.value]:
-                                            parseInt(e.target.value) || 0,
-                                        }))
-                                      }
-                                      size="sm"
-                                    />
-                                  </Col>
-                                </Row>
-                              </div>
-                            ),
-                          )}
-                        </div>
-                      </Form.Group>
-                    )}
-
-                  <Alert variant="info" className="mt-3">
-                    <strong>Assignment Info:</strong> Prospects will be
-                    automatically assigned to users within the selected
-                    campaigns based on their campaign user extensions. The
-                    system will distribute prospects equally among users in each
-                    campaign.
-                  </Alert>
-                </div>
-              </>
+              <CrmListDataAssignmentFormContent
+                entityLabel="Prospects"
+                assignmentFilters={assignmentFilters}
+                setAssignmentFilters={setAssignmentFilters}
+                availableTags={availableTags}
+                availableCampaigns={availableCampaigns}
+                assignmentCounts={assignmentCounts}
+                assignmentCampaign={assignmentCampaign}
+                setAssignmentCampaign={setAssignmentCampaign}
+                totalEntriesToAssign={totalEntriesToAssign}
+                setTotalEntriesToAssign={setTotalEntriesToAssign}
+                assignmentDistribution={assignmentDistribution}
+                setAssignmentDistribution={setAssignmentDistribution}
+                customDistribution={customDistribution}
+                setCustomDistribution={setCustomDistribution}
+              />
             }
             submitButtonText="OK"
             cancelButtonText="Cancel"
@@ -6654,70 +5270,15 @@ const CrmCompanyManagement = () => {
           />
 
           {/* Unschedule Confirmation Modal */}
-          <Modal
+          <CrmListUnscheduleModal
             show={showUnscheduleModal}
             onHide={() => {
               setShowUnscheduleModal(false);
               setEntryToUnschedule(null);
             }}
-            centered
-          >
-            <Modal.Header closeButton className="border-bottom">
-              <Modal.Title>Confirm Unschedule</Modal.Title>
-            </Modal.Header>
-            <Modal.Body className="p-4">
-              <div className="text-center">
-                <AlertCircleIcon size={48} className="text-warning mb-3" />
-                <p className="mb-0">
-                  Are you sure you want to unschedule the call for{" "}
-                  <strong>
-                    {entryToUnschedule
-                      ? entryToUnschedule.name ||
-                        `prospect #${entryToUnschedule.id}`
-                      : "this prospect"}
-                  </strong>
-                  ?
-                </p>
-                <p className="text-muted small mb-3">
-                  This action cannot be undone.
-                </p>
-
-                {entryToUnschedule && entryToUnschedule.scheduled_call_at && (
-                  <div className="alert alert-warning mb-3 text-start">
-                    <strong>Prospect:</strong>{" "}
-                    {entryToUnschedule.name || `#${entryToUnschedule.id}`}
-                    <br />
-                    <strong>Phone:</strong> {entryToUnschedule.phone || "N/A"}
-                    <br />
-                    <strong>Scheduled Date:</strong>{" "}
-                    {moment(entryToUnschedule.scheduled_call_at).format(
-                      "MMM DD, YYYY HH:mm",
-                    )}
-                    {entryToUnschedule.note && (
-                      <>
-                        <br />
-                        <strong>Note:</strong> {entryToUnschedule.note}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </Modal.Body>
-            <Modal.Footer className="border-top">
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setShowUnscheduleModal(false);
-                  setEntryToUnschedule(null);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button variant="warning" onClick={confirmUnscheduleCall}>
-                Unschedule
-              </Button>
-            </Modal.Footer>
-          </Modal>
+            entryToUnschedule={entryToUnschedule}
+            onConfirm={confirmUnscheduleCall}
+          />
 
           <FormModal
             show={showHistoryModal}
@@ -6726,321 +5287,14 @@ const CrmCompanyManagement = () => {
             desc="Please fill the details below to view the activity history."
             size="lg"
             formHtml={
-              <>
-                <div className="mb-4">
-                  <div className="d-flex justify-content-between align-items-center">
-                    <div>
-                      <h5 className="mb-1">System Activity Log</h5>
-                      <p className="text-muted mb-0">
-                        Track all user activities including CSV uploads, data
-                        assignments, and campaign management.
-                      </p>
-                    </div>
-                    <div className="text-end">
-                      <Badge bg="info" className="me-2">
-                        {historyPagination.total} Total Activities
-                      </Badge>
-                      <Badge bg="secondary">
-                        Page {historyPagination.current_page} of{" "}
-                        {historyPagination.last_page}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {historyLoading ? (
-                  <div className="text-center py-5">
-                    <Spinner animation="border" variant="primary" />
-                    <p className="mt-3 text-muted">
-                      Loading activity history...
-                    </p>
-                  </div>
-                ) : historyData.length === 0 ? (
-                  <div className="text-center py-5">
-                    <FiClock size={48} className="text-muted mb-3" />
-                    <h6 className="text-muted">No Activity Found</h6>
-                    <p className="text-muted">
-                      No activities have been recorded yet.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="timeline ">
-                    {historyData.map((activity, index) => {
-                      const getActivityIcon = (action: string) => {
-                        switch (action) {
-                          case "upload":
-                            return (
-                              <FiUpload size={18} className="text-white" />
-                            );
-                          case "assign":
-                            return <FiUsers size={18} className="text-white" />;
-                          case "schedule_call":
-                          case "reschedule_call":
-                            return (
-                              <FiCalendar size={18} className="text-white" />
-                            );
-                          case "cancel_call":
-                          case "unschedule_call":
-                            return <FiX size={18} className="text-white" />;
-                          default:
-                            return <FiUser size={18} className="text-white" />;
-                        }
-                      };
-
-                      const getActivityColor = (action: string) => {
-                        switch (action) {
-                          case "upload":
-                            return "primary";
-                          case "assign":
-                            return "success";
-                          case "schedule_call":
-                          case "reschedule_call":
-                            return "info";
-                          case "cancel_call":
-                          case "unschedule_call":
-                            return "warning";
-                          default:
-                            return "secondary";
-                        }
-                      };
-
-                      const formatActivityDetails = (activity: any) => {
-                        const details = activity.details || {};
-                        switch (activity.action) {
-                          case "upload":
-                            const campaignNames =
-                              details.campaign_ids
-                                ?.map(
-                                  (id: number) =>
-                                    campaignsById[id] || `Campaign #${id}`,
-                                )
-                                .join(", ") || "No campaigns";
-                            const tags = details.tags?.join(", ") || "No tags";
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>
-                                    Uploaded {activity.total_records || 0}{" "}
-                                    prospects
-                                  </strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Campaigns:</strong> {campaignNames}
-                                  </div>
-                                  <div>
-                                    <strong>Tags:</strong> {tags}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          case "assign":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>
-                                    Assigned {activity.total_records || 0}{" "}
-                                    prospects
-                                  </strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <strong>To:</strong>{" "}
-                                  {getNameByExtension(
-                                    activity.user_extension_done_to,
-                                  ) || "Campaign team"}
-                                </div>
-                              </div>
-                            );
-                          case "schedule_call":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>Scheduled call</strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Phone:</strong>{" "}
-                                    {details.phone || "N/A"}
-                                  </div>
-                                  <div>
-                                    <strong>Time:</strong>{" "}
-                                    {moment(details.scheduled_call_at).format(
-                                      "MMM DD, YYYY HH:mm",
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          case "reschedule_call":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>Rescheduled call</strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Phone:</strong>{" "}
-                                    {details.phone || "N/A"}
-                                  </div>
-                                  <div>
-                                    <strong>From:</strong>{" "}
-                                    {moment(
-                                      details.old_scheduled_call_at,
-                                    ).format("MMM DD, HH:mm")}
-                                  </div>
-                                  <div>
-                                    <strong>To:</strong>{" "}
-                                    {moment(
-                                      details.new_scheduled_call_at,
-                                    ).format("MMM DD, HH:mm")}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          case "cancel_call":
-                          case "unschedule_call":
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>Cancelled call</strong>
-                                </div>
-                                <div className="small text-muted">
-                                  <div>
-                                    <strong>Phone:</strong>{" "}
-                                    {details.phone || "N/A"}
-                                  </div>
-                                  <div>
-                                    <strong>Was scheduled:</strong>{" "}
-                                    {moment(
-                                      details.cancelled_scheduled_call_at ||
-                                        details.unscheduled_call_at,
-                                    ).format("MMM DD, HH:mm")}
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          default:
-                            return (
-                              <div>
-                                <div className="mb-1">
-                                  <strong>
-                                    {activity.action
-                                      ?.replace("_", " ")
-                                      .replace(/\b\w/g, (l: string) =>
-                                        l.toUpperCase(),
-                                      )}
-                                  </strong>
-                                </div>
-                                <div className="small text-muted">
-                                  {activity.details?.description ||
-                                    "No details available"}
-                                </div>
-                              </div>
-                            );
-                        }
-                      };
-
-                      return (
-                        <div key={activity.id} className="timeline-item mb-4 ">
-                          <div className="d-flex">
-                            <div className="timeline-marker me-3">
-                              <div
-                                className={`bg-${getActivityColor(
-                                  activity.action,
-                                )} rounded-circle d-flex align-items-center justify-content-center shadow-sm`}
-                                style={{ width: "36px", height: "36px" }}
-                              >
-                                {getActivityIcon(activity.action)}
-                              </div>
-                            </div>
-                            <div className="timeline-content flex-grow-1">
-                              <div className="card border-0 shadow-sm">
-                                <div className="card-body p-3">
-                                  <div className="d-flex justify-content-between align-items-start mb-2">
-                                    <div className="flex-grow-1">
-                                      <h6 className="mb-1 d-flex align-items-center">
-                                        <strong className="text-primary">
-                                          {getNameByExtension(
-                                            activity.user_extension_done_by,
-                                          ) || "System"}
-                                        </strong>
-                                        <Badge
-                                          bg={getActivityColor(activity.action)}
-                                          className="ms-2 small"
-                                        >
-                                          {activity.action
-                                            ?.replace("_", " ")
-                                            .replace(/\b\w/g, (l: string) =>
-                                              l.toUpperCase(),
-                                            )}
-                                        </Badge>
-                                      </h6>
-                                      <div className="text-muted">
-                                        {formatActivityDetails(activity)}
-                                      </div>
-                                    </div>
-                                    <div className="text-end">
-                                      <small className="text-muted">
-                                        {moment(activity.created_at).format(
-                                          "MMM DD, YYYY",
-                                        )}
-                                      </small>
-                                      <br />
-                                      <small className="text-muted">
-                                        {moment(activity.created_at).format(
-                                          "HH:mm:ss",
-                                        )}
-                                      </small>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="timeline-line"></div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Pagination */}
-                {!historyLoading &&
-                  historyData.length > 0 &&
-                  historyPagination.last_page > 1 && (
-                    <div className="d-flex justify-content-center mt-4">
-                      <div className="btn-group" role="group">
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          disabled={historyPagination.current_page === 1}
-                          onClick={() =>
-                            fetchHistoryData(historyPagination.current_page - 1)
-                          }
-                        >
-                          Previous
-                        </Button>
-                        <Button variant="outline-secondary" size="sm" disabled>
-                          {historyPagination.current_page} /{" "}
-                          {historyPagination.last_page}
-                        </Button>
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
-                          disabled={
-                            historyPagination.current_page ===
-                            historyPagination.last_page
-                          }
-                          onClick={() =>
-                            fetchHistoryData(historyPagination.current_page + 1)
-                          }
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-              </>
+              <CrmListHistoryFormContent
+                historyData={historyData}
+                historyLoading={historyLoading}
+                historyPagination={historyPagination}
+                fetchHistoryData={fetchHistoryData}
+                campaignsById={campaignsById}
+                getNameByExtension={getNameByExtension}
+              />
             }
             submitButtonText="Close"
             cancelButtonText="Cancel"
@@ -7187,17 +5441,13 @@ const CrmCompanyManagement = () => {
             if (selectedCompany?.created_at)
               aboutFields.push({
                 label: "Created",
-                value: moment(selectedCompany.created_at).format(
-                  "MMM DD, YYYY",
-                ),
+                value: formatCrmPreviewDate(selectedCompany.created_at),
                 type: "date",
               });
             if (selectedCompany?.updated_at)
               aboutFields.push({
                 label: "Updated",
-                value: moment(selectedCompany.updated_at).format(
-                  "MMM DD, YYYY",
-                ),
+                value: formatCrmPreviewDate(selectedCompany.updated_at),
                 type: "date",
               });
 
@@ -7427,7 +5677,7 @@ const CrmCompanyManagement = () => {
                     {
                       label: "Convert to Lead",
                       onClick: () => {
-                        setConvertingCompanyId(selectedCompany?.id ?? null);
+                        setConvertingToLeadCrmRecordId(selectedCompany?.id ?? null);
                         setShowConvertToLeadModal(true);
                       },
                     },
@@ -7670,14 +5920,14 @@ const CrmCompanyManagement = () => {
       </div>{" "}
       {/* End flex container */}
       {/* Convert to Lead Modal */}
-      {convertingCompanyId && (
+      {convertingToLeadCrmRecordId && (
         <ConvertToLeadModal
           show={showConvertToLeadModal}
           onHide={() => {
             setShowConvertToLeadModal(false);
-            setConvertingCompanyId(null);
+            setConvertingToLeadCrmRecordId(null);
           }}
-          prospectId={convertingCompanyId}
+          prospectId={convertingToLeadCrmRecordId}
           onSuccess={() => {
             setRefreshKey((prev) => prev + 1);
             toast.success("Company converted to lead successfully!");

@@ -59,6 +59,8 @@ interface UpdateStatusData {
   name?: string;
   color?: string;
   order?: number;
+  is_default?: boolean;
+  is_completed?: boolean;
 }
 
 interface ReorderStatusesData {

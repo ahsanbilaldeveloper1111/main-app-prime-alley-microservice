@@ -26,6 +26,7 @@ import {
 import "@assets/css/GenericTable.css";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
 import { useRouter } from "next/router";
+import { sanitizeSearchInputLive } from "@utils/Helper";
 
 const ACTION_COLUMN_KEY = "actions";
 
@@ -1449,7 +1450,19 @@ const GenericTable = <T extends Record<string, any>>({
                   type="text"
                   placeholder={toolbar.searchPlaceholder || "Search"}
                   value={toolbar.searchValue || ""}
-                  onChange={(e) => toolbar.onSearchChange?.(e.target.value)}
+                  onChange={(e) =>
+                    toolbar.onSearchChange?.(
+                      sanitizeSearchInputLive(e.target.value),
+                    )
+                  }
+                  onPaste={(e) => {
+                    const target = e.currentTarget;
+                    globalThis.setTimeout(() => {
+                      toolbar.onSearchChange?.(
+                        sanitizeSearchInputLive(target.value),
+                      );
+                    }, 0);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && toolbar.onSearch) {
                       toolbar.onSearch();
@@ -1802,7 +1815,7 @@ const GenericTable = <T extends Record<string, any>>({
             size="sm"
             value={rowsPerPage}
             onChange={(e) =>
-              onPaginationChange?.(currentPage, Number(e.target.value))
+              onPaginationChange?.(1, Number(e.target.value))
             }
             className="pagination-select"
           >

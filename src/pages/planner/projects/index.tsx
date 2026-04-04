@@ -1659,8 +1659,8 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                   <th className="generic-table-th">Project Name</th>
                   <th className="generic-table-th">Members</th>
 
-                  <th className="generic-table-th">Open</th>
-                  <th className="generic-table-th">Overdue</th>
+                  <th className="generic-table-th">Open Tasks</th>
+                  <th className="generic-table-th">Overdue Tasks</th>
                   <th className="generic-table-th">Last Update</th>
                   <th className="generic-table-th generic-table-actions-header">Actions</th>
                 </tr>

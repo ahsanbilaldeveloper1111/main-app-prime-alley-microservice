@@ -13,9 +13,10 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 import { getJourneys } from "@utils/staffManagement";
-import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import { useMainAppLookups, type MainAppDepartmentLookup } from "@hooks/useMainAppLookups";
 import { ChevronRight } from "lucide-react";
 import OnboardingDetailSidebar from "./sidebar";
+import { JOURNEY_STATUS_OPTIONS } from "@utils/workforce/journeyStatusOptions";
 
 interface OnboardingEmployee {
   id: string;
@@ -27,6 +28,12 @@ interface OnboardingEmployee {
   status: "In Progress" | "On Track" | "Completed";
   role?: string;
   department?: string;
+  /** Phone extension / user id from API (table column "Extension") */
+  user_id?: string;
+  /** Mirrors API `department_name` for table columns */
+  department_name?: string;
+  /** From API `user_profile.designation` */
+  designation?: string;
   total_steps_count?: string | number;
   completed_steps_count?: string | number;
   /** From API `user_profile.contract_type` */
@@ -58,6 +65,7 @@ interface JourneyRecord {
     id?: number;
     user_id?: string;
     job_title?: string;
+    designation?: string;
     contract_type?: string;
     employment_type?: string;
     [key: string]: unknown;
@@ -138,15 +146,19 @@ const getStatusColor = (status: OnboardingEmployee["status"]) => {
 };
 
 const EmployeesOnboarding = () => {
-  const { mainAppUsers, companyIdentifier } = useMainAppLookups();
+  const { mainAppUsers, mainAppDepartments, companyIdentifier } = useMainAppLookups();
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [appliedDepartment, setAppliedDepartment] = useState("");
   const [selectedEmploymentType, setSelectedEmploymentType] = useState("");
   const [selectedContract, setSelectedContract] = useState("");
   const [appliedEmploymentType, setAppliedEmploymentType] = useState("");
   const [appliedContract, setAppliedContract] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [appliedUserIds, setAppliedUserIds] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [appliedStatus, setAppliedStatus] = useState("");
   const [userSearchTerm, setUserSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
@@ -178,14 +190,28 @@ const EmployeesOnboarding = () => {
     const fetchJourneys = async () => {
       setLoadingJourneys(true);
       try {
-        const params: { page: number; limit: number; search?: string; employment_type?: string; contract_type?: string; user_ids?: string[] } = {
+        const params: {
+          page: number;
+          limit: number;
+          search?: string;
+          employment_type?: string;
+          contract_type?: string;
+          user_ids?: string[];
+          department_id?: number;
+          status?: string;
+        } = {
           page: currentPage,
           limit: rowsPerPage,
         };
         if (appliedSearch?.trim()) params.search = appliedSearch.trim();
+        if (appliedDepartment?.trim()) {
+          const deptId = Number(appliedDepartment.trim());
+          if (!Number.isNaN(deptId)) params.department_id = deptId;
+        }
         if (appliedEmploymentType?.trim()) params.employment_type = appliedEmploymentType.trim();
         if (appliedContract?.trim()) params.contract_type = appliedContract.trim();
         if (appliedUserIds.length > 0) params.user_ids = appliedUserIds;
+        if (appliedStatus?.trim()) params.status = appliedStatus.trim().toLowerCase().replaceAll(/\s/g, "_");
         const journeysResult = await getJourneys(params);
         const data = Array.isArray(journeysResult?.data) ? (journeysResult.data as JourneyRecord[]) : [];
         setJourneysData(data);
@@ -205,9 +231,11 @@ const EmployeesOnboarding = () => {
     rowsPerPage,
     refreshJourneysKey,
     appliedSearch,
+    appliedDepartment,
     appliedEmploymentType,
     appliedContract,
     appliedUserIds,
+    appliedStatus,
   ]);
 
   useEffect(() => {
@@ -217,7 +245,8 @@ const EmployeesOnboarding = () => {
 
   const employees: OnboardingEmployee[] = useMemo(() => {
     return journeysData.map((j) => {
-      const userId = j.user_id == null ? "" : String(j.user_id).trim();
+      const rawUserId = j.user_id ?? j.user_profile?.user_id;
+      const userId = rawUserId == null ? "" : String(rawUserId).trim();
       const name =
         users.find((u) => String(u.phone ?? "").trim() === userId || String(u.id) === userId)?.name ??
         (userId || "—");
@@ -237,6 +266,11 @@ const EmployeesOnboarding = () => {
       const profile = j.user_profile;
       const contractRaw = profile?.contract_type;
       const employmentRaw = profile?.employment_type;
+      const designationRaw = profile?.designation;
+      const designation =
+        designationRaw != null && String(designationRaw).trim() !== ""
+          ? String(designationRaw).trim()
+          : undefined;
       return {
         id: String(j.id ?? j.user_profile_id ?? (userId || "unknown")),
         name,
@@ -247,6 +281,9 @@ const EmployeesOnboarding = () => {
         status,
         role: j.job_title ?? profile?.job_title ?? undefined,
         department: j.department_name ?? undefined,
+        user_id: userId || undefined,
+        department_name: j.department_name ?? undefined,
+        designation,
         total_steps_count: j.total_steps_count,
         completed_steps_count: j.completed_steps_count,
         contract_type:
@@ -259,9 +296,11 @@ const EmployeesOnboarding = () => {
 
   const handleApply = () => {
     setAppliedSearch(searchTerm);
+    setAppliedDepartment(selectedDepartment);
     setAppliedEmploymentType(selectedEmploymentType);
     setAppliedContract(selectedContract);
     setAppliedUserIds(selectedUserIds);
+    setAppliedStatus(selectedStatus);
     setCurrentPage(1);
   };
 
@@ -279,12 +318,16 @@ const EmployeesOnboarding = () => {
   const resetFilters = () => {
     setSearchTerm("");
     setAppliedSearch("");
+    setSelectedDepartment("");
+    setAppliedDepartment("");
     setSelectedEmploymentType("");
     setAppliedEmploymentType("");
     setSelectedContract("");
     setAppliedContract("");
     setSelectedUserIds([]);
     setAppliedUserIds([]);
+    setSelectedStatus("");
+    setAppliedStatus("");
     setUserSearchTerm("");
     setCurrentPage(1);
   };
@@ -302,6 +345,51 @@ const EmployeesOnboarding = () => {
     [appliedUserIds, users],
   );
 
+  const departments = useMemo(() => mainAppDepartments ?? [], [mainAppDepartments]);
+
+  const selectedDepartmentLabel = useMemo(() => {
+    if (selectedDepartment === "") return "";
+    const d = departments.find((dept: MainAppDepartmentLookup) => String(dept.id) === selectedDepartment);
+    if (d == null) return selectedDepartment;
+    return hierarchyLabel(d);
+  }, [selectedDepartment, departments]);
+
+  const appliedDepartmentLabel = useMemo(() => {
+    if (appliedDepartment === "") return "";
+    const d = departments.find((dept: MainAppDepartmentLookup) => String(dept.id) === appliedDepartment);
+    if (d == null) return appliedDepartment;
+    return hierarchyLabel(d);
+  }, [appliedDepartment, departments]);
+
+  const departmentPillActiveLabel = useMemo(() => {
+    if (selectedDepartment) return selectedDepartmentLabel;
+    if (appliedDepartment) return appliedDepartmentLabel;
+    return undefined;
+  }, [
+    selectedDepartment,
+    appliedDepartment,
+    selectedDepartmentLabel,
+    appliedDepartmentLabel,
+  ]);
+
+  const selectedStatusLabel = useMemo(() => {
+    if (selectedStatus === "") return "";
+    const opt = JOURNEY_STATUS_OPTIONS.find((o) => o.value === selectedStatus);
+    return opt?.label ?? selectedStatus;
+  }, [selectedStatus]);
+
+  const appliedStatusLabel = useMemo(() => {
+    if (appliedStatus === "") return "";
+    const opt = JOURNEY_STATUS_OPTIONS.find((o) => o.value === appliedStatus);
+    return opt?.label ?? appliedStatus;
+  }, [appliedStatus]);
+
+  const statusPillActiveLabel = useMemo(() => {
+    if (selectedStatus) return selectedStatusLabel;
+    if (appliedStatus) return appliedStatusLabel;
+    return undefined;
+  }, [selectedStatus, appliedStatus, selectedStatusLabel, appliedStatusLabel]);
+
   const onboardingColumns = useMemo<TableColumn<OnboardingEmployee>[]>(
     () => [
       {
@@ -313,6 +401,24 @@ const EmployeesOnboarding = () => {
           getInitials: (row) => getInitials(row.name),
           getColor: (row) => getAvatarColor(row.name),
         },
+      },
+      {
+        key: "user_id",
+        label: "Extension",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "department_name",
+        label: "Department",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "designation",
+        label: "Designation",
+        type: "text",
+        sortable: false,
       },
       {
         key: "contract_type",
@@ -334,7 +440,7 @@ const EmployeesOnboarding = () => {
       },
       {
         key: "stages",
-        label: "Stages",
+        label: "Steps",
         type: "custom",
         sortable: false,
         render: (row) => (
@@ -471,9 +577,44 @@ const EmployeesOnboarding = () => {
     [],
   );
 
+  const departmentFilterOptions = useMemo(
+    () => [
+      {
+        label: "All departments",
+        value: "__all__",
+        onClick: () => setSelectedDepartment(""),
+      },
+      ...departments.map((dept: MainAppDepartmentLookup) => {
+        const idStr = String(dept.id);
+        return {
+          label: hierarchyLabel(dept),
+          value: idStr,
+          onClick: () => setSelectedDepartment(idStr),
+        };
+      }),
+    ],
+    [departments],
+  );
+
+  const statusFilterOptions = useMemo(
+    () => [
+      {
+        label: "All statuses",
+        value: "__all__",
+        onClick: () => setSelectedStatus(""),
+      },
+      ...JOURNEY_STATUS_OPTIONS.map((opt) => ({
+        label: opt.label,
+        value: opt.value,
+        onClick: () => setSelectedStatus(opt.value),
+      })),
+    ],
+    [],
+  );
+
   const usersDropdownContent = useMemo(
     () => (
-      <div style={{ minWidth: "260px", maxHeight: "320px", overflow: "hidden" }}>
+      <div style={{ minWidth: "260px" }}>
         <input
           type="text"
           placeholder="Search user..."
@@ -489,7 +630,7 @@ const EmployeesOnboarding = () => {
             fontSize: "13px",
           }}
         />
-        <div style={{ maxHeight: "200px", overflowY: "auto", marginBottom: "8px" }}>
+        <div style={{ marginBottom: "8px" }}>
           {filteredManagers.map((mgr: LookupUser, idx: number) => {
             const label = hierarchyLabel(mgr);
             const phone = String(mgr.phone ?? "").trim();
@@ -602,6 +743,24 @@ const EmployeesOnboarding = () => {
         dropdownOptions: contractFilterOptions,
       },
       {
+        id: "journey-department",
+        label: "Department",
+        showDropdown: true,
+        searchable: true,
+        dropdownSelectedValue: selectedDepartment || "__all__",
+        active: Boolean(selectedDepartment || appliedDepartment),
+        activeLabel: departmentPillActiveLabel,
+        onClear:
+          selectedDepartment || appliedDepartment
+            ? () => {
+                setSelectedDepartment("");
+                setAppliedDepartment("");
+                setCurrentPage(1);
+              }
+            : undefined,
+        dropdownOptions: departmentFilterOptions,
+      },
+      {
         id: "journey-users",
         label: "Users",
         showDropdown: true,
@@ -617,16 +776,42 @@ const EmployeesOnboarding = () => {
             : undefined,
         dropdownContent: usersDropdownContent,
       },
+      {
+        id: "journey-status",
+        label: "Status",
+        showDropdown: true,
+        searchable: true,
+        dropdownSelectedValue: selectedStatus || "__all__",
+        active: Boolean(selectedStatus || appliedStatus),
+        activeLabel: statusPillActiveLabel,
+        onClear:
+          selectedStatus || appliedStatus
+            ? () => {
+                setSelectedStatus("");
+                setAppliedStatus("");
+                setCurrentPage(1);
+              }
+            : undefined,
+        dropdownOptions: statusFilterOptions,
+      },
     ],
     [
+      appliedDepartment,
       appliedEmploymentType,
       appliedContract,
       appliedUserIds,
+      appliedStatus,
+      departmentFilterOptions,
+      departmentPillActiveLabel,
+      selectedDepartment,
       selectedEmploymentType,
       selectedContract,
+      selectedStatus,
       selectedUserIds,
       employmentFilterOptions,
       contractFilterOptions,
+      statusFilterOptions,
+      statusPillActiveLabel,
       usersDropdownContent,
     ],
   );
@@ -635,7 +820,7 @@ const EmployeesOnboarding = () => {
     () => ({
       showSearch: true,
       searchValue: searchTerm,
-      searchPlaceholder: "Search employee (extension/designation/department)...",
+      searchPlaceholder: "Search by extension or designation",
       onSearchChange: setSearchTerm,
       onSearch: handleApply,
       showFilterPills: true,
@@ -731,11 +916,18 @@ const EmployeesOnboarding = () => {
             showToolbarActions={false}
           />
 
-          {(appliedSearch.trim() || appliedEmploymentType || appliedContract || appliedUserIds.length > 0) && (
+          {(appliedSearch.trim() ||
+            appliedDepartment ||
+            appliedEmploymentType ||
+            appliedContract ||
+            appliedStatus ||
+            appliedUserIds.length > 0) && (
             <div style={{ marginTop: "10px", fontSize: "12px", color: "#6b7280" }}>
               {appliedSearch.trim() ? `Search: ${appliedSearch} | ` : ""}
+              {appliedDepartment ? `Department: ${appliedDepartmentLabel} | ` : ""}
               {appliedEmploymentType ? `Employment: ${appliedEmploymentType} | ` : ""}
               {appliedContract ? `Contract: ${appliedContract} | ` : ""}
+              {appliedStatus ? `Status: ${appliedStatusLabel} | ` : ""}
               {appliedUserIds.length > 0 ? `Users: ${appliedUserNames}` : ""}
             </div>
           )}

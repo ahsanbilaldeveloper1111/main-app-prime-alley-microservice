@@ -30,7 +30,7 @@ import {
 } from "react-icons/fi";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, formatDateForTable } from "@utils/Helper";
 
 const CrmOpportunities = () => {
 
@@ -197,7 +197,7 @@ const CrmOpportunities = () => {
           {props?.created_by ? name : ""}
           {props?.created_by && <br />}
           {props.created_at
-            ? new Date(props.created_at).toLocaleDateString()
+            ? formatDateForTable(props.created_at)
             : "Unknown"}
         </span>
         },

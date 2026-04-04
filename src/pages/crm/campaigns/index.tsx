@@ -70,7 +70,7 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { ModuleSlug, checkRequiredFields } from "@utils/Helper";
+import { ModuleSlug, checkRequiredFields, formatDateForTable } from "@utils/Helper";
 import { useSession } from "next-auth/react";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
@@ -254,10 +254,10 @@ function campaignFieldOptionKey(fieldName: string, option: string, optionIndex: 
 
 function viewModalDateRangeText(selected: { start_date?: string; end_date?: string }): string {
   if (selected.start_date && selected.end_date) {
-    return `${new Date(selected.start_date).toLocaleDateString()} - ${new Date(selected.end_date).toLocaleDateString()}`;
+    return `${formatDateForTable(selected.start_date)} - ${formatDateForTable(selected.end_date)}`;
   }
   if (selected.start_date) {
-    return `Starts: ${new Date(selected.start_date).toLocaleDateString()}`;
+    return `Starts: ${formatDateForTable(selected.start_date)}`;
   }
   return "Not set";
 }
@@ -1077,7 +1077,7 @@ type CrmCampaignListQueryParams = {
 };
 
 type CrmCampaignListSetters = {
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setListLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setCampaignsData: React.Dispatch<React.SetStateAction<any[]>>;
   setMetrics: React.Dispatch<React.SetStateAction<CampaignMetrics>>;
   setTotalCampaigns: React.Dispatch<React.SetStateAction<number>>;
@@ -1089,11 +1089,11 @@ function useCrmCampaignListQueryEffect(
   setters: CrmCampaignListSetters,
 ) {
   const { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch } = query;
-  const { setLoading, setCampaignsData, setMetrics, setTotalCampaigns } = setters;
+  const { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns } = setters;
   useEffect(() => {
     const loadCampaigns = async () => {
       try {
-        setLoading(true);
+        setListLoading(true);
         const filters = buildCrmCampaignListFilters(activeFilter, campaignFilters, memoizedFilters);
         const response = await getCampaigns({
           page: campaignsPagination.currentPage,
@@ -1112,7 +1112,7 @@ function useCrmCampaignListQueryEffect(
         consumeHandledApiError(error, "CrmCampaigns.loadCampaigns");
         toast.error("Failed to load campaigns");
       } finally {
-        setLoading(false);
+        setListLoading(false);
       }
     };
 
@@ -1158,6 +1158,7 @@ const CAMPAIGN_SELECTABLE_COLUMN_KEYS = [
   "status",
   "start_date",
   "user_extensions",
+  "created_by",
   "created_at",
   "actions",
 ] as const;
@@ -1167,6 +1168,7 @@ const DEFAULT_CAMPAIGN_SELECTED_COLUMNS: string[] = [
   "status",
   "start_date",
   "user_extensions",
+  "created_by",
   "created_at",
   "actions",
 ];
@@ -1233,6 +1235,7 @@ const CrmCampaigns = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
+  const [listLoading, setListLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Form data
@@ -1316,6 +1319,21 @@ const CrmCampaigns = () => {
     return `${userNames.slice(0, maxDisplay).join(", ")} +${userNames.length - maxDisplay} more`;
   }, [extensions]);
 
+  const getCreatedByName = useCallback((campaign: any) => {
+    const createdBy = campaign?.created_by;
+    const matchedExtension = extensions.find(
+      (ext) => sameExtensionId(ext.id, createdBy) || sameExtensionId(ext.extension, createdBy),
+    );
+    return (
+      matchedExtension?.display_name ||
+      matchedExtension?.name ||
+      campaign?.created_by_name ||
+      campaign?.creator_name ||
+      createdBy ||
+      "Unknown"
+    );
+  }, [extensions]);
+
   const getMaxRecords = () => includeAssignedRecords ? assignmentCounts.total : assignmentCounts.unassigned;
 
   const handleNumberKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1348,7 +1366,7 @@ const CrmCampaigns = () => {
   useCrmCampaignListQueryEffect(
     listCampaignsPermission,
     { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch },
-    { setLoading, setCampaignsData, setMetrics, setTotalCampaigns },
+    { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns },
   );
 
   // Modal handlers
@@ -1364,7 +1382,6 @@ const CrmCampaigns = () => {
 
   const handleEditCampaign = useCallback(async (campaign: any) => {
     try {
-      setLoading(true);
       const campaignData = await getCampaign(campaign.id);
       setSelectedCampaign(campaignData);
       const draft = deriveEditorStateFromCampaignApi(campaignData, extensions, industries, dealTemplates);
@@ -1378,22 +1395,17 @@ const CrmCampaigns = () => {
     } catch (error: unknown) {
       consumeHandledApiError(error, "CrmCampaigns.handleEditCampaign");
       toast.error("Failed to fetch campaign details");
-    } finally {
-      setLoading(false);
     }
   }, [extensions, industries, dealTemplates]);
 
   const handleViewCampaign = useCallback(async (campaign: any) => {
     try {
-      setLoading(true);
       const campaignData = await getCampaign(campaign.id);
       setSelectedCampaign(campaignData);
       setShowViewModal(true);
     } catch (error: unknown) {
       consumeHandledApiError(error, "CrmCampaigns.handleViewCampaign");
       toast.error("Failed to fetch campaign details");
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -1747,10 +1759,10 @@ const CrmCampaigns = () => {
       render: (campaign: any) => (
         <div>
           <div className="fw-semibold small">
-            {campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : "No start date"}
+            {campaign.start_date ? formatDateForTable(campaign.start_date) : "No start date"}
           </div>
           <small className="text-muted">
-            to {campaign.end_date ? new Date(campaign.end_date).toLocaleDateString() : "No end date"}
+            to {campaign.end_date ? formatDateForTable(campaign.end_date) : "No end date"}
           </small>
         </div>
       ),
@@ -1765,17 +1777,26 @@ const CrmCampaigns = () => {
       ),
     },
     {
+      key: "created_by",
+      label: "Created By",
+      sortable: true,
+      type: "custom",
+      render: (campaign: any) => (
+        <small className="text-muted">{getCreatedByName(campaign)}</small>
+      ),
+    },
+    {
       key: "created_at",
       label: "Created",
       sortable: true,
       type: "custom",
       render: (campaign: any) => (
         <small className="text-muted">
-          {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : "Unknown"}
+          {campaign.created_at ? formatDateForTable(campaign.created_at) : "Unknown"}
         </small>
       ),
     },
-  ], [extensions, getUserNames]);
+  ], [getCreatedByName, getUserNames]);
 
   const campaignsTableActions = useMemo(() => {
     const actions: any[] = [];
@@ -1786,7 +1807,7 @@ const CrmCampaigns = () => {
         icon: <Eye size={16} />,
         onClick: (campaign: any) => handleViewCampaign(campaign),
         variant: "link",
-        className: "p-1",
+        className: "p-1 text-primary",
       });
     }
     if (session?.user?.permissions?.includes("edit-crm-campaigns")) {
@@ -1909,7 +1930,7 @@ const CrmCampaigns = () => {
           defaultSortColumn={campaignsPagination.sortColumn}
           defaultSortDirection={campaignsPagination.sortDirection}
           onSort={handleCampaignsSort}
-          loading={loading}
+          loading={listLoading}
           emptyMessage="No campaigns found matching your criteria"
           pagination={{
             currentPage: campaignsPagination.currentPage,
@@ -2203,7 +2224,7 @@ const CrmCampaigns = () => {
                   </div>
                   <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
                     <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Created Date</div>
-                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{selectedCampaign.created_at ? new Date(selectedCampaign.created_at).toLocaleDateString() : "N/A"}</div>
+                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{selectedCampaign.created_at ? formatDateForTable(selectedCampaign.created_at) : "N/A"}</div>
                   </div>
                 </div>
 

@@ -25,6 +25,11 @@ import {
 } from "lucide-react";
 import OrgEmployeeSidebar from "./sidebar";
 import router from "next/router";
+import {
+  findMainAppUserByOrgChartUserId,
+  mainAppUserRowKeyForSelection,
+  normalizeOrgChartUserKey,
+} from "@utils/workforce/orgChartMainAppUserMatch";
 
 // Dynamically import react-organizational-chart to avoid SSR issues
 const Tree = dynamic(
@@ -399,8 +404,8 @@ const OrganizationalChart = () => {
         return;
       }
       const getName = (userId: string | undefined) => {
-        if (!userId) return '—';
-        const u = mainAppUsers?.find((x) => String(x.id) === String(userId));
+        if (!userId) return "—";
+        const u = findMainAppUserByOrgChartUserId(mainAppUsers, userId);
         return u?.name ?? userId;
       };
       const getDeptName = (departmentId: string | undefined) => {
@@ -492,8 +497,15 @@ const OrganizationalChart = () => {
     }, [loadingOrgChart, orgChartTreeRaw, orgChartUserIds, selectedUserId]);
 
     const usersInOrgChart = useMemo(
-      () => (mainAppUsers ?? []).filter((u) => orgChartUserIds.has(String(u.id))),
-      [mainAppUsers, orgChartUserIds]
+      () =>
+        (mainAppUsers ?? []).filter((u) => {
+          const phoneKey = normalizeOrgChartUserKey(u.phone);
+          return (
+            (phoneKey !== "" && orgChartUserIds.has(phoneKey)) ||
+            orgChartUserIds.has(String(u.id))
+          );
+        }),
+      [mainAppUsers, orgChartUserIds],
     );
 
     const selectedUserSubtreeIds = useMemo(() => {
@@ -730,7 +742,10 @@ const OrganizationalChart = () => {
                   fontWeight: '500',
                 }}
               >
-                {selectedUserId ? (usersInOrgChart.find((u) => String(u.id) === selectedUserId)?.name ?? selectedUserId) : 'All Users'}
+                {selectedUserId
+                  ? (findMainAppUserByOrgChartUserId(usersInOrgChart, selectedUserId)?.name ??
+                    selectedUserId)
+                  : "All Users"}
                 <ChevronDown size={16} />
               </button>
               {showUserDropdown && (
@@ -777,7 +792,7 @@ const OrganizationalChart = () => {
                     All Users
                   </button>
                   {usersInOrgChart.map((u) => {
-                    const uid = String(u.id);
+                    const uid = mainAppUserRowKeyForSelection(u);
                     const isSelected = selectedUserId === uid;
                     return (
                       <button
