@@ -184,8 +184,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   taskFiltersContainer: {
     display: "flex",
-    border: "1px solid rgb(138, 138, 138)",
-    borderRadius: "4px",
     overflow: "hidden",
   },
   taskFilterBtn: {
@@ -196,16 +194,16 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap" as const,
     backgroundColor: "#ffffff",
     color: "#141414",
-    border: "none",
-    borderRight: "1px solid rgb(138, 138, 138)",
+    border: "1px solid rgb(138, 138, 138)",
     padding: "8px 16px",
     fontFamily: FONT,
     fontSize: "12px",
     fontWeight: 300,
     lineHeight: "14px",
+    borderRight: "0px solid rgb(138, 138, 138)",
   },
   taskFilterBtnLast: {
-    borderRight: "none",
+    borderRight: "1px solid rgb(138, 138, 138)",
   },
   taskFilterBtnActive: {
     backgroundColor: "#e6e6e6",
@@ -490,8 +488,219 @@ type NextPageWithLayout = React.FC & {
   getLayout?: (page: ReactElement) => ReactElement;
 };
 
+type TaskStatKey = "allTasks" | "highPriority" | "toDos" | "calls" | "emails" | "linkedin";
+
+function getResponsiveStatsGridColumns(isMobile: boolean, isTablet: boolean): string {
+  if (isMobile) return "repeat(2, minmax(0, 1fr))";
+  if (isTablet) return "repeat(3, minmax(0, 1fr))";
+  return "repeat(6, 1fr)";
+}
+
+type SummaryTabContentProps = Readonly<{
+  activeTaskFilter: string;
+  setActiveTaskFilter: React.Dispatch<React.SetStateAction<string>>;
+  setShowCreate: React.Dispatch<React.SetStateAction<boolean>>;
+  selectedTaskStats: Record<TaskStatKey, number>;
+  selectedChartScale: number;
+  collapsedSections: Set<string>;
+  toggleSection: (sectionId: string) => void;
+  isCompactViewport: boolean;
+  isMobile: boolean;
+  responsiveStatsGridColumns: string;
+}>;
+
+function SummaryTabContent({
+  activeTaskFilter,
+  setActiveTaskFilter,
+  setShowCreate,
+  selectedTaskStats,
+  selectedChartScale,
+  collapsedSections,
+  toggleSection,
+  isCompactViewport,
+  isMobile,
+  responsiveStatsGridColumns,
+}: SummaryTabContentProps) {
+  return (
+    <>
+      {/* ── Tasks Section ── */}
+      <div style={styles.section}>
+        <SectionHeader
+          title="Tasks"
+          actionSlot={
+            <a style={styles.viewAllLink}>
+              View all <ExternalLink size={11} />
+            </a>
+          }
+          onToggle={() => toggleSection("tasks")}
+          isCollapsed={collapsedSections.has("tasks")}
+        />
+
+        {!collapsedSections.has("tasks") && (
+          <>
+            {/* Filter tabs */}
+            <div
+              style={{
+                ...styles.taskFilters,
+                alignItems: isCompactViewport ? "stretch" : styles.taskFilters.alignItems,
+                gap: isCompactViewport ? "10px" : styles.taskFilters.gap,
+              }}
+            >
+              <div
+                style={{
+                  ...styles.taskFiltersContainer,
+                  width: isCompactViewport ? "100%" : undefined,
+                  overflowX: (isCompactViewport ? "auto" : "hidden") as React.CSSProperties["overflowX"],
+                }}
+              >
+                {["All tasks", "Due today", "Overdue", "Due tomorrow"].map((f, index, arr) => (
+                  <button
+                    key={f}
+                    style={{
+                      ...styles.taskFilterBtn,
+                      ...(activeTaskFilter === f ? styles.taskFilterBtnActive : {}),
+                      ...(index === arr.length - 1 ? styles.taskFilterBtnLast : {}),
+                      flexShrink: 0,
+                    }}
+                    onClick={() => setActiveTaskFilter(f)}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  justifyContent: isCompactViewport ? "flex-end" : "flex-start",
+                  width: isCompactViewport ? "100%" : "auto",
+                }}
+              >
+                <button style={styles.btn} onClick={() => setShowCreate(true)}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <Plus size={12} /> Create task
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div
+              style={{
+                ...styles.statsGrid,
+                gridTemplateColumns: responsiveStatsGridColumns,
+                padding: isCompactViewport ? "0 10px 10px" : styles.statsGrid.padding,
+                gap: isCompactViewport ? "10px" : "0",
+              }}
+            >
+              {[
+                { label: "All tasks", value: selectedTaskStats.allTasks, icon: <CheckSquare size={16} color="#666" /> },
+                { label: "High priority", value: selectedTaskStats.highPriority, icon: <AlertTriangle size={16} color="#666" /> },
+                { label: "To-dos", value: selectedTaskStats.toDos, icon: <List size={16} color="#666" /> },
+                { label: "Calls", value: selectedTaskStats.calls, icon: <Phone size={16} color="#666" /> },
+                { label: "Emails", value: selectedTaskStats.emails, icon: <Mail size={16} color="#666" /> },
+                { label: "LinkedIn", value: selectedTaskStats.linkedin, icon: <ExternalLink size={16} color="#22c55e" />, done: true },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  style={{
+                    ...styles.statCard,
+                    margin: isCompactViewport ? "0" : styles.statCard.margin,
+                    padding: isMobile ? "14px" : styles.statCard.padding,
+                  }}
+                >
+                  <div
+                    style={{
+                      ...styles.statLabel,
+                      fontSize: isMobile ? "13px" : styles.statLabel.fontSize,
+                    }}
+                  >
+                    {stat.label}
+                    {stat.done ? (
+                      <span
+                        style={{
+                          width: "18px",
+                          height: "18px",
+                          borderRadius: "50%",
+                          backgroundColor: "#22c55e",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+                          <path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                    ) : (
+                      stat.icon
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      ...styles.statValue,
+                      fontSize: isMobile ? "20px" : styles.statValue.fontSize,
+                      color: stat.value === 0 ? "#141414" : "#006162",
+                      fontWeight: stat.value === 0 ? 400 : 700,
+                    }}
+                  >
+                    {stat.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── User Activity By Category ── */}
+      <div style={styles.section}>
+        <SectionHeader
+          title="User activity by category"
+          infoIcon
+          onToggle={() => toggleSection("userActivity")}
+          isCollapsed={collapsedSections.has("userActivity")}
+        />
+        {!collapsedSections.has("userActivity") && (
+          <div style={{ padding: isCompactViewport ? "8px 10px 12px" : "12px 16px 16px" }}>
+            <UserActivityByCategory scale={selectedChartScale} />
+          </div>
+        )}
+      </div>
+
+      <div style={styles.section}>
+        <SectionHeader
+          title="Activity"
+          infoIcon
+          onToggle={() => toggleSection("twoCharts")}
+          isCollapsed={collapsedSections.has("twoCharts")}
+        />
+        {!collapsedSections.has("twoCharts") && (
+          <div style={{ padding: isCompactViewport ? "8px 10px 12px" : "12px 16px 16px" }}>
+            <TwoCharts scale={selectedChartScale} />
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 const SalesDashboard: NextPageWithLayout = () => {
   const { data: session } = useSession();
+
+  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
+
+  React.useEffect(() => {
+    const updateViewportWidth = () => setViewportWidth(window.innerWidth);
+    updateViewportWidth();
+    window.addEventListener("resize", updateViewportWidth);
+    return () => window.removeEventListener("resize", updateViewportWidth);
+  }, []);
+
+  const isMobile = viewportWidth !== null && viewportWidth <= 767;
+  const isTablet = viewportWidth !== null && viewportWidth > 767 && viewportWidth <= 1024;
+  const isCompactViewport = isMobile || isTablet;
   
 
   const navTabs = React.useMemo(() => {
@@ -514,7 +723,6 @@ const SalesDashboard: NextPageWithLayout = () => {
   const [saving] = useState(false);
   const [activeTaskFilter, setActiveTaskFilter] = useState("All tasks");
 
-  type TaskStatKey = "allTasks" | "highPriority" | "toDos" | "calls" | "emails" | "linkedin";
   const taskStatsByFilter: Record<string, Record<TaskStatKey, number>> = {
     "All tasks": { allTasks: 7, highPriority: 3, toDos: 4, calls: 2, emails: 1, linkedin: 0 },
     "Due today": { allTasks: 4, highPriority: 1, toDos: 2, calls: 1, emails: 1, linkedin: 0 },
@@ -546,18 +754,60 @@ const SalesDashboard: NextPageWithLayout = () => {
     });
   };
 
+  const responsiveStatsGridColumns = getResponsiveStatsGridColumns(isMobile, isTablet);
+
   return (
     <div style={styles.page}>
       {/* ── Header ── */}
-      <div style={styles.header}>
-        <div style={styles.headerTop}>
-          <div style={styles.headerTitle}>
+      <div
+        style={{
+          ...styles.header,
+          padding: isCompactViewport ? "0 12px" : styles.header.padding,
+        }}
+      >
+        <div
+          style={{
+            ...styles.headerTop,
+            paddingTop: isCompactViewport ? "12px" : styles.headerTop.paddingTop,
+          }}
+        >
+          <div
+            style={{
+              ...styles.headerTitle,
+              fontSize: isCompactViewport ? "16px" : styles.headerTitle.fontSize,
+              flexWrap: "wrap",
+              rowGap: "2px",
+            }}
+          >
             <span>Welcome</span>
-            <span style={styles.headerDivider}>|</span>
-            <span style={styles.headerUser}>{session?.user?.name}</span>
+            <span
+              style={{
+                ...styles.headerDivider,
+                display: isCompactViewport ? "none" : styles.headerDivider.display,
+              }}
+            >
+              |
+            </span>
+            <span
+              style={{
+                ...styles.headerUser,
+                fontSize: isCompactViewport ? "16px" : styles.headerUser.fontSize,
+                overflowWrap: "anywhere",
+              }}
+            >
+              {session?.user?.name}
+            </span>
           </div>
         </div>
-        <nav style={styles.nav} aria-label="Dashboard sections">
+        <nav
+          style={{
+            ...styles.nav,
+            overflowX: "auto",
+            scrollbarWidth: "thin",
+            paddingBottom: isCompactViewport ? "2px" : "0",
+          }}
+          aria-label="Dashboard sections"
+        >
           {navTabs.map((tab) => (
             <button
               key={tab.id}
@@ -568,6 +818,8 @@ const SalesDashboard: NextPageWithLayout = () => {
                 background: "none",
                 font: "inherit",
                 boxShadow: "none",
+                flexShrink: 0,
+                padding: isCompactViewport ? "10px 12px" : styles.navTab.padding,
               }}
               aria-current={activeTab === tab.id ? "page" : undefined}
               onClick={() => setActiveTab(tab.id)}
@@ -579,136 +831,26 @@ const SalesDashboard: NextPageWithLayout = () => {
       </div>
 
       {/* ── Content ── */}
-      <div style={styles.content}>
+      <div
+        style={{
+          ...styles.content,
+          padding: isCompactViewport ? "12px" : styles.content.padding,
+          gap: isCompactViewport ? "12px" : styles.content.gap,
+        }}
+      >
         {activeTab === "Summary" && (
-        <>
-        {/* ── Tasks Section ── */}
-        <div style={styles.section}>
-          <SectionHeader
-            title="Tasks"
-            actionSlot={
-              <a style={styles.viewAllLink}>
-                View all <ExternalLink size={11} />
-              </a>
-            }
-            onToggle={() => toggleSection("tasks")}
-            isCollapsed={collapsedSections.has("tasks")}
+          <SummaryTabContent
+            activeTaskFilter={activeTaskFilter}
+            setActiveTaskFilter={setActiveTaskFilter}
+            setShowCreate={setShowCreate}
+            selectedTaskStats={selectedTaskStats}
+            selectedChartScale={selectedChartScale}
+            collapsedSections={collapsedSections}
+            toggleSection={toggleSection}
+            isCompactViewport={isCompactViewport}
+            isMobile={isMobile}
+            responsiveStatsGridColumns={responsiveStatsGridColumns}
           />
-
-          {!collapsedSections.has("tasks") && (
-          <>
-          {/* Filter tabs */}
-          <div style={styles.taskFilters}>
-            <div style={styles.taskFiltersContainer}>
-              {["All tasks", "Due today", "Overdue", "Due tomorrow"].map((f, index, arr) => (
-                <button
-                  key={f}
-                  style={{
-                    ...styles.taskFilterBtn,
-                    ...(activeTaskFilter === f ? styles.taskFilterBtnActive : {}),
-                    ...(index === arr.length - 1 ? styles.taskFilterBtnLast : {}),
-                  }}
-                  onClick={() => setActiveTaskFilter(f)}
-                >
-                  {f}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <button style={styles.btn} onClick={() => setShowCreate(true)}>
-                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <Plus size={12} /> Create task
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Stats Grid */}
-          <div style={styles.statsGrid}>
-            {[
-              { label: "All tasks", value: selectedTaskStats.allTasks, icon: <CheckSquare size={16} color="#666" /> },
-              { label: "High priority", value: selectedTaskStats.highPriority, icon: <AlertTriangle size={16} color="#666" /> },
-              { label: "To-dos", value: selectedTaskStats.toDos, icon: <List size={16} color="#666" /> },
-              { label: "Calls", value: selectedTaskStats.calls, icon: <Phone size={16} color="#666" /> },
-              { label: "Emails", value: selectedTaskStats.emails, icon: <Mail size={16} color="#666" /> },
-              { label: "LinkedIn", value: selectedTaskStats.linkedin, icon: <ExternalLink size={16} color="#22c55e" />, done: true },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                style={{
-                  ...styles.statCard,
-                  
-                }}
-              >
-                <div style={styles.statLabel}>
-                  {stat.label}
-                  {stat.done ? (
-                    <span
-                      style={{
-                        width: "18px",
-                        height: "18px",
-                        borderRadius: "50%",
-                        backgroundColor: "#22c55e",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                        <path d="M1 4l2.5 2.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </span>
-                  ) : (
-                    stat.icon
-                  )}
-                </div>
-                <div
-                  style={{
-                    ...styles.statValue,
-                    color: stat.value === 0 ? "#141414" : "#006162",
-                    fontWeight: stat.value === 0 ? 400 : 700,
-                  }}
-                >
-                  {stat.value}
-                </div>
-              </div>
-            ))}
-          </div>
-          </>
-          )}
-        </div>
-
-        {/* ── User Activity By Category ── */}
-        <div style={styles.section}>
-          <SectionHeader
-            title="User activity by category"
-            infoIcon
-            onToggle={() => toggleSection("userActivity")}
-            isCollapsed={collapsedSections.has("userActivity")}
-          />
-          {!collapsedSections.has("userActivity") && (
-            <div style={{ padding: "12px 16px 16px" }}>
-              <UserActivityByCategory scale={selectedChartScale} />
-            </div>
-          )}
-        </div>
-
-        <div style={styles.section}>
-          <SectionHeader
-            title="Activity"
-            infoIcon
-            onToggle={() => toggleSection("twoCharts")}
-            isCollapsed={collapsedSections.has("twoCharts")}
-          />
-          {!collapsedSections.has("twoCharts") && (
-            <div style={{ padding: "12px 16px 16px" }}>
-              <TwoCharts scale={selectedChartScale} />
-            </div>
-          )}
-        </div>
-
-       
-        </>
         )}
 
         {activeTab === "Companies" && <CompanyData />}

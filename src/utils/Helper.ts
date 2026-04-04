@@ -514,6 +514,24 @@ export const GlobalDateFormat = "D MMMM, YYYY";
 export const GlobalTimeFormat = "hh:mm:ss A";
 export const GlobalDateTimeFormat = "D MMMM, YYYY hh:mm:ss A";
 
+/** Calendar date for UI using {@link GlobalDateFormat} (e.g. `"02 Apr 2026"`). */
+export const formatDateGlobal = (
+  date: string | number | Date | null | undefined,
+): string => {
+  if (date == null || date === "") return "";
+  const m = moment(date);
+  return m.isValid() ? m.format(GlobalDateFormat) : "";
+};
+
+/** Date and time for UI using {@link GlobalDateTimeFormat}. */
+export const formatDateTimeGlobal = (
+  date: string | number | Date | null | undefined,
+): string => {
+  if (date == null || date === "") return "";
+  const m = moment(date);
+  return m.isValid() ? m.format(GlobalDateTimeFormat) : "";
+};
+
 /**
  * CRM tables and preview: full month name and comma before year (e.g. "30 March, 2026").
  */

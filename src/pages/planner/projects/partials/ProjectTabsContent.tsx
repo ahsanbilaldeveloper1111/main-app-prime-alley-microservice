@@ -15,7 +15,10 @@ import {
 } from '@planner/projectMemberRole';
 import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
 import {
+  BOARD_FILTER_STANDARD_PRIORITIES,
+  extensionOrIdToTrimmedString,
   filterBoardTasksForColumns,
+  firstExtensionOrIdString,
   sliceBoardTasksByStatusId,
   sortStringsLocale,
 } from '@planner/projectTabsContentUtils';
@@ -118,6 +121,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   const [boardSelectedAssignee, setBoardSelectedAssignee] = useState('All Assignees');
   const [boardSelectedPriority, setBoardSelectedPriority] = useState('All Priorities');
   const [boardSelectedLabel, setBoardSelectedLabel] = useState('All Labels');
+  const [boardSelectedStatus, setBoardSelectedStatus] = useState('All Statuses');
   const [showCompletedTasks, setShowCompletedTasks] = useState(false);
 
   useEffect(() => {
@@ -153,6 +157,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
         selectedAssignee: boardSelectedAssignee,
         selectedPriority: boardSelectedPriority,
         selectedLabel: boardSelectedLabel,
+        selectedStatus: boardSelectedStatus,
       },
       statuses,
     );
@@ -164,19 +169,34 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     boardTasks.forEach((task: any) => {
       if (task.assignees && task.assignees.length > 0) {
         task.assignees.forEach((assignee: any) => {
-          const name = assignee.user?.name || assignee.extension_number || '';
-          if (name) assigneeSet.add(name);
+          const ext = firstExtensionOrIdString(
+            assignee.extension_number,
+            assignee.extension,
+            assignee.id,
+          );
+          if (ext) {
+            assigneeSet.add(ext);
+          } else {
+            const nameOnly = extensionOrIdToTrimmedString(assignee.user?.name);
+            if (nameOnly) assigneeSet.add(nameOnly);
+          }
         });
       }
+    });
+    (assignees || []).forEach((row: any) => {
+      const ext = firstExtensionOrIdString(row.extension_number, row.id);
+      if (ext) assigneeSet.add(ext);
     });
     return Array.from(assigneeSet).sort(sortStringsLocale);
   };
 
   const getAllBoardPriorities = (): string[] => {
-    const prioritySet = new Set<string>();
+    const prioritySet = new Set<string>(BOARD_FILTER_STANDARD_PRIORITIES);
     boardTasks.forEach((task: any) => {
       if (task.priority) {
-        prioritySet.add(task.priority.charAt(0).toUpperCase() + task.priority.slice(1));
+        const label =
+          task.priority.charAt(0).toUpperCase() + task.priority.slice(1).toLowerCase();
+        prioritySet.add(label);
       }
     });
     return Array.from(prioritySet).sort(sortStringsLocale);
@@ -299,6 +319,8 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
             setBoardSelectedPriority={setBoardSelectedPriority}
             boardSelectedLabel={boardSelectedLabel}
             setBoardSelectedLabel={setBoardSelectedLabel}
+            boardSelectedStatus={boardSelectedStatus}
+            setBoardSelectedStatus={setBoardSelectedStatus}
             showCompletedTasks={showCompletedTasks}
             setShowCompletedTasks={setShowCompletedTasks}
             onCreateTask={(statusId) => {
@@ -441,7 +463,6 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
           color: status.color || '',
         }))}
         selectedStatusForTask={selectedStatusForTask}
-        taskType="regular"
         taskTypeChoices={['regular', 'recurring']}
         lockProjectSelection={Boolean(selectedProject)}
       />

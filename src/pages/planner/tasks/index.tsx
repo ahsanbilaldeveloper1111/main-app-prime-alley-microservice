@@ -493,7 +493,7 @@ const TasksListingPage = ({
     );
     const isProjectScopedEmbed = Boolean(sidebarProject?.id);
     const { hierarchyDataExtensions: hierarchyFromApi } = useHierarchyData(
-      ModuleSlug.USER_DIRECTORY,
+      ModuleSlug.WORK_PLANNER,
       !isProjectScopedEmbed,
     );
     const hierarchyDataExtensions = useMemo(() => {
@@ -2128,7 +2128,6 @@ const TasksListingPage = ({
           }
           task={editingTask?.rawData ?? editingTask}
           isEdit={!!editingTask}
-          taskType="regular"
           taskTypeChoices={
             omitTodoTaskType ? (["regular", "recurring"] as const) : undefined
           }

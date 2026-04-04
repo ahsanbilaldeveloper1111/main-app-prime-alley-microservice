@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   getProjectActivitiesPaged,
   getRecentActivity,
@@ -124,9 +124,13 @@ export interface AllActivitiesBrowserModalProps {
   activityModalSearch: string;
   setActivityModalSearch: (s: string) => void;
   activityModalAction: string;
-  handleActivityModalActionChange: (e: ChangeEvent<HTMLSelectElement>) => void;
+  setActivityModalAction: (action: string) => void;
+  /** Draft value bound to the "Per page" control until Apply. */
   activitiesModalPerPage: number;
-  handleActivitiesModalPerPageChange: (e: ChangeEvent<HTMLSelectElement>) => void;
+  setActivitiesModalPerPage: (n: number) => void;
+  /** Page size used for the current result set and pagination. */
+  activitiesModalPerPageApplied: number;
+  onApplyActivityFilters: () => void;
   activityModalTotalPages: number;
   activityModalTotalItems: number;
 }
@@ -149,7 +153,11 @@ export function useAllActivitiesBrowserModal(
   const [activityModalSearch, setActivityModalSearch] = useState("");
   const [activityModalSearchApplied, setActivityModalSearchApplied] = useState("");
   const [activityModalAction, setActivityModalAction] = useState("");
+  const [activityModalActionApplied, setActivityModalActionApplied] = useState("");
   const [activitiesModalPerPage, setActivitiesModalPerPage] = useState(
+    DEFAULT_ACTIVITIES_MODAL_PER_PAGE,
+  );
+  const [activitiesModalPerPageApplied, setActivitiesModalPerPageApplied] = useState(
     DEFAULT_ACTIVITIES_MODAL_PER_PAGE,
   );
 
@@ -168,7 +176,9 @@ export function useAllActivitiesBrowserModal(
     setActivityModalSearch("");
     setActivityModalSearchApplied("");
     setActivityModalAction("");
+    setActivityModalActionApplied("");
     setActivitiesModalPerPage(DEFAULT_ACTIVITIES_MODAL_PER_PAGE);
+    setActivitiesModalPerPageApplied(DEFAULT_ACTIVITIES_MODAL_PER_PAGE);
   }, []);
 
   useEffect(() => {
@@ -185,38 +195,25 @@ export function useAllActivitiesBrowserModal(
     setActivityModalSearch("");
     setActivityModalSearchApplied("");
     setActivityModalAction("");
+    setActivityModalActionApplied("");
     setActivitiesModalPerPage(DEFAULT_ACTIVITIES_MODAL_PER_PAGE);
+    setActivitiesModalPerPageApplied(DEFAULT_ACTIVITIES_MODAL_PER_PAGE);
     setActivitiesModalPage(1);
     setActivitiesPagination(null);
     setAllActivities([]);
     setShowAllActivitiesModal(true);
   }, [scope.type, resolvedTaskId, resolvedProjectId]);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const next = activityModalSearch.trim();
-      setActivityModalSearchApplied((prev) => {
-        if (next === prev) {
-          return prev;
-        }
-        if (showAllActivitiesModal) {
-          setActivitiesModalPage(1);
-        }
-        return next;
-      });
-    }, 450);
-    return () => clearTimeout(t);
-  }, [activityModalSearch, showAllActivitiesModal]);
-
-  const handleActivityModalActionChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    setActivityModalAction(e.target.value);
+  const applyActivityModalFilters = useCallback(() => {
+    setActivityModalSearchApplied(activityModalSearch.trim());
+    setActivityModalActionApplied(activityModalAction);
+    setActivitiesModalPerPageApplied(activitiesModalPerPage);
     setActivitiesModalPage(1);
-  };
+  }, [activityModalSearch, activityModalAction, activitiesModalPerPage]);
 
-  const handleActivitiesModalPerPageChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    setActivitiesModalPerPage(parseActivitiesModalPerPage(e.target.value));
-    setActivitiesModalPage(1);
-  };
+  const setActivitiesModalPerPageDraft = useCallback((n: number) => {
+    setActivitiesModalPerPage(parseActivitiesModalPerPage(String(n)));
+  }, []);
 
   useEffect(() => {
     if (!showAllActivitiesModal) {
@@ -238,9 +235,9 @@ export function useAllActivitiesBrowserModal(
           resolvedTaskId,
           resolvedProjectId,
           activitiesModalPage,
-          activitiesModalPerPage,
+          activitiesModalPerPageApplied,
           activityModalSearchApplied,
-          activityModalAction,
+          activityModalActionApplied,
         );
         if (cancelled) {
           return;
@@ -270,8 +267,8 @@ export function useAllActivitiesBrowserModal(
     resolvedProjectId,
     activitiesModalPage,
     activityModalSearchApplied,
-    activityModalAction,
-    activitiesModalPerPage,
+    activityModalActionApplied,
+    activitiesModalPerPageApplied,
   ]);
 
   useEffect(() => {
@@ -301,9 +298,11 @@ export function useAllActivitiesBrowserModal(
     activityModalSearch,
     setActivityModalSearch,
     activityModalAction,
-    handleActivityModalActionChange,
+    setActivityModalAction,
     activitiesModalPerPage,
-    handleActivitiesModalPerPageChange,
+    setActivitiesModalPerPage: setActivitiesModalPerPageDraft,
+    activitiesModalPerPageApplied,
+    onApplyActivityFilters: applyActivityModalFilters,
     activityModalTotalPages,
     activityModalTotalItems,
   };

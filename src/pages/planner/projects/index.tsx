@@ -14,6 +14,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
 } from "react";
@@ -44,11 +45,17 @@ import {
   getSessionPhoneOrExtension,
 } from "@planner/projectMemberRole";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { ModuleSlug, getAutoTimezone } from "@utils/Helper";
+import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
+import {
+  ModuleSlug,
+  getAutoTimezone,
+  formatDateGlobal,
+  formatDateTimeGlobal,
+} from "@utils/Helper";
 import { toast } from "react-toastify";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { StatsCardData } from "@components/GenericStatsCards";
-import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+import GenericFilterSidebar, { type FilterOption, FilterField } from "@components/GenericFilterSidebar";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import GenericTable, {
   TableColumn,
@@ -129,6 +136,8 @@ type ProjectStatusFilter = "active" | "completed" | "archived" | "all";
 
 type ProjectFormStatus = "active" | "archived" | "completed";
 
+const PROJECT_NAME_MAX_LENGTH = 150;
+
 interface ProjectFormState {
   name: string;
   description: string;
@@ -181,6 +190,18 @@ function formatApiDateForProjectInput(value: string | null | undefined): string 
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+/**
+ * Formats API date strings for the project detail sidebar (`formatDateGlobal` / `GlobalDateFormat`).
+ * Returns `null` when missing or invalid so callers can show "—".
+ */
+function formatProjectSidebarDate(iso: string | null | undefined): string | null {
+  if (iso == null) return null;
+  const s = String(iso).trim();
+  if (s === "") return null;
+  const formatted = formatDateGlobal(s);
+  return formatted === "" ? null : formatted;
 }
 
 /** `YYYY-MM-DD` for today's local calendar date (for `<input type="date" min>`). */
@@ -352,6 +373,17 @@ function collectWatcherExtensionNumbers(api: Record<string, unknown>): string[] 
   return out;
 }
 
+/** Distinct assignee extensions from API, or 1 when only a legacy display name exists. */
+function countAssignees(
+  extensionNumbers: string[] | undefined,
+  assigneeDisplayLabel: string | undefined,
+): number {
+  const n = extensionNumbers?.length ?? 0;
+  if (n > 0) return n;
+  if (assigneeDisplayLabel != null && assigneeDisplayLabel.trim() !== "") return 1;
+  return 0;
+}
+
 function mapApiTaskToPlannerTask(
   api: Record<string, unknown>,
   projectId: string,
@@ -470,27 +502,6 @@ const priorityConfig = {
   urgent: { label: "Urgent", color: "#7c3aed" },
 };
 
-function ParticipantNamesCell({
-  extensionNumbers,
-  resolveExtensionDisplayName,
-}: Readonly<{
-  extensionNumbers: string[] | undefined;
-  resolveExtensionDisplayName: (extensionNumber: string) => string;
-}>) {
-  if (extensionNumbers == null || extensionNumbers.length === 0) {
-    return <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>—</span>;
-  }
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-      {extensionNumbers.map((ext) => (
-        <span key={ext} style={{ fontSize: "0.8rem", color: "#64748b" }} title={ext}>
-          {resolveExtensionDisplayName(ext)}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 interface TaskRowProps {
   task: Task;
   depth?: number;
@@ -498,7 +509,6 @@ interface TaskRowProps {
   expandedTasks: Set<string>;
   onToggleTask: (taskId: string) => void;
   canPreviewEditTask: boolean;
-  resolveExtensionDisplayName: (extensionNumber: string) => string;
 }
 
 function computeOpenSubtaskCount(task: Task): number | null {
@@ -549,7 +559,6 @@ const TaskRow: React.FC<TaskRowProps> = ({
   expandedTasks,
   onToggleTask,
   canPreviewEditTask,
-  resolveExtensionDisplayName,
 }) => {
   const [hovered, setHovered] = useState(false);
   const isExpanded = expandedTasks.has(task.id);
@@ -696,20 +705,11 @@ const TaskRow: React.FC<TaskRowProps> = ({
           </div>
         </td>
 
-        {/* Members — project-only column; empty for tasks */}
-        <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
-
-        <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-          <ParticipantNamesCell
-            extensionNumbers={task.assigneeExtensionNumbers}
-            resolveExtensionDisplayName={resolveExtensionDisplayName}
-          />
-        </td>
-        <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-          <ParticipantNamesCell
-            extensionNumbers={task.watcherExtensionNumbers}
-            resolveExtensionDisplayName={resolveExtensionDisplayName}
-          />
+        {/* Members column: assignee count for tasks (matches project member badge) */}
+        <td>
+          <div className="member-avatar bg-primary">
+            {countAssignees(task.assigneeExtensionNumbers, task.assignee)}
+          </div>
         </td>
 
         {/* Open (subtask count as "open") */}
@@ -728,9 +728,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
 
         {/* Due date */}
         <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-          {task.dueDate
-            ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-            : "—"}
+          {task.dueDate ? formatDateGlobal(task.dueDate) || "—" : "—"}
         </td>
 
         <td className="generic-table-actions-cell" />
@@ -748,7 +746,6 @@ const TaskRow: React.FC<TaskRowProps> = ({
             expandedTasks={expandedTasks}
             onToggleTask={onToggleTask}
             canPreviewEditTask={canPreviewEditTask}
-            resolveExtensionDisplayName={resolveExtensionDisplayName}
           />
         ))}
       {isExpanded && subtasksLoaded && !hasChildTasks &&
@@ -758,7 +755,6 @@ const TaskRow: React.FC<TaskRowProps> = ({
             subtask={sub}
             depth={depth + 1}
             canPreviewEditTask={canPreviewEditTask}
-            resolveExtensionDisplayName={resolveExtensionDisplayName}
             onPreview={() => {
               onPreview({
                 id: sub.id,
@@ -784,7 +780,6 @@ interface SubtaskRowProps {
   depth: number;
   onPreview: () => void;
   canPreviewEditTask: boolean;
-  resolveExtensionDisplayName: (extensionNumber: string) => string;
 }
 
 /** Renders a subtask row (leaf node, no further expansion) */
@@ -793,7 +788,6 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
   depth,
   onPreview,
   canPreviewEditTask,
-  resolveExtensionDisplayName,
 }) => {
   const [hovered, setHovered] = useState(false);
   const status = statusConfig[subtask.status];
@@ -865,18 +859,10 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
         </div>
       </td>
 
-      <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
-      <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-        <ParticipantNamesCell
-          extensionNumbers={subtask.assigneeExtensionNumbers}
-          resolveExtensionDisplayName={resolveExtensionDisplayName}
-        />
-      </td>
-      <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-        <ParticipantNamesCell
-          extensionNumbers={subtask.watcherExtensionNumbers}
-          resolveExtensionDisplayName={resolveExtensionDisplayName}
-        />
+      <td>
+        <div className="member-avatar bg-primary">
+          {countAssignees(subtask.assigneeExtensionNumbers, subtask.assignee)}
+        </div>
       </td>
       <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
       <td style={{ fontSize: "0.8rem" }}>
@@ -885,9 +871,7 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
         ) : "—"}
       </td>
       <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>
-        {subtask.dueDate
-          ? new Date(subtask.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-          : "—"}
+        {subtask.dueDate ? formatDateGlobal(subtask.dueDate) || "—" : "—"}
       </td>
       <td className="generic-table-actions-cell" />
     </tr>
@@ -1014,9 +998,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
             <DetailBox label="Due Date">
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                 <Calendar size={14} style={{ color: "#6b7280" }} />
-                {task.dueDate
-                  ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  : "No due date"}
+                {task.dueDate ? formatDateGlobal(task.dueDate) || "No due date" : "No due date"}
               </div>
             </DetailBox>
           </Col>
@@ -1110,7 +1092,6 @@ interface ExpandableProjectTableProps {
   projects: Project[];
   loading: boolean;
   extensions: any[];
-  resolveExtensionDisplayName: (extensionNumber: string) => string;
   // Pass through all the existing table props
   onProjectClick: (project: Project) => void;
   onEditProject: (project: Project) => void;
@@ -1211,7 +1192,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   projects,
   loading,
   extensions,
-  resolveExtensionDisplayName,
   onProjectClick,
   onEditProject,
   onDeleteProject,
@@ -1341,7 +1321,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       return (
         <tbody>
           <tr>
-            <td colSpan={9} className="text-center py-5" style={{ color: "#94a3b8" }}>
+            <td colSpan={7} className="text-center py-5" style={{ color: "#94a3b8" }}>
               <Spinner animation="border" size="sm" className="me-2" />
               Loading projects...
             </td>
@@ -1354,7 +1334,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       return (
         <tbody>
           <tr>
-            <td colSpan={9} className="text-center py-5">
+            <td colSpan={7} className="text-center py-5">
               <FolderOpen size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
               <div style={{ color: "#64748b" }}>No projects found</div>
             </td>
@@ -1440,9 +1420,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
             <div className="member-avatar bg-primary">{project.members?.length || 0}</div>
           </td>
 
-          <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
-          <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
-
           {/* Open */}
           <td>{project.open}</td>
 
@@ -1516,7 +1493,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         if (isLoadingTasks) {
           rows.push(
             <tr key={`loading-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={9} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
+              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
                 <Spinner animation="border" size="sm" className="me-2" style={{ color: "#94a3b8" }} />
                 <span style={{ color: "#94a3b8", fontSize: "0.875rem" }}>Loading tasks...</span>
               </td>
@@ -1525,7 +1502,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         } else if (tasks.length === 0) {
           rows.push(
             <tr key={`empty-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={9} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
+              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
                 No tasks found for this project.
               </td>
             </tr>
@@ -1541,7 +1518,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                 expandedTasks={expandedTasks}
                 onToggleTask={handleToggleTask}
                 canPreviewEditTask={canPreviewEditTask}
-                resolveExtensionDisplayName={resolveExtensionDisplayName}
               />
             );
           });
@@ -1551,7 +1527,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         if (canManageProjectFromMembers(project, sessionUserPhoneOrExtension)) {
           rows.push(
             <tr key={`add-task-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={9} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
+              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
                 <button
                   style={{
                     background: "none",
@@ -1614,7 +1590,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         }
         task={fetchedEditTask ?? undefined}
         isEdit={!!fetchedEditTask}
-        taskType="regular"
       />
 
       {/* Use GenericTable only for toolbar + pagination; render our own table body */}
@@ -1684,10 +1659,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                   <th className="generic-table-th">Project Name</th>
                   <th className="generic-table-th">Members</th>
 
-                  <th className="generic-table-th">Assignees</th>
-                  <th className="generic-table-th">Watchers</th>
-
-
                   <th className="generic-table-th">Open</th>
                   <th className="generic-table-th">Overdue</th>
                   <th className="generic-table-th">Last Update</th>
@@ -1749,6 +1720,9 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
   const resolvedStatus =
     selectedProjectDetails ? getProjectStatusFromApiStatus(selectedProjectDetails.status) : selectedProject?.status;
 
+  const activityActorDisplayName = (extension: string) =>
+    extension === "system" ? "System" : getUserNameFromExtension(extension);
+
   const recentActivityContent = (() => {
     if (loadingActivities) return <Spinner animation="border" size="sm" />;
     if (projectActivities.length === 0) {
@@ -1784,7 +1758,7 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: "0.875rem", color: "#334155" }}>
-                  <span style={{ fontWeight: 600 }}>{ext === "system" ? "System" : ext}</span>{" "}
+                  <span style={{ fontWeight: 600 }}>{activityActorDisplayName(ext)}</span>{" "}
                   {activity.description || `${activity.action} task`}
                   {activity.task && (
                     <span style={{ fontWeight: 600, color: "#3b82f6" }}>
@@ -1837,7 +1811,7 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
                 </span>
               </div>
               <div style={{ fontSize: "0.875rem", color: "#475569", marginBottom: "0.25rem" }}>
-                <span style={{ fontWeight: 600 }}>{ext === "system" ? "System" : ext}</span>
+                <span style={{ fontWeight: 600 }}>{activityActorDisplayName(ext)}</span>
                 {activity.task && (
                   <>
                     {" "}
@@ -1867,6 +1841,15 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
     }
 
     if (!selectedProject) return null;
+
+    const sidebarStartDate = formatProjectSidebarDate(
+      selectedProjectDetails?.start_date ?? selectedProject.apiData?.start_date ?? undefined,
+    );
+    const sidebarEndDate = formatProjectSidebarDate(
+      selectedProjectDetails?.end_date ?? selectedProject.apiData?.end_date ?? undefined,
+    );
+    const sidebarProjectColor =
+      selectedProjectDetails?.color?.trim() || selectedProject.iconColor;
 
     return (
       <>
@@ -2003,11 +1986,7 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
                 <Calendar size={16} className="me-2 text-muted" />
                 <span>
                   {selectedProjectDetails?.updated_at
-                    ? new Date(selectedProjectDetails.updated_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
+                    ? formatDateGlobal(selectedProjectDetails.updated_at) || selectedProject.lastUpdate
                     : selectedProject.lastUpdate}
                 </span>
               </div>
@@ -2015,10 +1994,78 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
           </Col>
         </Row>
 
-        {selectedProjectDetails?.description && (
+        <Row className="g-2 mb-3">
+          <Col xs={12} sm={4}>
+            <div className="detail-section">
+              <div className="detail-label">Start date</div>
+              <div
+                className="d-flex align-items-center"
+                style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}
+              >
+                <Calendar size={16} className="me-2 text-muted flex-shrink-0" />
+                <span>{sidebarStartDate ?? "—"}</span>
+              </div>
+            </div>
+          </Col>
+          <Col xs={12} sm={4}>
+            <div className="detail-section">
+              <div className="detail-label">End date</div>
+              <div
+                className="d-flex align-items-center"
+                style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}
+              >
+                <CalendarDays size={16} className="me-2 text-muted flex-shrink-0" />
+                <span>{sidebarEndDate ?? "—"}</span>
+              </div>
+            </div>
+          </Col>
+          <Col xs={12} sm={4}>
+            <div className="detail-section">
+              <div className="detail-label">Color</div>
+              <div className="d-flex align-items-center gap-2 flex-wrap" style={{ marginTop: 4 }}>
+                <span
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    backgroundColor: sidebarProjectColor,
+                    border: "1px solid #e2e8f0",
+                    flexShrink: 0,
+                  }}
+                  title={sidebarProjectColor}
+                  aria-hidden
+                />
+                <span
+                  style={{
+                    fontSize: "0.8125rem",
+                    color: "#64748b",
+                    fontFamily: "ui-monospace, monospace",
+                  }}
+                >
+                  {sidebarProjectColor.toUpperCase()}
+                </span>
+              </div>
+            </div>
+          </Col>
+        </Row>
+
+        {selectedProjectDetails?.description?.trim() && (
           <div className="detail-section">
             <div className="detail-label">Description</div>
-            <div style={{ fontSize: "0.875rem", color: "#475569" }}>{selectedProjectDetails.description}</div>
+            <div
+              className="task-description-html"
+              style={{
+                fontSize: "0.875rem",
+                color: "#475569",
+                lineHeight: 1.6,
+                margin: 0,
+                overflowX: "auto",
+                wordBreak: "break-word",
+              }}
+              dangerouslySetInnerHTML={{
+                __html: String(selectedProjectDetails.description).trim(),
+              }}
+            />
           </div>
         )}
 
@@ -2119,6 +2166,26 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
       </Offcanvas.Header>
 
       <Offcanvas.Body>
+        <style>{`
+          .project-detail-panel .task-description-html ul,
+          .project-detail-panel .task-description-html ol {
+            padding-left: 1.25rem;
+            margin: 0.5rem 0;
+          }
+          .project-detail-panel .task-description-html p {
+            margin: 0.35rem 0;
+          }
+          .project-detail-panel .task-description-html p:first-child {
+            margin-top: 0;
+          }
+          .project-detail-panel .task-description-html p:last-child {
+            margin-bottom: 0;
+          }
+          .project-detail-panel .task-description-html a {
+            color: #4680ff;
+            text-decoration: underline;
+          }
+        `}</style>
         {bodyContent}
       </Offcanvas.Body>
     </Offcanvas>
@@ -2130,11 +2197,11 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
 // (mostly unchanged from original — search for "CHANGED" comments)
 // ============================================================
 
-type SelectOption = { value: string; label: string };
 type AppliedProjectFilters = {
   search: string;
   status: ProjectStatusFilter;
-  owner: string;
+  /** Selected owner / PM extension numbers; empty means no filter (all owners). */
+  ownerExtensionNumbers: string[];
   team: string;
   startDateFrom: string;
   endDateTo: string;
@@ -2152,7 +2219,7 @@ const WorkPlannerProjects = () => {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showFilterSidebar, setShowFilterSidebar] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -2166,14 +2233,14 @@ const WorkPlannerProjects = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<ProjectStatusFilter>("all");
-  const [filterOwner, setFilterOwner] = useState("All Owners");
+  const [filterOwnerExtensions, setFilterOwnerExtensions] = useState<string[]>([]);
   const [filterTeam, setFilterTeam] = useState("All Teams");
   const [filterStartDateFrom, setFilterStartDateFrom] = useState("");
   const [filterEndDateTo, setFilterEndDateTo] = useState("");
   const [appliedFilters, setAppliedFilters] = useState<AppliedProjectFilters>({
     search: "",
     status: "all",
-    owner: "All Owners",
+    ownerExtensionNumbers: [],
     team: "All Teams",
     startDateFrom: "",
     endDateTo: "",
@@ -2201,7 +2268,7 @@ const WorkPlannerProjects = () => {
       fetchProjects({
         search: searchTerm,
         status: filterStatus,
-        owner: filterOwner,
+        ownerExtensionNumbers: filterOwnerExtensions,
         startDateFrom: filterStartDateFrom,
         endDateTo: filterEndDateTo,
       });
@@ -2213,7 +2280,10 @@ const WorkPlannerProjects = () => {
       setLoading(true);
       const pageForRequest = typeof filters?.page === "number" ? filters.page : pagination.page;
       const statusParam = filters?.status && filters.status !== "all" ? filters.status : undefined;
-      const ownerParam = filters?.owner && filters.owner !== "All Owners" ? [filters.owner] : undefined;
+      const extensionNumbers =
+        filters?.ownerExtensionNumbers && filters.ownerExtensionNumbers.length > 0
+          ? filters.ownerExtensionNumbers.map((ext) => String(ext).trim()).filter(Boolean)
+          : undefined;
       let startFrom = filters?.startDateFrom?.trim() || undefined;
       let endTo = filters?.endDateTo?.trim() || undefined;
       if (startFrom && endTo && endTo < startFrom) {
@@ -2224,7 +2294,7 @@ const WorkPlannerProjects = () => {
         limit: pagination.limit,
         search: filters?.search || "",
         status: statusParam,
-        user_extensions: ownerParam,
+        extension_numbers: extensionNumbers,
         start_date_from: startFrom,
         end_date_to: endTo,
       });
@@ -2265,7 +2335,7 @@ const WorkPlannerProjects = () => {
     });
 
     const lastUpdate = apiProject.updated_at
-      ? new Date(apiProject.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      ? formatDateGlobal(apiProject.updated_at) || "N/A"
       : "N/A";
 
     type IconComponent = typeof Folder;
@@ -2305,7 +2375,7 @@ const WorkPlannerProjects = () => {
     setEditingProject(project);
     const api = project.apiData;
     setProjectFormData({
-      name: project.name,
+      name: project.name.slice(0, PROJECT_NAME_MAX_LENGTH),
       description: api?.description || "",
       start_date: formatApiDateForProjectInput(api?.start_date ?? undefined),
       end_date: formatApiDateForProjectInput(api?.end_date ?? undefined),
@@ -2345,12 +2415,11 @@ const WorkPlannerProjects = () => {
     e.preventDefault();
     const start = projectFormData.start_date.trim();
     const end = projectFormData.end_date.trim();
-    const today = todayYmdLocal();
     if (!start) {
       toast.error("Start date is required");
       return;
     }
-    if (!editingProject && start < today) {
+    if (editingProject == null && start < todayYmdLocal()) {
       toast.error("Start date cannot be in the past");
       return;
     }
@@ -2361,7 +2430,7 @@ const WorkPlannerProjects = () => {
     try {
       setSubmitting(true);
       const projectData: Parameters<typeof createProject>[0] = {
-        name: projectFormData.name.trim(),
+        name: projectFormData.name.trim().slice(0, PROJECT_NAME_MAX_LENGTH),
         description: projectFormData.description.trim() || undefined,
         color: projectFormData.color,
         status: projectFormData.status,
@@ -2416,11 +2485,10 @@ const WorkPlannerProjects = () => {
     if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
     if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
-    return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return formatDateGlobal(dateString);
   };
 
-  const formatDateTime = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  const formatDateTime = (dateString: string) => formatDateTimeGlobal(dateString);
 
   const getUserNameFromExtension = (extensionNumber: string): string => {
     if (!extensionNumber || !hierarchyDataExtensions || hierarchyDataExtensions.length === 0) return extensionNumber || "Unknown";
@@ -2454,14 +2522,14 @@ const WorkPlannerProjects = () => {
     setSearchTerm("");
     setActiveTab("all");
     setFilterStatus("all");
-    setFilterOwner("All Owners");
+    setFilterOwnerExtensions([]);
     setFilterTeam("All Teams");
     setFilterStartDateFrom("");
     setFilterEndDateTo("");
     const cleared: AppliedProjectFilters = {
       search: "",
       status: "all",
-      owner: "All Owners",
+      ownerExtensionNumbers: [],
       team: "All Teams",
       startDateFrom: "",
       endDateTo: "",
@@ -2475,7 +2543,7 @@ const WorkPlannerProjects = () => {
     const next: AppliedProjectFilters = {
       search: searchTerm,
       status: filterStatus,
-      owner: filterOwner,
+      ownerExtensionNumbers: filterOwnerExtensions,
       team: filterTeam,
       startDateFrom: filterStartDateFrom,
       endDateTo: filterEndDateTo,
@@ -2490,7 +2558,7 @@ const WorkPlannerProjects = () => {
     const next: AppliedProjectFilters = {
       search: searchTerm,
       status,
-      owner: filterOwner,
+      ownerExtensionNumbers: filterOwnerExtensions,
       team: filterTeam,
       startDateFrom: filterStartDateFrom,
       endDateTo: filterEndDateTo,
@@ -2506,7 +2574,7 @@ const WorkPlannerProjects = () => {
     const next: AppliedProjectFilters = {
       search: searchTerm,
       status: filterStatus,
-      owner: filterOwner,
+      ownerExtensionNumbers: filterOwnerExtensions,
       team: filterTeam,
       startDateFrom: "",
       endDateTo: "",
@@ -2559,7 +2627,7 @@ const WorkPlannerProjects = () => {
     const next: AppliedProjectFilters = {
       search: searchTerm,
       status,
-      owner: filterOwner,
+      ownerExtensionNumbers: filterOwnerExtensions,
       team: filterTeam,
       startDateFrom: filterStartDateFrom,
       endDateTo: filterEndDateTo,
@@ -2573,7 +2641,9 @@ const WorkPlannerProjects = () => {
     const projectStatusKey = String(project.apiData?.status || project.status || "").toLowerCase();
     const matchesStatus = appliedFilters.status === "all" || projectStatusKey === appliedFilters.status;
     const projectOwnerExt = project.apiData?.owner_extension_number || project.owner;
-    const matchesOwner = appliedFilters.owner === "All Owners" || String(projectOwnerExt || "") === String(appliedFilters.owner);
+    const matchesOwner =
+      appliedFilters.ownerExtensionNumbers.length === 0 ||
+      appliedFilters.ownerExtensionNumbers.some((ext) => String(projectOwnerExt || "") === String(ext));
     const projectMembers = (project.apiData?.members || project.members || []) as any[];
     const matchesTeam = appliedFilters.team === "All Teams" || projectMembers.some((m: any) => String(m?.extension_number || m?.name || "") === String(appliedFilters.team));
     return matchesSearch && matchesStatus && matchesOwner && matchesTeam;
@@ -2588,7 +2658,43 @@ const WorkPlannerProjects = () => {
       .sort((a, b) => a.label.localeCompare(b.label));
   })();
 
-  const ownerSelectOptions: SelectOption[] = [{ value: "All Owners", label: "All Owners" }, ...userOptions];
+  const clearOwnerFilterAndRefetch = () => {
+    setFilterOwnerExtensions([]);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status: filterStatus,
+      ownerExtensionNumbers: [],
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
+    setAppliedFilters(next);
+    fetchProjects({ ...next, page: 1 });
+  };
+
+  const applyOwnerExtensionsAndRefetch = (extensions: string[]) => {
+    const trimmed = extensions.map((ext) => String(ext).trim()).filter((ext) => ext.length > 0);
+    setFilterOwnerExtensions(trimmed);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status: filterStatus,
+      ownerExtensionNumbers: trimmed,
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
+    setAppliedFilters(next);
+    fetchProjects({ ...next, page: 1 });
+  };
+
+  const applyOwnerExtensionsRef = useRef(applyOwnerExtensionsAndRefetch);
+  applyOwnerExtensionsRef.current = applyOwnerExtensionsAndRefetch;
+  const clearOwnerFilterRef = useRef(clearOwnerFilterAndRefetch);
+  clearOwnerFilterRef.current = clearOwnerFilterAndRefetch;
+
+ 
 
   const statuses: Array<{ value: ProjectStatusFilter; label: string }> = [
     { value: "all", label: "All Status" },
@@ -2600,7 +2706,27 @@ const WorkPlannerProjects = () => {
   const filterFields: FilterField[] = [
     { id: "search", label: "Search", type: "text", value: searchTerm, onChange: (v: string) => setSearchTerm(v ?? ""), placeholder: "Search projects..." },
     { id: "status", label: "Status", type: "dropdown", value: filterStatus, onChange: (v) => setFilterStatus(coerceProjectStatusFilter(v)), options: statuses },
-    { id: "owner", label: "Owner / PM", type: "dropdown", value: filterOwner, onChange: (v) => setFilterOwner(v ?? "All Owners"), options: ownerSelectOptions },
+    {
+      id: "owner",
+      label: "Owner / PM",
+      type: "multi-select",
+      value: filterOwnerExtensions.map((ext) => ({
+        value: ext,
+        label: getUserNameFromExtension(ext) || ext,
+      })),
+      onChange: (selected: unknown) => {
+        if (!selected || !Array.isArray(selected)) {
+          setFilterOwnerExtensions([]);
+          return;
+        }
+        setFilterOwnerExtensions(
+          (selected as FilterOption[]).map((o) => String(o.value)).filter((v) => v.length > 0),
+        );
+      },
+      options: userOptions,
+      placeholder: "Select users (by extension)",
+      isClearable: true,
+    },
     {
       id: "start_date_from",
       label: "Start date (from)",
@@ -2649,13 +2775,16 @@ const WorkPlannerProjects = () => {
       ],
       onClear: () => applyProjectStatusFromPill("all"),
     },
-    {
-      id: "owner",
-      label: filterOwner === "All Owners" ? "Owner / PM" : filterOwner,
-      active: filterOwner !== "All Owners",
-      activeLabel: filterOwner === "All Owners" ? undefined : getUserNameFromExtension(filterOwner),
-      onClear: () => setFilterOwner("All Owners"),
-    },
+    // {
+    //   id: "owner",
+    //   label: "Owner / PM",
+    //   active: filterOwnerExtensions.length > 0,
+    //   activeLabel: ownerFilterPillActiveLabel,
+    //   showDropdown: true,
+    //   searchable: true,
+    //   dropdownOptions: ownerFilterPillOptions,
+    //   onClear: filterOwnerExtensions.length > 0 ? () => clearOwnerFilterRef.current() : undefined,
+    // },
     {
       id: "date_range",
       label: "Dates",
@@ -2826,7 +2955,6 @@ const WorkPlannerProjects = () => {
               projects={filteredProjects}
               loading={loading}
               extensions={(hierarchyDataExtensions as any[]) || []}
-              resolveExtensionDisplayName={getUserNameFromExtension}
               sessionUserPhoneOrExtension={sessionUserPhoneOrExtension}
               onProjectClick={handleProjectClick}
               onEditProject={handleEditProject}
@@ -2872,11 +3000,41 @@ const WorkPlannerProjects = () => {
             <Form onSubmit={handleSubmitProject}>
               <Form.Group className="mb-3">
                 <Form.Label>Project Name <span className="text-danger">*</span></Form.Label>
-                <Form.Control type="text" value={projectFormData.name} onChange={(e) => setProjectFormData({ ...projectFormData, name: e.target.value })} placeholder="Enter project name" required />
+                <Form.Control
+                  type="text"
+                  value={projectFormData.name}
+                  maxLength={PROJECT_NAME_MAX_LENGTH}
+                  onChange={(e) =>
+                    setProjectFormData((prev) => ({
+                      ...prev,
+                      name: e.target.value.slice(0, PROJECT_NAME_MAX_LENGTH),
+                    }))
+                  }
+                  placeholder="Enter project name"
+                  required
+                />
+                <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+                  <Form.Text className="text-muted mb-0">
+                    Maximum {PROJECT_NAME_MAX_LENGTH} characters.
+                  </Form.Text>
+                  <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
+                    {projectFormData.name.length}/{PROJECT_NAME_MAX_LENGTH}
+                  </Form.Text>
+                </div>
               </Form.Group>
               <Form.Group className="mb-3">
                 <Form.Label>Description</Form.Label>
-                <Form.Control as="textarea" rows={3} value={projectFormData.description} onChange={(e) => setProjectFormData({ ...projectFormData, description: e.target.value })} placeholder="Enter project description" />
+                <RichTextEditor
+                  buttonSize="sm"
+                  value={projectFormData.description || ""}
+                  onChange={(html) =>
+                    setProjectFormData((prev) => ({ ...prev, description: html }))
+                  }
+                  placeholder="Enter project description"
+                  minHeight="100px"
+                  maxHeight="220px"
+                  maxLength={5000}
+                />
               </Form.Group>
               <Row className="mb-3 g-2">
                 <Col md={6}>
@@ -2887,12 +3045,12 @@ const WorkPlannerProjects = () => {
                     <Form.Control
                       type="date"
                       required
-                      min={editingProject ? undefined : todayYmdLocal()}
+                      min={editingProject == null ? todayYmdLocal() : undefined}
                       value={projectFormData.start_date}
                       onChange={(e) => {
                         const newStart = e.target.value;
                         const today = todayYmdLocal();
-                        if (!editingProject && newStart && newStart < today) {
+                        if (editingProject == null && newStart && newStart < today) {
                           toast.error("Start date cannot be in the past");
                           return;
                         }
@@ -2905,6 +3063,9 @@ const WorkPlannerProjects = () => {
                         });
                       }}
                     />
+                    {editingProject == null ? (
+                      <Form.Text className="text-muted">Start date must be today or a future date.</Form.Text>
+                    ) : null}
                   </Form.Group>
                 </Col>
                 <Col md={6}>

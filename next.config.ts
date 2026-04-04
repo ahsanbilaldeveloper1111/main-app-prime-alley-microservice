@@ -1,6 +1,7 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 import path from "node:path";
+import webpack from "webpack";
 
 const nextConfig: NextConfig = {
 
@@ -41,6 +42,16 @@ const nextConfig: NextConfig = {
                 path.join(sockjsPath, 'lib/transport/driver/websocket.js');
         }
         
+        // Default react-bootstrap Modal to static backdrop (no dismiss on outside click).
+        // ESM entry is swapped for a thin wrapper; wrapper loads the stock CJS Modal to avoid a replacement loop.
+        config.plugins = config.plugins ?? [];
+        config.plugins.push(
+            new webpack.NormalModuleReplacementPlugin(
+                /node_modules[/\\]react-bootstrap[/\\]esm[/\\]Modal\.js$/,
+                path.resolve(__dirname, "src/shims/react-bootstrap-modal.tsx")
+            )
+        );
+
         // Suppress CSS loader import trace warnings
         config.ignoreWarnings = [
             {
