@@ -2,12 +2,14 @@ import {
   useCallback,
   useState,
   type Dispatch,
-  type RefObject,
   type SetStateAction,
 } from "react";
 import type { NextRouter } from "next/router";
 import type { TabConfig } from "@components/GenericTable";
-import { useCrmListPageTabCreateContactAndFilter } from "@hooks/useCrmListPageTabCreateContactAndFilter";
+import {
+  useCrmListPageTabCreateContactAndFilter,
+  type CrmListContactSidebarParams,
+} from "@hooks/useCrmListPageTabCreateContactAndFilter";
 import { getCrmDataHistory, type CrmDataItem } from "@utils/crm";
 import type { CrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
 import {
@@ -46,19 +48,7 @@ export type UseCrmListFiltersMetricsHistoryStateParams<M> = {
   defaultColumnIds: string[];
   initialMetrics: M;
   setCampaignsById: Dispatch<SetStateAction<Record<number, string>>>;
-  showAddContactsDropdown: boolean;
-  setShowAddContactsDropdown: Dispatch<SetStateAction<boolean>>;
-  addContactsRef: RefObject<HTMLDivElement | null>;
-  showCreateContactSidebar: boolean;
-  setShowCreateContactSidebar: Dispatch<SetStateAction<boolean>>;
-  editingContactId: number | null;
-  setEditingContactId: Dispatch<SetStateAction<number | null>>;
-  setContactForm: Dispatch<SetStateAction<CrmListContactFormState>>;
-  setContactFormLoadError: Dispatch<SetStateAction<string | null>>;
-  setContactFormLoading: Dispatch<SetStateAction<boolean>>;
-  sourceField: "source" | "source_file";
-  loadFailedMessage: string;
-};
+} & CrmListContactSidebarParams<CrmListContactFormState>;
 
 /**
  * Shared filter / pagination / metrics / history state for CRM list pages

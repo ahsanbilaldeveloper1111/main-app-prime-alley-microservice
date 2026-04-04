@@ -28,14 +28,18 @@ export interface CrmListViewDataModalProps {
   selectedDataItem: CrmDataItem | null;
   extensions: any[];
   availableCampaigns: Array<{ value: string; label: string; id: number }>;
-  callRecordings: any[];
-  callRecordingsLoading: boolean;
-  callRecordingsTotal: number;
-  downloadingRecordings: Set<string>;
-  downloadProgress: Record<string, number>;
-  onPlayCallRecording: (recording: any) => void;
-  onDownloadCallRecording: (recording: any) => void;
+  callRecordings?: any[];
+  callRecordingsLoading?: boolean;
+  callRecordingsTotal?: number;
+  downloadingRecordings?: Set<string>;
+  downloadProgress?: Record<string, number>;
+  onPlayCallRecording?: (recording: any) => void;
+  onDownloadCallRecording?: (recording: any) => void;
 }
+
+const EMPTY_SET = new Set<string>();
+const EMPTY_PROGRESS: Record<string, number> = {};
+const noop = () => {};
 
 export function CrmListViewDataModal({
   show,
@@ -43,13 +47,13 @@ export function CrmListViewDataModal({
   selectedDataItem,
   extensions,
   availableCampaigns,
-  callRecordings,
-  callRecordingsLoading,
-  callRecordingsTotal,
-  downloadingRecordings,
-  downloadProgress,
-  onPlayCallRecording,
-  onDownloadCallRecording,
+  callRecordings = [],
+  callRecordingsLoading = false,
+  callRecordingsTotal = 0,
+  downloadingRecordings = EMPTY_SET,
+  downloadProgress = EMPTY_PROGRESS,
+  onPlayCallRecording = noop,
+  onDownloadCallRecording = noop,
 }: CrmListViewDataModalProps) {
   if (!selectedDataItem) return null;
 

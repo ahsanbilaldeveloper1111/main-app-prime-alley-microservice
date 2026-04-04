@@ -26,23 +26,23 @@ export function useCrmListAssignmentContactSidebarState() {
     unassigned: 0,
   });
   const [availableTags, setAvailableTags] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
+    Array<{ value: string; label: string; id: number }>
   >([]);
   const [availableCampaigns, setAvailableCampaigns] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
+    Array<{ value: string; label: string; id: number }>
   >([]);
   const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
     {},
   );
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
+
+  const assignmentEntries = {
+    assignmentFilters, setAssignmentFilters, assignmentCampaign, setAssignmentCampaign,
+    assignmentDistribution, setAssignmentDistribution, totalEntriesToAssign, setTotalEntriesToAssign,
+    customDistribution, setCustomDistribution, assignmentCounts, setAssignmentCounts,
+    availableTags, setAvailableTags, availableCampaigns, setAvailableCampaigns,
+    campaignsById, setCampaignsById, selectedItems, setSelectedItems,
+  };
 
   const [afterCallData, setAfterCallData] = useState({
     disposition: "",
@@ -52,7 +52,6 @@ export function useCrmListAssignmentContactSidebarState() {
     nextCallTime: "",
     generateLead: "no",
   });
-
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedEntryForSchedule, setSelectedEntryForSchedule] =
     useState<any>(null);
@@ -62,11 +61,17 @@ export function useCrmListAssignmentContactSidebarState() {
     time: "",
     notes: "",
   });
-
   const [showUnscheduleModal, setShowUnscheduleModal] = useState(false);
   const [entryToUnschedule, setEntryToUnschedule] = useState<any>(null);
-
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+
+  const callScheduleEntries = {
+    afterCallData, setAfterCallData, showScheduleModal, setShowScheduleModal,
+    selectedEntryForSchedule, setSelectedEntryForSchedule,
+    isEditingSchedule, setIsEditingSchedule, scheduleData, setScheduleData,
+    showUnscheduleModal, setShowUnscheduleModal,
+    entryToUnschedule, setEntryToUnschedule, showHistoryModal, setShowHistoryModal,
+  };
 
   const [showProspectSidebar, setShowProspectSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
@@ -89,66 +94,18 @@ export function useCrmListAssignmentContactSidebarState() {
   >(null);
   const [contactFormLoading, setContactFormLoading] = useState(false);
 
-  return {
-    assignmentFilters,
-    setAssignmentFilters,
-    assignmentCampaign,
-    setAssignmentCampaign,
-    assignmentDistribution,
-    setAssignmentDistribution,
-    totalEntriesToAssign,
-    setTotalEntriesToAssign,
-    customDistribution,
-    setCustomDistribution,
-    assignmentCounts,
-    setAssignmentCounts,
-    availableTags,
-    setAvailableTags,
-    availableCampaigns,
-    setAvailableCampaigns,
-    campaignsById,
-    setCampaignsById,
-    selectedItems,
-    setSelectedItems,
-    afterCallData,
-    setAfterCallData,
-    showScheduleModal,
-    setShowScheduleModal,
-    selectedEntryForSchedule,
-    setSelectedEntryForSchedule,
-    isEditingSchedule,
-    setIsEditingSchedule,
-    scheduleData,
-    setScheduleData,
-    showUnscheduleModal,
-    setShowUnscheduleModal,
-    entryToUnschedule,
-    setEntryToUnschedule,
-    showHistoryModal,
-    setShowHistoryModal,
-    showProspectSidebar,
-    setShowProspectSidebar,
-    showFiltersSidebar,
-    setShowFiltersSidebar,
-    selectedProspect,
-    setSelectedProspect,
-    sidebarProspectFetchTokenRef,
-    showFilterBar,
-    setShowFilterBar,
-    showAddContactsDropdown,
-    setShowAddContactsDropdown,
-    showCreateContactSidebar,
-    setShowCreateContactSidebar,
-    addContactsRef,
-    contactForm,
-    setContactForm,
-    createContactLoading,
-    setCreateContactLoading,
-    editingContactId,
-    setEditingContactId,
-    contactFormLoadError,
-    setContactFormLoadError,
-    contactFormLoading,
-    setContactFormLoading,
+  const sidebarContactEntries = {
+    showProspectSidebar, setShowProspectSidebar,
+    showFiltersSidebar, setShowFiltersSidebar,
+    selectedProspect, setSelectedProspect, sidebarProspectFetchTokenRef,
+    showFilterBar, setShowFilterBar,
+    showAddContactsDropdown, setShowAddContactsDropdown,
+    showCreateContactSidebar, setShowCreateContactSidebar, addContactsRef,
+    contactForm, setContactForm, createContactLoading, setCreateContactLoading,
+    editingContactId, setEditingContactId,
+    contactFormLoadError, setContactFormLoadError,
+    contactFormLoading, setContactFormLoading,
   };
+
+  return { ...assignmentEntries, ...callScheduleEntries, ...sidebarContactEntries };
 }

@@ -1,16 +1,9 @@
+import { useMemo, useState } from "react";
 import {
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type RefObject,
-  type SetStateAction,
-} from "react";
-import type { NextRouter } from "next/router";
-import type { CrmActivitiesPanelRef } from "@components/CrmActivitiesPanel";
-import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
-import type { CrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
-import { useCrmListFiltersMetricsHistoryState } from "@crm/shared/useCrmListFiltersMetricsHistoryState";
+  useCrmListFiltersMetricsHistoryState,
+  type UseCrmListFiltersMetricsHistoryStateParams,
+} from "@crm/shared/useCrmListFiltersMetricsHistoryState";
+import { useCrmListSidebarActivityModals } from "@crm/shared/useCrmListSidebarActivityModals";
 import {
   crmQuotesListDefaultTableColumnIds,
   crmQuotesListValidTabFilterIds,
@@ -31,22 +24,16 @@ const QUOTES_INITIAL_METRICS: Record<string, number> = {
   scheduled_records: 0,
 };
 
-export type UseCrmQuotesListFiltersMetricsHistorySidebarStateParams = {
-  router: NextRouter;
-  currentFilters: Record<string, any>;
-  selectedProspect: any;
-  setCampaignsById: Dispatch<SetStateAction<Record<number, string>>>;
-  showAddContactsDropdown: boolean;
-  setShowAddContactsDropdown: Dispatch<SetStateAction<boolean>>;
-  addContactsRef: RefObject<HTMLDivElement | null>;
-  showCreateContactSidebar: boolean;
-  setShowCreateContactSidebar: Dispatch<SetStateAction<boolean>>;
-  editingContactId: number | null;
-  setEditingContactId: Dispatch<SetStateAction<number | null>>;
-  setContactForm: Dispatch<SetStateAction<CrmListContactFormState>>;
-  setContactFormLoadError: Dispatch<SetStateAction<string | null>>;
-  setContactFormLoading: Dispatch<SetStateAction<boolean>>;
-};
+type SharedFilterParams = Omit<
+  UseCrmListFiltersMetricsHistoryStateParams<any>,
+  "validFilters" | "defaultColumnIds" | "initialMetrics" | "sourceField" | "loadFailedMessage"
+>;
+
+export type UseCrmQuotesListFiltersMetricsHistorySidebarStateParams =
+  SharedFilterParams & {
+    currentFilters: Record<string, any>;
+    selectedProspect: any;
+  };
 
 /**
  * Quotes-specific layer on top of the shared filter/metrics/history hook.
@@ -74,24 +61,18 @@ export function useCrmQuotesListFiltersMetricsHistorySidebarState(
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
 
-  const sidebarActivitiesPanelRef = useRef<CrmActivitiesPanelRef>(null);
-  const sidebarRecordId = selectCrmQuotesSidebarRecordId(selectedProspect);
-  const sidebarRecordName = selectCrmQuotesSidebarRecordName(selectedProspect);
-  const sidebarRecordPhone = selectCrmQuotesSidebarRecordPhone(selectedProspect);
-  const sidebarRecordEmail =
-    selectCrmQuotesSidebarRecordEmail(selectedProspect);
-
-  const sidebarActivityModals = useCrmActivityModals({
-    recordType: "prospect",
+  const {
+    activitiesPanelRef: sidebarActivitiesPanelRef,
     recordId: sidebarRecordId,
     recordName: sidebarRecordName,
-    recordEmail: sidebarRecordEmail,
     recordPhone: sidebarRecordPhone,
-    onTaskCreated: () => sidebarActivitiesPanelRef.current?.refetchTasks?.(),
-    onNoteCreated: () => sidebarActivitiesPanelRef.current?.refetchNotes?.(),
-    onEmailSent: () => sidebarActivitiesPanelRef.current?.refetchEmails?.(),
-    onMeetingScheduled: () =>
-      sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
+    recordEmail: sidebarRecordEmail,
+    activityModals: sidebarActivityModals,
+  } = useCrmListSidebarActivityModals(selectedProspect, "prospect", {
+    selectId: selectCrmQuotesSidebarRecordId,
+    selectName: selectCrmQuotesSidebarRecordName,
+    selectPhone: selectCrmQuotesSidebarRecordPhone,
+    selectEmail: selectCrmQuotesSidebarRecordEmail,
   });
 
   return {

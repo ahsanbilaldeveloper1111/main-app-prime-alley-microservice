@@ -9,7 +9,7 @@ import {
   unscheduleCall,
   type CrmDataItem,
 } from "@utils/crm";
-import { DownloadCallRecording } from "@utils/calls";
+import { downloadCallRecordingWithProgress } from "./crmListDownloadRecordingUtils";
 
 export type CrmListSharedCallbacksDeps = {
   session: any;
@@ -360,52 +360,10 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
 
   const handleDownloadCallRecording = useCallback(async (recording: any) => {
     if (!setDownloadingRecordings || !setDownloadProgress) return;
-    const { Id, AgentExtension } = recording;
-    setDownloadingRecordings((prev) => new Set(prev).add(Id));
-    setDownloadProgress((prev) => ({ ...prev, [Id]: 0 }));
-
-    try {
-      const progressInterval = setInterval(() => {
-        setDownloadProgress((prev) => {
-          const currentProgress = prev[Id] || 0;
-          if (currentProgress < 90) {
-            return { ...prev, [Id]: currentProgress + Math.random() * 15 };
-          }
-          return prev;
-        });
-      }, 200);
-
-      await DownloadCallRecording(Id, AgentExtension, "call-logs/recordings/download", recording.imagicle);
-
-      clearInterval(progressInterval);
-      setDownloadProgress((prev) => ({ ...prev, [Id]: 100 }));
-
-      setTimeout(() => {
-        setDownloadingRecordings((prev) => {
-          const newSet = new Set(prev);
-          newSet.delete(Id);
-          return newSet;
-        });
-        setDownloadProgress((prev) => {
-          const newProgress = { ...prev };
-          delete newProgress[Id];
-          return newProgress;
-        });
-      }, 1000);
-    } catch (error) {
-      console.error("Download error:", error);
-      toast.error("Download failed");
-      setDownloadingRecordings((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(Id);
-        return newSet;
-      });
-      setDownloadProgress((prev) => {
-        const newProgress = { ...prev };
-        delete newProgress[Id];
-        return newProgress;
-      });
-    }
+    await downloadCallRecordingWithProgress(recording, {
+      setDownloadingRecordings,
+      setDownloadProgress,
+    });
   }, [setDownloadingRecordings, setDownloadProgress]);
 
   const handleItemSelection = useCallback((selected: CrmDataItem[]) => {

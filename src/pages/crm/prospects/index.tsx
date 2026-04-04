@@ -2,7 +2,6 @@ import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
-  useEffect,
   useCallback,
   useMemo,
   useRef,
@@ -48,14 +47,7 @@ import {
   ChevronDown,
   X,
   AlertCircle as AlertCircleIcon,
-  ArrowUp,
-  ArrowDown,
   Download,
-  ArrowUpDown,
-  ChevronsLeft,
-  ChevronsRight,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   Trash2,
   MoreVertical,
@@ -78,18 +70,12 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
 import {
-  getCrmData,
   updateCrmData,
-  uploadCrmDataCsv,
-  deleteCrmData,
   getCrmDataCounts,
-  getCrmDataTags,
-  getCampaigns,
   CrmDataItem,
   CrmDataMetrics,
   downloadExampleCsv,
 } from "@utils/crm";
-import { GetHierarchyData } from "@utils/users";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -101,7 +87,6 @@ let customFieldIdCounter = 0;
 
 const createCustomFieldId = () => `custom-field-${Date.now()}-${customFieldIdCounter++}`;
 import {
-  ModuleSlug,
   RECORD_TYPES,
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
@@ -123,13 +108,17 @@ import {
 } from "@utils/crmContactFormFromCrmItem";
 import {
   CRM_LIST_PAGE_CALL_END_REASONS,
-  CRM_LIST_PAGE_STATIC_TAGS,
 } from "@utils/crmListPageStaticData";
 import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
 import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
 import { useCrmListFiltersMetricsHistoryState } from "@crm/shared/useCrmListFiltersMetricsHistoryState";
 import { useCrmListContactFormHandlers } from "@crm/shared/useCrmListContactFormHandlers";
 import { useCrmListSharedCallbacks } from "@crm/shared/useCrmListSharedCallbacks";
+import { useCrmListSideEffects } from "@crm/shared/useCrmListSideEffects";
+import { useCrmListSortPagination } from "@crm/shared/useCrmListSortPagination";
+import { useCrmListFilterActions } from "@crm/shared/useCrmListFilterActions";
+import { useCrmListDataOperations } from "@crm/shared/useCrmListDataOperations";
+import { useCrmListNavigationHandlers } from "@crm/shared/useCrmListNavigationHandlers";
 import { CrmListCreateContactSidebar } from "@crm/shared/CrmListCreateContactSidebar";
 import { CrmListDataAssignmentFormContent } from "@crm/shared/CrmListDataAssignmentFormContent";
 import { CrmListAfterCallFormContent } from "@crm/shared/CrmListAfterCallFormContent";
@@ -138,6 +127,7 @@ import {
   CrmListUnscheduleModal,
 } from "@crm/shared/CrmListScheduleCallModals";
 import { CrmListHistoryFormContent } from "@crm/shared/CrmListHistoryFormContent";
+import { CrmListViewDataModal } from "@crm/shared/CrmListViewDataModal";
 import {
   applyCrmListExportDateRangePreset,
   crmListExportDateRangePresetValue,
@@ -495,188 +485,97 @@ const CrmProspectsManagement = () => {
     [],
   );
 
-  const fetchCrmDataForExport = useCallback(
-    async (filters: Record<string, any>) => {
-      const PER_PAGE = 100;
-      const allData: CrmDataItem[] = [];
-      let page = 1;
-      for (;;) {
-        const response = await getCrmData(
-          buildExportParams(filters, { page, per_page: PER_PAGE }),
-        );
-        const chunk = response?.data || [];
-        allData.push(...chunk);
-        if (chunk.length < PER_PAGE) break;
-        page += 1;
-      }
-      return allData;
-    },
-    [buildExportParams],
-  );
-
-  const handleProspectsExport = useCallback(async () => {
-    const name =
-      exportFileName.trim() || `prospects_${moment().format("YYYY-MM-DD")}`;
-    const ext = name.endsWith(".csv") ? "" : ".csv";
-    setExporting(true);
-    try {
-      const allData = await fetchCrmDataForExport(exportFilters);
-      if (allData.length === 0) {
-        toast.info("No prospects match the selected filters.");
-        return;
-      }
-
-      const { headers, nestedDataKeysSet } = buildProspectsExportHeaders(allData);
-      const csvContent = buildProspectsCsvContent(
-        headers,
-        allData,
-        nestedDataKeysSet,
-      );
-
-      const blob = new Blob([csvContent], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name + ext;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      setShowExportModal(false);
-      toast.success(`Exported ${allData.length} prospects successfully!`);
-    } catch (err) {
-      toast.error("Failed to export prospects");
-    } finally {
-      setExporting(false);
-    }
-  }, [exportFileName, exportFilters, fetchCrmDataForExport]);
-
   const uniqueSources = useMemo(
     () => buildProspectsSourceFileSelectOptions(dataList),
     [dataList],
   );
 
-  // Initialize export filters when export modal opens (default to current table filters)
-  useEffect(() => {
-    if (showExportModal) {
-      setExportFilters({ ...currentFilters });
-      setExportFileName(`prospects_${moment().format("YYYY-MM-DD")}`);
-    }
-  }, [showExportModal, currentFilters]);
+  const { getNameByExtension } = useCrmListSideEffects({
+    refreshKey,
+    showHistoryModal,
+    fetchHistoryData,
+    activeFilter,
+    clearSelectedRows,
+    showExportModal,
+    currentFilters,
+    entityName: "prospects",
+    extensions,
+    setExtensions,
+    setAvailableTags,
+    setAvailableCampaigns,
+    setCampaignsById,
+    setSelectedItems,
+    setCurrentFilters,
+    setExportFilters,
+    setExportFileName,
+  });
 
-  // Fetch extensions data
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        const hierarchyData = await GetHierarchyData(
-          ModuleSlug.CRM_DATA_MANAGEMENT,
-        );
-        if (hierarchyData?.extensions) {
-          setExtensions(hierarchyData.extensions);
-        }
-      } catch (error) {
-        console.error("Failed to fetch extensions:", error);
-      }
-    };
-    fetchExtensions();
-  }, []);
+  const { handleFiltersChange, applyTableFiltersPatch, hasAdvancedFiltersApplied } = useCrmListFilterActions({
+    currentFilters,
+    setCurrentFilters,
+    setRefreshKey,
+    setPagination,
+    computeAdvancedFiltersApplied: computeProspectsAdvancedFiltersApplied,
+  });
 
-  function getNameByExtension(extension: string) {
-    const extensionData = extensions.find((ext) => ext.id === extension);
-    return extensionData?.display_name || extensionData?.name || extension;
-  }
+  const {
+    fetchCrmData,
+    handleExport: handleProspectsExport,
+    handleFileSelect,
+    handleFileInputChange,
+    handleUpload,
+    confirmDelete,
+  } = useCrmListDataOperations({
+    entityName: "prospects",
+    requestIdRef,
+    memoizedFilters,
+    buildCrmDataParams,
+    buildExportParams,
+    buildExportHeaders: buildProspectsExportHeaders,
+    buildCsvContent: buildProspectsCsvContent,
+    validateUploadCsvFile: validateProspectsUploadCsvFile,
+    setLoading,
+    setDataList,
+    setTotalRecords,
+    setTotalAll: setTotalAllProspects,
+    setMetrics,
+    setExporting,
+    setShowExportModal,
+    setSelectedFile,
+    setFieldTags,
+    setShowUploadModal,
+    setRefreshKey,
+    setShowDeleteModal,
+    setDeleteModalMode,
+    setItemToDelete,
+    setSelectedItems,
+    setSuccessModalTitle,
+    setSuccessModalDescription,
+    setShowSuccessfulModal,
+    exportFileName,
+    exportFilters,
+    selectedFile,
+    fieldTags,
+    itemToDelete,
+    session,
+    refreshKey,
+  });
 
-  // Load history data when modal is opened
-  useEffect(() => {
-    if (showHistoryModal) {
-      fetchHistoryData();
-    }
-  }, [showHistoryModal, fetchHistoryData]);
-
-  // Load available tags
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const tags = await getCrmDataTags();
-        const tagOptions = tags
-        .filter((tag: any) => tag.id != null)
-        .map((tag: any) => ({
-          value: tag.name,
-          label: tag.name,
-          id: tag.id,
-        }));
-        setAvailableTags(tagOptions);
-      } catch (error) {
-        console.error("Failed to load tags:", error);
-        // Fallback to static tags
-        setAvailableTags(
-          CRM_LIST_PAGE_STATIC_TAGS.map((tag) => ({
-            value: tag.value,
-            label: tag.label,
-            id: parseInt(tag.value.replace("tag-", "")) || 0,
-          })),
-        );
-      }
-    };
-    loadTags();
-  }, [refreshKey]);
-
-  // Load available campaigns
-  useEffect(() => {
-    const loadCampaigns = async () => {
-      try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
-        const campaignOptions = campaignsResponse.data.map((campaign: any) => ({
-          value: campaign.id.toString(),
-          label: campaign.name,
-          id: campaign.id,
-        }));
-        setAvailableCampaigns(campaignOptions);
-
-        const campaignsMap: Record<number, string> = {};
-        campaignsResponse.data.forEach((campaign: any) => {
-          campaignsMap[campaign.id] = campaign.name;
-        });
-        setCampaignsById((prev) => ({ ...prev, ...campaignsMap }));
-      } catch (error) {
-        console.error("Failed to load campaigns:", error);
-        // Fallback to empty array
-        setAvailableCampaigns([]);
-      }
-    };
-    loadCampaigns();
-  }, [refreshKey]);
-
-  // Handle filter changes
-  const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters(filters);
-    setRefreshKey((prev) => prev + 1);
-  }, []);
-
-  const applyTableFiltersPatch = useCallback(
-    (patch: Record<string, any>) => {
-      const next: Record<string, any> = { ...currentFilters, ...patch };
-
-      Object.keys(next).forEach((k) => {
-        const v = next[k];
-        if (
-          v === undefined ||
-          v === null ||
-          v === "" ||
-          (Array.isArray(v) && v.length === 0)
-        ) {
-          delete next[k];
-        }
-      });
-
-      handleFiltersChange(next);
-      setPagination((prev) => ({ ...prev, currentPage: 1 }));
-    },
-    [currentFilters, handleFiltersChange, setPagination],
-  );
-
-  const hasAdvancedFiltersApplied = useMemo(
-    () => computeProspectsAdvancedFiltersApplied(currentFilters),
-    [currentFilters],
-  );
+  const {
+    handleCloseSidebar: handleCloseProspectSidebar,
+    handleOpenFiltersSidebar,
+    handleCloseFiltersSidebar,
+    handlePreviewClick,
+    handleFirstColumnClick,
+  } = useCrmListNavigationHandlers({
+    sidebarFetchTokenRef: sidebarProspectFetchTokenRef,
+    setShowSidebar: setShowProspectSidebar,
+    setSelectedRecord: setSelectedProspect,
+    setShowFiltersSidebar,
+    openSidebar: openProspectSidebar,
+    router,
+    buildDetailUrl: (prospect: any) => `/crm/detailspage?type=prospect&id=${prospect?.id ?? ""}`,
+  });
 
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
@@ -970,359 +869,13 @@ const CrmProspectsManagement = () => {
     uniqueSources,
   ]);
 
-  // Handle activeFilter changes to update currentFilters
-  useEffect(() => {
-    if (activeFilter === "all") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.has_scheduled_calls;
-        delete newFilters.has_tickets;
-        return newFilters;
-      });
-    } else if (activeFilter === "scheduled") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.has_tickets;
-        newFilters.has_scheduled_calls = true;
-        return newFilters;
-      });
-    } else if (activeFilter === "has_leads") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.has_scheduled_calls;
-        newFilters.has_tickets = true;
-        return newFilters;
-      });
-    }
-    // Don't reset pagination here - it's already reset in onFilterChange
-  }, [activeFilter]);
-
-  // Helper functions for sorting and pagination
-  const handleSort = (column: string) => {
-    const newDirection =
-      pagination.sortColumn === column && pagination.sortDirection === "asc"
-        ? "desc"
-        : "asc";
-    setPagination({
-      ...pagination,
-      sortColumn: column,
-      sortDirection: newDirection,
-      currentPage: 1,
+  const { handleSort, renderSortIcon, renderPaginationControls } =
+    useCrmListSortPagination({
+      pagination,
+      setPagination,
+      totalRecords,
+      entityName: "prospects",
     });
-  };
-
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
-  ): T[] => {
-    if (!sortColumn) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderSortIcon = (column: string) => {
-    if (pagination.sortColumn !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return pagination.sortDirection === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
-  };
-
-  const renderPaginationControls = () => {
-    const totalPages = getTotalPages(totalRecords, pagination.rowsPerPage);
-    const { currentPage, rowsPerPage } = pagination;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, totalRecords);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPagination({
-                ...pagination,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={15}>15</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalRecords} prospects
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() => setPagination({ ...pagination, currentPage: 1 })}
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage - 1 })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPagination({ ...pagination, currentPage: pageNum })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: currentPage + 1 })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPagination({ ...pagination, currentPage: totalPages })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  // Fetch prospects data
-  const fetchCrmData = useCallback(async () => {
-    // Increment request ID to track the latest request
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-
-    setLoading(true);
-    try {
-      const response = await getCrmData(buildCrmDataParams());
-
-      // Only update state if this is still the latest request
-      if (currentRequestId !== requestIdRef.current) {
-        return;
-      }
-
-      setDataList(response.data || []);
-      setTotalRecords(response.pagination.total || 0);
-
-      // Keep total all prospects only when fetching without tab filter (all prospects)
-      const isAllProspects =
-        memoizedFilters.has_scheduled_calls !== true &&
-        memoizedFilters.has_tickets !== true;
-      if (isAllProspects) {
-        setTotalAllProspects(response.pagination.total || 0);
-      }
-
-      setMetrics(
-        response.metrics || {},
-      );
-    } catch (error: any) {
-      // Only handle error if this is still the latest request
-      if (currentRequestId !== requestIdRef.current) {
-        return;
-      }
-      console.error("Failed to fetch CRM data:", error);
-      setDataList([]);
-      setTotalRecords(0);
-    } finally {
-      // Only set loading to false if this is still the current request
-      if (currentRequestId === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [buildCrmDataParams]);
-
-  // Load data when filters or pagination changes
-  useEffect(() => {
-    fetchCrmData();
-  }, [fetchCrmData, refreshKey]);
-
-  // Clear selection after bulk delete or when clearSelectedRows changes
-  useEffect(() => {
-    if (clearSelectedRows) {
-      setSelectedItems([]);
-    }
-  }, [clearSelectedRows]);
-
-  const handleFileSelect = (file: File) => {
-    const validation = validateProspectsUploadCsvFile(file);
-
-    if (validation.isValid) {
-      setSelectedFile(file);
-    } else {
-      validation.errors.forEach((error) => toast.error(error));
-    }
-  };
-
-  // Handle file input change
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFileSelect(e.target.files[0]);
-    }
-  };
-
-  // Upload CSV file
-  const handleUpload = async () => {
-    if (!session?.user?.permissions?.includes("add-crm-data-management")) {
-      toast.error("You don't have permission to upload data");
-      return;
-    }
-
-    if (!selectedFile) {
-      toast.error("Please select a file to upload");
-      return;
-    }
-
-    try {
-      // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
-
-      }, 200);
-
-      // Extract tag values from selected options
-      const tagValues = Array.from(fieldTags).map((tag) => tag.value);
-
-      const response: any = await uploadCrmDataCsv(
-        selectedFile,
-        [], // No campaigns selected
-        tagValues,
-        true, // No auto-assignment
-      );
-
-      clearInterval(progressInterval);
-
-      // Parse response
-      const responseData = response?.data || {};
-      const processedCount = responseData.processed_count || 0;
-      const validationFailures = responseData.validation_failures || 0;
-
-      // Show success message
-      if (processedCount > 0) {
-        let successMessage = `Successfully processed ${processedCount} record${
-          processedCount !== 1 ? "s" : ""
-        }`;
-
-        if (validationFailures > 0) {
-          successMessage += ` with ${validationFailures} validation failure${
-            validationFailures !== 1 ? "s" : ""
-          }`;
-        }
-
-        setSuccessModalTitle("Upload Successful");
-        setSuccessModalDescription(successMessage);
-        setShowSuccessfulModal(true);
-      } else if (validationFailures > 0) {
-        // All records failed validation
-        toast.error(
-          `Upload failed: All ${validationFailures} record${
-            validationFailures !== 1 ? "s" : ""
-          } failed validation`,
-        );
-      } else {
-        toast.error("Upload completed but no prospects were processed");
-      }
-
-      setSelectedFile(null);
-      setFieldTags([]);
-      setShowUploadModal(false);
-
-      // Refresh data
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      const errorMessage =
-        error?.response?.data?.message ||
-        error?.message ||
-        "Failed to upload file. Please try again.";
-      toast.error(errorMessage);
-    }
-  };
 
   const handleNoteCreate = (
     note: string,
@@ -1336,63 +889,6 @@ const CrmProspectsManagement = () => {
       taskDueDate,
     });
   };
-
-  // Confirm single delete
-  const confirmDelete = useCallback(async () => {
-    if (!itemToDelete) return;
-
-    try {
-      await deleteCrmData(itemToDelete.id);
-      setShowDeleteModal(false);
-      setDeleteModalMode(null);
-      setItemToDelete(null);
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      console.error("Delete error:", error);
-    }
-  }, [itemToDelete]);
-
-  // Calculate filtered entry counts using API
-
-  // Handle data assignment directly (no second dialog)
-  // Handle call button click
-  // Handle data assignment modal close
-
-  // Schedule/Unschedule call handlers
-  // Schedule modal handlers
-  // Handle bulk delete
-  // Handle close prospect sidebar
-  const handleCloseProspectSidebar = useCallback(() => {
-    sidebarProspectFetchTokenRef.current += 1;
-    setShowProspectSidebar(false);
-    setSelectedProspect(null);
-  }, []);
-
-
-  // Handle open filters sidebar
-  const handleOpenFiltersSidebar = useCallback(() => {
-    setShowFiltersSidebar(true);
-  }, []);
-
-  // Handle close filters sidebar
-  const handleCloseFiltersSidebar = useCallback(() => {
-    setShowFiltersSidebar(false);
-  }, []);
-
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback((prospect: any) => {
-    openProspectSidebar(prospect);
-  }, [openProspectSidebar]);
-
-  // Handle first column click - navigates to detail page with prospect ID in URL
-  const handleFirstColumnClick = useCallback(
-    (prospect: any) => {
-      router.push(
-        `/crm/detailspage?type=prospect&id=${prospect?.id ?? ""}`,
-      );
-    },
-    [router],
-  );
 
   // Stats cards data for metrics
   const prospectsStatsCards: StatsCardData[] = useMemo(
@@ -2368,888 +1864,13 @@ const CrmProspectsManagement = () => {
             </Modal>
           )}
 
-          {/* View Data Modal - Redesigned */}
-          {selectedDataItem && (
-            <Modal
-              show={showViewModal}
-              onHide={() => setShowViewModal(false)}
-              size="xl"
-              centered
-              className="prospect-view-modal"
-            >
-              {/* Modern Header with Gradient */}
-              <div
-                style={{
-                  background: "#fff",
-                  color: "black",
-                  padding: "24px 32px",
-                  position: "relative",
-                  borderTopLeftRadius: "12px",
-                  borderTopRightRadius: "12px",
-                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                  borderBottom: "1px solid #ccc",
-                }}
-              >
-                <button
-                  onClick={() => setShowViewModal(false)}
-                  style={{
-                    position: "absolute",
-                    top: "16px",
-                    right: "16px",
-                    background: "rgba(255,255,255,0.15)",
-                    backdropFilter: "blur(10px)",
-                    border: "1px solid rgba(255,255,255,0.2)",
-                    color: "black",
-                    width: "32px",
-                    height: "32px",
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-                    e.currentTarget.style.transform = "scale(1.05)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }}
-                >
-                  <X size={18} />
-                </button>
-
-                {/* Header Content */}
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "16px" }}
-                >
-                  <div
-                    style={{
-                      width: "64px",
-                      height: "64px",
-                      borderRadius: "16px",
-                      background: "#2563eb",
-                      backdropFilter: "blur(10px)",
-                      border: "2px solid rgba(255,255,255,0.3)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "28px",
-                      fontWeight: "700",
-                      flexShrink: 0,
-                      color: "#fff",
-                    }}
-                  >
-                    {selectedDataItem.name
-                      ? selectedDataItem.name.charAt(0).toUpperCase()
-                      : "P"}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h2
-                      style={{
-                        margin: 0,
-                        fontWeight: 700,
-                        fontSize: "26px",
-                        textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {selectedDataItem.name ||
-                        `Prospect #${selectedDataItem.id}`}
-                    </h2>
-                    <div
-                      style={{
-                        marginTop: "6px",
-                        opacity: 0.95,
-                        fontSize: "14px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        flexWrap: "wrap",
-                        color: "#000",
-                      }}
-                    >
-                      <span
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "6px",
-                        }}
-                      >
-                        <PhoneIcon size={14} />
-                        {selectedDataItem.phone || "No phone"}
-                      </span>
-                      <span>•</span>
-                      <span>
-                        Added{" "}
-                        {selectedDataItem.created_at
-                          ? formatCrmPreviewDate(selectedDataItem.created_at) ||
-                            "N/A"
-                          : "N/A"}
-                      </span>
-                      {selectedDataItem.is_viewed && (
-                        <>
-                          <span>•</span>
-                          <Badge
-                            bg="light"
-                            text="dark"
-                            style={{
-                              background: "rgba(255,255,255,0.25)",
-                              border: "1px solid rgba(255,255,255,0.3)",
-                              color: "white",
-                              fontWeight: 500,
-                            }}
-                          >
-                            Viewed
-                          </Badge>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Modal.Body
-                style={{
-                  padding: 0,
-                  maxHeight: "calc(90vh - 200px)",
-                  overflowY: "auto",
-                }}
-              >
-                {/* Main Content Grid */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 360px",
-                    minHeight: "500px",
-                  }}
-                >
-                  {/* Left Panel - Main Information */}
-                  <div
-                    style={{
-                      padding: "32px",
-                      borderRight: "1px solid #e5e7eb",
-                    }}
-                  >
-                    {/* Quick Info Cards */}
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "repeat(2, 1fr)",
-                        gap: "16px",
-                        marginBottom: "28px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          padding: "20px",
-                          borderRadius: "12px",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = "translateY(-4px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 16px rgba(102, 126, 234, 0.15)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "44px",
-                              height: "44px",
-                              borderRadius: "10px",
-                              background: "#2563eb",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <User size={20} style={{ color: "white" }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: "#2563eb",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.8px",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              Assigned Agent
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {selectedDataItem.user_extension
-                                ? extensions.find(
-                                    (extension: any) =>
-                                      extension.id.toString() ===
-                                      selectedDataItem.user_extension?.toString(),
-                                  )?.display_name ||
-                                  selectedDataItem.user_extension
-                                : "Unassigned"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #f093fb30",
-                          padding: "20px",
-                          borderRadius: "12px",
-                          transition: "all 0.3s ease",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = "translateY(-4px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 8px 16px rgba(240, 147, 251, 0.15)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "none";
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "44px",
-                              height: "44px",
-                              borderRadius: "10px",
-                              background: "#0284c7",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Target size={20} style={{ color: "white" }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 700,
-                                color: "#f5576c",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.8px",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              Campaign
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "15px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {availableCampaigns.find(
-                                (c) =>
-                                  c.value ===
-                                  selectedDataItem.campaign_id?.toString(),
-                              )?.label || "No Campaign"}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Contact Information Section */}
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "4px",
-                            height: "18px",
-                            background:
-                              "linear-gradient(135deg, #f093fb15 0%, #f5576c15 100%)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                        Contact Details
-                      </h5>
-                      <div
-                        style={{
-                          background: "#f9fafb",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "12px",
-                          padding: "20px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "140px 1fr",
-                            gap: "16px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 600,
-                            }}
-                          >
-                            <PhoneIcon size={16} style={{ color: "#2563eb" }} />
-                            Phone
-                          </div>
-                          <div
-                            style={{
-                              color: "#1f2937",
-                              fontSize: "15px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {selectedDataItem.phone || "N/A"}
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                              color: "#6b7280",
-                              fontSize: "14px",
-                              fontWeight: 600,
-                            }}
-                          >
-                            <Calendar size={16} style={{ color: "#2563eb" }} />
-                            Created
-                          </div>
-                          <div
-                            style={{
-                              color: "#1f2937",
-                              fontSize: "15px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            {selectedDataItem.created_at
-                              ? formatCrmPreviewDateTime(
-                                  selectedDataItem.created_at,
-                                ) || "N/A"
-                              : "N/A"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Call Note Section */}
-                    {selectedDataItem?.note && (
-                      <div style={{ marginBottom: "28px" }}>
-                        <h5
-                          style={{
-                            fontSize: "15px",
-                            fontWeight: 700,
-                            color: "#1f2937",
-                            marginBottom: "16px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "4px",
-                              height: "18px",
-                              background:
-                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                              borderRadius: "2px",
-                            }}
-                          />
-                          Call Notes
-                        </h5>
-                        <div
-                          style={{
-                            background: "#fffbeb",
-                            border: "1px solid #fcd34d",
-                            borderRadius: "12px",
-                            padding: "16px 20px",
-                            fontSize: "14px",
-                            color: "#78350f",
-                            lineHeight: "1.6",
-                          }}
-                        >
-                          {selectedDataItem.note}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Custom Data Fields Section */}
-                    {selectedDataItem.data &&
-                      Object.keys(selectedDataItem.data).length > 0 && (
-                        <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
-                            Additional Information
-                          </h5>
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "12px",
-                              padding: "20px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: "16px 24px",
-                              }}
-                            >
-                              {Object.entries(selectedDataItem.data).map(
-                                ([key, value]) => (
-                                  <div key={key}>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      {key
-                                        .replace(/_/g, " ")
-                                        .replace(/\b\w/g, (l) =>
-                                          l.toUpperCase(),
-                                        )}
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {value !== null && value !== undefined
-                                        ? typeof value === "object"
-                                          ? JSON.stringify(value)
-                                          : String(value)
-                                        : "N/A"}
-                                    </div>
-                                  </div>
-                                ),
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Call Recordings Section */}
-                    <div style={{ marginBottom: "20px" }}>
-                      <h5
-                        style={{
-                          fontSize: "15px",
-                          fontWeight: 700,
-                          color: "#1f2937",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "4px",
-                            height: "18px",
-                            background:
-                              "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                            borderRadius: "2px",
-                          }}
-                        />
-                        Call Recordings
-                      </h5>
-                    </div>
-                  </div>
-
-                  {/* Right Panel - Quick Actions & Timeline */}
-                  <div
-                    style={{
-                      padding: "32px 24px",
-                      background: "#fafbfc",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "24px",
-                    }}
-                  >
-                    {/* Quick Actions */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Quick Actions
-                      </h6>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "10px",
-                        }}
-                      >
-                        <button
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "10px",
-                            padding: "12px 16px",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "#1f2937",
-                          }}
-                          onClick={() => {
-                            // Handle call action
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.borderColor = "#2563eb";
-                            e.currentTarget.style.background = "#eff6ff";
-                            e.currentTarget.style.transform = "translateX(4px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.background = "white";
-                            e.currentTarget.style.transform = "translateX(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "8px",
-                              background: "#2563eb",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <PhoneIcon size={16} style={{ color: "white" }} />
-                          </div>
-                          Call Prospect
-                        </button>
-
-                        <button
-                          style={{
-                            background: "white",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: "10px",
-                            padding: "12px 16px",
-                            cursor: "pointer",
-                            transition: "all 0.2s ease",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            fontSize: "14px",
-                            fontWeight: 500,
-                            color: "#1f2937",
-                          }}
-                          onClick={() => {
-                            // Handle message action
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.borderColor = "#2563eb";
-                            e.currentTarget.style.background = "#eff6ff";
-                            e.currentTarget.style.transform = "translateX(4px)";
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.borderColor = "#e5e7eb";
-                            e.currentTarget.style.background = "white";
-                            e.currentTarget.style.transform = "translateX(0)";
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "8px",
-                              background:
-                                "linear-gradient(135deg, #2563eb 0%, #764ba2 100%)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              flexShrink: 0,
-                            }}
-                          >
-                            <Mail size={16} style={{ color: "white" }} />
-                          </div>
-                          Send Message
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Status Overview */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Status Overview
-                      </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "14px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Status
-                            </span>
-                            <Badge
-                              bg={
-                                selectedDataItem.is_viewed
-                                  ? "success"
-                                  : "primary"
-                              }
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                padding: "4px 10px",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              {selectedDataItem.is_viewed ? "Viewed" : "New"}
-                            </Badge>
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Total Calls
-                            </span>
-                          </div>
-
-                          {selectedDataItem.scheduled_call_at && (
-                            <div
-                              style={{
-                                marginTop: "8px",
-                                paddingTop: "14px",
-                                borderTop: "1px solid #f3f4f6",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                  marginBottom: "6px",
-                                }}
-                              >
-                                <Calendar
-                                  size={14}
-                                  style={{ color: "#2563eb" }}
-                                />
-                                <span
-                                  style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  Scheduled Call
-                                </span>
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                  marginLeft: "22px",
-                                }}
-                              >
-                                {formatCrmPreviewDateTime(
-                                  selectedDataItem.scheduled_call_at,
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Activity Timeline */}
-                    <div style={{ flex: 1 }}>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Recent Activity
-                      </h6>
-                    </div>
-                  </div>
-                </div>
-              </Modal.Body>
-
-              {/* Footer */}
-              <div
-                style={{
-                  padding: "20px 32px",
-                  borderTop: "1px solid #e5e7eb",
-                  background: "white",
-                  borderBottomLeftRadius: "12px",
-                  borderBottomRightRadius: "12px",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <div style={{ fontSize: "13px", color: "#6b7280" }}>
-                  Prospect ID: <strong>#{selectedDataItem.id}</strong>
-                </div>
-                <Button
-                  variant="outline-secondary"
-                  onClick={() => setShowViewModal(false)}
-                  style={{
-                    padding: "10px 24px",
-                    borderRadius: "8px",
-                    fontWeight: 600,
-                    fontSize: "14px",
-                    border: "2px solid #e5e7eb",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = "#2563eb";
-                    e.currentTarget.style.color = "#2563eb";
-                    e.currentTarget.style.background = "#eff6ff";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.color = "#6c757d";
-                    e.currentTarget.style.background = "white";
-                  }}
-                >
-                  Close
-                </Button>
-              </div>
-            </Modal>
-          )}
+          <CrmListViewDataModal
+            show={showViewModal}
+            onHide={() => setShowViewModal(false)}
+            selectedDataItem={selectedDataItem}
+            extensions={extensions}
+            availableCampaigns={availableCampaigns}
+          />
 
 
           {/* Delete Confirmation Modal (single + bulk) */}

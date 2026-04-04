@@ -44,7 +44,6 @@ import { StatsCardData } from "@components/GenericStatsCards";
 import {
   updateCrmData,
   uploadCrmDataCsv,
-  markCrmDataAsViewed,
   CrmDataItem,
 } from "@utils/crm";
 import "@assets/scss/common.scss";
@@ -100,6 +99,19 @@ import {
   CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS,
 } from "@crm/shared/crmListExportModalDateRangePresets";
 import { pruneEmptyCrmListFilterEntries } from "@crm/billing-quotes/crmQuotesListPagePruneFilters";
+import { useCrmListFilterActions } from "@crm/shared/useCrmListFilterActions";
+import { useCrmListNavigationHandlers } from "@crm/shared/useCrmListNavigationHandlers";
+import { useCrmListCallAndViewActions } from "@crm/shared/useCrmListCallAndViewActions";
+import { handleCrmListUploadResponse } from "@crm/shared/crmListUploadResponseUtils";
+import {
+  CRM_LIST_DELETE_BUTTON_STYLE,
+  CRM_LIST_PRIMARY_BUTTON_STYLE,
+  CRM_LIST_DROPDOWN_STYLE,
+  CRM_LIST_DROPDOWN_ITEM_STYLE,
+  DELETE_BUTTON_HOVER,
+  PRIMARY_BUTTON_HOVER,
+  DROPDOWN_ITEM_HOVER,
+} from "@crm/shared/crmListActionButtonStyles";
 import { useCrmQuotesListActiveFilterSync } from "@crm/billing-quotes/useCrmQuotesListActiveFilterSync";
 import { useCrmQuotesListFetchDummyCrmData } from "@crm/billing-quotes/useCrmQuotesListFetchDummyCrmData";
 import { useCrmQuotesListSidebarQuickActions } from "@crm/billing-quotes/useCrmQuotesListSidebarQuickActions";
@@ -412,26 +424,15 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     [extensions],
   );
 
-  // Handle filter changes
-  const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters(filters);
-    setRefreshKey((prev) => prev + 1);
-  }, []);
-
-  const applyTableFiltersPatch = useCallback(
-    (patch: Record<string, any>) => {
-      const next: Record<string, any> = { ...currentFilters, ...patch };
-      pruneEmptyCrmListFilterEntries(next);
-      handleFiltersChange(next);
-      setPagination((prev) => ({ ...prev, currentPage: 1 }));
-    },
-    [currentFilters, handleFiltersChange, setPagination],
-  );
-
-  const hasAdvancedFiltersApplied = useMemo(
-    () => computeCrmListAdvancedFiltersApplied(currentFilters),
-    [currentFilters],
-  );
+  const { handleFiltersChange, applyTableFiltersPatch, hasAdvancedFiltersApplied } =
+    useCrmListFilterActions({
+      currentFilters,
+      setCurrentFilters,
+      setRefreshKey,
+      setPagination,
+      computeAdvancedFiltersApplied: computeCrmListAdvancedFiltersApplied,
+      pruneFilters: pruneEmptyCrmListFilterEntries,
+    });
 
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
@@ -515,13 +516,11 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     }
   };
 
-  // Upload CSV file
   const handleUpload = async () => {
     if (!session?.user?.permissions?.includes("add-crm-data-management")) {
       toast.error("You don't have permission to upload data");
       return;
     }
-
     if (!selectedFile) {
       toast.error("Please select a file to upload");
       return;
@@ -530,77 +529,33 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     setUploading(true);
     setUploadProgress(0);
 
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return prev;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
     try {
-      // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return prev;
-          }
-          return prev + 10;
-        });
-      }, 200);
-
-      // Extract tag values from selected options
       const tagValues = Array.from(fieldTags).map((tag) => tag.value);
-
-      const response: any = await uploadCrmDataCsv(
-        selectedFile,
-        [], // No campaigns selected
-        tagValues,
-        true, // No auto-assignment
-      );
+      const response: any = await uploadCrmDataCsv(selectedFile, [], tagValues, true);
 
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      // Parse response
-      const responseData = response?.data || {};
-      const processedCount = responseData.processed_count || 0;
-      const validationFailures = responseData.validation_failures || 0;
-      // const errors = responseData.errors || [];
-      const message = responseData.message || "Upload completed";
-
-      // Show error messages for validation failures
-      // if (errors.length > 0) {
-      //   errors.forEach((error: string) => {
-      //     toast.warn(error);
-      //   });
-      // }
-
-      // Show success message
-      if (processedCount > 0) {
-        let successMessage = `Successfully processed ${processedCount} record${
-          processedCount !== 1 ? "s" : ""
-        }`;
-
-        if (validationFailures > 0) {
-          successMessage += ` with ${validationFailures} validation failure${
-            validationFailures !== 1 ? "s" : ""
-          }`;
-        }
-
-        setSuccessModalTitle("Upload Successful");
-        setSuccessModalDescription(successMessage);
-        setShowSuccessfulModal(true);
-      } else if (validationFailures > 0) {
-        // All records failed validation
-        toast.error(
-          `Upload failed: All ${validationFailures} record${
-            validationFailures !== 1 ? "s" : ""
-          } failed validation`,
-        );
-      } else {
-        toast.error("Upload completed but no prospects were processed");
-      }
+      handleCrmListUploadResponse(response, "prospects", {
+        setSuccessModalTitle,
+        setSuccessModalDescription,
+        setShowSuccessfulModal,
+      });
 
       setSelectedFile(null);
       setFieldTags([]);
       setShowUploadModal(false);
       setUploadProgress(0);
-
-      // Refresh data
       setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Upload error:", error);
@@ -616,50 +571,8 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
   };
 
 
-  // Handle play call recording
-
-  // Handle delete data item
-  // Handle mark as viewed
-  const handleMarkAsViewed = useCallback(async (item: CrmDataItem) => {
-    try {
-      await markCrmDataAsViewed(item.id);
-      setRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      console.error("Mark as viewed error:", error);
-    }
-  }, []);
-
-  // Handle call actions
-  const handleCallAction = useCallback((action: string, item: CrmDataItem) => {
-    const phone = item.phone;
-    if (!phone) {
-      toast.error("No phone number available for this entry");
-      return;
-    }
-
-    switch (action) {
-      case "whatsapp":
-        window.open(`https://wa.me/${phone.replace(/[^0-9]/g, "")}`, "_blank");
-        break;
-      case "phone":
-        window.open(`tel:${phone}`, "_self");
-        break;
-      case "sms":
-        window.open(`sms:${phone}`, "_self");
-        break;
-      case "facebook":
-        toast.info("Facebook calling feature coming soon");
-        break;
-      case "telegram":
-        toast.info("Telegram calling feature coming soon");
-        break;
-      case "skype":
-        toast.info("Skype calling feature coming soon");
-        break;
-      default:
-        toast.error("Unknown action");
-    }
-  }, []);
+  const { handleMarkAsViewed, handleCallAction } =
+    useCrmListCallAndViewActions(setRefreshKey);
 
   const handleNoteCreate = (
     note: string,
@@ -681,27 +594,23 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
     console.log("Playing recording:", recordingUrl);
   }, []);
 
-  // Handle data assignment modal close
-  // After Call modal handlers
+  const {
+    handleCloseSidebar: handleCloseProspectSidebar,
+    handleOpenFiltersSidebar,
+    handleCloseFiltersSidebar,
+    handlePreviewClick,
+    handleFirstColumnClick,
+  } = useCrmListNavigationHandlers({
+    sidebarFetchTokenRef: sidebarProspectFetchTokenRef,
+    setShowSidebar: setShowProspectSidebar,
+    setSelectedRecord: setSelectedProspect,
+    setShowFiltersSidebar,
+    openSidebar: openProspectSidebar,
+    router,
+    buildDetailUrl: (prospect: any) =>
+      `/crm/detailspage?type=prospect&id=${prospect?.id ?? ""}`,
+  });
 
-  // Schedule/Unschedule call handlers
-
-  // Schedule modal handlers
-  // Handle bulk delete
-  // Handle item selection
-  // Handle prospect row click
-  const handleProspectClick = useCallback((prospect: any) => {
-    openProspectSidebar(prospect);
-  }, [openProspectSidebar]);
-
-  // Handle close prospect sidebar
-  const handleCloseProspectSidebar = useCallback(() => {
-    sidebarProspectFetchTokenRef.current += 1;
-    setShowProspectSidebar(false);
-    setSelectedProspect(null);
-  }, []);
-
-  // Handle owner change from prospect sidebar (Update owner dropdown)
   const handleProspectOwnerSelect = useCallback(
     async (ownerValue: string) => {
       const prospect = selectedProspect;
@@ -735,31 +644,6 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
       }
     },
     [selectedProspect, fetchCrmData],
-  );
-
-  // Handle open filters sidebar
-  const handleOpenFiltersSidebar = useCallback(() => {
-    setShowFiltersSidebar(true);
-  }, []);
-
-  // Handle close filters sidebar
-  const handleCloseFiltersSidebar = useCallback(() => {
-    setShowFiltersSidebar(false);
-  }, []);
-
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback((prospect: any) => {
-    openProspectSidebar(prospect);
-  }, [openProspectSidebar]);
-
-  // Handle first column click - navigates to detail page with prospect ID in URL
-  const handleFirstColumnClick = useCallback(
-    (prospect: any) => {
-      router.push(
-        `/crm/detailspage?type=prospect&id=${prospect?.id ?? ""}`,
-      );
-    },
-    [router],
   );
 
   const prospectsStatsCards: StatsCardData[] = useMemo(
@@ -804,25 +688,8 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
               setDeleteModalMode("bulk");
               setShowDeleteModal(true);
             }}
-            style={{
-              padding: "9px 13px",
-              backgroundColor: "#dc3545",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "4px",
-              fontSize: "12px",
-              fontWeight: "500",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#c82333";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "#dc3545";
-            }}
+            style={CRM_LIST_DELETE_BUTTON_STYLE}
+            {...DELETE_BUTTON_HOVER}
           >
             <Trash2 size={16} />
             Delete ({selectedItems.length})
@@ -831,71 +698,24 @@ function CrmQuotesListPageContent({ variant }: CrmQuotesListPageProps) {
       <div style={{ width: "146px" }}>
         <button
           onClick={() => {
-            //setShowAddContactsDropdown(!showAddContactsDropdown);
-            // setShowCreateQuoteSidebar(true);
             router.push('/billing/create-invoice');
           }}
-          style={{
-            padding: "9px 13px",
-            backgroundColor: "#000000",
-            color: "#ffffff",
-            border: "none",
-            borderRadius: "4px",
-            fontSize: "12px",
-            fontWeight: "500",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
+          style={CRM_LIST_PRIMARY_BUTTON_STYLE}
+          {...PRIMARY_BUTTON_HOVER}
         >
           Create quote
           <ChevronDown size={16} />
         </button>
 
       {showAddContactsDropdown && (
-        <div
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            marginTop: "4px",
-            backgroundColor: "#ffffff",
-            border: "1px solid #e2e8f0",
-            borderRadius: "5px",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-            minWidth: "160px",
-            zIndex: 1000,
-            overflow: "hidden",
-          }}
-        >
+        <div style={CRM_LIST_DROPDOWN_STYLE}>
           <button
             onClick={() => {
               setShowAddContactsDropdown(false);
               router.push("/crm/quotes/create");
             }}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              backgroundColor: "transparent",
-              border: "none",
-              textAlign: "left",
-              fontSize: "14px",
-              color: "#141414",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#f7fafc";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-            }}
+            style={CRM_LIST_DROPDOWN_ITEM_STYLE}
+            {...DROPDOWN_ITEM_HOVER}
           >
             Create new
           </button>

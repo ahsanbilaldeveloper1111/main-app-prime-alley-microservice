@@ -16,6 +16,11 @@ export interface CrmListAfterCallFormContentProps {
   setAfterCallData: React.Dispatch<React.SetStateAction<AfterCallData>>;
 }
 
+const GENERATE_LEAD_OPTIONS = [
+  { id: "generate-lead-yes", value: "yes", label: "Yes, generate lead" },
+  { id: "generate-lead-no", value: "no", label: "No, do not generate lead" },
+] as const;
+
 export function CrmListAfterCallFormContent({
   afterCallData,
   setAfterCallData,
@@ -77,24 +82,18 @@ export function CrmListAfterCallFormContent({
       <Form.Group className="mb-3">
         <Form.Label>Generate Lead *</Form.Label>
         <div className="d-flex gap-4">
-          <Form.Check
-            type="radio"
-            id="generate-lead-yes"
-            name="generateLead"
-            value="yes"
-            checked={afterCallData.generateLead === "yes"}
-            onChange={(e) => update({ generateLead: e.target.value })}
-            label="Yes, generate lead"
-          />
-          <Form.Check
-            type="radio"
-            id="generate-lead-no"
-            name="generateLead"
-            value="no"
-            checked={afterCallData.generateLead === "no"}
-            onChange={(e) => update({ generateLead: e.target.value })}
-            label="No, do not generate lead"
-          />
+          {GENERATE_LEAD_OPTIONS.map((opt) => (
+            <Form.Check
+              key={opt.value}
+              type="radio"
+              id={opt.id}
+              name="generateLead"
+              value={opt.value}
+              checked={afterCallData.generateLead === opt.value}
+              onChange={(e) => update({ generateLead: e.target.value })}
+              label={opt.label}
+            />
+          ))}
         </div>
         <Form.Text className="text-muted">
           Select &quot;Yes&quot; if this call resulted in a qualified lead that

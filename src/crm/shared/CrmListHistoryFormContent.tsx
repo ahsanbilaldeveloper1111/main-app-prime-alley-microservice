@@ -9,6 +9,7 @@ import {
   FiCalendar,
 } from "react-icons/fi";
 import moment from "moment";
+import { formatCrmPreviewDate } from "@utils/Helper";
 
 export interface CrmListHistoryFormContentProps {
   historyData: any[];
@@ -333,7 +334,7 @@ function HistoryTimelineItem({
                 </div>
                 <div className="text-end">
                   <small className="text-muted">
-                    {moment(activity.created_at).format("MMM DD, YYYY")}
+                    {formatCrmPreviewDate(activity.created_at)}
                   </small>
                   <br />
                   <small className="text-muted">

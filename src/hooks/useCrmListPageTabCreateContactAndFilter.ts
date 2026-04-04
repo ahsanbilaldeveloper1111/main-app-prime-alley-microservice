@@ -16,15 +16,7 @@ import {
   resolveTabFilterFromUrlQuery,
 } from "@hooks/crmListPageTabCreateContactAndFilterHelpers";
 
-export type UseCrmListPageTabCreateContactAndFilterParams<
-  TForm,
-  TPagination extends { currentPage: number },
-> = {
-  router: NextRouter;
-  validFilters: readonly string[];
-  setActiveFilter: (value: string) => void;
-  setPagination: Dispatch<SetStateAction<TPagination>>;
-  setLoading: (value: boolean) => void;
+export type CrmListContactSidebarParams<TForm> = {
   showAddContactsDropdown: boolean;
   setShowAddContactsDropdown: (value: boolean) => void;
   addContactsRef: RefObject<HTMLDivElement | null>;
@@ -38,6 +30,17 @@ export type UseCrmListPageTabCreateContactAndFilterParams<
   sourceField: "source" | "source_file";
   loadFailedMessage: string;
 };
+
+export type UseCrmListPageTabCreateContactAndFilterParams<
+  TForm,
+  TPagination extends { currentPage: number },
+> = {
+  router: NextRouter;
+  validFilters: readonly string[];
+  setActiveFilter: (value: string) => void;
+  setPagination: Dispatch<SetStateAction<TPagination>>;
+  setLoading: (value: boolean) => void;
+} & CrmListContactSidebarParams<TForm>;
 
 /**
  * Tab sync from URL, deep-link to create/edit contact sidebar, dropdown click-outside,
