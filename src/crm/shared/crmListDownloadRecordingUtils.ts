@@ -2,6 +2,17 @@ import type { Dispatch, SetStateAction } from "react";
 import { toast } from "react-toastify";
 import { DownloadCallRecording } from "@utils/calls";
 
+/** Uniform value in [0, max) for UI progress jitter; uses Web Crypto, not Math.random (S2245). */
+function randomUiScalar(max: number): number {
+  const c = globalThis.crypto;
+  if (c?.getRandomValues) {
+    const u32 = new Uint32Array(1);
+    c.getRandomValues(u32);
+    return (u32[0] / 2 ** 32) * max;
+  }
+  return max / 2;
+}
+
 export interface DownloadRecordingDeps {
   setDownloadingRecordings: Dispatch<SetStateAction<Set<string>>>;
   setDownloadProgress: Dispatch<SetStateAction<Record<string, number>>>;
@@ -35,7 +46,7 @@ export async function downloadCallRecordingWithProgress(
       setDownloadProgress((prev) => {
         const current = prev[Id] || 0;
         if (current < 90) {
-          return { ...prev, [Id]: current + Math.random() * 15 };
+          return { ...prev, [Id]: current + randomUiScalar(15) };
         }
         return prev;
       });

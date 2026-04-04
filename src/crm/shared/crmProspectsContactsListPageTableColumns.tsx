@@ -2,7 +2,11 @@ import React from "react";
 import moment from "moment";
 import type { TableColumn } from "@components/GenericTable";
 import { CRM_LIST_PAGE_CALL_END_REASONS } from "@utils/crmListPageStaticData";
-import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import {
+  getInitials,
+  getRandomColor,
+  stableStringHash,
+} from "@utils/crmNameAvatar";
 import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspectsContactsListPageConfig";
 
 export function buildCrmProspectsContactsTableColumns(
@@ -128,9 +132,9 @@ export function buildCrmProspectsContactsTableColumns(
           (d) => d.value === row.disposition,
         );
         if (disposition) return disposition.label;
-        const randomDisposition =
-          dispositions[Math.floor(Math.random() * dispositions.length)];
-        return randomDisposition.label;
+        const idx =
+          stableStringHash(String(row.disposition)) % dispositions.length;
+        return dispositions[idx].label;
       },
       badge: {
         getVariant: (row) => {
@@ -156,9 +160,9 @@ export function buildCrmProspectsContactsTableColumns(
             "info",
             "primary",
           ];
-          return randomColors[
-            Math.floor(Math.random() * randomColors.length)
-          ] as any;
+          const colorIdx =
+            stableStringHash(String(row.disposition)) % randomColors.length;
+          return randomColors[colorIdx] as any;
         },
       },
       emptyValue: "-",
