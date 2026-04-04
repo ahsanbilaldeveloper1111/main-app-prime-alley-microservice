@@ -707,7 +707,7 @@ const ApprovalRequest = () => {
 
   const requestedByDropdownContent = useMemo(
     () => (
-      <div style={{ minWidth: "260px", maxHeight: "320px", overflow: "hidden" }}>
+      <div style={{ minWidth: "260px" }}>
         <input
           type="text"
           placeholder="Search user..."
@@ -722,7 +722,7 @@ const ApprovalRequest = () => {
             fontSize: "13px",
           }}
         />
-        <div style={{ maxHeight: "200px", overflowY: "auto", marginBottom: "8px" }}>
+        <div style={{ marginBottom: "8px" }}>
           <label
             style={{
               display: "flex",
@@ -820,7 +820,7 @@ const ApprovalRequest = () => {
   const typeDropdownContent = useMemo(
     () => (
       <div style={{ minWidth: "220px" }}>
-        <div style={{ maxHeight: "240px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           <button
             type="button"
             onClick={() => {
