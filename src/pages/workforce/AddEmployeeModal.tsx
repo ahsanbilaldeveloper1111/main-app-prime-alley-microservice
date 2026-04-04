@@ -224,7 +224,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     setDepartmentUsers([]);
   }, []);
 
-  /** Reset + close — only for Cancel and successful Create (not X / backdrop / Esc). */
+  /** Reset + close for Cancel, header close, and submit success; backdrop/Esc are disabled on Modal. */
   const handleCancelClick = useCallback(() => {
     resetFormState();
     onHide();
@@ -311,7 +311,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   };
 
   return (
-    <Modal size="lg" show={show} onHide={onHide} centered>
+    <Modal size="lg" show={show} onHide={handleCancelClick} centered>
       <Modal.Header closeButton>
         <Modal.Title>{title}</Modal.Title>
       </Modal.Header>

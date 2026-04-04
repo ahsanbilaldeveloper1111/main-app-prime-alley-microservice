@@ -13,7 +13,10 @@ import {
   getEmployeeDashboardLeaveCalendar,
   type EmployeeDashboardParams,
 } from "@utils/staffManagement";
-import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import {
+  useMainAppLookups,
+  type MainAppDepartmentLookup,
+} from "@hooks/useMainAppLookups";
 import DashboardStats from "./partials/DashboardStats";
 import AddEmployeeModal from "@pages/workforce/AddEmployeeModal";
 import NewRequestModal from "@pages/workforce/NewRequestModal";
@@ -52,8 +55,42 @@ export interface LeaveCalendarDay {
 /** Upload modal panel: explicit px cap so layout/containment cannot clamp to ~600px. */
 const DOCUMENT_UPLOAD_MODAL_MAX_WIDTH_PX = 960;
 
+type DepartmentHeadcountRow = { department_id: number; count: number };
+
+function parseDepartmentHeadcountApiRows(raw: unknown): DepartmentHeadcountRow[] {
+  if (!Array.isArray(raw)) return [];
+  const out: DepartmentHeadcountRow[] = [];
+  for (const item of raw) {
+    if (item == null || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const idRaw = o.department_id;
+    const id = typeof idRaw === "number" ? idRaw : Number(idRaw);
+    if (!Number.isFinite(id)) continue;
+    const c = o.count;
+    const count =
+      typeof c === "number" && Number.isFinite(c) ? c : Number(c);
+    out.push({
+      department_id: id,
+      count: Number.isFinite(count) ? count : 0,
+    });
+  }
+  return out;
+}
+
+function departmentNameFromLookup(
+  departmentId: number,
+  departments: MainAppDepartmentLookup[],
+): string {
+  const match = departments.find((d) => d.id === departmentId);
+  const n = match?.name;
+  if (n != null && String(n).trim() !== "") {
+    return String(n).trim();
+  }
+  return `Department #${departmentId}`;
+}
+
 const EmployeesDashboard = () => {
-    const { mainAppUsers, companyIdentifier } = useMainAppLookups();
+    const { mainAppUsers, mainAppDepartments, companyIdentifier } = useMainAppLookups();
     const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
     const [showNewRequestModal, setShowNewRequestModal] = useState(false);
 
@@ -81,7 +118,9 @@ const EmployeesDashboard = () => {
     }, []);
     const [leaveCalendarData, setLeaveCalendarData] = useState<LeaveCalendarDay[]>([]);
     const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-    const [departmentHeadcountData, setDepartmentHeadcountData] = useState<{ name: string; count: number }[]>([]);
+    const [departmentHeadcountRows, setDepartmentHeadcountRows] = useState<
+      DepartmentHeadcountRow[]
+    >([]);
     const [approvalsAgingData, setApprovalsAgingData] = useState<{ "0_3_days"?: number; "4_7_days"?: number; "8_plus_days"?: number }>({});
 
     const dashboardParams: EmployeeDashboardParams = (() => {
@@ -111,13 +150,8 @@ const EmployeesDashboard = () => {
               getEmployeeDashboardLeaveCalendar(),
             ]);
           setLeaveCalendarData(Array.isArray(leaveCalendar) ? (leaveCalendar as LeaveCalendarDay[]) : []);
-          setDepartmentHeadcountData(
-            Array.isArray(departmentHeadcount)
-              ? (departmentHeadcount as { name?: string; count?: number }[]).map((d) => ({
-                  name: String(d?.name ?? "—"),
-                  count: Number(d?.count ?? 0),
-                }))
-              : []
+          setDepartmentHeadcountRows(
+            parseDepartmentHeadcountApiRows(departmentHeadcount),
           );
           setApprovalsAgingData(
             approvalsAging && typeof approvalsAging === "object"
@@ -172,11 +206,22 @@ const EmployeesDashboard = () => {
 
     const DEPARTMENT_CHART_COLORS = ['#6366F1', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899', '#06B6D4', '#84CC16', '#F97316'];
 
+    const departmentHeadcountData = React.useMemo(
+      () =>
+        departmentHeadcountRows.map((row) => ({
+          departmentId: row.department_id,
+          name: departmentNameFromLookup(row.department_id, mainAppDepartments),
+          count: row.count,
+        })),
+      [departmentHeadcountRows, mainAppDepartments],
+    );
+
     const departmentData = React.useMemo(() => {
       const list = departmentHeadcountData;
       if (!list.length) return [];
       const total = list.reduce((sum, d) => sum + d.count, 0);
       return list.map((d, idx) => ({
+        id: d.departmentId,
         name: d.name,
         value: d.count,
         color: DEPARTMENT_CHART_COLORS[idx % DEPARTMENT_CHART_COLORS.length],
@@ -390,7 +435,7 @@ const EmployeesDashboard = () => {
                   cursor: 'pointer',
                   transition: 'all 0.2s'
                 }}>
-                <span>{selectedDays}</span>
+                <span>{selectedDays} Days</span>
                 <ChevronDown size={14} color="#9CA3AF" />
               </button>
               {openDropdown === 'days' && (
@@ -548,7 +593,7 @@ const EmployeesDashboard = () => {
                 <div style={{ fontSize: '14px', color: '#9CA3AF', padding: '12px 0' }}>No department data for the selected period.</div>
               ) : (
                 departmentData.map((dept) => (
-                  <div key={dept.name} style={{
+                  <div key={dept.id} style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
@@ -599,7 +644,7 @@ const EmployeesDashboard = () => {
                     />
                     <Bar dataKey="value" radius={[8, 8, 0, 0]} barSize={45}>
                       {departmentData.map((entry) => (
-                        <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                        <Cell key={`cell-${entry.id}`} fill={entry.color} />
                       ))}
                     </Bar>
                   </BarChart>

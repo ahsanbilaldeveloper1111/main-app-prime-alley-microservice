@@ -42,7 +42,7 @@ const nextConfig: NextConfig = {
                 path.join(sockjsPath, 'lib/transport/driver/websocket.js');
         }
         
-        // Default react-bootstrap Modal to static backdrop (no dismiss on outside click).
+        // Default react-bootstrap Modal: static backdrop + no Esc dismiss (opt out per-modal via props).
         // ESM entry is swapped for a thin wrapper; wrapper loads the stock CJS Modal to avoid a replacement loop.
         config.plugins = config.plugins ?? [];
         config.plugins.push(
