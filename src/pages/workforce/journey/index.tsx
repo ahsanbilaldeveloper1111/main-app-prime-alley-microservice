@@ -16,7 +16,7 @@ import { getJourneys } from "@utils/staffManagement";
 import { useMainAppLookups, type MainAppDepartmentLookup } from "@hooks/useMainAppLookups";
 import { ChevronRight } from "lucide-react";
 import OnboardingDetailSidebar from "./sidebar";
-import { JOURNEY_STATUS_OPTIONS } from "./journeyStatusOptions";
+import { JOURNEY_STATUS_OPTIONS } from "@utils/workforce/journeyStatusOptions";
 
 interface OnboardingEmployee {
   id: string;

@@ -29,7 +29,7 @@ import {
   findMainAppUserByOrgChartUserId,
   mainAppUserRowKeyForSelection,
   normalizeOrgChartUserKey,
-} from "./orgChartMainAppUserMatch";
+} from "@utils/workforce/orgChartMainAppUserMatch";
 
 // Dynamically import react-organizational-chart to avoid SSR issues
 const Tree = dynamic(

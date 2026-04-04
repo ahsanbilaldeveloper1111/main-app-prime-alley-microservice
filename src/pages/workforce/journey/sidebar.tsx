@@ -26,7 +26,7 @@ import { Form, Modal } from "react-bootstrap";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment";
-import { JOURNEY_STATUS_OPTIONS as STATUS_OPTIONS } from "./journeyStatusOptions";
+import { JOURNEY_STATUS_OPTIONS as STATUS_OPTIONS } from "@utils/workforce/journeyStatusOptions";
 
 /** API journey step shape */
 interface JourneyStepRecord {

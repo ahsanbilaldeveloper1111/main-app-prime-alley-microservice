@@ -18,7 +18,7 @@ import {
   mainAppUserMatchesOrgChartUserId,
   mainAppUserRowKeyForSelection,
   normalizeOrgChartUserKey,
-} from './orgChartMainAppUserMatch';
+} from '@utils/workforce/orgChartMainAppUserMatch';
 
 interface Employee {
   id: string;
