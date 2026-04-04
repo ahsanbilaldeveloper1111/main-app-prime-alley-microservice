@@ -594,7 +594,7 @@ const Layout = ({ children }: LayoutProps) => {
           transition: margin-left 0.3s ease-in-out;
         }
           .app-content-area {
-          margin-left:65px !important
+          margin-left:65px;
           }
         
         /* CRM Prime-style top bar */

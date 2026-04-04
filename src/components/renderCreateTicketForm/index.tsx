@@ -128,6 +128,7 @@ const dropdownToggleStyle = (hasValue: boolean): React.CSSProperties => ({
   justifyContent: "space-between",
   alignItems: "center",
   boxSizing: "border-box",
+  whiteSpace: "nowrap",
 });
 
 const OVERLAY_BUTTON_STYLE: React.CSSProperties = {
@@ -146,7 +147,8 @@ const SIDEBAR_STYLE: React.CSSProperties = {
   position: "fixed",
   top: 0,
   right: 0,
-  width: "600px",
+  width: "min(600px, 100vw)",
+  maxWidth: "100vw",
   height: "100vh",
   backgroundColor: "#ffffff",
   boxShadow: "-2px 0 8px rgba(0,0,0,0.1)",
@@ -179,10 +181,15 @@ const SimpleDropdown: React.FC<SimpleDropdownProps> = ({
         width: "100%",
         maxHeight: "220px",
         overflowY: "auto",
+        textAlign: "left",
       }}
     >
       {options.map((opt) => (
-        <Dropdown.Item key={opt} onClick={() => onChange(opt)}>
+        <Dropdown.Item
+          key={opt}
+          onClick={() => onChange(opt)}
+          style={{ textAlign: "left" }}
+        >
           {opt}
         </Dropdown.Item>
       ))}
@@ -323,7 +330,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
         {/* ── Header ── */}
         <div
           style={{
-            padding: "20px 24px",
+            padding: "20px clamp(16px, 4vw, 24px)",
             borderBottom: "1px solid #eaf0f6",
             display: "flex",
             alignItems: "center",
@@ -359,7 +366,7 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
         </div>
 
         {/* ── Content ── */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "16px 40px 40px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px clamp(16px, 6vw, 40px) 40px" }}>
 
           {/* Edit this form link */}
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "20px" }}>
@@ -830,11 +837,12 @@ export const CreateTicketSidebar: React.FC<CreateTicketSidebarProps> = ({
         {/* ── Footer ── */}
         <div
           style={{
-            padding: "16px 24px",
+            padding: "16px clamp(16px, 4vw, 24px)",
             borderTop: "1px solid #eaf0f6",
             display: "flex",
             gap: "12px",
             justifyContent: "flex-start",
+            flexWrap: "wrap",
           }}
         >
           {/* Create */}
