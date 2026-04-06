@@ -4,10 +4,9 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
 import { ListCallLogs, DownloadCallsExport } from '@utils/calls';
-import { Row, Col, Form, Button } from 'react-bootstrap';
+import { Form, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
-import StatsCards from '@components/GenericStatsCards';
 import { Phone, Hash, PhoneIncoming, PhoneOutgoing, Calendar } from 'lucide-react';
 import moment from 'moment';
 
@@ -420,6 +419,7 @@ const CallLogs = () => {
     };
 
     const handleExport = async () => {
+        if (isExporting) return;
         setIsExporting(true);
         try {
             const exportPayload = {
@@ -455,6 +455,16 @@ const CallLogs = () => {
     };
 
     const tableToolbar = useMemo<any>(() => ({
+        showTabs: true,
+        tabs: [
+            {
+                id: 'call-logs-title',
+                label: 'Call Logs',
+                removable: false,
+            },
+        ],
+        activeTab: 'call-logs-title',
+        onTabChange: () => {},
         showSearch: true,
         searchValue,
         searchPlaceholder: 'Search by username, extension, phone...',
@@ -464,6 +474,8 @@ const CallLogs = () => {
             fetchCallLogs(1, tablePagination.rowsPerPage, searchValue.trim());
         },
         showFiltersButton: true,
+        showExportButton: session?.user?.permissions?.includes('export-call-logs'),
+        onExportClick: () => handleExport(),
         showFilterPills: true,
         showMoreFiltersButton: false,
         filterPills: [
@@ -600,61 +612,28 @@ const CallLogs = () => {
                 ),
             },
         ],
-        rightActions: (
-            <div className="d-flex align-items-center gap-2">
-                {session?.user?.permissions?.includes('export-call-logs') && (
-                    <button
-                        type="button"
-                        className="btn btn-outline-secondary btn-sm"
-                        onClick={() => handleExport()}
-                        disabled={isExporting}
-                    >
-                        {isExporting ? 'Exporting...' : 'Export'}
-                    </button>
-                )}
-            </div>
-        ),
     }), [
         searchValue,
         tablePagination.rowsPerPage,
         fetchCallLogs,
         currentFilters,
-        appliedFilters,
         hierarchyDataExtensions,
         hierarchyDataDepartments,
         session?.user?.permissions,
         isExporting,
         applyFilters,
+        handleExport,
     ]);
 
     
     return (
-        <React.Fragment>
+        <div className="call-logs-page">
+            <style
+                dangerouslySetInnerHTML={{
+                    __html: `.call-logs-page .gt-toolbar-tabs-section .gt-tab-button { margin-left: 12px; }`,
+                }}
+            />
             <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" showPageLoader={showPageLoader} />
-           
-
-            <Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title style-2">
-                <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={4}>
-                      
-                      <h2 className="mb-0">Call Logs</h2>
-                    </Col>
-
-
-                    <Col md={8} className="d-flex justify-content-end" />
-                  </Row>
-               
-                
-                </div>
-            </Col>
-            </Row>
-
-           
-            <div className="mb-4">
-              <StatsCards data={statsCardsData} gridMinWidth="180px" />
-            </div>
 
             {showDateRange && startDateTime && endDateTime && moment.utc(startDateTime).isValid() && moment.utc(endDateTime).isValid() && (
                 <div
@@ -707,6 +686,8 @@ const CallLogs = () => {
                     showToolbar={true}
                     toolbar={tableToolbar}
                     showToolbarActions={false}
+                    statsCards={statsCardsData}
+                    metricsGridMinWidth="180px"
                     pagination={{
                         currentPage: tablePagination.currentPage,
                         rowsPerPage: tablePagination.rowsPerPage,
@@ -723,7 +704,7 @@ const CallLogs = () => {
                     uniqueKey="id"
                 />
             )}
-        </React.Fragment>
+        </div>
     );
 };
 
