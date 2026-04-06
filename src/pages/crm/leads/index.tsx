@@ -387,11 +387,11 @@ const CrmLeads = () => {
         "assignedUser",
         "created",
       ];
-      if (typeof window === "undefined") {
+      if (globalThis.window === undefined) {
         return defaults;
       }
       const stored = parseStoredVisibleColumnKeysLoose(
-        localStorage.getItem("leadsSelectedColumns"),
+        globalThis.localStorage.getItem("leadsSelectedColumns"),
       );
       return stored ?? defaults;
     },

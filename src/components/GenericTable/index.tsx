@@ -165,6 +165,46 @@ export interface BoundTableContextMenuItem {
   disabledClassName?: string;
 }
 
+function buildDropdownContextMenuItems<T>(
+  action: TableAction<T>,
+  row: T,
+): TableContextMenuItem<T>[] {
+  const opts = getVisibleDropdownOptions(action.dropdown!.options, row);
+  if (opts.length === 0) return [];
+
+  const mapOption = (o: DropdownOption<T>): TableContextMenuItem<T> => ({
+    label: o.label,
+    icon: o.icon,
+    onClick: o.onClick,
+    divider: o.divider ?? false,
+    className: o.className,
+  });
+
+  if (action.dropdown!.nestInContextMenu) {
+    return [{ label: action.label, icon: action.icon, submenu: opts.map(mapOption) }];
+  }
+  return opts.map(mapOption);
+}
+
+function buildClickActionContextMenuItem<T>(
+  action: TableAction<T>,
+  row: T,
+): TableContextMenuItem<T> {
+  const isDisabled = action.disabled?.(row);
+  return {
+    label: action.label,
+    icon: action.icon,
+    onClick: action.onClick,
+    divider: false,
+    className: isDisabled
+      ? action.disabledClassName || "text-muted"
+      : action.className,
+    disabled: isDisabled,
+    disabledTitle: action.disabledTitle,
+    disabledClassName: action.disabledClassName,
+  };
+}
+
 export function buildTableContextMenuItems<T>(
   actions: TableAction<T>[],
   row: T,
@@ -173,47 +213,9 @@ export function buildTableContextMenuItems<T>(
   for (const action of actions) {
     if (action.show && !action.show(row)) continue;
     if (action.dropdown) {
-      const opts = getVisibleDropdownOptions(action.dropdown.options, row);
-      if (opts.length === 0) {
-        continue;
-      }
-      if (action.dropdown.nestInContextMenu) {
-        items.push({
-          label: action.label,
-          icon: action.icon,
-          submenu: opts.map((o) => ({
-            label: o.label,
-            icon: o.icon,
-            onClick: o.onClick,
-            divider: o.divider ?? false,
-            className: o.className,
-          })),
-        });
-      } else {
-        for (const o of opts) {
-          items.push({
-            label: o.label,
-            icon: o.icon,
-            onClick: o.onClick,
-            divider: o.divider ?? false,
-            className: o.className,
-          });
-        }
-      }
+      items.push(...buildDropdownContextMenuItems(action, row));
     } else if (action.onClick && !action.render) {
-      const isDisabled = action.disabled?.(row);
-      items.push({
-        label: action.label,
-        icon: action.icon,
-        onClick: action.onClick,
-        divider: false,
-        className: isDisabled
-          ? action.disabledClassName || "text-muted"
-          : action.className,
-        disabled: isDisabled,
-        disabledTitle: action.disabledTitle,
-        disabledClassName: action.disabledClassName,
-      });
+      items.push(buildClickActionContextMenuItem(action, row));
     }
   }
   return items;

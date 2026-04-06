@@ -104,6 +104,22 @@ import {
 import { renderCrmProspectsKanbanTableCustomBody } from "@crm/shared/crmProspectsContactsListPageKanbanCustomBody";
 import { prospectsTableRowDoubleClick } from "@crm/shared/crmProspectsContactsListPageTableRowHandlers";
 
+function resolveDeleteModalProps(
+  mode: "single" | "bulk" | null,
+  handlers: { bulk: () => void; single: () => void },
+  copy: { itemTypeBulk: string; itemTypeSingle: string },
+) {
+  return {
+    onConfirm: mode === "bulk" ? handlers.bulk : handlers.single,
+    itemType: mode === "bulk" ? copy.itemTypeBulk : copy.itemTypeSingle,
+  };
+}
+
+function resolveNumericProspectId(prospect: any): number {
+  const raw = prospect?.id ?? prospect?.data?.id ?? (prospect as any)?.data?.data?.id ?? Number.NaN;
+  return Number(raw);
+}
+
 export function CrmProspectsContactsListPage({
   config,
 }: Readonly<{
@@ -1047,15 +1063,12 @@ export function CrmProspectsContactsListPage({
               setDeleteModalMode(null);
               setItemToDelete(null);
             }}
-            onConfirm={
-              deleteModalMode === "bulk" ? handleBulkDelete : confirmDelete
-            }
+            {...resolveDeleteModalProps(
+              deleteModalMode,
+              { bulk: handleBulkDelete, single: confirmDelete },
+              config.deleteModalCopy,
+            )}
             itemName={deleteModalItemName}
-            itemType={
-              deleteModalMode === "bulk"
-                ? config.deleteModalCopy.itemTypeBulk
-                : config.deleteModalCopy.itemTypeSingle
-            }
             additionalInfo={
               <CrmListDeleteModalAdditionalInfo
                 mode={deleteModalMode}
@@ -1166,26 +1179,16 @@ export function CrmProspectsContactsListPage({
               gradient: getRandomColor(selectedProspect?.name || ""),
             }}
             recordType="prospect"
-            recordId={
-              selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
-            }
+            recordId={resolveNumericProspectId(selectedProspect) || undefined}
             resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
             crmSummary={
-              selectedProspect?.crm_summary ??
-              selectedProspect?.data?.crm_summary ??
-              (selectedProspect as any)?.data?.data?.crm_summary ??
-              undefined
+              selectedProspect?.crm_summary ?? selectedProspect?.data?.crm_summary ?? undefined
             }
             recordLink={{
               label: "View record",
               onClick: () => {
-                const prospectId = Number(
-                  selectedProspect?.id ??
-                    selectedProspect?.data?.id ??
-                    (selectedProspect as any)?.data?.data?.id ??
-                    Number.NaN,
-                );
+                const prospectId = resolveNumericProspectId(selectedProspect);
                 if (!Number.isFinite(prospectId) || prospectId <= 0) return;
                 handleCloseProspectSidebar();
                 router.push(config.sidebar.buildDetailUrlFromNumericId(prospectId));
@@ -1315,11 +1318,10 @@ export function CrmProspectsContactsListPage({
                   action: {
                     label: "Log activity",
                     onClick: () => {
-                      const id = selectedProspect?.id ?? selectedProspect?.data?.id ?? "";
-                      if (id) {
-                        router.push(config.sidebar.buildLogActivityUrl(id));
-                        handleCloseProspectSidebar();
-                      }
+                      const id = resolveNumericProspectId(selectedProspect);
+                      if (!id) return;
+                      router.push(config.sidebar.buildLogActivityUrl(id));
+                      handleCloseProspectSidebar();
                     },
                   },
                 },

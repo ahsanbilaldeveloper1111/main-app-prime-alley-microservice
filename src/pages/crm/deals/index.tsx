@@ -849,11 +849,11 @@ const CrmDeals = () => {
         "closeDate",
         "owner",
       ];
-      if (typeof window === "undefined") {
+      if (globalThis.window === undefined) {
         return defaults;
       }
       const stored = parseStoredVisibleColumnKeysLoose(
-        localStorage.getItem("dealsSelectedColumns"),
+        globalThis.localStorage.getItem("dealsSelectedColumns"),
       );
       return stored ?? defaults;
     },

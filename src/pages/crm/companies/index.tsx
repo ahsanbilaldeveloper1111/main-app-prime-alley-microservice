@@ -3287,9 +3287,7 @@ const CrmCompanyManagement = () => {
                       </label>
                       <input
                         type="datetime-local"
-                        {...(scheduledInputMin === undefined
-                          ? {}
-                          : { min: scheduledInputMin })}
+                        min={scheduledInputMin}
                         value={contactForm.scheduled_call_at}
                         onFocus={(e) => {
                           const floor = getDatetimeLocalMinNow();

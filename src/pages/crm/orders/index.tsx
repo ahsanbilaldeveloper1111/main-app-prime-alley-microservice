@@ -289,11 +289,11 @@ const CrmOrders = () => {
         "orderDate",
         "owner",
       ];
-      if (typeof window === "undefined") {
+      if (globalThis.window === undefined) {
         return defaults;
       }
       const stored = parseStoredVisibleColumnKeysLoose(
-        localStorage.getItem("ordersSelectedColumns"),
+        globalThis.localStorage.getItem("ordersSelectedColumns"),
       );
       return stored ?? defaults;
     },

@@ -86,13 +86,13 @@ export function useCrmListPageTabCreateContactAndFilter<
       return;
     setShowCreateContactSidebar(true);
     const editId = parsePositiveIntFromQueryParam(router.query.editContactId);
-    if (editId != null) {
-      setEditingContactId(editId);
-    } else {
+    if (editId == null) {
       setEditingContactId(null);
       if (seedNewContactForm) {
         setContactForm(seedNewContactForm());
       }
+    } else {
+      setEditingContactId(editId);
     }
 
     router.replace(

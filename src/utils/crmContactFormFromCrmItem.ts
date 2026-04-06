@@ -175,9 +175,9 @@ export function resolveDefaultContactOwnerExtension(
   if (!sessionUser || extensions.length === 0) return null;
   const candidates = new Set<string>();
   const phone =
-    sessionUser.phone != null ? String(sessionUser.phone).trim() : "";
+    sessionUser.phone == null ? "" : String(sessionUser.phone).trim();
   const ext =
-    sessionUser.extension != null ? String(sessionUser.extension).trim() : "";
+    sessionUser.extension == null ? "" : String(sessionUser.extension).trim();
   if (phone) candidates.add(phone);
   if (ext) candidates.add(ext);
   for (const e of extensions) {
