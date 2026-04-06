@@ -461,6 +461,9 @@ export function applyCallEventToCallStateMap(
     hasActiveParticipants: resolveHasActiveParticipantsForEvent(evt, hasActiveParties),
     eventName: evt.eventName || base.eventName,
     heldByAddress,
+    // Supervision metadata must follow each event; otherwise refresh/ongoing merge loses monitoring on the next event.
+    isMonitoring: evt.isMonitoring ?? base.isMonitoring,
+    monitoring: evt.monitoring ?? base.monitoring,
   };
 
   if (shouldTerminate) {
@@ -520,6 +523,75 @@ export function resolveOngoingCallCurrentState(
     return activeParties[0]?.callStatus || "UNKNOWN";
   }
   return currentState || "UNKNOWN";
+}
+
+/** Keys to ignore when detecting a flat call-id → call-state map from ongoing-calls payloads. */
+const ONGOING_CALLS_PAYLOAD_METADATA_KEYS = new Set([
+  "type",
+  "message",
+  "timestamp",
+  "status",
+  "error",
+]);
+
+/**
+ * CTI may send ongoing calls as `{ callsByDn: { ... } }` or as a flat map of callId → call state.
+ * Normalizes to a single map suitable for {@link mergeOngoingCallsIntoCallStateMap}.
+ */
+export function extractCallsByDnFromOngoingCallsPayload(
+  data: unknown,
+): Record<string, unknown> | null {
+  if (!isRecord(data)) return null;
+
+  const o = data ;
+
+  const direct = getCallsByDn(o, "callsByDn") ?? getCallsByDn(o, "calls_by_dn");
+  if (direct) return direct;
+
+  const keys = Object.keys(o).filter(
+    (k) => !ONGOING_CALLS_PAYLOAD_METADATA_KEYS.has(k),
+  );
+  if (!keys.length) return null;
+
+  const firstVal = o[keys[0]];
+  if (!isCallLike(firstVal)) return null;
+
+  const out: Record<string, unknown> = {};
+
+  for (const k of keys) {
+    const v = o[k];
+    if (isCallLike(v, false)) {
+      out[k] = v;
+    }
+  }
+
+  return Object.keys(out).length ? out : null;
+}
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return !!val && typeof val === "object" && !Array.isArray(val);
+}
+
+function getCallsByDn(
+  obj: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> | null {
+  const val = obj[key];
+  return isRecord(val) ? val : null;
+}
+
+function isCallLike(
+  val: unknown,
+  requireParties: boolean = true,
+): val is Record<string, unknown> {
+  if (!isRecord(val)) return false;
+
+  const rec = val;
+
+  const hasCallId = typeof rec.callId === "string";
+  const hasParties = Array.isArray(rec.parties);
+
+  return requireParties ? hasCallId && hasParties : hasCallId;
 }
 
 export function mergeOngoingCallsIntoCallStateMap(

@@ -347,8 +347,18 @@ export function computeUserCardMonitoringDerived({
       (activeMonitoring.dn || (monitoringWithSessions.sessions?.length ?? 0) > 0)
   )
 
-  const thisCardIsMonitored =
-    monitoringWithSessions.sessions?.some((s) => s.dn === dn) || activeMonitoring.dn === dn
+  let thisCardIsMonitored =
+    monitoringWithSessions.sessions?.some((s) => String(s.dn) === String(dn)) ||
+    (activeMonitoring.dn != null && String(activeMonitoring.dn) === String(dn))
+
+  if (
+    userAddress &&
+    String(dn) === String(userAddress) &&
+    activeMonitoring.dn != null &&
+    String(userAddress) === String(activeMonitoring.dn)
+  ) {
+    thisCardIsMonitored = false
+  }
 
   const disableStartMonitoringMustStopFirst =
     supervisorIsAlreadyMonitoring && !thisCardIsMonitored

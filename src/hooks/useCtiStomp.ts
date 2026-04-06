@@ -9,6 +9,7 @@ import tokenService from "@utils/tokenService";
 import {
   applyCallEventToCallStateMap,
   mergeOngoingCallsIntoCallStateMap,
+  extractCallsByDnFromOngoingCallsPayload,
   reduceLoadPersistedCallStates,
   reduceSaveCallStates,
   pickMostRecentCall,
@@ -310,6 +311,9 @@ export default function useCtiStomp(
         if (Object.keys(callsToPersist).length === 0) {
           localStorage.removeItem(CALL_STATES_STORAGE_KEY);
           localStorage.removeItem(CALL_STATES_TIMESTAMP_KEY);
+        } else {
+          localStorage.setItem(CALL_STATES_STORAGE_KEY, JSON.stringify(callsToPersist));
+          localStorage.setItem(CALL_STATES_TIMESTAMP_KEY, new Date().toISOString());
         }
       } catch (error) {
         console.warn("[useCtiStomp] saveCallStatesToStorage failed", error);
@@ -367,19 +371,18 @@ export default function useCtiStomp(
     [saveCallStatesToStorage, dnsMap] // Include dnsMap so non-master tabs have access to latest device info
   );
 
-  // Handle ongoing calls response
+  // Handle ongoing calls response (shape may be { callsByDn } or a flat call-id map from CTI)
   const handleOngoingCalls = useCallback(
-    (data: { callsByDn?: Record<string, any> }) => {
-      if (!data?.callsByDn) {
+    (data: unknown) => {
+      const callsByDn = extractCallsByDnFromOngoingCallsPayload(data);
+      if (!callsByDn || Object.keys(callsByDn).length === 0) {
         return;
       }
-
-      const callsByDn = data.callsByDn;
 
       setCallStateMap((prev) => {
         const updated = mergeOngoingCallsIntoCallStateMap(
           prev as Record<string, any>,
-          callsByDn,
+          callsByDn as Record<string, any>,
         ) as Record<string, CtiCallEvent>;
         saveCallStatesToStorage(updated);
         return updated;
@@ -2159,6 +2162,22 @@ export default function useCtiStomp(
     });
   }, [saveCallStatesToStorage]);
 
+  /** Drop call ids from in-memory map and persisted storage (GetCallLegs verify, end-call sync). */
+  const removeCallIdsFromCallStateMap = useCallback(
+    (callIds: string[]) => {
+      if (!callIds.length) return;
+      setCallStateMap((prev) => {
+        const next = { ...prev };
+        for (const id of callIds) {
+          delete next[id];
+        }
+        saveCallStatesToStorage(next);
+        return next;
+      });
+    },
+    [saveCallStatesToStorage],
+  );
+
   // Function that runs when all things are loaded
   const onAllLoaded = useCallback(
     async (callback: () => void | Promise<void>) => {
@@ -2207,6 +2226,7 @@ export default function useCtiStomp(
     getActiveCallIdsFromLocalStorage, // Get call IDs from localStorage where currentState != DISCONNECTED
     getAllCallIds, // Get all call IDs from current state
     removeTerminatingCalls, // Remove calls with isTerminating: true from store
+    removeCallIdsFromCallStateMap, // Prune ended/inactive calls from map + localStorage
     onAllLoaded, // Function that runs when all things are loaded
     getUserTeams, // Get user teams data
     getUserDataExtensions, // Get user data extensions

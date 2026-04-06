@@ -21,12 +21,14 @@ import FilterBar from './_partials/FilterBar'
 import PageHeader from './_partials/PageHeader'
 import SectionsRenderer from './_partials/SectionsRenderer'
 import {
-  buildMonitoringPayloadFromEvent,
+  buildWallboardMonitoringPayloadFromEvent,
   computeNextIdleSinceMap,
   devicePayloadFromDnsStateEvent,
   devicesArrayFromCompleteStateEvent,
+  findLatestMonitoringEventFromLog,
   isCompleteStateLikeEvent,
   monitoringPayloadDiffersFromActive,
+  pickBestMonitoringPayloadFromCallStateMap,
   registeredEntriesFromDevices,
   type RegisteredDeviceEntry,
 } from '@components/communications/wallboards-live/wallboardEventParsing'
@@ -618,42 +620,26 @@ const LiveCallDashboard = () => {
     }
   }, [eventLog, activeMonitoring.dn, activeMonitoring.deviceName, activeMonitoring.monitor, clearMonitoringState])
 
-  // Detect monitoring start from events and set monitoring state
-  // Use a ref to track the last processed event sequence to avoid re-processing
-  const lastProcessedEventSequenceRef = useRef<number | null>(null)
-  
+  // Refill activeMonitoring after refresh from callStateMap (SSE ongoing_calls merge) when eventLog has not replayed yet
   useEffect(() => {
-    if (!eventLog?.length || !dnsMap || !isInitialized || !userAddress) return
-
-    const lastEvent = eventLog.at(-1)
-    if (!lastEvent?.parties?.length) return
-
-    if (
-      lastProcessedEventSequenceRef.current !== null &&
-      lastEvent.sequence !== undefined &&
-      lastEvent.sequence <= lastProcessedEventSequenceRef.current
-    ) {
+    if (!isInitialized || !dnsMap || !callStateMap) {
       return
     }
 
-    if (!lastEvent.isMonitoring || !lastEvent.monitoring) return
-
-    const payload = buildMonitoringPayloadFromEvent(
-      lastEvent.parties,
-      lastEvent.monitoring as { monitorDn?: string; monitoredDn?: string; monitoringType?: string },
-      dnsMap as Parameters<typeof buildMonitoringPayloadFromEvent>[2],
-      userAddress
+    const payload = pickBestMonitoringPayloadFromCallStateMap(
+      callStateMap as Record<string, unknown>,
+      dnsMap as Parameters<typeof buildWallboardMonitoringPayloadFromEvent>[2],
     )
-    if (!payload) return
+    if (!payload) {
+      return
+    }
 
-    if (!monitoringPayloadDiffersFromActive(activeMonitoring, payload)) return
+    if (!monitoringPayloadDiffersFromActive(activeMonitoring, payload)) {
+      return
+    }
 
-    console.log('[Monitoring] Setting monitoring state from event (Case 1 - isMonitoring: true)', {
+    console.log('[Monitoring] Setting monitoring state from callStateMap (ongoing_calls / refresh)', {
       ...payload,
-      eventName: lastEvent.eventName,
-      eventType: lastEvent.eventType,
-      callId: lastEvent.callId,
-      sequence: lastEvent.sequence,
     })
     setActiveMonitoring({
       dn: payload.monitoredDn,
@@ -666,14 +652,67 @@ const LiveCallDashboard = () => {
     setMonitoringStartTime((prev) =>
       prev[payload.monitoredDn] ? prev : { ...prev, [payload.monitoredDn]: new Date() }
     )
-    if (lastEvent.sequence !== undefined) {
-      lastProcessedEventSequenceRef.current = lastEvent.sequence
+  }, [
+    callStateMap,
+    dnsMap,
+    isInitialized,
+    activeMonitoring,
+    setActiveMonitoring,
+    setMonitoringStartTime,
+  ])
+
+  // Detect monitoring start from events and set monitoring state
+  // Use a ref to track the last processed event sequence to avoid re-processing
+  const lastProcessedEventSequenceRef = useRef<number | null>(null)
+  
+  useEffect(() => {
+    if (!eventLog?.length || !dnsMap || !isInitialized) return
+
+    const monitoringEvent = findLatestMonitoringEventFromLog(eventLog)
+    if (!monitoringEvent?.parties?.length) return
+
+    if (
+      lastProcessedEventSequenceRef.current !== null &&
+      monitoringEvent.sequence !== undefined &&
+      monitoringEvent.sequence <= lastProcessedEventSequenceRef.current
+    ) {
+      return
+    }
+
+    const payload = buildWallboardMonitoringPayloadFromEvent(
+      monitoringEvent.parties,
+      monitoringEvent.monitoring as { monitorDn?: string; monitoredDn?: string; monitoringType?: string },
+      dnsMap as Parameters<typeof buildWallboardMonitoringPayloadFromEvent>[2],
+    )
+    if (!payload) return
+
+    if (!monitoringPayloadDiffersFromActive(activeMonitoring, payload)) return
+
+    console.log('[Monitoring] Setting monitoring state from event (latest monitoring entry in log)', {
+      ...payload,
+      eventName: monitoringEvent.eventName,
+      eventType: monitoringEvent.eventType,
+      callId: monitoringEvent.callId,
+      sequence: monitoringEvent.sequence,
+    })
+    setActiveMonitoring({
+      dn: payload.monitoredDn,
+      type: payload.monitoringType,
+      monitor: payload.monitorDn,
+      deviceName: payload.monitoredDeviceName,
+      monitorDeviceName: payload.monitorDeviceName,
+      monitorDeviceType: payload.monitorDeviceType,
+    })
+    setMonitoringStartTime((prev) =>
+      prev[payload.monitoredDn] ? prev : { ...prev, [payload.monitoredDn]: new Date() }
+    )
+    if (monitoringEvent.sequence !== undefined) {
+      lastProcessedEventSequenceRef.current = monitoringEvent.sequence
     }
   }, [
     eventLog,
     dnsMap,
     isInitialized,
-    userAddress,
     activeMonitoring,
     setActiveMonitoring,
     setMonitoringStartTime,
@@ -685,28 +724,37 @@ const LiveCallDashboard = () => {
 
     const monitoredDn = activeMonitoring.dn
     const monitoredDeviceName = activeMonitoring.deviceName
+
+    const isCallActive = (call: { isTerminating?: boolean; parties?: Array<{ callStatus?: string }> } | null) =>
+      Boolean(
+        call &&
+          !call.isTerminating &&
+          call.parties?.some(
+            (p) =>
+              p.callStatus !== 'DROPPED' &&
+              p.callStatus !== 'DISCONNECTED' &&
+              ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(p.callStatus ?? '')
+          )
+      )
+
+    const deviceCall = getCallStateForDevice(monitoredDn, monitoredDeviceName)
+    if (isCallActive(deviceCall)) {
+      return
+    }
+
+    const dnCall = getDnCallState(monitoredDn)
+    if (isCallActive(dnCall)) {
+      return
+    }
+
     const monitoredDevice = dnsMap[monitoredDn]?.devices?.[monitoredDeviceName]
-    
-    if (!monitoredDevice) {
+    if (!monitoredDevice && !deviceCall && !dnCall) {
       clearMonitoringState(monitoredDn, 'device not found')
       return
     }
 
-    const deviceCall = getCallStateForDevice(monitoredDn, monitoredDeviceName)
-    const isDeviceActiveCall =
-      deviceCall &&
-      !deviceCall.isTerminating &&
-      deviceCall.parties?.some(
-        (p: { callStatus?: string }) =>
-          p.callStatus !== 'DROPPED' &&
-          p.callStatus !== 'DISCONNECTED' &&
-          ['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED', 'RINGING'].includes(p.callStatus ?? '')
-      )
-
-    if (!isDeviceActiveCall) {
-      clearMonitoringState(monitoredDn, 'call ended')
-    }
-  }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, clearMonitoringState])
+    clearMonitoringState(monitoredDn, 'call ended')
+  }, [activeMonitoring, dnsMap, isInitialized, getCallStateForDevice, getDnCallState, clearMonitoringState])
 
   // Handle FLIP animations when cards change sections
   useEffect(() => {
@@ -906,6 +954,7 @@ const LiveCallDashboard = () => {
         showPopup={showPopup}
         session={session}
         getUserDataExtensions={getUserDataExtensions}
+        getCallStatesForDn={getCallStatesForDn}
         getCallStateForDevice={getCallStateForDevice}
         setSelectedMonitor={setSelectedMonitor}
         setTempMonitorSelection={setTempMonitorSelection}
