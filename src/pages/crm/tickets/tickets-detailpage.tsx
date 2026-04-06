@@ -836,10 +836,6 @@ import React, {
         toast.error("Name, email and phone are required");
         return;
       }
-      if (data.campaign_id == null) {
-        toast.error("Campaign is required");
-        return;
-      }
   
       const phoneForPayload =
         data.phone_country_code && data.phoneNumber?.trim()
@@ -877,9 +873,6 @@ import React, {
           source: data.source?.trim() || undefined,
           scheduled_call_at: data.scheduled_call_at || undefined,
           data: dataPayload,
-          tag_ids: data.tags?.length
-            ? data.tags.map((t: { id: number }) => t.id)
-            : [],
         });
         setShowEditContactSidebar(false);
         const updated = await getAllCrmDataById(data.id);
@@ -899,8 +892,7 @@ import React, {
         prospectForm?.email?.trim() &&
         prospectForm?.phoneNumber?.trim() &&
         prospectForm?.firstName?.trim() &&
-        prospectForm?.lastName?.trim() &&
-        prospectForm?.campaign_id != null;
+        prospectForm?.lastName?.trim();
   
       return (
         <ProspectEditSidebar

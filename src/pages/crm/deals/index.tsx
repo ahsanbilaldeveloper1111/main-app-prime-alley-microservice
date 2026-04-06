@@ -22,6 +22,10 @@ import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
+import {
+  parseStoredVisibleColumnKeysLoose,
+  persistVisibleColumnKeys,
+} from "@utils/crmListVisibleColumnsStorage";
 import CrmExportModal from "@components/CrmExportModal";
 import { StatsCardData } from "@components/GenericStatsCards";
 import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
@@ -737,7 +741,7 @@ const CrmDeals = () => {
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("table");
+  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("board");
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -834,20 +838,24 @@ const CrmDeals = () => {
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   const [selectedDealsColumns, setSelectedDealsColumns] = useState<string[]>(
     () => {
-      const saved = localStorage.getItem("dealsSelectedColumns");
-      return saved
-        ? JSON.parse(saved)
-        : [
-            "name",
-            "company",
-            "stage",
-            "approvalStatus",
-            "dealType",
-            "value",
-            "assignedUser",
-            "closeDate",
-            "owner",
-          ];
+      const defaults = [
+        "name",
+        "company",
+        "stage",
+        "approvalStatus",
+        "dealType",
+        "value",
+        "assignedUser",
+        "closeDate",
+        "owner",
+      ];
+      if (globalThis.window === undefined) {
+        return defaults;
+      }
+      const stored = parseStoredVisibleColumnKeysLoose(
+        globalThis.localStorage.getItem("dealsSelectedColumns"),
+      );
+      return stored ?? defaults;
     },
   );
   const [dealsPagination, setDealsPagination] = useState({
@@ -6959,12 +6967,7 @@ const CrmDeals = () => {
         selectedColumnKeys={selectedDealsColumns}
         onApply={(keys) => {
           setSelectedDealsColumns(keys);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
-              "dealsSelectedColumns",
-              JSON.stringify(keys),
-            );
-          }
+          persistVisibleColumnKeys("dealsSelectedColumns", keys);
         }}
       />
 

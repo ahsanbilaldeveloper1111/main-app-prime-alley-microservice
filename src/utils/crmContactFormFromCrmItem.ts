@@ -148,15 +148,57 @@ export type CrmListContactFormState =
   | (ContactFormBase & { source: string })
   | (ContactFormBase & { source_file: string });
 
+/** Options when seeding an empty create-contact form (e.g. default Owner = logged-in user). */
+export type CreateEmptyCrmListContactFormOptions = {
+  defaultContactOwner?: string | null;
+};
+
+export type CrmExtensionLikeForOwnerDefault = {
+  extension?: string | number | null;
+  id?: string | number | null;
+};
+
+/**
+ * Returns the extension `value` string used by Prospect Owner select if the session user
+ * matches an entry in `extensions` (same rules as ProspectEditSidebar option values).
+ */
+export function resolveDefaultContactOwnerExtension(
+  sessionUser:
+    | {
+        phone?: string | number | null;
+        extension?: string | number | null;
+      }
+    | null
+    | undefined,
+  extensions: readonly CrmExtensionLikeForOwnerDefault[],
+): string | null {
+  if (!sessionUser || extensions.length === 0) return null;
+  const candidates = new Set<string>();
+  const phone =
+    sessionUser.phone == null ? "" : String(sessionUser.phone).trim();
+  const ext =
+    sessionUser.extension == null ? "" : String(sessionUser.extension).trim();
+  if (phone) candidates.add(phone);
+  if (ext) candidates.add(ext);
+  for (const e of extensions) {
+    const v = String(e.extension ?? e.id ?? "");
+    if (v && candidates.has(v)) return v;
+  }
+  return null;
+}
+
 /** Initial empty state for create-contact sidebar on CRM list pages (quotes, contacts, prospects). */
 export function createEmptyCrmListContactFormState(
   sourceField: "source",
+  options?: CreateEmptyCrmListContactFormOptions,
 ): ContactFormBase & { source: string };
 export function createEmptyCrmListContactFormState(
   sourceField: "source_file",
+  options?: CreateEmptyCrmListContactFormOptions,
 ): ContactFormBase & { source_file: string };
 export function createEmptyCrmListContactFormState(
   sourceField: "source" | "source_file",
+  options?: CreateEmptyCrmListContactFormOptions,
 ): CrmListContactFormState {
   const base: ContactFormBase = {
     firstName: "",
@@ -165,7 +207,7 @@ export function createEmptyCrmListContactFormState(
     phone_country_code: "",
     phoneNumber: "",
     campaign_id: null,
-    contact_owner: null,
+    contact_owner: options?.defaultContactOwner ?? null,
     lifecycle_stage: "Lead",
     disposition: "",
     legal_basis: [],

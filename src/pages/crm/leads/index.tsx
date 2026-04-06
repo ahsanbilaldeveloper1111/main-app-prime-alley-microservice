@@ -17,6 +17,10 @@ import GenericTable, {
 } from "@components/GenericTable";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
+import {
+  parseStoredVisibleColumnKeysLoose,
+  persistVisibleColumnKeys,
+} from "@utils/crmListVisibleColumnsStorage";
 import CrmExportModal from "@components/CrmExportModal";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
@@ -372,20 +376,24 @@ const CrmLeads = () => {
 
   const [selectedLeadsColumns, setSelectedLeadsColumns] = useState<string[]>(
     () => {
-      const saved = localStorage.getItem("leadsSelectedColumns");
-      return saved
-        ? JSON.parse(saved)
-        : [
-            "name",
-            "company",
-            "email",
-            "phone",
-            "stage",
-            "leadPotential",
-            "followUps",
-            "assignedUser",
-            "created",
-          ];
+      const defaults = [
+        "name",
+        "company",
+        "email",
+        "phone",
+        "stage",
+        "leadPotential",
+        "followUps",
+        "assignedUser",
+        "created",
+      ];
+      if (globalThis.window === undefined) {
+        return defaults;
+      }
+      const stored = parseStoredVisibleColumnKeysLoose(
+        globalThis.localStorage.getItem("leadsSelectedColumns"),
+      );
+      return stored ?? defaults;
     },
   );
   const [leadsPagination, setLeadsPagination] = useState({
@@ -9520,9 +9528,7 @@ const CrmLeads = () => {
         selectedColumnKeys={selectedLeadsColumns}
         onApply={(keys) => {
           setSelectedLeadsColumns(keys);
-          if (typeof window !== "undefined") {
-            localStorage.setItem("leadsSelectedColumns", JSON.stringify(keys));
-          }
+          persistVisibleColumnKeys("leadsSelectedColumns", keys);
         }}
       />
 

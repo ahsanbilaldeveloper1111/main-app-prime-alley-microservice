@@ -40,8 +40,7 @@ export function CrmListCreateContactSidebar({
   const isFormValid =
     contactForm.email?.trim() &&
     contactForm.phoneNumber?.trim() &&
-    (contactForm.firstName?.trim() || contactForm.lastName?.trim()) &&
-    contactForm.campaign_id != null;
+    (contactForm.firstName?.trim() || contactForm.lastName?.trim());
 
   return (
     <ProspectEditSidebar

@@ -130,6 +130,11 @@ export interface TableAction<T = any> {
     align?: "start" | "end";
     toggleVariant?: string;
     toggleClassName?: string;
+    /**
+     * When true, the right-click context menu shows one row (action label) that opens a
+     * flyout submenu instead of listing every option at the top level.
+     */
+    nestInContextMenu?: boolean;
   };
 }
 
@@ -137,7 +142,9 @@ export interface TableAction<T = any> {
 export type TableContextMenuItem<T = unknown> = {
   label: string;
   icon?: React.ReactNode;
-  onClick: (row: T) => void;
+  /** Present for leaf items; omitted when `submenu` is set. */
+  onClick?: (row: T) => void;
+  submenu?: TableContextMenuItem<T>[];
   divider?: boolean;
   className?: string;
   disabled?: boolean;
@@ -149,12 +156,53 @@ export type TableContextMenuItem<T = unknown> = {
 export interface BoundTableContextMenuItem {
   label: string;
   icon?: React.ReactNode;
-  onClick: () => void;
+  onClick?: () => void;
+  submenu?: BoundTableContextMenuItem[];
   divider?: boolean;
   className?: string;
   disabled?: boolean;
   disabledTitle?: string;
   disabledClassName?: string;
+}
+
+function buildDropdownContextMenuItems<T>(
+  action: TableAction<T>,
+  row: T,
+): TableContextMenuItem<T>[] {
+  const opts = getVisibleDropdownOptions(action.dropdown!.options, row);
+  if (opts.length === 0) return [];
+
+  const mapOption = (o: DropdownOption<T>): TableContextMenuItem<T> => ({
+    label: o.label,
+    icon: o.icon,
+    onClick: o.onClick,
+    divider: o.divider ?? false,
+    className: o.className,
+  });
+
+  if (action.dropdown!.nestInContextMenu) {
+    return [{ label: action.label, icon: action.icon, submenu: opts.map(mapOption) }];
+  }
+  return opts.map(mapOption);
+}
+
+function buildClickActionContextMenuItem<T>(
+  action: TableAction<T>,
+  row: T,
+): TableContextMenuItem<T> {
+  const isDisabled = action.disabled?.(row);
+  return {
+    label: action.label,
+    icon: action.icon,
+    onClick: action.onClick,
+    divider: false,
+    className: isDisabled
+      ? action.disabledClassName || "text-muted"
+      : action.className,
+    disabled: isDisabled,
+    disabledTitle: action.disabledTitle,
+    disabledClassName: action.disabledClassName,
+  };
 }
 
 export function buildTableContextMenuItems<T>(
@@ -165,53 +213,134 @@ export function buildTableContextMenuItems<T>(
   for (const action of actions) {
     if (action.show && !action.show(row)) continue;
     if (action.dropdown) {
-      const opts = getVisibleDropdownOptions(action.dropdown.options, row);
-      for (const o of opts) {
-        items.push({
-          label: o.label,
-          icon: o.icon,
-          onClick: o.onClick,
-          divider: o.divider ?? false,
-          className: o.className,
-        });
-      }
+      items.push(...buildDropdownContextMenuItems(action, row));
     } else if (action.onClick && !action.render) {
-      const isDisabled = action.disabled?.(row);
-      items.push({
-        label: action.label,
-        icon: action.icon,
-        onClick: action.onClick,
-        divider: false,
-        className: isDisabled
-          ? action.disabledClassName || "text-muted"
-          : action.className,
-        disabled: isDisabled,
-        disabledTitle: action.disabledTitle,
-        disabledClassName: action.disabledClassName,
-      });
+      items.push(buildClickActionContextMenuItem(action, row));
     }
   }
   return items;
+}
+
+function bindTableContextMenuItemsToRow<T>(
+  items: TableContextMenuItem<T>[],
+  row: T,
+): BoundTableContextMenuItem[] {
+  return items.map((item) => {
+    const bound: BoundTableContextMenuItem = {
+      label: item.label,
+      icon: item.icon,
+      divider: item.divider,
+      className: item.className,
+      disabled: item.disabled,
+      disabledTitle: item.disabledTitle,
+      disabledClassName: item.disabledClassName,
+    };
+    if (item.submenu && item.submenu.length > 0) {
+      bound.submenu = bindTableContextMenuItemsToRow(item.submenu, row);
+    } else if (item.onClick) {
+      bound.onClick = () => item.onClick!(row);
+    }
+    return bound;
+  });
 }
 
 export function buildBoundTableContextMenuItems<T>(
   actions: TableAction<T>[],
   row: T,
 ): BoundTableContextMenuItem[] {
-  return buildTableContextMenuItems(actions, row).map((item) => ({
-    label: item.label,
-    icon: item.icon,
-    onClick: () => item.onClick(row),
-    divider: item.divider,
-    className: item.className,
-    disabled: item.disabled,
-    disabledTitle: item.disabledTitle,
-    disabledClassName: item.disabledClassName,
-  }));
+  return bindTableContextMenuItemsToRow(buildTableContextMenuItems(actions, row), row);
 }
 
 /** One row in `gt-context-menu`; `onClick` is a bound handler (no row argument). */
 export type GtContextMenuItemRow = BoundTableContextMenuItem;
+
+function renderGtContextMenuItemRow(
+  item: GtContextMenuItemRow,
+  idx: number,
+  keyPrefix: string,
+  onClose: () => void,
+): React.ReactNode {
+  const key = `${keyPrefix}-${item.label}-${idx}-${item.className ?? ""}`;
+
+  if (item.submenu && item.submenu.length > 0) {
+    return (
+      <React.Fragment key={key}>
+        <div className="gt-context-menu-submenu-host">
+          <div
+            className={`gt-context-menu-item gt-context-menu-item--parent ${item.className || ""}`}
+            role="menuitem"
+            aria-haspopup="menu"
+          >
+            {item.icon && (
+              <span className="gt-context-menu-icon">{item.icon}</span>
+            )}
+            <span className="gt-context-menu-item-label">{item.label}</span>
+            <ChevronRight
+              size={16}
+              className="gt-context-menu-chevron"
+              aria-hidden
+            />
+          </div>
+          <div className="gt-context-submenu" role="menu">
+            {item.submenu.map((sub, subIdx) =>
+              renderGtContextMenuItemRow(sub, subIdx, `${key}-sub`, onClose),
+            )}
+          </div>
+        </div>
+        {item.divider ? <div className="gt-context-menu-divider" /> : null}
+      </React.Fragment>
+    );
+  }
+
+  const runClick = () => {
+    item.onClick?.();
+    onClose();
+  };
+
+  return (
+    <React.Fragment key={key}>
+      {item.disabled && item.disabledTitle ? (
+        <span
+          className="gt-context-menu-disabled-wrapper"
+          title={item.disabledTitle}
+        >
+          <button
+            type="button"
+            className={`gt-context-menu-item ${item.className || ""}`}
+            disabled
+            onClick={(e) => e.stopPropagation()}
+            role="menuitem"
+          >
+            {item.icon && (
+              <span className="gt-context-menu-icon">{item.icon}</span>
+            )}
+            {item.label}
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          className={`gt-context-menu-item ${item.className || ""}`}
+          disabled={item.disabled}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!item.disabled) {
+              runClick();
+            }
+          }}
+          role="menuitem"
+          title={item.disabled ? item.disabledTitle : undefined}
+        >
+          {item.icon && (
+            <span className="gt-context-menu-icon">{item.icon}</span>
+          )}
+          {item.label}
+        </button>
+      )}
+      {item.divider ? <div className="gt-context-menu-divider" /> : null}
+    </React.Fragment>
+  );
+}
 
 /** Shared markup for context menu rows (GenericTable right‑click + Kanban card menu). */
 export const GtContextMenuItemList: React.FC<{
@@ -219,52 +348,9 @@ export const GtContextMenuItemList: React.FC<{
   onClose: () => void;
 }> = ({ items, onClose }) => (
   <>
-    {items.map((item, idx) => (
-      <React.Fragment
-        key={`${item.label}-${idx}-${item.className ?? ""}`}
-      >
-        {item.disabled && item.disabledTitle ? (
-          <span
-            className="gt-context-menu-disabled-wrapper"
-            title={item.disabledTitle}
-          >
-            <button
-              type="button"
-              className={`gt-context-menu-item ${item.className || ""}`}
-              disabled
-              onClick={(e) => e.stopPropagation()}
-              role="menuitem"
-            >
-              {item.icon && (
-                <span className="gt-context-menu-icon">{item.icon}</span>
-              )}
-              {item.label}
-            </button>
-          </span>
-        ) : (
-          <button
-            type="button"
-            className={`gt-context-menu-item ${item.className || ""}`}
-            disabled={item.disabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!item.disabled) {
-                item.onClick();
-                onClose();
-              }
-            }}
-            role="menuitem"
-            title={item.disabled ? item.disabledTitle : undefined}
-          >
-            {item.icon && (
-              <span className="gt-context-menu-icon">{item.icon}</span>
-            )}
-            {item.label}
-          </button>
-        )}
-        {item.divider && <div className="gt-context-menu-divider" />}
-      </React.Fragment>
-    ))}
+    {items.map((item, idx) =>
+      renderGtContextMenuItemRow(item, idx, "gt-ctx", onClose),
+    )}
   </>
 );
 
@@ -1104,8 +1190,8 @@ const GenericTable = <T extends Record<string, any>>({
     }
   }, [toolbar?.showFilterPills]);
 
-  const getContextMenuItems = useMemo(() => {
-    return (row: T) => buildTableContextMenuItems(actions, row);
+  const getBoundContextMenuItems = useMemo(() => {
+    return (row: T) => buildBoundTableContextMenuItems(actions, row);
   }, [actions]);
 
   // Close context menu on outside click or Escape
@@ -1942,11 +2028,12 @@ const GenericTable = <T extends Record<string, any>>({
           onMouseEnter={() => setHoveredRowIndex(index)}
           onMouseLeave={() => setHoveredRowIndex(null)}
           onContextMenu={(e) => {
-            if (!actionsColumnVisible) return;
+            // Context menu is independent of the visible actions column (e.g. showActions={false}).
+            if (actions.length === 0) return;
+            const items = getBoundContextMenuItems(row);
+            if (items.length === 0) return;
             e.preventDefault();
             e.stopPropagation();
-            const items = getContextMenuItems(row);
-            if (items.length === 0) return;
             setContextMenu({ x: e.clientX, y: e.clientY, row });
           }}
           className={`generic-table-row ${rowClassName?.(row, index) || ""} ${isClickable ? "clickable" : ""}`}
@@ -2016,16 +2103,7 @@ const GenericTable = <T extends Record<string, any>>({
           role="menu"
         >
           <GtContextMenuItemList
-            items={getContextMenuItems(contextMenu.row).map((item) => ({
-              label: item.label,
-              icon: item.icon,
-              className: item.className,
-              divider: item.divider,
-              disabled: item.disabled,
-              disabledTitle: item.disabledTitle,
-              disabledClassName: item.disabledClassName,
-              onClick: () => item.onClick(contextMenu.row),
-            }))}
+            items={getBoundContextMenuItems(contextMenu.row)}
             onClose={() => setContextMenu(null)}
           />
         </div>

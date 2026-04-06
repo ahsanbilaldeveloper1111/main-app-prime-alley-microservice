@@ -1,11 +1,18 @@
-import { useCallback, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { toast } from "react-toastify";
 import { createCrmData, updateCrmData } from "@utils/crm";
 import {
   createEmptyCrmListContactFormState,
+  resolveDefaultContactOwnerExtension,
+  type CrmExtensionLikeForOwnerDefault,
   type CrmListContactFormState,
 } from "@utils/crmContactFormFromCrmItem";
-
 export type CrmListContactFormHandlersDeps = {
   session: any;
   contactForm: CrmListContactFormState;
@@ -16,6 +23,9 @@ export type CrmListContactFormHandlersDeps = {
   setEditingContactId: Dispatch<SetStateAction<number | null>>;
   fetchCrmData: () => void;
   sourceField: "source" | "source_file";
+  /** User extension list for Owner select; used to default Owner to the logged-in user on create. */
+  extensions: readonly CrmExtensionLikeForOwnerDefault[];
+  showCreateContactSidebar: boolean;
 };
 
 function getSourceValue(form: CrmListContactFormState): string | undefined {
@@ -68,10 +78,44 @@ function buildDataPayload(
 
 export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDeps) {
   const {
-    session, contactForm, setContactForm, setCreateContactLoading,
-    setShowCreateContactSidebar, editingContactId, setEditingContactId,
-    fetchCrmData, sourceField,
+    session,
+    contactForm,
+    setContactForm,
+    setCreateContactLoading,
+    setShowCreateContactSidebar,
+    editingContactId,
+    setEditingContactId,
+    fetchCrmData,
+    sourceField,
+    extensions,
+    showCreateContactSidebar,
   } = deps;
+
+  const extensionOwnerSeedKey = useMemo(
+    () =>
+      extensions
+        .map((e) => String(e.extension ?? e.id ?? ""))
+        .join("|"),
+    [extensions],
+  );
+
+  useEffect(() => {
+    if (!showCreateContactSidebar || editingContactId != null) return;
+    if (!extensionOwnerSeedKey) return;
+    const def = resolveDefaultContactOwnerExtension(session?.user, extensions);
+    if (def == null) return;
+    setContactForm((prev: CrmListContactFormState) => {
+      if (prev.contact_owner != null) return prev;
+      return { ...prev, contact_owner: def };
+    });
+  }, [
+    showCreateContactSidebar,
+    editingContactId,
+    extensionOwnerSeedKey,
+    extensions,
+    session?.user,
+    setContactForm,
+  ]);
 
   const handleCreateContactSubmit = useCallback(
     async (addAnother: boolean) => {
@@ -79,10 +123,6 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
         buildContactPayloadFields(contactForm);
       if (!name || !contactForm.email || !contactForm.phoneNumber?.trim()) {
         toast.error("Name, email and phone are required");
-        return;
-      }
-      if (contactForm.campaign_id == null) {
-        toast.error("Campaign is required");
         return;
       }
       const userExtension = String(session?.user?.phone ?? "");
@@ -102,13 +142,17 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
           company_domain: contactForm.company_domain?.trim() || undefined,
           source: getSourceValue(contactForm),
-          tag_ids: contactForm.tags?.length
-            ? contactForm.tags.map((t) => t.id)
-            : [],
           data: dataPayload,
         });
         fetchCrmData();
-        setContactForm(createEmptyCrmListContactFormState(sourceField as any));
+        setContactForm(
+          createEmptyCrmListContactFormState(sourceField, {
+            defaultContactOwner: resolveDefaultContactOwnerExtension(
+              session?.user,
+              extensions,
+            ),
+          }),
+        );
         if (!addAnother) {
           setShowCreateContactSidebar(false);
         }
@@ -118,7 +162,16 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
         setCreateContactLoading(false);
       }
     },
-    [contactForm, fetchCrmData, session?.user, setContactForm, setCreateContactLoading, setShowCreateContactSidebar, sourceField],
+    [
+      contactForm,
+      extensions,
+      fetchCrmData,
+      session?.user,
+      setContactForm,
+      setCreateContactLoading,
+      setShowCreateContactSidebar,
+      sourceField,
+    ],
   );
 
   const handleUpdateContactSubmit = useCallback(async () => {
@@ -127,10 +180,6 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
       buildContactPayloadFields(contactForm);
     if (!name || !contactForm.email?.trim() || !contactForm.phoneNumber?.trim()) {
       toast.error("Name, email and phone are required");
-      return;
-    }
-    if (contactForm.campaign_id == null) {
-      toast.error("Campaign is required");
       return;
     }
 
@@ -146,9 +195,6 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
         source: getSourceValue(contactForm),
         scheduled_call_at: contactForm.scheduled_call_at || undefined,
         data: dataPayload,
-        tag_ids: contactForm.tags?.length
-          ? contactForm.tags.map((t) => t.id)
-          : [],
       });
       fetchCrmData();
       setShowCreateContactSidebar(false);
@@ -158,7 +204,14 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
     } finally {
       setCreateContactLoading(false);
     }
-  }, [editingContactId, contactForm, fetchCrmData, setCreateContactLoading, setShowCreateContactSidebar, setEditingContactId]);
+  }, [
+    editingContactId,
+    contactForm,
+    fetchCrmData,
+    setCreateContactLoading,
+    setShowCreateContactSidebar,
+    setEditingContactId,
+  ]);
 
   return { handleCreateContactSubmit, handleUpdateContactSubmit };
 }

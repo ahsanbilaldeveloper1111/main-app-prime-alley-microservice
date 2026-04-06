@@ -128,6 +128,20 @@ const getRecordTypeFromAuditableType = (auditableType: unknown): string => {
   return typeParts.at(-1) || "";
 };
 
+const getLeadToOrderConversionPercentage = (
+  apiValue: unknown,
+  leadsCount: number,
+  ordersCount: number,
+): number => {
+  if (typeof apiValue === "number" && !Number.isNaN(apiValue)) {
+    return apiValue;
+  }
+  if (leadsCount > 0) {
+    return (ordersCount / leadsCount) * 100;
+  }
+  return 0;
+};
+
 const getMeetingRecordNavigation = (
   recordType: unknown,
   recordId: unknown,
@@ -455,8 +469,12 @@ const CrmDashboard = () => {
   const leadsCount = dashboardData?.counts?.leads || 0;
   const dealsCount = dashboardData?.counts?.deals || 0;
   const ordersCount = dashboardData?.counts?.orders || 0;
-  const leadToDealConversionPercentage = dashboardData?.conversion_ratios?.lead_to_deal || 0;
-  
+  const leadToOrderConversionPercentage = getLeadToOrderConversionPercentage(
+    dashboardData?.conversion_ratios?.lead_to_order,
+    leadsCount,
+    ordersCount,
+  );
+
   const prospectsPercentage = prospectsCount > 0 ? 100 : 0;
   const leadsPercentage = prospectsCount > 0 ? Math.round((leadsCount / prospectsCount) * 100) : 0;
   const dealsPercentage = prospectsCount > 0 ? Math.round((dealsCount / prospectsCount) * 100) : 0;
@@ -722,7 +740,7 @@ const CrmDashboard = () => {
                   </div>
                 </div>
 
-                <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Leads → Deals conversion: {leadToDealConversionPercentage?.toFixed(2) || 0}%</p>
+                <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Leads → Orders conversion: {leadToOrderConversionPercentage.toFixed(2)}%</p>
               </Card.Body>
             </Card>
 
@@ -806,9 +824,9 @@ const CrmDashboard = () => {
               <Card.Body>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h5 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: '#1E293B' }}>Upcoming Meetings</h5>
-                  <a href="#" style={{ fontSize: '14px', color: '#3B82F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Link href="/planner/calendar" style={{ fontSize: '14px', color: '#3B82F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     View Calendar <ChevronRight size={16} />
-                  </a>
+                  </Link>
                 </div>
 
                 <ListGroup variant="flush">

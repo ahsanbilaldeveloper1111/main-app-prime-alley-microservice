@@ -1,6 +1,6 @@
 import type { FilterPill } from "@components/GenericTable";
 import { getCrmDataCounts } from "@utils/crm";
-import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspectsContactsListPageConfig";
+import { persistVisibleColumnKeys } from "@utils/crmListVisibleColumnsStorage";
 
 type AssignmentFiltersForCounts = {
   selectedCampaigns: ReadonlyArray<{ value: string }> | Set<{ value: string }>;
@@ -102,21 +102,9 @@ export function resetActiveFilterIfRemovedTabMatches(
   handleFilterChange("all");
 }
 
-export function persistCrmDataSelectedColumns(
-  columnEditorLocalStorage: CrmProspectsContactsListPageConfig["columnEditorLocalStorage"],
+export function persistCrmProspectsContactsSelectedColumns(
+  storageKey: string,
   keys: string[],
 ): void {
-  const serialized = JSON.stringify(keys);
-  if (columnEditorLocalStorage === "globalThis") {
-    if (typeof globalThis !== "undefined" && globalThis.window) {
-      globalThis.window.localStorage.setItem(
-        "crmDataSelectedColumns",
-        serialized,
-      );
-    }
-    return;
-  }
-  if (typeof globalThis !== "undefined") {
-    globalThis.localStorage?.setItem("crmDataSelectedColumns", serialized);
-  }
+  persistVisibleColumnKeys(storageKey, keys);
 }

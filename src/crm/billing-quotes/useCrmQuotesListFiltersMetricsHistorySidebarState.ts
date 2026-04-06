@@ -5,6 +5,8 @@ import {
 } from "@crm/shared/useCrmListFiltersMetricsHistoryState";
 import { useCrmListSidebarActivityModals } from "@crm/shared/useCrmListSidebarActivityModals";
 import {
+  CRM_QUOTES_LIST_VISIBLE_COLUMNS_LEGACY_KEYS,
+  CRM_QUOTES_LIST_VISIBLE_COLUMNS_STORAGE_KEY,
   crmQuotesListDefaultTableColumnIds,
   crmQuotesListValidTabFilterIds,
   selectCrmQuotesSidebarRecordEmail,
@@ -26,7 +28,13 @@ const QUOTES_INITIAL_METRICS: Record<string, number> = {
 
 type SharedFilterParams = Omit<
   UseCrmListFiltersMetricsHistoryStateParams<any>,
-  "validFilters" | "defaultColumnIds" | "initialMetrics" | "sourceField" | "loadFailedMessage"
+  | "validFilters"
+  | "defaultColumnIds"
+  | "initialMetrics"
+  | "sourceField"
+  | "loadFailedMessage"
+  | "selectedColumnsStorageKey"
+  | "selectedColumnsLegacyStorageKeys"
 >;
 
 export type UseCrmQuotesListFiltersMetricsHistorySidebarStateParams =
@@ -52,6 +60,10 @@ export function useCrmQuotesListFiltersMetricsHistorySidebarState(
     ...sharedParams,
     validFilters: [...crmQuotesListValidTabFilterIds],
     defaultColumnIds: [...crmQuotesListDefaultTableColumnIds],
+    selectedColumnsStorageKey: CRM_QUOTES_LIST_VISIBLE_COLUMNS_STORAGE_KEY,
+    selectedColumnsLegacyStorageKeys: [
+      ...CRM_QUOTES_LIST_VISIBLE_COLUMNS_LEGACY_KEYS,
+    ],
     initialMetrics: QUOTES_INITIAL_METRICS,
     sourceField: "source_file",
     loadFailedMessage: "Failed to load prospect",
