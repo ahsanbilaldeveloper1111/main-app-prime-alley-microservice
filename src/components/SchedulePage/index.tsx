@@ -1461,14 +1461,14 @@ export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePag
       />
 
       {/* ── Got feedback ── */}
-      <div style={{
+      {/* <div style={{
         position: "fixed", bottom: "16px", right: "16px",
         backgroundColor: "#fff", border: "1px solid #e0e0e0", borderRadius: "4px",
         padding: "8px 14px", fontSize: "12px", color: PRIMARY, cursor: "pointer",
         boxShadow: "0 2px 8px rgba(0,0,0,0.08)", fontFamily: FONT, zIndex: 100,
       }}>
         Got feedback?
-      </div>
+      </div> */}
     </div>
   );
 }
