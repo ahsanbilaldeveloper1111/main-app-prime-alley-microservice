@@ -410,3 +410,81 @@ export function buildMonitoringPayloadFromEvent(
     monitorDeviceType,
   }
 }
+
+type MonitoringCallStateSlice = {
+  parties?: Party[]
+  monitoring?: { monitorDn?: string; monitoredDn?: string; monitoringType?: string }
+  isMonitoring?: boolean
+  isTerminating?: boolean
+  hasActiveParticipants?: boolean
+  eventTime?: string
+}
+
+function parseEventTimeMsForMonitoringPick(eventTime: string | undefined): number {
+  if (!eventTime || typeof eventTime !== 'string') {
+    return 0
+  }
+  const ms = new Date(eventTime).getTime()
+  return Number.isFinite(ms) ? ms : 0
+}
+
+function isMonitoringCallStateCandidate(call: MonitoringCallStateSlice, userAddress: string): boolean {
+  if (!call.parties?.length) {
+    return false
+  }
+  if (call.isTerminating === true) {
+    return false
+  }
+  if (call.hasActiveParticipants === false) {
+    return false
+  }
+  if (!call.monitoring) {
+    return false
+  }
+  return (
+    (call.isMonitoring === true && Boolean(call.monitoring)) ||
+    call.monitoring.monitorDn === userAddress
+  )
+}
+
+/**
+ * After reload, `eventLog` may be empty while `callStateMap` already includes ongoing_calls merge.
+ * Picks the best supervisor monitoring session for the current user (latest by eventTime).
+ */
+export function pickBestMonitoringPayloadFromCallStateMap(
+  callStateMap: Record<string, unknown>,
+  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+  userAddress: string,
+): MonitoringPayload | null {
+  if (!userAddress || !callStateMap || typeof callStateMap !== 'object') {
+    return null
+  }
+
+  const scored: { payload: MonitoringPayload; eventTimeMs: number }[] = []
+
+  for (const call of Object.values(callStateMap)) {
+    if (!call || typeof call !== 'object') {
+      continue
+    }
+    const c = call as MonitoringCallStateSlice
+    if (!isMonitoringCallStateCandidate(c, userAddress)) {
+      continue
+    }
+    const parties = c.parties
+    const monitoring = c.monitoring
+    if (!parties?.length || !monitoring) {
+      continue
+    }
+    const payload = buildMonitoringPayloadFromEvent(parties, monitoring, dnsMap, userAddress)
+    if (!payload) {
+      continue
+    }
+    scored.push({ payload, eventTimeMs: parseEventTimeMsForMonitoringPick(c.eventTime) })
+  }
+
+  if (scored.length === 0) {
+    return null
+  }
+  scored.sort((a, b) => b.eventTimeMs - a.eventTimeMs)
+  return scored[0]?.payload ?? null
+}

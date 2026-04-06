@@ -276,7 +276,10 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
     const call = getDnCallState(dn)
     const active = hasActiveCalls(dn)
     const section = categorizeDns(dn, deviceList, call, active)
-
+    console.log("Logged in user address",userAddress);
+    if(dn == activeMonitoring.monitor && dn !== userAddress && activeMonitoring.type === "SILENT"){
+      return;
+    }
     if (!matchesFilters(dn, section)) {
       return
     }

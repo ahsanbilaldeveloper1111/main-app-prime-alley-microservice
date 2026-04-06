@@ -512,6 +512,7 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
   // This ensures in-progress calls are shown after page reload
   // Processes ALL calls from callStateMap (filtering happens at component level)
   useEffect(() => {
+    console.log('ctiStomp.callStateMap', ctiStomp.callStateMap);
     if (!ctiStomp.isInitialized || !ctiStomp.callStateMap) return;
     
     // Process all calls from callStateMap (not filtered by user - filtering happens in components)

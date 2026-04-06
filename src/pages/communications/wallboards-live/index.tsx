@@ -27,6 +27,7 @@ import {
   devicesArrayFromCompleteStateEvent,
   isCompleteStateLikeEvent,
   monitoringPayloadDiffersFromActive,
+  pickBestMonitoringPayloadFromCallStateMap,
   registeredEntriesFromDevices,
   type RegisteredDeviceEntry,
 } from '@components/communications/wallboards-live/wallboardEventParsing'
@@ -617,6 +618,49 @@ const LiveCallDashboard = () => {
       }
     }
   }, [eventLog, activeMonitoring.dn, activeMonitoring.deviceName, activeMonitoring.monitor, clearMonitoringState])
+
+  // Refill activeMonitoring after refresh from callStateMap (SSE ongoing_calls merge) when eventLog has not replayed yet
+  useEffect(() => {
+    if (!isInitialized || !userAddress || !dnsMap || !callStateMap) {
+      return
+    }
+
+    const payload = pickBestMonitoringPayloadFromCallStateMap(
+      callStateMap as Record<string, unknown>,
+      dnsMap as Parameters<typeof buildMonitoringPayloadFromEvent>[2],
+      userAddress
+    )
+    if (!payload) {
+      return
+    }
+
+    if (!monitoringPayloadDiffersFromActive(activeMonitoring, payload)) {
+      return
+    }
+
+    console.log('[Monitoring] Setting monitoring state from callStateMap (ongoing_calls / refresh)', {
+      ...payload,
+    })
+    setActiveMonitoring({
+      dn: payload.monitoredDn,
+      type: payload.monitoringType,
+      monitor: payload.monitorDn,
+      deviceName: payload.monitoredDeviceName,
+      monitorDeviceName: payload.monitorDeviceName,
+      monitorDeviceType: payload.monitorDeviceType,
+    })
+    setMonitoringStartTime((prev) =>
+      prev[payload.monitoredDn] ? prev : { ...prev, [payload.monitoredDn]: new Date() }
+    )
+  }, [
+    callStateMap,
+    dnsMap,
+    isInitialized,
+    userAddress,
+    activeMonitoring,
+    setActiveMonitoring,
+    setMonitoringStartTime,
+  ])
 
   // Detect monitoring start from events and set monitoring state
   // Use a ref to track the last processed event sequence to avoid re-processing
