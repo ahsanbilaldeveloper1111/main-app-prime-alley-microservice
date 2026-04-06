@@ -33,6 +33,20 @@ const toggleStringSelection = (list: readonly string[], value: string): string[]
   return next;
 };
 
+/** Human-readable labels for filter options; API/filter state keeps snake_case values. */
+function formatBillingHistoryFilterLabel(option: string): string {
+  if (option === "All Statuses" || option === "All Payments") return option;
+  if (option.includes("_")) {
+    return option
+      .split("_")
+      .map((part) =>
+        part.length === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+      )
+      .join(" ");
+  }
+  return option.charAt(0).toUpperCase() + option.slice(1).toLowerCase();
+}
+
 function CardActions({
   onView,
   onDownload,
@@ -135,6 +149,34 @@ const s: Record<string, React.CSSProperties> = {
     padding: "8px 24px",
     maxWidth: "calc(1376px)",
     margin: "0 auto",
+  },
+  emptyState: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "56px 24px",
+    textAlign: "center" as const,
+    backgroundColor: "#fff",
+    border: "1px solid rgb(204, 204, 204)",
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  emptyStateTitle: {
+    fontFamily: font,
+    fontSize: 18,
+    fontWeight: 600,
+    color: "#141414",
+    margin: "0 0 8px 0",
+  },
+  emptyStateHint: {
+    fontFamily: font,
+    fontSize: 14,
+    fontWeight: 400,
+    color: "#666",
+    margin: 0,
+    maxWidth: 420,
+    lineHeight: 1.5,
   },
   dateLabel: {
     fontSize: 14,
@@ -672,7 +714,6 @@ function StatusDropdown({
                     alignItems: "center",
                     gap: 10,
                     borderRadius: 6,
-                    textTransform: "capitalize",
                     backgroundColor: isSelected ? "#f0fafa" : "transparent",
                     color: isSelected ? "rgb(0,97,98)" : "#141414",
                   }}
@@ -690,7 +731,7 @@ function StatusDropdown({
                       flexShrink: 0,
                     }}
                   />
-                  {opt}
+                  {formatBillingHistoryFilterLabel(opt)}
                 </button>
               );
             })}
@@ -877,7 +918,8 @@ export default function BillingHistoryPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("All Payments");
 
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  /** Start true so the first paint shows loading, not an empty state, before `useEffect` fetches. */
+  const [loadingInvoices, setLoadingInvoices] = useState(true);
   const requestIdRef = useRef(0);
   const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<InvoiceViewData | null>(null);
@@ -970,10 +1012,10 @@ export default function BillingHistoryPage() {
 
   const filters = [
     { label: "Date range", options: ["Last 30 days", "Last 3 months", "Last 6 months", "Last 12 months", "Custom range"] },
-    { label: "Status", options: ["All Statuses", "draft", "sent", "paid", "pending", "overdue", "cancelled"] },
+    { label: "Status", options: ["All Statuses", "paid", "partially_paid", "pending", "overdue"] },
     { label: "Orders", options: ["Order issued", "Order amended", "Order cancelled"] },
     { label: "Invoices", options: ["Invoice issued", "Invoice credited", "Invoice voided"] },
-    { label: "Payments", options: ["All Payments", "pending", "completed", "failed"] },
+    // { label: "Payments", options: ["All Payments", "pending", "completed", "failed"] },
     { label: "Credits", options: ["Credit applied", "Credit issued", "Credit expired"] },
     { label: "Refunds", options: ["Refund issued", "Refund pending"] },
     { label: "Usage & Limits", options: ["Credits used", "Credits added", "Limit changed"] },
@@ -1082,9 +1124,21 @@ export default function BillingHistoryPage() {
       {/* Content */}
       <div style={s.content}>
 
-        {loadingInvoices ? (
+        {loadingInvoices && (
           <div style={{ padding: "24px 0", color: "#666" }}>Loading...</div>
-        ) : (
+        )}
+        {!loadingInvoices && invoices.length === 0 && (
+          <div style={s.emptyState} role="status" aria-live="polite">
+            <FileText size={48} color="#ccc" style={{ marginBottom: 16 }} aria-hidden />
+            <p style={s.emptyStateTitle}>No invoices found</p>
+            <p style={s.emptyStateHint}>
+              There is no billing history for the current filters. Adjust your search, date range, or status filters,
+              or check back after new invoices are available.
+            </p>
+          </div>
+        )}
+        {!loadingInvoices &&
+          invoices.length > 0 &&
           invoices.map((invoice: any) => (
             <div key={invoice.id}>
               <div style={s.dateLabel}>
@@ -1130,14 +1184,14 @@ export default function BillingHistoryPage() {
                 amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
               /> */}
             </div>
-          ))
-        )}
+          ))}
         <InvoiceViewModal
           show={showViewInvoiceModal}
           onHide={closeViewInvoiceModal}
           invoice={selectedInvoiceForView}
           loading={isInvoiceLoading}
           companyName={session?.user?.company_name || ""}
+          isTenantInvoice={true}
         />
         {invoicePaymentModal}
       </div>

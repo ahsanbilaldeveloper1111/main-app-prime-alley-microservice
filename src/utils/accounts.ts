@@ -144,6 +144,8 @@ export interface InvoiceData {
   updated_at: string;
   payment_mode: string;
   status: string;
+  /** When true, invoice view uses vendor/session tenant layout (see InvoiceViewModal). */
+  is_tenant_invoice?: boolean;
   company: CompanyData;
   reseller: ResellerData | null;
   items: InvoiceItemData[];
@@ -1170,12 +1172,12 @@ export const updateInvoice = async (
 };
 
 export const deleteInvoice = async (id: number): Promise<void> => {
-  try {
-    await axiosInstance.delete(`/accounting/invoices/${id}`);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to delete invoice");
-    throw error;
-  }
+    const response = await axiosInstance.delete(`/accounting/invoices/${id}`);
+    const result = extractData<any>(response.data);
+    if(result?.success === true){
+      return result;
+    }
+    throw new Error(result?.message);
 };
 
 // Expense Management
@@ -1879,6 +1881,11 @@ export interface CustomerCreatePayload {
 
 export interface CustomerUpdatePayload {
   name?: string;
+  crm_company_id?: string | number;
+  phone?: string;
+  email?: string;
+  /** Send only keys that changed; backend should merge into existing profile. */
+  profile?: Record<string, unknown>;
   [key: string]: any;
 }
 

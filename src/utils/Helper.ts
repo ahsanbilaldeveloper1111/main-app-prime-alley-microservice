@@ -1087,9 +1087,9 @@ function checkFieldValidation(value: unknown, type: ValidationType): boolean {
   return isValid;
 }
 
-function isValidEmail(value: unknown): boolean {
+export function isValidEmail(value: unknown): boolean {
   if (typeof value === "string") {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
   }
   return false;
 }

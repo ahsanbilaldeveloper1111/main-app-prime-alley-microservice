@@ -5,6 +5,8 @@ import { toast } from "react-toastify";
 import type { SelectBoxOption } from "@components/SelectBox";
 import { getMinifiedCompanies } from "@utils/crm";
 import { getErrorMessage } from "@utils/errors";
+import { isValidEmail } from "@utils/Helper";
+import { isOptionalWorkforcePhoneValid } from "@utils/workforcePhoneValidation";
 import {
   createCustomer,
   createInvoice,
@@ -13,6 +15,7 @@ import {
   getInvoice,
   updateCustomer,
   updateInvoice,
+  type CustomerUpdatePayload,
   type InvoiceItemData,
   type ProductPricingData,
   type InvoiceItemAPIPayload,
@@ -45,22 +48,55 @@ function computeDefaultDueDate(): string {
   return new Date(Date.UTC(targetYear, targetMonth, clampedDay)).toISOString().slice(0, 10);
 }
 
-function buildNextProfileFromForm(customerData: any, customerForm: {
-  address: string;
-  postal_code: string;
-  city: string;
-  country: string;
-}) {
-  const base = customerData?.profile && typeof customerData.profile === "object"
-    ? { ...customerData.profile }
-    : {};
-  return {
-    ...base,
-    address: customerForm.address,
-    postal_code: customerForm.postal_code,
-    city: customerForm.city,
-    country: customerForm.country,
+function normalizeCustomerField(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function buildCustomerUpdatePayload(params: {
+  crmCompanyId: string;
+  customerData: any;
+  customerForm: {
+    phone: string;
+    email: string;
+    address: string;
+    postal_code: string;
+    city: string;
+    country: string;
   };
+}): CustomerUpdatePayload {
+  const { crmCompanyId, customerData, customerForm } = params;
+  const payload: CustomerUpdatePayload = { crm_company_id: crmCompanyId };
+
+  const phoneNext = normalizeCustomerField(customerForm.phone);
+  const phonePrev = normalizeCustomerField(customerData?.phone);
+  if (phoneNext !== phonePrev) {
+    payload.phone = phoneNext || undefined;
+  }
+
+  const emailNext = normalizeCustomerField(customerForm.email).toLowerCase();
+  const emailPrev = normalizeCustomerField(customerData?.email).toLowerCase();
+  if (emailNext !== emailPrev) {
+    payload.email = emailNext || undefined;
+  }
+
+  const prevProfile =
+    customerData?.profile && typeof customerData.profile === "object"
+      ? (customerData.profile as Record<string, unknown>)
+      : {};
+  const profileKeys = ["address", "postal_code", "city", "country"] as const;
+  const profilePatch: Record<string, string> = {};
+  for (const key of profileKeys) {
+    const next = String(customerForm[key] ?? "");
+    const prev = String(prevProfile[key] ?? "");
+    if (next !== prev) {
+      profilePatch[key] = next;
+    }
+  }
+  if (Object.keys(profilePatch).length > 0) {
+    payload.profile = profilePatch;
+  }
+
+  return payload;
 }
 
 function getProductSelectPlaceholder(
@@ -202,7 +238,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
       setCustomerModalSection(section);
       setCustomerForm({
         phone: String(customerData?.phone ?? ""),
-        email: String(customerData?.email ?? ""),
+        email: String(customerData?.email ?? "").toLowerCase(),
         address: String(p?.address ?? ""),
         postal_code: String(p?.postal_code ?? ""),
         city: String(p?.city ?? ""),
@@ -219,13 +255,43 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
       toast.error("Please select a company first");
       return;
     }
+    const crmFallback = customerData?.crm_company_id;
+    const crmCompanyIdRaw =
+      selectedCompanyId ??
+      (crmFallback !== undefined && crmFallback !== null ? String(crmFallback) : "");
+    const crmCompanyId = String(crmCompanyIdRaw).trim();
+    if (crmCompanyId === "") {
+      toast.error("Please select a company first");
+      return;
+    }
+    const emailForSave = normalizeCustomerField(customerForm.email).toLowerCase();
+    if (emailForSave && !isValidEmail(emailForSave)) {
+      toast.error("Enter a valid email address (lowercase).");
+      return;
+    }
+    if (!isOptionalWorkforcePhoneValid(customerForm.phone)) {
+      toast.error("Enter a valid phone number or clear the field.");
+      return;
+    }
     try {
-      const nextProfile = buildNextProfileFromForm(customerData, customerForm);
-      const updated = await updateCustomer(customerId, {
-        phone: customerForm.phone.trim() ? customerForm.phone.trim() : undefined,
-        email: customerForm.email.trim() ? customerForm.email.trim() : undefined,
-        profile: nextProfile,
+      const payload = buildCustomerUpdatePayload({
+        crmCompanyId,
+        customerData,
+        customerForm,
       });
+      const serverCrm = normalizeCustomerField(customerData?.crm_company_id);
+      const crmChanged = crmCompanyId !== serverCrm;
+      const hasDelta =
+        crmChanged ||
+        payload.phone !== undefined ||
+        payload.email !== undefined ||
+        (payload.profile != null && Object.keys(payload.profile).length > 0);
+      if (!hasDelta) {
+        toast.info("No changes to save");
+        setCustomerModalOpen(false);
+        return;
+      }
+      const updated = await updateCustomer(crmCompanyId, payload);
       setCustomerData(updated);
       const ccy = String(updated?.profile?.currency_code ?? updated?.profile?.currency ?? "").trim().toUpperCase();
       if (ccy) setCurrencyCode(ccy);
@@ -234,7 +300,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
     } catch (e) {
       toast.error(getErrorMessage(e, "Failed to update customer"));
     }
-  }, [customerData, customerForm]);
+  }, [customerData, customerForm, selectedCompanyId]);
 
   useEffect(() => {
     if (!customerModalOpen) return;
