@@ -48,7 +48,7 @@ export function getCrmPersonRowDispositionRaw(row: unknown): string {
     (r.data as Record<string, unknown> | undefined)?.disposition,
   ];
   for (const c of candidates) {
-    if (c == null || typeof c === "object") {
+    if (typeof c !== "string" && typeof c !== "number") {
       continue;
     }
     const s = String(c).trim();

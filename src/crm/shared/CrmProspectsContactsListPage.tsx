@@ -116,7 +116,7 @@ function resolveDeleteModalProps(
 }
 
 function resolveNumericProspectId(prospect: any): number {
-  const raw = prospect?.id ?? prospect?.data?.id ?? (prospect as any)?.data?.data?.id ?? Number.NaN;
+  const raw = prospect?.id ?? prospect?.data?.id ?? prospect?.data?.data?.id ?? Number.NaN;
   return Number(raw);
 }
 
