@@ -443,8 +443,8 @@ const BillingManagement = () => {
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [dataList, setDataList] = useState<BillingProductRow[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -488,9 +488,9 @@ const BillingManagement = () => {
         params.created_at_to = memoizedFilters.created_at_to;
       }
 
-      if (pagination.sortColumn) {
-        params.sort_column = pagination.sortColumn;
-        params.sort_direction = pagination.sortDirection;
+      if (pagination.sortBy) {
+        params.sort_by = pagination.sortBy;
+        params.sort_order = pagination.sortOrder;
       }
 
       return params;
@@ -502,8 +502,8 @@ const BillingManagement = () => {
       memoizedFilters.created_at_to,
       pagination.currentPage,
       pagination.rowsPerPage,
-      pagination.sortColumn,
-      pagination.sortDirection,
+      pagination.sortBy,
+      pagination.sortOrder,
     ],
   );
 
@@ -1304,13 +1304,13 @@ const BillingManagement = () => {
                 }}
                 // Sorting
                 sortable={true}
-                defaultSortColumn={pagination.sortColumn}
-                defaultSortDirection={pagination.sortDirection}
+                defaultSortBy={pagination.sortBy}
+                defaultSortOrder={pagination.sortOrder}
                 onSort={(column, direction) => {
                   setPagination((prev) => ({
                     ...prev,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                     currentPage: 1,
                   }));
                 }}

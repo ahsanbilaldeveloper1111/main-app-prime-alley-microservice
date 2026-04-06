@@ -902,13 +902,13 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                 }}
                 // Sorting
                 sortable={true}
-                defaultSortColumn={pagination.sortColumn}
-                defaultSortDirection={pagination.sortDirection}
+                defaultSortBy={pagination.sortBy}
+                defaultSortOrder={pagination.sortOrder}
                 onSort={(column, direction) => {
                   setPagination((prev) => ({
                     ...prev,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                     currentPage: 1,
                   }));
                 }}

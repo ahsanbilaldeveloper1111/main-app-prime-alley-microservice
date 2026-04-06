@@ -421,8 +421,8 @@ export function CrmProspectsContactsListPage({
       memoizedFilters,
       pagination.currentPage,
       pagination.rowsPerPage,
-      pagination.sortColumn,
-      pagination.sortDirection,
+      pagination.sortBy,
+      pagination.sortOrder,
     ],
   );
 
@@ -855,13 +855,13 @@ export function CrmProspectsContactsListPage({
                 }}
                 // Sorting
                 sortable={true}
-                defaultSortColumn={pagination.sortColumn}
-                defaultSortDirection={pagination.sortDirection}
+                defaultSortBy={pagination.sortBy}
+                defaultSortOrder={pagination.sortOrder}
                 onSort={(column, direction) => {
                   setPagination((prev) => ({
                     ...prev,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                     currentPage: 1,
                   }));
                 }}

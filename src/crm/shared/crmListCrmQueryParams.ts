@@ -4,8 +4,8 @@ import { ModuleSlug } from "@utils/Helper";
 export type CrmListPaginationSlice = {
   currentPage: number;
   rowsPerPage: number;
-  sortColumn: string;
-  sortDirection: "asc" | "desc";
+  sortBy: string;
+  sortOrder: "asc" | "desc";
 };
 
 function copyTruthyFilterToParam(
@@ -122,9 +122,9 @@ export function buildCrmListTableCrmDataParams(
     ...overrides,
   };
   applySharedCrmListGetCrmDataFilters(params, memoizedFilters);
-  if (pagination.sortColumn) {
-    params.sort_column = pagination.sortColumn;
-    params.sort_direction = pagination.sortDirection;
+  if (pagination.sortBy) {
+    params.sort_by = pagination.sortBy;
+    params.sort_order = pagination.sortOrder;
   }
   params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
   return params;

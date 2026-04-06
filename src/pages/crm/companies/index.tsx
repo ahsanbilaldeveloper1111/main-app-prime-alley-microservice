@@ -745,8 +745,8 @@ const CrmCompanyManagement = () => {
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -890,9 +890,9 @@ const CrmCompanyManagement = () => {
         params.tag_ids = memoizedFilters.tag_ids;
       if (memoizedFilters.disposition)
         params.disposition = memoizedFilters.disposition;
-      if (pagination.sortColumn) {
-        params.sort_column = pagination.sortColumn;
-        params.sort_direction = pagination.sortDirection;
+      if (pagination.sortBy) {
+        params.sort_by = pagination.sortBy;
+        params.sort_order = pagination.sortOrder;
       }
       params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
       return params;
@@ -901,8 +901,8 @@ const CrmCompanyManagement = () => {
       memoizedFilters,
       pagination.currentPage,
       pagination.rowsPerPage,
-      pagination.sortColumn,
-      pagination.sortDirection,
+      pagination.sortBy,
+      pagination.sortOrder,
     ],
   );
 
@@ -4276,13 +4276,13 @@ const CrmCompanyManagement = () => {
                 }}
                 // Sorting
                 sortable={true}
-                defaultSortColumn={pagination.sortColumn}
-                defaultSortDirection={pagination.sortDirection}
+                defaultSortBy={pagination.sortBy}
+                defaultSortOrder={pagination.sortOrder}
                 onSort={(column, direction) => {
                   setPagination({
                     ...pagination,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                   });
                 }}
                 // Row interactions

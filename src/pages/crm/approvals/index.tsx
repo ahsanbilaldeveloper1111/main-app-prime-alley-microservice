@@ -343,8 +343,8 @@ const CrmDeals = () => {
   const [dealsPagination, setDealsPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [serverPaginationMeta, setServerPaginationMeta] = useState<{
     total: number;
@@ -412,14 +412,14 @@ const CrmDeals = () => {
       });
       if (
         includeTableSorting &&
-        dealsPagination.sortColumn
+        dealsPagination.sortBy
       ) {
-        params.sort_column = dealsPagination.sortColumn;
-        params.sort_direction = dealsPagination.sortDirection;
+        params.sort_by = dealsPagination.sortBy;
+        params.sort_order = dealsPagination.sortOrder;
       }
       return params;
     },
-    [dealsPagination.sortColumn, dealsPagination.sortDirection],
+    [dealsPagination.sortBy, dealsPagination.sortOrder],
   );
 
   // Fetch deals when filters or search change
@@ -1691,28 +1691,28 @@ const CrmDeals = () => {
     setPaginationState: (state: any) => void,
   ) => {
     const newDirection =
-      paginationState.sortColumn === column &&
-      paginationState.sortDirection === "asc"
+      paginationState.sortBy === column &&
+      paginationState.sortOrder === "asc"
         ? "desc"
         : "asc";
     setPaginationState({
       ...paginationState,
-      sortColumn: column,
-      sortDirection: newDirection,
+      sortBy: column,
+      sortOrder: newDirection,
       currentPage: 1,
     });
   };
 
   const sortData = <T extends Record<string, any>>(
     data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
+    sortBy: string,
+    sortOrder: "asc" | "desc",
   ): T[] => {
-    if (!sortColumn) return data;
+    if (!sortBy) return data;
 
     return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
 
       if (aVal === undefined) aVal = "";
       if (bVal === undefined) bVal = "";
@@ -1720,8 +1720,8 @@ const CrmDeals = () => {
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
 
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
+      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
   };
@@ -1890,10 +1890,10 @@ const CrmDeals = () => {
   };
 
   const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortColumn !== column) {
+    if (paginationState.sortBy !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return paginationState.sortDirection === "asc" ? (
+    return paginationState.sortOrder === "asc" ? (
       <ArrowUp size={14} className="ms-1" />
     ) : (
       <ArrowDown size={14} className="ms-1" />
@@ -3045,13 +3045,13 @@ const CrmDeals = () => {
                 });
               }}
               sortable={true}
-              defaultSortColumn={dealsPagination.sortColumn}
-              defaultSortDirection={dealsPagination.sortDirection}
+              defaultSortBy={dealsPagination.sortBy}
+              defaultSortOrder={dealsPagination.sortOrder}
               onSort={(column, direction) => {
                 setDealsPagination({
                   ...dealsPagination,
-                  sortColumn: column,
-                  sortDirection: direction,
+                  sortBy: column,
+                  sortOrder: direction,
                 });
               }}
               onRowDoubleClick={(row) => {

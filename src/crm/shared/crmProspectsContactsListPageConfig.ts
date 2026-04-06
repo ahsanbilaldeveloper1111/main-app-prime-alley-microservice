@@ -136,8 +136,8 @@ export type CrmProspectsContactsListPageConfig = {
     pagination: {
       currentPage: number;
       rowsPerPage: number;
-      sortColumn: string;
-      sortDirection: string;
+      sortBy: string;
+      sortOrder: "asc" | "desc";
     },
     overrides?: { page?: number; per_page?: number },
   ) => Record<string, any>;

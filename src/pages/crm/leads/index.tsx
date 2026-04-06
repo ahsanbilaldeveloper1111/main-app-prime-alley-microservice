@@ -399,8 +399,8 @@ const CrmLeads = () => {
   const [leadsPagination, setLeadsPagination] = useState({
     currentPage: 1,
     rowsPerPage: 10,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [leadsFilters, setLeadsFilters] = useState({
     assignedTo: null as string | null,
@@ -511,14 +511,14 @@ const CrmLeads = () => {
         }
       });
 
-      if (includeSort && leadsPagination.sortColumn) {
-        params.sort_column = leadsPagination.sortColumn;
-        params.sort_direction = leadsPagination.sortDirection;
+      if (includeSort && leadsPagination.sortBy) {
+        params.sort_by = leadsPagination.sortBy;
+        params.sort_order = leadsPagination.sortOrder;
       }
 
       return params;
     },
-    [leadsPagination.sortColumn, leadsPagination.sortDirection],
+    [leadsPagination.sortBy, leadsPagination.sortOrder],
   );
 
   const getLeadsTotalFromResponse = useCallback((response: any): number => {
@@ -3304,13 +3304,13 @@ const CrmLeads = () => {
                   });
                 }}
                 sortable={true}
-                defaultSortColumn={leadsPagination.sortColumn}
-                defaultSortDirection={leadsPagination.sortDirection}
+                defaultSortBy={leadsPagination.sortBy}
+                defaultSortOrder={leadsPagination.sortOrder}
                 onSort={(column, direction) => {
                   setLeadsPagination({
                     ...leadsPagination,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                   });
                 }}
                 // customizableColumns={true}

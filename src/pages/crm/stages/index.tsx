@@ -291,8 +291,8 @@ const StagesManagement = () => {
   const [stagesPagination, setStagesPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [stagesData, setStagesData] = useState<StageData[]>([]);
   const [allStagesData, setAllStagesData] = useState<StageData[]>([]);
@@ -649,17 +649,17 @@ const StagesManagement = () => {
 
   const sortData = <T,>(
     data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
+    sortBy: string,
+    sortOrder: "asc" | "desc",
   ): T[] => {
-    if (!sortColumn) return data;
+    if (!sortBy) return data;
 
     const cell = (row: T, key: string): unknown =>
       (row as Record<string, unknown>)[key];
 
     return [...data].sort((a, b) => {
-      let aVal = cell(a, sortColumn);
-      let bVal = cell(b, sortColumn);
+      let aVal = cell(a, sortBy);
+      let bVal = cell(b, sortBy);
 
       if (aVal === undefined) aVal = "";
       if (bVal === undefined) bVal = "";
@@ -667,8 +667,8 @@ const StagesManagement = () => {
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
 
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
+      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
   };
@@ -700,8 +700,8 @@ const StagesManagement = () => {
   }, [stagesData, currentFilters]);
 
   const sortedStages = useMemo(
-    () => sortData(filteredStages, stagesPagination.sortColumn, stagesPagination.sortDirection),
-    [filteredStages, stagesPagination.sortColumn, stagesPagination.sortDirection],
+    () => sortData(filteredStages, stagesPagination.sortBy, stagesPagination.sortOrder),
+    [filteredStages, stagesPagination.sortBy, stagesPagination.sortOrder],
   );
 
   const paginatedStages = useMemo(
@@ -718,8 +718,8 @@ const StagesManagement = () => {
     (column: string, direction: "asc" | "desc") => {
       setStagesPagination((prev) => ({
         ...prev,
-        sortColumn: column,
-        sortDirection: direction,
+        sortBy: column,
+        sortOrder: direction,
         currentPage: 1,
       }));
     },
@@ -1009,8 +1009,8 @@ const StagesManagement = () => {
             actions={[]}
             showActions={false}
             sortable
-            defaultSortColumn={stagesPagination.sortColumn}
-            defaultSortDirection={stagesPagination.sortDirection}
+            defaultSortBy={stagesPagination.sortBy}
+            defaultSortOrder={stagesPagination.sortOrder}
             onSort={handleStagesSort}
             loading={loadingStages}
             emptyMessage="No stages found matching your criteria"

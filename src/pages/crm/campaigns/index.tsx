@@ -508,7 +508,7 @@ type ToolbarFactoryArgs = {
   campaignsSearch: string;
   setCampaignsSearch: (v: string) => void;
   handleFiltersChange: (filters: Record<string, any>) => void;
-  setCampaignsPagination: React.Dispatch<React.SetStateAction<{ currentPage: number; rowsPerPage: number; sortColumn: string; sortDirection: "asc" | "desc" }>>;
+  setCampaignsPagination: React.Dispatch<React.SetStateAction<{ currentPage: number; rowsPerPage: number; sortBy: string; sortOrder: "asc" | "desc" }>>;
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
   filterCounts: { all: number; active: number; inactive: number };
   activeFilter: string;
@@ -1062,7 +1062,7 @@ function useCrmCampaignBootstrapData(
 
 type CrmCampaignListQueryParams = {
   refreshKey: number;
-  campaignsPagination: { currentPage: number; rowsPerPage: number; sortColumn: string; sortDirection: "asc" | "desc" };
+  campaignsPagination: { currentPage: number; rowsPerPage: number; sortBy: string; sortOrder: "asc" | "desc" };
   memoizedFilters: Record<string, any>;
   campaignFilters: {
     status: string[];
@@ -1209,8 +1209,8 @@ const CrmCampaigns = () => {
   const [campaignsPagination, setCampaignsPagination] = useState({
     currentPage: 1,
     rowsPerPage: 10,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [selectedCampaignTableColumns, setSelectedCampaignTableColumns] =
     useState<string[]>(() => {
@@ -1892,7 +1892,7 @@ const CrmCampaigns = () => {
   }, []);
 
   const handleCampaignsSort = useCallback((column: string, direction: "asc" | "desc") => {
-    setCampaignsPagination((prev) => ({ ...prev, sortColumn: column, sortDirection: direction, currentPage: 1 }));
+    setCampaignsPagination((prev) => ({ ...prev, sortBy: column, sortOrder: direction, currentPage: 1 }));
   }, []);
 
   const closeCreateEditModal = () => {
@@ -1936,8 +1936,8 @@ const CrmCampaigns = () => {
           showActions={campaignsTableActions.length > 0}
           actionsLabel="Actions"
           sortable
-          defaultSortColumn={campaignsPagination.sortColumn}
-          defaultSortDirection={campaignsPagination.sortDirection}
+          defaultSortBy={campaignsPagination.sortBy}
+          defaultSortOrder={campaignsPagination.sortOrder}
           onSort={handleCampaignsSort}
           loading={listLoading}
           emptyMessage="No campaigns found matching your criteria"

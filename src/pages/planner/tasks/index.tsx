@@ -2128,8 +2128,8 @@ const TasksListingPage = ({
                 setPager(p => ({ ...p, page, perPage }))
               }
               sortable
-              defaultSortColumn={pager.sortCol}
-              defaultSortDirection={pager.sortDir}
+              defaultSortBy={pager.sortCol}
+              defaultSortOrder={pager.sortDir}
               onSort={(col, dir) => setPager(p => ({ ...p, sortCol: col, sortDir: dir }))}
               onFirstColumnClick={row => router.push(`/planner/tasks/task-detail?id=${row.id}`)}
               loading={loading}

@@ -115,8 +115,8 @@ type StatusesTableCustomBodyProps = {
   onToggleSelectAllPage: (checked: boolean) => void;
   onToggleRow: (id: number, checked: boolean) => void;
   onReorderPageRows: (fromPageIndex: number, toPageIndex: number) => void;
-  sortColumn: string;
-  sortDirection: 'asc' | 'desc';
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
   onSort: (column: string, direction: 'asc' | 'desc') => void;
   sortable: boolean;
   onFirstColumnClick: (row: any, index: number) => void;
@@ -143,8 +143,8 @@ const StatusesTableCustomBody: React.FC<StatusesTableCustomBodyProps> = ({
   onToggleSelectAllPage,
   onToggleRow,
   onReorderPageRows,
-  sortColumn,
-  sortDirection,
+  sortBy,
+  sortOrder,
   onSort,
   sortable,
   onFirstColumnClick,
@@ -168,10 +168,10 @@ const StatusesTableCustomBody: React.FC<StatusesTableCustomBodyProps> = ({
     (hasActions ? 1 : 0);
 
   const renderSortIcon = (columnKey: string) => {
-    if (sortColumn !== columnKey) {
+    if (sortBy !== columnKey) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return sortDirection === 'asc' ? (
+    return sortOrder === 'asc' ? (
       <ArrowUp size={14} className="ms-1" />
     ) : (
       <ArrowDown size={14} className="ms-1" />
@@ -183,7 +183,7 @@ const StatusesTableCustomBody: React.FC<StatusesTableCustomBodyProps> = ({
     const col = visibleColumns.find((c) => c.key === columnKey);
     if (col?.sortable === false) return;
     const newDirection =
-      sortColumn === columnKey && sortDirection === 'asc' ? 'desc' : 'asc';
+      sortBy === columnKey && sortOrder === 'asc' ? 'desc' : 'asc';
     onSort(columnKey, newDirection);
   };
 
@@ -507,8 +507,8 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: '',
-    sortDirection: 'asc' as 'asc' | 'desc',
+    sortBy: '',
+    sortOrder: 'asc' as 'asc' | 'desc',
   });
   const [searchValue, setSearchValue] = useState('');
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
@@ -611,9 +611,9 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   }, [statuses, searchValue, colorFilter]);
 
   const sortedFilteredStatuses = useMemo(() => {
-    const col = pagination.sortColumn;
+    const col = pagination.sortBy;
     if (!col) return filteredStatuses;
-    const dir = pagination.sortDirection;
+    const dir = pagination.sortOrder;
     return [...filteredStatuses].sort((a: any, b: any) => {
       const aVal = a[col] ?? '';
       const bVal = b[col] ?? '';
@@ -623,7 +623,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       if (aStr > bStr) return dir === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [filteredStatuses, pagination.sortColumn, pagination.sortDirection]);
+  }, [filteredStatuses, pagination.sortBy, pagination.sortOrder]);
 
   const paginatedStatuses = useMemo(() => {
     const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
@@ -987,13 +987,13 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
               onReorderPageRows={(fromIdx, toIdx) => {
                 handleStatusRowReorder(fromIdx, toIdx).catch(() => undefined);
               }}
-              sortColumn={pagination.sortColumn}
-              sortDirection={pagination.sortDirection}
+              sortBy={pagination.sortBy}
+              sortOrder={pagination.sortOrder}
               onSort={(column, direction) => {
                 setPagination((prev) => ({
                   ...prev,
-                  sortColumn: column,
-                  sortDirection: direction,
+                  sortBy: column,
+                  sortOrder: direction,
                   currentPage: 1,
                 }));
               }}
@@ -1031,13 +1031,13 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
             });
           }}
           sortable={true}
-          defaultSortColumn={pagination.sortColumn}
-          defaultSortDirection={pagination.sortDirection}
+          defaultSortBy={pagination.sortBy}
+          defaultSortOrder={pagination.sortOrder}
           onSort={(column, direction) => {
             setPagination((prev) => ({
               ...prev,
-              sortColumn: column,
-              sortDirection: direction,
+              sortBy: column,
+              sortOrder: direction,
               currentPage: 1,
             }));
           }}

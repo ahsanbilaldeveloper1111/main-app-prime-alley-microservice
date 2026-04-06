@@ -65,8 +65,8 @@ const MembersTab: React.FC<MembersTabProps> = ({
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: '',
-    sortDirection: 'asc' as 'asc' | 'desc',
+    sortBy: '',
+    sortOrder: 'asc' as 'asc' | 'desc',
   });
   const [searchValue, setSearchValue] = useState('');
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
@@ -654,13 +654,13 @@ const MembersTab: React.FC<MembersTabProps> = ({
           
           // Sorting
           sortable={true}
-          defaultSortColumn={pagination.sortColumn}
-          defaultSortDirection={pagination.sortDirection}
+          defaultSortBy={pagination.sortBy}
+          defaultSortOrder={pagination.sortOrder}
           onSort={(column, direction) => {
             setPagination((prev) => ({
               ...prev,
-              sortColumn: column,
-              sortDirection: direction,
+              sortBy: column,
+              sortOrder: direction,
               currentPage: 1,
             }));
           }}
