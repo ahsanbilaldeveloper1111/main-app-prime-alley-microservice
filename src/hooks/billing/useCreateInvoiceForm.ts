@@ -49,7 +49,19 @@ function computeDefaultDueDate(): string {
 }
 
 function normalizeCustomerField(value: unknown): string {
-  return String(value ?? "").trim();
+  if (value == null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value).trim() : "";
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  return "";
 }
 
 function buildCustomerUpdatePayload(params: {
@@ -86,8 +98,8 @@ function buildCustomerUpdatePayload(params: {
   const profileKeys = ["address", "postal_code", "city", "country"] as const;
   const profilePatch: Record<string, string> = {};
   for (const key of profileKeys) {
-    const next = String(customerForm[key] ?? "");
-    const prev = String(prevProfile[key] ?? "");
+    const next = normalizeCustomerField(customerForm[key]);
+    const prev = normalizeCustomerField(prevProfile[key]);
     if (next !== prev) {
       profilePatch[key] = next;
     }

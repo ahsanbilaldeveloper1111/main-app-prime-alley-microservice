@@ -1,5 +1,4 @@
 import React from "react";
-import PrimeAlleyLogo from "@assets/images/Prime3.png";
 import { Alert, Button, Col, Modal, Row } from "react-bootstrap";
 import moment from "moment";
 import { formatNumber, getCompanyByCrmId, GlobalDateFormat } from "@utils/Helper";
@@ -52,6 +51,7 @@ export type InvoiceIssuingParty = {
 export type InvoiceViewData = {
   /** When true, use vendor + session bill-to + vendor bank accounts; when false, reseller/CRM legacy behavior. */
   is_tenant_invoice?: boolean;
+  crm_company_id?: string | number;
   id?: string | number;
   invoice_number?: string;
   invoice_date?: string;
@@ -74,9 +74,19 @@ export type InvoiceViewData = {
     line_total?: string | number;
   }>;
   company?: {
+    name?: string;
+    email?: string;
+    phone?: string;
     crm_company_id?: string | number;
     country?: string;
-    profile?: { address?: string; tax_id?: string | number; vat_rate?: string | number | null };
+    profile?: {
+      address?: string;
+      tax_id?: string | number;
+      vat_rate?: string | number | null;
+      city?: unknown;
+      logo_url?: string;
+      logo?: string;
+    };
     vendor?: InvoiceIssuingParty;
     /** Legacy issuing party when `vendor` is absent (older payloads). */
     reseller?: InvoiceIssuingParty;
@@ -180,13 +190,21 @@ function VendorHeader({
   companyName,
   isTenantInvoice,
 }: Readonly<{ invoice: InvoiceViewData; companyName: string; isTenantInvoice: boolean }>) {
-  const vendor = getInvoiceIssuingParty(invoice.company, isTenantInvoice);
-  const profile = vendor?.profile;
-  const headerTitle = isTenantInvoice ? vendor?.name || "" : companyName || "";
+  const company = invoice.company;
+  const vendor = getInvoiceIssuingParty(company, isTenantInvoice);
+  const issuingProfile = isTenantInvoice ? vendor?.profile : company?.profile;
+  const headerTitle = isTenantInvoice
+    ? vendor?.name || ""
+    : company?.name?.trim() || companyName || "";
+  const headerPhone = isTenantInvoice ? vendor?.phone : company?.phone;
+  const headerEmail = isTenantInvoice ? vendor?.email : company?.email;
 
-  const showTaxInvoice = isPositiveNumberLike(profile?.tax_id);
-  const cityValue = profile?.city;
-  const showCityLine = typeof cityValue === "string" ? Boolean(cityValue.trim()) : isPositiveNumberLike(cityValue);
+  const showTaxInvoice = isPositiveNumberLike(issuingProfile?.tax_id);
+  const cityValue = issuingProfile?.city;
+  const showCityCountryLineTenant =
+    typeof cityValue === "string" ? Boolean(cityValue.trim()) : isPositiveNumberLike(cityValue);
+  const showCountryLineLegacy =
+    !isTenantInvoice && typeof company?.country === "string" && Boolean(company.country.trim());
   const showDueAmount = parseMoney(invoice.amount_due) > 0;
 
   return (
@@ -196,32 +214,33 @@ function VendorHeader({
 
         {showTaxInvoice && (
           <h5 className="mb-3 fw-bold" style={{ color: "#14509e" }}>
-            TAX INVOICE {String(profile?.tax_id ?? "")}
+            TAX INVOICE {String(issuingProfile?.tax_id ?? "")}
           </h5>
         )}
 
-        <p className="mb-2">{profile?.address || ""}</p>
-        {showCityLine && (
+        <p className="mb-2">{issuingProfile?.address || ""}</p>
+        {isTenantInvoice && showCityCountryLineTenant && (
           <p className="mb-2">
             {String(cityValue ?? "")},{" "}
-            {profile?.country || ""}
+            {vendor?.profile?.country || ""}
           </p>
         )}
+        {showCountryLineLegacy && <p className="mb-2">{company?.country}</p>}
 
         <p className="mb-2">
           <b>Phone:</b>
-          {vendor?.phone || ""}
+          {headerPhone || ""}
         </p>
         <p className="mb-3">
-          <b>Email:</b> {vendor?.email || ""}
+          <b>Email:</b> {headerEmail || ""}
         </p>
       </Col>
 
       <Col md={6}>
         <div>
-          {issuingPartyLogoSrc(profile) && (
+          {issuingPartyLogoSrc(issuingProfile) && (
             <img
-              src={issuingPartyLogoSrc(profile)}
+              src={issuingPartyLogoSrc(issuingProfile)}
               alt="Logo"
               className="img-fluid"
               style={{ maxWidth: "60%", float: "right" }}
@@ -257,9 +276,12 @@ function BillTo({
   const { data: session } = useSession();
   const company = invoice.company;
   const showTrn = isPositiveNumberLike(company?.profile?.tax_id);
+  const sessionCompanyName =
+    (session?.user as { company_name?: string } | undefined)?.company_name ?? "";
+  const billToCrmId = company?.crm_company_id ?? invoice.crm_company_id;
   const billToName = isTenantInvoice
-    ? (session?.user as { company_name?: string } | undefined)?.company_name ?? ""
-    : getCompanyByCrmId(company?.crm_company_id, companyOptions) ?? "";
+    ? sessionCompanyName
+    : getCompanyByCrmId(billToCrmId, companyOptions) ?? company?.name?.trim() ?? "";
 
   return (
     <Col md={6}>
