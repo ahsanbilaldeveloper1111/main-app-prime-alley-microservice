@@ -78,7 +78,8 @@ const PAY_NOW_ELIGIBLE_STATUSES = new Set<string>([
   STATUS_PARTIALLY_PAID,
 ]);
 
-const BILLING_INVOICES_COLUMN_STORAGE_KEY = "customerInvoicesSelectedColumns";
+/** v2: default set includes GenericTable `actions` column key so row actions show unless hidden in column editor. */
+const BILLING_INVOICES_COLUMN_STORAGE_KEY = "customerInvoicesSelectedColumns_v2";
 
 const DEFAULT_INVOICE_TABLE_COLUMN_KEYS: string[] = [
   "invoice_number",
@@ -87,6 +88,7 @@ const DEFAULT_INVOICE_TABLE_COLUMN_KEYS: string[] = [
   "amount_due",
   "invoice_date",
   "due_date",
+  "actions",
 ];
 
 function parseStoredInvoiceColumnKeys(
@@ -952,7 +954,6 @@ const InvoiceList = () => {
     setDeletingInvoice(true);
     try {
       await deleteInvoice(deleteTarget.id);
-      toast.success("Invoice deleted");
       setRefreshKey((prev) => prev + 1);
       setDeleteModalOpen(false);
       setDeleteTarget(null);
@@ -1574,6 +1575,7 @@ const InvoiceList = () => {
         invoice={selectedInvoiceForView}
         companyName={session?.user?.company_name || ""}
         companyOptions={companyOptions}
+        isTenantInvoice={false}
       />
 
       <ColumnEditorModal
