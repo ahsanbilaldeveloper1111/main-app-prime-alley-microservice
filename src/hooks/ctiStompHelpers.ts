@@ -463,7 +463,7 @@ export function applyCallEventToCallStateMap(
     heldByAddress,
     // Supervision metadata must follow each event; otherwise refresh/ongoing merge loses monitoring on the next event.
     isMonitoring: evt.isMonitoring ?? base.isMonitoring,
-    monitoring: evt.monitoring !== undefined ? evt.monitoring : base.monitoring,
+    monitoring: evt.monitoring ?? base.monitoring,
   };
 
   if (shouldTerminate) {
@@ -541,54 +541,57 @@ const ONGOING_CALLS_PAYLOAD_METADATA_KEYS = new Set([
 export function extractCallsByDnFromOngoingCallsPayload(
   data: unknown,
 ): Record<string, unknown> | null {
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return null;
-  }
-  const o = data as Record<string, unknown>;
-  if (
-    o.callsByDn &&
-    typeof o.callsByDn === "object" &&
-    !Array.isArray(o.callsByDn)
-  ) {
-    return o.callsByDn as Record<string, unknown>;
-  }
-  if (
-    o.calls_by_dn &&
-    typeof o.calls_by_dn === "object" &&
-    !Array.isArray(o.calls_by_dn)
-  ) {
-    return o.calls_by_dn as Record<string, unknown>;
-  }
+  if (!isRecord(data)) return null;
 
-  const keys = Object.keys(o).filter((k) => !ONGOING_CALLS_PAYLOAD_METADATA_KEYS.has(k));
-  if (keys.length === 0) {
-    return null;
-  }
+  const o = data as Record<string, unknown>;
+
+  const direct = getCallsByDn(o, "callsByDn") ?? getCallsByDn(o, "calls_by_dn");
+  if (direct) return direct;
+
+  const keys = Object.keys(o).filter(
+    (k) => !ONGOING_CALLS_PAYLOAD_METADATA_KEYS.has(k),
+  );
+  if (!keys.length) return null;
 
   const firstVal = o[keys[0]];
-  if (
-    firstVal &&
-    typeof firstVal === "object" &&
-    !Array.isArray(firstVal) &&
-    typeof (firstVal as Record<string, unknown>).callId === "string" &&
-    Array.isArray((firstVal as Record<string, unknown>).parties)
-  ) {
-    const out: Record<string, unknown> = {};
-    for (const k of keys) {
-      const v = o[k];
-      if (
-        v &&
-        typeof v === "object" &&
-        !Array.isArray(v) &&
-        typeof (v as Record<string, unknown>).callId === "string"
-      ) {
-        out[k] = v;
-      }
+  if (!isCallLike(firstVal)) return null;
+
+  const out: Record<string, unknown> = {};
+
+  for (const k of keys) {
+    const v = o[k];
+    if (isCallLike(v, false)) {
+      out[k] = v;
     }
-    return Object.keys(out).length > 0 ? out : null;
   }
 
-  return null;
+  return Object.keys(out).length ? out : null;
+}
+
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return !!val && typeof val === "object" && !Array.isArray(val);
+}
+
+function getCallsByDn(
+  obj: Record<string, unknown>,
+  key: string,
+): Record<string, unknown> | null {
+  const val = obj[key];
+  return isRecord(val) ? val : null;
+}
+
+function isCallLike(
+  val: unknown,
+  requireParties: boolean = true,
+): val is Record<string, unknown> {
+  if (!isRecord(val)) return false;
+
+  const rec = val as Record<string, unknown>;
+
+  const hasCallId = typeof rec.callId === "string";
+  const hasParties = Array.isArray(rec.parties);
+
+  return requireParties ? hasCallId && hasParties : hasCallId;
 }
 
 export function mergeOngoingCallsIntoCallStateMap(

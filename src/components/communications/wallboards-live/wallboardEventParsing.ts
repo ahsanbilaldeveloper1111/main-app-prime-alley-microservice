@@ -518,26 +518,26 @@ function inferMonitorDnPairFromInternalParties(
   parties: Party[],
   dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
 ): { monitorDn: string; monitoredDn: string } | null {
-  const isKnownDn = (a: string | undefined) => Boolean(a && Object.prototype.hasOwnProperty.call(dnsMap, String(a)))
+  const isKnownDn = (a: string | undefined) => Boolean(a && Object.hasOwn(dnsMap, String(a)))
 
   for (const p of parties) {
     if (p.callStatus === 'DROPPED' || p.callStatus === 'DISCONNECTED') {
       continue
     }
-    const ca = p.callingAddress != null ? String(p.callingAddress) : ''
-    const da = p.calledAddress != null ? String(p.calledAddress) : ''
-    if (!isKnownDn(ca) || !isKnownDn(da) || ca === da) {
+    const callingAddress = String(p.callingAddress ?? '');
+    const calledAddress = String(p.calledAddress ?? '');
+    if (!isKnownDn(callingAddress) || !isKnownDn(calledAddress) || callingAddress === calledAddress) {
       continue
     }
-    const devA = resolveMonitoredDeviceNameFromParties(parties, ca, da)
-    const devB = resolveMonitoredDeviceNameFromParties(parties, da, ca)
+    const devA = resolveMonitoredDeviceNameFromParties(parties, callingAddress, calledAddress)
+    const devB = resolveMonitoredDeviceNameFromParties(parties, calledAddress, callingAddress)
     if (devA && !devB) {
-      return { monitorDn: ca, monitoredDn: da }
+      return { monitorDn: callingAddress, monitoredDn: calledAddress }
     }
     if (devB && !devA) {
-      return { monitorDn: da, monitoredDn: ca }
+      return { monitorDn: calledAddress, monitoredDn: callingAddress }
     }
-    return { monitorDn: ca, monitoredDn: da }
+    return { monitorDn: callingAddress, monitoredDn: calledAddress }
   }
   return null
 }
@@ -637,8 +637,8 @@ function callHasLiveSupervisorAndAgentParties(
   supervisorDn: string,
   agentDn: string
 ): boolean {
-  const sup = String(supervisorDn)
-  const ag = String(agentDn)
+  const supervisor = String(supervisorDn)
+  const agent = String(agentDn)
   if (!call.parties?.length) {
     return false
   }
@@ -646,9 +646,9 @@ function callHasLiveSupervisorAndAgentParties(
     if (p.callStatus === 'DROPPED' || p.callStatus === 'DISCONNECTED') {
       return false
     }
-    const ca = p.callingAddress != null ? String(p.callingAddress) : ''
-    const da = p.calledAddress != null ? String(p.calledAddress) : ''
-    return (ca === sup || da === sup) && (ca === ag || da === ag)
+    const callingAddress = String(p.callingAddress ?? '');
+    const calledAddress = String(p.calledAddress ?? '');
+    return (callingAddress === supervisor || calledAddress === supervisor) && (callingAddress === agent || calledAddress === agent)
   })
 }
 
