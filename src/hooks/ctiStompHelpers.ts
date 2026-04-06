@@ -461,6 +461,9 @@ export function applyCallEventToCallStateMap(
     hasActiveParticipants: resolveHasActiveParticipantsForEvent(evt, hasActiveParties),
     eventName: evt.eventName || base.eventName,
     heldByAddress,
+    // Supervision metadata must follow each event; otherwise refresh/ongoing merge loses monitoring on the next event.
+    isMonitoring: evt.isMonitoring ?? base.isMonitoring,
+    monitoring: evt.monitoring !== undefined ? evt.monitoring : base.monitoring,
   };
 
   if (shouldTerminate) {
@@ -520,6 +523,72 @@ export function resolveOngoingCallCurrentState(
     return activeParties[0]?.callStatus || "UNKNOWN";
   }
   return currentState || "UNKNOWN";
+}
+
+/** Keys to ignore when detecting a flat call-id → call-state map from ongoing-calls payloads. */
+const ONGOING_CALLS_PAYLOAD_METADATA_KEYS = new Set([
+  "type",
+  "message",
+  "timestamp",
+  "status",
+  "error",
+]);
+
+/**
+ * CTI may send ongoing calls as `{ callsByDn: { ... } }` or as a flat map of callId → call state.
+ * Normalizes to a single map suitable for {@link mergeOngoingCallsIntoCallStateMap}.
+ */
+export function extractCallsByDnFromOngoingCallsPayload(
+  data: unknown,
+): Record<string, unknown> | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    return null;
+  }
+  const o = data as Record<string, unknown>;
+  if (
+    o.callsByDn &&
+    typeof o.callsByDn === "object" &&
+    !Array.isArray(o.callsByDn)
+  ) {
+    return o.callsByDn as Record<string, unknown>;
+  }
+  if (
+    o.calls_by_dn &&
+    typeof o.calls_by_dn === "object" &&
+    !Array.isArray(o.calls_by_dn)
+  ) {
+    return o.calls_by_dn as Record<string, unknown>;
+  }
+
+  const keys = Object.keys(o).filter((k) => !ONGOING_CALLS_PAYLOAD_METADATA_KEYS.has(k));
+  if (keys.length === 0) {
+    return null;
+  }
+
+  const firstVal = o[keys[0]];
+  if (
+    firstVal &&
+    typeof firstVal === "object" &&
+    !Array.isArray(firstVal) &&
+    typeof (firstVal as Record<string, unknown>).callId === "string" &&
+    Array.isArray((firstVal as Record<string, unknown>).parties)
+  ) {
+    const out: Record<string, unknown> = {};
+    for (const k of keys) {
+      const v = o[k];
+      if (
+        v &&
+        typeof v === "object" &&
+        !Array.isArray(v) &&
+        typeof (v as Record<string, unknown>).callId === "string"
+      ) {
+        out[k] = v;
+      }
+    }
+    return Object.keys(out).length > 0 ? out : null;
+  }
+
+  return null;
 }
 
 export function mergeOngoingCallsIntoCallStateMap(

@@ -1,5 +1,7 @@
 /** Pure helpers for wallboard live dashboard eventLog / dnsMap parsing (Sonar: lowers index.tsx complexity). */
 
+import { pickMostRecentCall } from '@hooks/ctiStompHelpers'
+
 export type RegisteredDeviceEntry = {
   deviceName: string
   when: string
@@ -101,6 +103,7 @@ type Party = {
   calledAddress?: string
   callingDeviceName?: string
   calledDeviceName?: string
+  callStatus?: string
 }
 
 export function resolveMonitoredDeviceNameFromParties(
@@ -365,16 +368,50 @@ export function monitoringPayloadDiffersFromActive(
   )
 }
 
-export function buildMonitoringPayloadFromEvent(
+/** Latest event in the log that carries supervision metadata (last event is often unrelated, e.g. dns_states). */
+export function findLatestMonitoringEventFromLog(eventLog: readonly unknown[]): {
+  isMonitoring?: boolean
+  monitoring?: { monitorDn?: string; monitoredDn?: string; monitoringType?: string }
+  parties: Party[]
+  sequence?: number
+  callId?: string
+  eventName?: string
+  eventType?: string
+} | null {
+  for (let i = eventLog.length - 1; i >= 0; i -= 1) {
+    const raw = eventLog[i]
+    if (!raw || typeof raw !== 'object') {
+      continue
+    }
+    const evt = raw as {
+      isMonitoring?: boolean
+      monitoring?: { monitorDn?: string; monitoredDn?: string; monitoringType?: string }
+      parties?: Party[]
+    }
+    if (evt.isMonitoring && evt.monitoring && evt.parties?.length) {
+      return raw as {
+        isMonitoring?: boolean
+        monitoring?: { monitorDn?: string; monitoredDn?: string; monitoringType?: string }
+        parties: Party[]
+        sequence?: number
+        callId?: string
+        eventName?: string
+        eventType?: string
+      }
+    }
+  }
+  return null
+}
+
+function buildMonitoringPayloadFromPartiesAndDns(
   parties: Party[],
   monitoring: { monitorDn?: string; monitoredDn?: string; monitoringType?: string },
   dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
-  userAddress: string
 ): MonitoringPayload | null {
   const monitorDn = monitoring.monitorDn
   const monitoredDn = monitoring.monitoredDn
-  const monitoringType = monitoring.monitoringType
-  if (monitorDn !== userAddress || !monitoredDn || !monitoringType) {
+  const monitoringType = (monitoring.monitoringType && String(monitoring.monitoringType).trim()) || 'SILENT'
+  if (!monitorDn || !monitoredDn) {
     return null
   }
 
@@ -411,6 +448,33 @@ export function buildMonitoringPayloadFromEvent(
   }
 }
 
+/** Supervisor-only: used when the viewer must be the monitor (e.g. dialer-owned flows). */
+export function buildMonitoringPayloadFromEvent(
+  parties: Party[],
+  monitoring: { monitorDn?: string; monitoredDn?: string; monitoringType?: string },
+  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+  userAddress: string
+): MonitoringPayload | null {
+  const monitorDn = monitoring.monitorDn
+  if (monitorDn !== userAddress) {
+    return null
+  }
+  return buildMonitoringPayloadFromPartiesAndDns(parties, monitoring, dnsMap)
+}
+
+/**
+ * Wallboard: same device resolution as {@link buildMonitoringPayloadFromEvent} but does not require
+ * the current user to be the supervisor. Every SSE client (any logged-in viewer) needs the same
+ * active monitoring snapshot for cards/sections.
+ */
+export function buildWallboardMonitoringPayloadFromEvent(
+  parties: Party[],
+  monitoring: { monitorDn?: string; monitoredDn?: string; monitoringType?: string },
+  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+): MonitoringPayload | null {
+  return buildMonitoringPayloadFromPartiesAndDns(parties, monitoring, dnsMap)
+}
+
 type MonitoringCallStateSlice = {
   parties?: Party[]
   monitoring?: { monitorDn?: string; monitoredDn?: string; monitoringType?: string }
@@ -428,7 +492,7 @@ function parseEventTimeMsForMonitoringPick(eventTime: string | undefined): numbe
   return Number.isFinite(ms) ? ms : 0
 }
 
-function isMonitoringCallStateCandidate(call: MonitoringCallStateSlice, userAddress: string): boolean {
+function isWallboardMonitoringCallStateCandidate(call: MonitoringCallStateSlice): boolean {
   if (!call.parties?.length) {
     return false
   }
@@ -438,25 +502,93 @@ function isMonitoringCallStateCandidate(call: MonitoringCallStateSlice, userAddr
   if (call.hasActiveParticipants === false) {
     return false
   }
-  if (!call.monitoring) {
-    return false
+  const m = call.monitoring
+  if (m?.monitorDn && m?.monitoredDn) {
+    return true
   }
-  return (
-    (call.isMonitoring === true && Boolean(call.monitoring)) ||
-    call.monitoring.monitorDn === userAddress
+  // Ongoing-calls / replay snapshots may omit the monitoring block but keep isMonitoring.
+  return call.isMonitoring === true
+}
+
+/**
+ * When {@link mergeOngoingCallsIntoCallStateMap} or replay has isMonitoring but no structured
+ * monitoring object, infer supervisor vs agent from two known internal DNs on one party leg.
+ */
+function inferMonitorDnPairFromInternalParties(
+  parties: Party[],
+  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+): { monitorDn: string; monitoredDn: string } | null {
+  const isKnownDn = (a: string | undefined) => Boolean(a && Object.prototype.hasOwnProperty.call(dnsMap, String(a)))
+
+  for (const p of parties) {
+    if (p.callStatus === 'DROPPED' || p.callStatus === 'DISCONNECTED') {
+      continue
+    }
+    const ca = p.callingAddress != null ? String(p.callingAddress) : ''
+    const da = p.calledAddress != null ? String(p.calledAddress) : ''
+    if (!isKnownDn(ca) || !isKnownDn(da) || ca === da) {
+      continue
+    }
+    const devA = resolveMonitoredDeviceNameFromParties(parties, ca, da)
+    const devB = resolveMonitoredDeviceNameFromParties(parties, da, ca)
+    if (devA && !devB) {
+      return { monitorDn: ca, monitoredDn: da }
+    }
+    if (devB && !devA) {
+      return { monitorDn: da, monitoredDn: ca }
+    }
+    return { monitorDn: ca, monitoredDn: da }
+  }
+  return null
+}
+
+function tryBuildWallboardMonitoringPayloadFromCallStateSlice(
+  call: MonitoringCallStateSlice,
+  dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
+): MonitoringPayload | null {
+  const parties = call.parties
+  if (!parties?.length) {
+    return null
+  }
+  const m = call.monitoring
+  if (m?.monitorDn && m?.monitoredDn) {
+    return buildWallboardMonitoringPayloadFromEvent(
+      parties,
+      {
+        monitorDn: m.monitorDn,
+        monitoredDn: m.monitoredDn,
+        monitoringType: m.monitoringType,
+      },
+      dnsMap,
+    )
+  }
+  if (call.isMonitoring !== true) {
+    return null
+  }
+  const inferred = inferMonitorDnPairFromInternalParties(parties, dnsMap)
+  if (!inferred) {
+    return null
+  }
+  return buildWallboardMonitoringPayloadFromEvent(
+    parties,
+    {
+      monitorDn: inferred.monitorDn,
+      monitoredDn: inferred.monitoredDn,
+      monitoringType: m?.monitoringType,
+    },
+    dnsMap,
   )
 }
 
 /**
  * After reload, `eventLog` may be empty while `callStateMap` already includes ongoing_calls merge.
- * Picks the best supervisor monitoring session for the current user (latest by eventTime).
+ * Picks the latest active supervision session (by eventTime) for wallboard UI — same for every viewer.
  */
 export function pickBestMonitoringPayloadFromCallStateMap(
   callStateMap: Record<string, unknown>,
   dnsMap: Record<string, { devices?: Record<string, DnsDevice> } | undefined>,
-  userAddress: string,
 ): MonitoringPayload | null {
-  if (!userAddress || !callStateMap || typeof callStateMap !== 'object') {
+  if (!callStateMap || typeof callStateMap !== 'object') {
     return null
   }
 
@@ -467,15 +599,14 @@ export function pickBestMonitoringPayloadFromCallStateMap(
       continue
     }
     const c = call as MonitoringCallStateSlice
-    if (!isMonitoringCallStateCandidate(c, userAddress)) {
+    if (!isWallboardMonitoringCallStateCandidate(c)) {
       continue
     }
     const parties = c.parties
-    const monitoring = c.monitoring
-    if (!parties?.length || !monitoring) {
+    if (!parties?.length) {
       continue
     }
-    const payload = buildMonitoringPayloadFromEvent(parties, monitoring, dnsMap, userAddress)
+    const payload = tryBuildWallboardMonitoringPayloadFromCallStateSlice(c, dnsMap)
     if (!payload) {
       continue
     }
@@ -487,4 +618,126 @@ export function pickBestMonitoringPayloadFromCallStateMap(
   }
   scored.sort((a, b) => b.eventTimeMs - a.eventTimeMs)
   return scored[0]?.payload ?? null
+}
+
+type LooseWallboardCall = {
+  isTerminating?: boolean
+  isMonitoring?: boolean
+  parties?: Array<{
+    callingAddress?: string
+    calledAddress?: string
+    callStatus?: string
+  }>
+  eventTime?: string
+  callId?: string
+}
+
+function callHasLiveSupervisorAndAgentParties(
+  call: LooseWallboardCall,
+  supervisorDn: string,
+  agentDn: string
+): boolean {
+  const sup = String(supervisorDn)
+  const ag = String(agentDn)
+  if (!call.parties?.length) {
+    return false
+  }
+  return call.parties.some((p) => {
+    if (p.callStatus === 'DROPPED' || p.callStatus === 'DISCONNECTED') {
+      return false
+    }
+    const ca = p.callingAddress != null ? String(p.callingAddress) : ''
+    const da = p.calledAddress != null ? String(p.calledAddress) : ''
+    return (ca === sup || da === sup) && (ca === ag || da === ag)
+  })
+}
+
+function shapeCallLikeGetDnCallState(dn: string, call: LooseWallboardCall): unknown {
+  const activeParties =
+    call.parties?.filter(
+      (p) => p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
+    ) ?? []
+  if (activeParties.length === 0) {
+    return null
+  }
+  const dnStr = String(dn)
+  const matchedParty = activeParties.find(
+    (p) => String(p.callingAddress) === dnStr || String(p.calledAddress) === dnStr
+  )
+  if (!matchedParty) {
+    return null
+  }
+  return {
+    ...call,
+    parties: activeParties,
+    role: String(matchedParty.callingAddress) === dnStr ? 'calling' : 'called',
+    isActive: true,
+  }
+}
+
+/**
+ * Prefer the agent's customer/handled call, not the supervisor–agent observation leg.
+ * `getCallStateForDevice` alone can still pick the monitoring session when it is most recent
+ * and the same device appears on both calls.
+ */
+export function pickMonitoredAgentWallboardCall(
+  monitoredDn: string,
+  monitorDn: string | undefined,
+  getCallStatesForDn: (dn: string) => unknown[],
+  getCallStateForDevice: (dn: string, deviceName: string) => unknown,
+  deviceName: string | null | undefined
+): unknown {
+  const calls = getCallStatesForDn(monitoredDn) as LooseWallboardCall[]
+  const withoutObservationLeg = calls.filter((c) => {
+    if (c.isTerminating) {
+      return false
+    }
+    if (c.isMonitoring === true) {
+      return false
+    }
+    if (monitorDn && callHasLiveSupervisorAndAgentParties(c, monitorDn, monitoredDn)) {
+      return false
+    }
+    return true
+  })
+
+  if (withoutObservationLeg.length > 0) {
+    const mostRecent = pickMostRecentCall(withoutObservationLeg)
+    const shaped = shapeCallLikeGetDnCallState(monitoredDn, mostRecent)
+    if (shaped) {
+      return shaped
+    }
+  }
+
+  if (deviceName != null && String(deviceName) !== '') {
+    const deviceCall = getCallStateForDevice(String(monitoredDn), String(deviceName))
+    if (deviceCall) {
+      return deviceCall
+    }
+  }
+
+  return null
+}
+
+export function resolveWallboardDisplayCall(
+  dn: string,
+  activeMonitoring: { dn?: string | null; monitor?: string; deviceName?: string | null },
+  getDnCallState: (d: string) => unknown,
+  getCallStateForDevice: (d: string, deviceName: string) => unknown,
+  getCallStatesForDn: (d: string) => unknown[]
+): unknown {
+  const monitoredDn = activeMonitoring?.dn
+  if (monitoredDn != null && String(dn) === String(monitoredDn)) {
+    const picked = pickMonitoredAgentWallboardCall(
+      String(monitoredDn),
+      activeMonitoring.monitor,
+      getCallStatesForDn,
+      getCallStateForDevice,
+      activeMonitoring.deviceName
+    )
+    if (picked) {
+      return picked
+    }
+  }
+  return getDnCallState(dn)
 }
