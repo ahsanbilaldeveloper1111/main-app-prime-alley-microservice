@@ -38,6 +38,8 @@ import CrmExportModal from "@components/CrmExportModal";
 import { CrmFilterBar as FilterBar } from "@components/crm/CrmListPageUi";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import {
+  createEmptyCrmListContactFormState,
+  resolveDefaultContactOwnerExtension,
   type CrmListContactFormState,
 } from "@utils/crmContactFormFromCrmItem";
 import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
@@ -89,6 +91,8 @@ import {
   useCrmQuotesListTagsEffect,
 } from "@crm/billing-quotes/useCrmQuotesListResourceLoadEffects";
 import { getCrmListExtensionDisplayName } from "@crm/shared/crmListExtensionDisplayName";
+import { CRM_QUOTES_LIST_VISIBLE_COLUMNS_STORAGE_KEY } from "@crm/billing-quotes/crmQuotesListPageShared";
+import { persistVisibleColumnKeys } from "@utils/crmListVisibleColumnsStorage";
 import { CrmListPageScopedLayoutStyles } from "@crm/shared/CrmListPageScopedLayoutStyles";
 import { useCrmListClearSelectedRowsEffect } from "@crm/shared/crmListClearSelectedRowsEffect";
 import { useCrmQuotesListPageUploadHandlers } from "@crm/billing-quotes/useCrmQuotesListPageUploadHandlers";
@@ -211,6 +215,17 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     setContactFormLoading,
   } = useCrmListAssignmentContactSidebarState();
 
+  const seedNewContactForm = useCallback(
+    () =>
+      createEmptyCrmListContactFormState("source_file", {
+        defaultContactOwner: resolveDefaultContactOwnerExtension(
+          session?.user,
+          extensions,
+        ),
+      }),
+    [session?.user, extensions],
+  );
+
   const {
     confirmDelete,
     handleDuplicateQuote,
@@ -309,6 +324,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     >,
     setContactFormLoadError,
     setContactFormLoading,
+    seedNewContactForm,
   });
 
   const { handleProspectsExport } = useCrmQuotesListExportHandlers({
@@ -554,6 +570,8 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
       setEditingContactId,
       fetchCrmData,
       sourceField: "source_file",
+      extensions,
+      showCreateContactSidebar,
     });
 
   const closeCreateContactSidebar = useCallback(() => {
@@ -1118,12 +1136,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
         selectedColumnKeys={selectedColumns}
         onApply={(keys) => {
           setSelectedColumns(keys);
-          if (globalThis.window !== undefined) {
-            globalThis.window.localStorage.setItem(
-              "crmDataSelectedColumns",
-              JSON.stringify(keys),
-            );
-          }
+          persistVisibleColumnKeys(CRM_QUOTES_LIST_VISIBLE_COLUMNS_STORAGE_KEY, keys);
         }}
       />
       {/* Export Modal */}

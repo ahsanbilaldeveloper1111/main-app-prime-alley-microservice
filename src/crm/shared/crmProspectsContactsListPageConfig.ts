@@ -104,7 +104,10 @@ export type CrmProspectsContactsListPageConfig = {
     showSuccessToast: boolean;
   };
   createContactSidebarEntityLabel: string;
-  columnEditorLocalStorage: "globalThis" | "window";
+  /** Primary localStorage key for Column Editor selections (per entity). */
+  selectedColumnsStorageKey: string;
+  /** Older keys to read once for migration (e.g. shared `crmDataSelectedColumns`). */
+  selectedColumnsLegacyStorageKeys: readonly string[];
   sidebar: {
     fallbackTitle: string;
     aboutSectionId: string;
@@ -166,6 +169,8 @@ export type CrmProspectsContactsListPageConfig = {
   augmentTableColumns: (columns: TableColumn<any>[]) => TableColumn<any>[];
   navigationDetailPath: (row: unknown) => string;
   listLoadFailedMessage: string;
+  /** When false, the Kanban board toggle and board layout are hidden (table only). */
+  enableBoardView: boolean;
 };
 
 type PersonListIntegrationsSlice = Pick<
@@ -234,7 +239,8 @@ type CrmPersonListVariantUi = {
   };
   convertLeadToast: string;
   createLeadModalShowSuccessToast: boolean;
-  columnEditorLocalStorage: "globalThis" | "window";
+  selectedColumnsStorageKey: string;
+  selectedColumnsLegacyStorageKeys: readonly string[];
   sidebar: CrmProspectsContactsListPageConfig["sidebar"];
   stats: CrmProspectsContactsListPageConfig["stats"];
   callRecordingExtras: CrmProspectsContactsListPageConfig["callRecordingExtras"];
@@ -262,7 +268,11 @@ const CRM_PROSPECTS_LIST_UI_VARIANT: CrmPersonListVariantUi = {
   },
   convertLeadToast: "Prospect converted to lead successfully!",
   createLeadModalShowSuccessToast: false,
-  columnEditorLocalStorage: "globalThis",
+  selectedColumnsStorageKey: "crm-prospects-visible-columns-v1",
+  selectedColumnsLegacyStorageKeys: [
+    "crmDataSelectedColumns",
+    "prospectsSelectedColumns",
+  ],
   sidebar: {
     fallbackTitle: "Prospect Details",
     aboutSectionId: "about-prospect",
@@ -303,7 +313,8 @@ const CRM_CONTACTS_LIST_UI_VARIANT: CrmPersonListVariantUi = {
   },
   convertLeadToast: "Contact converted to lead successfully!",
   createLeadModalShowSuccessToast: true,
-  columnEditorLocalStorage: "window",
+  selectedColumnsStorageKey: "crm-contacts-visible-columns-v1",
+  selectedColumnsLegacyStorageKeys: ["crmDataSelectedColumns"],
   sidebar: {
     fallbackTitle: "Contact Details",
     aboutSectionId: "about-contact",
@@ -335,6 +346,7 @@ const CRM_CONTACTS_LIST_UI_VARIANT: CrmPersonListVariantUi = {
 function buildCrmPersonListPageConfig(
   ui: CrmPersonListVariantUi,
   integrations: PersonListIntegrationsSlice,
+  options?: { enableBoardView?: boolean },
 ): CrmProspectsContactsListPageConfig {
   const e = ui.operationsEntityName;
   const title = ui.entityTitle;
@@ -381,10 +393,12 @@ function buildCrmPersonListPageConfig(
       showSuccessToast: ui.createLeadModalShowSuccessToast,
     },
     createContactSidebarEntityLabel: singular,
-    columnEditorLocalStorage: ui.columnEditorLocalStorage,
+    selectedColumnsStorageKey: ui.selectedColumnsStorageKey,
+    selectedColumnsLegacyStorageKeys: ui.selectedColumnsLegacyStorageKeys,
     sidebar: ui.sidebar,
     stats: ui.stats,
     callRecordingExtras: ui.callRecordingExtras,
+    enableBoardView: options?.enableBoardView ?? true,
     ...integrations,
   };
 }
@@ -392,6 +406,7 @@ function buildCrmPersonListPageConfig(
 export const CRM_PROSPECTS_LIST_PAGE_CONFIG = buildCrmPersonListPageConfig(
   CRM_PROSPECTS_LIST_UI_VARIANT,
   CRM_PROSPECTS_LIST_INTEGRATIONS,
+  { enableBoardView: false },
 );
 
 export const CRM_CONTACTS_LIST_PAGE_CONFIG = buildCrmPersonListPageConfig(

@@ -880,11 +880,6 @@ const ProspectDetailPage: NextPageWithLayout = () => {
         return;
       }
 
-      if (data.campaign_id == null) {
-        toast.error("Campaign is required");
-        return;
-      }
-
       const phoneForPayload =
         data.phone_country_code && data.phoneNumber?.trim()
           ? `${data.phone_country_code} ${data.phoneNumber.trim()}`
@@ -926,7 +921,6 @@ const ProspectDetailPage: NextPageWithLayout = () => {
           source: data.source_file?.trim() || undefined,
           scheduled_call_at: data.scheduled_call_at || undefined,
           data: dataPayload,
-          tag_ids: data.tags?.length ? data.tags.map((t: { id: number }) => t.id) : [],
         });
 
         setShowEditContactSidebar(false);
@@ -938,7 +932,7 @@ const ProspectDetailPage: NextPageWithLayout = () => {
         setEditContactLoading(false);
       }
     },
-    []
+    [],
   );
 
   const allDeals =
@@ -1006,8 +1000,7 @@ const ProspectDetailPage: NextPageWithLayout = () => {
         prospectForm?.email?.trim() &&
         prospectForm?.phoneNumber?.trim() &&
         prospectForm?.firstName?.trim() &&
-        prospectForm?.lastName?.trim() &&
-        prospectForm?.campaign_id != null;
+        prospectForm?.lastName?.trim();
 
       return (
         <ProspectEditSidebar

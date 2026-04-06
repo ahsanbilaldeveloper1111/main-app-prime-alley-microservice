@@ -1488,9 +1488,45 @@ export const bulkDeleteCrmData = async (
       ids: ids,
     });
 
-    if (response.data.success) {
-      toast.success(response.data.message);
+    const asRecord = (value: unknown): Record<string, unknown> | null =>
+      value !== undefined && value !== null && typeof value === "object"
+        ? (value as Record<string, unknown>)
+        : null;
+
+    const root: Record<string, unknown> = response.data ?? {};
+    const nested = asRecord(root.data);
+    const innerPayload = nested ? asRecord(nested.data) : null;
+
+    const failureExplicit =
+      root.success === false ||
+      nested?.success === false ||
+      innerPayload?.success === false;
+
+    const messageFromApi = [
+      root.message,
+      nested?.message,
+      innerPayload?.message,
+    ].find((m): m is string => typeof m === "string" && m.trim().length > 0);
+
+    const deletedCountRaw =
+      nested?.deleted_count ?? innerPayload?.deleted_count ?? root.deleted_count;
+    const deletedCount =
+      typeof deletedCountRaw === "number" ? deletedCountRaw : undefined;
+
+    if (failureExplicit) {
+      toast.error(messageFromApi || "Failed to delete CRM data");
+      return response.data;
     }
+
+    // Single-item delete always toasts on HTTP success; bulk previously only checked
+    // response.data.success, so Controlhub-style bodies (success on nested data) showed no toast.
+    const displayMessage =
+      messageFromApi ||
+      (deletedCount === undefined
+        ? `Successfully deleted ${ids.length} record(s).`
+        : `Successfully deleted ${deletedCount} record(s).`);
+
+    toast.success(displayMessage);
 
     return response.data;
   } catch (error: any) {

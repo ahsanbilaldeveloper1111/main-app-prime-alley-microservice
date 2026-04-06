@@ -19,6 +19,10 @@ import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
+import {
+  parseStoredVisibleColumnKeysLoose,
+  persistVisibleColumnKeys,
+} from "@utils/crmListVisibleColumnsStorage";
 import CrmExportModal from "@components/CrmExportModal";
 import { StatsCardData } from "@components/GenericStatsCards";
 import { EditOrderSidebar } from "@components/EditOrderSidebar";
@@ -273,21 +277,25 @@ const CrmOrders = () => {
   const [ordersSearch, setOrdersSearch] = useState("");
   const [selectedOrdersColumns, setSelectedOrdersColumns] = useState<string[]>(
     () => {
-      const saved = localStorage.getItem("ordersSelectedColumns");
-      return saved
-        ? JSON.parse(saved)
-        : [
-            "orderNumber",
-            "customer",
-            "deal",
-            "stage",
-            "value",
-            "approvalStatus",
-            "fulfillmentStatus",
-            "assignedUser",
-            "orderDate",
-            "owner",
-          ];
+      const defaults = [
+        "orderNumber",
+        "customer",
+        "deal",
+        "stage",
+        "value",
+        "approvalStatus",
+        "fulfillmentStatus",
+        "assignedUser",
+        "orderDate",
+        "owner",
+      ];
+      if (typeof window === "undefined") {
+        return defaults;
+      }
+      const stored = parseStoredVisibleColumnKeysLoose(
+        localStorage.getItem("ordersSelectedColumns"),
+      );
+      return stored ?? defaults;
     },
   );
   const [ordersPagination, setOrdersPagination] = useState({
@@ -3141,12 +3149,7 @@ const CrmOrders = () => {
         selectedColumnKeys={selectedOrdersColumns}
         onApply={(keys) => {
           setSelectedOrdersColumns(keys);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
-              "ordersSelectedColumns",
-              JSON.stringify(keys),
-            );
-          }
+          persistVisibleColumnKeys("ordersSelectedColumns", keys);
         }}
       />
 

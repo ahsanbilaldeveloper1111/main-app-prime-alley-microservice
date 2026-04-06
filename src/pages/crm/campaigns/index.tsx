@@ -1155,6 +1155,7 @@ const CAMPAIGN_TABLE_COLUMN_STORAGE_KEY = "campaignsSelectedColumns";
 
 const CAMPAIGN_SELECTABLE_COLUMN_KEYS = [
   "name",
+  "description",
   "status",
   "start_date",
   "user_extensions",
@@ -1165,6 +1166,7 @@ const CAMPAIGN_SELECTABLE_COLUMN_KEYS = [
 
 const DEFAULT_CAMPAIGN_SELECTED_COLUMNS: string[] = [
   "name",
+  "description",
   "status",
   "start_date",
   "user_extensions",
@@ -1728,16 +1730,23 @@ const CrmCampaigns = () => {
       label: "Campaign Name",
       sortable: true,
       type: "custom",
-      width: "min(320px, 36vw)",
+      width: "min(240px, 28vw)",
       render: (campaign: any) => (
-        <div>
-          <div className="fw-semibold">{campaign.name || "Unnamed Campaign"}</div>
-          <CrmTruncatedDescriptionCell
-            text={campaign.description}
-            emptyDisplay="No Description"
-            className="small text-muted mt-1"
-          />
-        </div>
+        <div className="fw-semibold">{campaign.name || "Unnamed Campaign"}</div>
+      ),
+    },
+    {
+      key: "description",
+      label: "Description",
+      sortable: true,
+      type: "custom",
+      width: "min(280px, 32vw)",
+      render: (campaign: any) => (
+        <CrmTruncatedDescriptionCell
+          text={campaign.description}
+          emptyDisplay="No Description"
+          className="small text-muted"
+        />
       ),
     },
     {

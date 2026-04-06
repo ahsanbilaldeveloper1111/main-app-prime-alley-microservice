@@ -169,6 +169,7 @@ import {
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { getDatetimeLocalMinNow } from "@utils/datetimeLocalInput";
 
 type CompanyAssignedToSelectOption = {
   value: string | number;
@@ -2513,9 +2514,18 @@ const CrmCompanyManagement = () => {
     const isFormValid =
       contactForm.firstName?.trim() || contactForm.lastName?.trim();
 
+    const scheduledFloor = getDatetimeLocalMinNow();
+    const isEditingContact = editingContactId != null;
+    const allowLegacyPastScheduled =
+      isEditingContact &&
+      contactForm.scheduled_call_at !== "" &&
+      contactForm.scheduled_call_at < scheduledFloor;
+    const scheduledInputMin = allowLegacyPastScheduled
+      ? undefined
+      : scheduledFloor;
+
     return (
       <>
-        {/* Overlay */}
         <div
           className="contact-sidebar-overlay"
           style={{
@@ -2525,8 +2535,9 @@ const CrmCompanyManagement = () => {
             right: 0,
             bottom: 0,
             zIndex: 1000,
+            background: "transparent",
           }}
-          onClick={() => setShowCreateContactSidebar(false)}
+          aria-hidden="true"
         />
 
         {/* Sidebar */}
@@ -3276,13 +3287,30 @@ const CrmCompanyManagement = () => {
                       </label>
                       <input
                         type="datetime-local"
+                        {...(scheduledInputMin === undefined
+                          ? {}
+                          : { min: scheduledInputMin })}
                         value={contactForm.scheduled_call_at}
-                        onChange={(e) =>
+                        onFocus={(e) => {
+                          const floor = getDatetimeLocalMinNow();
+                          const cur = contactForm.scheduled_call_at;
+                          if (isEditingContact && cur !== "" && cur < floor) {
+                            e.currentTarget.removeAttribute("min");
+                          } else {
+                            e.currentTarget.min = floor;
+                          }
+                        }}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const minVal = getDatetimeLocalMinNow();
+                          if (v !== "" && v < minVal) {
+                            return;
+                          }
                           setContactForm({
                             ...contactForm,
-                            scheduled_call_at: e.target.value,
-                          })
-                        }
+                            scheduled_call_at: v,
+                          });
+                        }}
                         style={{
                           width: "100%",
                           padding: "10px 12px",

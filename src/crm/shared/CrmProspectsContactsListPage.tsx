@@ -38,9 +38,12 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
 import {
+  CrmDataItem,
   CrmDataMetrics,
   downloadExampleCsv,
+  updateCrmData,
 } from "@utils/crm";
+import { buildCrmPersonListRowDispositionUpdatePayload } from "@utils/crmPersonDispositionQuickUpdate";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -61,7 +64,11 @@ import {
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
-import { type CrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
+import {
+  createEmptyCrmListContactFormState,
+  resolveDefaultContactOwnerExtension,
+  type CrmListContactFormState,
+} from "@utils/crmContactFormFromCrmItem";
 import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
 import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
 import { useCrmListFiltersMetricsHistoryState } from "@crm/shared/useCrmListFiltersMetricsHistoryState";
@@ -91,7 +98,7 @@ import {
   fetchCrmProspectsEntryCountsForFilters,
   getProspectsContactsDeleteModalItemName,
   mergeCrmProspectsToolbarFilterPills,
-  persistCrmDataSelectedColumns,
+  persistCrmProspectsContactsSelectedColumns,
   resetActiveFilterIfRemovedTabMatches,
 } from "@crm/shared/crmProspectsContactsListPageHelpers";
 import { renderCrmProspectsKanbanTableCustomBody } from "@crm/shared/crmProspectsContactsListPageKanbanCustomBody";
@@ -205,6 +212,17 @@ export function CrmProspectsContactsListPage({
     setContactFormLoading,
   } = useCrmListAssignmentContactSidebarState();
 
+  const seedNewContactForm = useCallback(
+    () =>
+      createEmptyCrmListContactFormState("source_file", {
+        defaultContactOwner: resolveDefaultContactOwnerExtension(
+          session?.user,
+          extensions,
+        ),
+      }),
+    [session?.user, extensions],
+  );
+
   const deleteModalItemName = useMemo(
     () =>
       getProspectsContactsDeleteModalItemName(
@@ -289,6 +307,8 @@ export function CrmProspectsContactsListPage({
       "last_called_at", "last_call_end_reason", "disposition",
       "scheduled_call_at", "tags",
     ],
+    selectedColumnsStorageKey: config.selectedColumnsStorageKey,
+    selectedColumnsLegacyStorageKeys: config.selectedColumnsLegacyStorageKeys,
     initialMetrics: {
       assigned_records: 0,
       unassigned_records: 0,
@@ -312,6 +332,7 @@ export function CrmProspectsContactsListPage({
     setContactFormLoading,
     sourceField: "source_file",
     loadFailedMessage: config.listLoadFailedMessage,
+    seedNewContactForm,
   });
 
   const prospectsCalculateEntryCounts = useCallback(async () => {
@@ -472,6 +493,37 @@ export function CrmProspectsContactsListPage({
     refreshKey,
   });
 
+  const dispositionQuickUpdateInFlightRef = useRef<Set<number>>(new Set());
+
+  const handleDispositionQuickUpdate = useCallback(
+    async (row: any, dispositionValue: string) => {
+      const id = row?.id;
+      if (typeof id !== "number") {
+        return;
+      }
+      if (dispositionQuickUpdateInFlightRef.current.has(id)) {
+        return;
+      }
+      dispositionQuickUpdateInFlightRef.current.add(id);
+      try {
+        const payload = buildCrmPersonListRowDispositionUpdatePayload(
+          row as CrmDataItem & Record<string, unknown>,
+          dispositionValue,
+        );
+        await updateCrmData(
+          id,
+          payload as unknown as Parameters<typeof updateCrmData>[1],
+        );
+        fetchCrmData();
+      } catch {
+        // Errors are surfaced by updateCrmData
+      } finally {
+        dispositionQuickUpdateInFlightRef.current.delete(id);
+      }
+    },
+    [fetchCrmData],
+  );
+
   const {
     handleCloseSidebar: handleCloseProspectSidebar,
     handleOpenFiltersSidebar,
@@ -526,7 +578,7 @@ export function CrmProspectsContactsListPage({
         subtitle: config.stats.subtitleAssignedUnassigned(metrics),
       },
       {
-        title: "Scheduled",
+        title: "Upcoming",
         value: metrics.scheduled_records ?? 0,
         icon: Calendar,
         iconColor: "#10B981",
@@ -605,6 +657,7 @@ export function CrmProspectsContactsListPage({
         setDeleteModalMode,
         setItemToDelete,
         setShowDeleteModal,
+        onDispositionChange: handleDispositionQuickUpdate,
       }),
     [
       session,
@@ -620,6 +673,7 @@ export function CrmProspectsContactsListPage({
       setDeleteModalMode,
       setItemToDelete,
       setShowDeleteModal,
+      handleDispositionQuickUpdate,
     ],
   );
 
@@ -634,6 +688,8 @@ export function CrmProspectsContactsListPage({
       setEditingContactId,
       fetchCrmData,
       sourceField: "source_file",
+      extensions,
+      showCreateContactSidebar,
     });
 
   const closeCreateContactSidebar = useCallback(() => {
@@ -674,8 +730,12 @@ export function CrmProspectsContactsListPage({
     onEditColumnsClick: () => setShowColumnEditor(true),
     showImport: true,
     onImportClick: () => setShowUploadModal(true),
-    currentTableView: prospectsViewMode,
-    onTableViewChange: setProspectsViewMode,
+    ...(config.enableBoardView
+      ? {
+          currentTableView: prospectsViewMode,
+          onTableViewChange: setProspectsViewMode,
+        }
+      : {}),
     extensions,
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
@@ -683,6 +743,7 @@ export function CrmProspectsContactsListPage({
       <CrmProspectsContactsAddContactsButton
         addContactsRef={addContactsRef}
         session={session}
+        extensions={extensions}
         config={config}
         selectedItems={selectedItems}
         showAddContactsDropdown={showAddContactsDropdown}
@@ -823,14 +884,17 @@ export function CrmProspectsContactsListPage({
                 }}
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
-                // When Board View is selected, show board content instead of table
-                customBody={renderCrmProspectsKanbanTableCustomBody({
-                  prospectsViewMode,
-                  dataList,
-                  prospectsActions,
-                  handleViewData,
-                  prospectsSearch,
-                })}
+                customBody={
+                  config.enableBoardView
+                    ? renderCrmProspectsKanbanTableCustomBody({
+                        prospectsViewMode,
+                        dataList,
+                        prospectsActions,
+                        handleViewData,
+                        prospectsSearch,
+                      })
+                    : undefined
+                }
               />
             </div>
           </div>
@@ -1522,7 +1586,10 @@ export function CrmProspectsContactsListPage({
         selectedColumnKeys={selectedColumns}
         onApply={(keys) => {
           setSelectedColumns(keys);
-          persistCrmDataSelectedColumns(config.columnEditorLocalStorage, keys);
+          persistCrmProspectsContactsSelectedColumns(
+            config.selectedColumnsStorageKey,
+            keys,
+          );
         }}
       />
       {/* Export Modal */}
@@ -1688,7 +1755,7 @@ export function CrmProspectsContactsListPage({
                     ...customTabs,
                     {
                       id: "has_leads",
-                      label: "Convert to Leads",
+                      label: "Converted Leads",
                       removable: true,
                     },
                   ]);
@@ -1699,7 +1766,7 @@ export function CrmProspectsContactsListPage({
               disabled={customTabs.some((t) => t.id === "has_leads")}
             >
               <FiTarget size={16} className="me-2" />
-              Convert to Leads
+              Converted Leads
             </Button>
           </div>
         </Modal.Body>

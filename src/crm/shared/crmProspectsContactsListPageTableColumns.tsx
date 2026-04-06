@@ -2,11 +2,12 @@ import React from "react";
 import moment from "moment";
 import type { TableColumn } from "@components/GenericTable";
 import { CRM_LIST_PAGE_CALL_END_REASONS } from "@utils/crmListPageStaticData";
+import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import {
-  getInitials,
-  getRandomColor,
-  stableStringHash,
-} from "@utils/crmNameAvatar";
+  formatCrmPersonDispositionLabel,
+  getCrmPersonDispositionBadgeVariant,
+  getCrmPersonRowDispositionRaw,
+} from "@utils/crmPersonDisposition";
 import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspectsContactsListPageConfig";
 
 export function buildCrmProspectsContactsTableColumns(
@@ -109,61 +110,15 @@ export function buildCrmProspectsContactsTableColumns(
       sortable: true,
       type: "badge",
       accessor: (row) => {
-        if (!row.disposition) return null;
-        const dispositions = [
-          { value: "interested", label: "Interested", color: "success" },
-          {
-            value: "not_interested",
-            label: "Not Interested",
-            color: "danger",
-          },
-          {
-            value: "callback_requested",
-            label: "Callback Requested",
-            color: "warning",
-          },
-          { value: "no_answer", label: "No Answer", color: "warning" },
-          { value: "busy", label: "Busy", color: "info" },
-          { value: "do_not_call", label: "Do Not Call", color: "danger" },
-          { value: "wrong_number", label: "Wrong Number", color: "info" },
-          { value: "follow_up", label: "Follow Up", color: "primary" },
-        ];
-        const disposition = dispositions.find(
-          (d) => d.value === row.disposition,
-        );
-        if (disposition) return disposition.label;
-        const idx =
-          stableStringHash(String(row.disposition)) % dispositions.length;
-        return dispositions[idx].label;
+        const raw = getCrmPersonRowDispositionRaw(row);
+        if (!raw) {
+          return null;
+        }
+        return formatCrmPersonDispositionLabel(raw);
       },
       badge: {
-        getVariant: (row) => {
-          if (!row.disposition) return "secondary";
-          const dispositions = [
-            { value: "interested", color: "success" },
-            { value: "not_interested", color: "danger" },
-            { value: "callback_requested", color: "warning" },
-            { value: "no_answer", color: "warning" },
-            { value: "busy", color: "info" },
-            { value: "do_not_call", color: "danger" },
-            { value: "wrong_number", color: "info" },
-            { value: "follow_up", color: "primary" },
-          ];
-          const disposition = dispositions.find(
-            (d) => d.value === row.disposition,
-          );
-          if (disposition) return disposition.color as any;
-          const randomColors = [
-            "success",
-            "danger",
-            "warning",
-            "info",
-            "primary",
-          ];
-          const colorIdx =
-            stableStringHash(String(row.disposition)) % randomColors.length;
-          return randomColors[colorIdx] as any;
-        },
+        getVariant: (row) =>
+          getCrmPersonDispositionBadgeVariant(getCrmPersonRowDispositionRaw(row)),
       },
       emptyValue: "-",
     },

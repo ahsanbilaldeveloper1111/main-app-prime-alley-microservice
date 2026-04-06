@@ -29,6 +29,8 @@ export type CrmListContactSidebarParams<TForm> = {
   setContactFormLoading: (value: boolean) => void;
   sourceField: "source" | "source_file";
   loadFailedMessage: string;
+  /** When opening create via URL (no edit id), reset the form; omit if not used. */
+  seedNewContactForm?: () => TForm;
 };
 
 export type UseCrmListPageTabCreateContactAndFilterParams<
@@ -70,6 +72,7 @@ export function useCrmListPageTabCreateContactAndFilter<
     setContactFormLoading,
     sourceField,
     loadFailedMessage,
+    seedNewContactForm,
   } = params;
 
   useEffect(() => {
@@ -83,7 +86,14 @@ export function useCrmListPageTabCreateContactAndFilter<
       return;
     setShowCreateContactSidebar(true);
     const editId = parsePositiveIntFromQueryParam(router.query.editContactId);
-    if (editId != null) setEditingContactId(editId);
+    if (editId != null) {
+      setEditingContactId(editId);
+    } else {
+      setEditingContactId(null);
+      if (seedNewContactForm) {
+        setContactForm(seedNewContactForm());
+      }
+    }
 
     router.replace(
       {
@@ -93,7 +103,15 @@ export function useCrmListPageTabCreateContactAndFilter<
       undefined,
       { shallow: true },
     );
-  }, [router.isReady, router.query.createContact, router.query.editContactId]);
+  }, [
+    router.isReady,
+    router.query.createContact,
+    router.query.editContactId,
+    setShowCreateContactSidebar,
+    setEditingContactId,
+    setContactForm,
+    seedNewContactForm,
+  ]);
 
   useEffect(() => {
     if (!showAddContactsDropdown) return;
