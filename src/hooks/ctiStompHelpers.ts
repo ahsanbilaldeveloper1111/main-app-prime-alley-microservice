@@ -543,7 +543,7 @@ export function extractCallsByDnFromOngoingCallsPayload(
 ): Record<string, unknown> | null {
   if (!isRecord(data)) return null;
 
-  const o = data as Record<string, unknown>;
+  const o = data ;
 
   const direct = getCallsByDn(o, "callsByDn") ?? getCallsByDn(o, "calls_by_dn");
   if (direct) return direct;
@@ -586,7 +586,7 @@ function isCallLike(
 ): val is Record<string, unknown> {
   if (!isRecord(val)) return false;
 
-  const rec = val as Record<string, unknown>;
+  const rec = val;
 
   const hasCallId = typeof rec.callId === "string";
   const hasParties = Array.isArray(rec.parties);
