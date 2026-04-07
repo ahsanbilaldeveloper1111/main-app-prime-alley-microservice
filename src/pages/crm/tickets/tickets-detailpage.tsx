@@ -29,6 +29,7 @@ import React, {
   import Layout from "@layout/index";
   import {
     getAllCrmDataById,
+    CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
     getCampaigns,
     getCrmDataTags,
     updateCrmData,
@@ -695,7 +696,10 @@ import React, {
     useEffect(() => {
       const loadCampaigns = async () => {
         try {
-          const campaignsResponse = await getCampaigns({ per_page: 1000 });
+          const campaignsResponse = await getCampaigns({
+            per_page: 1000,
+            filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+          });
           const campaignOptions = campaignsResponse.data.map((campaign: any) => ({
             value: campaign.id.toString(),
             label: campaign.name,
@@ -870,7 +874,7 @@ import React, {
           phone: phoneForPayload,
           campaign_id: data.campaign_id ?? null,
           company_domain: data.company_domain?.trim() || undefined,
-          source: data.source?.trim() || undefined,
+          source_file: data.source?.trim() || undefined,
           scheduled_call_at: data.scheduled_call_at || undefined,
           data: dataPayload,
         });

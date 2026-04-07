@@ -61,6 +61,11 @@ import {
   type HistoryChainRecord,
 } from "@utils/crm";
 import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
+import {
+  buildFollowUpTaskFields,
+  followUpTaskFieldsToApiPayload,
+  resolveFollowUpDueDateYmd,
+} from "@utils/crmFollowUpTaskDue";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
@@ -863,6 +868,9 @@ export interface GenericSidebarProps {
     queue: string;
     assignedTo: string;
     notes: string;
+    createFollowUpTask: boolean;
+    followUpTaskDueDate: string | null;
+    followUpTaskDueTime: string | null;
   }) => void;
 
   onCall?: (phoneNumber: string) => void;
@@ -902,8 +910,9 @@ export interface GenericSidebarProps {
     message: string;
     contacts: Array<{ id: string; name: string; email?: string }>;
     activityDate: string;
-    createTask: boolean;
-    taskDueDate?: string;
+    createFollowUpTask: boolean;
+    followUpTaskDueDate: string | null;
+    followUpTaskDueTime: string | null;
     attachments: File[];
   }) => void;
 }
@@ -2463,6 +2472,9 @@ interface TaskModalProps {
     queue: string;
     assignedTo: string;
     notes: string;
+    createFollowUpTask: boolean;
+    followUpTaskDueDate: string | null;
+    followUpTaskDueTime: string | null;
   }) => void;
 }
 
@@ -2781,6 +2793,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
     const dateToSend = activityDate === "Custom..." ? customDate : activityDate;
     const timeToSend = activityDate === "Custom..." ? customTime : activityTime;
+    const followUp = buildFollowUpTaskFields(
+      true,
+      activityDate,
+      customDate,
+      timeToSend,
+    );
 
     onSave({
       title,
@@ -2793,6 +2811,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       queue,
       assignedTo: selectedUserExtension?.value ?? "",
       notes,
+      ...followUp,
     });
 
     // Reset form
@@ -5447,35 +5466,6 @@ const LegacyMeetingModal: React.FC<LegacyMeetingModalProps> = ({
 // HELPERS (module scope — no component state dependencies)
 // ============================================================================
 
-const parseTaskDueDate = (
-  activityDate: string,
-  _activityTime: string,
-): string => {
-  // Custom date is sent as YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(activityDate)) return activityDate;
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, "0");
-  const d = String(today.getDate()).padStart(2, "0");
-  const base = `${y}-${m}-${d}`;
-  if (activityDate === "Today") return base;
-  const addDays = (n: number) => {
-    const t = new Date(today);
-    t.setDate(t.getDate() + n);
-    return t.toISOString().slice(0, 10);
-  };
-  if (activityDate === "Tomorrow") return addDays(1);
-  if (
-    activityDate?.includes("3 business") ||
-    activityDate?.includes("Friday")
-  )
-    return addDays(3);
-  if (activityDate === "In 1 week") return addDays(7);
-  if (activityDate === "In 2 weeks") return addDays(14);
-  if (activityDate === "In 1 month") return addDays(30);
-  return addDays(3);
-};
-
 const isCrmEntityType = (value: string): value is CrmEntityType =>
   value === "prospect" ||
   value === "lead" ||
@@ -6252,6 +6242,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       bcc: string[];
       subject: string;
       body: string;
+      createFollowUpTask: boolean;
+      followUpTaskDueDate: string | null;
+      followUpTaskDueTime: string | null;
       attachments?: File[];
     },
     record?: {
@@ -6269,6 +6262,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         content: emailData.body,
         record_id: record?.id,
         record_type: record?.type,
+        ...(emailData.attachments?.length
+          ? { attachmentFiles: emailData.attachments }
+          : {}),
+        ...followUpTaskFieldsToApiPayload({
+          createFollowUpTask: emailData.createFollowUpTask,
+          followUpTaskDueDate: emailData.followUpTaskDueDate,
+          followUpTaskDueTime: emailData.followUpTaskDueTime,
+        }),
       });
       onEmailSend?.(emailData);
     } catch (err: unknown) {
@@ -6313,12 +6314,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     queue: string;
     assignedTo: string;
     notes: string;
+    createFollowUpTask: boolean;
+    followUpTaskDueDate: string | null;
+    followUpTaskDueTime: string | null;
   }) => {
     if (recordType && recordId != null && !Number.isNaN(Number(recordId))) {
-      const due_date = parseTaskDueDate(
-        taskData.activityDate,
-        taskData.activityTime,
-      );
+      const due_date =
+        taskData.followUpTaskDueDate ??
+        resolveFollowUpDueDateYmd(taskData.activityDate, "");
+      const timeSlice =
+        taskData.followUpTaskDueTime ??
+        (taskData.activityTime?.length >= 5
+          ? taskData.activityTime.slice(0, 5)
+          : undefined);
       let urgency: "high" | "med" | "low";
       if (taskData.priority === "High") {
         urgency = "high";
@@ -6335,16 +6343,18 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           created_by: extension,
           urgency,
           due_date,
-          time:
-            taskData.activityTime?.length >= 5
-              ? taskData.activityTime.slice(0, 5)
-              : undefined,
+          time: timeSlice,
           status: "pending",
           notes: taskData.notes?.trim()
             ? [{ note: taskData.notes.trim() }]
             : undefined,
           record_type: recordType as CrmEntityType,
           record_id: Number(recordId),
+          ...followUpTaskFieldsToApiPayload({
+            createFollowUpTask: taskData.createFollowUpTask,
+            followUpTaskDueDate: taskData.followUpTaskDueDate,
+            followUpTaskDueTime: taskData.followUpTaskDueTime,
+          }),
         });
         setShowTaskModal(false);
         onTaskCreate?.(taskData);
@@ -6510,8 +6520,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     message: string;
     contacts: Array<{ id: string; name: string; email?: string }>;
     activityDate: string;
-    createTask: boolean;
-    taskDueDate?: string;
+    createFollowUpTask: boolean;
+    followUpTaskDueDate: string | null;
+    followUpTaskDueTime: string | null;
     attachments: File[];
   }) => {
     const rawTo =
@@ -6533,6 +6544,11 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
         extension,
         ...(recordType && { record_type: recordType }),
         ...(recordId != null && { record_id: Number(recordId) }),
+        ...followUpTaskFieldsToApiPayload({
+          createFollowUpTask: smsData.createFollowUpTask,
+          followUpTaskDueDate: smsData.followUpTaskDueDate,
+          followUpTaskDueTime: smsData.followUpTaskDueTime,
+        }),
       });
       setShowSmsModal(false);
       if (onSmsLog) onSmsLog(smsData);

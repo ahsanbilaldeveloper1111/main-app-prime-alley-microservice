@@ -3,6 +3,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useEffect,
   useRef,
   type Dispatch,
   type SetStateAction,
@@ -184,6 +185,8 @@ export function CrmProspectsContactsListPage({
     setAvailableCampaigns,
     campaignsById,
     setCampaignsById,
+    campaignStatusById,
+    setCampaignStatusById,
     selectedItems,
     setSelectedItems,
     afterCallData,
@@ -453,6 +456,7 @@ export function CrmProspectsContactsListPage({
     setAvailableTags,
     setAvailableCampaigns,
     setCampaignsById,
+    setCampaignStatusById,
     setSelectedItems,
     setCurrentFilters,
     setExportFilters,
@@ -466,6 +470,19 @@ export function CrmProspectsContactsListPage({
     setPagination,
     computeAdvancedFiltersApplied: config.computeAdvancedFiltersApplied,
   });
+
+  /** Prospects only: Overdue metric switches to Scheduled tab + API overdue filter. */
+  const handleProspectOverdueMetricClick = useCallback(() => {
+    if (config.operationsEntityName !== "prospects") {
+      return;
+    }
+    handleFilterChange("scheduled");
+    applyTableFiltersPatch({ scheduled_call_status: "overdue" });
+  }, [
+    applyTableFiltersPatch,
+    config.operationsEntityName,
+    handleFilterChange,
+  ]);
 
   const {
     fetchCrmData,
@@ -541,10 +558,10 @@ export function CrmProspectsContactsListPage({
   );
 
   const {
-    handleCloseSidebar: handleCloseProspectSidebar,
+    handleCloseSidebar: handleCloseProspectSidebarCore,
     handleOpenFiltersSidebar,
     handleCloseFiltersSidebar,
-    handlePreviewClick,
+    handlePreviewClick: handlePreviewClickCore,
     handleFirstColumnClick,
   } = useCrmListNavigationHandlers({
     sidebarFetchTokenRef: sidebarProspectFetchTokenRef,
@@ -555,6 +572,79 @@ export function CrmProspectsContactsListPage({
     router,
     buildDetailUrl: (row: any) => config.navigationDetailPath(row),
   });
+
+  const previewPersistenceKey = config.previewPersistenceLocalStorageKey;
+  /** Ensures we only attempt storage-based restore once per mount (not on every refetch). */
+  const didInitialPreviewRestoreRef = useRef(false);
+
+  const writePreviewIdToStorage = useCallback(
+    (row: { id?: unknown }) => {
+      const id = Number(row?.id);
+      if (!Number.isFinite(id) || id <= 0) return;
+      if (globalThis.window === undefined) return;
+      try {
+        globalThis.localStorage.setItem(previewPersistenceKey, String(id));
+      } catch {
+        /* quota / private mode */
+      }
+    },
+    [previewPersistenceKey],
+  );
+
+  const clearPreviewIdFromStorage = useCallback(() => {
+    if (globalThis.window === undefined) return;
+    try {
+      globalThis.localStorage.removeItem(previewPersistenceKey);
+    } catch {
+      /* ignore */
+    }
+  }, [previewPersistenceKey]);
+
+  /** User dismissed preview (X): close and forget persisted id. */
+  const handleCloseProspectSidebar = useCallback(() => {
+    handleCloseProspectSidebarCore();
+    clearPreviewIdFromStorage();
+  }, [handleCloseProspectSidebarCore, clearPreviewIdFromStorage]);
+
+  /** Navigate away (e.g. View record) while keeping id so back-navigation can reopen preview. */
+  const handleHideProspectSidebarKeepPersistence = useCallback(() => {
+    handleCloseProspectSidebarCore();
+  }, [handleCloseProspectSidebarCore]);
+
+  const handlePreviewClick = useCallback(
+    (row: CrmDataItem) => {
+      handlePreviewClickCore(row);
+      writePreviewIdToStorage(row);
+    },
+    [handlePreviewClickCore, writePreviewIdToStorage],
+  );
+
+  useEffect(() => {
+    if (!isInitialized || loading) return;
+    if (didInitialPreviewRestoreRef.current) return;
+    didInitialPreviewRestoreRef.current = true;
+
+    let raw: string | null = null;
+    try {
+      raw = globalThis.localStorage.getItem(previewPersistenceKey);
+    } catch {
+      return;
+    }
+    const trimmed = raw?.trim() ?? "";
+    if (!trimmed) return;
+    const id = Number(trimmed);
+    if (!Number.isFinite(id) || id <= 0) {
+      clearPreviewIdFromStorage();
+      return;
+    }
+    openProspectSidebar({ id } as CrmDataItem);
+  }, [
+    isInitialized,
+    loading,
+    previewPersistenceKey,
+    openProspectSidebar,
+    clearPreviewIdFromStorage,
+  ]);
 
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
@@ -582,7 +672,7 @@ export function CrmProspectsContactsListPage({
     });
   };
 
-  // Stats cards data for metrics
+  // Stats cards data for metrics (prospects: only Overdue is clickable → list filter)
   const prospectsStatsCards: StatsCardData[] = useMemo(
     () => [
       {
@@ -614,6 +704,9 @@ export function CrmProspectsContactsListPage({
           text: "Client-defined",
           dotColor: "#F97316",
         },
+        ...(config.operationsEntityName === "prospects"
+          ? { onClick: handleProspectOverdueMetricClick }
+          : {}),
       },
       {
         title: config.stats.convertedCardTitle,
@@ -649,12 +742,22 @@ export function CrmProspectsContactsListPage({
         },
       },
     ],
-    [config.stats, metrics],
+    [
+      config.operationsEntityName,
+      config.stats,
+      handleProspectOverdueMetricClick,
+      metrics,
+    ],
   );
 
   const prospectsColumns = useMemo(
-    () => buildCrmProspectsContactsTableColumns(config, extensions),
-    [config, extensions],
+    () =>
+      buildCrmProspectsContactsTableColumns(
+        config,
+        extensions,
+        campaignStatusById,
+      ),
+    [campaignStatusById, config, extensions],
   );
 
   const prospectsActions = useMemo(
@@ -1190,7 +1293,7 @@ export function CrmProspectsContactsListPage({
               onClick: () => {
                 const prospectId = resolveNumericProspectId(selectedProspect);
                 if (!Number.isFinite(prospectId) || prospectId <= 0) return;
-                handleCloseProspectSidebar();
+                handleHideProspectSidebarKeepPersistence();
                 router.push(config.sidebar.buildDetailUrlFromNumericId(prospectId));
               },
             }}
@@ -1321,7 +1424,7 @@ export function CrmProspectsContactsListPage({
                       const id = resolveNumericProspectId(selectedProspect);
                       if (!id) return;
                       router.push(config.sidebar.buildLogActivityUrl(id));
-                      handleCloseProspectSidebar();
+                      handleHideProspectSidebarKeepPersistence();
                     },
                   },
                 },

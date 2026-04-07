@@ -10,6 +10,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
 import {
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
   getCampaigns,
   deleteCampaign,
   createCampaign,
@@ -231,6 +232,17 @@ function buildCrmDataAssignmentPayload(args: {
   }
 
   payload.custom_extensions = extensionArray;
+  payload.distribution_mode = distributionMode === "custom" ? "custom" : distributionMode;
+
+  if (distributionMode === "custom") {
+    const dist: Record<number, number> = {};
+    Object.entries(customDistribution).forEach(([v, count]) => {
+      const id = Number.parseInt(v, 10);
+      if (id > 0 && count > 0) dist[id] = count;
+    });
+    payload.extension_distribution = dist;
+  }
+
   return { ok: true, payload };
 }
 
@@ -378,16 +390,37 @@ function buildCrmCampaignListFilters(
   return filters;
 }
 
-function createCustomDistributionAmountChangeHandler(
-  campaignValueKey: string,
+function sumCustomDistributionValues(dist: Record<string, number>): number {
+  return Object.values(dist).reduce((s, c) => s + (typeof c === "number" && Number.isFinite(c) ? c : 0), 0);
+}
+
+/** Max allowed for one target key: remaining records plus what this key already holds. */
+function maxCustomDistributionForKey(
+  dist: Record<string, number>,
+  valueKey: string,
   recordsToAssign: number,
-  handleNumberChange: (value: string, max: number, setter: (val: number) => void) => void,
+): number {
+  const current = dist[valueKey] ?? 0;
+  const totalOthers = sumCustomDistributionValues(dist) - current;
+  return Math.max(0, recordsToAssign - totalOthers);
+}
+
+function createCustomDistributionAmountChangeHandler(
+  valueKey: string,
+  recordsToAssign: number,
   setCustomDistribution: React.Dispatch<React.SetStateAction<Record<string, number>>>,
 ): (value: string) => void {
   return (value: string) => {
-    handleNumberChange(value, recordsToAssign, (v) =>
-      setCustomDistribution((prev) => ({ ...prev, [campaignValueKey]: v })),
-    );
+    setCustomDistribution((prev) => {
+      const maxForKey = maxCustomDistributionForKey(prev, valueKey, recordsToAssign);
+      const cleaned = value.replaceAll(/\D/g, "");
+      if (cleaned === "") {
+        return { ...prev, [valueKey]: 0 };
+      }
+      const numValue = Number.parseInt(cleaned, 10);
+      const clamped = Math.min(Math.max(0, numValue), maxForKey);
+      return { ...prev, [valueKey]: clamped };
+    });
   };
 }
 
@@ -423,6 +456,13 @@ function validateCampaignFormBeforeSave(
   if (formData.start_date && formData.end_date && formData.start_date >= formData.end_date) {
     toast.error("End date must be after start date");
     return false;
+  }
+  if (formData.status === "active") {
+    const todayIso = getTodayDate();
+    if (!formData.end_date || formData.end_date <= todayIso) {
+      toast.error("To activate a campaign, set the end date to a future date (after today).");
+      return false;
+    }
   }
   return true;
 }
@@ -872,31 +912,31 @@ const KPICard: React.FC<Readonly<KPICardData>> = ({
 
 function CrmProportionalDistributionRows(
   props: Readonly<{
-    assignToCampaigns: string[];
-    availableCampaignsForUpload: Array<{ value: string; label: string; id: number }>;
+    items: Array<{ valueKey: string; label: string }>;
     recordsToAssign: number;
     customDistribution: Record<string, number>;
     handleNumberKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-    handleNumberChange: (value: string, max: number, setter: (val: number) => void) => void;
     setCustomDistribution: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   }>,
 ) {
   return (
     <>
-      {props.assignToCampaigns.map((c) => {
-        const opt = props.availableCampaignsForUpload.find((ac) => ac.label === c);
-        if (!opt) return null;
+      {props.items.map(({ valueKey, label }) => {
+        const maxForRow = maxCustomDistributionForKey(
+          props.customDistribution,
+          valueKey,
+          props.recordsToAssign,
+        );
         return (
           <CustomDistributionAmountRow
-            key={opt.value}
-            label={c}
-            recordsToAssign={props.recordsToAssign}
-            amount={props.customDistribution[opt.value] || 0}
+            key={valueKey}
+            label={label}
+            maxAllowed={maxForRow}
+            amount={props.customDistribution[valueKey] || 0}
             onKeyDown={props.handleNumberKeyDown}
             onAmountChange={createCustomDistributionAmountChangeHandler(
-              opt.value,
+              valueKey,
               props.recordsToAssign,
-              props.handleNumberChange,
               props.setCustomDistribution,
             )}
           />
@@ -908,13 +948,13 @@ function CrmProportionalDistributionRows(
 
 function CustomDistributionAmountRow({
   label,
-  recordsToAssign,
+  maxAllowed,
   amount,
   onKeyDown,
   onAmountChange,
 }: Readonly<{
   label: string;
-  recordsToAssign: number;
+  maxAllowed: number;
   amount: number;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onAmountChange: (value: string) => void;
@@ -929,7 +969,7 @@ function CustomDistributionAmountRow({
           <Form.Control
             type="number"
             min={0}
-            max={recordsToAssign}
+            max={maxAllowed}
             value={amount}
             onKeyDown={onKeyDown}
             onChange={(e) => onAmountChange(e.target.value)}
@@ -1020,7 +1060,10 @@ function useCrmCampaignBootstrapData(
   useEffect(() => {
     const loadCampaignOptions = async () => {
       try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
+        const campaignsResponse = await getCampaigns({
+          per_page: 1000,
+          filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+        });
         setAvailableCampaignsForUpload(
           campaignsResponse.data.map((campaign) => ({
             value: campaign.id.toString(),
@@ -1668,7 +1711,14 @@ const CrmCampaigns = () => {
       const total = Object.values(customDistribution).reduce((sum, count) => sum + count, 0);
       if (total !== recordsToAssign) { toast.error(`Custom allocation must equal total records to assign (${recordsToAssign}). Current total: ${total}`); return; }
     }
-    if (assignmentTargetType === "users" && selectedUserExtensions.length === 0) { toast.error("Please select at least one user"); return; }
+    if (assignmentTargetType === "users" && (!distributionMode || selectedUserExtensions.length === 0)) {
+      toast.error("Please select distribution mode and at least one user");
+      return;
+    }
+    if (assignmentTargetType === "users" && distributionMode === "custom") {
+      const total = Object.values(customDistribution).reduce((sum, count) => sum + count, 0);
+      if (total !== recordsToAssign) { toast.error(`Custom allocation must equal total records to assign (${recordsToAssign}). Current total: ${total}`); return; }
+    }
 
     setAssigningData(true);
     try {
@@ -1712,16 +1762,36 @@ const CrmCampaigns = () => {
   }, [assignmentTargetType, recordsToAssign, distributionMode, assignToCampaigns, selectedUserExtensions, assignmentFilterCampaigns, assignmentFilterTags, availableTags, availableCampaignsForUpload, includeAssignedRecords, customDistribution]);
 
   const handleAutoFillEqualDistribution = useCallback(() => {
-    if (assignToCampaigns.length === 0) return;
-    const eq = Math.floor(recordsToAssign / assignToCampaigns.length);
-    const rem = recordsToAssign % assignToCampaigns.length;
-    const dist: Record<string, number> = {};
-    assignToCampaigns.forEach((c, i) => {
-      const opt = availableCampaignsForUpload.find((ac) => ac.label === c);
-      if (opt) dist[opt.value] = eq + (i < rem ? 1 : 0);
-    });
-    setCustomDistribution(dist);
-  }, [recordsToAssign, assignToCampaigns, availableCampaignsForUpload]);
+    if (assignmentTargetType === "campaigns") {
+      if (assignToCampaigns.length === 0) return;
+      const eq = Math.floor(recordsToAssign / assignToCampaigns.length);
+      const rem = recordsToAssign % assignToCampaigns.length;
+      const dist: Record<string, number> = {};
+      assignToCampaigns.forEach((c, i) => {
+        const opt = availableCampaignsForUpload.find((ac) => ac.label === c);
+        if (opt) dist[opt.value] = eq + (i < rem ? 1 : 0);
+      });
+      setCustomDistribution(dist);
+      return;
+    }
+    if (assignmentTargetType === "users" && selectedUserExtensions.length > 0) {
+      const n = selectedUserExtensions.length;
+      const eq = Math.floor(recordsToAssign / n);
+      const rem = recordsToAssign % n;
+      const dist: Record<string, number> = {};
+      selectedUserExtensions.forEach((opt: { value?: string }, i: number) => {
+        const key = opt.value?.toString() ?? "";
+        if (key) dist[key] = eq + (i < rem ? 1 : 0);
+      });
+      setCustomDistribution(dist);
+    }
+  }, [
+    assignmentTargetType,
+    recordsToAssign,
+    assignToCampaigns,
+    availableCampaignsForUpload,
+    selectedUserExtensions,
+  ]);
 
   // --- GenericTable columns ---
   const campaignsTableColumns = useMemo<TableColumn<any>[]>(() => [
@@ -2174,155 +2244,157 @@ const CrmCampaigns = () => {
       </Modal>
 
       {/* View Campaign Modal */}
-      {selectedCampaign && (
-        <Modal show={showViewModal} onHide={() => { setShowViewModal(false); setSelectedCampaign(null); }} size="xl" centered>
-          <div style={{ color: "black", padding: "30px", position: "relative", borderTopLeftRadius: "8px", borderTopRightRadius: "8px", borderBottom: "1px solid #e5e7eb" }}>
-            <button
-              type="button"
-              aria-label="Close campaign details"
-              onClick={() => { setShowViewModal(false); setSelectedCampaign(null); }}
-              style={{ position: "absolute", top: "20px", right: "20px", background: "rgba(255,255,255,0.2)", border: "none", color: "black", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", transition: "all 0.3s", display: "flex", alignItems: "center", justifyContent: "center" }}
-              onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
-              onFocus={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
-              onBlur={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
-            >
-              <X size={20} aria-hidden />
-            </button>
-            <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>{selectedCampaign.name}</h3>
-            <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>Campaign Details</p>
-          </div>
-          <Modal.Body style={{ padding: "30px" }}>
-            {loading ? (
-              <output className="text-center py-4 d-block" aria-live="polite">
-                <span className="spinner-border d-inline-block" aria-hidden />
-                <span className="visually-hidden">Loading...</span>
-              </output>
-            ) : (
-              <>
-                <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <Megaphone size={18} style={{ color: "#4680ff" }} /> Campaign Information
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
-                  {[
-                    { label: "Campaign Name", value: selectedCampaign.name },
-                    { label: "Status", value: <Badge bg={selectedCampaign.status === "active" ? "success" : "secondary"} style={{ padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>{selectedCampaign.status?.charAt(0).toUpperCase() + selectedCampaign.status?.slice(1) || "Inactive"}</Badge> },
-                  ].map((item) => (
-                    <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
-                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{item.label}</div>
-                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{item.value}</div>
+      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="xl" centered>
+        {selectedCampaign && (
+          <>
+            <div style={{ color: "black", padding: "30px", position: "relative", borderTopLeftRadius: "8px", borderTopRightRadius: "8px", borderBottom: "1px solid #e5e7eb" }}>
+              <button
+                type="button"
+                aria-label="Close campaign details"
+                onClick={() => { setShowViewModal(false); setSelectedCampaign(null); }}
+                style={{ position: "absolute", top: "20px", right: "20px", background: "rgba(255,255,255,0.2)", border: "none", color: "black", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", transition: "all 0.3s", display: "flex", alignItems: "center", justifyContent: "center" }}
+                onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
+                onFocus={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
+                onBlur={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
+              >
+                <X size={20} aria-hidden />
+              </button>
+              <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>{selectedCampaign.name}</h3>
+              <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>Campaign Details</p>
+            </div>
+            <Modal.Body style={{ padding: "30px" }}>
+              {loading ? (
+                <output className="text-center py-4 d-block" aria-live="polite">
+                  <span className="spinner-border d-inline-block" aria-hidden />
+                  <span className="visually-hidden">Loading...</span>
+                </output>
+              ) : (
+                <>
+                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <Megaphone size={18} style={{ color: "#4680ff" }} /> Campaign Information
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+                    {[
+                      { label: "Campaign Name", value: selectedCampaign.name },
+                      { label: "Status", value: <Badge bg={selectedCampaign.status === "active" ? "success" : "secondary"} style={{ padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>{selectedCampaign.status?.charAt(0).toUpperCase() + selectedCampaign.status?.slice(1) || "Inactive"}</Badge> },
+                    ].map((item) => (
+                      <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{item.label}</div>
+                        <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Description</div>
+                  <CrmDescriptionDetailsBlock
+                    text={selectedCampaign.description}
+                    emptyDisplay="No description"
+                  />
+
+                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <Calendar size={18} style={{ color: "#4680ff" }} /> Date Information
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Date Range</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                        {viewModalDateRangeText(selectedCampaign)}
+                      </div>
                     </div>
-                  ))}
-                </div>
-
-                <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Description</div>
-                <CrmDescriptionDetailsBlock
-                  text={selectedCampaign.description}
-                  emptyDisplay="No description"
-                />
-
-                <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <Calendar size={18} style={{ color: "#4680ff" }} /> Date Information
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
-                  <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Date Range</div>
-                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
-                      {viewModalDateRangeText(selectedCampaign)}
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Created Date</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{selectedCampaign.created_at ? formatDateForTable(selectedCampaign.created_at) : "N/A"}</div>
                     </div>
                   </div>
-                  <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Created Date</div>
-                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{selectedCampaign.created_at ? formatDateForTable(selectedCampaign.created_at) : "N/A"}</div>
+
+                  {selectedCampaign.user_extensions?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                        <Users size={18} style={{ color: "#4680ff" }} /> Campaign Users ({selectedCampaign.user_extensions.length})
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "30px" }}>
+                        {selectedCampaign.user_extensions.map((ue: { user_extension: unknown }) => {
+                          const ext = extensions.find((e) => sameExtensionId(e.id, ue.user_extension));
+                          return (
+                            <div key={`ue-${String(ue.user_extension)}`} style={{ background: "#f8f9fa", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 500 }}>
+                              {ext?.display_name || ext?.name || `Extension ${ue.user_extension}`}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+
+                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <FileText size={18} style={{ color: "#4680ff" }} /> Campaign Fields ({selectedCampaign.fields?.length || 0})
                   </div>
-                </div>
-
-                {selectedCampaign.user_extensions?.length > 0 && (
-                  <>
-                    <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
-                      <Users size={18} style={{ color: "#4680ff" }} /> Campaign Users ({selectedCampaign.user_extensions.length})
+                  {selectedCampaign.fields?.length > 0 ? (
+                    <div className="table-responsive mb-4">
+                      <table className="table table-bordered">
+                        <thead>
+                          <tr><th>Field Name</th><th>Type</th><th>Required</th><th>Options</th></tr>
+                        </thead>
+                        <tbody>
+                          {selectedCampaign.fields.map((field: any, index: number) => (
+                            <tr key={campaignFieldRowKey(field, index)}>
+                              <td>{field.field_name}</td>
+                              <td><Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge></td>
+                              <td>{field.is_required ? <Badge bg="danger">Required</Badge> : <Badge bg="secondary">Optional</Badge>}</td>
+                              <td>
+                                {field.field_type === "dropdown" && field.field_options
+                                  ? field.field_options.map((opt: string, i: number) => (
+                                    <Badge key={campaignFieldOptionKey(field.field_name, opt, i)} bg="info" className="me-1">{opt}</Badge>
+                                  ))
+                                  : <span className="text-muted">N/A</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "30px" }}>
-                      {selectedCampaign.user_extensions.map((ue: { user_extension: unknown }) => {
-                        const ext = extensions.find((e) => sameExtensionId(e.id, ue.user_extension));
-                        return (
-                          <div key={`ue-${String(ue.user_extension)}`} style={{ background: "#f8f9fa", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 500 }}>
-                            {ext?.display_name || ext?.name || `Extension ${ue.user_extension}`}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
+                  ) : (
+                    <Alert variant="info" className="mb-4">No custom fields defined for this campaign.</Alert>
+                  )}
 
-                <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <FileText size={18} style={{ color: "#4680ff" }} /> Campaign Fields ({selectedCampaign.fields?.length || 0})
-                </div>
-                {selectedCampaign.fields?.length > 0 ? (
-                  <div className="table-responsive mb-4">
-                    <table className="table table-bordered">
-                      <thead>
-                        <tr><th>Field Name</th><th>Type</th><th>Required</th><th>Options</th></tr>
-                      </thead>
-                      <tbody>
-                        {selectedCampaign.fields.map((field: any, index: number) => (
-                          <tr key={campaignFieldRowKey(field, index)}>
-                            <td>{field.field_name}</td>
-                            <td><Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge></td>
-                            <td>{field.is_required ? <Badge bg="danger">Required</Badge> : <Badge bg="secondary">Optional</Badge>}</td>
-                            <td>
-                              {field.field_type === "dropdown" && field.field_options
-                                ? field.field_options.map((opt: string, i: number) => (
-                                  <Badge key={campaignFieldOptionKey(field.field_name, opt, i)} bg="info" className="me-1">{opt}</Badge>
-                                ))
-                                : <span className="text-muted">N/A</span>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <Alert variant="info" className="mb-4">No custom fields defined for this campaign.</Alert>
-                )}
-
-                <div
-                  style={{
-                    ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
-                    justifyContent: "flex-end",
-                    paddingTop: "20px",
-                    borderTop: "1px solid #e5e7eb",
-                  }}
-                >
-                  {session?.user?.permissions?.includes("edit-crm-campaigns") && (
+                  <div
+                    style={{
+                      ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                      justifyContent: "flex-end",
+                      paddingTop: "20px",
+                      borderTop: "1px solid #e5e7eb",
+                    }}
+                  >
+                    {session?.user?.permissions?.includes("edit-crm-campaigns") && (
+                      <Button
+                        variant="primary"
+                        onClick={() => {
+                          setShowViewModal(false);
+                          handleEditCampaign(selectedCampaign);
+                        }}
+                        style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                      >
+                        <Edit size={16} aria-hidden />
+                        Edit Campaign
+                      </Button>
+                    )}
                     <Button
-                      variant="primary"
+                      variant="outline-secondary"
                       onClick={() => {
                         setShowViewModal(false);
-                        handleEditCampaign(selectedCampaign);
+                        setSelectedCampaign(null);
                       }}
-                      style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                      style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
                     >
-                      <Edit size={16} aria-hidden />
-                      Edit Campaign
+                      Close
                     </Button>
-                  )}
-                  <Button
-                    variant="outline-secondary"
-                    onClick={() => {
-                      setShowViewModal(false);
-                      setSelectedCampaign(null);
-                    }}
-                    style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
-                  >
-                    Close
-                  </Button>
-                </div>
-              </>
-            )}
-          </Modal.Body>
-        </Modal>
-      )}
+                  </div>
+                </>
+              )}
+            </Modal.Body>
+          </>
+        )}
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
@@ -2337,7 +2409,7 @@ const CrmCampaigns = () => {
 
       {/* Upload Modal */}
       {session?.user?.permissions?.includes("add-crm-data-management") && (
-        <Modal show={showUploadModal} onHide={() => { setShowUploadModal(false); setSelectedFile(null); setFieldTags([]); setUploadSelectedCampaigns([]); setAutoDistributeToUsers(false); }} size="lg" centered>
+        <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} size="lg" centered>
           <Modal.Header closeButton className="border-bottom bg-light">
             <Modal.Title>Upload CSV - Import Prospects</Modal.Title>
           </Modal.Header>
@@ -2444,8 +2516,8 @@ const CrmCampaigns = () => {
               <Form.Group className="mb-3">
                 <Form.Label className="fw-semibold small text-muted mb-2">Assign To <span className="text-danger">*</span></Form.Label>
                 <div>
-                  <Form.Check type="radio" id="assign-campaigns" name="assignTarget" label="Campaigns" value="campaigns" checked={assignmentTargetType === "campaigns"} onChange={() => { setAssignmentTargetType("campaigns"); setDistributionMode("equal"); setAssignToCampaigns([]); setSelectedUserExtensions([]); }} className="mb-2" />
-                  <Form.Check type="radio" id="assign-users" name="assignTarget" label="Users" value="users" checked={assignmentTargetType === "users"} onChange={() => { setAssignmentTargetType("users"); setDistributionMode(""); setAssignToCampaigns([]); setSelectedUserExtensions([]); }} />
+                  <Form.Check type="radio" id="assign-campaigns" name="assignTarget" label="Campaigns" value="campaigns" checked={assignmentTargetType === "campaigns"} onChange={() => { setAssignmentTargetType("campaigns"); setDistributionMode("equal"); setAssignToCampaigns([]); setSelectedUserExtensions([]); setCustomDistribution({}); }} className="mb-2" />
+                  <Form.Check type="radio" id="assign-users" name="assignTarget" label="Users" value="users" checked={assignmentTargetType === "users"} onChange={() => { setAssignmentTargetType("users"); setDistributionMode("equal"); setAssignToCampaigns([]); setSelectedUserExtensions([]); setCustomDistribution({}); }} />
                 </div>
               </Form.Group>
 
@@ -2478,12 +2550,13 @@ const CrmCampaigns = () => {
                           <div className="border rounded p-3 bg-light">
                             <p className="small text-muted mb-3">Total: <strong>{recordsToAssign}</strong> | Allocated: <strong>{Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong> | Remaining: <strong>{recordsToAssign - Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong></p>
                             <CrmProportionalDistributionRows
-                              assignToCampaigns={assignToCampaigns}
-                              availableCampaignsForUpload={availableCampaignsForUpload}
+                              items={assignToCampaigns.flatMap((c) => {
+                                const opt = availableCampaignsForUpload.find((ac) => ac.label === c);
+                                return opt ? [{ valueKey: opt.value, label: c }] : [];
+                              })}
                               recordsToAssign={recordsToAssign}
                               customDistribution={customDistribution}
                               handleNumberKeyDown={handleNumberKeyDown}
-                              handleNumberChange={handleNumberChange}
                               setCustomDistribution={setCustomDistribution}
                             />
                           </div>
@@ -2506,10 +2579,65 @@ const CrmCampaigns = () => {
                     <Col md={6}>
                       <Form.Group>
                         <Form.Label className="fw-semibold small text-muted mb-2">Select Users <span className="text-danger">*</span></Form.Label>
-                        <Select isMulti options={dataManagementExtensions.map((ext: any) => ({ value: ext.id?.toString() || ext.extension?.toString() || "", label: ext.display_name || ext.name || `Extension ${ext.id || ext.extension}`, extension: ext }))} value={selectedUserExtensions} onChange={(s) => setSelectedUserExtensions(s || [])} placeholder="Select users..." styles={CRM_CAMPAIGNS_SELECT_STYLES} />
+                        <Select
+                          isMulti
+                          options={dataManagementExtensions.map((ext: any) => ({
+                            value: ext.id?.toString() || ext.extension?.toString() || "",
+                            label: ext.display_name || ext.name || `Extension ${ext.id || ext.extension}`,
+                            extension: ext,
+                          }))}
+                          value={selectedUserExtensions}
+                          onChange={(s) => {
+                            const next = s || [];
+                            const allowed = new Set(next.map((o: { value?: string }) => String(o.value ?? "")));
+                            setSelectedUserExtensions(next);
+                            setCustomDistribution((prev) => {
+                              const pruned: Record<string, number> = {};
+                              for (const [k, v] of Object.entries(prev)) {
+                                if (allowed.has(k)) pruned[k] = v;
+                              }
+                              return pruned;
+                            });
+                          }}
+                          placeholder="Select users..."
+                          styles={CRM_CAMPAIGNS_SELECT_STYLES}
+                        />
                       </Form.Group>
                     </Col>
                   </Row>
+                  {distributionMode === "custom" && selectedUserExtensions.length > 0 && (
+                    <Row className="mt-3">
+                      <Col md={12}>
+                        <Form.Group>
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <Form.Label className="mb-0 fw-semibold small text-muted">Proportional Distribution</Form.Label>
+                            <Button variant="outline-secondary" size="sm" onClick={handleAutoFillEqualDistribution}>
+                              Auto-fill Equal
+                            </Button>
+                          </div>
+                          <div className="border rounded p-3 bg-light">
+                            <p className="small text-muted mb-3">
+                              Total: <strong>{recordsToAssign}</strong> | Allocated:{" "}
+                              <strong>{Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong> | Remaining:{" "}
+                              <strong>{recordsToAssign - Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong>
+                            </p>
+                            <CrmProportionalDistributionRows
+                              items={selectedUserExtensions
+                                .map((opt: { value?: string; label?: string }) => ({
+                                  valueKey: String(opt.value ?? ""),
+                                  label: String(opt.label ?? opt.value ?? "User"),
+                                }))
+                                .filter((row: { valueKey: string }) => row.valueKey.length > 0)}
+                              recordsToAssign={recordsToAssign}
+                              customDistribution={customDistribution}
+                              handleNumberKeyDown={handleNumberKeyDown}
+                              setCustomDistribution={setCustomDistribution}
+                            />
+                          </div>
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  )}
                 </div>
               )}
             </div>
@@ -2550,7 +2678,7 @@ const CrmCampaigns = () => {
             </span>
           </Form.Text>
           <Button variant="light" onClick={handleDataAssignmentModalClose} disabled={assigningData} className="px-4 fw-semibold">Cancel</Button>
-          <Button variant="primary" disabled={assigningData || !assignmentTargetType || recordsToAssign === 0 || recordsToAssign > getMaxRecords() || (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) || (assignmentTargetType === "users" && selectedUserExtensions.length === 0)} onClick={handleDataAssignmentSubmit} className="px-4 fw-semibold d-flex align-items-center gap-2">
+          <Button variant="primary" disabled={assigningData || !assignmentTargetType || recordsToAssign === 0 || recordsToAssign > getMaxRecords() || (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) || (assignmentTargetType === "users" && (!distributionMode || selectedUserExtensions.length === 0))} onClick={handleDataAssignmentSubmit} className="px-4 fw-semibold d-flex align-items-center gap-2">
             {assigningData ? (
               <output className="d-inline-flex align-items-center gap-2 mb-0" aria-live="polite">
                 <span className="spinner-border spinner-border-sm" aria-hidden />

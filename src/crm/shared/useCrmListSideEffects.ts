@@ -33,6 +33,9 @@ interface UseCrmListSideEffectsParams {
     SetStateAction<Array<{ value: string; label: string; id: number }>>
   >;
   setCampaignsById: Dispatch<SetStateAction<Record<number, string>>>;
+  setCampaignStatusById?: Dispatch<
+    SetStateAction<Record<number, string>>
+  >;
   setSelectedItems: Dispatch<SetStateAction<number[]>>;
   setCurrentFilters: Dispatch<SetStateAction<Record<string, any>>>;
   setExportFilters: (v: Record<string, any>) => void;
@@ -53,6 +56,7 @@ export function useCrmListSideEffects({
   setAvailableTags,
   setAvailableCampaigns,
   setCampaignsById,
+  setCampaignStatusById,
   setSelectedItems,
   setCurrentFilters,
   setExportFilters,
@@ -73,6 +77,7 @@ export function useCrmListSideEffects({
     setAvailableCampaigns,
     setCampaignsById,
     "merge",
+    setCampaignStatusById,
   );
 
   useCrmListActiveTabFiltersEffect(activeFilter, setCurrentFilters);

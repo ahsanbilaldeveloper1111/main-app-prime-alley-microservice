@@ -63,6 +63,31 @@ function unknownToFormString(value: unknown): string {
   return "";
 }
 
+/** CRM detail/list payloads sometimes expose campaign only as nested `campaign: { id }` without top-level `campaign_id`. */
+function resolveCampaignIdFromSources(
+  item: Record<string, unknown>,
+  d: Record<string, unknown>,
+): number | null {
+  const coerceId = (raw: unknown): number | null => {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+    if (typeof raw === "string" && raw.trim() !== "") {
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : null;
+    }
+    return null;
+  };
+
+  const direct = coerceId(item.campaign_id ?? d.campaign_id);
+  if (direct != null) return direct;
+
+  const nestedRaw = item.campaign ?? d.campaign;
+  if (nestedRaw && typeof nestedRaw === "object") {
+    return coerceId((nestedRaw as { id?: unknown }).id);
+  }
+  return null;
+}
+
 function resolveSourceFieldValue(
   item: CrmItemForContactForm,
   d: Record<string, unknown>,
@@ -255,7 +280,7 @@ export function mapCrmDataItemToContactFormState(
     email: unknownToFormString(emailRaw),
     phone_country_code,
     phoneNumber,
-    campaign_id: (item.campaign_id ?? d.campaign_id ?? null) as number | null,
+    campaign_id: resolveCampaignIdFromSources(anyItem, d),
     contact_owner: (anyItem.user_extension ??
       d.contact_owner ??
       anyItem.contact_owner ??

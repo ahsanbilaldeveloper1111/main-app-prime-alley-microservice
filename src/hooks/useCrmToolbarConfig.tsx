@@ -431,10 +431,15 @@ export function useCrmToolbarConfig(
       searchPlaceholder,
       onSearchChange: (value: string) => {
         onSearchChange(value);
-        if (!normalizeSearchQuery(value)) {
+        const q = normalizeSearchQuery(value);
+        if (!q) {
           handleFiltersChange({ ...currentFilters, search: undefined });
           refresh();
+          return;
         }
+        handleFiltersChange({ ...currentFilters, search: q });
+        onPaginationReset?.();
+        refresh();
       },
       onSearch: () => {
         const q = normalizeSearchQuery(searchValue);

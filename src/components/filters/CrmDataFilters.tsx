@@ -2,7 +2,10 @@ import React, { useEffect, useState } from "react";
 import GenericFilter from './GenericFilter';
 import { createCrmDataFiltersConfig } from './filterConfigs';
 import { useSession } from "next-auth/react";
-import { getCampaigns } from "@utils/crm";
+import {
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+  getCampaigns,
+} from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
 
@@ -38,7 +41,10 @@ export default function CrmDataFilters({ onFiltersChange, onExport }: CrmDataFil
       try {
         setLoading(true);
         const [campaignsData, hierarchyData] = await Promise.all([
-          getCampaigns(),
+          getCampaigns({
+            per_page: 1000,
+            filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+          }),
           GetHierarchyData(ModuleSlug.CRM_DATA_MANAGEMENT)
         ]);
         

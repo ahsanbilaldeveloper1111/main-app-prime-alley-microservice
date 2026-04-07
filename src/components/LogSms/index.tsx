@@ -17,7 +17,7 @@
 //      onClose={() => setIssmsModalOpen(false)}
 //      associatedRecords={['Acme Corp', 'John Doe']}  // optional
 //      onSave={(data) => {
-//        console.log(data.message, data.contacts, data.activityDate, data.createTask);
+//        console.log(data.message, data.createFollowUpTask, data.followUpTaskDueDate, data.followUpTaskDueTime);
 //      }}
 //    />
 //
@@ -25,7 +25,7 @@
 //   isOpen           — boolean to control visibility
 //   onClose          — callback when modal is closed
 //   associatedRecords — string[] of record names to associate (default: [])
-//   onSave           — callback with { message, contacts, activityDate, createTask, taskDueDate, attachments }
+//   onSave           — callback with { message, contacts, activityDate, createFollowUpTask, followUpTaskDueDate, followUpTaskDueTime, attachments }
 // ============================================================================
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -36,6 +36,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { generateSms } from '@utils/communication';
+import { buildFollowUpTaskFields } from '@utils/crmFollowUpTaskDue';
 
 // ── Shared styles (local only, to reduce duplication) ─────────────────────────
 
@@ -134,8 +135,9 @@ interface smsMessageModalProps {
     message: string;
     contacts: Contact[];
     activityDate: string;
-    createTask: boolean;
-    taskDueDate?: string;
+    createFollowUpTask: boolean;
+    followUpTaskDueDate: string | null;
+    followUpTaskDueTime: string | null;
     attachments: File[];
   }) => void;
 }
@@ -227,15 +229,20 @@ const SmsMessageModal: React.FC<smsMessageModalProps> = ({
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   const handleSave = () => {
-    const taskDateToSend = taskActivityDate === 'Custom...' ? taskCustomDate : taskActivityDate;
-    const taskTimeToSend = taskActivityDate === 'Custom...' ? taskCustomTime : taskActivityTime;
+    const timeForFollowUp =
+      taskActivityDate === 'Custom...' ? taskCustomTime : taskActivityTime;
+    const followUp = buildFollowUpTaskFields(
+      createTask,
+      taskActivityDate,
+      taskCustomDate,
+      timeForFollowUp,
+    );
 
     onSave({
       message: messageText,
       contacts,
       activityDate,
-      createTask,
-      taskDueDate: createTask ? `${taskDateToSend} ${taskTimeToSend}` : undefined,
+      ...followUp,
       attachments: [],
     });
     // Reset state

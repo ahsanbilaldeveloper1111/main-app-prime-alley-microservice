@@ -159,6 +159,7 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { useCti } from "@hooks/useCti";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 
 const ignoredKeys = ["stage_id"];
 // Phone Container Component (with Badge for tables)
@@ -1738,7 +1739,7 @@ const CrmDeals = () => {
     }
   }, []);
 
-  const handlePreviewClick = useCallback(
+  const handlePreviewClickBase = useCallback(
     async (deal: any) => {
       const dealId = deal.rawData?.id || deal.id;
       // Set the deal immediately to show sidebar
@@ -1760,6 +1761,29 @@ const CrmDeals = () => {
       }
     },
     [fetchDealFollowUps, fetchDealMeetings],
+  );
+
+  const openDealPreviewById = useCallback(
+    (id: number) => {
+      void handlePreviewClickBase({ id, rawData: { id } });
+    },
+    [handlePreviewClickBase],
+  );
+
+  const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
+    useCrmListPreviewPersistence({
+      localStorageKey: "crm-deals-list-preview-record-id",
+      listLoading: !isInitialized || loading,
+      openPreviewByNumericId: openDealPreviewById,
+    });
+
+  const handlePreviewClick = useCallback(
+    async (deal: any) => {
+      const dealId = deal.rawData?.id || deal.id;
+      if (dealId) writePreviewIdToStorage(Number(dealId));
+      await handlePreviewClickBase(deal);
+    },
+    [handlePreviewClickBase, writePreviewIdToStorage],
   );
 
   // Handle first column click - navigates to detail page
@@ -1816,6 +1840,12 @@ const CrmDeals = () => {
   );
 
   const handleCloseDealSidebar = useCallback(() => {
+    setShowDealSidebar(false);
+    setSelectedDeal(null);
+    clearPreviewIdFromStorage();
+  }, [clearPreviewIdFromStorage]);
+
+  const handleHideDealSidebarKeepPersistence = useCallback(() => {
     setShowDealSidebar(false);
     setSelectedDeal(null);
   }, []);
@@ -3367,7 +3397,7 @@ const CrmDeals = () => {
               onClick: () => {
                 const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
                 if (dealId) {
-                  setShowDealSidebar(false);
+                  handleHideDealSidebarKeepPersistence();
                   router.push(`/crm/detailspage?type=deal&id=${dealId}`);
                 }
               },

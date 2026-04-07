@@ -7,7 +7,7 @@ type UpdateCrmDataPayload = {
   data: Record<string, unknown>;
   scheduled_call_at?: string;
   company_domain?: string;
-  source?: string;
+  source_file?: string;
   tag_ids?: number[];
 };
 
@@ -60,7 +60,7 @@ export function buildCrmPersonListRowDispositionUpdatePayload(
       (typeof row.company_domain === "string" && row.company_domain) ||
       companyFromData ||
       undefined,
-    source:
+    source_file:
       (typeof sourceFromRow === "string" && sourceFromRow) || sourceFromData,
   };
 

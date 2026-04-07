@@ -128,6 +128,7 @@ import {
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 
 const ignoredKeys = ["order_stage_id"];
 
@@ -1171,8 +1172,8 @@ const CrmOrders = () => {
     }
   }, []);
 
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback(
+  // Handle preview button click - shows sidebar (persistence wrapper below)
+  const handlePreviewClickBase = useCallback(
     async (order: any) => {
       const orderId = order.rawData?.id || order.id;
       // Set the order immediately to show sidebar
@@ -1195,8 +1196,40 @@ const CrmOrders = () => {
     [fetchOrderDetails],
   );
 
+  const openOrderPreviewById = useCallback(
+    (id: number) => {
+      void handlePreviewClickBase({ id, rawData: { id } });
+    },
+    [handlePreviewClickBase],
+  );
+
+  const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
+    useCrmListPreviewPersistence({
+      localStorageKey: "crm-orders-list-preview-record-id",
+      listLoading: !isInitialized || loading,
+      openPreviewByNumericId: openOrderPreviewById,
+    });
+
+  const handlePreviewClick = useCallback(
+    async (order: any) => {
+      const orderId = order.rawData?.id || order.id;
+      if (orderId) writePreviewIdToStorage(Number(orderId));
+      await handlePreviewClickBase(order);
+    },
+    [handlePreviewClickBase, writePreviewIdToStorage],
+  );
+
   // Handle close order sidebar
   const handleCloseOrderSidebar = useCallback(() => {
+    setShowOrderSidebar(false);
+    setSelectedOrder(null);
+    setViewingOrder(null);
+    setRelatedDeal(null);
+    setRelatedLead(null);
+    clearPreviewIdFromStorage();
+  }, [clearPreviewIdFromStorage]);
+
+  const handleHideOrderSidebarKeepPersistence = useCallback(() => {
     setShowOrderSidebar(false);
     setSelectedOrder(null);
     setViewingOrder(null);
@@ -2828,7 +2861,7 @@ const CrmOrders = () => {
               onClick: () => {
                 const orderId = selectedOrder?.id || selectedOrder?.rawData?.id;
                 if (orderId) {
-                  setShowOrderSidebar(false);
+                  handleHideOrderSidebarKeepPersistence();
                   router.push(`/crm/detailspage?type=order&id=${orderId}`);
                 }
               },

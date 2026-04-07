@@ -140,6 +140,7 @@ import {
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 
 const ignoredKeys = ["stage_id"];
 
@@ -1149,7 +1150,7 @@ const CrmDeals = () => {
     [fetchDealFollowUps, fetchDealMeetings],
   );
 
-  const handlePreviewClick = useCallback(
+  const handlePreviewClickBase = useCallback(
     async (deal: any) => {
       const dealId = deal.rawData?.id || deal.id;
       // Set the deal immediately to show sidebar
@@ -1171,6 +1172,29 @@ const CrmDeals = () => {
       }
     },
     [fetchDealFollowUps, fetchDealMeetings],
+  );
+
+  const openApprovalDealPreviewById = useCallback(
+    (id: number) => {
+      void handlePreviewClickBase({ id, rawData: { id } });
+    },
+    [handlePreviewClickBase],
+  );
+
+  const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
+    useCrmListPreviewPersistence({
+      localStorageKey: "crm-approvals-list-preview-record-id",
+      listLoading: !isInitialized || loading,
+      openPreviewByNumericId: openApprovalDealPreviewById,
+    });
+
+  const handlePreviewClick = useCallback(
+    async (deal: any) => {
+      const dealId = deal.rawData?.id || deal.id;
+      if (dealId) writePreviewIdToStorage(Number(dealId));
+      await handlePreviewClickBase(deal);
+    },
+    [handlePreviewClickBase, writePreviewIdToStorage],
   );
 
   // Handle first column click - navigates to detail page
@@ -1227,6 +1251,12 @@ const CrmDeals = () => {
   );
 
   const handleCloseDealSidebar = useCallback(() => {
+    setShowDealSidebar(false);
+    setSelectedDeal(null);
+    clearPreviewIdFromStorage();
+  }, [clearPreviewIdFromStorage]);
+
+  const handleHideDealSidebarKeepPersistence = useCallback(() => {
     setShowDealSidebar(false);
     setSelectedDeal(null);
   }, []);
@@ -3148,7 +3178,7 @@ const CrmDeals = () => {
               onClick: () => {
                 const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
                 if (dealId) {
-                  setShowDealSidebar(false);
+                  handleHideDealSidebarKeepPersistence();
                   router.push(`/crm/detailspage?type=deal&id=${dealId}&approval=1`);
                 }
               },

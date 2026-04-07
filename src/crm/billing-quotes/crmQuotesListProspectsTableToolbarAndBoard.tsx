@@ -62,7 +62,8 @@ export function renderCrmQuotesListProspectsBoardCustomBody(
             scheduled_call_at: prospect.scheduled_call_at || undefined,
             company_domain: prospect.data?.company_domain || undefined,
             company_name: prospect.data?.company_name || undefined,
-            source: prospect.data?.source || undefined,
+            source_file:
+              prospect.data?.source_file || prospect.data?.source || undefined,
           });
         }
       }}

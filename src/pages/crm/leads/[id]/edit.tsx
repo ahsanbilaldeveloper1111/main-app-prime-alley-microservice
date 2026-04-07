@@ -7,6 +7,7 @@ import {
   getLead,
   getStages,
   StageData,
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
   getCampaigns,
   getCampaignById,
   CampaignData,
@@ -545,7 +546,10 @@ const EditLead = () => {
 
   const fetchCampaigns = async () => {
     try {
-      const campaignsData = await getCampaigns({ per_page: 100 });
+      const campaignsData = await getCampaigns({
+        per_page: 100,
+        filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+      });
       setCampaigns(campaignsData?.data || []);
     } catch (error) {
       console.error("Failed to fetch campaigns:", error);

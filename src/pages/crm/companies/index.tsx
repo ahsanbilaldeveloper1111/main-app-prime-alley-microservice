@@ -170,6 +170,7 @@ import {
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import { getDatetimeLocalMinNow } from "@utils/datetimeLocalInput";
+import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 
 type CompanyAssignedToSelectOption = {
   value: string | number;
@@ -1755,12 +1756,6 @@ const CrmCompanyManagement = () => {
     [router],
   );
 
-  // Handle close company sidebar
-  const handleCloseCompanySidebar = useCallback(() => {
-    setShowCompanySidebar(false);
-    setSelectedCompany(null);
-  }, []);
-
   // Handle open filters sidebar
   const handleOpenFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(true);
@@ -1771,10 +1766,45 @@ const CrmCompanyManagement = () => {
     setShowFiltersSidebar(false);
   }, []);
 
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback((company: any) => {
+  const handlePreviewClickBase = useCallback((company: any) => {
     setSelectedCompany(company);
     setShowCompanySidebar(true);
+  }, []);
+
+  const openCompanyPreviewById = useCallback(
+    (id: number) => {
+      handlePreviewClickBase({ id, rawData: { id } });
+    },
+    [handlePreviewClickBase],
+  );
+
+  const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
+    useCrmListPreviewPersistence({
+      localStorageKey: "crm-companies-list-preview-record-id",
+      listLoading: loading,
+      openPreviewByNumericId: openCompanyPreviewById,
+    });
+
+  const handlePreviewClick = useCallback(
+    (company: any) => {
+      const cid = company?.id ?? company?.rawData?.id;
+      if (cid != null) writePreviewIdToStorage(Number(cid));
+      handlePreviewClickBase(company);
+    },
+    [handlePreviewClickBase, writePreviewIdToStorage],
+  );
+
+  // Handle close company sidebar (X): clear persisted preview id
+  const handleCloseCompanySidebar = useCallback(() => {
+    setShowCompanySidebar(false);
+    setSelectedCompany(null);
+    clearPreviewIdFromStorage();
+  }, [clearPreviewIdFromStorage]);
+
+  /** Hide sidebar when navigating to detail so browser back can restore preview. */
+  const handleHideCompanySidebarKeepPersistence = useCallback(() => {
+    setShowCompanySidebar(false);
+    setSelectedCompany(null);
   }, []);
 
   // Stats cards data for metrics
@@ -4415,7 +4445,10 @@ const CrmCompanyManagement = () => {
                           company_domain:
                             company.data?.company_domain || undefined,
                           company_name: company.data?.company_name || undefined,
-                          source: company.data?.source || undefined,
+                          source_file:
+                            company.data?.source_file ||
+                            company.data?.source ||
+                            undefined,
                         });
                       }}
                       searchValue={companySearch}
@@ -5687,13 +5720,13 @@ const CrmCompanyManagement = () => {
                   label: "View record",
                   onClick: () => {
                     if (selectedCompany?.id != null) {
+                      handleHideCompanySidebarKeepPersistence();
                       router.push(
                         `/crm/detailspage?type=companies&id=${encodeURIComponent(
                           String(selectedCompany.id)
                         )}`
                       );
                     }
-                    setShowCompanySidebar(false);
                   },
                 }}
                 onNoteCreate={handleNoteCreate}

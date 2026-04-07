@@ -1337,14 +1337,35 @@ const GenericTable = <T extends Record<string, any>>({
     }
   };
 
-  /** Escape scroll/overflow parents (short tables clip `position: absolute` menus). */
-  const columnSelectorMenuPopperConfig = useMemo(
-    () => ({ strategy: "fixed" as const }),
+  /** Always open downward, escape overflow parents, stay within the viewport. */
+  const getColumnSelectorPopperConfig = useMemo(
+    () =>
+      (defaultConfig: Record<string, any>) => ({
+        ...defaultConfig,
+        strategy: "fixed" as const,
+        placement: "bottom-end" as const,
+        modifiers: (defaultConfig.modifiers ?? []).map(
+          (mod: Record<string, any>) => {
+            if (mod.name === "flip") return { ...mod, enabled: false };
+            if (mod.name === "preventOverflow")
+              return {
+                ...mod,
+                options: {
+                  ...mod.options,
+                  boundary: "viewport" as const,
+                  padding: 8,
+                },
+              };
+            return mod;
+          },
+        ),
+      }),
     [],
   );
 
   const renderColumnCustomizerDropdown = (toggleId: string) => (
     <Dropdown
+      drop="down"
       align="end"
       autoClose="outside"
       onClick={(e: React.MouseEvent) => e.stopPropagation()}
@@ -1361,7 +1382,8 @@ const GenericTable = <T extends Record<string, any>>({
       <Dropdown.Menu
         align="end"
         className="column-selector-menu"
-        popperConfig={columnSelectorMenuPopperConfig}
+        renderOnMount
+        popperConfig={getColumnSelectorPopperConfig}
       >
         {columnCatalog.map((c) => (
           <Dropdown.Item key={c.key} as="div">

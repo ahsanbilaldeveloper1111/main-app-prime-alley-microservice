@@ -3,6 +3,10 @@ import { ChevronDown, X, Link, Image, List, Clock } from 'lucide-react';
 import Select from 'react-select';
 import { ModuleSlug } from '@utils/Helper';
 import { GetHierarchyData } from '@utils/users';
+import {
+  buildFollowUpTaskFields,
+  type FollowUpTaskFields,
+} from '@utils/crmFollowUpTaskDue';
 
 // ============================================================================
 // URL INPUT MODAL (for link/image URL entry)
@@ -203,6 +207,20 @@ const UrlInputModal: React.FC<UrlInputModalProps> = ({
 // TASK MODAL
 // ============================================================================
 
+/** Payload from Task modal save; includes aligned follow-up keys (always true for this flow). */
+export type TaskModalSaveTaskData = {
+  title: string;
+  activityDate: string;
+  activityTime: string;
+  reminder: string;
+  repeat: boolean;
+  taskType: string;
+  priority: string;
+  queue: string;
+  assignedTo: string;
+  notes: string;
+} & FollowUpTaskFields;
+
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -210,18 +228,7 @@ interface TaskModalProps {
   assignedToName?: string;
   /** Optional HTML string used to prefill the notes editor (e.g. when editing an existing task). */
   initialNotesHtml?: string;
-  onSave: (taskData: {
-    title: string;
-    activityDate: string;
-    activityTime: string;
-    reminder: string;
-    repeat: boolean;
-    taskType: string;
-    priority: string;
-    queue: string;
-    assignedTo: string;
-    notes: string;
-  }) => void;
+  onSave: (taskData: TaskModalSaveTaskData) => void;
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({
@@ -443,6 +450,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
     const dateToSend = activityDate === 'Custom...' ? customDate : activityDate;
     const timeToSend = activityDate === 'Custom...' ? customTime : activityTime;
+    const followUp = buildFollowUpTaskFields(
+      true,
+      activityDate,
+      customDate,
+      timeToSend,
+    );
 
     onSave({
       title,
@@ -455,6 +468,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       queue,
       assignedTo: selectedUserExtension?.value ?? '',
       notes,
+      ...followUp,
     });
 
     const now = new Date();

@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Maximize2, Paperclip, ChevronDown } from 'lucide-react';
 import RichNoteEditor from '@components/RichNoteEditor';
+import { buildFollowUpTaskFields } from '@utils/crmFollowUpTaskDue';
+
+export interface NotesModalSavePayload {
+  note: string;
+  createFollowUpTask: boolean;
+  followUpTaskDueDate: string | null;
+  followUpTaskDueTime: string | null;
+}
 
 interface NotesModalProps {
   isOpen: boolean;
   onClose: () => void;
   recordName: string;
-  onSave: (note: string, createTask: boolean, taskDueDate?: string) => void;
+  onSave: (payload: NotesModalSavePayload) => void;
 }
 
 const NotesModal: React.FC<NotesModalProps> = ({
@@ -77,16 +85,19 @@ const NotesModal: React.FC<NotesModalProps> = ({
   };
 
   const handleSave = () => {
-    const dateToSend =
-      activityDate === 'Custom...' ? customDate : activityDate;
-    const timeToSend =
+    const timeForFollowUp =
       activityDate === 'Custom...' ? customTime : activityTime;
-
-    onSave(
-      noteHtml,
+    const followUp = buildFollowUpTaskFields(
       createTask,
-      createTask ? `${dateToSend} ${timeToSend}` : undefined,
+      activityDate,
+      customDate,
+      timeForFollowUp,
     );
+
+    onSave({
+      note: noteHtml,
+      ...followUp,
+    });
     setNoteHtml('');
     setCreateTask(false);
     setIsDraftSaved(false);

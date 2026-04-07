@@ -59,21 +59,28 @@ import {
   type SmsListMeta,
 } from "@utils/communication";
 import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
-import { GlobalDateTimeFormat, ModuleSlug } from "@utils/Helper";
+import {
+  formatCrmPreviewDate,
+  formatCrmPreviewDateTime,
+  ModuleSlug,
+} from "@utils/Helper";
 import { ListCallLogs } from "@utils/calls";
 import axiosInstance from "@utils/axios";
 import CallLog from "@components/CallLogNew";
 import AudioPlayer, { AudioPlayerRef } from "@components/AudioPlayer";
-import NotesModal from "@components/NotesModal";
+import NotesModal, { type NotesModalSavePayload } from "@components/NotesModal";
+import {
+  followUpTaskFieldsToApiPayload,
+  resolveFollowUpDueDateYmd,
+} from "@utils/crmFollowUpTaskDue";
 import RichNoteEditor from "@components/RichNoteEditor";
 import EmailModal from "@components/EmailModal";
-import TaskModal from "@components/TaskModal";
+import TaskModal, { type TaskModalSaveTaskData } from "@components/TaskModal";
 import MeetingModal from "@components/MeetingModal";
 import LogSmsModal from "@components/LogSms";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { useSession } from "next-auth/react";
-import moment from "moment-timezone";
 import { useRouter } from "next/router";
 import { toast } from "react-toastify";
 
@@ -798,8 +805,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
   }, [whatsappMessagesLoading, whatsappMessages]);
 
   const handleNoteCreate = useCallback(
-    async (note: string) => {
-      const text = (note ?? "").trim();
+    async (payload: NotesModalSavePayload) => {
+      const text = (payload.note ?? "").trim();
       if (!text) return;
       if (recordId == null || Number.isNaN(Number(recordId))) return;
       try {
@@ -807,6 +814,11 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           record_type: recordType,
           record_id: Number(recordId),
           text,
+          ...followUpTaskFieldsToApiPayload({
+            createFollowUpTask: payload.createFollowUpTask,
+            followUpTaskDueDate: payload.followUpTaskDueDate,
+            followUpTaskDueTime: payload.followUpTaskDueTime,
+          }),
         });
         setShowNotesModal(false);
         await fetchNotes();
@@ -985,47 +997,17 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     [editingMeetingId, editMeetingDefaults, fetchMeetings],
   );
 
-  const parseTaskDueDate = useCallback(
-    (activityDate: string, activityTime: string): string => {
-      const today = new Date();
-      const addDays = (n: number) => {
-        const t = new Date(today);
-        t.setDate(t.getDate() + n);
-        return t.toISOString().slice(0, 10);
-      };
-      if (activityDate === "Today") return addDays(0);
-      if (activityDate === "Tomorrow") return addDays(1);
-      if (
-        activityDate?.includes("3 business") ||
-        activityDate?.includes("Friday")
-      )
-        return addDays(3);
-      if (activityDate === "In 1 week") return addDays(7);
-      if (activityDate === "In 2 weeks") return addDays(14);
-      if (activityDate === "In 1 month") return addDays(30);
-      return addDays(3);
-    },
-    [],
-  );
-
   const handleTaskSave = useCallback(
-    async (taskData: {
-      title: string;
-      activityDate: string;
-      activityTime: string;
-      reminder: string;
-      repeat: boolean;
-      taskType: string;
-      priority: string;
-      queue: string;
-      assignedTo: string;
-      notes: string;
-    }) => {
+    async (taskData: TaskModalSaveTaskData) => {
       if (recordId == null || Number.isNaN(Number(recordId))) return;
-      const due_date = parseTaskDueDate(
-        taskData.activityDate,
-        taskData.activityTime,
-      );
+      const due_date =
+        taskData.followUpTaskDueDate ??
+        resolveFollowUpDueDateYmd(taskData.activityDate, "");
+      const timeSlice =
+        taskData.followUpTaskDueTime ??
+        (taskData.activityTime?.length >= 5
+          ? taskData.activityTime.slice(0, 5)
+          : undefined);
       const urgency =
         taskData.priority === "High"
           ? "high"
@@ -1040,16 +1022,18 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           created_by: extension,
           urgency,
           due_date,
-          time:
-            taskData.activityTime?.length >= 5
-              ? taskData.activityTime.slice(0, 5)
-              : undefined,
+          time: timeSlice,
           status: "pending",
           notes: taskData.notes?.trim()
             ? [{ note: taskData.notes.trim() }]
             : undefined,
           record_type: recordType,
           record_id: Number(recordId),
+          ...followUpTaskFieldsToApiPayload({
+            createFollowUpTask: taskData.createFollowUpTask,
+            followUpTaskDueDate: taskData.followUpTaskDueDate,
+            followUpTaskDueTime: taskData.followUpTaskDueTime,
+          }),
         });
         setShowTaskModal(false);
         await fetchTasks();
@@ -1057,7 +1041,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
         // createTask shows toast on error
       }
     },
-    [recordType, recordId, extension, parseTaskDueDate, fetchTasks],
+    [recordType, recordId, extension, fetchTasks],
   );
 
   const handleTaskDeleteConfirm = useCallback(async () => {
@@ -1077,8 +1061,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       message: string;
       contacts: Array<{ id: string; name: string; email?: string }>;
       activityDate: string;
-      createTask: boolean;
-      taskDueDate?: string;
+      createFollowUpTask: boolean;
+      followUpTaskDueDate: string | null;
+      followUpTaskDueTime: string | null;
       attachments: File[];
     }) => {
       const to = (record?.data?.phone ?? "").replaceAll(/\s/g, "").trim();
@@ -1099,6 +1084,11 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           extension,
           ...(recordType && { record_type: recordType }),
           ...(recordId != null && { record_id: Number(recordId) }),
+          ...followUpTaskFieldsToApiPayload({
+            createFollowUpTask: smsData.createFollowUpTask,
+            followUpTaskDueDate: smsData.followUpTaskDueDate,
+            followUpTaskDueTime: smsData.followUpTaskDueTime,
+          }),
         });
         setShowCreateSmsModal(false);
         await fetchSms();
@@ -1199,13 +1189,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       const title = event === "created" ? "Record created" : "Record updated";
       const description = entry.description?.trim() || "—";
       const timestamp = entry.created_at
-        ? new Date(entry.created_at).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })
+        ? formatCrmPreviewDateTime(entry.created_at)
         : "—";
       const auditChanges: Array<{
         field: string;
@@ -1802,9 +1786,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {moment(email.created_at).format(
-                              GlobalDateTimeFormat,
-                            )}
+                            {formatCrmPreviewDateTime(email.created_at)}
                           </span>
                         </div>
                       )}
@@ -2005,16 +1987,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           ) : (
             <div>
               {notesList.map((note) => {
-                const updatedAt = new Date(note.updated_at).toLocaleDateString(
-                  "en-US",
-                  {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  },
-                );
+                const updatedAt = note.updated_at
+                  ? formatCrmPreviewDateTime(note.updated_at)
+                  : "";
                 const isEditing = editingNoteId === note.id;
                 const iconBtnStyle: React.CSSProperties = {
                   background: "transparent",
@@ -2593,9 +2568,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               }}
                             >
                               {dueDate
-                                ? new Date(task.due_date!).toLocaleDateString(
-                                    "en-US",
-                                  )
+                                ? formatCrmPreviewDate(task.due_date!)
                                 : "—"}
                               {task.time ? ` ${task.time.slice(0, 5)}` : ""}
                               {task.status ? ` · ${task.status}` : ""}
@@ -2635,16 +2608,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                             }}
                           >
                             {task.updated_at
-                              ? new Date(task.updated_at).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    month: "short",
-                                    day: "numeric",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  },
-                                )
+                              ? formatCrmPreviewDateTime(task.updated_at)
                               : ""}
                           </span>
                           <button
@@ -2762,15 +2726,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           ) : (
             <div>
               {meetingsList.map((meeting) => {
-                const meetingUpdatedAt = new Date(
-                  meeting.updated_at,
-                ).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
+                const meetingUpdatedAt = meeting.updated_at
+                  ? formatCrmPreviewDateTime(meeting.updated_at)
+                  : "";
                 const meetingDate = meeting.meeting_date?.slice(0, 10) ?? "";
                 const iconBtnStyle: React.CSSProperties = {
                   background: "transparent",
@@ -2823,9 +2781,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                           >
                             {meeting.meeting_type} ·{" "}
                             {meetingDate
-                              ? new Date(meeting.meeting_date).toLocaleDateString(
-                                  "en-US",
-                                )
+                              ? formatCrmPreviewDate(meeting.meeting_date)
                               : "—"}{" "}
                             {meeting.meeting_time ?? ""}
                             {meeting.status ? ` · ${meeting.status}` : ""}
@@ -3051,16 +3007,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {new Date(sms.created_at).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
+                            {formatCrmPreviewDateTime(sms.created_at)}
                           </span>
                         </div>
                       )}
@@ -3348,16 +3295,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {new Date(chat.last_message_at).toLocaleDateString(
-                              "en-US",
-                              {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
+                            {formatCrmPreviewDateTime(chat.last_message_at)}
                           </span>
                         </div>
                       )}
@@ -3396,6 +3334,14 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   content: emailData.body ?? "",
                   ...(recordId != null && { record_id: Number(recordId) }),
                   ...(recordType && { record_type: recordType }),
+                  ...(emailData.attachments?.length
+                    ? { attachmentFiles: emailData.attachments }
+                    : {}),
+                  ...followUpTaskFieldsToApiPayload({
+                    createFollowUpTask: emailData.createFollowUpTask,
+                    followUpTaskDueDate: emailData.followUpTaskDueDate,
+                    followUpTaskDueTime: emailData.followUpTaskDueTime,
+                  }),
                 });
                 await fetchEmails();
                 setShowEmailModal(false);
@@ -3630,9 +3576,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     }}
                   >
                     {selectedSms.created_at &&
-                      moment(selectedSms.created_at).format(
-                        GlobalDateTimeFormat,
-                      )}
+                      formatCrmPreviewDateTime(selectedSms.created_at)}
                   </div>
                   <div
                     style={{
@@ -3756,9 +3700,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     }}
                   >
                     {selectedEmail.created_at &&
-                      moment(selectedEmail.created_at).format(
-                        GlobalDateTimeFormat,
-                      )}
+                      formatCrmPreviewDateTime(selectedEmail.created_at)}
                     {selectedEmail.status != null && (
                       <span
                         style={{
@@ -3976,9 +3918,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                             }}
                           >
                             {msg.created_at
-                              ? moment(msg.created_at).format(
-                                  GlobalDateTimeFormat,
-                                )
+                              ? formatCrmPreviewDateTime(msg.created_at)
                               : ""}{" "}
                             {msg.status && ` · ${msg.status}`}
                           </div>

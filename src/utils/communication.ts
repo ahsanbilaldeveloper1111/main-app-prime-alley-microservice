@@ -28,8 +28,16 @@ export interface SendEmailPayload {
   bcc?: string[];
   /** Reply-to email. */
   reply_to?: string;
-  /** Array of file path strings. */
+  /** Array of file path strings (JSON body; server-side paths). */
   attachments?: string[];
+  /** Browser files from the email modal; sent as multipart `attachments[]`. */
+  attachmentFiles?: File[];
+  /** When false, due fields are null. When true, due fields are UTC-derived from the user’s local pickers. */
+  create_follow_up_task?: boolean;
+  /** UTC calendar date `YYYY-MM-DD` (from the same instant as local due date + time). */
+  follow_up_task_due_date?: string | null;
+  /** UTC time `HH:mm:ssZ` (Zulu), e.g. `06:50:00Z`. */
+  follow_up_task_due_time?: string | null;
 }
 
 /** Success response (200) for send-email. */
@@ -110,6 +118,11 @@ export interface SendSmsPayload {
   record_type?: string;
   /** Optional record ID for CRM association. */
   record_id?: number;
+  /** Follow-up to-do on send. When false, due fields should be null. */
+  create_follow_up_task?: boolean;
+  follow_up_task_due_date?: string | null;
+  /** UTC `HH:mm:ssZ`. */
+  follow_up_task_due_time?: string | null;
 }
 
 /** Success response (200) for send-sms. */
@@ -291,17 +304,81 @@ export interface GenerateSmsSuccessResponse {
 
 // ==================== APIs ====================
 
+function appendSendEmailFormData(
+  formData: FormData,
+  payload: Omit<SendEmailPayload, "attachmentFiles">,
+): void {
+  const toList = Array.isArray(payload.to) ? payload.to : [payload.to];
+  toList.forEach((email) => formData.append("to[]", email));
+  formData.append("subject", payload.subject);
+  formData.append("content", payload.content);
+  if (payload.content_type) {
+    formData.append("content_type", payload.content_type);
+  }
+  if (payload.record_id != null) {
+    formData.append("record_id", String(payload.record_id));
+  }
+  if (payload.record_type) {
+    formData.append("record_type", payload.record_type);
+  }
+  if (payload.created_by) {
+    formData.append("created_by", payload.created_by);
+  }
+  payload.cc?.forEach((email) => formData.append("cc[]", email));
+  payload.bcc?.forEach((email) => formData.append("bcc[]", email));
+  if (payload.reply_to) {
+    formData.append("reply_to", payload.reply_to);
+  }
+  payload.attachments?.forEach((path) => formData.append("attachments[]", path));
+  if (payload.create_follow_up_task !== undefined) {
+    formData.append(
+      "create_follow_up_task",
+      payload.create_follow_up_task ? "1" : "0",
+    );
+  }
+  if (payload.follow_up_task_due_date !== undefined) {
+    formData.append(
+      "follow_up_task_due_date",
+      payload.follow_up_task_due_date ?? "",
+    );
+  }
+  if (payload.follow_up_task_due_time !== undefined) {
+    formData.append(
+      "follow_up_task_due_time",
+      payload.follow_up_task_due_time ?? "",
+    );
+  }
+}
+
 /**
  * POST send-email
  * Sends an email with the given payload.
+ * Uses multipart/form-data when `attachmentFiles` is non-empty (same pattern as CRM notes).
  */
 export const sendEmail = async (
   data: SendEmailPayload,
 ): Promise<SendEmailSuccessResponse> => {
-  const response = await axiosInstance.post<SendEmailSuccessResponse>(
-    `${prefix}/send-email`,
-    data,
-  );
+  const { attachmentFiles, ...rest } = data;
+  const files = attachmentFiles?.length ? attachmentFiles : undefined;
+
+  let response;
+  if (files) {
+    const formData = new FormData();
+    appendSendEmailFormData(formData, rest);
+    files.forEach((file) =>
+      formData.append("attachments[]", file, file.name),
+    );
+    response = await axiosInstance.post<SendEmailSuccessResponse>(
+      `${prefix}/send-email`,
+      formData,
+    );
+  } else {
+    response = await axiosInstance.post<SendEmailSuccessResponse>(
+      `${prefix}/send-email`,
+      rest,
+    );
+  }
+
   if (response?.status === 200) {
     toast.success(response.data.message || "Email sent successfully");
     return response.data;
