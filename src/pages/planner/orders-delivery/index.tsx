@@ -32,7 +32,7 @@ import {
   FiCalendar,
   FiTarget,
   FiMoreVertical,
-} from "react-icons/fi";
+} from "@crm/orders/orderListFiIcons";
 import {
   getOrders,
   getOrder,
@@ -48,7 +48,7 @@ import {
   getLead,
   getDealAttachments,
   downloadDealAttachment,
-} from "@utils/crm";
+} from "@crm/orders/orderListCrmApi";
 import { GetHierarchyData } from "@utils/users";
 import {
   Button,
@@ -61,8 +61,8 @@ import {
   Table,
   InputGroup,
   Modal,
-  Spinner
-} from "react-bootstrap";
+  Spinner,
+} from "@crm/orders/orderListBootstrap";
 import Select from "@components/AppSelect";
 import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {

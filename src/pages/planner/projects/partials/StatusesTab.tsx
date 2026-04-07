@@ -1,4 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { useProjectSettingsTabListState } from '@hooks/useProjectSettingsTabListState';
+import { paginatedSlice } from '@utils/paginatedSlice';
 import { Spinner, Button, Modal, Form, Table } from 'react-bootstrap';
 import {
   Plus,
@@ -503,16 +505,15 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   const [formData, setFormData]             = useState(() => ({ ...DEFAULT_STATUS_FORM }));
   const [processing, setProcessing]         = useState(false);
 
-  // Pagination and search states
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortBy: '',
-    sortOrder: 'asc' as 'asc' | 'desc',
-  });
-  const [searchValue, setSearchValue] = useState('');
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [selectedColumns] = useState<string[]>(['name', 'color']);
+  const {
+    pagination,
+    setPagination,
+    searchValue,
+    setSearchValue,
+    selectedItems,
+    setSelectedItems,
+    selectedColumns,
+  } = useProjectSettingsTabListState(['name', 'color']);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [colorFilter, setColorFilter] = useState<string | null>(null);
 
@@ -625,11 +626,15 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
     });
   }, [filteredStatuses, pagination.sortBy, pagination.sortOrder]);
 
-  const paginatedStatuses = useMemo(() => {
-    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
-    const end = start + pagination.rowsPerPage;
-    return sortedFilteredStatuses.slice(start, end);
-  }, [sortedFilteredStatuses, pagination.currentPage, pagination.rowsPerPage]);
+  const paginatedStatuses = useMemo(
+    () =>
+      paginatedSlice(
+        sortedFilteredStatuses,
+        pagination.currentPage,
+        pagination.rowsPerPage,
+      ),
+    [sortedFilteredStatuses, pagination.currentPage, pagination.rowsPerPage],
+  );
 
   // ── Stats Cards ───────────────────────────────────────────────────────────
   const statsCardsData: StatsCardData[] = useMemo(() => {

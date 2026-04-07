@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@crm/leads/leadFullPageStyles";
 import React, { ReactElement, useState, useEffect, useRef } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -50,8 +50,6 @@ import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";

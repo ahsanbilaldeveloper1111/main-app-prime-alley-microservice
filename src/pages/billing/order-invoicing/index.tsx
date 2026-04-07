@@ -35,7 +35,7 @@ import {
   FiCalendar,
   FiTarget,
   FiMoreVertical,
-} from "react-icons/fi";
+} from "@crm/orders/orderListFiIcons";
 import {
   getOrders,
   getOrder,
@@ -52,7 +52,7 @@ import {
   getDealAttachments,
   downloadDealAttachment,
   getMinifiedCompanies,
-} from "@utils/crm";
+} from "@crm/orders/orderListCrmApi";
 import { GetHierarchyData } from "@utils/users";
 import {
   Button,
@@ -66,7 +66,7 @@ import {
   InputGroup,
   Modal,
   Spinner,
-} from "react-bootstrap";
+} from "@crm/orders/orderListBootstrap";
 import Select from "react-select";
 import {
   GlobalDateFormat,

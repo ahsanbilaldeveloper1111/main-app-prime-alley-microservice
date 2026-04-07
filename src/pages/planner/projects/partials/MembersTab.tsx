@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useProjectSettingsTabListState } from '@hooks/useProjectSettingsTabListState';
+import { paginatedSlice } from '@utils/paginatedSlice';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
 import { UserPlus, Edit, Trash2, Users, Filter } from 'lucide-react';
@@ -61,16 +63,15 @@ const MembersTab: React.FC<MembersTabProps> = ({
   const [formData, setFormData] = useState({ extension_number: '', role: 'member' });
   const [processing, setProcessing] = useState(false);
 
-  // Pagination and search states
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortBy: '',
-    sortOrder: 'asc' as 'asc' | 'desc',
-  });
-  const [searchValue, setSearchValue] = useState('');
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [selectedColumns] = useState<string[]>(['member', 'extension_number', 'role']);
+  const {
+    pagination,
+    setPagination,
+    searchValue,
+    setSearchValue,
+    selectedItems,
+    setSelectedItems,
+    selectedColumns,
+  } = useProjectSettingsTabListState(['member', 'extension_number', 'role']);
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -356,11 +357,15 @@ const MembersTab: React.FC<MembersTabProps> = ({
     return result;
   }, [enrichedMembers, searchValue, roleFilter]);
 
-  const paginatedMembers = useMemo(() => {
-    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
-    const end = start + pagination.rowsPerPage;
-    return filteredMembers.slice(start, end);
-  }, [filteredMembers, pagination.currentPage, pagination.rowsPerPage]);
+  const paginatedMembers = useMemo(
+    () =>
+      paginatedSlice(
+        filteredMembers,
+        pagination.currentPage,
+        pagination.rowsPerPage,
+      ),
+    [filteredMembers, pagination.currentPage, pagination.rowsPerPage],
+  );
 
   const countMembersByRole = useCallback((role: string) => {
     const r = role.toLowerCase();

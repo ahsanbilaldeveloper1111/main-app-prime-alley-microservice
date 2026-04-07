@@ -1351,6 +1351,4 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
   );
 }
 
-export function CrmQuotesListPage(props: Readonly<CrmQuotesListPageProps>) {
-  return <CrmQuotesListPageContent {...props} />;
-}
+export const CrmQuotesListPage = CrmQuotesListPageContent;

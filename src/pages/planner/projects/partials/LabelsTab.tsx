@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useProjectSettingsTabListState } from '@hooks/useProjectSettingsTabListState';
+import { paginatedSlice } from '@utils/paginatedSlice';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, Tag } from 'lucide-react';
 import { createProjectLabel, updateProjectLabel, deleteProjectLabel } from '@utils/tasks';
@@ -47,16 +49,15 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   const [formData, setFormData] = useState({ name: '', color: '#4680FF' });
   const [processing, setProcessing] = useState(false);
 
-  // Pagination and search states
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortBy: '',
-    sortOrder: 'asc' as 'asc' | 'desc',
-  });
-  const [searchValue, setSearchValue] = useState('');
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [selectedColumns] = useState<string[]>(['name', 'color', 'tasks']);
+  const {
+    pagination,
+    setPagination,
+    searchValue,
+    setSearchValue,
+    selectedItems,
+    setSelectedItems,
+    selectedColumns,
+  } = useProjectSettingsTabListState(['name', 'color', 'tasks']);
   const [colorFilter, setColorFilter] = useState<string | null>(null);
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
@@ -256,11 +257,15 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     return result;
   }, [enrichedLabels, searchValue, colorFilter]);
 
-  const paginatedLabels = useMemo(() => {
-    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
-    const end = start + pagination.rowsPerPage;
-    return filteredLabels.slice(start, end);
-  }, [filteredLabels, pagination.currentPage, pagination.rowsPerPage]);
+  const paginatedLabels = useMemo(
+    () =>
+      paginatedSlice(
+        filteredLabels,
+        pagination.currentPage,
+        pagination.rowsPerPage,
+      ),
+    [filteredLabels, pagination.currentPage, pagination.rowsPerPage],
+  );
 
   // ── Stats Cards ───────────────────────────────────────────────────────────
   const statsCardsData: StatsCardData[] = useMemo(() => {
