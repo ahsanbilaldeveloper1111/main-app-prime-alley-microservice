@@ -7,6 +7,17 @@ import {
   CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS,
 } from "@crm/shared/crmListExportModalDateRangePresets";
 
+function patchExportFilterStringField(
+  prev: Record<string, any>,
+  key: string,
+  value: string,
+): Record<string, any> {
+  const next = { ...prev };
+  if (value) next[key] = value;
+  else delete next[key];
+  return next;
+}
+
 export type CrmProspectsListExportModalFiltersBodyProps = Readonly<{
   extensions: readonly {
     id?: string | number;
@@ -42,12 +53,9 @@ export function CrmProspectsListExportModalFiltersBody({
               }
               onChange={(e) => {
                 const v = e.target.value;
-                setExportFilters((prev) => {
-                  const next = { ...prev };
-                  if (v) next.user_extension = v;
-                  else delete next.user_extension;
-                  return next;
-                });
+                setExportFilters((prev) =>
+                  patchExportFilterStringField(prev, "user_extension", v),
+                );
               }}
             >
               <option value="">All owners</option>
@@ -73,12 +81,9 @@ export function CrmProspectsListExportModalFiltersBody({
               value={exportFilters.disposition || ""}
               onChange={(e) => {
                 const v = e.target.value;
-                setExportFilters((prev) => {
-                  const next = { ...prev };
-                  if (v) next.disposition = v;
-                  else delete next.disposition;
-                  return next;
-                });
+                setExportFilters((prev) =>
+                  patchExportFilterStringField(prev, "disposition", v),
+                );
               }}
             >
               <option value="">All status</option>
@@ -130,12 +135,9 @@ export function CrmProspectsListExportModalFiltersBody({
           value={exportFilters.search || ""}
           onChange={(e) => {
             const v = e.target.value.trim();
-            setExportFilters((prev) => {
-              const next = { ...prev };
-              if (v) next.search = v;
-              else delete next.search;
-              return next;
-            });
+            setExportFilters((prev) =>
+              patchExportFilterStringField(prev, "search", v),
+            );
           }}
         />
       </Form.Group>

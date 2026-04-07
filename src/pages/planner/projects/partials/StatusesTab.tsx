@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { useProjectSettingsTabListState, paginatedSlice } from '@planner/projectTabTableShared';
+import { ProjectSettingsPresetColorPicker } from '@planner/ProjectSettingsPresetColorPicker';
 import { Spinner, Button, Modal, Form, Table } from 'react-bootstrap';
 import {
   Plus,
@@ -28,56 +29,6 @@ interface StatusesTabProps {
   styles: any;
   canManageProject: boolean;
 }
-
-const predefinedColors = [
-  '#4680FF', '#2CA87F', '#FFB64D', '#DC2626', '#9E9E9E',
-  '#667EEA', '#F56565', '#48BB78', '#ED8936', '#4FC3F7',
-];
-
-type StatusFormColorPickerProps = {
-  color: string;
-  onColorChange: (color: string) => void;
-};
-
-const StatusFormColorPicker: React.FC<StatusFormColorPickerProps> = ({
-  color,
-  onColorChange,
-}) => (
-  <>
-    <div
-      style={{
-        display: 'flex',
-        gap: '0.5rem',
-        marginBottom: '0.5rem',
-        flexWrap: 'wrap',
-      }}
-    >
-      {predefinedColors.map((preset) => (
-        <button
-          key={preset}
-          type="button"
-          onClick={() => onColorChange(preset)}
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px',
-            backgroundColor: preset,
-            border:
-              color === preset ? '3px solid #1F2937' : '2px solid #E5E9F2',
-            cursor: 'pointer',
-            padding: 0,
-          }}
-        />
-      ))}
-    </div>
-    <Form.Control
-      type="color"
-      value={color}
-      onChange={(e) => onColorChange(e.target.value)}
-      style={{ width: '100%', height: '40px' }}
-    />
-  </>
-);
 
 const DEFAULT_STATUS_FORM = {
   name: '',
@@ -1076,7 +1027,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Color</Form.Label>
-              <StatusFormColorPicker
+              <ProjectSettingsPresetColorPicker
                 color={formData.color}
                 onColorChange={(next) =>
                   setFormData((prev) => ({ ...prev, color: next }))
@@ -1139,7 +1090,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Color</Form.Label>
-              <StatusFormColorPicker
+              <ProjectSettingsPresetColorPicker
                 color={formData.color}
                 onColorChange={(next) =>
                   setFormData((prev) => ({ ...prev, color: next }))

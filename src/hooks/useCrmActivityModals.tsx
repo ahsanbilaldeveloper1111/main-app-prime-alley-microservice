@@ -21,6 +21,7 @@ import MeetingModal from "@components/MeetingModal";
 import LogSmsModal from "@components/LogSms";
 import WhatsAppMessageModal from "@components/WhatsAppMessageModalNew";
 import { toast } from "react-toastify";
+import { getCrmSessionUserContext } from "@crm/shared/crmSessionUserContext";
 
 export type CrmRecordType = "prospect" | "lead" | "deal" | "order" | "company";
 
@@ -72,18 +73,8 @@ export function useCrmActivityModals({
 }: UseCrmActivityModalsParams): UseCrmActivityModalsReturn {
   const { data: session } = useSession();
   const router = useRouter();
-  const userEmail =
-    (session?.user as { email?: string } | undefined)?.email ?? "user@example.com";
-  const userName =
-    (session?.user as { name?: string } | undefined)?.name ?? "Your Name";
-  const extension =
-    (session?.user as { extension?: string; phone?: string } | undefined)?.extension ??
-    (session?.user as { extension?: string; phone?: string } | undefined)?.phone ??
-    "unknown";
-  const tenantId =
-    (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant_id ??
-    (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant ??
-    "default";
+  const { userEmail, userName, extension, tenantId } =
+    getCrmSessionUserContext(session);
 
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);

@@ -164,3 +164,35 @@ export function computeCrmListAdvancedFiltersApplied(
 
   return hasCampaign || hasTags || hasSource || hasNextCall;
 }
+
+/**
+ * Copy a fixed set of keys from a filter object onto API params when values are truthy.
+ * Use for leads/deals/orders/tasks-style lists to avoid repeating `if (filters.x) params.x = …`.
+ */
+export function copyTruthyKeysToParams(
+  target: Record<string, any>,
+  source: Record<string, any>,
+  keys: readonly string[],
+): void {
+  for (const key of keys) {
+    const v = source[key];
+    if (v) {
+      target[key] = v;
+    }
+  }
+}
+
+/**
+ * Copy keys when `source[key] !== undefined` (preserves explicit `null` if needed by API).
+ */
+export function copyDefinedKeysToParams(
+  target: Record<string, any>,
+  source: Record<string, any>,
+  keys: readonly string[],
+): void {
+  for (const key of keys) {
+    if (source[key] !== undefined) {
+      target[key] = source[key];
+    }
+  }
+}

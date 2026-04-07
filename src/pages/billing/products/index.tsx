@@ -53,25 +53,6 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 /** Row from `getProducts` / list-products — not CRM `getCrmData`. */
 type BillingProductRow = ProductData & Record<string, unknown>;
 
-let customFieldIdSeq = 0;
-function createCustomFieldId(fieldName: string): string {
-  const w = (globalThis as unknown as { window?: Window }).window;
-  const cryptoObj = w?.crypto;
-
-  if (cryptoObj?.randomUUID) {
-    return `${cryptoObj.randomUUID()}-${fieldName}`;
-  }
-
-  if (cryptoObj?.getRandomValues) {
-    const bytes = new Uint8Array(16);
-    cryptoObj.getRandomValues(bytes);
-    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-    return `${hex}-${fieldName}`;
-  }
-
-  customFieldIdSeq += 1;
-  return `${Date.now()}-${customFieldIdSeq}-${fieldName}`;
-}
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 

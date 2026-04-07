@@ -75,6 +75,7 @@ import EmailModal from "@components/EmailModal";
 import MeetingModal from "@components/MeetingModal";
 import Select from "react-select";
 import { GetHierarchyData } from "@utils/users";
+import { getCrmSessionUserContext } from "@crm/shared/crmSessionUserContext";
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -5888,18 +5889,9 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     useState(false);
   const [availableDevices, setAvailableDevices] = useState<any[]>([]);
   const [pendingDialedNumber, setPendingDialedNumber] = useState("");
-  const extension =
-    (session?.user as { extension?: string; phone?: string } | undefined)
-      ?.extension ??
-    (session?.user as { extension?: string; phone?: string } | undefined)
-      ?.phone ??
-    "unknown";
-  const tenantId =
-    (session?.user as { tenant_id?: string; tenant?: string } | undefined)
-      ?.tenant_id ??
-    (session?.user as { tenant_id?: string; tenant?: string } | undefined)
-      ?.tenant ??
-    "";
+  const { extension, tenantId } = getCrmSessionUserContext(session, {
+    tenantMissingFallback: "empty",
+  });
 
   const {
     prospectData,

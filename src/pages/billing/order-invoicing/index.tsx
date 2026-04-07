@@ -154,6 +154,7 @@ import {
 } from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
 import moment from "moment";
+import { buildCrmOrdersListGetOrdersParams } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
 
 const ignoredKeys = ["order_stage_id"];
 
@@ -291,62 +292,15 @@ const CrmOrders = () => {
     async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
-        const params: any = {
+        const params = buildCrmOrdersListGetOrdersParams({
+          filters: currentFilters,
           page,
-          per_page: perPage,
-        };
-
-        // Use search from currentFilters if available
-        if (currentFilters.search) {
-          params.search = currentFilters.search;
-        }
-
-        // Add filter parameters at top level
-        if (currentFilters.stage_id) {
-          params.stage_id = currentFilters.stage_id;
-        }
-        if (currentFilters.assigned_to) {
-          params.assigned_to = currentFilters.assigned_to;
-        }
-        if (currentFilters.is_lost !== undefined) {
-          params.is_lost = currentFilters.is_lost;
-        }
-        if (currentFilters.include_lost !== undefined) {
-          params.include_lost = currentFilters.include_lost;
-        }
-        if (currentFilters.include_archived !== undefined) {
-          params.include_archived = currentFilters.include_archived;
-        }
-        if (currentFilters.industry) {
-          params.industry = currentFilters.industry;
-        }
-        if (currentFilters.order_value_min) {
-          params.order_value_min = currentFilters.order_value_min;
-        }
-        if (currentFilters.order_value_max) {
-          params.order_value_max = currentFilters.order_value_max;
-        }
-        if (currentFilters.order_stage_id) {
-          params.order_stage_id = currentFilters.order_stage_id;
-        }
-        if (currentFilters.order_approval_status) {
-          params.order_approval_status = currentFilters.order_approval_status;
-        }
-        if (currentFilters.fulfillment_status) {
-          params.fulfillment_status = currentFilters.fulfillment_status;
-        }
-        if (currentFilters.payment_status) {
-          params.payment_status = currentFilters.payment_status;
-        }
-        if (currentFilters.date_from) {
-          params.date_from = currentFilters.date_from;
-        }
-        if (currentFilters.date_to) {
-          params.date_to = currentFilters.date_to;
-        }
-        if (selectedCompanyId) {
-          params.crm_company_id = selectedCompanyId;
-        }
+          perPage,
+          tableSort: null,
+          normalizeSearch: false,
+          ownerParamStyle: "assigned_to",
+          crmCompanyId: selectedCompanyId,
+        });
 
         const response: any = await getOrders(params);
         console.log("Raw response from getOrders:", response);

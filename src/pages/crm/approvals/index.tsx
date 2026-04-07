@@ -145,7 +145,12 @@ import {
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
+import { CrmListExportModalAssignedToSelect } from "@crm/shared/CrmListExportModalAssignedToSelect";
 import { buildDealsListSidebarBaseFilterPayload } from "@crm/deals/dealsListPageFilterHelpers";
+import {
+  buildDealsListGetDealsExportParams,
+  buildDealsListGetDealsParams,
+} from "@crm/deals/dealsListGetDealsQueryParams";
 import { CrmDealsListAddTabModal } from "@crm/deals/CrmDealsListAddTabModal";
 
 /** Option shape for single-value react-select filters on this page. Keeps `onChange` typed (avoids `{}`). */
@@ -399,46 +404,13 @@ const CrmDeals = () => {
       page = 1,
       perPage = 15,
       includeTableSorting = true,
-    ) => {
-      const params: Record<string, any> = {
+    ) =>
+      buildDealsListGetDealsParams(filters, {
         page,
-        per_page: perPage,
-      };
-      const truthyFilterKeys = [
-        "search",
-        "stage_id",
-        "assigned_to",
-        "follow_up_date_from",
-        "follow_up_date_to",
-        "probability_min",
-        "probability_max",
-        "deal_type",
-        "industry",
-        "expected_close_date_from",
-        "expected_close_date_to",
-        "approval_status",
-      ] as const;
-      truthyFilterKeys.forEach((key) => {
-        if (filters[key]) {
-          params[key] = filters[key];
-        }
-      });
-
-      const definedFilterKeys = ["is_lost", "include_lost", "include_archived"] as const;
-      definedFilterKeys.forEach((key) => {
-        if (filters[key] !== undefined) {
-          params[key] = filters[key];
-        }
-      });
-      if (
-        includeTableSorting &&
-        dealsPagination.sortBy
-      ) {
-        params.sort_by = dealsPagination.sortBy;
-        params.sort_order = dealsPagination.sortOrder;
-      }
-      return params;
-    },
+        perPage,
+        includeTableSorting,
+        tableSort: dealsPagination,
+      }),
     [dealsPagination.sortBy, dealsPagination.sortOrder],
   );
 
@@ -603,44 +575,7 @@ const CrmDeals = () => {
     (
       filters: Record<string, any>,
       pagination?: { page: number; per_page: number },
-    ) => {
-      const params: Record<string, any> = {};
-      if (filters.search) params.search = filters.search;
-      if (filters.stage_id) params.stage_id = filters.stage_id;
-      if (filters.assigned_to) params.assigned_to = filters.assigned_to;
-      if (filters.is_lost !== undefined) params.is_lost = filters.is_lost;
-      if (filters.include_lost !== undefined)
-        params.include_lost = filters.include_lost;
-      if (filters.include_archived !== undefined)
-        params.include_archived = filters.include_archived;
-      if (filters.follow_up_date_from)
-        params.follow_up_date_from = filters.follow_up_date_from;
-      if (filters.follow_up_date_to)
-        params.follow_up_date_to = filters.follow_up_date_to;
-      if (
-        filters.probability_min != null &&
-        filters.probability_min !== ""
-      )
-        params.probability_min = Number(filters.probability_min);
-      if (
-        filters.probability_max != null &&
-        filters.probability_max !== ""
-      )
-        params.probability_max = Number(filters.probability_max);
-      if (filters.deal_type) params.deal_type = filters.deal_type;
-      if (filters.industry) params.industry = filters.industry;
-      if (filters.expected_close_date_from)
-        params.expected_close_date_from = filters.expected_close_date_from;
-      if (filters.expected_close_date_to)
-        params.expected_close_date_to = filters.expected_close_date_to;
-      if (filters.approval_status)
-        params.approval_status = filters.approval_status;
-      if (pagination) {
-        params.page = pagination.page;
-        params.per_page = pagination.per_page;
-      }
-      return params;
-    },
+    ) => buildDealsListGetDealsExportParams(filters, pagination),
     [],
   );
 
@@ -7146,49 +7081,17 @@ const CrmDeals = () => {
         <h6 className="mb-3">Export filters</h6>
         <Row>
           <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Owner</Form.Label>
-              <Select<DealApprovalsFilterOption, false>
-                options={[
-                  { value: "", label: "All owners" },
-                  ...extensions.map((ext: any) => ({
-                    value: String(ext.id ?? ext.extension),
-                    label:
-                      ext.display_name || ext.name || ext.id || ext.extension || "",
-                  })),
-                ]}
-                value={
-                  exportFilters.assigned_to
-                    ? (() => {
-                        const id = exportFilters.assigned_to;
-                        const ext = extensions.find(
-                          (e: any) => (e.id || e.extension) === id,
-                        );
-                        return {
-                          value: id,
-                          label: ext
-                            ? ext.display_name || ext.name || id
-                            : id,
-                        };
-                      })()
-                    : null
-                }
-                onChange={(selected: SingleValue<DealApprovalsFilterOption>) => {
-                  const v =
-                    selected?.value != null ? String(selected.value) : "";
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.assigned_to = v;
-                    else delete next.assigned_to;
-                    return next;
-                  });
-                }}
-                placeholder="Select owner..."
-                isClearable
-                isSearchable
-                styles={dealApprovalsSelectStyles}
-              />
-            </Form.Group>
+            <CrmListExportModalAssignedToSelect
+              extensions={extensions}
+              value={
+                exportFilters.assigned_to != null &&
+                exportFilters.assigned_to !== ""
+                  ? String(exportFilters.assigned_to)
+                  : undefined
+              }
+              setExportFilters={setExportFilters}
+              styles={dealApprovalsSelectStyles}
+            />
           </Col>
         </Row>
       </CrmExportModal>

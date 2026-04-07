@@ -62,7 +62,6 @@ import {
   RECORD_TYPES,
   formatDateForTable,
   formatCrmPreviewDate,
-  normalizeSearchQuery,
 } from "@utils/Helper";
 import {
   Target,
@@ -128,6 +127,11 @@ import {
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { CrmListExportModalAssignedToSelect } from "@crm/shared/CrmListExportModalAssignedToSelect";
+import {
+  buildCrmOrdersListExportParams,
+  buildCrmOrdersListGetOrdersParams,
+} from "@crm/orders/buildCrmOrdersListGetOrdersParams";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 
 const ignoredKeys = ["order_stage_id"];
@@ -338,40 +342,15 @@ const CrmOrders = () => {
 
   // Build API params from filters for export (per Orders API spec)
   const buildOrdersExportParams = useCallback(
-    (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
-      const params: Record<string, any> = {};
-      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
-      if (filters.include_archived !== undefined) params.include_archived = filters.include_archived;
-      if (filters.user_extensions?.length) {
-        params.user_extensions = filters.user_extensions;
-      } else if (filters.assigned_to) {
-        params.user_extensions = [filters.assigned_to];
-      }
-      if (filters.industry) params.industry = filters.industry;
-      if (filters.order_value_min != null && filters.order_value_min !== "") params.order_value_min = Number(filters.order_value_min);
-      if (filters.order_value_max != null && filters.order_value_max !== "") params.order_value_max = Number(filters.order_value_max);
-      if (filters.order_stage_id) params.order_stage_id = filters.order_stage_id;
-      if (filters.stage_id) params.stage_id = filters.stage_id;
-      if (filters.order_approval_status) params.order_approval_status = filters.order_approval_status;
-      if (filters.fulfillment_status) params.fulfillment_status = filters.fulfillment_status;
-      if (filters.payment_status) params.payment_status = filters.payment_status;
-      if (filters.status) params.status = filters.status;
-      if (filters.ticket_id != null && filters.ticket_id !== "") params.ticket_id = filters.ticket_id;
-      if (filters.deal_id != null && filters.deal_id !== "") params.deal_id = filters.deal_id;
-      if (filters.date_from) params.date_from = filters.date_from;
-      if (filters.date_to) params.date_to = filters.date_to;
-      if (filters.created_at_from) params.created_at_from = filters.created_at_from;
-      if (filters.created_at_to) params.created_at_to = filters.created_at_to;
-      if (filters.created_at_month) params.created_at_month = filters.created_at_month;
-      if (filters.search) params.search = filters.search;
-      if (filters.sort_by) params.sort_by = filters.sort_by;
-      if (filters.sort_order) params.sort_order = filters.sort_order;
-      if (pagination) {
-        params.page = pagination.page;
-        params.per_page = pagination.per_page;
-      }
-      return params;
-    },
+    (
+      filters: Record<string, any>,
+      pagination?: { page: number; per_page: number },
+    ) =>
+      buildCrmOrdersListExportParams(
+        filters,
+        pagination,
+        "user_extensions",
+      ),
     [],
   );
 
@@ -454,46 +433,14 @@ const CrmOrders = () => {
     async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
-        const params: any = {
+        const params = buildCrmOrdersListGetOrdersParams({
+          filters: currentFilters,
           page,
-          per_page: perPage,
-        };
-
-        // Orders API: include_lost, include_archived, user_extensions, assigned_to, industry,
-        // order_value_min/max, order_stage_id, stage_id, order_approval_status, fulfillment_status,
-        // payment_status, status, ticket_id, deal_id, date_from/to, created_at_from/to/month, search, sort_by, sort_order
-        const ordersSearchQuery = normalizeSearchQuery(currentFilters.search);
-        if (ordersSearchQuery) params.search = ordersSearchQuery;
-        if (currentFilters.include_lost !== undefined) params.include_lost = currentFilters.include_lost;
-        if (currentFilters.include_archived !== undefined) params.include_archived = currentFilters.include_archived;
-        if (currentFilters.user_extensions?.length) {
-          params.user_extensions = currentFilters.user_extensions;
-        } else if (currentFilters.assigned_to) {
-          params.user_extensions = [currentFilters.assigned_to];
-        }
-        if (currentFilters.industry) params.industry = currentFilters.industry;
-        if (currentFilters.order_value_min != null && currentFilters.order_value_min !== "") params.order_value_min = Number(currentFilters.order_value_min);
-        if (currentFilters.order_value_max != null && currentFilters.order_value_max !== "") params.order_value_max = Number(currentFilters.order_value_max);
-        if (currentFilters.order_stage_id) params.order_stage_id = currentFilters.order_stage_id;
-        if (currentFilters.stage_id) params.stage_id = currentFilters.stage_id;
-        if (currentFilters.order_approval_status) params.order_approval_status = currentFilters.order_approval_status;
-        if (currentFilters.fulfillment_status) params.fulfillment_status = currentFilters.fulfillment_status;
-        if (currentFilters.payment_status) params.payment_status = currentFilters.payment_status;
-        if (currentFilters.status) params.status = currentFilters.status;
-        if (currentFilters.ticket_id != null && currentFilters.ticket_id !== "") params.ticket_id = currentFilters.ticket_id;
-        if (currentFilters.deal_id != null && currentFilters.deal_id !== "") params.deal_id = currentFilters.deal_id;
-        if (currentFilters.date_from) params.date_from = currentFilters.date_from;
-        if (currentFilters.date_to) params.date_to = currentFilters.date_to;
-        if (currentFilters.created_at_from) params.created_at_from = currentFilters.created_at_from;
-        if (currentFilters.created_at_to) params.created_at_to = currentFilters.created_at_to;
-        if (currentFilters.created_at_month) params.created_at_month = currentFilters.created_at_month;
-        if (currentFilters.sort_by) params.sort_by = currentFilters.sort_by;
-        if (currentFilters.sort_order) params.sort_order = currentFilters.sort_order;
-
-        if (ordersPagination.sortBy) {
-          params.sort_by = ordersPagination.sortBy;
-          params.sort_order = ordersPagination.sortOrder;
-        }
+          perPage,
+          tableSort: ordersPagination,
+          normalizeSearch: true,
+          ownerParamStyle: "user_extensions",
+        });
 
         const response: any = await getOrders(params);
         console.log("Raw response from getOrders:", response);
@@ -3205,48 +3152,17 @@ const CrmOrders = () => {
         <h6 className="mb-3">Export filters</h6>
         <Row>
           <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Owner</Form.Label>
-              <Select
-                options={[
-                  { value: "", label: "All owners" },
-                  ...extensions.map((ext: any) => ({
-                    value: String(ext.id ?? ext.extension),
-                    label:
-                      ext.display_name || ext.name || ext.id || ext.extension || "",
-                  })),
-                ]}
-                value={
-                  exportFilters.assigned_to
-                    ? (() => {
-                        const id = exportFilters.assigned_to;
-                        const ext = extensions.find(
-                          (e: any) => (e.id || e.extension) === id,
-                        );
-                        return {
-                          value: id,
-                          label: ext
-                            ? ext.display_name || ext.name || id
-                            : id,
-                        };
-                      })()
-                    : null
-                }
-                onChange={(selected: { value: string; label: string } | null) => {
-                  const v = selected?.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.assigned_to = v;
-                    else delete next.assigned_to;
-                    return next;
-                  });
-                }}
-                placeholder="Select owner..."
-                isClearable
-                isSearchable
-                styles={customSelectStyles}
-              />
-            </Form.Group>
+            <CrmListExportModalAssignedToSelect
+              extensions={extensions}
+              value={
+                exportFilters.assigned_to != null &&
+                exportFilters.assigned_to !== ""
+                  ? String(exportFilters.assigned_to)
+                  : undefined
+              }
+              setExportFilters={setExportFilters}
+              styles={customSelectStyles}
+            />
           </Col>
           <Col md={6}>
             <Form.Group className="mb-3">
