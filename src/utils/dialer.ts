@@ -402,16 +402,16 @@ export function getRemotePartyDnForTransfer(
   callingAddress: string | null | undefined,
   calledAddress: string | null | undefined,
 ): string {
-  const u = userAddress != null && userAddress !== '' ? String(userAddress) : ''
-  const ca = callingAddress != null ? String(callingAddress) : ''
-  const cd = calledAddress != null ? String(calledAddress) : ''
-  if (u && cd === u && ca) {
-    return ca
+  const userAddr = String(userAddress ?? "") 
+  const callingAddr = String(callingAddress ?? "") 
+  const calledAddr = String(calledAddress ?? "")
+  if (userAddr && calledAddr === userAddr && callingAddr) {
+    return callingAddr
   }
-  if (u && ca === u && cd) {
-    return cd
+  if (userAddr && callingAddr === userAddr && calledAddr) {
+    return calledAddr
   }
-  return cd || ca
+  return calledAddr || callingAddr
 }
 
 /**
