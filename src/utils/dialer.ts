@@ -393,6 +393,28 @@ export const GetOngoingCall = async (params: any): Promise<any> => {
 }
 
 /**
+ * Other party's DN on the active call (for transfer/hold APIs that must not use self).
+ * Inbound: user is callee → remote is {@link callingAddress}.
+ * Outbound: user is caller → remote is {@link calledAddress}.
+ */
+export function getRemotePartyDnForTransfer(
+  userAddress: string | null | undefined,
+  callingAddress: string | null | undefined,
+  calledAddress: string | null | undefined,
+): string {
+  const u = userAddress != null && userAddress !== '' ? String(userAddress) : ''
+  const ca = callingAddress != null ? String(callingAddress) : ''
+  const cd = calledAddress != null ? String(calledAddress) : ''
+  if (u && cd === u && ca) {
+    return ca
+  }
+  if (u && ca === u && cd) {
+    return cd
+  }
+  return cd || ca
+}
+
+/**
  * Get calling device information from CTI data
  * @param userAddress - The user's extension number
  * @param dnsMap - The CTI devices map

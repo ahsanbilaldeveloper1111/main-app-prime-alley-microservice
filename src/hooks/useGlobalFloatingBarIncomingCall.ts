@@ -107,17 +107,23 @@ export function useGlobalFloatingBarIncomingCall({
 }) {
   const incomingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const incomingCallRef = useRef<FloatingBarIncomingCallState | null>(null);
+  /** Prevents reopening from the same stale eventLog tail after dismiss (effect re-runs when modal closes). */
+  const lastIncomingOpenLogIndexRef = useRef(-1);
   incomingCallRef.current = incomingCall;
 
   useEffect(() => {
     if (!eventLog?.length || !userAddress) return;
 
+    const logTailIndex = eventLog.length - 1;
     const latestEvent = eventLog.at(-1);
     if (!latestEvent) return;
 
     const eventData = latestEvent.parties?.[0];
 
     if (latestEvent.eventType === "INCOMING_CALL" && eventData?.calledAddress === userAddress) {
+      if (logTailIndex <= lastIncomingOpenLogIndexRef.current) {
+        return;
+      }
       openIncomingSession(
         {
           callId: eventData.callId || `incoming_${Date.now()}`,
@@ -134,14 +140,23 @@ export function useGlobalFloatingBarIncomingCall({
         setShowIncomingCallModalContext,
         incomingTimerRef
       );
+      lastIncomingOpenLogIndexRef.current = logTailIndex;
       return;
     }
 
-    if (
-      latestEvent.eventType === "RINGING" &&
-      eventData?.calledAddress === userAddress &&
-      !showIncomingCallModal
-    ) {
+    if (latestEvent.eventType === "RINGING" && eventData?.calledAddress === userAddress) {
+      if (logTailIndex <= lastIncomingOpenLogIndexRef.current) {
+        return;
+      }
+      const cur = incomingCallRef.current;
+      const sameCallAsModal =
+        Boolean(cur && showIncomingCallModal) &&
+        (eventData.callId === cur.callId ||
+          (eventData.callingAddress === cur.callingAddress && eventData.calledAddress === cur.calledAddress));
+      if (sameCallAsModal) {
+        lastIncomingOpenLogIndexRef.current = logTailIndex;
+        return;
+      }
       const userDeviceInfo = dnsMap?.[userAddress];
       const userDevices = userDeviceInfo ? Object.values(userDeviceInfo.devices || {}) : [];
       const activeUserDevice = userDevices.find((device) => device.terminalState === "REGISTERED");
@@ -162,6 +177,7 @@ export function useGlobalFloatingBarIncomingCall({
         setShowIncomingCallModalContext,
         incomingTimerRef
       );
+      lastIncomingOpenLogIndexRef.current = logTailIndex;
       return;
     }
 

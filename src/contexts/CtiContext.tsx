@@ -11,6 +11,7 @@ import {
   mergeCalls as mergeCallsAPI,
   transferCalls as transferCallsAPI,
   getCallingDeviceInfo,
+  getRemotePartyDnForTransfer,
   getAllUserDevices,
   GetCallLegs,
   type HoldCallParams,
@@ -918,12 +919,17 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       return holdResult;
     }
 
+    const transferAddress = getRemotePartyDnForTransfer(
+      ctiStomp.userAddress,
+      callEntry.callingAddress,
+      callEntry.calledAddress,
+    ) || params.transferAddress
     return await transferCallsAPI({
       callId: params.callId,
       transferInitiatorAddress,
       transferInitiatorDeviceType,
       transferInitiatorDeviceName,
-      transferAddress: params.transferAddress,
+      transferAddress,
       targetAddress: params.targetAddress,
       mode: 'CONSULT',
     });
