@@ -4,6 +4,7 @@ import SectionContainer from './SectionContainer'
 import { SECTION_ORDER } from '@components/live-calls/utils/constants'
 import { getCallSortDurationMs } from '@components/live-calls/utils/helpers'
 import { CtiDevice } from '@components/live-calls/utils/types'
+import { resolveWallboardDisplayCall } from '@components/communications/wallboards-live/wallboardEventParsing'
 
 const SECTION_STATUS_MAP: Record<string, string> = {
   supervision: 'supervision',
@@ -115,6 +116,23 @@ function sortSectionsByDuration(sectionArray: any[], sortOrder: string): any[] {
   return [...sectionArray].sort((a, b) => compareByCallDuration(a, b, sortOrder))
 }
 
+/** SILENT: hide the supervisor's row from everyone except the supervisor (monitor sees full grid including monitored agent). */
+function shouldOmitSupervisorRowForSilentMonitoring(
+  dn: string,
+  userAddress: string | null | undefined,
+  activeMonitoring: { monitor?: string; type?: string | null }
+): boolean {
+  const monitoringType = activeMonitoring?.type
+  if (!monitoringType || String(monitoringType).toUpperCase() !== 'SILENT') {
+    return false
+  }
+  const monitorDn = activeMonitoring.monitor
+  if (monitorDn == null || userAddress == null || userAddress === '') {
+    return false
+  }
+  return String(dn) === String(monitorDn) && String(userAddress) !== String(monitorDn)
+}
+
 interface SectionsRendererProps {
   dnsMap: Record<string, any>
   summaryData: { extensions: number }
@@ -127,6 +145,7 @@ interface SectionsRendererProps {
   showPopup: any
   session: any
   getUserDataExtensions: () => any
+  getCallStatesForDn: (dn: string) => unknown[]
   getCallStateForDevice: (dn: string, deviceName: string) => any
   setSelectedMonitor: React.Dispatch<React.SetStateAction<Record<string, string>>>
   setTempMonitorSelection: React.Dispatch<React.SetStateAction<Record<string, string | null>>>
@@ -161,6 +180,7 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   showPopup,
   session,
   getUserDataExtensions,
+  getCallStatesForDn,
   getCallStateForDevice,
   setSelectedMonitor,
   setTempMonitorSelection,
@@ -273,10 +293,19 @@ const SectionsRenderer: React.FC<SectionsRendererProps> = ({
   dnsList.forEach((entry: { dn: string; devices: unknown }) => {
     const { dn, devices } = entry
     const deviceList = devicesObjectToList(devices)
-    const call = getDnCallState(dn)
+    const call = resolveWallboardDisplayCall(
+      dn,
+      activeMonitoring,
+      getDnCallState,
+      getCallStateForDevice,
+      getCallStatesForDn
+    )
     const active = hasActiveCalls(dn)
     const section = categorizeDns(dn, deviceList, call, active)
 
+    if (shouldOmitSupervisorRowForSilentMonitoring(dn, userAddress, activeMonitoring)) {
+      return
+    }
     if (!matchesFilters(dn, section)) {
       return
     }

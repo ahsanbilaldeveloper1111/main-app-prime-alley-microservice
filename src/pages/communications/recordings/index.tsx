@@ -17,7 +17,6 @@ import ChartBar from '@components/ChartBar';
 import AudioPlayer, { AudioPlayerRef } from '@components/AudioPlayer';
 import EmptyState from '@components/EmptyState';
 import { Hash, Phone, PhoneIncoming, PhoneOutgoing, Calendar } from 'lucide-react';
-import StatsCards from "@components/GenericStatsCards";
 
 import '@assets/scss/common.scss';
 
@@ -629,7 +628,20 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     return '';
   };
 
+  const selectedStartDateTime = String(appliedFilters?.start_date || startDateTime || '');
+  const selectedEndDateTime = String(appliedFilters?.end_date || endDateTime || '');
+
   const tableToolbar = useMemo(() => ({
+    showTabs: true,
+    tabs: [
+      {
+        id: 'call-recordings-title',
+        label: 'Call Recordings',
+        removable: false,
+      },
+    ],
+    activeTab: 'call-recordings-title',
+    onTabChange: () => {},
     showSearch: true,
     searchValue,
     searchPlaceholder: 'Search by username, extension, phone...',
@@ -639,6 +651,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       fetchCallLogsOriginal(1, paginationInfo.perPage, searchValue.trim());
     },
     showFiltersButton: true,
+    showExportButton: session?.user?.permissions?.includes('export-call-recordings'),
+    onExportClick: () => handleExport('excel', appliedFilters),
     showFilterPills: true,
     showMoreFiltersButton: false,
     filterPills: [
@@ -749,16 +763,33 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       },
     ],
     rightActions: (
-      <div className="d-flex align-items-center gap-2">
-        {session?.user?.permissions?.includes('export-call-recordings') && (
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm"
-            onClick={() => handleExport('excel', appliedFilters)}
-            disabled={showPageLoader}
+      <div className="d-flex align-items-center gap-2 call-recordings-date-range-wrap">
+        {showDateRange && selectedStartDateTime && selectedEndDateTime && moment.utc(selectedStartDateTime).isValid() && moment.utc(selectedEndDateTime).isValid() && (
+          <div
+            className="d-flex align-items-center gap-2 call-recordings-date-chip"
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '6px 10px',
+            }}
           >
-            {showPageLoader ? 'Exporting...' : 'Export'}
-          </button>
+            <span
+              className="d-inline-flex align-items-center justify-content-center"
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '6px',
+                background: '#eef2ff',
+                color: '#4f46e5',
+              }}
+            >
+              <Calendar size={14} />
+            </span>
+            <span className="call-recordings-date-text" style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
+              {formatDateTimeToLocal(selectedStartDateTime, GlobalDateTimeFormat)} - {formatDateTimeToLocal(selectedEndDateTime, GlobalDateTimeFormat)}
+            </span>
+          </div>
         )}
       </div>
     ),
@@ -773,6 +804,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     session?.user?.permissions,
     showPageLoader,
     appliedFilters,
+    showDateRange,
+    selectedStartDateTime,
+    selectedEndDateTime,
     applyFilters,
   ]);
 
@@ -789,7 +823,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         setDownloadProgress(prev => {
           const currentProgress = prev[Id] || 0;
           if (currentProgress < 90) {
-            return { ...prev, [Id]: currentProgress + Math.random() * 15 };
+            const randomIncrement = (crypto.getRandomValues(new Uint8Array(1))[0] / 255) * 15;
+            return { ...prev, [Id]: currentProgress + randomIncrement };
           }
           return prev;
         });
@@ -1130,67 +1165,36 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       </Modal>
 
 
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Recordings" showPageLoader={showPageLoader} />
-      
-      <Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title style-2">
-                <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={4}>
-                      
-                      <h2 className="mb-0">Call Recordings</h2>
-                    </Col>
-
-
-                    <Col md={8} className="d-flex justify-content-end">
-                    </Col>
-                  </Row>
-               
-                
-                </div>
-            </Col>
-            </Row>
-
-    
-
-      <div className="mb-4">
-        <StatsCards data={statsCardsData} gridMinWidth="180px" />
-      </div>
-
-      {showDateRange && startDateTime && endDateTime && moment.utc(startDateTime).isValid() && moment.utc(endDateTime).isValid() && (
-        <div
-          className="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
-          style={{
-            background: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            borderRadius: '10px',
-            padding: '10px 12px',
+      <div className="call-recordings-page">
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              .call-recordings-page .gt-toolbar-tabs-section .gt-tab-button { margin-left: 12px; }
+              .call-recordings-page .call-recordings-date-chip { max-width: 100%; }
+              .call-recordings-page .call-recordings-date-text { white-space: nowrap; line-height: 1.35; }
+              @media (max-width: 992px) {
+              
+                .call-recordings-page .gt-toolbar-tabs-section > .d-flex {
+                  flex-wrap: wrap;
+                  row-gap: 8px;
+                }
+                .call-recordings-page .call-recordings-date-range-wrap {
+                  display:none !important;
+                }
+                .call-recordings-page .call-recordings-date-chip {
+                  width: 100%;
+                }
+                .call-recordings-page .call-recordings-date-text {
+                  white-space: normal !important;
+                  overflow-wrap: anywhere;
+                  word-break: break-word;
+                }
+              }
+            `,
           }}
-        >
-          <div className="d-flex align-items-center gap-2">
-            <span
-              className="d-inline-flex align-items-center justify-content-center"
-              style={{
-                width: '30px',
-                height: '30px',
-                borderRadius: '8px',
-                background: '#eef2ff',
-                color: '#4f46e5',
-              }}
-            >
-              <Calendar size={16} />
-            </span>
-            <div className="d-flex align-items-center gap-2">
-              <span className="text-muted" style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.3px' }}>
-                Selected Date Range
-              </span>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
-                {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)} — {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+        />
+        <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Recordings" showPageLoader={showPageLoader} />
+
       {/* Charts */}
       {showAnalytics && (
       <Row className="mb-3">
@@ -1273,6 +1277,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                    showToolbar={true}
                    toolbar={tableToolbar}
                    showToolbarActions={false}
+                   statsCards={statsCardsData}
+                   metricsGridMinWidth="180px"
                    pagination={{
                      currentPage: paginationInfo.currentPage,
                      rowsPerPage: paginationInfo.perPage,
@@ -1292,6 +1298,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
                    uniqueKey="Id"
                  />
             )}
+              </div>
 
       {/* Media Player Modal */}
       <Modal

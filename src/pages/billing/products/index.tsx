@@ -271,6 +271,11 @@ const BillingManagement = () => {
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
+  /** Sidebar search + status; applied to `currentFilters` only when user clicks Apply. */
+  const [filterSidebarDraft, setFilterSidebarDraft] = useState<{
+    search: string;
+    is_active: boolean | undefined;
+  }>({ search: "", is_active: undefined });
   const requestIdRef = useRef(0);
 
 
@@ -799,8 +804,15 @@ const BillingManagement = () => {
   }, []);
 
   const handleOpenFiltersSidebar = useCallback(() => {
+    setFilterSidebarDraft({
+      search: String(currentFilters.search ?? ""),
+      is_active:
+        typeof currentFilters.is_active === "boolean"
+          ? currentFilters.is_active
+          : undefined,
+    });
     setShowFiltersSidebar(true);
-  }, []);
+  }, [currentFilters.search, currentFilters.is_active]);
 
   const handleCloseFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(false);
@@ -1117,9 +1129,9 @@ const BillingManagement = () => {
         id: "search",
         label: "Search",
         type: "text",
-        value: currentFilters.search ?? "",
+        value: filterSidebarDraft.search,
         onChange: (value) =>
-          setCurrentFilters((prev) => ({ ...prev, search: value || undefined })),
+          setFilterSidebarDraft((prev) => ({ ...prev, search: value ?? "" })),
         placeholder: "Search products...",
       },
       {
@@ -1127,10 +1139,10 @@ const BillingManagement = () => {
         label: "Status",
         type: "dropdown",
         value: billingProductActiveFilterToDropdownValue(
-          currentFilters.is_active,
+          filterSidebarDraft.is_active,
         ),
         onChange: (value) =>
-          setCurrentFilters((prev) => ({
+          setFilterSidebarDraft((prev) => ({
             ...prev,
             is_active: billingProductDropdownValueToActiveFilter(value ?? ""),
           })),
@@ -1141,7 +1153,7 @@ const BillingManagement = () => {
         ],
       },
     ],
-    [currentFilters.search, currentFilters.is_active],
+    [filterSidebarDraft.search, filterSidebarDraft.is_active],
   );
 
   if (!session?.user?.permissions?.includes("list-crm-data-management")) {
@@ -1540,12 +1552,28 @@ const BillingManagement = () => {
           width="400px"
           filters={productFilterFields}
           onApply={() => {
-            setProspectsSearch(currentFilters.search ?? "");
+            const trimmedSearch = filterSidebarDraft.search.trim();
+            setCurrentFilters((prev) => {
+              const next = { ...prev };
+              if (trimmedSearch) {
+                next.search = trimmedSearch;
+              } else {
+                delete next.search;
+              }
+              if (typeof filterSidebarDraft.is_active === "boolean") {
+                next.is_active = filterSidebarDraft.is_active;
+              } else {
+                delete next.is_active;
+              }
+              return next;
+            });
+            setProspectsSearch(trimmedSearch);
             setPagination((prev) => ({ ...prev, currentPage: 1 }));
             setRefreshKey((k) => k + 1);
             setShowFiltersSidebar(false);
           }}
           onReset={() => {
+            setFilterSidebarDraft({ search: "", is_active: undefined });
             setCurrentFilters({});
             setProspectsSearch("");
             setPagination((prev) => ({ ...prev, currentPage: 1 }));
