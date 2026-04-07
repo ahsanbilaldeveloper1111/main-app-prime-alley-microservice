@@ -13,7 +13,6 @@ import { Button, Modal, Form, Dropdown } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { FiSearch } from "react-icons/fi";
 import { Plus, ChevronDown, Filter, MoreVertical, Settings, Trash2 } from "lucide-react";
 import GenericTable, { TableColumn, TableAction, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
@@ -42,6 +41,23 @@ import { extensionOrIdToTrimmedString } from "@planner/projectTabsContentUtils";
 import { useSession } from "next-auth/react";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug } from "@utils/Helper";
+import { useTasksListingPager } from "@hooks/useTasksListingPager";
+import {
+  ALL_STATUS_VALUE,
+  applyPlannerTaskFiltersToListParams,
+  applyPlannerTaskTabToListParams,
+  plannerTaskListTodayTriple,
+} from "@utils/taskListing/plannerTasksQueryParams";
+import {
+  buildTaskListingPageStyleTag,
+  formatTaskDueDateCellParts,
+  TaskCompleteCircleButton,
+  TaskListingAssigneeCell,
+  TaskListingSearchRow,
+  TASK_LIST_BTN_OUTLINE,
+  TASK_LIST_CELL,
+  TASK_PRIORITY_DOT_COLORS,
+} from "@utils/taskListing/taskListUiPrimitives";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -179,8 +195,6 @@ const PRIORITY_OPTIONS = [
   { value: "urgent", label: "Urgent" },
 ];
 
-const ALL_STATUS_VALUE = "All Status";
-
 /** Planner workflow status from GET /statuses */
 type PlannerWorkflowStatusRow = { id: number; name: string };
 
@@ -200,14 +214,6 @@ function normalizePlannerStatusesFromApi(raw: unknown): PlannerWorkflowStatusRow
 
 /** Relations for GET /projects/:id — statuses for filter dropdown. */
 const PROJECT_DETAILS_STATUS_WITH = ["statuses", "statuses.tasks"] as const;
-
-const PRIORITY_COLOR: Record<string, string> = {
-  low: "#22c55e",
-  medium: "#f59e0b",
-  normal: "#f59e0b",
-  high: "#ef4444",
-  urgent: "#ef4444",
-};
 
 const INITIAL_FILTER_FORM = {
   task_type: null as any,
@@ -363,78 +369,6 @@ function createTaskRowActionsToggleHandler(
   };
 }
 
-function applyFiltersToParams(
-  params: Record<string, any>,
-  filters: Record<string, any>,
-  allProjects: Array<{ id: number; name: string }>,
-) {
-  if (filters.priority) {
-    const priorityMap: Record<string, string> = {
-      low: "low",
-      medium: "normal",
-      high: "high",
-      urgent: "urgent",
-    };
-    params.priority = priorityMap[String(filters.priority)] || "normal";
-  }
-  if (filters.due_date_from) params.due_date_from = filters.due_date_from;
-  if (filters.due_date_to) params.due_date_to = filters.due_date_to;
-
-  if (filters.project && filters.project !== "All Projects") {
-    const proj = allProjects.find((p) => p.name === filters.project);
-    if (proj) params.project_id = proj.id;
-  }
-
-  if (filters.assignee?.length) params.assignees = filters.assignee;
-
-  const taskTypeFilter = filters.task_type;
-  if (
-    taskTypeFilter &&
-    (taskTypeFilter === "regular" ||
-      taskTypeFilter === "todo" ||
-      taskTypeFilter === "recurring")
-  ) {
-    params.type = taskTypeFilter;
-  }
-
-  if (filters.status && filters.status !== ALL_STATUS_VALUE) {
-    const statusId = Number(filters.status);
-    if (Number.isFinite(statusId)) {
-      params.status_id = statusId;
-    }
-  }
-}
-
-function applyTabToParams(
-  params: Record<string, any>,
-  activeTab: string,
-  dates: { today: string; yesterday: string; tomorrow: string }
-) {
-  if (activeTab === "due_today") {
-    params.due_date_from = dates.today;
-    params.due_date_to = dates.today;
-    return;
-  }
-  if (activeTab === "overdue") {
-    params.due_date_to = dates.yesterday;
-    params.is_completed = false;
-    return;
-  }
-  if (activeTab === "upcoming") {
-    params.due_date_from = dates.tomorrow;
-    return;
-  }
-  if (activeTab === "completed") {
-    params.is_completed = true;
-    return;
-  }
-  if (activeTab === "pending") {
-    params.is_completed = false;
-    // Pending should exclude overdue tasks.
-    params.due_date_from = dates.today;
-  }
-}
-
 /** Tab bar order matches POSSIBLE_TABS. */
 function normalizeVisibleTabIdsForStorage(ids: string[]): string[] {
   const set = new Set(ids);
@@ -468,30 +402,6 @@ function getInitialVisibleTabIds(): string[] {
     return [...DEFAULT_VISIBLE_TAB_IDS];
   }
 }
-
-const BTN_BASE: React.CSSProperties = {
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  fontSize: 12,
-  fontWeight: 400,
-  borderRadius: 4,
-  border: "1px solid #8a8a8a",
-  padding: "8px 16px",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  whiteSpace: "nowrap",
-  outline: "none",
-  backgroundColor: "#fff",
-  color: "#141414",
-};
-
-const CELL_STYLE: React.CSSProperties = {
-  fontSize: 13,
-  color: "#374151",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  fontWeight: 300,
-};
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
@@ -673,10 +583,7 @@ const TasksListingPage = ({
     const [search, setSearch]         = useState("");
   
   
-    const [pager, setPager] = useState({
-      page: 1, perPage: 25,
-      sortCol: "due_date", sortDir: "asc" as "asc" | "desc",
-    });
+    const { pager, setPager } = useTasksListingPager();
   
     // ── Filter sidebar ────────────────────────────────────────────────────────────
     const [showSidebar, setShowSidebar]   = useState(false);
@@ -816,10 +723,6 @@ const TasksListingPage = ({
     const fetchTasks = useCallback(async () => {
       setLoading(true);
       try {
-        const today = moment().format("YYYY-MM-DD");
-        const yesterday = moment().subtract(1, "day").format("YYYY-MM-DD");
-        const tomorrow = moment().add(1, "day").format("YYYY-MM-DD");
-
         const params: any = {
           page: pager.page,
           limit: pager.perPage,
@@ -828,8 +731,12 @@ const TasksListingPage = ({
           withRelations: ["project", "status", "assignees"],
         };
 
-        applyFiltersToParams(params, filters, projectsForApplyFilters);
-        applyTabToParams(params, activeTab, { today, yesterday, tomorrow });
+        applyPlannerTaskFiltersToListParams(params, filters, projectsForApplyFilters);
+        applyPlannerTaskTabToListParams(
+          params,
+          activeTab,
+          plannerTaskListTodayTriple(),
+        );
 
         if (sidebarProject?.id) {
           params.project_id = sidebarProject.id;
@@ -999,30 +906,16 @@ const TasksListingPage = ({
             completeBtnTitle = plannerTaskRowEditDeniedTitle(false) ?? "";
           }
           return (
-          <button
-            type="button"
-            aria-disabled={!canToggleComplete}
-            onClick={async e => {
-              e.stopPropagation();
-              if (!canToggleComplete) return;
-              await handleToggleComplete(row);
-            }}
-            title={completeBtnTitle}
-            style={{
-              background: "transparent", border: "1.5px solid #9ca3af",
-              borderRadius: "50%", width: 20, height: 20,
-              cursor: canToggleComplete ? "pointer" : "not-allowed",
-              opacity: canToggleComplete ? 1 : 0.5,
-              display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-            }}
-          >
-            {row.status === "completed" && (
-              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                <path d="M1 4L3.5 6.5L9 1" stroke="#6b7280" strokeWidth="1.5"
-                  strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </button>
+            <TaskCompleteCircleButton
+              isCompleted={row.status === "completed"}
+              title={completeBtnTitle}
+              disabled={!canToggleComplete}
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (!canToggleComplete) return;
+                await handleToggleComplete(row);
+              }}
+            />
           );
         },
       },
@@ -1051,7 +944,7 @@ const TasksListingPage = ({
                 type="button"
                 onClick={e => { e.stopPropagation(); openEdit(row); }}
                 style={{
-                  ...BTN_BASE,
+                  ...TASK_LIST_BTN_OUTLINE,
                   paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11,
                   flexShrink: 0,
                 }}
@@ -1065,7 +958,7 @@ const TasksListingPage = ({
       {
         key: "task_type", label: "Task Type", sortable: true, type: "custom",
         render: (row) => (
-          <span style={CELL_STYLE}>
+          <span style={TASK_LIST_CELL}>
             {TASK_TYPE_OPTIONS.find(t => t.value === row.task_type)?.label || row.task_type}
           </span>
         ),
@@ -1074,36 +967,19 @@ const TasksListingPage = ({
         key: "assigned_to", label: "Assigned to", sortable: true, type: "custom",
         render: (row) => {
           const names = assigneeDisplayNamesForTaskRow(row, hierarchyDataExtensions);
-          if (names.length === 0) {
-            return <span style={{ ...CELL_STYLE, color: "#9ca3af" }}>—</span>;
-          }
-          const display = names.join(", ");
-          const initialSource = names[0];
-          const initial =
-            initialSource.length > 0 ? initialSource.charAt(0).toUpperCase() : "?";
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{
-                width: 22, height: 22, borderRadius: "50%", background: "#10b981",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
-              }}>{initial}</div>
-              <span style={{ ...CELL_STYLE, maxWidth: 130, overflow: "hidden",
-                textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
-                title={display}>{display}</span>
-            </div>
-          );
+          const display = names.length > 0 ? names.join(", ") : "";
+          return <TaskListingAssigneeCell label={display} />;
         },
       },
       {
         key: "priority", label: "Priority", sortable: true, type: "custom",
         render: (row) => {
-          if (!row.priority) return <span style={{ ...CELL_STYLE, color: "#9ca3af" }}>—</span>;
+          if (!row.priority) return <span style={{ ...TASK_LIST_CELL, color: "#9ca3af" }}>—</span>;
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, display: "inline-block",
-                backgroundColor: PRIORITY_COLOR[row.priority] }} />
-              <span style={CELL_STYLE}>{row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}</span>
+                backgroundColor: TASK_PRIORITY_DOT_COLORS[row.priority] }} />
+              <span style={TASK_LIST_CELL}>{row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}</span>
             </div>
           );
         },
@@ -1111,20 +987,24 @@ const TasksListingPage = ({
       {
         key: "due_date", label: "Due date", sortable: true, type: "custom",
         render: (row) => {
-          if (!row.due_date) return <span style={{ ...CELL_STYLE, color: "#9ca3af" }}>—</span>;
-          const overdue = moment(row.due_date).isBefore(moment()) && row.status !== "completed";
-          const isToday    = moment(row.due_date).isSame(moment(), "day");
-          const isTomorrow = moment(row.due_date).isSame(moment().add(1, "day"), "day");
-          let label = moment(row.due_date).format("D MMMM YYYY HH:mm");
-          if (isToday) label = `Today at ${moment(row.due_date).format("HH:mm")}`;
-          else if (isTomorrow) label = `Tomorrow at ${moment(row.due_date).format("HH:mm")}`;
-          return <span style={{ ...CELL_STYLE, color: overdue ? "#ef4444" : "#374151", fontWeight: overdue ? 500 : 300 }}>{label}</span>;
+          const parts = formatTaskDueDateCellParts(row.due_date, row.status);
+          return (
+            <span
+              style={{
+                ...TASK_LIST_CELL,
+                color: parts.color,
+                fontWeight: parts.fontWeight,
+              }}
+            >
+              {parts.label}
+            </span>
+          );
         },
       },
       {
         key: "notes", label: "Notes", sortable: true, type: "custom",
         render: (row) => (
-          <span style={{ ...CELL_STYLE, maxWidth: 200, overflow: "hidden",
+          <span style={{ ...TASK_LIST_CELL, maxWidth: 200, overflow: "hidden",
             textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
             title={row.notes || ""}>{row.notes || "—"}</span>
         ),
@@ -1132,14 +1012,14 @@ const TasksListingPage = ({
       {
         key: "workflow_status", label: "Status", sortable: false, type: "custom",
         render: (row) => (
-          <span style={CELL_STYLE}>{taskStatusColumnLabel(row)}</span>
+          <span style={TASK_LIST_CELL}>{taskStatusColumnLabel(row)}</span>
         ),
       },
       {
         key: "repeat_status", label: "Repeat Status", sortable: false, type: "custom",
         render: (row) => {
           const label = formatRepeatStatusLabel(row.repeat_status);
-          return <span style={CELL_STYLE}>{label || "—"}</span>;
+          return <span style={TASK_LIST_CELL}>{label || "—"}</span>;
         },
       },
       {
@@ -1376,25 +1256,13 @@ const TasksListingPage = ({
       <React.Fragment>
   
         {/* ── Global style overrides ── */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          body, .tasks-page, .tasks-page * { box-sizing: border-box; }
-  
-          /* Kill GenericTable toolbar — we render our own */
-          .tasks-page .gt-toolbar-container { display: none !important; }
-
-          .tasks-page .task-title-cell .task-edit-btn { visibility: hidden; }
-          .tasks-page .task-title-cell:hover .task-edit-btn { visibility: visible; }
-  
-          /* Flatten card so our sections sit flush */
-          .tasks-page .generic-table-card,
-          .tasks-page .generic-table-container,
-          .tasks-page .card-body {
-            border-radius: 0 !important;
-            box-shadow: none !important;
-            border: none !important;
-            background: #fff !important;
-          }
-        `}} />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: buildTaskListingPageStyleTag({
+              showTitleHoverEditButton: true,
+            }),
+          }}
+        />
   
         <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="Tasks" />
   
@@ -1434,7 +1302,7 @@ const TasksListingPage = ({
                   type="button"
                   onClick={() => { setEditingTask(null); setShowCreate(true); }}
                   style={{
-                    ...BTN_BASE,
+                    ...TASK_LIST_BTN_OUTLINE,
                     backgroundColor: "#000",
                     background: "#000",
                     borderColor: "#000",
@@ -1992,84 +1860,23 @@ const TasksListingPage = ({
           {/* ══════════════════════════════════════════════════════
               ROW 4 — Search + Edit columns
           ══════════════════════════════════════════════════════ */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "8px 16px",
-            backgroundColor: "#fff",
-            borderBottom: "1px solid #e5e7eb",
-            flexShrink: 0,
-          }}>
-            {/* Search — height 41px, rounded, with an outline-secondary search button beside it */}
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              {/* Input wrapper */}
-              <div style={{ position: "relative" }}>
-                <FiSearch size={14} style={{
-                  position: "absolute", left: 12, top: "50%",
-                  transform: "translateY(-50%)", color: "#9ca3af", pointerEvents: "none",
-                }} />
-                <input
-                  className="task-search-input"
-                  type="text"
-                  placeholder="Search task title and notes"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      setFilters(p => ({ ...p, search }));
-                      setPager(p => ({ ...p, page: 1 }));
-                    }
-                  }}
-                  style={{
-                    /* height 41px matches search button height per spec */
-                    height: 41,
-                    width: 260,
-                    padding: "0 12px 0 34px",
-                    border: "1px solid #d1d5db",
-                    /* left side rounded only — right abuts the search button */
-                    borderRadius: "20px 0 0 20px",
-                    borderRight: "none",
-                    fontSize: 13,
-                    color: "#374151",
-                    outline: "none",
-                    backgroundColor: "#fff",
-                    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                  }}
-                />
-              </div>
-  
-              {/* Bootstrap outline-secondary search button */}
-              <Button
-                variant="outline-secondary"
-                onClick={() => {
-                  setFilters(p => ({ ...p, search }));
-                  setPager(p => ({ ...p, page: 1 }));
-                }}
-                style={{
-                  height: 41,
-                  padding: "0 16px",
-                  borderRadius: "0 20px 20px 0",
-                  border: "1px solid #d1d5db",
-                  borderLeft: "none",
-                  backgroundColor: "#fff",
-                  color: "#6b7280",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  fontSize: 13,
-                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                }}
-              >
-                <FiSearch size={15} />
-              </Button>
-            </div>
-  
+          <TaskListingSearchRow
+            search={search}
+            onSearchChange={setSearch}
+            onSubmitSearch={() => {
+              setFilters((p) => ({ ...p, search }));
+              setPager((p) => ({ ...p, page: 1 }));
+            }}
+            wrapperStyle={{
+              borderBottom: "1px solid #e5e7eb",
+            }}
+            editColumnsSlot={(
             <Dropdown align="end" autoClose="outside">
               <Dropdown.Toggle
                 variant="outline-secondary"
                 id="tasks-edit-columns-dropdown"
                 style={{
-                  ...BTN_BASE,
+                  ...TASK_LIST_BTN_OUTLINE,
                   fontSize: 12,
                   backgroundColor: "#fff",
                   borderColor: "#8a8a8a",
@@ -2104,7 +1911,8 @@ const TasksListingPage = ({
                 </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
-          </div>
+            )}
+          />
   
           {/* ══════════════════════════════════════════════════════
               ROW 5 — Table (fills remaining height)
