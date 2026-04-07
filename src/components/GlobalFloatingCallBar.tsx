@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button, Modal, Form } from "react-bootstrap";
 import { useCti } from "../contexts/CtiContext";
+import { getRemotePartyDnForTransfer } from "../utils/dialer";
 import { usePermissions } from "../utils/permissionUtils";
 import { useIncomingCall } from "../contexts/IncomingCallContext";
 import UserDummyImage from "@assets/images/user-dummy.jpg";
@@ -99,7 +100,6 @@ const GlobalFloatingCallBar: React.FC = () => {
     holdCall,
     resumeCall,
     transferCall,
-    attendCall,
     getAvailableExtensions,
     getUserDataExtensions,
   } = useCti();
@@ -110,7 +110,6 @@ const GlobalFloatingCallBar: React.FC = () => {
     setIncomingCall: setIncomingCallContext,
     setShowIncomingCallModal: setShowIncomingCallModalContext,
   } = useIncomingCall();
-  const [isDialing, setIsDialing] = useState(false);
   const [isEndingCall, setIsEndingCall] = useState(false);
   const [isHoldingCall, setIsHoldingCall] = useState(false);
   const [isResumingCall, setIsResumingCall] = useState(false);
@@ -140,6 +139,18 @@ const GlobalFloatingCallBar: React.FC = () => {
     setShowIncomingCallModal,
     setShowIncomingCallModalContext,
   });
+
+  // Layout / IncomingCallContext may clear the modal (e.g. auto-close when answered elsewhere)
+  // without touching this component's local duplicate state — keep them aligned so the bar
+  // does not reappear with stale inbound controls.
+  useEffect(() => {
+    if (showIncomingCallModalFromContext) {
+      return;
+    }
+    setShowIncomingCallModal(false);
+    setIncomingCall(null);
+    clearFloatingBarIncomingTimer(incomingTimerRef);
+  }, [showIncomingCallModalFromContext, incomingTimerRef]);
 
   // Drag and position state – free (x,y) position; null = use default top-right
   const [barPosition, setBarPosition] = useState<{ x: number; y: number } | null>(null);
@@ -599,9 +610,13 @@ const GlobalFloatingCallBar: React.FC = () => {
 
     setIsTransferringCall(true);
     try {
+      const transferAddress =
+        getRemotePartyDnForTransfer(userAddress, activeCall.callingAddress, activeCall.calledAddress) ||
+        activeCall.calledAddress ||
+        activeCall.number
       const result = await transferCall({
         callId: activeCall.callId,
-        transferAddress: activeCall.calledAddress || activeCall.number,
+        transferAddress,
         targetAddress: transferTarget,
         mode: "CONSULT",
         transferInitiatorAddress: controllerDevice.controllerAddress,
@@ -633,73 +648,6 @@ const GlobalFloatingCallBar: React.FC = () => {
       );
       return !isInCall;
     });
-  };
-
-  const handleAttendCall = async () => {
-    if (!hasPermission("dial-call-cti")) {
-      return;
-    }
-
-    if (!incomingCall) {
-      return;
-    }
-
-    const devices = userAddress ? dnsMap[userAddress]?.devices : undefined;
-    if (!devices) {
-      return;
-    }
-
-    const userDevices = Object.values(devices);
-    if (userDevices.length === 0) {
-      return;
-    }
-
-    let activeDevice =
-      incomingCall.controllerDeviceName
-        ? userDevices.find((device) => device.deviceName === incomingCall.controllerDeviceName)
-        : undefined;
-
-    if (!activeDevice) {
-      activeDevice =
-        userDevices.find((device) => device.terminalState === "REGISTERED") || userDevices[0];
-    }
-
-    clearFloatingBarIncomingTimer(incomingTimerRef);
-
-    setIsDialing(true);
-    try {
-      const result = await attendCall({
-        callId: incomingCall.callId,
-        callingAddress: incomingCall.callingAddress,
-        calledAddress: incomingCall.calledAddress,
-        controllerAddress: userAddress ?? "",
-        controllerDeviceName: activeDevice.deviceName || "WebCTI",
-        controllerDeviceType: activeDevice.deviceType || "SOFT_HARD",
-      });
-
-      if (result.success) {
-        setShowIncomingCallModal(false);
-        setShowIncomingCallModalContext(false);
-        setIncomingCall(null);
-        setIncomingCallContext(null);
-      } else {
-        console.error("[GlobalFloatingCallBar] attendCall failed:", result.error);
-      }
-    } catch (error) {
-      console.error("[GlobalFloatingCallBar] attendCall error:", error);
-    } finally {
-      setIsDialing(false);
-    }
-  };
-
-  const handleRejectCall = () => {
-    clearFloatingBarIncomingTimer(incomingTimerRef);
-    
-    // Close the incoming call modal without attending
-    setShowIncomingCallModal(false);
-    setShowIncomingCallModalContext(false);
-    setIncomingCall(null);
-    setIncomingCallContext(null);
   };
 
   // Don't render anything if CTI is not initialized or user doesn't have permission
@@ -1038,141 +986,6 @@ const GlobalFloatingCallBar: React.FC = () => {
                   </i>
                 )}
               </button>
-            )}
-
-            {/* Accept/Reject buttons for incoming ringing calls */}
-            {/* CRITICAL: Only show answer/decline if call is actually still ringing (not answered externally) */}
-            {activeCall.status === "ringing" &&
-             activeCall.calledAddress === userAddress &&
-             activeCall.callId &&
-             callStateMap?.[activeCall.callId]?.parties?.some(
-               (p: { callStatus?: string; calledAddress?: string; callingAddress?: string }) =>
-                 p.callStatus === "RINGING" &&
-                 (p.calledAddress === userAddress || p.callingAddress === userAddress)
-             ) && (
-              <>
-                <button
-                  type="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Find the incoming call and attend it
-                    if (incomingCall) {
-                      handleAttendCall();
-                    } else {
-                      // If no incomingCall state, try to attend using activeCall data
-                      const controllerDevice = getControllerDeviceInfo(activeCall);
-                      if (controllerDevice && activeCall.callId) {
-                        setIsDialing(true);
-                        void attendCall({
-                          callId: activeCall.callId,
-                          callingAddress: activeCall.callingAddress || "",
-                          calledAddress: activeCall.calledAddress || activeCall.number,
-                          controllerAddress: controllerDevice.controllerAddress,
-                          controllerDeviceName: controllerDevice.controllerDeviceName,
-                          controllerDeviceType: controllerDevice.controllerDeviceType,
-                        })
-                          .then((result) => {
-                            if (!result.success) {
-                              console.error(
-                                "[GlobalFloatingCallBar] attendCall from bar failed:",
-                                result.error
-                              );
-                            }
-                          })
-                          .catch((err) => {
-                            console.error("[GlobalFloatingCallBar] attendCall from bar error:", err);
-                          })
-                          .finally(() => {
-                            setIsDialing(false);
-                          });
-                      }
-                    }
-                  }}
-                  className="btn rounded-pill d-flex align-items-center gap-2"
-                  style={{
-                    padding: "0.625rem 1.75rem",
-                    fontWeight: 500,
-                    fontSize: "1rem",
-                    color: "white",
-                    backgroundColor: "#22c55e",
-                    border: "none",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!e.currentTarget.disabled) {
-                      e.currentTarget.style.backgroundColor = "#16a34a";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!e.currentTarget.disabled) {
-                      e.currentTarget.style.backgroundColor = "#22c55e";
-                    }
-                  }}
-                  title="Answer Call"
-                  disabled={isDialing}
-                >
-                  <i
-                    className="material-icons-two-tone"
-                    style={{ fontSize: "1rem", color: "#fff" }}
-                  >
-                    call
-                  </i>{" "}
-                  Answer
-                </button>
-                <button
-                  type="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRejectCall();
-                    // Also end the call if it exists in activeCalls
-                    if (activeCall?.callId) {
-                      const controllerDevice = getControllerDeviceInfo(activeCall);
-                      if (controllerDevice) {
-                        endCall({
-                          callId: activeCall.callId,
-                          callingAddress: activeCall.callingAddress!, // Keep original calling address
-                          calledAddress: activeCall.calledAddress || activeCall.number,
-                          callingDeviceType: activeCall.callingDeviceType || 'SOFT_HARD', // From active call
-                          callingDeviceName: activeCall.callingDeviceName || 'WebCTI', // From active call
-                          // Add controller fields from user's device
-                          controllerAddress: controllerDevice.controllerAddress,
-                          controllerDeviceName: controllerDevice.controllerDeviceName,
-                          controllerDeviceType: controllerDevice.controllerDeviceType,
-                        } as any).catch(() => {
-                          // Silently fail if call already ended
-                        });
-                      }
-                    }
-                  }}
-                  className="btn rounded-pill d-flex align-items-center gap-2"
-                  style={{
-                    padding: "0.625rem 1.75rem",
-                    backgroundColor: "white",
-                    border: "2px solid #f87171",
-                    color: "#ef4444",
-                    fontWeight: 500,
-                    fontSize: "1rem",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#fef2f2";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "white";
-                  }}
-                  title="Reject Call"
-                >
-                  <i
-                    className="material-icons-two-tone"
-                    style={{ fontSize: "1rem", color: "#ef4444" }}
-                  >
-                    call_end
-                  </i>{" "}
-                  Decline
-                </button>
-              </>
             )}
 
             {/* End Call Button */}
