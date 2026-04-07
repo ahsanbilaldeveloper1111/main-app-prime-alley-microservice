@@ -1,7 +1,6 @@
 import "@crm/leads/leadFullPageStyles";
 import React, { ReactElement, useState, useEffect, useRef } from "react";
-import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
+import { Layout, BreadcrumbItem } from "@crm/leads/leadFullPageFrame";
 import {
   updateLead,
   getLead,
@@ -22,17 +21,25 @@ import {
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Badge } from "react-bootstrap";
 import Select from "react-select";
-import PhoneInput from "react-phone-number-input";
-import { parsePhoneNumber } from "react-phone-number-input";
-import "react-phone-number-input/style.css";
-import { Country, State, City } from "country-state-city";
+import {
+  PhoneInput,
+  parsePhoneNumber,
+  Country,
+  State,
+  City,
+} from "@crm/leads/leadFormPhoneGeo";
 import {
   FiArrowLeft,
   FiDatabase,
   FiTarget,
   FiPlus,
-} from "react-icons/fi";
-import { CheckCircle, ChevronLeft, ChevronRight, X } from "lucide-react";
+} from "@crm/leads/leadFormFiIcons";
+import {
+  CheckCircle,
+  ChevronLeft,
+  ChevronRight,
+  X,
+} from "@crm/leads/leadFormLucideCommon";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";

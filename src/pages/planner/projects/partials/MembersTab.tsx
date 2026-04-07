@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useProjectSettingsTabListState } from '@hooks/useProjectSettingsTabListState';
-import { paginatedSlice } from '@utils/paginatedSlice';
+import { useProjectSettingsTabListState, paginatedSlice } from '@planner/projectTabTableShared';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
 import { UserPlus, Edit, Trash2, Users, Filter } from 'lucide-react';

@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { useProjectSettingsTabListState } from '@hooks/useProjectSettingsTabListState';
-import { paginatedSlice } from '@utils/paginatedSlice';
+import { useProjectSettingsTabListState, paginatedSlice } from '@planner/projectTabTableShared';
 import { Spinner, Button, Modal, Form, Table } from 'react-bootstrap';
 import {
   Plus,

@@ -1,4 +1,3 @@
-import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
   useState,
@@ -8,7 +7,6 @@ import React, {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import "react-phone-number-input/style.css";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -30,8 +28,6 @@ import CreateLeadModal from "@components/CreateLeadModal";
 import GenericTable from "@components/GenericTable";
 
 import { StatsCardData } from "@components/GenericStatsCards";
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";

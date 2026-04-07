@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@crm/orders/orderListPageOrderScss";
 import { useRouter } from "next/router";
 import React, {
   ReactElement,
@@ -7,16 +7,18 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, {
-  TableColumn,
-  TableAction,
-} from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebar";
-import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import OrderEditModal from "@components/OrderEditModal";
+import {
+  Layout,
+  BreadcrumbItem,
+  GenericTable,
+  GenericSidebar,
+  GenericFilterSidebar,
+  StatsCards,
+  OrderEditModal,
+  type TableColumn,
+  type TableAction,
+  type StatsCardData,
+} from "@crm/orders/orderListOrderPageFrame";
 import {
   FiUpload,
   FiDatabase,
@@ -67,7 +69,9 @@ import {
   Modal,
   Spinner,
 } from "@crm/orders/orderListBootstrap";
-import Select from "react-select";
+import Select, { type SingleValue } from "react-select";
+
+type OrderInvoicingSelectOption = { value: string | number; label: string };
 import {
   GlobalDateFormat,
   ModuleSlug,
@@ -116,12 +120,12 @@ import {
   User,
   Paperclip,
   Upload,
-  Download as DownloadIcon,
+  DownloadIcon,
   RotateCcw,
   AlertCircle,
   Handshake,
   Info,
-} from "lucide-react";
+} from "@crm/orders/orderListLucideHeavy";
 import {
   PieChart,
   Pie,
@@ -133,24 +137,23 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-} from "recharts";
+} from "@crm/orders/orderListRecharts";
 import Link from "next/link";
 import { toast } from "react-toastify";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import FormModal from "@pages/partial/FormModal";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import {
+  SuccessfulModal,
+  FormModal,
+  DeleteConfirmationModal,
+  PhoneDisplay,
+  KPICard,
+  FilterBar,
+  getInitials,
+  getRandomColor,
+  customSelectStyles,
+} from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import {
-  CrmPhoneDisplay as PhoneDisplay,
-  CrmKPICard as KPICard,
-  CrmFilterBar as FilterBar,
-} from "@components/crm/CrmListPageUi";
-import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
-import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 
 const ignoredKeys = ["order_stage_id"];
 
@@ -1932,7 +1935,10 @@ const CrmOrders = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const assignedToValue = selected ? selected.value : null;
+                      const opt =
+                        selected as SingleValue<OrderInvoicingSelectOption>;
+                      const assignedToValue =
+                        opt?.value != null ? String(opt.value) : null;
                       setOrdersFilters((prev) => ({
                         ...prev,
                         assignedTo: assignedToValue,
@@ -1968,7 +1974,10 @@ const CrmOrders = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const stageValue = selected ? selected.value : null;
+                      const opt =
+                        selected as SingleValue<OrderInvoicingSelectOption>;
+                      const stageValue =
+                        opt?.value != null ? String(opt.value) : null;
                       setOrdersFilters((prev) => ({
                         ...prev,
                         stage: stageValue,
