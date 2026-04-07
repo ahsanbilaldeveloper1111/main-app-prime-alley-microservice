@@ -2568,7 +2568,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               }}
                             >
                               {dueDate
-                                ? formatCrmPreviewDate(task.due_date!)
+                                ? formatCrmPreviewDate(dueDate)
                                 : "—"}
                               {task.time ? ` ${task.time.slice(0, 5)}` : ""}
                               {task.status ? ` · ${task.status}` : ""}

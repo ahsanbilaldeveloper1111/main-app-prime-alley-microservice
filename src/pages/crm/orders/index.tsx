@@ -1198,7 +1198,9 @@ const CrmOrders = () => {
 
   const openOrderPreviewById = useCallback(
     (id: number) => {
-      void handlePreviewClickBase({ id, rawData: { id } });
+      handlePreviewClickBase({ id, rawData: { id } }).catch((error: unknown) => {
+        console.error("openOrderPreviewById:", error);
+      });
     },
     [handlePreviewClickBase],
   );

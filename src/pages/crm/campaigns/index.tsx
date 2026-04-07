@@ -106,6 +106,72 @@ function getErrorMessageFromUnknown(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function sumCrmCustomDistributionCounts(dist: Record<string, number>): number {
+  return Object.values(dist).reduce((sum, count) => sum + count, 0);
+}
+
+function crmCustomAllocationMismatchMessage(
+  recordsToAssign: number,
+  customDistribution: Record<string, number>,
+): string | null {
+  const total = sumCrmCustomDistributionCounts(customDistribution);
+  if (total === recordsToAssign) {
+    return null;
+  }
+  return `Custom allocation must equal total records to assign (${recordsToAssign}). Current total: ${total}`;
+}
+
+type CrmDataAssignmentSubmitValidationInput = {
+  assignmentTargetType: string;
+  recordsToAssign: number;
+  maxRecords: number;
+  distributionMode: string;
+  assignToCampaigns: string[];
+  selectedUserExtensions: readonly unknown[];
+  customDistribution: Record<string, number>;
+};
+
+function getCrmDataAssignmentSubmitValidationError(
+  input: CrmDataAssignmentSubmitValidationInput,
+): string | null {
+  const {
+    assignmentTargetType,
+    recordsToAssign,
+    maxRecords,
+    distributionMode,
+    assignToCampaigns,
+    selectedUserExtensions,
+    customDistribution,
+  } = input;
+
+  if (!assignmentTargetType) {
+    return "Please select assignment target (Campaigns or Users)";
+  }
+  if (recordsToAssign === 0 || recordsToAssign > maxRecords) {
+    return `Please enter a valid number of records (max: ${maxRecords})`;
+  }
+
+  if (assignmentTargetType === "campaigns") {
+    if (!distributionMode || assignToCampaigns.length === 0) {
+      return "Please select distribution mode and target campaigns";
+    }
+    return distributionMode === "custom"
+      ? crmCustomAllocationMismatchMessage(recordsToAssign, customDistribution)
+      : null;
+  }
+
+  if (assignmentTargetType === "users") {
+    if (!distributionMode || selectedUserExtensions.length === 0) {
+      return "Please select distribution mode and at least one user";
+    }
+    return distributionMode === "custom"
+      ? crmCustomAllocationMismatchMessage(recordsToAssign, customDistribution)
+      : null;
+  }
+
+  return null;
+}
+
 function laterCalendarIsoDate(isoDayA: string, isoDayB: string): string {
   const msA = new Date(`${isoDayA}T12:00:00`).getTime();
   const msB = new Date(`${isoDayB}T12:00:00`).getTime();
@@ -1703,21 +1769,19 @@ const CrmCampaigns = () => {
   }, []);
 
   const handleDataAssignmentSubmit = useCallback(async () => {
-    if (!assignmentTargetType) { toast.error("Please select assignment target (Campaigns or Users)"); return; }
     const maxRecords = getMaxRecords();
-    if (recordsToAssign === 0 || recordsToAssign > maxRecords) { toast.error(`Please enter a valid number of records (max: ${maxRecords})`); return; }
-    if (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) { toast.error("Please select distribution mode and target campaigns"); return; }
-    if (assignmentTargetType === "campaigns" && distributionMode === "custom") {
-      const total = Object.values(customDistribution).reduce((sum, count) => sum + count, 0);
-      if (total !== recordsToAssign) { toast.error(`Custom allocation must equal total records to assign (${recordsToAssign}). Current total: ${total}`); return; }
-    }
-    if (assignmentTargetType === "users" && (!distributionMode || selectedUserExtensions.length === 0)) {
-      toast.error("Please select distribution mode and at least one user");
+    const validationError = getCrmDataAssignmentSubmitValidationError({
+      assignmentTargetType,
+      recordsToAssign,
+      maxRecords,
+      distributionMode,
+      assignToCampaigns,
+      selectedUserExtensions,
+      customDistribution,
+    });
+    if (validationError) {
+      toast.error(validationError);
       return;
-    }
-    if (assignmentTargetType === "users" && distributionMode === "custom") {
-      const total = Object.values(customDistribution).reduce((sum, count) => sum + count, 0);
-      if (total !== recordsToAssign) { toast.error(`Custom allocation must equal total records to assign (${recordsToAssign}). Current total: ${total}`); return; }
     }
 
     setAssigningData(true);

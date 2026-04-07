@@ -574,17 +574,17 @@ button.preview-button:hover, button.preview-button:focus {
 }
 
 .crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--active {
-  background-color: #16a34a !important;
+  background-color: #15803d !important;
   color: #ffffff !important;
 }
 
 .crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--inactive {
-  background-color: #dc2626 !important;
+  background-color: #b91c1c !important;
   color: #ffffff !important;
 }
 
 .crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--warning {
-  background-color: #d97706 !important;
+  background-color: #b45309 !important;
   color: #ffffff !important;
 }
 
@@ -594,18 +594,18 @@ button.preview-button:hover, button.preview-button:focus {
 }
 
 .crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--info {
-  background-color: #0284c7 !important;
+  background-color: #0369a1 !important;
   color: #ffffff !important;
 }
 
 .crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--unknown {
   background-color: #e5e7eb !important;
-  color: #374151 !important;
+  color: #1f2937 !important;
 }
 
 .crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--none {
   background-color: #f3f4f6 !important;
-  color: #6b7280 !important;
+  color: #374151 !important;
   border: 1px solid #e5e7eb !important;
 }
 

@@ -1176,7 +1176,9 @@ const CrmDeals = () => {
 
   const openApprovalDealPreviewById = useCallback(
     (id: number) => {
-      void handlePreviewClickBase({ id, rawData: { id } });
+      handlePreviewClickBase({ id, rawData: { id } }).catch((error: unknown) => {
+        console.error("openApprovalDealPreviewById:", error);
+      });
     },
     [handlePreviewClickBase],
   );

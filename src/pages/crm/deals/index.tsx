@@ -1765,7 +1765,9 @@ const CrmDeals = () => {
 
   const openDealPreviewById = useCallback(
     (id: number) => {
-      void handlePreviewClickBase({ id, rawData: { id } });
+      handlePreviewClickBase({ id, rawData: { id } }).catch((error: unknown) => {
+        console.error("openDealPreviewById:", error);
+      });
     },
     [handlePreviewClickBase],
   );

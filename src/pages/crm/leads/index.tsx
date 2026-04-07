@@ -1104,7 +1104,7 @@ const CrmLeads = () => {
 
   const openLeadPreviewById = useCallback(
     (id: number) => {
-      void handlePreviewClickBase({
+      handlePreviewClickBase({
         id,
         name: "",
         email: "",
@@ -1124,7 +1124,9 @@ const CrmLeads = () => {
         campaign: "",
         isLost: false,
         rawData: { id },
-      } as LeadData);
+      } as LeadData).catch((error: unknown) => {
+        console.error("openLeadPreviewById:", error);
+      });
     },
     [handlePreviewClickBase],
   );
