@@ -9,20 +9,8 @@ import React, {
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import {
-  Button,
-  Row,
-  Col,
-  Form,
-  Modal,
-} from "react-bootstrap";
-import Select from "react-select";
 import { toast } from "react-toastify";
 import { CreateQuoteSidebar } from "@components/renderCreateQuoteForm";
-import {
-  FiCalendar,
-  FiTarget,
-} from "react-icons/fi";
 import { ChevronDown, Trash2 } from "lucide-react";
 import CreateLeadModal from "@components/CreateLeadModal";
 import GenericTable from "@components/GenericTable";
@@ -47,6 +35,12 @@ import { useCrmQuotesListFiltersMetricsHistorySidebarState } from "@crm/billing-
 import { CrmListViewDataModal } from "@crm/shared/CrmListViewDataModal";
 import { CrmListUploadModal } from "@crm/shared/CrmListUploadModal";
 import { CrmListPipelineModals } from "@crm/shared/CrmListPipelineModals";
+import { useCrmListCallRecordingViewModalState } from "@crm/shared/useCrmListCallRecordingViewModalState";
+import { CrmProspectsListExportModalFiltersBody } from "@crm/shared/CrmProspectsListExportModalFiltersBody";
+import { CrmProspectsListAddTabModal } from "@crm/shared/CrmProspectsListAddTabModal";
+import { buildCrmProspectsListPipelineModalsProps } from "@crm/shared/buildCrmProspectsListPipelineModalsProps";
+import { getCrmProspectsDataListGenericTableSharedProps } from "@crm/shared/getCrmProspectsDataListGenericTableSharedProps";
+import { prospectsTableRowDoubleClick } from "@crm/shared/crmProspectsContactsListPageTableRowHandlers";
 import { buildCrmQuotesListStatsCards } from "@crm/billing-quotes/crmQuotesListStatsAndTable";
 import { CrmQuotesListProspectKpiAnalyticsSection } from "@crm/billing-quotes/CrmQuotesListProspectKpiAnalyticsSection";
 import {
@@ -60,11 +54,6 @@ import {
 import { useCrmQuotesListQuotesTableModel } from "@crm/billing-quotes/useCrmQuotesListQuotesTableModel";
 import { useCrmQuotesListSharedQuoteListCallbacks } from "@crm/billing-quotes/useCrmQuotesListSharedQuoteListCallbacks";
 import { computeCrmListAdvancedFiltersApplied } from "@crm/shared/crmListCrmQueryParams";
-import {
-  applyCrmListExportDateRangePreset,
-  crmListExportDateRangePresetValue,
-  CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS,
-} from "@crm/shared/crmListExportModalDateRangePresets";
 import { pruneEmptyCrmListFilterEntries } from "@crm/billing-quotes/crmQuotesListPagePruneFilters";
 import { useCrmListFilterActions } from "@crm/shared/useCrmListFilterActions";
 import { useCrmListNavigationHandlers } from "@crm/shared/useCrmListNavigationHandlers";
@@ -237,19 +226,19 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     assignmentFilters,
   });
 
-  // Call recordings state (values passed to view modal; list is populated elsewhere when wired)
-  const [callRecordings] = useState<any[]>([]);
-  const [callRecordingsLoading] = useState(false);
-  const [callRecordingsTotal] = useState(0);
-  const [selectedRecording, setSelectedRecording] = useState<any>(null);
-  const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
-    useState(false);
-  const [downloadingRecordings, setDownloadingRecordings] = useState<
-    Set<string>
-  >(new Set());
-  const [downloadProgress, setDownloadProgress] = useState<
-    Record<string, number>
-  >({});
+  const {
+    callRecordings,
+    callRecordingsLoading,
+    callRecordingsTotal,
+    selectedRecording,
+    setSelectedRecording,
+    showRecordingPlayerModal,
+    setShowRecordingPlayerModal,
+    downloadingRecordings,
+    setDownloadingRecordings,
+    downloadProgress,
+    setDownloadProgress,
+  } = useCrmListCallRecordingViewModalState();
 
   const [showProspectsAnalytics] = useState(false);
 
@@ -865,72 +854,23 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                   selectedColumns.includes(c.key),
                 )}
                 actions={quotesActions}
-                showActions={false}
-                // Selection
-                selectable={session?.user?.permissions?.includes(
-                  "delete-crm-data-management",
-                )}
-                selectedRows={dataList.filter((item) =>
-                  selectedItems.includes(item.id),
-                )}
-                onSelectionChange={(selected) => {
-                  setSelectedItems(selected.map((item) => item.id));
-                  setClearSelectedRows(false);
-                }}
-                // Column customization
-                // customizableColumns={true}
-                // defaultSelectedColumns={defaultSelectedColumns}
-                // columnStorageKey="crmDataSelectedColumns"
-
-                // Pagination
-                pagination={{
-                  currentPage: pagination.currentPage,
-                  rowsPerPage: pagination.rowsPerPage,
-                  totalRows: totalRecords,
-                  pageSizeOptions: [10, 15, 25, 50, 100],
-                }}
-                onPaginationChange={(page, rowsPerPage) => {
-                  setPagination({
-                    ...pagination,
-                    currentPage: page,
-                    rowsPerPage,
-                  });
-                }}
-                // Sorting
-                sortable={true}
-                defaultSortBy={pagination.sortBy}
-                defaultSortOrder={pagination.sortOrder}
-                onSort={(column, direction) => {
-                  setPagination((prev) => ({
-                    ...prev,
-                    sortBy: column,
-                    sortOrder: direction,
-                    currentPage: 1,
-                  }));
-                }}
-                // Row interactions
-                onPreviewClick={(row) => handlePreviewClick(row)}
-                onFirstColumnClick={(row) => handleFirstColumnClick(row)}
-                onRowDoubleClick={(row) => {
-                  if (
-                    session?.user?.permissions?.includes(
-                      "view-crm-data-management",
-                    )
-                  ) {
-                    handleViewData(row);
-                  }
-                }}
-                // Loading & styling
-                loading={loading}
-                emptyMessage="No prospects found matching your criteria"
-                loadingMessage="Loading prospects..."
-                hover={true}
-                uniqueKey="id"
-                // Fixed height mode
-                fixedHeight={true}
-                maxHeight="calc(100vh - 345px)"
-                // Toolbar
-                showToolbar={true}
+                {...getCrmProspectsDataListGenericTableSharedProps({
+                  session,
+                  dataList,
+                  selectedItems,
+                  setSelectedItems,
+                  setClearSelectedRows,
+                  pagination,
+                  setPagination,
+                  loading,
+                  totalRecords,
+                  emptyMessage: "No prospects found matching your criteria",
+                  loadingMessage: "Loading prospects...",
+                  onPreviewClick: (row) => handlePreviewClick(row),
+                  onFirstColumnClick: (row) => handleFirstColumnClick(row),
+                  onRowDoubleClick: (row) =>
+                    prospectsTableRowDoubleClick(session, handleViewData, row),
+                })}
                 toolbar={mergeCrmQuotesListProspectsToolbarConfig(
                   prospectsToolbarConfig,
                   {
@@ -940,7 +880,6 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                     quotesFilterPills,
                   },
                 )}
-                // Stats cards for metrics
                 statsCards={prospectsStatsCards}
                 customBody={renderCrmQuotesListProspectsBoardCustomBody({
                   prospectsViewMode,
@@ -998,81 +937,81 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
           />
 
           <CrmListPipelineModals
-            assignment={{
-              show: showDataAssignmentModal,
-              onHide: handleDataAssignmentModalClose,
-              title: "Smart Prospect Distribution",
-              desc: "Please fill the details below to smart prospect distribution.",
-              onSubmit: handleDataAssignmentSubmit,
-              onCancel: handleDataAssignmentModalClose,
-            }}
-            assignmentForm={{
-              entityLabel: "Prospects",
-              assignmentFilters,
-              setAssignmentFilters,
-              availableTags,
-              availableCampaigns,
-              assignmentCounts,
-              assignmentCampaign,
-              setAssignmentCampaign,
-              totalEntriesToAssign,
-              setTotalEntriesToAssign,
-              assignmentDistribution,
-              setAssignmentDistribution,
-              customDistribution,
-              setCustomDistribution,
-            }}
-            afterCall={{
-              show: showAfterCallModal,
-              onHide: () => setShowAfterCallModal(false),
-              onSubmit: handleAfterCallSubmit,
-              afterCallData,
-              setAfterCallData,
-            }}
-            schedule={{
-              show: showScheduleModal,
-              onHide: () => setShowScheduleModal(false),
-              isEditingSchedule,
-              selectedEntryForSchedule,
-              scheduleData,
-              setScheduleData,
-              onSubmit: handleScheduleSubmit,
-              onCancel: handleScheduleModalClose,
-            }}
-            unschedule={{
-              show: showUnscheduleModal,
-              onHide: () => {
-                setShowUnscheduleModal(false);
-                setEntryToUnschedule(null);
+            {...buildCrmProspectsListPipelineModalsProps({
+              assignment: {
+                show: showDataAssignmentModal,
+                onHide: handleDataAssignmentModalClose,
+                title: "Smart Prospect Distribution",
+                desc: "Please fill the details below to smart prospect distribution.",
+                onSubmit: handleDataAssignmentSubmit,
+                onCancel: handleDataAssignmentModalClose,
+                entityLabel: "Prospects",
+                assignmentFilters,
+                setAssignmentFilters,
+                availableTags,
+                availableCampaigns,
+                assignmentCounts,
+                assignmentCampaign,
+                setAssignmentCampaign,
+                totalEntriesToAssign,
+                setTotalEntriesToAssign,
+                assignmentDistribution,
+                setAssignmentDistribution,
+                customDistribution,
+                setCustomDistribution,
               },
-              entryToUnschedule,
-              onConfirm: confirmUnscheduleCall,
-            }}
-            history={{
-              show: showHistoryModal,
-              onHide: () => setShowHistoryModal(false),
-              onClose: () => setShowHistoryModal(false),
-              historyData,
-              historyLoading,
-              historyPagination,
-              fetchHistoryData,
-              campaignsById,
-              getNameByExtension,
-            }}
-            success={{
-              show: showSuccessfulModal,
-              onHide: () => setShowSuccessfulModal(false),
-              title: successModalTitle,
-              description: successModalDescription,
-            }}
-            recording={{
-              show: showRecordingPlayerModal,
-              onHide: () => {
-                setShowRecordingPlayerModal(false);
-                setSelectedRecording(null);
+              afterCall: {
+                show: showAfterCallModal,
+                onHide: () => setShowAfterCallModal(false),
+                onSubmit: handleAfterCallSubmit,
+                afterCallData,
+                setAfterCallData,
               },
-              recording: selectedRecording,
-            }}
+              schedule: {
+                show: showScheduleModal,
+                onHide: () => setShowScheduleModal(false),
+                isEditingSchedule,
+                selectedEntryForSchedule,
+                scheduleData,
+                setScheduleData,
+                onSubmit: handleScheduleSubmit,
+                onCancel: handleScheduleModalClose,
+              },
+              unschedule: {
+                show: showUnscheduleModal,
+                onHide: () => {
+                  setShowUnscheduleModal(false);
+                  setEntryToUnschedule(null);
+                },
+                entryToUnschedule,
+                onConfirm: confirmUnscheduleCall,
+              },
+              history: {
+                show: showHistoryModal,
+                onHide: () => setShowHistoryModal(false),
+                onClose: () => setShowHistoryModal(false),
+                historyData,
+                historyLoading,
+                historyPagination,
+                fetchHistoryData,
+                campaignsById,
+                getNameByExtension,
+              },
+              success: {
+                show: showSuccessfulModal,
+                onHide: () => setShowSuccessfulModal(false),
+                title: successModalTitle,
+                description: successModalDescription,
+              },
+              recording: {
+                show: showRecordingPlayerModal,
+                onHide: () => {
+                  setShowRecordingPlayerModal(false);
+                  setSelectedRecording(null);
+                },
+                recording: selectedRecording,
+              },
+            })}
           />
         </div>{" "}
         {/* End main content area */}
@@ -1148,177 +1087,20 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
         exporting={exporting}
         exportButtonLabel="Export"
       >
-        <hr />
-        <h6 className="mb-3">Export filters</h6>
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Associate with</Form.Label>
-                <Form.Select
-                  value={
-                    exportFilters.user_extension
-                      ? String(exportFilters.user_extension)
-                      : ""
-                  }
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v) next.user_extension = v;
-                      else delete next.user_extension;
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="">All owners</option>
-                  {extensions.map((ext) => (
-                    <option
-                      key={String(ext.id || ext.extension)}
-                      value={String(ext.id || ext.extension)}
-                    >
-                      {ext.display_name ||
-                        ext.name ||
-                        ext.id ||
-                        ext.extension ||
-                        ""}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Lead status</Form.Label>
-                <Form.Select
-                  value={exportFilters.disposition || ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v) next.disposition = v;
-                      else delete next.disposition;
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="">All status</option>
-                  <option value="hot_lead">Hot Lead</option>
-                  <option value="warm_lead">Warm Lead</option>
-                  <option value="cold_lead">Cold Lead</option>
-                  <option value="interested">Interested</option>
-                  <option value="callback_requested">Callback Requested</option>
-                  <option value="no_answer">No Answer</option>
-                  <option value="not_interested">Not Interested</option>
-                  <option value="follow_up">Follow Up</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
-          <Row>
-            {CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS.map(
-              ({ label, keys }) => (
-                <Col md={6} key={keys.from}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>{label}</Form.Label>
-                    <Form.Select
-                      value={crmListExportDateRangePresetValue(
-                        exportFilters,
-                        keys,
-                      )}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setExportFilters((prev) =>
-                          applyCrmListExportDateRangePreset(prev, v, keys),
-                        );
-                      }}
-                    >
-                      <option value="all">All time</option>
-                      <option value="today">Today</option>
-                      <option value="week">Last 7 days</option>
-                      <option value="month">Last 30 days</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-              ),
-            )}
-          </Row>
-          <Form.Group className="mb-0">
-            <Form.Label>Search (optional)</Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Filter by name, phone, etc."
-              value={exportFilters.search || ""}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                setExportFilters((prev) => {
-                  const next = { ...prev };
-                  if (v) next.search = v;
-                  else delete next.search;
-                  return next;
-                });
-              }}
-            />
-          </Form.Group>
+        <CrmProspectsListExportModalFiltersBody
+          extensions={extensions}
+          exportFilters={exportFilters}
+          setExportFilters={setExportFilters}
+        />
       </CrmExportModal>
-      {/* Add Tab Modal */}
-      <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Add New Tab</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted mb-3">Select a filter to add as a new tab</p>
-          <div className="d-grid gap-2">
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.some((t) => t.id === "scheduled")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "scheduled",
-                      label: "Scheduled",
-                      count: metrics.scheduled_records,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "scheduled")}
-            >
-              <FiCalendar size={16} className="me-2" />
-              Scheduled
-            </Button>
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.some((t) => t.id === "has_leads")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "has_leads",
-                      label: "Convert to Leads",
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "has_leads")}
-            >
-              <FiTarget size={16} className="me-2" />
-              Convert to Leads
-            </Button>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowTabModal(false)}>
-            Cancel
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <CrmProspectsListAddTabModal
+        show={showTabModal}
+        onHide={() => setShowTabModal(false)}
+        customTabs={customTabs}
+        setCustomTabs={setCustomTabs}
+        scheduledRecordsCount={metrics.scheduled_records}
+        hasLeadsTabLabel="Convert to Leads"
+      />
       {/* Create Contact Sidebar */}
       <CrmListCreateContactSidebar
         show={showCreateContactSidebar}

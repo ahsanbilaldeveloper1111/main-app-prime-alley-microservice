@@ -370,23 +370,17 @@ const TaskModal: React.FC<TaskModalProps> = ({
     if (notesRef.current) setNotes(notesRef.current.innerHTML || '');
   };
 
-  const handleBold = () => {
+  const runRichTextFormatCommand = (
+    command: 'bold' | 'italic' | 'underline',
+  ) => {
     notesRef.current?.focus();
-    document.execCommand('bold', false);
+    document.execCommand(command, false);
     syncNotesFromEditor();
   };
 
-  const handleItalic = () => {
-    notesRef.current?.focus();
-    document.execCommand('italic', false);
-    syncNotesFromEditor();
-  };
-
-  const handleUnderline = () => {
-    notesRef.current?.focus();
-    document.execCommand('underline', false);
-    syncNotesFromEditor();
-  };
+  const handleBold = () => runRichTextFormatCommand('bold');
+  const handleItalic = () => runRichTextFormatCommand('italic');
+  const handleUnderline = () => runRichTextFormatCommand('underline');
 
   const handleLink = () => {
     const el = notesRef.current;
@@ -560,34 +554,29 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   return (
     <>
-      <UrlInputModal
-        isOpen={urlModalType === 'link'}
-        onClose={() => setUrlModalType(null)}
-        title="Enter URL"
-        defaultValue="https://"
-        placeholder="https://"
-        submitLabel="Insert link"
-        onSubmit={(url) => {
-          notesRef.current?.focus();
-          document.execCommand('createLink', false, url);
-          syncNotesFromEditor();
-          setUrlModalType(null);
-        }}
-      />
-      <UrlInputModal
-        isOpen={urlModalType === 'image'}
-        onClose={() => setUrlModalType(null)}
-        title="Enter image URL"
-        defaultValue="https://"
-        placeholder="https://"
-        submitLabel="Insert image"
-        onSubmit={(url) => {
-          notesRef.current?.focus();
-          document.execCommand('insertImage', false, url);
-          syncNotesFromEditor();
-          setUrlModalType(null);
-        }}
-      />
+      {urlModalType ? (
+        <UrlInputModal
+          isOpen
+          onClose={() => setUrlModalType(null)}
+          title={
+            urlModalType === 'link' ? 'Enter URL' : 'Enter image URL'
+          }
+          defaultValue="https://"
+          placeholder="https://"
+          submitLabel={
+            urlModalType === 'link' ? 'Insert link' : 'Insert image'
+          }
+          onSubmit={(url) => {
+            notesRef.current?.focus();
+            document.execCommand(
+              urlModalType === 'link' ? 'createLink' : 'insertImage',
+              false,
+              url,
+            );
+            syncNotesFromEditor();
+          }}
+        />
+      ) : null}
       <div
         style={{
           position: 'fixed',

@@ -266,6 +266,30 @@ const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
   gap: "8px",
 };
 
+function BillingProductsToolbarButton({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={ACTION_BUTTON_BASE_STYLE}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#1a1a1a";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "#000000";
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 const BillingManagement = () => {
   const { data: session } = useSession();
   const router = useRouter();
@@ -986,34 +1010,18 @@ const BillingManagement = () => {
       }}
       ref={addContactsRef}
     >
-     
-
-<button
-          onClick={() => router.push("/billing/products/manage-categories")}
-          style={ACTION_BUTTON_BASE_STYLE}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
-        >
-          <Plus size={16} />
-          Manage Categories
-        </button>
-        <button
-          onClick={() => setShowCreateProductModal(true)}
-          style={ACTION_BUTTON_BASE_STYLE}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
-        >
-          <Plus size={16} />
-          Add Product
-        </button>
+      <BillingProductsToolbarButton
+        onClick={() => router.push("/billing/products/manage-categories")}
+      >
+        <Plus size={16} />
+        Manage Categories
+      </BillingProductsToolbarButton>
+      <BillingProductsToolbarButton
+        onClick={() => setShowCreateProductModal(true)}
+      >
+        <Plus size={16} />
+        Add Product
+      </BillingProductsToolbarButton>
     
     </div>
   );
@@ -1620,8 +1628,7 @@ const BillingManagement = () => {
       {/* Create Contact Sidebar */}
       {renderCreateContactSidebar()}
       {/* Create Product Modal */}
-       {/* Create Product Modal */}
-       {showCreateProductModal && (
+      {showCreateProductModal && (
         <CreateProductModal
           key={createProductModalKey}
           productId={editingProductId ?? undefined}

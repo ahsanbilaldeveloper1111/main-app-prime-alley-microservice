@@ -59,7 +59,11 @@ import {
   Modal,
   Spinner,
 } from "react-bootstrap";
-import Select from "react-select";
+import Select, {
+  type GroupBase,
+  type SingleValue,
+  type StylesConfig,
+} from "react-select";
 import {
   GlobalDateFormat,
   ModuleSlug,
@@ -141,6 +145,21 @@ import {
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
+import { buildDealsListSidebarBaseFilterPayload } from "@crm/deals/dealsListPageFilterHelpers";
+import { CrmDealsListAddTabModal } from "@crm/deals/CrmDealsListAddTabModal";
+
+/** Option shape for single-value react-select filters on this page. Keeps `onChange` typed (avoids `{}`). */
+type DealApprovalsFilterOption = {
+  value: string | number;
+  label: string | number;
+};
+
+const dealApprovalsSelectStyles =
+  customSelectStyles as StylesConfig<
+    DealApprovalsFilterOption,
+    false,
+    GroupBase<DealApprovalsFilterOption>
+  >;
 
 const ignoredKeys = ["stage_id"];
 
@@ -422,6 +441,31 @@ const CrmDeals = () => {
     },
     [dealsPagination.sortBy, dealsPagination.sortOrder],
   );
+
+  const buildApprovalsSidebarFiltersPayload = useCallback(() => {
+    const filtersToApply = buildDealsListSidebarBaseFilterPayload(
+      dealsSearch,
+      {
+        assignedTo: dealsFilters.assignedTo,
+        stage: dealsFilters.stage,
+        followUpDateFrom: dealsFilters.followUpDateFrom,
+        followUpDateTo: dealsFilters.followUpDateTo,
+        probabilityMin: dealsFilters.probabilityMin,
+        probabilityMax: dealsFilters.probabilityMax,
+        expectedCloseDateFrom: dealsFilters.expectedCloseDateFrom,
+        expectedCloseDateTo: dealsFilters.expectedCloseDateTo,
+        approvalStatus: dealsFilters.approvalStatus,
+      },
+      "alwaysSetNullable",
+    );
+    if (dealsFilters.dealType) {
+      filtersToApply.deal_type = dealsFilters.dealType;
+    }
+    if (dealsFilters.industry) {
+      filtersToApply.industry = dealsFilters.industry;
+    }
+    return filtersToApply;
+  }, [dealsSearch, dealsFilters]);
 
   // Fetch deals when filters or search change
   const fetchDeals = useCallback(
@@ -2675,7 +2719,7 @@ const CrmDeals = () => {
                       <Form.Label className="small fw-bold mb-2">
                         Assigned To
                       </Form.Label>
-                      <Select
+                      <Select<DealApprovalsFilterOption, false>
                         options={extensions.map((ext: any) => ({
                           value: ext.id || ext.extension,
                           label:
@@ -2684,33 +2728,32 @@ const CrmDeals = () => {
                             ext.id ||
                             ext.extension,
                         }))}
-                        value={
-                          dealsFilters.assignedTo
-                            ? (() => {
-                                const assignedToId = dealsFilters.assignedTo;
-                                const ext = extensions.find(
-                                  (e: any) =>
-                                    (e.id || e.extension) === assignedToId,
-                                );
-                                return ext
-                                  ? {
-                                      value: assignedToId,
-                                      label:
-                                        ext.display_name ||
-                                        ext.name ||
-                                        assignedToId,
-                                    }
-                                  : {
-                                      value: assignedToId,
-                                      label: assignedToId,
-                                    };
-                              })()
-                            : null
-                        }
-                        onChange={(selected) => {
-                          const assignedToValue = selected
-                            ? selected.value
-                            : null;
+                        value={(() => {
+                          const assignedToId = dealsFilters.assignedTo;
+                          if (assignedToId == null || assignedToId === "")
+                            return null;
+                          const id = assignedToId as string;
+                          const ext = extensions.find(
+                            (e: any) => (e.id || e.extension) === id,
+                          );
+                          const option: DealApprovalsFilterOption = ext
+                            ? {
+                                value: id,
+                                label:
+                                  ext.display_name ||
+                                  ext.name ||
+                                  ext.id ||
+                                  ext.extension ||
+                                  id,
+                              }
+                            : { value: id, label: id };
+                          return option;
+                        })()}
+                        onChange={(selected: SingleValue<DealApprovalsFilterOption>) => {
+                          const assignedToValue =
+                            selected?.value != null
+                              ? String(selected.value)
+                              : null;
                           setDealsFilters((prev) => ({
                             ...prev,
                             assignedTo: assignedToValue,
@@ -2719,7 +2762,7 @@ const CrmDeals = () => {
                           setActiveFilter("all");
                         }}
                         placeholder="Select user..."
-                        styles={customSelectStyles}
+                        styles={dealApprovalsSelectStyles}
                         isClearable
                       />
                     </Col>
@@ -2727,26 +2770,31 @@ const CrmDeals = () => {
                       <Form.Label className="small fw-bold mb-2">
                         Stages
                       </Form.Label>
-                      <Select
+                      <Select<DealApprovalsFilterOption, false>
                         options={stages.map((s) => ({
                           value: s.id.toString(),
                           label: s.name,
                         }))}
-                        value={
-                          dealsFilters.stage
-                            ? (() => {
-                                const stageId = dealsFilters.stage;
-                                const stage = stages.find(
-                                  (st: any) => st.id.toString() === stageId,
-                                );
-                                return stage
-                                  ? { value: stageId, label: stage.name }
-                                  : { value: stageId, label: stageId };
-                              })()
-                            : null
-                        }
-                        onChange={(selected) => {
-                          const stageValue = selected ? selected.value : null;
+                        value={(() => {
+                          const stageId = dealsFilters.stage;
+                          if (stageId == null || stageId === "") return null;
+                          const id = stageId as string;
+                          const stage = stages.find(
+                            (st: any) => st.id.toString() === id,
+                          );
+                          const option: DealApprovalsFilterOption = stage
+                            ? {
+                                value: id,
+                                label: stage.name ?? id,
+                              }
+                            : { value: id, label: id };
+                          return option;
+                        })()}
+                        onChange={(selected: SingleValue<DealApprovalsFilterOption>) => {
+                          const stageValue =
+                            selected?.value != null
+                              ? String(selected.value)
+                              : null;
                           setDealsFilters((prev) => ({
                             ...prev,
                             stage: stageValue,
@@ -2759,7 +2807,7 @@ const CrmDeals = () => {
                           }
                         }}
                         placeholder="Select stage..."
-                        styles={customSelectStyles}
+                        styles={dealApprovalsSelectStyles}
                         isClearable
                       />
                     </Col>
@@ -2946,54 +2994,9 @@ const CrmDeals = () => {
                           variant="outline-secondary"
                           className="d-flex align-items-center justify-content-center"
                           onClick={() => {
-                            // Map dealsFilters to the format expected by handleFiltersChange
-                            const filtersToApply: Record<string, any> = {};
-
-                            if (dealsSearch) {
-                              filtersToApply.search = dealsSearch;
-                            }
-                            if (dealsFilters.assignedTo) {
-                              filtersToApply.assigned_to =
-                                dealsFilters.assignedTo;
-                            }
-                            if (dealsFilters.stage) {
-                              filtersToApply.stage_id = dealsFilters.stage;
-                            }
-                            if (dealsFilters.followUpDateFrom) {
-                              filtersToApply.follow_up_date_from =
-                                dealsFilters.followUpDateFrom;
-                            }
-                            if (dealsFilters.followUpDateTo) {
-                              filtersToApply.follow_up_date_to =
-                                dealsFilters.followUpDateTo;
-                            }
-                            if (dealsFilters.probabilityMin) {
-                              filtersToApply.probability_min =
-                                dealsFilters.probabilityMin;
-                            }
-                            if (dealsFilters.probabilityMax) {
-                              filtersToApply.probability_max =
-                                dealsFilters.probabilityMax;
-                            }
-                            if (dealsFilters.dealType) {
-                              filtersToApply.deal_type = dealsFilters.dealType;
-                            }
-                            // Always pass approval_status so it can be set or cleared
-                            filtersToApply.approval_status =
-                              dealsFilters.approvalStatus || null;
-                            if (dealsFilters.industry) {
-                              filtersToApply.industry = dealsFilters.industry;
-                            }
-                            if (dealsFilters.expectedCloseDateFrom) {
-                              filtersToApply.expected_close_date_from =
-                                dealsFilters.expectedCloseDateFrom;
-                            }
-                            if (dealsFilters.expectedCloseDateTo) {
-                              filtersToApply.expected_close_date_to =
-                                dealsFilters.expectedCloseDateTo;
-                            }
-
-                            handleFiltersChange(filtersToApply);
+                            handleFiltersChange(
+                              buildApprovalsSidebarFiltersPayload(),
+                            );
                             setDealsPagination({
                               ...dealsPagination,
                               currentPage: 1,
@@ -6631,15 +6634,18 @@ const CrmDeals = () => {
                   <Form.Label className="fw-semibold small">
                     Meeting Type <span className="text-danger">*</span>
                   </Form.Label>
-                  <Select
+                  <Select<DealApprovalsFilterOption, false>
                     value={{
                       value: meetingData.meetingType,
                       label: meetingData.meetingType,
                     }}
-                    onChange={(option) =>
+                    onChange={(option: SingleValue<DealApprovalsFilterOption>) =>
                       setMeetingData({
                         ...meetingData,
-                        meetingType: option?.value || "Online",
+                        meetingType:
+                          option?.value != null
+                            ? String(option.value)
+                            : "Online",
                       })
                     }
                     options={[
@@ -6648,7 +6654,7 @@ const CrmDeals = () => {
                       { value: "Phone Call", label: "Phone Call" },
                       { value: "Video Call", label: "Video Call" },
                     ]}
-                    styles={customSelectStyles}
+                    styles={dealApprovalsSelectStyles}
                     placeholder="Select meeting type..."
                   />
                 </Form.Group>
@@ -6707,7 +6713,7 @@ const CrmDeals = () => {
                     <Form.Label className="fw-semibold small">
                       Meeting Outcome
                     </Form.Label>
-                    <Select
+                    <Select<DealApprovalsFilterOption, false>
                       value={
                         meetingData.meetingOutcome
                           ? {
@@ -6716,10 +6722,11 @@ const CrmDeals = () => {
                             }
                           : null
                       }
-                      onChange={(option) =>
+                      onChange={(option: SingleValue<DealApprovalsFilterOption>) =>
                         setMeetingData({
                           ...meetingData,
-                          meetingOutcome: option?.value || "",
+                          meetingOutcome:
+                            option?.value != null ? String(option.value) : "",
                         })
                       }
                       options={[
@@ -6736,7 +6743,7 @@ const CrmDeals = () => {
                         { value: "No Show", label: "No Show" },
                         { value: "Rescheduled", label: "Rescheduled" },
                       ]}
-                      styles={customSelectStyles}
+                      styles={dealApprovalsSelectStyles}
                       placeholder="Select meeting outcome..."
                       isClearable
                     />
@@ -7053,47 +7060,7 @@ const CrmDeals = () => {
           },
         ]}
         onApply={() => {
-          // Map dealsFilters to the format expected by handleFiltersChange
-          const filtersToApply: Record<string, any> = {};
-
-          if (dealsSearch) {
-            filtersToApply.search = dealsSearch;
-          }
-          if (dealsFilters.assignedTo) {
-            filtersToApply.assigned_to = dealsFilters.assignedTo;
-          }
-          if (dealsFilters.stage) {
-            filtersToApply.stage_id = dealsFilters.stage;
-          }
-          if (dealsFilters.followUpDateFrom) {
-            filtersToApply.follow_up_date_from = dealsFilters.followUpDateFrom;
-          }
-          if (dealsFilters.followUpDateTo) {
-            filtersToApply.follow_up_date_to = dealsFilters.followUpDateTo;
-          }
-          if (dealsFilters.probabilityMin) {
-            filtersToApply.probability_min = dealsFilters.probabilityMin;
-          }
-          if (dealsFilters.probabilityMax) {
-            filtersToApply.probability_max = dealsFilters.probabilityMax;
-          }
-          if (dealsFilters.dealType) {
-            filtersToApply.deal_type = dealsFilters.dealType;
-          }
-          filtersToApply.approval_status = dealsFilters.approvalStatus || null;
-          if (dealsFilters.industry) {
-            filtersToApply.industry = dealsFilters.industry;
-          }
-          if (dealsFilters.expectedCloseDateFrom) {
-            filtersToApply.expected_close_date_from =
-              dealsFilters.expectedCloseDateFrom;
-          }
-          if (dealsFilters.expectedCloseDateTo) {
-            filtersToApply.expected_close_date_to =
-              dealsFilters.expectedCloseDateTo;
-          }
-
-          handleFiltersChange(filtersToApply);
+          handleFiltersChange(buildApprovalsSidebarFiltersPayload());
           setDealsPagination({ ...dealsPagination, currentPage: 1 });
           setRefreshKey((prev) => prev + 1);
           setShowFiltersSidebar(false);
@@ -7135,119 +7102,14 @@ const CrmDeals = () => {
         />
       )}
 
-      {/* Add New Tab Modal */}
-      <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Add New Tab</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted mb-3">Select a filter to add as a new tab</p>
-          <div className="d-grid gap-2">
-            {stages.map((stage: any) => {
-              const isAlreadyAdded = customTabs.some(
-                (t) => t.id === stage.id.toString(),
-              );
-              const stageCount = filterCounts[stage.id] || 0;
-              return (
-                <Button
-                  key={stage.id}
-                  variant="outline-primary"
-                  onClick={() => {
-                    if (!isAlreadyAdded) {
-                      setCustomTabs([
-                        ...customTabs,
-                        {
-                          id: stage.id.toString(),
-                          label: stage.name,
-                          count: stageCount,
-                          removable: true,
-                        },
-                      ]);
-                      setShowTabModal(false);
-                      toast.success("Tab added successfully!");
-                    }
-                  }}
-                  disabled={isAlreadyAdded}
-                  className="d-flex align-items-center justify-content-start"
-                  style={{ textAlign: "left" }}
-                >
-                  <Layers size={16} className="me-2" />
-                  {stage.name}
-                  {stageCount > 0 && (
-                    <Badge bg="secondary" className="ms-auto">
-                      {stageCount}
-                    </Badge>
-                  )}
-                </Button>
-              );
-            })}
-            {/* Lost and Deleted tabs */}
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.find((t) => t.id === "lost")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "lost",
-                      label: "Lost",
-                      count: filterCounts.lost || 0,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "lost")}
-              className="d-flex align-items-center justify-content-start"
-              style={{ textAlign: "left" }}
-            >
-              <X size={16} className="me-2" />
-              Lost
-              {(filterCounts.lost || 0) > 0 && (
-                <Badge bg="secondary" className="ms-auto">
-                  {filterCounts.lost || 0}
-                </Badge>
-              )}
-            </Button>
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.find((t) => t.id === "deleted")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "deleted",
-                      label: "Deleted",
-                      count: filterCounts.deleted || 0,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "deleted")}
-              className="d-flex align-items-center justify-content-start"
-              style={{ textAlign: "left" }}
-            >
-              <Trash2 size={16} className="me-2" />
-              Deleted
-              {(filterCounts.deleted || 0) > 0 && (
-                <Badge bg="secondary" className="ms-auto">
-                  {filterCounts.deleted || 0}
-                </Badge>
-              )}
-            </Button>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowTabModal(false)}>
-            Cancel
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <CrmDealsListAddTabModal
+        show={showTabModal}
+        onHide={() => setShowTabModal(false)}
+        stages={stages}
+        customTabs={customTabs}
+        setCustomTabs={setCustomTabs}
+        filterCounts={filterCounts}
+      />
 
       {/* Column Editor Modal */}
       <ColumnEditorModal
@@ -7286,7 +7148,7 @@ const CrmDeals = () => {
           <Col md={6}>
             <Form.Group className="mb-3">
               <Form.Label>Owner</Form.Label>
-              <Select
+              <Select<DealApprovalsFilterOption, false>
                 options={[
                   { value: "", label: "All owners" },
                   ...extensions.map((ext: any) => ({
@@ -7311,8 +7173,9 @@ const CrmDeals = () => {
                       })()
                     : null
                 }
-                onChange={(selected: { value: string; label: string } | null) => {
-                  const v = selected?.value;
+                onChange={(selected: SingleValue<DealApprovalsFilterOption>) => {
+                  const v =
+                    selected?.value != null ? String(selected.value) : "";
                   setExportFilters((prev) => {
                     const next = { ...prev };
                     if (v) next.assigned_to = v;
@@ -7323,7 +7186,7 @@ const CrmDeals = () => {
                 placeholder="Select owner..."
                 isClearable
                 isSearchable
-                styles={customSelectStyles}
+                styles={dealApprovalsSelectStyles}
               />
             </Form.Group>
           </Col>
