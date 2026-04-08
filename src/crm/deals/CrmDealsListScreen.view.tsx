@@ -4678,10 +4678,6 @@ export function CrmDealsListScreenView({
         setShowDealHistoryModal={setShowDealHistoryModal}
         setShowAddMeetingModal={setShowAddMeetingModal}
       />
-                              </div>
-                            </div>
-                          </DetailSection>
-                        )}
 
                         {/* Lead Information Section */}
                         {relatedLead && (
@@ -4782,8 +4778,6 @@ export function CrmDealsListScreenView({
                             </div>
                           </DetailSection>
                         )}
-                      </div>
-                    )}
 
                     {activeTab === "campaign-prospect" && (
                       <div>
@@ -4973,7 +4967,6 @@ export function CrmDealsListScreenView({
                           )}
                       </div>
                     )}
-                  </div>
 
                   {/* Right Panel - Quick Actions & Timeline */}
                   <div
@@ -5528,10 +5521,6 @@ export function CrmDealsListScreenView({
                       </div>
                     </div>
                   </div>
-                </div>
-              </>
-            )}
-          </Modal.Body>
 
           {/* Footer */}
           <div
@@ -5574,8 +5563,6 @@ export function CrmDealsListScreenView({
               Close
             </Button>
           </div>
-        </Modal>
-      )}
 
       {/* Deal History Modal */}
       {viewingDeal && (
