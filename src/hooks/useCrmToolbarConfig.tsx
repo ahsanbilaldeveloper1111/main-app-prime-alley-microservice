@@ -51,6 +51,28 @@ function hasProspectsLikeOwnerFilter(value: unknown): boolean {
   return value.length > 0;
 }
 
+/** Safe display when no extension row matches; avoids String(object) → "[object Object]". */
+function extensionIdToFallbackLabel(extensionId: unknown): string {
+  if (
+    typeof extensionId === "string" ||
+    typeof extensionId === "number" ||
+    typeof extensionId === "boolean" ||
+    typeof extensionId === "bigint"
+  ) {
+    return String(extensionId);
+  }
+  if (extensionId !== null && typeof extensionId === "object") {
+    const record = extensionId as Record<string, unknown>;
+    for (const key of ["id", "value", "extension"] as const) {
+      const v = record[key];
+      if (typeof v === "string" || typeof v === "number") {
+        return String(v);
+      }
+    }
+  }
+  return "";
+}
+
 function findExtensionLabel(
   extensionId: unknown,
   extensions: Array<{ id?: string; extension?: string; display_name?: string; name?: string }>,
@@ -59,7 +81,11 @@ function findExtensionLabel(
     return undefined;
   }
   const ext = extensions.find((item: any) => (item.id || item.extension) === extensionId);
-  return ext ? ext.display_name || ext.name || ext.extension : String(extensionId);
+  if (ext) {
+    return ext.display_name || ext.name || ext.extension;
+  }
+  const fallback = extensionIdToFallbackLabel(extensionId);
+  return fallback || undefined;
 }
 
 function getOwnerFilterValue(
