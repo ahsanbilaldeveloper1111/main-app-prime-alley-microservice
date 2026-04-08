@@ -111,6 +111,83 @@ export function addPresentExportFilters(
   });
 }
 
+const LEADS_EXPORT_OMIT_TOP_LEVEL_KEYS = new Set([
+  "campaign",
+  "stage",
+  "contact_persons",
+]);
+
+function serializeLeadsExportCsvCell(val: unknown): string {
+  if (val == null) return "";
+  if (typeof val === "object") return "";
+  const s = String(val).replaceAll('"', '""');
+  return s.includes(",") || s.includes('"') ? `"${s}"` : s;
+}
+
+/** Flat row CSV text for leads list API rows (primitive columns only). */
+export function buildLeadsListExportCsvText(allData: unknown[]): string {
+  const headers = Array.from(
+    new Set(
+      allData.flatMap((row) =>
+        typeof row === "object" && row !== null
+          ? Object.keys(row).filter(
+              (k) =>
+                !LEADS_EXPORT_OMIT_TOP_LEVEL_KEYS.has(k) &&
+                typeof (row as Record<string, unknown>)[k] !== "object",
+            )
+          : [],
+      ),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+  const headerRow = headers.join(",");
+  const dataRows = allData.map((row) =>
+    headers
+      .map((h) =>
+        serializeLeadsExportCsvCell(
+          typeof row === "object" && row !== null
+            ? (row as Record<string, unknown>)[h]
+            : undefined,
+        ),
+      )
+      .join(","),
+  );
+  return [headerRow, ...dataRows].join("\n");
+}
+
+const CONTACT_PERSON_EMAIL_RE = /\S+@\S+\.\S+/;
+
+export type ContactPersonFieldsForValidation = {
+  title?: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+};
+
+/** First validation error message, or null if all contacts are valid. */
+export function getContactPersonsValidationError(
+  persons: ReadonlyArray<ContactPersonFieldsForValidation>,
+): string | null {
+  for (let i = 0; i < persons.length; i++) {
+    const person = persons[i];
+    if (!person?.title?.trim()) {
+      return `Contact person ${i + 1}: Title is required`;
+    }
+    if (!person?.name?.trim()) {
+      return `Contact person ${i + 1}: Name is required`;
+    }
+    if (!person?.phone?.trim()) {
+      return `Contact person ${i + 1}: Phone is required`;
+    }
+    if (!person?.email?.trim()) {
+      return `Contact person ${i + 1}: Email is required`;
+    }
+    if (!CONTACT_PERSON_EMAIL_RE.test(person.email)) {
+      return `Contact person ${i + 1}: Invalid email format`;
+    }
+  }
+  return null;
+}
+
 export function leadsToKanbanColumns(
   leads: LeadData[],
   stages: Array<{ id: number | string; name: string }>,

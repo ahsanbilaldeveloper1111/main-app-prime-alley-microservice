@@ -18,10 +18,7 @@ import GenericTable, {
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
-import KanbanBoard, {
-  KanbanColumnDef,
-  KanbanCardData,
-} from "@components/KanbanBoard";
+import KanbanBoard from "@components/KanbanBoard";
 import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { EditDealApprovalSidebar } from "@components/EditDealApprovalSidebar";
 import {
@@ -85,13 +82,6 @@ import {
   Clock,
   Layers,
   Calendar,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   DollarSign,
   Activity,
   FileText,
@@ -153,6 +143,17 @@ import {
   buildDealsListGetDealsExportParams,
   buildDealsListGetDealsParams,
 } from "@crm/deals/dealsListGetDealsQueryParams";
+import {
+  buildDealsListFullExportCsvFromApiRows,
+  triggerCsvDownload,
+} from "@crm/deals/dealsListCsvExport";
+import { buildDealsKanbanColumns } from "@crm/deals/dealsListKanbanColumns";
+import {
+  computeDealsListAnalytics,
+  computeDealsListTabFilterCounts,
+} from "@crm/deals/dealsListAnalyticsHelpers";
+import { transformDealForGenericTableRow } from "@crm/deals/dealsListTransformDealRow";
+import { DEALS_EMPTY_MEETING_FORM } from "@crm/deals/dealsListModalFormDefaults";
 import { CrmDealsListAddTabModal } from "@crm/deals/CrmDealsListAddTabModal";
 
 /** Option shape for single-value react-select filters on this page. Keeps `onChange` typed (avoids `{}`). */
@@ -187,43 +188,6 @@ const APPROVAL_FILTER_RULES = [
   { key: "expected_close_date_from", kind: "truthy" },
   { key: "expected_close_date_to", kind: "truthy" },
 ] as const;
-
-const dealsToKanbanColumns = (
-  deals: any[],
-  stagesData: any[]
-): KanbanColumnDef[] => {
-  const buckets: Record<string | number, KanbanCardData[]> = {};
-
-  stagesData.forEach((stage) => {
-    buckets[stage.id] = [];
-  });
-
-  deals.forEach((deal: any) => {
-    const stageId = deal.stage_id || deal.stage?.id;
-    if (stageId && buckets[stageId]) {
-      const dealName = deal.name || "";
-      buckets[stageId].push({
-        id: deal.id,
-        name: dealName,
-        email: deal.company_name || "",
-        avatarInitials: getInitials(dealName),
-        avatarColor: getRandomColor(dealName),
-        metaLines: [
-          deal.net_value || deal.grand_total
-            ? `${deal.currency || "AED"} ${deal.net_value || deal.grand_total}`
-            : "",
-        ].filter(Boolean),
-        raw: deal,
-      });
-    }
-  });
-
-  return stagesData.map((stage) => ({
-    id: String(stage.id),
-    title: stage.name || "No Stage",
-    cards: buckets[stage.id] || [],
-  }));
-};
 
 const CrmDeals = () => { // NOSONAR
   const { data: session } = useSession();
@@ -324,16 +288,9 @@ const CrmDeals = () => { // NOSONAR
   // Meeting Modal
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
   const [meetingIdToEdit, setMeetingIdToEdit] = useState<number | null>(null);
-  const [meetingData, setMeetingData] = useState({
-    dealId: null as number | null,
-    dealName: "",
-    meetingName: "",
-    meetingType: "Online",
-    meetingDate: "",
-    meetingTime: "",
-    meetingOutcome: "",
-    extensions: [] as string[],
-  });
+  const [meetingData, setMeetingData] = useState(() => ({
+    ...DEALS_EMPTY_MEETING_FORM,
+  }));
   const [meetingAttendees, setMeetingAttendees] = useState<readonly any[]>([]);
   const [loadingMeeting, setLoadingMeeting] = useState(false);
 
@@ -628,7 +585,6 @@ const CrmDeals = () => { // NOSONAR
     const name =
       exportFileName.trim() ||
       `approvals_deals_${moment().format("YYYY-MM-DD")}`;
-    const ext = name.endsWith(".csv") ? "" : ".csv";
     setExporting(true);
     try {
       const allData = await fetchDealsForExport(exportFilters);
@@ -636,40 +592,8 @@ const CrmDeals = () => { // NOSONAR
         toast.info("No deals match the selected filters.");
         return;
       }
-      const headers = Array.from(
-        new Set(
-          allData.flatMap((row) =>
-            typeof row === "object" && row !== null
-              ? Object.keys(row).filter(
-                  (k) => typeof (row as any)[k] !== "object",
-                )
-              : [],
-          ),
-        ),
-      ).sort();
-      const csvRows = [
-        headers.join(","),
-        ...allData.map((row) =>
-          headers
-            .map((h) => {
-              const val = (row as any)[h];
-              if (val == null) return "";
-              if (typeof val === "object") return "";
-              const s = String(val).replace(/"/g, '""');
-              return s.includes(",") || s.includes('"') ? `"${s}"` : s;
-            })
-            .join(","),
-        ),
-      ];
-      const blob = new Blob([csvRows.join("\n")], {
-        type: "text/csv;charset=utf-8;",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name + ext;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      const csvText = buildDealsListFullExportCsvFromApiRows(allData);
+      triggerCsvDownload(csvText, name);
       setShowExportModal(false);
       toast.success(`Exported ${allData.length} deals successfully!`);
     } catch (err) {
@@ -1173,16 +1097,7 @@ const CrmDeals = () => { // NOSONAR
       // Reset form and close modal
       setShowAddMeetingModal(false);
       setMeetingIdToEdit(null);
-      setMeetingData({
-        dealId: null,
-        dealName: "",
-        meetingName: "",
-        meetingType: "Online",
-        meetingDate: "",
-        meetingTime: "",
-        meetingOutcome: "",
-        extensions: [],
-      });
+      setMeetingData({ ...DEALS_EMPTY_MEETING_FORM });
       setMeetingAttendees([]);
 
       // Refresh deals list
@@ -1232,16 +1147,7 @@ const CrmDeals = () => { // NOSONAR
       // Reset form and close modal
       setShowAddMeetingModal(false);
       setMeetingIdToEdit(null);
-      setMeetingData({
-        dealId: null,
-        dealName: "",
-        meetingName: "",
-        meetingType: "Online",
-        meetingDate: "",
-        meetingTime: "",
-        meetingOutcome: "",
-        extensions: [],
-      });
+      setMeetingData({ ...DEALS_EMPTY_MEETING_FORM });
       setMeetingAttendees([]);
 
       // Refresh deals list
@@ -1299,6 +1205,7 @@ const CrmDeals = () => { // NOSONAR
 
       setMeetingIdToEdit(meeting.id);
       setMeetingData({
+        ...DEALS_EMPTY_MEETING_FORM,
         dealId: viewingDeal?.id || null,
         dealName: viewingDeal?.name || "",
         meetingName: meeting.name || "",
@@ -1306,7 +1213,7 @@ const CrmDeals = () => { // NOSONAR
         meetingDate: meetingDate,
         meetingTime: meetingTime,
         meetingOutcome: meeting.meeting_outcome || "",
-        extensions: meetingExtensionStrings, // Store extension strings, not objects
+        extensions: meetingExtensionStrings,
       });
       setMeetingAttendees(attendees);
       setShowAddMeetingModal(true);
@@ -1553,31 +1460,47 @@ const CrmDeals = () => { // NOSONAR
     }
   }, [dealToMarkLost, lostReasonId, lostFeedback]);
 
-  const handleApproveDeal = useCallback(async (deal: any) => {
-    const dealId = deal?.id ?? deal?.rawData?.id;
-    if (!dealId) return;
-    try {
-      await approveDeal(dealId);
-      toast.success("Deal approved successfully!");
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
-      console.error("Failed to approve deal:", error);
-      toast.error("Failed to approve deal");
-    }
-  }, []);
+  const runDealApprovalDecision = useCallback(
+    async (deal: any, decision: "approve" | "reject") => {
+      const dealId = deal?.id ?? deal?.rawData?.id;
+      if (!dealId) return;
+      try {
+        if (decision === "approve") {
+          await approveDeal(dealId);
+          toast.success("Deal approved successfully!");
+        } else {
+          await rejectDeal(dealId);
+          toast.success("Deal rejected successfully!");
+        }
+        setRefreshKey((oldKey) => oldKey + 1);
+      } catch (error) {
+        console.error(
+          `Failed to ${decision} deal:`,
+          error,
+        );
+        toast.error(
+          decision === "approve"
+            ? "Failed to approve deal"
+            : "Failed to reject deal",
+        );
+      }
+    },
+    [],
+  );
 
-  const handleRejectDeal = useCallback(async (deal: any) => {
-    const dealId = deal?.id ?? deal?.rawData?.id;
-    if (!dealId) return;
-    try {
-      await rejectDeal(dealId);
-      toast.success("Deal rejected successfully!");
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
-      console.error("Failed to reject deal:", error);
-      toast.error("Failed to reject deal");
-    }
-  }, []);
+  const handleApproveDeal = useCallback(
+    (deal: any) => {
+      runDealApprovalDecision(deal, "approve");
+    },
+    [runDealApprovalDecision],
+  );
+
+  const handleRejectDeal = useCallback(
+    (deal: any) => {
+      runDealApprovalDecision(deal, "reject");
+    },
+    [runDealApprovalDecision],
+  );
 
   // Edit Deal - opens sidebar (same pattern as Deals page)
   const handleEditDeal = useCallback((dealId: number) => {
@@ -1585,347 +1508,28 @@ const CrmDeals = () => { // NOSONAR
     setShowEditDealSidebar(true);
   }, []);
 
-  // Helper functions
-  const handleSort = (
-    column: string,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-  ) => {
-    const newDirection =
-      paginationState.sortBy === column &&
-      paginationState.sortOrder === "asc"
-        ? "desc"
-        : "asc";
-    setPaginationState({
-      ...paginationState,
-      sortBy: column,
-      sortOrder: newDirection,
-      currentPage: 1,
-    });
-  };
+  const transformDealData = (deal: any) =>
+    transformDealForGenericTableRow(deal, extensions, { includeTicketId: false });
 
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortBy: string,
-    sortOrder: "asc" | "desc",
-  ): T[] => {
-    if (!sortBy) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortBy];
-      let bVal = b[sortBy];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderPaginationControls = (
-    dataLength: number,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-    label: string,
-    serverMeta?: {
-      total: number;
-      current_page: number;
-      per_page: number;
-      last_page: number;
-    } | null,
-  ) => {
-    // Use server pagination meta if available, otherwise fall back to client-side calculation
-    const totalPages = serverMeta
-      ? serverMeta.last_page
-      : getTotalPages(dataLength, paginationState.rowsPerPage);
-    const totalItems = serverMeta ? serverMeta.total : dataLength;
-    const { currentPage, rowsPerPage } = paginationState;
-    const actualCurrentPage = serverMeta
-      ? serverMeta.current_page
-      : currentPage;
-    const actualPerPage = serverMeta ? serverMeta.per_page : rowsPerPage;
-    const startRow = (actualCurrentPage - 1) * actualPerPage + 1;
-    const endRow = Math.min(actualCurrentPage * actualPerPage, totalItems);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPaginationState({
-                ...paginationState,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalItems} {label}
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={actualCurrentPage === 1}
-            onClick={() =>
-              setPaginationState({ ...paginationState, currentPage: 1 })
-            }
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={actualCurrentPage === 1}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: actualCurrentPage - 1,
-              })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= actualCurrentPage - 1 &&
-                pageNum <= actualCurrentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    actualCurrentPage === pageNum
-                      ? "primary"
-                      : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPaginationState({
-                      ...paginationState,
-                      currentPage: pageNum,
-                    })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === actualCurrentPage - 2 ||
-              pageNum === actualCurrentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={actualCurrentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: actualCurrentPage + 1,
-              })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={actualCurrentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: totalPages,
-              })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortBy !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return paginationState.sortOrder === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
-  };
-
-  // Transform API deal data to UI format
-  const transformDealData = (deal: any) => {
-    return {
-      id: deal.id,
-      name: deal.name || "",
-      company: deal.company_name || "",
-      industry: deal.industry || "",
-      stage: deal.stage?.name || "No Stage",
-      stageColor: deal.stage?.color || "grey",
-      dealType: deal.deal_type || "",
-      approvalStatus: deal.approval_status || "",
-      value: deal.net_value || deal.grand_total || "0",
-      currency: deal.currency || "AED",
-      probability: deal?.stage?.probability || 0,
-
-      // closeDate: formatDateForTable(deal.expected_close_date),
-      // followUpDate: formatDateForTable(deal.follow_up_date),
-
-      closeDate: deal.expected_close_date
-        ? moment(deal.expected_close_date).format(GlobalDateFormat)
-        : "-",
-      followUpDate: deal.follow_up_date
-        ? moment(deal.follow_up_date).format(GlobalDateFormat)
-        : "-",
-
-      owner:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == deal?.created_by || ext?.extension == deal?.created_by,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == deal?.created_by || ext?.extension == deal?.created_by,
-        )?.name ||
-        deal.created_by ||
-        "",
-      assignedUser:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to,
-        )?.name ||
-        deal.assigned_to ||
-        "",
-      created: formatDateForTable(deal.created_at),
-      riskLevel: deal.risk_level || "",
-      negotiationBar: deal.negotiation_bar || 0,
-      quotationSent: deal.quotation_sent || false,
-      contractSent: deal.contract_sent || false,
-      isLost: deal.is_lost || false,
-      rawData: deal, // Keep original data for actions
-    };
-  };
-
-  // Calculate analytics data
   const analyticsData = useMemo(() => {
     const transformedDeals = dealsData.map(transformDealData);
-
-    const total = summaryTiles ? totalDeals : transformedDeals.length;
-    const won = transformedDeals.filter(
-      (d) => d.stage?.toLowerCase().includes("won") || d.rawData?.stage?.is_won,
-    ).length;
-    const inNegotiation = transformedDeals.filter((d) =>
-      d.stage?.toLowerCase().includes("negotiation"),
-    ).length;
-
-    // Calculate total value
-    const totalValue = transformedDeals.reduce((sum, d) => {
-      const value = parseFloat(String(d.value).replace(/[^0-9.-]/g, "")) || 0;
-      return sum + value;
-    }, 0);
-
-    // Stage distribution
-    const stageCounts: Record<string, number> = {};
-    transformedDeals.forEach((d) => {
-      const stage = d.stage || "No Stage";
-      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
-    });
-
-    // Deal type distribution
-    const dealTypeCounts: Record<string, number> = {};
-    transformedDeals.forEach((d) => {
-      const type = d.dealType || "new_sale";
-      dealTypeCounts[type] = (dealTypeCounts[type] || 0) + 1;
-    });
-
-    return {
-      total,
-      won,
-      inNegotiation,
-      totalValue,
-      stageCounts,
-      dealTypeCounts,
-    };
+    return computeDealsListAnalytics(transformedDeals, summaryTiles, totalDeals);
   }, [dealsData, extensions, summaryTiles, totalDeals]);
 
-  // Transform deals data (no client-side filtering - API handles it)
   const filteredDeals = useMemo(() => {
     return dealsData.map(transformDealData);
   }, [dealsData, extensions]);
 
-  // Tab badge counts: use API totals independent of the active tab (current page data is filtered).
   const filterCounts = useMemo(() => {
     const transformed = dealsData.map(transformDealData);
-    const counts: Record<string, number> = {
-      all:
-        tabTotals.all ??
-        summaryTiles?.total_deals ??
-        totalDeals ??
-        transformed.length,
-      lost:
-        tabTotals.lost ??
-        summaryTiles?.lost_deals ??
-        transformed.filter((d) => d.isLost).length,
-      deleted: tabTotals.deleted ?? summaryTiles?.deleted_deals ?? 0,
-    };
-
-    stages.forEach((stage: { id: number | string }) => {
-      counts[stage.id] = tabTotals[stage.id] ?? 0;
-    });
-
-    return counts;
+    return computeDealsListTabFilterCounts(
+      transformed,
+      tabTotals,
+      summaryTiles,
+      totalDeals,
+      stages,
+      { includeRejectedCount: false },
+    );
   }, [dealsData, extensions, stages, summaryTiles, tabTotals, totalDeals]);
 
   // Update custom tabs counts when filterCounts change
@@ -2932,7 +2536,10 @@ const CrmDeals = () => { // NOSONAR
                 customBody={
                   approvalsViewMode === "board" ? (
                     <KanbanBoard
-                      columns={dealsToKanbanColumns(dealsData, stages)}
+                      columns={buildDealsKanbanColumns(dealsData, stages, {
+                        getInitials,
+                        getRandomColor,
+                      })}
                       onCardClick={(card) => handleViewDeal(Number(card.id))}
                       onCardMove={(cardId, fromCol, toCol) => {
                         const deal = dealsData.find(

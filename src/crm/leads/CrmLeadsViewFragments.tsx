@@ -41,13 +41,13 @@ import {
   getBusinessTypes,
   getLeadFollowUps,
   getMeetings,
-} from "@utils/crm";
+} from "./leadsPageCrmBundle";
 import type {
   StageData,
   CampaignData,
   CrmDataItem,
   BusinessTypeData,
-} from "@utils/crm";
+} from "./leadsPageCrmBundle";
 import { GetHierarchyData } from "@utils/users";
 import {
   Button,
@@ -61,6 +61,15 @@ import {
 } from "react-bootstrap";
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
+
+function getCrmLeadsStringSelectValue(selected: unknown): string | undefined {
+  if (selected && typeof selected === "object" && "value" in selected) {
+    const v = (selected as { value: unknown }).value;
+    if (v == null) return undefined;
+    return typeof v === "string" ? v : String(v);
+  }
+  return undefined;
+}
 import PhoneInput from "react-phone-number-input";
 import { parsePhoneNumber as parsePhoneLib } from "react-phone-number-input";
 import "react-phone-number-input/style.css";
@@ -140,7 +149,17 @@ import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
 import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
 import { useLeadsPageContext } from "./leadsPageContext";
 import type { LeadData } from "./leadsPageShared";
-import { leadsToKanbanColumns } from "./leadsPageShared";
+import { ignoredKeys, leadsToKanbanColumns } from "./leadsPageShared";
+import {
+  CrmLeadEditCampaignFieldControl,
+  CrmLeadPreviewGrayField,
+  CrmLeadViewDetailTabButton,
+  CrmLeadViewQuickStatCard,
+  CrmLeadViewSectionTitle,
+  crmMeetingOutcomeToBadgeBg,
+  crmMeetingTimelineDotFill,
+  resolveCrmExtensionDisplayName,
+} from "./CrmLeadsViewUiPrimitives";
 
 export function CrmLeadsViewFragment01() {
   useLeadsPageContext();
@@ -237,9 +256,12 @@ export function CrmLeadsViewFragment02() {
   const {
     activeFilter,
     analyticsData,
+    campaigns,
     contactEmail,
     contactPhone,
+    extensions,
     fetchLeads,
+    filterBusinessTypes,
     filterCounts,
     filteredLeads,
     getNameByExtension,
@@ -256,20 +278,28 @@ export function CrmLeadsViewFragment02() {
     handlePreviewClick,
     handleViewLead,
     leadFollowUps,
+    leadsActions,
+    leadsColumns,
     leadsFilters,
     leadsPagination,
     leadsSearch,
+    leadsStatsCards,
     leadsToolbarConfig,
     leadsViewMode,
+    loading,
+    router,
     selectedLead,
     selectedLeadsColumns,
+    session,
     setActiveFilter,
     setConvertingLeadId,
+    setCurrentFilters,
     setFollowUpIdToEdit,
     setFollowupData,
     setLeadsFilters,
     setLeadsPagination,
     setLeadsSearch,
+    setRefreshKey,
     setSelectedLeadsColumns,
     setShowAddFollowupModal,
     setShowConvertToDealModal,
@@ -279,8 +309,46 @@ export function CrmLeadsViewFragment02() {
     showFilterBar,
     showLeadSidebar,
     showLeadsAnalytics,
+    stages,
+    summaryTiles,
+    totalLeads,
     uniqueSources
   } = useLeadsPageContext();
+
+  const leadsQuickFilters = useMemo(
+    () => [
+      {
+        id: "all",
+        label: "All Leads",
+        count: filterCounts.all,
+        color: "#0d6efd",
+        icon: <Users size={16} />,
+      },
+      ...stages.slice(0, 5).map((stage: any) => ({
+        id: stage.id.toString(),
+        label: stage.name,
+        count: filterCounts[stage.id] || 0,
+        color: stage.color || "#6c757d",
+        icon: <Layers size={16} />,
+      })),
+      {
+        id: "lost",
+        label: "Lost",
+        count: filterCounts.lost || 0,
+        color: "#fd7e14",
+        icon: <X size={16} />,
+      },
+      {
+        id: "deleted",
+        label: "Deleted",
+        count: filterCounts.deleted || 0,
+        color: "#dc3545",
+        icon: <Trash2 size={16} />,
+      },
+    ],
+    [filterCounts, stages],
+  );
+
   return (
     <>
       {/* Main flex container for content and sidebar */}
@@ -423,36 +491,7 @@ export function CrmLeadsViewFragment02() {
             {/* Filter Bar */}
             {showFilterBar && (
               <FilterBar
-                quickFilters={[
-                  {
-                    id: "all",
-                    label: "All Leads",
-                    count: filterCounts.all,
-                    color: "#0d6efd",
-                    icon: <Users size={16} />,
-                  },
-                  ...stages.slice(0, 5).map((stage: any) => ({
-                    id: stage.id.toString(),
-                    label: stage.name,
-                    count: filterCounts[stage.id] || 0,
-                    color: stage.color || "#6c757d",
-                    icon: <Layers size={16} />,
-                  })),
-                  {
-                    id: "lost",
-                    label: "Lost",
-                    count: filterCounts.lost || 0,
-                    color: "#fd7e14",
-                    icon: <X size={16} />,
-                  },
-                  {
-                    id: "deleted",
-                    label: "Deleted",
-                    count: filterCounts.deleted || 0,
-                    color: "#dc3545",
-                    icon: <Trash2 size={16} />,
-                  },
-                ]}
+                quickFilters={leadsQuickFilters}
                 activeFilter={activeFilter}
                 onFilterChange={handleFilterChange}
               />
@@ -501,9 +540,8 @@ export function CrmLeadsViewFragment02() {
                               : null
                           }
                           onChange={(selected) => {
-                            const assignedToValue = selected
-                              ? selected.value
-                              : null;
+                            const assignedToValue =
+                              getCrmLeadsStringSelectValue(selected) ?? null;
                             setLeadsFilters((prev) => ({
                               ...prev,
                               assignedTo: assignedToValue,
@@ -539,7 +577,8 @@ export function CrmLeadsViewFragment02() {
                               : null
                           }
                           onChange={(selected) => {
-                            const stageValue = selected ? selected.value : null;
+                            const stageValue =
+                              getCrmLeadsStringSelectValue(selected) ?? null;
                             setLeadsFilters((prev) => ({
                               ...prev,
                               stage: stageValue,
@@ -582,9 +621,8 @@ export function CrmLeadsViewFragment02() {
                               : null
                           }
                           onChange={(selected) => {
-                            const businessTypeValue = selected
-                              ? selected.value
-                              : null;
+                            const businessTypeValue =
+                              getCrmLeadsStringSelectValue(selected) ?? null;
                             setLeadsFilters((prev) => ({
                               ...prev,
                               businessType: businessTypeValue,
@@ -610,9 +648,8 @@ export function CrmLeadsViewFragment02() {
                               : null
                           }
                           onChange={(selected) => {
-                            const sourceValue = selected
-                              ? selected.value
-                              : null;
+                            const sourceValue =
+                              getCrmLeadsStringSelectValue(selected) ?? null;
                             setLeadsFilters((prev) => ({
                               ...prev,
                               source: sourceValue,
@@ -645,9 +682,8 @@ export function CrmLeadsViewFragment02() {
                               : null
                           }
                           onChange={(selected) => {
-                            const leadPotentialValue = selected
-                              ? selected.value
-                              : null;
+                            const leadPotentialValue =
+                              getCrmLeadsStringSelectValue(selected) ?? null;
                             setLeadsFilters((prev) => ({
                               ...prev,
                               leadPotential: leadPotentialValue,
@@ -684,9 +720,8 @@ export function CrmLeadsViewFragment02() {
                               : null
                           }
                           onChange={(selected) => {
-                            const campaignValue = selected
-                              ? selected.value
-                              : null;
+                            const campaignValue =
+                              getCrmLeadsStringSelectValue(selected) ?? null;
                             setLeadsFilters((prev) => ({
                               ...prev,
                               campaign: campaignValue,
@@ -1476,6 +1511,7 @@ export function CrmLeadsViewFragment03() {
     leadToDelete,
     lostFeedback,
     lostReasonId,
+    lostReasons,
     meetingToDelete,
     setConvertFormData,
     setFollowUpToDelete,
@@ -1703,8 +1739,10 @@ export function CrmLeadsViewFragment04() {
   const {
     activeFilter,
     activeTab,
+    extensions,
     handleConvertLead,
     loadingLead,
+    session,
     setActiveTab,
     setEditLeadIdForSidebar,
     setFollowupData,
@@ -1954,38 +1992,18 @@ export function CrmLeadsViewFragment04() {
                   >
                     {/* Tabs Navigation */}
                     <div className="lead-detail-filter-buttons mb-4">
-                      <button
-                        className={`lead-detail-filter-button ${activeTab === "general-info" ? "active" : ""}`}
+                      <CrmLeadViewDetailTabButton
+                        active={activeTab === "general-info"}
                         onClick={() => setActiveTab("general-info")}
-                        style={{
-                          backgroundColor:
-                            activeTab === "general-info" ? "#2563eb" : "white",
-                          borderColor: "#2563eb",
-                          color:
-                            activeTab === "general-info" ? "white" : "#2563eb",
-                        }}
-                      >
-                        <Target className="filter-icon" size={18} />
-                        <span>General Information</span>
-                      </button>
-                      <button
-                        className={`lead-detail-filter-button ${activeTab === "campaign-prospect" ? "active" : ""}`}
+                        icon={<Target className="filter-icon" size={18} />}
+                        label="General Information"
+                      />
+                      <CrmLeadViewDetailTabButton
+                        active={activeTab === "campaign-prospect"}
                         onClick={() => setActiveTab("campaign-prospect")}
-                        style={{
-                          backgroundColor:
-                            activeTab === "campaign-prospect"
-                              ? "#2563eb"
-                              : "white",
-                          borderColor: "#2563eb",
-                          color:
-                            activeTab === "campaign-prospect"
-                              ? "white"
-                              : "#2563eb",
-                        }}
-                      >
-                        <FileText className="filter-icon" size={18} />
-                        <span>Campaign & Prospect</span>
-                      </button>
+                        icon={<FileText className="filter-icon" size={18} />}
+                        label="Campaign & Prospect"
+                      />
                     </div>
 
                     {/* Tab Content */}
@@ -2000,343 +2018,77 @@ export function CrmLeadsViewFragment04() {
                             marginBottom: "28px",
                           }}
                         >
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              padding: "20px",
-                              borderRadius: "12px",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-4px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 8px 16px rgba(37, 99, 235, 0.15)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
+                          <CrmLeadViewQuickStatCard
+                            accentColor="#2563eb"
+                            label="Assigned To"
+                            icon={<User size={20} style={{ color: "white" }} />}
                           >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "44px",
-                                  height: "44px",
-                                  borderRadius: "10px",
-                                  background: "#2563eb",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <User size={20} style={{ color: "white" }} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    fontWeight: 700,
-                                    color: "#2563eb",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.8px",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  Assigned To
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "15px",
-                                    color: "#1f2937",
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {extensions.find(
-                                    (ext: any) =>
-                                      ext?.id == viewingLead?.user_extension ||
-                                      ext?.extension ==
-                                        viewingLead?.user_extension,
-                                  )?.display_name ||
-                                    extensions.find(
-                                      (ext: any) =>
-                                        ext?.id ==
-                                          viewingLead?.user_extension ||
-                                        ext?.extension ==
-                                          viewingLead?.user_extension,
-                                    )?.name ||
-                                    viewingLead.user_extension ||
-                                    "Not assigned"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                            {resolveCrmExtensionDisplayName(
+                              extensions,
+                              viewingLead?.user_extension,
+                            )}
+                          </CrmLeadViewQuickStatCard>
 
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              padding: "20px",
-                              borderRadius: "12px",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-4px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 8px 16px rgba(37, 99, 235, 0.15)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
+                          <CrmLeadViewQuickStatCard
+                            accentColor="#0284c7"
+                            label="Lead Potential"
+                            icon={
+                              <Target size={20} style={{ color: "white" }} />
+                            }
                           >
-                            <div
+                            <Badge
+                              bg={
+                                viewingLead.lead_potential === "Hot"
+                                  ? "danger"
+                                  : viewingLead.lead_potential === "Warm"
+                                    ? "warning"
+                                    : "secondary"
+                              }
                               style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
+                                padding: "6px 14px",
+                                borderRadius: "20px",
+                                fontSize: "12px",
+                                fontWeight: 600,
                               }}
                             >
-                              <div
-                                style={{
-                                  width: "44px",
-                                  height: "44px",
-                                  borderRadius: "10px",
-                                  background: "#0284c7",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <Target size={20} style={{ color: "white" }} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    fontWeight: 700,
-                                    color: "#0284c7",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.8px",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  Lead Potential
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "15px",
-                                    color: "#1f2937",
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  <Badge
-                                    bg={
-                                      viewingLead.lead_potential === "Hot"
-                                        ? "danger"
-                                        : viewingLead.lead_potential === "Warm"
-                                          ? "warning"
-                                          : "secondary"
-                                    }
-                                    style={{
-                                      padding: "6px 14px",
-                                      borderRadius: "20px",
-                                      fontSize: "12px",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    {viewingLead.lead_potential || "N/A"}
-                                  </Badge>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                              {viewingLead.lead_potential || "N/A"}
+                            </Badge>
+                          </CrmLeadViewQuickStatCard>
 
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              padding: "20px",
-                              borderRadius: "12px",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-4px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 8px 16px rgba(37, 99, 235, 0.15)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
+                          <CrmLeadViewQuickStatCard
+                            accentColor={
+                              viewingLead.stage?.color || "#6c757d"
+                            }
+                            labelColor="#6b7280"
+                            label="Stage"
+                            icon={
+                              <Target size={20} style={{ color: "white" }} />
+                            }
                           >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "44px",
-                                  height: "44px",
-                                  borderRadius: "10px",
-                                  background:
-                                    viewingLead.stage?.color || "#6c757d",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <Target size={20} style={{ color: "white" }} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    fontWeight: 700,
-                                    color: "#6b7280",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.8px",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  Stage
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "15px",
-                                    color: "#1f2937",
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {viewingLead.stage?.name || "Not assigned"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                            {viewingLead.stage?.name || "Not assigned"}
+                          </CrmLeadViewQuickStatCard>
 
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              padding: "20px",
-                              borderRadius: "12px",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-4px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 8px 16px rgba(37, 99, 235, 0.15)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
+                          <CrmLeadViewQuickStatCard
+                            accentColor="#10b981"
+                            label="Lead Score"
+                            icon={
+                              <ChartLine
+                                size={20}
+                                style={{ color: "white" }}
+                              />
+                            }
                           >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "44px",
-                                  height: "44px",
-                                  borderRadius: "10px",
-                                  background: "#10b981",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <ChartLine
-                                  size={20}
-                                  style={{ color: "white" }}
-                                />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    fontWeight: 700,
-                                    color: "#10b981",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.8px",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  Lead Score
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "15px",
-                                    color: "#1f2937",
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {viewingLead?.lead_score !== null
-                                    ? `${viewingLead?.lead_score}%`
-                                    : "Not Set"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
+                            {viewingLead?.lead_score !== null
+                              ? `${viewingLead?.lead_score}%`
+                              : "Not Set"}
+                          </CrmLeadViewQuickStatCard>
                         </div>
 
                         {/* Lead Information Section */}
                         <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
+                          <CrmLeadViewSectionTitle>
                             Lead Details
-                          </h5>
+                          </CrmLeadViewSectionTitle>
                           <div
                             style={{
                               background: "#f9fafb",
@@ -2448,27 +2200,8 @@ export function CrmLeadsViewFragment04() {
                                   gap: "16px 24px",
                                 }}
                               >
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Company Name
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
+                                <CrmLeadPreviewGrayField label="Company Name">
+                                  <>
                                     <Building2
                                       size={14}
                                       style={{
@@ -2478,116 +2211,32 @@ export function CrmLeadsViewFragment04() {
                                       }}
                                     />
                                     {viewingLead.company_name}
-                                  </div>
-                                </div>
+                                  </>
+                                </CrmLeadPreviewGrayField>
                                 {viewingLead.industry && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Industry
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {viewingLead.industry}
-                                    </div>
-                                  </div>
+                                  <CrmLeadPreviewGrayField label="Industry">
+                                    {viewingLead.industry}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                                 {viewingLead.business_type && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Business Type
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {viewingLead.business_type}
-                                    </div>
-                                  </div>
+                                  <CrmLeadPreviewGrayField label="Business Type">
+                                    {viewingLead.business_type}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                                 {viewingLead.company_size && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Company Size
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {viewingLead.company_size}
-                                    </div>
-                                  </div>
+                                  <CrmLeadPreviewGrayField label="Company Size">
+                                    {viewingLead.company_size}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                                 {viewingLead.company_city && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Location
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {[
-                                        viewingLead.company_city,
-                                        viewingLead.company_country,
-                                      ]
-                                        .filter(Boolean)
-                                        .join(", ") || "N/A"}
-                                    </div>
-                                  </div>
+                                  <CrmLeadPreviewGrayField label="Location">
+                                    {[
+                                      viewingLead.company_city,
+                                      viewingLead.company_country,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(", ") || "N/A"}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                               </div>
                             </div>
@@ -2931,28 +2580,9 @@ export function CrmLeadsViewFragment04() {
 
                         {/* Prospect Information Section */}
                         <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
+                          <CrmLeadViewSectionTitle>
                             Prospect Information
-                          </h5>
+                          </CrmLeadViewSectionTitle>
                           {viewingLead.crm_data ? (
                             <div
                               style={{
@@ -2970,268 +2600,119 @@ export function CrmLeadsViewFragment04() {
                                 }}
                               >
                                 {viewingLead.crm_data.id && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      CRM Data ID
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      #{viewingLead.crm_data.id}
-                                    </div>
-                                  </div>
+                                  <CrmLeadPreviewGrayField label="CRM Data ID">
+                                    #{viewingLead.crm_data.id}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                                 {(viewingLead.crm_data.name ||
                                   (viewingLead.crm_data.data &&
                                     viewingLead.crm_data.data.name)) && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Name
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {viewingLead.crm_data.name ||
-                                        (viewingLead.crm_data.data &&
-                                          viewingLead.crm_data.data.name) ||
-                                        "N/A"}
-                                    </div>
-                                  </div>
+                                  <CrmLeadPreviewGrayField label="Name">
+                                    {viewingLead.crm_data.name ||
+                                      (viewingLead.crm_data.data &&
+                                        viewingLead.crm_data.data.name) ||
+                                      "N/A"}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                                 {(viewingLead.crm_data.phone ||
                                   (viewingLead.crm_data.data &&
                                     viewingLead.crm_data.data.phone)) && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Phone
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <PhoneDisplay
-                                        phone={
-                                          viewingLead.crm_data.phone ||
-                                          (viewingLead.crm_data.data &&
-                                            viewingLead.crm_data.data.phone) ||
-                                          ""
-                                        }
-                                      />
-                                    </div>
-                                  </div>
+                                  <CrmLeadPreviewGrayField label="Phone">
+                                    <PhoneDisplay
+                                      phone={
+                                        viewingLead.crm_data.phone ||
+                                        (viewingLead.crm_data.data &&
+                                          viewingLead.crm_data.data.phone) ||
+                                        ""
+                                      }
+                                    />
+                                  </CrmLeadPreviewGrayField>
                                 )}
                                 {viewingLead.crm_data.source_file && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Source File
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {viewingLead.crm_data.source_file}
-                                    </div>
-                                  </div>
+                                  <CrmLeadPreviewGrayField label="Source File">
+                                    {viewingLead.crm_data.source_file}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                                 {viewingLead.crm_data.uploaded_by && (
-                                  <div>
-                                    <div
+                                  <CrmLeadPreviewGrayField label="Uploaded By">
+                                    <User
+                                      size={14}
                                       style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
+                                        color: "#2563eb",
+                                        marginRight: "6px",
+                                        display: "inline",
                                       }}
-                                    >
-                                      Uploaded By
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <User
-                                        size={14}
-                                        style={{
-                                          color: "#2563eb",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {viewingLead.crm_data.uploaded_by}
-                                    </div>
-                                  </div>
+                                    />
+                                    {viewingLead.crm_data.uploaded_by}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                                 {viewingLead?.crm_data?.scheduled_call_at && (
-                                  <div>
-                                    <div
+                                  <CrmLeadPreviewGrayField label="Scheduled Call">
+                                    <Calendar
+                                      size={14}
                                       style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
+                                        color: "#2563eb",
+                                        marginRight: "6px",
+                                        display: "inline",
                                       }}
-                                    >
-                                      Scheduled Call
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <Calendar
-                                        size={14}
-                                        style={{
-                                          color: "#2563eb",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {(() => {
-                                        const scheduledAt =
-                                          viewingLead.crm_data
-                                            .scheduled_call_at;
-                                        const isOverdue =
-                                          moment(scheduledAt).isBefore(
-                                            moment(),
-                                          );
-                                        const isNextHour = moment(
-                                          scheduledAt,
-                                        ).isBefore(moment().add(1, "hour"));
-                                        return (
-                                          <span>
-                                            {moment(scheduledAt).format(
-                                              "MMM DD, YYYY HH:mm",
-                                            )}
-                                            {isOverdue && (
-                                              <Badge
-                                                bg="danger"
-                                                className="ms-2"
-                                                style={{
-                                                  fontSize: "10px",
-                                                  padding: "2px 6px",
-                                                }}
-                                              >
-                                                Overdue
-                                              </Badge>
-                                            )}
-                                            {isNextHour && !isOverdue && (
-                                              <Badge
-                                                bg="warning"
-                                                className="ms-2"
-                                                style={{
-                                                  fontSize: "10px",
-                                                  padding: "2px 6px",
-                                                }}
-                                              >
-                                                Soon
-                                              </Badge>
-                                            )}
-                                          </span>
-                                        );
-                                      })()}
-                                    </div>
-                                  </div>
+                                    />
+                                    {(() => {
+                                      const scheduledAt =
+                                        viewingLead.crm_data.scheduled_call_at;
+                                      const isOverdue = moment(
+                                        scheduledAt,
+                                      ).isBefore(moment());
+                                      const isNextHour = moment(
+                                        scheduledAt,
+                                      ).isBefore(moment().add(1, "hour"));
+                                      return (
+                                        <span>
+                                          {moment(scheduledAt).format(
+                                            "MMM DD, YYYY HH:mm",
+                                          )}
+                                          {isOverdue && (
+                                            <Badge
+                                              bg="danger"
+                                              className="ms-2"
+                                              style={{
+                                                fontSize: "10px",
+                                                padding: "2px 6px",
+                                              }}
+                                            >
+                                              Overdue
+                                            </Badge>
+                                          )}
+                                          {isNextHour && !isOverdue && (
+                                            <Badge
+                                              bg="warning"
+                                              className="ms-2"
+                                              style={{
+                                                fontSize: "10px",
+                                                padding: "2px 6px",
+                                              }}
+                                            >
+                                              Soon
+                                            </Badge>
+                                          )}
+                                        </span>
+                                      );
+                                    })()}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                                 {viewingLead.crm_data.created_at && (
-                                  <div>
-                                    <div
+                                  <CrmLeadPreviewGrayField label="Created At">
+                                    <Calendar
+                                      size={14}
                                       style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
+                                        color: "#2563eb",
+                                        marginRight: "6px",
+                                        display: "inline",
                                       }}
-                                    >
-                                      Created At
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <Calendar
-                                        size={14}
-                                        style={{
-                                          color: "#2563eb",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {formatCrmPreviewDate(
-                                        viewingLead.crm_data.created_at,
-                                      )}
-                                    </div>
-                                  </div>
+                                    />
+                                    {formatCrmPreviewDate(
+                                      viewingLead.crm_data.created_at,
+                                    )}
+                                  </CrmLeadPreviewGrayField>
                                 )}
                               </div>
 
@@ -3290,28 +2771,9 @@ export function CrmLeadsViewFragment04() {
                           typeof viewingLead.crm_data.data === "object" &&
                           Object.keys(viewingLead.crm_data.data).length > 0 && (
                             <div style={{ marginBottom: "28px" }}>
-                              <h5
-                                style={{
-                                  fontSize: "15px",
-                                  fontWeight: 700,
-                                  color: "#1f2937",
-                                  marginBottom: "16px",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: "4px",
-                                    height: "18px",
-                                    background:
-                                      "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                                    borderRadius: "2px",
-                                  }}
-                                />
+                              <CrmLeadViewSectionTitle>
                                 Prospect Fields
-                              </h5>
+                              </CrmLeadViewSectionTitle>
                               <div
                                 style={{
                                   background: "#f9fafb",
@@ -3334,30 +2796,12 @@ export function CrmLeadsViewFragment04() {
                                         key.toLowerCase() !== "phone",
                                     )
                                     .map(([key, value]: [string, any]) => (
-                                      <div key={key}>
-                                        <div
-                                          style={{
-                                            fontSize: "12px",
-                                            fontWeight: 700,
-                                            color: "#6b7280",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
-                                            marginBottom: "6px",
-                                          }}
-                                        >
-                                          {key}
-                                        </div>
-                                        <div
-                                          style={{
-                                            fontSize: "14px",
-                                            color: "#1f2937",
-                                            fontWeight: 500,
-                                            wordBreak: "break-word",
-                                          }}
-                                        >
-                                          {String(value || "N/A")}
-                                        </div>
-                                      </div>
+                                      <CrmLeadPreviewGrayField
+                                        key={key}
+                                        label={key}
+                                      >
+                                        {String(value || "N/A")}
+                                      </CrmLeadPreviewGrayField>
                                     ))}
                                 </div>
                               </div>
@@ -4067,13 +3511,7 @@ export function CrmLeadsViewFragment04() {
 
                             {viewingLead.meetings
                               .slice(0, 5)
-                              .map((meeting: any, index: number) => {
-                                const isCompleted =
-                                  meeting.meeting_outcome ===
-                                  "Completed - Successful";
-                                const isCancelled =
-                                  meeting.meeting_outcome === "Cancelled";
-                                return (
+                              .map((meeting: any, index: number) => (
                                   <div
                                     key={meeting.id || index}
                                     style={{
@@ -4099,11 +3537,9 @@ export function CrmLeadsViewFragment04() {
                                         width: "16px",
                                         height: "16px",
                                         borderRadius: "50%",
-                                        background: isCompleted
-                                          ? "#10b981"
-                                          : isCancelled
-                                            ? "#dc3545"
-                                            : "#2563eb",
+                                        background: crmMeetingTimelineDotFill(
+                                          meeting.meeting_outcome,
+                                        ),
                                         border: "3px solid white",
                                         boxShadow: "0 0 0 1px #e5e7eb",
                                       }}
@@ -4135,21 +3571,9 @@ export function CrmLeadsViewFragment04() {
                                       </div>
                                       {meeting.meeting_outcome && (
                                         <Badge
-                                          bg={
-                                            meeting.meeting_outcome ===
-                                            "Completed - Successful"
-                                              ? "success"
-                                              : meeting.meeting_outcome ===
-                                                  "Completed - Needs Follow-up"
-                                                ? "info"
-                                                : meeting.meeting_outcome ===
-                                                    "Cancelled"
-                                                  ? "danger"
-                                                  : meeting.meeting_outcome ===
-                                                      "Rescheduled"
-                                                    ? "warning"
-                                                    : "secondary"
-                                          }
+                                          bg={crmMeetingOutcomeToBadgeBg(
+                                            meeting.meeting_outcome,
+                                          )}
                                           style={{
                                             fontSize: "10px",
                                             padding: "2px 8px",
@@ -4160,8 +3584,7 @@ export function CrmLeadsViewFragment04() {
                                       )}
                                     </div>
                                   </div>
-                                );
-                              })}
+                                ))}
 
                             {viewingLead.meetings.length > 5 && (
                               <div
@@ -4303,6 +3726,7 @@ export function CrmLeadsViewFragment04() {
 
 export function CrmLeadsViewFragment05() {
   const {
+    extensions,
     setShowLeadHistoryModal,
     showLeadHistoryModal,
     viewingLead
@@ -4473,18 +3897,10 @@ export function CrmLeadsViewFragment05() {
                       Assigned To
                     </div>
                     <div style={{ fontSize: "16px", fontWeight: 600 }}>
-                      {extensions.find(
-                        (ext: any) =>
-                          ext?.id == viewingLead?.user_extension ||
-                          ext?.extension == viewingLead?.user_extension,
-                      )?.display_name ||
-                        extensions.find(
-                          (ext: any) =>
-                            ext?.id == viewingLead?.user_extension ||
-                            ext?.extension == viewingLead?.user_extension,
-                        )?.name ||
-                        viewingLead.user_extension ||
-                        "Not assigned"}
+                      {resolveCrmExtensionDisplayName(
+                        extensions,
+                        viewingLead?.user_extension,
+                      )}
                     </div>
                   </Col>
                 </Row>
@@ -4569,19 +3985,11 @@ export function CrmLeadsViewFragment05() {
                     audit.event,
                     audit.changes,
                   );
-                  const performedBy =
-                    extensions.find(
-                      (ext: any) =>
-                        ext?.id == audit?.user_extension ||
-                        ext?.extension == audit?.user_extension,
-                    )?.display_name ||
-                    extensions.find(
-                      (ext: any) =>
-                        ext?.id == audit?.user_extension ||
-                        ext?.extension == audit?.user_extension,
-                    )?.name ||
-                    audit.user_extension ||
-                    "System";
+                  const performedBy = resolveCrmExtensionDisplayName(
+                    extensions,
+                    audit?.user_extension,
+                    "System",
+                  );
                   const timestamp =
                     audit.created_at_human ||
                     new Date(audit.created_at).toLocaleString();
@@ -4880,8 +4288,7 @@ export function CrmLeadsViewFragment06() {
     followUpIdToEdit,
     followupData,
     getTodayDate,
-    handleCreateFollowUp,
-    handleUpdateFollowUp,
+    submitFollowUpFromModal,
     loadingFollowUp,
     setFollowUpIdToEdit,
     setFollowupData,
@@ -4970,7 +4377,8 @@ export function CrmLeadsViewFragment06() {
                     onChange={(option) =>
                       setFollowupData({
                         ...followupData,
-                        followUpStatus: option?.value || "Pending",
+                        followUpStatus:
+                          getCrmLeadsStringSelectValue(option) || "Pending",
                       })
                     }
                     options={[
@@ -5000,7 +4408,8 @@ export function CrmLeadsViewFragment06() {
                     onChange={(option) =>
                       setFollowupData({
                         ...followupData,
-                        communicationChannel: option?.value || "Phone Call",
+                        communicationChannel:
+                          getCrmLeadsStringSelectValue(option) || "Phone Call",
                         communicationChannelOther: "",
                       })
                     }
@@ -5107,9 +4516,7 @@ export function CrmLeadsViewFragment06() {
                 !followupData.communicationChannelOther?.trim()) ||
               loadingFollowUp
             }
-            onClick={
-              followUpIdToEdit ? handleUpdateFollowUp : handleCreateFollowUp
-            }
+            onClick={submitFollowUpFromModal}
           >
             {loadingFollowUp ? (
               <>
@@ -5134,9 +4541,9 @@ export function CrmLeadsViewFragment06() {
 
 export function CrmLeadsViewFragment07() {
   const {
+    extensions,
     getTodayDate,
-    handleCreateMeeting,
-    handleUpdateMeeting,
+    submitMeetingFromModal,
     loadingMeeting,
     meetingAttendees,
     meetingData,
@@ -5226,7 +4633,8 @@ export function CrmLeadsViewFragment07() {
                     onChange={(option) =>
                       setMeetingData({
                         ...meetingData,
-                        meetingType: option?.value || "Online",
+                        meetingType:
+                          getCrmLeadsStringSelectValue(option) || "Online",
                       })
                     }
                     options={[
@@ -5306,7 +4714,8 @@ export function CrmLeadsViewFragment07() {
                       onChange={(option) =>
                         setMeetingData({
                           ...meetingData,
-                          meetingOutcome: option?.value || "",
+                          meetingOutcome:
+                            getCrmLeadsStringSelectValue(option) || "",
                         })
                       }
                       options={[
@@ -5405,9 +4814,7 @@ export function CrmLeadsViewFragment07() {
               !meetingData.meetingTime ||
               loadingMeeting
             }
-            onClick={
-              meetingIdToEdit ? handleUpdateMeeting : handleCreateMeeting
-            }
+            onClick={submitMeetingFromModal}
           >
             {loadingMeeting ? (
               <>
@@ -6233,123 +5640,13 @@ export function CrmLeadsViewFragment09() {
                                         <span className="text-danger">*</span>
                                       )}
                                     </Form.Label>
-                                    {field.field_type === "string" && (
-                                      <Form.Control
-                                        type="text"
-                                        value={
-                                          editFormData.campaign_field_values?.[
-                                            field.field_key
-                                          ] || ""
-                                        }
-                                        onChange={(e) =>
-                                          handleEditCampaignFieldChange(
-                                            field.field_key,
-                                            e.target.value,
-                                          )
-                                        }
-                                        placeholder={`Enter ${field.field_name.toLowerCase()}`}
-                                        required={field.required}
-                                      />
-                                    )}
-                                    {field.field_type === "email" && (
-                                      <Form.Control
-                                        type="email"
-                                        value={
-                                          editFormData.campaign_field_values?.[
-                                            field.field_key
-                                          ] || ""
-                                        }
-                                        onChange={(e) =>
-                                          handleEditCampaignFieldChange(
-                                            field.field_key,
-                                            e.target.value,
-                                          )
-                                        }
-                                        placeholder={`Enter ${field.field_name.toLowerCase()}`}
-                                        required={field.required}
-                                      />
-                                    )}
-                                    {field.field_type === "text" && (
-                                      <Form.Control
-                                        as="textarea"
-                                        rows={3}
-                                        value={
-                                          editFormData.campaign_field_values?.[
-                                            field.field_key
-                                          ] || ""
-                                        }
-                                        onChange={(e) =>
-                                          handleEditCampaignFieldChange(
-                                            field.field_key,
-                                            e.target.value,
-                                          )
-                                        }
-                                        placeholder={`Enter ${field.field_name.toLowerCase()}`}
-                                        required={field.required}
-                                      />
-                                    )}
-                                    {field.field_type === "integer" && (
-                                      <Form.Control
-                                        type="number"
-                                        value={
-                                          editFormData.campaign_field_values?.[
-                                            field.field_key
-                                          ] || ""
-                                        }
-                                        onChange={(e) =>
-                                          handleEditCampaignFieldChange(
-                                            field.field_key,
-                                            e.target.value,
-                                          )
-                                        }
-                                        placeholder={`Enter ${field.field_name.toLowerCase()}`}
-                                        required={field.required}
-                                      />
-                                    )}
-                                    {field.field_type === "date" && (
-                                      <Form.Control
-                                        type="date"
-                                        value={
-                                          editFormData.campaign_field_values?.[
-                                            field.field_key
-                                          ] || ""
-                                        }
-                                        onChange={(e) =>
-                                          handleEditCampaignFieldChange(
-                                            field.field_key,
-                                            e.target.value,
-                                          )
-                                        }
-                                        required={field.required}
-                                      />
-                                    )}
-                                    {field.field_type === "dropdown" && (
-                                      <Form.Select
-                                        value={
-                                          editFormData.campaign_field_values?.[
-                                            field.field_key
-                                          ] || ""
-                                        }
-                                        onChange={(e) =>
-                                          handleEditCampaignFieldChange(
-                                            field.field_key,
-                                            e.target.value,
-                                          )
-                                        }
-                                        required={field.required}
-                                      >
-                                        <option value="">
-                                          Select {field.field_name}
-                                        </option>
-                                        {field.dropdown_options?.map(
-                                          (option: string) => (
-                                            <option key={option} value={option}>
-                                              {option}
-                                            </option>
-                                          ),
-                                        )}
-                                      </Form.Select>
-                                    )}
+                                    <CrmLeadEditCampaignFieldControl
+                                      field={field}
+                                      values={editFormData.campaign_field_values}
+                                      onFieldChange={
+                                        handleEditCampaignFieldChange
+                                      }
+                                    />
                                   </Form.Group>
                                 </Col>
                               ),
@@ -6421,13 +5718,16 @@ export function CrmLeadsViewFragment09() {
 export function CrmLeadsViewFragment10() {
   const {
     activeFilter,
+    campaigns,
     convertingLeadId,
     customTabs,
     editLeadIdForSidebar,
     exportFileName,
     exportFilters,
     exporting,
+    extensions,
     fetchLeads,
+    filterBusinessTypes,
     filterCounts,
     handleAddCustomTab,
     handleConvertLead,
@@ -6439,10 +5739,15 @@ export function CrmLeadsViewFragment10() {
     handleViewLead,
     leadFollowUps,
     leadMeetings,
+    lostReasons,
+    leadsColumns,
     leadsFilters,
     leadsSearch,
+    router,
     selectedLead,
     selectedLeadsColumns,
+    session,
+    stages,
     setActiveFilter,
     setConvertingLeadId,
     setEditLeadIdForSidebar,
@@ -6455,6 +5760,7 @@ export function CrmLeadsViewFragment10() {
     setLeadsSearch,
     setMeetingAttendees,
     setMeetingData,
+    setRefreshKey,
     setSelectedLead,
     setSelectedLeadsColumns,
     setShowAddFollowupModal,

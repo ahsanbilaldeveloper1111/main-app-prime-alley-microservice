@@ -16,7 +16,7 @@ import GenericTable, {
   TabConfig,
   buildBoundTableContextMenuItems,
 } from "@components/GenericTable";
-import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
+import KanbanBoard, { type KanbanCardData } from "@components/KanbanBoard";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
@@ -176,9 +176,15 @@ import {
   applyDealTabStageFilters,
 } from "@crm/deals/dealsListTabFilterHelpers";
 import {
-  buildDealsExportCsvContent,
+  buildDealsListFullExportCsvFromApiRows,
   triggerCsvDownload,
 } from "@crm/deals/dealsListCsvExport";
+import { buildDealsKanbanColumns } from "@crm/deals/dealsListKanbanColumns";
+import {
+  computeDealsListAnalytics,
+  computeDealsListTabFilterCounts,
+} from "@crm/deals/dealsListAnalyticsHelpers";
+import { transformDealForGenericTableRow } from "@crm/deals/dealsListTransformDealRow";
 import {
   DEALS_EMPTY_FOLLOWUP_FORM,
   DEALS_EMPTY_MEETING_FORM,
@@ -604,81 +610,7 @@ const CrmDeals = () => { // NOSONAR
         toast.info("No deals match the selected filters.");
         return;
       }
-      const preferredExportFields: Array<{ label: string; key: string }> = [
-        { label: "Deal ID", key: "id" },
-        { label: "Deal Name", key: "name" },
-        { label: "Company", key: "company_name" },
-        { label: "Stage", key: "stage_name" },
-        { label: "Approval Status", key: "approval_status" },
-        { label: "Value", key: "net_value" },
-        { label: "Currency", key: "currency" },
-        { label: "Probability (%)", key: "probability" },
-        { label: "Expected Close Date", key: "expected_close_date" },
-        { label: "Follow-up Date", key: "follow_up_date" },
-        { label: "Owner", key: "assigned_to" },
-        { label: "Source Ticket ID", key: "ticket_id" },
-        { label: "Decision Maker Name", key: "decision_maker_name" },
-        { label: "Decision Maker Title", key: "decision_maker_title" },
-        { label: "Decision Maker Phone", key: "decision_maker_phone" },
-        { label: "Decision Maker Email", key: "decision_maker_email" },
-        { label: "Created At", key: "created_at" },
-        { label: "Updated At", key: "updated_at" },
-      ];
-
-      const optionalHiddenKeys = new Set(["business_type_id", "deal_template_id"]);
-      const usedPreferredKeys = new Set(preferredExportFields.map((f) => f.key));
-
-      const getRowValue = (row: Record<string, any>, key: string): unknown => {
-        switch (key) {
-          case "stage_name":
-            return row.stage?.name ?? row.stage_name ?? "";
-          case "decision_maker_phone": {
-            const code = row.decision_maker_phone_country_code || "";
-            const phone = row.decision_maker_phone || "";
-            return `${code} ${phone}`.trim() || "";
-          }
-          default:
-            return row[key];
-        }
-      };
-
-      const availablePreferredFields = preferredExportFields.filter(({ key }) =>
-        allData.some((row) => {
-          if (typeof row !== "object" || row === null) return false;
-          const value = getRowValue(row as Record<string, any>, key);
-          return value != null && value !== "";
-        }),
-      );
-
-      const remainingScalarKeys = Array.from(
-        new Set(
-          allData.flatMap((row) =>
-            typeof row === "object" && row !== null
-              ? Object.keys(row).filter((k) => {
-                  const value = row[k];
-                  return (
-                    typeof value !== "object" &&
-                    !usedPreferredKeys.has(k) &&
-                    !optionalHiddenKeys.has(k)
-                  );
-                })
-              : [],
-          ),
-        ),
-      ).sort();
-
-      const exportFields = [
-        ...availablePreferredFields,
-        ...remainingScalarKeys.map((key) => ({
-          label: key,
-          key,
-        })),
-      ];
-      const csvText = buildDealsExportCsvContent(
-        exportFields,
-        allData,
-        getRowValue,
-      );
+      const csvText = buildDealsListFullExportCsvFromApiRows(allData);
       triggerCsvDownload(csvText, name);
       setShowExportModal(false);
       toast.success(`Exported ${allData.length} deals successfully!`);
@@ -1649,417 +1581,60 @@ const CrmDeals = () => { // NOSONAR
     setShowCreateDealSidebar(true);
   }, []);
 
-  // Helper functions
-  const handleSort = (
-    column: string,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-  ) => {
-    const newDirection =
-      paginationState.sortBy === column &&
-      paginationState.sortOrder === "asc"
-        ? "desc"
-        : "asc";
-    setPaginationState({
-      ...paginationState,
-      sortBy: column,
-      sortOrder: newDirection,
-      currentPage: 1,
-    });
-  };
+  /** Kanban + list avatar style (matches previous in-component helpers). */
+  const dealsKanbanStyleAvatar = useMemo(
+    () => ({
+      getInitials(name: string) {
+        if (!name) return "?";
+        return name
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2);
+      },
+      getRandomColor(name: string) {
+        const colors = [
+          "#FF6B6B",
+          "#4ECDC4",
+          "#45B7D1",
+          "#FFA07A",
+          "#98D8C8",
+          "#F7DC6F",
+          "#BB8FCE",
+          "#85C1E2",
+        ];
+        const hash = name
+          .split("")
+          .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        return colors[hash % colors.length];
+      },
+    }),
+    [],
+  );
 
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortBy: string,
-    sortOrder: "asc" | "desc",
-  ): T[] => {
-    if (!sortBy) return data;
+  const transformDealData = (deal: any) =>
+    transformDealForGenericTableRow(deal, extensions, { includeTicketId: true });
 
-    return [...data].sort((a, b) => {
-      let aVal = a[sortBy];
-      let bVal = b[sortBy];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderPaginationControls = (
-    dataLength: number,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-    label: string,
-    serverMeta?: {
-      total: number;
-      current_page: number;
-      per_page: number;
-      last_page: number;
-    } | null,
-  ) => {
-    // Use server pagination meta if available, otherwise fall back to client-side calculation
-    const totalPages = serverMeta
-      ? serverMeta.last_page
-      : getTotalPages(dataLength, paginationState.rowsPerPage);
-    const totalItems = serverMeta ? serverMeta.total : dataLength;
-    const { currentPage, rowsPerPage } = paginationState;
-    const actualCurrentPage = serverMeta
-      ? serverMeta.current_page
-      : currentPage;
-    const actualPerPage = serverMeta ? serverMeta.per_page : rowsPerPage;
-    const startRow = (actualCurrentPage - 1) * actualPerPage + 1;
-    const endRow = Math.min(actualCurrentPage * actualPerPage, totalItems);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPaginationState({
-                ...paginationState,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {totalItems} {label}
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={actualCurrentPage === 1}
-            onClick={() =>
-              setPaginationState({ ...paginationState, currentPage: 1 })
-            }
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={actualCurrentPage === 1}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: actualCurrentPage - 1,
-              })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= actualCurrentPage - 1 &&
-                pageNum <= actualCurrentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    actualCurrentPage === pageNum
-                      ? "primary"
-                      : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPaginationState({
-                      ...paginationState,
-                      currentPage: pageNum,
-                    })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === actualCurrentPage - 2 ||
-              pageNum === actualCurrentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={actualCurrentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: actualCurrentPage + 1,
-              })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={actualCurrentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: totalPages,
-              })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortBy !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return paginationState.sortOrder === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
-  };
-
-  // Transform API deal data to UI format
-  const transformDealData = (deal: any) => {
-    return {
-      id: deal.id,
-      name: deal.name || "",
-      ticketId: deal.ticket_id || "",
-      company: deal.company_name || "",
-      industry: deal.industry || "",
-      stage: deal.stage?.name || "No Stage",
-      stageColor: deal.stage?.color || "grey",
-      dealType: deal.deal_type || "",
-      value: deal.net_value || deal.grand_total || "0",
-      currency: deal.currency || "AED",
-      probability: deal?.stage?.probability || 0,
-
-      // closeDate: formatDateForTable(deal.expected_close_date),
-      // followUpDate: formatDateForTable(deal.follow_up_date),
-
-      closeDate: deal.expected_close_date
-        ? moment(deal.expected_close_date).format(GlobalDateFormat)
-        : "-",
-      followUpDate: deal.follow_up_date
-        ? moment(deal.follow_up_date).format(GlobalDateFormat)
-        : "-",
-
-      owner:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == deal?.created_by || ext?.extension == deal?.created_by,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == deal?.created_by || ext?.extension == deal?.created_by,
-        )?.name ||
-        deal.created_by ||
-        "",
-      assignedUser:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == deal?.assigned_to || ext?.extension == deal?.assigned_to,
-        )?.name ||
-        deal.assigned_to ||
-        "",
-      created: formatDateForTable(deal.created_at),
-      approvalStatus: deal.approval_status ?? deal.approvalStatus ?? "",
-      riskLevel: deal.risk_level || "",
-      negotiationBar: deal.negotiation_bar || 0,
-      quotationSent: deal.quotation_sent || false,
-      contractSent: deal.contract_sent || false,
-      isLost: deal.is_lost || false,
-      rawData: deal, // Keep original data for actions
-    };
-  };
-
-  // Helper function to get initials from a name
-  const getInitials = (name: string): string => {
-    if (!name) return "?";
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  // Helper function to get a color for a name
-  const getRandomColor = (name: string): string => {
-    const colors = [
-      "#FF6B6B",
-      "#4ECDC4",
-      "#45B7D1",
-      "#FFA07A",
-      "#98D8C8",
-      "#F7DC6F",
-      "#BB8FCE",
-      "#85C1E2",
-    ];
-    const hash = name.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[hash % colors.length];
-  };
-
-  // Transform deals to Kanban columns based on stages
-  const dealsToKanbanColumns = (deals: any[], stagesData: any[]): KanbanColumnDef[] => {
-    const buckets: Record<string | number, KanbanCardData[]> = {};
-    
-    // Initialize buckets for each stage
-    stagesData.forEach((stage) => {
-      buckets[stage.id] = [];
-    });
-
-    // Distribute deals into stage buckets
-    deals.forEach((deal: any) => {
-      const stageId = deal.stage_id || deal.stage?.id;
-      if (stageId && buckets[stageId]) {
-        const dealName = deal.name || "";
-        buckets[stageId].push({
-          id: deal.id,
-          name: dealName,
-          email: deal.company_name || "",
-          avatarInitials: getInitials(dealName),
-          avatarColor: getRandomColor(dealName),
-          metaLines: [
-            deal.net_value || deal.grand_total
-              ? `${deal.currency || "AED"} ${deal.net_value || deal.grand_total}`
-              : "",
-          ].filter(Boolean),
-          raw: deal,
-        });
-      }
-    });
-
-    // Create column definitions
-    return stagesData.map((stage) => ({
-      id: String(stage.id),
-      title: stage.name || "No Stage",
-      cards: buckets[stage.id] || [],
-    }));
-  };
-
-  // Calculate analytics data
   const analyticsData = useMemo(() => {
     const transformedDeals = dealsData.map(transformDealData);
-
-    const total = summaryTiles ? totalDeals : transformedDeals.length;
-    const won = transformedDeals.filter(
-      (d) => d.stage?.toLowerCase().includes("won") || d.rawData?.stage?.is_won,
-    ).length;
-    const inNegotiation = transformedDeals.filter((d) =>
-      d.stage?.toLowerCase().includes("negotiation"),
-    ).length;
-
-    // Calculate total value
-    const totalValue = transformedDeals.reduce((sum, d) => {
-      const value = parseFloat(String(d.value).replace(/[^0-9.-]/g, "")) || 0;
-      return sum + value;
-    }, 0);
-
-    // Stage distribution
-    const stageCounts: Record<string, number> = {};
-    transformedDeals.forEach((d) => {
-      const stage = d.stage || "No Stage";
-      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
-    });
-
-    // Deal type distribution
-    const dealTypeCounts: Record<string, number> = {};
-    transformedDeals.forEach((d) => {
-      const type = d.dealType || "new_sale";
-      dealTypeCounts[type] = (dealTypeCounts[type] || 0) + 1;
-    });
-
-    return {
-      total,
-      won,
-      inNegotiation,
-      totalValue,
-      stageCounts,
-      dealTypeCounts,
-    };
+    return computeDealsListAnalytics(transformedDeals, summaryTiles, totalDeals);
   }, [dealsData, extensions, summaryTiles, totalDeals]);
 
-  // Transform deals data (no client-side filtering - API handles it)
   const filteredDeals = useMemo(() => {
     return dealsData.map(transformDealData);
   }, [dealsData, extensions]);
 
-  // Calculate filter counts (using summary_tiles if available, otherwise from data)
   const filterCounts = useMemo(() => {
     const transformed = dealsData.map(transformDealData);
-    const counts: Record<string, number> = {
-      all:
-        tabTotals.all ??
-        summaryTiles?.total_deals ??
-        totalDeals ??
-        transformed.length,
-      lost:
-        tabTotals.lost ??
-        summaryTiles?.lost_deals ??
-        transformed.filter((d) => d.isLost).length,
-      deleted: tabTotals.deleted ?? summaryTiles?.deleted_deals ?? 0,
-      rejected:
-        tabTotals.rejected ??
-        transformed.filter((d) => d.approvalStatus === "rejected").length,
-    };
-
-    // Add counts for all stages (not just first 5, for custom tabs)
-    stages.forEach((stage: any) => {
-      counts[stage.id] = tabTotals[stage.id] ?? 0;
-    });
-
-    return counts;
+    return computeDealsListTabFilterCounts(
+      transformed,
+      tabTotals,
+      summaryTiles,
+      totalDeals,
+      stages,
+      { includeRejectedCount: true },
+    );
   }, [dealsData, extensions, stages, summaryTiles, tabTotals, totalDeals]);
 
   // Update custom tabs counts when filterCounts change
@@ -2155,8 +1730,9 @@ const CrmDeals = () => { // NOSONAR
         sortable: true,
         type: "avatar",
         avatar: {
-          getInitials: (row) => getInitials(row.name),
-          getColor: (row) => getRandomColor(row.name),
+          getInitials: (row) => dealsKanbanStyleAvatar.getInitials(row.name),
+          getColor: (row) =>
+            dealsKanbanStyleAvatar.getRandomColor(row.name),
         },
         emptyValue: "N/A",
       },
@@ -2257,7 +1833,7 @@ const CrmDeals = () => { // NOSONAR
         emptyValue: "-",
       },
     ],
-    [],
+    [dealsKanbanStyleAvatar],
   );
 
   // Define actions for GenericTable
@@ -2705,7 +2281,11 @@ const CrmDeals = () => { // NOSONAR
                 customBody={
                   dealsViewMode === "board" ? (
                     <KanbanBoard
-                      columns={dealsToKanbanColumns(dealsData, stages)}
+                      columns={buildDealsKanbanColumns(
+                        dealsData,
+                        stages,
+                        dealsKanbanStyleAvatar,
+                      )}
                       onCardClick={(card) => handleViewDeal(Number(card.id))}
                       cardContextMenuItems={getDealCardContextMenuItems}
                       onCardMove={(cardId, fromCol, toCol) => {
@@ -2751,9 +2331,13 @@ const CrmDeals = () => { // NOSONAR
               selectedDeal?.decision_maker_phone_country_code && selectedDeal?.decision_maker_phone ? `${selectedDeal?.decision_maker_phone_country_code} ${selectedDeal?.decision_maker_phone}` : selectedDeal?.decision_maker_phone
             }
             avatar={{
-              initials: getInitials(selectedDeal?.name || "NA"),
+              initials: dealsKanbanStyleAvatar.getInitials(
+                selectedDeal?.name || "NA",
+              ),
               name: selectedDeal?.name || "NA",
-              gradient: getRandomColor(selectedDeal?.name || ""),
+              gradient: dealsKanbanStyleAvatar.getRandomColor(
+                selectedDeal?.name || "",
+              ),
             }}
             record={{
               id: selectedDeal?.id || selectedDeal?.rawData?.id,

@@ -12,7 +12,15 @@ import type {
   TabConfig,
 } from "@components/GenericTable";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import {
+  buildShallowTabFilterPushArgs,
+  resolveTabFilterFromUrlQuery,
+} from "@hooks/crmListPageTabCreateContactAndFilterHelpers";
 import { parseStoredVisibleColumnKeysLoose } from "@utils/crmListVisibleColumnsStorage";
+import {
+  getMinIsoDateForDateInput,
+  toIsoDateInputValueFromDbField,
+} from "@utils/crmDateInputMinToday";
 import {
   getLeads,
   getLead,
@@ -34,13 +42,13 @@ import {
   getBusinessTypes,
   getLeadFollowUps,
   getMeetings,
-} from "@utils/crm";
+} from "./leadsPageCrmBundle";
 import type {
   StageData,
   CampaignData,
   CrmDataItem,
   BusinessTypeData,
-} from "@utils/crm";
+} from "./leadsPageCrmBundle";
 import { GetHierarchyData } from "@utils/users";
 import { Badge } from "react-bootstrap";
 import {
@@ -83,8 +91,44 @@ import {
   addTruthyExportFilters,
   addDefinedExportFilters,
   addPresentExportFilters,
+  buildLeadsListExportCsvText,
+  getContactPersonsValidationError,
 } from "./leadsPageShared";
 
+/** Spacing between CRM bootstrap requests to reduce API burst / 429 rate-limit errors. */
+const CRM_LEADS_BOOTSTRAP_STAGGER_MS = 100;
+
+async function runQuietFetch<T>(
+  label: string,
+  load: () => Promise<T>,
+  onSuccess: (data: T) => void,
+): Promise<void> {
+  try {
+    const data = await load();
+    onSuccess(data);
+  } catch (error) {
+    console.error(`Failed to fetch ${label}:`, error);
+  }
+}
+
+function mapMeetingExtensionStringsToAttendeeOptions(
+  meetingExtensionStrings: string[],
+  extensions: readonly any[],
+): { value: string | number; label: string }[] {
+  if (meetingExtensionStrings.length === 0) return [];
+  return extensions
+    .filter((ext: any) => {
+      const extExtension = String(ext.extension || "");
+      const extId = String(ext.id || "");
+      return meetingExtensionStrings.some(
+        (meetingExt) => meetingExt === extExtension || meetingExt === extId,
+      );
+    })
+    .map((ext: any) => ({
+      value: ext.id || ext.extension,
+      label: ext.display_name || ext.name || ext.id || ext.extension,
+    }));
+}
 
 export function useCrmLeadsPageModel() {
   const { data: session } = useSession();
@@ -309,14 +353,6 @@ export function useCrmLeadsPageModel() {
       contactPhone,
     };
   }, [selectedLead]);
-  // Fetch stages and extensions on component mount
-  useEffect(() => {
-    fetchStages();
-    fetchLostReasons();
-    fetchExtensions(ModuleSlug.CRM_LEADS);
-    fetchCampaigns();
-    fetchFilterBusinessTypes();
-  }, []);
 
   const fetchFilterBusinessTypes = async () => {
     try {
@@ -503,22 +539,22 @@ export function useCrmLeadsPageModel() {
     }
   }, [activeFilter, stages]);
 
+  const leadsTabValidFilters = useMemo(
+    () => ["all", "lost", "deleted", ...stages.map((s: any) => String(s.id))],
+    [stages],
+  );
+
   // Read tab from URL on mount and when router is ready
   useEffect(() => {
-    if (router.isReady && router.query.tab) {
-      const tabFromUrl = String(router.query.tab);
-      // Allow "all", "lost", "deleted", or any stage ID
-      const isValidFilter =
-        tabFromUrl === "all" ||
-        tabFromUrl === "lost" ||
-        tabFromUrl === "deleted" ||
-        (stages.length > 0 &&
-          stages.some((s: any) => s.id.toString() === tabFromUrl));
-      if (isValidFilter) {
-        setActiveFilter((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
-      }
+    if (!router.isReady) return;
+    const tab = resolveTabFilterFromUrlQuery(
+      router.query.tab,
+      leadsTabValidFilters,
+    );
+    if (tab != null) {
+      setActiveFilter((prev) => (prev === tab ? prev : tab));
     }
-  }, [router.isReady, router.query.tab, stages]);
+  }, [router.isReady, router.query.tab, leadsTabValidFilters]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
@@ -526,12 +562,8 @@ export function useCrmLeadsPageModel() {
       // Update active tab immediately to avoid visual lag
       setActiveFilter(filterId);
       setLeadsPagination((prev) => ({ ...prev, currentPage: 1 }));
-      // Update URL with tab query parameter
       router.push(
-        {
-          pathname: router.pathname,
-          query: { ...router.query, tab: filterId },
-        },
+        buildShallowTabFilterPushArgs(router.pathname, router.query, filterId),
         undefined,
         { shallow: true },
       );
@@ -711,34 +743,8 @@ export function useCrmLeadsPageModel() {
         toast.info("No leads match the selected filters.");
         return;
       }
-      const headers = Array.from(
-        new Set(
-          allData.flatMap((row) =>
-            typeof row === "object" && row !== null
-              ? Object.keys(row).filter(
-                  (k) =>
-                    !["campaign", "stage", "contact_persons"].includes(k) &&
-                    typeof (row as any)[k] !== "object",
-                )
-              : [],
-          ),
-        ),
-      ).sort();
-      const csvRows = [
-        headers.join(","),
-        ...allData.map((row) =>
-          headers
-            .map((h) => {
-              const val = (row as any)[h];
-              if (val == null) return "";
-              if (typeof val === "object") return "";
-              const s = String(val).replace(/"/g, '""');
-              return s.includes(",") || s.includes('"') ? `"${s}"` : s;
-            })
-            .join(","),
-        ),
-      ];
-      const blob = new Blob([csvRows.join("\n")], {
+      const csvText = buildLeadsListExportCsvText(allData);
+      const blob = new Blob([csvText], {
         type: "text/csv;charset=utf-8;",
       });
       const url = window.URL.createObjectURL(blob);
@@ -882,32 +888,29 @@ export function useCrmLeadsPageModel() {
   );
 
   const fetchStages = async () => {
-    try {
-      const stagesData = await getStages("lead");
-      setStages(stagesData || []);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-    }
+    await runQuietFetch("stages", () => getStages("lead"), (stagesData) =>
+      setStages(stagesData || []),
+    );
   };
 
   const fetchLostReasons = async () => {
-    try {
-      const lostReasonsData = await (getStages as any)("lost_reason");
-      setLostReasons(lostReasonsData || []);
-    } catch (error) {
-      console.error("Failed to fetch lost reasons:", error);
-    }
+    await runQuietFetch(
+      "lost reasons",
+      () => (getStages as (slug: string) => Promise<any[]>)("lost_reason"),
+      (lostReasonsData) => setLostReasons(lostReasonsData || []),
+    );
   };
 
   const fetchExtensions = async (moduleSlug: string = ModuleSlug.CRM_LEADS) => {
-    try {
-      const hierarchyData = await GetHierarchyData(moduleSlug);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch extensions:", error);
-    }
+    await runQuietFetch(
+      "extensions",
+      () => GetHierarchyData(moduleSlug),
+      (hierarchyData) => {
+        if (hierarchyData?.extensions) {
+          setExtensions(hierarchyData.extensions);
+        }
+      },
+    );
   };
 
   const fetchCampaigns = async () => {
@@ -922,6 +925,37 @@ export function useCrmLeadsPageModel() {
       console.error("Failed to fetch campaigns:", error);
     }
   };
+
+  // Reference data: run sequentially with small gaps to avoid bursting the API (5 parallel calls → 429).
+  useEffect(() => {
+    let cancelled = false;
+    const stagger = () =>
+      new Promise<void>((resolve) =>
+        setTimeout(resolve, CRM_LEADS_BOOTSTRAP_STAGGER_MS),
+      );
+
+    void (async () => {
+      await fetchStages();
+      if (cancelled) return;
+      await stagger();
+      await fetchLostReasons();
+      if (cancelled) return;
+      await stagger();
+      await fetchExtensions(ModuleSlug.CRM_LEADS);
+      if (cancelled) return;
+      await stagger();
+      await fetchCampaigns();
+      if (cancelled) return;
+      await stagger();
+      await fetchFilterBusinessTypes();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally empty: bootstrap runs once per mount; helpers close over latest setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot reference-data load
+  }, []);
 
   // Transform API lead data to UI format
   const transformLeadData = (lead: any): LeadData => {
@@ -1444,28 +1478,10 @@ export function useCrmLeadsPageModel() {
   };
 
   const validateEditStep2 = (): boolean => {
-    for (let i = 0; i < editFormData.contact_persons.length; i++) {
-      const person = editFormData.contact_persons[i];
-      if (!person.title?.trim()) {
-        toast.error(`Contact person ${i + 1}: Title is required`);
-        return false;
-      }
-      if (!person.name?.trim()) {
-        toast.error(`Contact person ${i + 1}: Name is required`);
-        return false;
-      }
-      if (!person.phone?.trim()) {
-        toast.error(`Contact person ${i + 1}: Phone is required`);
-        return false;
-      }
-      if (!person.email?.trim()) {
-        toast.error(`Contact person ${i + 1}: Email is required`);
-        return false;
-      }
-      if (!/\S+@\S+\.\S+/.test(person.email)) {
-        toast.error(`Contact person ${i + 1}: Invalid email format`);
-        return false;
-      }
+    const err = getContactPersonsValidationError(editFormData.contact_persons);
+    if (err) {
+      toast.error(err);
+      return false;
     }
     return true;
   };
@@ -1643,35 +1659,16 @@ export function useCrmLeadsPageModel() {
     ],
   );
 
-  // Handle follow-up creation
-  const handleCreateFollowUp = useCallback(async () => {
-    await submitFollowUp("create");
-  }, [submitFollowUp]);
+  const submitFollowUpFromModal = useCallback(async () => {
+    await submitFollowUp(followUpIdToEdit ? "update" : "create");
+  }, [submitFollowUp, followUpIdToEdit]);
 
-  // Handle follow-up update
-  const handleUpdateFollowUp = useCallback(async () => {
-    await submitFollowUp("update");
-  }, [submitFollowUp]);
-  const getTodayDate = useCallback((startDateParam: string = "") => {
-    let today = new Date();
-    if (startDateParam) {
-      const startDate = new Date(startDateParam);
-      if (moment(startDate).isBefore(today)) {
-        today = startDate;
-      }
-    }
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }, []);
   // Handle edit follow-up click
   const handleEditFollowUp = useCallback(
     (followUp: any) => {
-      // Format date for input (YYYY-MM-DD)
-      const followUpDate = followUp.follow_up_date
-        ? new Date(followUp.follow_up_date).toISOString().split("T")[0]
-        : "";
+      const followUpDate = toIsoDateInputValueFromDbField(
+        followUp.follow_up_date,
+      );
 
       setFollowUpIdToEdit(followUp.id);
       setFollowupData({
@@ -1810,29 +1807,18 @@ export function useCrmLeadsPageModel() {
     ],
   );
 
-  // Handle meeting creation
-  const handleCreateMeeting = useCallback(async () => {
-    await submitMeeting("create");
-  }, [submitMeeting]);
-
-  // Handle meeting update
-  const handleUpdateMeeting = useCallback(async () => {
-    await submitMeeting("update");
-  }, [submitMeeting]);
+  const submitMeetingFromModal = useCallback(async () => {
+    await submitMeeting(meetingIdToEdit ? "update" : "create");
+  }, [submitMeeting, meetingIdToEdit]);
 
   // Handle edit meeting click
   const handleEditMeeting = useCallback(
     (meeting: any) => {
-      // Format date for input (YYYY-MM-DD)
-      const meetingDate = meeting.meeting_date
-        ? new Date(meeting.meeting_date).toISOString().split("T")[0]
-        : "";
+      const meetingDate = toIsoDateInputValueFromDbField(meeting.meeting_date);
 
       // Format time for input (HH:MM)
       const meetingTime = meeting.meeting_time || "";
 
-      // Set attendees from meeting extensions
-      // meeting.extensions is an array of objects with 'extension' property (e.g., { extension: "511", ... })
       const meetingExtensionStrings =
         meeting.extensions && Array.isArray(meeting.extensions)
           ? meeting.extensions.map(
@@ -1840,23 +1826,10 @@ export function useCrmLeadsPageModel() {
             )
           : [];
 
-      const attendees =
-        meetingExtensionStrings.length > 0
-          ? extensions
-              .filter((ext: any) => {
-                // Match by extension string or ID (convert to string for comparison)
-                const extExtension = String(ext.extension || "");
-                const extId = String(ext.id || "");
-                return meetingExtensionStrings.some(
-                  (meetingExt: string) =>
-                    meetingExt === extExtension || meetingExt === extId,
-                );
-              })
-              .map((ext: any) => ({
-                value: ext.id || ext.extension,
-                label: ext.display_name || ext.name || ext.id || ext.extension,
-              }))
-          : [];
+      const attendees = mapMeetingExtensionStringsToAttendeeOptions(
+        meetingExtensionStrings,
+        extensions,
+      );
 
       setMeetingIdToEdit(meeting.id);
       setMeetingData({
@@ -2635,17 +2608,15 @@ export function useCrmLeadsPageModel() {
     validateFollowUpForm,
     buildFollowUpPayload,
     submitFollowUp,
-    handleCreateFollowUp,
-    handleUpdateFollowUp,
-    getTodayDate,
+    submitFollowUpFromModal,
+    getTodayDate: getMinIsoDateForDateInput,
     handleEditFollowUp,
     handleDeleteFollowUp,
     confirmDeleteFollowUp,
     resetMeetingForm,
     buildMeetingPayload,
     submitMeeting,
-    handleCreateMeeting,
-    handleUpdateMeeting,
+    submitMeetingFromModal,
     handleEditMeeting,
     handleDeleteMeeting,
     confirmDeleteMeeting,
@@ -2655,6 +2626,9 @@ export function useCrmLeadsPageModel() {
     filterCounts,
     handleOpenFiltersSidebar,
     leadsToolbarConfig,
+    leadsActions,
+    leadsColumns,
+    leadsStatsCards,
     handleAddCustomTab
   };
 }
