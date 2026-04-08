@@ -363,7 +363,7 @@ function TaskUrlInputOverlay({
   urlModalType,
   onClose,
   onInsertHtml,
-}: TaskUrlInputOverlayProps) {
+}: Readonly<TaskUrlInputOverlayProps>) {
   if (!urlModalType) return null;
   const isLink = urlModalType === 'link';
   return (

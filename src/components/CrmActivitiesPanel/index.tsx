@@ -124,6 +124,10 @@ interface WhatsAppMessage {
   status?: string;
 }
 
+type TaskStatus = "pending" | "completed" | "failed";
+type TaskUrgency = "low" | "med" | "high";
+type CrmRecordType = "prospect" | "lead" | "deal" | "order";
+
 /** Email item from GET emails response (matches API structure) */
 interface EmailListItem {
   id: number | string;
@@ -370,8 +374,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     name: "",
     due_date: "",
     time: "",
-    status: "pending" as "pending" | "completed" | "failed",
-    urgency: "med" as "low" | "med" | "high",
+    status: "pending" as TaskStatus,
+    urgency: "med" as TaskUrgency,
     assigned_to: "",
     notes: "",
   });
@@ -869,7 +873,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
           meeting_type: "Video",
           meeting_date,
           meeting_time,
-          record_type: recordType as "prospect" | "lead" | "deal" | "order",
+          record_type: recordType as CrmRecordType,
           record_id: Number(recordId),
           extensions,
           tenant_id: tenantId,
@@ -2440,10 +2444,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                 onChange={(e) =>
                                   updateEditingTaskField(
                                     "status",
-                                    e.target.value as
-                                      | "pending"
-                                      | "completed"
-                                      | "failed",
+                                    e.target.value as TaskStatus,
                                   )
                                 }
                                 style={{
@@ -2462,7 +2463,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                 onChange={(e) =>
                                   updateEditingTaskField(
                                     "urgency",
-                                    e.target.value as "low" | "med" | "high",
+                                    e.target.value as TaskUrgency,
                                   )
                                 }
                                 style={{
@@ -2645,14 +2646,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                 name: task.name,
                                 due_date: dueDate,
                                 time: task.time?.slice(0, 5) ?? "",
-                                status:
-                                  (task.status as
-                                    | "pending"
-                                    | "completed"
-                                    | "failed") || "pending",
-                                urgency:
-                                  (task.urgency as "low" | "med" | "high") ||
-                                  "med",
+                                status: (task.status as TaskStatus) || "pending",
+                                urgency: (task.urgency as TaskUrgency) || "med",
                                 assigned_to:
                                   String(
                                     (task as TaskData & { assigned_to?: string | null })
