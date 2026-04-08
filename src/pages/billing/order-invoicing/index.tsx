@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@crm/orders/orderListPageOrderScss";
 import { useRouter } from "next/router";
 import React, {
   ReactElement,
@@ -7,16 +7,17 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, {
-  TableColumn,
-  TableAction,
-} from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebar";
-import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import OrderEditModal from "@components/OrderEditModal";
+import {
+  Layout,
+  BreadcrumbItem,
+  GenericTable,
+  GenericSidebar,
+  GenericFilterSidebar,
+  StatsCards,
+  OrderEditModal,
+  type TableColumn,
+  type TableAction,
+} from "@crm/orders/orderListOrderPageFrame";
 import {
   FiUpload,
   FiDatabase,
@@ -35,7 +36,7 @@ import {
   FiCalendar,
   FiTarget,
   FiMoreVertical,
-} from "react-icons/fi";
+} from "@crm/orders/orderListFiIcons";
 import {
   getOrders,
   getOrder,
@@ -52,7 +53,7 @@ import {
   getDealAttachments,
   downloadDealAttachment,
   getMinifiedCompanies,
-} from "@utils/crm";
+} from "@crm/orders/orderListCrmApi";
 import { GetHierarchyData } from "@utils/users";
 import {
   Button,
@@ -66,8 +67,15 @@ import {
   InputGroup,
   Modal,
   Spinner,
-} from "react-bootstrap";
-import Select from "react-select";
+} from "@crm/orders/orderListBootstrap";
+import Select, { type SingleValue } from "react-select";
+
+type OrderInvoicingSelectOption = { value: string | number; label: string };
+
+const toOptionalSelectString = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined) return null;
+  return String(value);
+};
 import {
   GlobalDateFormat,
   ModuleSlug,
@@ -116,12 +124,12 @@ import {
   User,
   Paperclip,
   Upload,
-  Download as DownloadIcon,
+  DownloadIcon,
   RotateCcw,
   AlertCircle,
   Handshake,
   Info,
-} from "lucide-react";
+} from "@crm/orders/orderListLucideHeavy";
 import {
   PieChart,
   Pie,
@@ -133,24 +141,24 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-} from "recharts";
+} from "@crm/orders/orderListRecharts";
 import Link from "next/link";
 import { toast } from "react-toastify";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import FormModal from "@pages/partial/FormModal";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import {
+  SuccessfulModal,
+  FormModal,
+  DeleteConfirmationModal,
+  PhoneDisplay,
+  KPICard,
+  FilterBar,
+  getInitials,
+  getRandomColor,
+  customSelectStyles,
+} from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import {
-  CrmPhoneDisplay as PhoneDisplay,
-  CrmKPICard as KPICard,
-  CrmFilterBar as FilterBar,
-} from "@components/crm/CrmListPageUi";
-import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
-import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { buildCrmOrdersListGetOrdersParams } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
 
 const ignoredKeys = ["order_stage_id"];
 
@@ -248,8 +256,8 @@ const CrmOrders = () => {
   const [ordersPagination, setOrdersPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [ordersFilters, setOrdersFilters] = useState({
     assignedTo: null as string | null,
@@ -288,62 +296,15 @@ const CrmOrders = () => {
     async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
-        const params: any = {
+        const params = buildCrmOrdersListGetOrdersParams({
+          filters: currentFilters,
           page,
-          per_page: perPage,
-        };
-
-        // Use search from currentFilters if available
-        if (currentFilters.search) {
-          params.search = currentFilters.search;
-        }
-
-        // Add filter parameters at top level
-        if (currentFilters.stage_id) {
-          params.stage_id = currentFilters.stage_id;
-        }
-        if (currentFilters.assigned_to) {
-          params.assigned_to = currentFilters.assigned_to;
-        }
-        if (currentFilters.is_lost !== undefined) {
-          params.is_lost = currentFilters.is_lost;
-        }
-        if (currentFilters.include_lost !== undefined) {
-          params.include_lost = currentFilters.include_lost;
-        }
-        if (currentFilters.include_archived !== undefined) {
-          params.include_archived = currentFilters.include_archived;
-        }
-        if (currentFilters.industry) {
-          params.industry = currentFilters.industry;
-        }
-        if (currentFilters.order_value_min) {
-          params.order_value_min = currentFilters.order_value_min;
-        }
-        if (currentFilters.order_value_max) {
-          params.order_value_max = currentFilters.order_value_max;
-        }
-        if (currentFilters.order_stage_id) {
-          params.order_stage_id = currentFilters.order_stage_id;
-        }
-        if (currentFilters.order_approval_status) {
-          params.order_approval_status = currentFilters.order_approval_status;
-        }
-        if (currentFilters.fulfillment_status) {
-          params.fulfillment_status = currentFilters.fulfillment_status;
-        }
-        if (currentFilters.payment_status) {
-          params.payment_status = currentFilters.payment_status;
-        }
-        if (currentFilters.date_from) {
-          params.date_from = currentFilters.date_from;
-        }
-        if (currentFilters.date_to) {
-          params.date_to = currentFilters.date_to;
-        }
-        if (selectedCompanyId) {
-          params.crm_company_id = selectedCompanyId;
-        }
+          perPage,
+          tableSort: null,
+          normalizeSearch: false,
+          ownerParamStyle: "assigned_to",
+          crmCompanyId: selectedCompanyId,
+        });
 
         const response: any = await getOrders(params);
         console.log("Raw response from getOrders:", response);
@@ -919,28 +880,28 @@ const CrmOrders = () => {
     setPaginationState: (state: any) => void,
   ) => {
     const newDirection =
-      paginationState.sortColumn === column &&
-      paginationState.sortDirection === "asc"
+      paginationState.sortBy === column &&
+      paginationState.sortOrder === "asc"
         ? "desc"
         : "asc";
     setPaginationState({
       ...paginationState,
-      sortColumn: column,
-      sortDirection: newDirection,
+      sortBy: column,
+      sortOrder: newDirection,
       currentPage: 1,
     });
   };
 
   const sortData = <T extends Record<string, any>>(
     data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
+    sortBy: string,
+    sortOrder: "asc" | "desc",
   ): T[] => {
-    if (!sortColumn) return data;
+    if (!sortBy) return data;
 
     return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
 
       if (aVal === undefined) aVal = "";
       if (bVal === undefined) bVal = "";
@@ -948,8 +909,8 @@ const CrmOrders = () => {
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
 
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
+      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
   };
@@ -1101,10 +1062,10 @@ const CrmOrders = () => {
   };
 
   const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortColumn !== column) {
+    if (paginationState.sortBy !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return paginationState.sortDirection === "asc" ? (
+    return paginationState.sortOrder === "asc" ? (
       <ArrowUp size={14} className="ms-1" />
     ) : (
       <ArrowDown size={14} className="ms-1" />
@@ -1932,7 +1893,9 @@ const CrmOrders = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const assignedToValue = selected ? selected.value : null;
+                      const opt =
+                        selected as SingleValue<OrderInvoicingSelectOption>;
+                      const assignedToValue = toOptionalSelectString(opt?.value);
                       setOrdersFilters((prev) => ({
                         ...prev,
                         assignedTo: assignedToValue,
@@ -1968,7 +1931,9 @@ const CrmOrders = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const stageValue = selected ? selected.value : null;
+                      const opt =
+                        selected as SingleValue<OrderInvoicingSelectOption>;
+                      const stageValue = toOptionalSelectString(opt?.value);
                       setOrdersFilters((prev) => ({
                         ...prev,
                         stage: stageValue,

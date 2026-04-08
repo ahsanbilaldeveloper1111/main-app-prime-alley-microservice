@@ -21,8 +21,8 @@ import {
 type CrmListPagination = {
   currentPage: number;
   rowsPerPage: number;
-  sortColumn: string;
-  sortDirection: "asc" | "desc";
+  sortBy: string;
+  sortOrder: "asc" | "desc";
 };
 
 const DEFAULT_PAGE_FILTERS = {
@@ -113,8 +113,8 @@ export function useCrmListFiltersMetricsHistoryState<M>(
   const [pagination, setPagination] = useState<CrmListPagination>({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc",
+    sortBy: "",
+    sortOrder: "asc",
   });
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);

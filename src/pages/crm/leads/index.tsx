@@ -39,6 +39,7 @@ import {
   deleteMeeting,
   restoreLead,
   updateLead,
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
   getCampaigns,
   getCampaignById,
   getBusinessTypes,
@@ -138,6 +139,7 @@ import {
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 
 import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
 import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
@@ -399,8 +401,8 @@ const CrmLeads = () => {
   const [leadsPagination, setLeadsPagination] = useState({
     currentPage: 1,
     rowsPerPage: 10,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [leadsFilters, setLeadsFilters] = useState({
     assignedTo: null as string | null,
@@ -511,14 +513,14 @@ const CrmLeads = () => {
         }
       });
 
-      if (includeSort && leadsPagination.sortColumn) {
-        params.sort_column = leadsPagination.sortColumn;
-        params.sort_direction = leadsPagination.sortDirection;
+      if (includeSort && leadsPagination.sortBy) {
+        params.sort_by = leadsPagination.sortBy;
+        params.sort_order = leadsPagination.sortOrder;
       }
 
       return params;
     },
-    [leadsPagination.sortColumn, leadsPagination.sortDirection],
+    [leadsPagination.sortBy, leadsPagination.sortOrder],
   );
 
   const getLeadsTotalFromResponse = useCallback((response: any): number => {
@@ -1075,8 +1077,8 @@ const CrmLeads = () => {
     [fetchLeadFollowUps, fetchMeetings],
   );
 
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback(
+  // Handle preview button click - shows sidebar (persistence wrapper below)
+  const handlePreviewClickBase = useCallback(
     async (lead: LeadData) => {
       const leadId = lead.rawData?.id || lead.id;
       // Set the lead immediately to show sidebar
@@ -1098,6 +1100,51 @@ const CrmLeads = () => {
       }
     },
     [fetchLeadFollowUps, fetchMeetings],
+  );
+
+  const openLeadPreviewById = useCallback(
+    (id: number) => {
+      handlePreviewClickBase({
+        id,
+        name: "",
+        email: "",
+        phone: "",
+        company: "",
+        industry: "",
+        stage: "",
+        stageColor: "",
+        leadPotential: "",
+        lead_score: 0,
+        assignedUser: "",
+        created: "",
+        lastActivity: "",
+        followUps: [],
+        meetings: [],
+        source: "",
+        campaign: "",
+        isLost: false,
+        rawData: { id },
+      } as LeadData).catch((error: unknown) => {
+        console.error("openLeadPreviewById:", error);
+      });
+    },
+    [handlePreviewClickBase],
+  );
+
+  const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
+    useCrmListPreviewPersistence({
+      localStorageKey: "crm-leads-list-preview-record-id",
+      listLoading: !isInitialized || loading,
+      openPreviewByNumericId: openLeadPreviewById,
+    });
+
+  const handlePreviewClick = useCallback(
+    async (lead: LeadData) => {
+      const leadId = lead.rawData?.id || lead.id;
+      if (leadId) writePreviewIdToStorage(Number(leadId));
+      await handlePreviewClickBase(lead);
+    },
+    [handlePreviewClickBase, writePreviewIdToStorage],
   );
 
   // Handle first column click - navigates to detail page with lead ID in URL (same as prospect)
@@ -1143,6 +1190,7 @@ const CrmLeads = () => {
       const campaignsData = await getCampaigns({
         per_page: 1000,
         module_slug: ModuleSlug.CRM_CAMPAIGNS,
+        filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
       });
       setCampaigns(campaignsData?.data || []);
     } catch (error) {
@@ -1323,8 +1371,15 @@ const CrmLeads = () => {
     [selectedLead],
   );
 
-  // Handle close lead sidebar
+  // Handle close lead sidebar (X): clear persisted preview id
   const handleCloseLeadSidebar = useCallback(() => {
+    setShowLeadSidebar(false);
+    setSelectedLead(null);
+    clearPreviewIdFromStorage();
+  }, [clearPreviewIdFromStorage]);
+
+  /** Hide sidebar when navigating to detail so browser back can restore preview. */
+  const handleHideLeadSidebarKeepPersistence = useCallback(() => {
     setShowLeadSidebar(false);
     setSelectedLead(null);
   }, []);
@@ -3304,13 +3359,13 @@ const CrmLeads = () => {
                   });
                 }}
                 sortable={true}
-                defaultSortColumn={leadsPagination.sortColumn}
-                defaultSortDirection={leadsPagination.sortDirection}
+                defaultSortBy={leadsPagination.sortBy}
+                defaultSortOrder={leadsPagination.sortOrder}
                 onSort={(column, direction) => {
                   setLeadsPagination({
                     ...leadsPagination,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                   });
                 }}
                 // customizableColumns={true}
@@ -3419,7 +3474,7 @@ const CrmLeads = () => {
               onClick: () => {
                 const leadId = selectedLead?.id || selectedLead?.rawData?.id;
                 if (leadId) {
-                  setShowLeadSidebar(false);
+                  handleHideLeadSidebarKeepPersistence();
                   router.push(`/crm/detailspage?type=lead&id=${leadId}`);
                 }
               },

@@ -53,25 +53,6 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 /** Row from `getProducts` / list-products — not CRM `getCrmData`. */
 type BillingProductRow = ProductData & Record<string, unknown>;
 
-let customFieldIdSeq = 0;
-function createCustomFieldId(fieldName: string): string {
-  const w = (globalThis as unknown as { window?: Window }).window;
-  const cryptoObj = w?.crypto;
-
-  if (cryptoObj?.randomUUID) {
-    return `${cryptoObj.randomUUID()}-${fieldName}`;
-  }
-
-  if (cryptoObj?.getRandomValues) {
-    const bytes = new Uint8Array(16);
-    cryptoObj.getRandomValues(bytes);
-    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-    return `${hex}-${fieldName}`;
-  }
-
-  customFieldIdSeq += 1;
-  return `${Date.now()}-${customFieldIdSeq}-${fieldName}`;
-}
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 
@@ -266,6 +247,30 @@ const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
   gap: "8px",
 };
 
+function BillingProductsToolbarButton({
+  onClick,
+  children,
+}: Readonly<{
+  onClick: () => void;
+  children: React.ReactNode;
+}>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={ACTION_BUTTON_BASE_STYLE}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#1a1a1a";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "#000000";
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 const BillingManagement = () => {
   const { data: session } = useSession();
   const router = useRouter();
@@ -448,8 +453,8 @@ const BillingManagement = () => {
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [dataList, setDataList] = useState<BillingProductRow[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -493,9 +498,9 @@ const BillingManagement = () => {
         params.created_at_to = memoizedFilters.created_at_to;
       }
 
-      if (pagination.sortColumn) {
-        params.sort_column = pagination.sortColumn;
-        params.sort_direction = pagination.sortDirection;
+      if (pagination.sortBy) {
+        params.sort_by = pagination.sortBy;
+        params.sort_order = pagination.sortOrder;
       }
 
       return params;
@@ -507,8 +512,8 @@ const BillingManagement = () => {
       memoizedFilters.created_at_to,
       pagination.currentPage,
       pagination.rowsPerPage,
-      pagination.sortColumn,
-      pagination.sortDirection,
+      pagination.sortBy,
+      pagination.sortOrder,
     ],
   );
 
@@ -986,34 +991,18 @@ const BillingManagement = () => {
       }}
       ref={addContactsRef}
     >
-     
-
-<button
-          onClick={() => router.push("/billing/products/manage-categories")}
-          style={ACTION_BUTTON_BASE_STYLE}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
-        >
-          <Plus size={16} />
-          Manage Categories
-        </button>
-        <button
-          onClick={() => setShowCreateProductModal(true)}
-          style={ACTION_BUTTON_BASE_STYLE}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
-        >
-          <Plus size={16} />
-          Add Product
-        </button>
+      <BillingProductsToolbarButton
+        onClick={() => router.push("/billing/products/manage-categories")}
+      >
+        <Plus size={16} />
+        Manage Categories
+      </BillingProductsToolbarButton>
+      <BillingProductsToolbarButton
+        onClick={() => setShowCreateProductModal(true)}
+      >
+        <Plus size={16} />
+        Add Product
+      </BillingProductsToolbarButton>
     
     </div>
   );
@@ -1316,13 +1305,13 @@ const BillingManagement = () => {
                 }}
                 // Sorting
                 sortable={true}
-                defaultSortColumn={pagination.sortColumn}
-                defaultSortDirection={pagination.sortDirection}
+                defaultSortBy={pagination.sortBy}
+                defaultSortOrder={pagination.sortOrder}
                 onSort={(column, direction) => {
                   setPagination((prev) => ({
                     ...prev,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                     currentPage: 1,
                   }));
                 }}
@@ -1620,8 +1609,7 @@ const BillingManagement = () => {
       {/* Create Contact Sidebar */}
       {renderCreateContactSidebar()}
       {/* Create Product Modal */}
-       {/* Create Product Modal */}
-       {showCreateProductModal && (
+      {showCreateProductModal && (
         <CreateProductModal
           key={createProductModalKey}
           productId={editingProductId ?? undefined}

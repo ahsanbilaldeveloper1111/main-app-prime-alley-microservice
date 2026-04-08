@@ -155,8 +155,8 @@ const CrmApprovals = () => {
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
 
   // Filters

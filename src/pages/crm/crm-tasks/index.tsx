@@ -7,12 +7,10 @@ import React, {
   } from "react";
   import Layout from "@layout/index";
   import BreadcrumbItem from "@common/BreadcrumbItem";
-  import { Button, Dropdown, Form, Card } from "react-bootstrap";
-  import Select from "react-select";
+  import { Button, Dropdown, Form } from "react-bootstrap";
   import { toast } from "react-toastify";
   import { useRouter } from "next/router";
   import moment from "moment";
-  import { FiSearch } from "react-icons/fi";
   import { 
     Plus, 
     X, 
@@ -20,22 +18,29 @@ import React, {
     ExternalLink, 
     Save, 
     Filter,
-    Eye,
-    Edit as EditIcon,
-    Trash2,
-    MoreVertical
   } from "lucide-react";
   import GenericTable, { 
     TableColumn, 
     TableAction,
     FilterPill,
-    PaginationConfig,
-    ToolbarConfig,
   } from "@components/GenericTable";
   import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
   import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
   import SuccessfulModal from "@pages/partial/SuccessfulModal";
   import CreateTaskSidebar from "@components/CreateTaskSidebar";
+import { useTasksListingPager } from "@hooks/useTasksListingPager";
+import { buildCrmTasksListQueryParams } from "@utils/taskListing/buildCrmTasksListQueryParams";
+import {
+  buildTaskListingPageStyleTag,
+  formatTaskDueDateCellParts,
+  TaskCompleteCircleButton,
+  TaskListingAssigneeCell,
+  TaskListingSearchRow,
+  TASK_LIST_BTN_OUTLINE,
+  TASK_LIST_BTN_COMPACT_CELL,
+  TASK_LIST_CELL,
+  TASK_PRIORITY_DOT_COLORS,
+} from "@utils/taskListing/taskListUiPrimitives";
     
     // ─── Types ─────────────────────────────────────────────────────────────────────
     
@@ -384,50 +389,6 @@ import React, {
       { value: "high", label: "High" },
     ];
     
-    const PRIORITY_COLOR: Record<string, string> = {
-      low: "#22c55e",
-      medium: "#f59e0b",
-      high: "#ef4444",
-    };
-    
-    // ─── Button style (exact per spec) ─────────────────────────────────────────────
-    
-    const BTN: React.CSSProperties = {
-      backgroundColor: "rgb(255, 255, 255)",
-      borderColor: "#8a8a8a",
-      color: "#141414",
-      textDecoration: "none",
-      borderRadius: 4,
-      borderWidth: 1,
-      borderStyle: "solid",
-      verticalAlign: "middle",
-      paddingTop: 8,
-      paddingBottom: 8,
-      paddingLeft: 16,
-      paddingRight: 16,
-      maxWidth: "100%",
-      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-      fontSize: 12,
-      fontWeight: 400,
-      letterSpacing: 0,
-      lineHeight: "14px",
-      cursor: "pointer",
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 6,
-      whiteSpace: "nowrap" as const,
-      outline: "none",
-      background: "#fff",
-    };
-    
-    // ─── Cell text style ───────────────────────────────────────────────────────────
-    
-    const CELL: React.CSSProperties = {
-      fontSize: 13,
-      color: "#374151",
-      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-      fontWeight: 300,
-    };
     
     // ─── Input style ───────────────────────────────────────────────────────────────
     
@@ -519,10 +480,7 @@ import React, {
       const [search, setSearch]         = useState("");
       const [hoveredId, setHoveredId]   = useState<number | null>(null);
     
-      const [pager, setPager] = useState({
-        page: 1, perPage: 25,
-        sortCol: "due_date", sortDir: "asc" as "asc" | "desc",
-      });
+      const { pager, setPager } = useTasksListingPager();
     
       // ── Filter sidebar ────────────────────────────────────────────────────────────
       const [showSidebar, setShowSidebar]   = useState(false);
@@ -555,15 +513,12 @@ import React, {
       const fetchTasks = useCallback(async () => {
         setLoading(true);
         try {
-          const p: any = { page: pager.page, per_page: pager.perPage };
-          if (filters.search)     p.search       = filters.search;
-          if (filters.task_type)  p.task_type    = filters.task_type;
-          if (filters.priority)   p.priority     = filters.priority;
-          if (filters.due_date_from) p.due_date_from = filters.due_date_from;
-          if (filters.due_date_to)   p.due_date_to   = filters.due_date_to;
-          if (activeTab === "due_today") p.due_today = true;
-          if (activeTab === "overdue")   p.overdue   = true;
-          if (activeTab === "upcoming")  p.upcoming  = true;
+          const p = buildCrmTasksListQueryParams({
+            page: pager.page,
+            perPage: pager.perPage,
+            filters,
+            activeTab,
+          });
     
           const res = await getTasks(p);
           setTasks(res.data || []);
@@ -618,26 +573,19 @@ import React, {
         {
           key: "status", label: "Status", sortable: false, type: "custom",
           render: (row) => (
-            <button
-              onClick={async e => {
-                e.stopPropagation();
-                try { await markTaskComplete(row.id); fetchTasks(); }
-                catch { toast.error("Failed to update"); }
-              }}
+            <TaskCompleteCircleButton
+              isCompleted={row.status === "completed"}
               title="Mark complete"
-              style={{
-                background: "transparent", border: "1.5px solid #9ca3af",
-                borderRadius: "50%", width: 20, height: 20, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  await markTaskComplete(row.id);
+                  fetchTasks();
+                } catch {
+                  toast.error("Failed to update");
+                }
               }}
-            >
-              {row.status === "completed" && (
-                <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                  <path d="M1 4L3.5 6.5L9 1" stroke="#6b7280" strokeWidth="1.5"
-                    strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </button>
+            />
           ),
         },
         {
@@ -657,12 +605,12 @@ import React, {
               {hoveredId === row.id && (
                 <>
                   <button onClick={e => { e.stopPropagation(); openEdit(row); }}
-                    style={{ ...BTN, paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11 }}>
+                    style={TASK_LIST_BTN_COMPACT_CELL}>
                     Edit
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); router.push(`/crm/tasks/task-detail?id=${row.id}&tab=history`); }}
-                    style={{ ...BTN, paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11 }}>
+                    style={TASK_LIST_BTN_COMPACT_CELL}>
                     History <ExternalLink size={10} />
                   </button>
                 </>
@@ -673,7 +621,7 @@ import React, {
         {
           key: "task_type", label: "Task Type", sortable: true, type: "custom",
           render: (row) => (
-            <span style={CELL}>
+            <span style={TASK_LIST_CELL}>
               {TASK_TYPE_OPTIONS.find(t => t.value === row.task_type)?.label || row.task_type}
             </span>
           ),
@@ -681,31 +629,21 @@ import React, {
         {
           key: "assigned_to", label: "Assigned to", sortable: true, type: "custom",
           render: (row) => {
-            if (!row.assigned_to) return <span style={{ ...CELL, color: "#9ca3af" }}>—</span>;
-            const name = row.assigned_to_name || row.assigned_to;
-            return (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: "50%", background: "#10b981",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
-                }}>{name.charAt(0).toUpperCase()}</div>
-                <span style={{ ...CELL, maxWidth: 130, overflow: "hidden",
-                  textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
-                  title={name}>{name}</span>
-              </div>
-            );
+            const name = row.assigned_to
+              ? row.assigned_to_name || row.assigned_to
+              : "";
+            return <TaskListingAssigneeCell label={name} />;
           },
         },
         {
           key: "priority", label: "Priority", sortable: true, type: "custom",
           render: (row) => {
-            if (!row.priority) return <span style={{ ...CELL, color: "#9ca3af" }}>—</span>;
+            if (!row.priority) return <span style={{ ...TASK_LIST_CELL, color: "#9ca3af" }}>—</span>;
             return (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, display: "inline-block",
-                  backgroundColor: PRIORITY_COLOR[row.priority] }} />
-                <span style={CELL}>{row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}</span>
+                  backgroundColor: TASK_PRIORITY_DOT_COLORS[row.priority] }} />
+                <span style={TASK_LIST_CELL}>{row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}</span>
               </div>
             );
           },
@@ -713,29 +651,31 @@ import React, {
         {
           key: "due_date", label: "Due date", sortable: true, type: "custom",
           render: (row) => {
-            if (!row.due_date) return <span style={{ ...CELL, color: "#9ca3af" }}>—</span>;
-            const overdue = moment(row.due_date).isBefore(moment()) && row.status !== "completed";
-            const isToday    = moment(row.due_date).isSame(moment(), "day");
-            const isTomorrow = moment(row.due_date).isSame(moment().add(1, "day"), "day");
-            const label = isToday
-              ? `Today at ${moment(row.due_date).format("HH:mm")}`
-              : isTomorrow
-                ? `Tomorrow at ${moment(row.due_date).format("HH:mm")}`
-                : moment(row.due_date).format("D MMMM YYYY HH:mm");
-            return <span style={{ ...CELL, color: overdue ? "#ef4444" : "#374151", fontWeight: overdue ? 500 : 300 }}>{label}</span>;
+            const parts = formatTaskDueDateCellParts(row.due_date, row.status);
+            return (
+              <span
+                style={{
+                  ...TASK_LIST_CELL,
+                  color: parts.color,
+                  fontWeight: parts.fontWeight,
+                }}
+              >
+                {parts.label}
+              </span>
+            );
           },
         },
         {
           key: "notes", label: "Notes", sortable: true, type: "custom",
           render: (row) => (
-            <span style={{ ...CELL, maxWidth: 200, overflow: "hidden",
+            <span style={{ ...TASK_LIST_CELL, maxWidth: 200, overflow: "hidden",
               textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
               title={row.notes || ""}>{row.notes || "—"}</span>
           ),
         },
         {
           key: "repeat_status", label: "Repeat Status", sortable: false, type: "custom",
-          render: (row) => <span style={CELL}>{row.repeat_status || "—"}</span>,
+          render: (row) => <span style={TASK_LIST_CELL}>{row.repeat_status || "—"}</span>,
         },
       ], [hoveredId, fetchTasks, router]);
     
@@ -803,23 +743,14 @@ import React, {
         <React.Fragment>
     
           {/* ── Global style overrides ── */}
-          <style dangerouslySetInnerHTML={{ __html: `
-            body, .tasks-page, .tasks-page * { box-sizing: border-box; }
-    
-            /* Kill GenericTable toolbar — we render our own */
-            .tasks-page .gt-toolbar-container { display: none !important; }
-    
-            /* Flatten card so our sections sit flush */
-            .tasks-page .generic-table-card,
-            .tasks-page .generic-table-container,
-            .tasks-page .card-body {
-              border-radius: 0 !important;
-              box-shadow: none !important;
-              border: none !important;
-              background: #fff !important;
-            }
-              .generic-table-responsive.fixed-height-table {border-radius: 0px 0px 0px 0px !important; margin-top:0px !important;}
-          `}} />
+          <style
+            dangerouslySetInnerHTML={{
+              __html: buildTaskListingPageStyleTag({
+                extraRules:
+                  ".generic-table-responsive.fixed-height-table { border-radius: 0 !important; margin-top: 0 !important; }",
+              }),
+            }}
+          />
     
           <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Tasks" />
     
@@ -857,12 +788,13 @@ import React, {
               </div>
     
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button style={BTN}>Manage queues</button>
-                <button style={BTN}>Import</button>
+                <button type="button" style={TASK_LIST_BTN_OUTLINE}>Manage queues</button>
+                <button type="button" style={TASK_LIST_BTN_OUTLINE}>Import</button>
                 <button
+                  type="button"
                   onClick={() => setShowCreate(true)}
                   style={{ 
-                    ...BTN,
+                    ...TASK_LIST_BTN_OUTLINE,
                     backgroundColor: "#000",
                     background: "#000",
                     borderColor: "#000", 
@@ -1110,7 +1042,7 @@ import React, {
                 <Button
                   variant="outline-secondary"
                   style={{
-                    ...BTN, fontSize: 12,
+                    ...TASK_LIST_BTN_OUTLINE, fontSize: 12,
                     backgroundColor: "#fff", borderColor: "#8a8a8a", color: "#141414",
                   }}
                 >
@@ -1119,7 +1051,7 @@ import React, {
                 <Button
                   variant="outline-secondary"
                   style={{
-                    ...BTN, fontSize: 12,
+                    ...TASK_LIST_BTN_OUTLINE, fontSize: 12,
                     backgroundColor: "#fff", borderColor: "#8a8a8a", color: "#141414",
                   }}
                 >
@@ -1131,96 +1063,40 @@ import React, {
             {/* ══════════════════════════════════════════════════════
                 ROW 4 — Search + Edit columns
             ══════════════════════════════════════════════════════ */}
-            <div
-  style={{
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "8px 16px",
-    paddingBottom: "18px", // overridden final value
-    backgroundColor: "#fff",
-    borderTop: "1px solid rgb(229, 231, 235)",
-    borderLeft: "1px solid #ccc",
-    borderRight: "1px solid #ccc",
-    borderRadius: "14px 14px 0 0",
-    flexShrink: 0,
-    marginLeft: "25px",
-    marginRight: "30px",
-    marginBottom: 0,
-  }}
->
-              {/* Search — height 41px, rounded, with an outline-secondary search button beside it */}
-              <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-                {/* Input wrapper */}
-                <div style={{ position: "relative" }}>
-                  <FiSearch size={14} style={{
-                    position: "absolute", left: 12, top: "50%",
-                    transform: "translateY(-50%)", color: "#9ca3af", pointerEvents: "none",
-                  }} />
-                  <input
-                    className="task-search-input"
-                    type="text"
-                    placeholder="Search task title and notes"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === "Enter") {
-                        setFilters(p => ({ ...p, search }));
-                        setPager(p => ({ ...p, page: 1 }));
-                      }
-                    }}
-                    style={{
-                      /* height 41px matches search button height per spec */
-                      height: 41,
-                      width: 260,
-                      padding: "0 12px 0 34px",
-                      border: "1px solid #d1d5db",
-                      /* left side rounded only — right abuts the search button */
-                      borderRadius: "20px 0 0 20px",
-                      borderRight: "none",
-                      fontSize: 13,
-                      color: "#374151",
-                      outline: "none",
-                      backgroundColor: "#fff",
-                      fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                    }}
-                  />
-                </div>
-    
-                {/* Bootstrap outline-secondary search button */}
+            <TaskListingSearchRow
+              search={search}
+              onSearchChange={setSearch}
+              onSubmitSearch={() => {
+                setFilters((p) => ({ ...p, search }));
+                setPager((p) => ({ ...p, page: 1 }));
+              }}
+              wrapperStyle={{
+                padding: "8px 16px",
+                paddingBottom: 18,
+                backgroundColor: "#fff",
+                borderTop: "1px solid rgb(229, 231, 235)",
+                borderLeft: "1px solid #ccc",
+                borderRight: "1px solid #ccc",
+                borderRadius: "14px 14px 0 0",
+                marginLeft: 25,
+                marginRight: 30,
+                marginBottom: 0,
+              }}
+              editColumnsSlot={(
                 <Button
                   variant="outline-secondary"
-                  onClick={() => {
-                    setFilters(p => ({ ...p, search }));
-                    setPager(p => ({ ...p, page: 1 }));
-                  }}
                   style={{
-                    height: 41,
-                    padding: "0 16px",
-                    borderRadius: "0 20px 20px 0",
-                    border: "1px solid #d1d5db",
-                    borderLeft: "none",
+                    ...TASK_LIST_BTN_OUTLINE,
+                    fontSize: 12,
                     backgroundColor: "#fff",
-                    color: "#6b7280",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    fontSize: 13,
-                    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                    borderColor: "#8a8a8a",
+                    color: "#141414",
                   }}
                 >
-                  <FiSearch size={15} />
+                  Edit columns
                 </Button>
-              </div>
-    
-              {/* Edit columns */}
-              <Button
-                variant="outline-secondary"
-                style={{
-                  ...BTN, fontSize: 12,
-                  backgroundColor: "#fff", borderColor: "#8a8a8a", color: "#141414",
-                }}
-              >Edit columns</Button>
-            </div>
+              )}
+            />
     
             {/* ══════════════════════════════════════════════════════
                 ROW 5 — Table (fills remaining height)
@@ -1244,8 +1120,8 @@ import React, {
                   setPager(p => ({ ...p, page, perPage }))
                 }
                 sortable
-                defaultSortColumn={pager.sortCol}
-                defaultSortDirection={pager.sortDir}
+                defaultSortBy={pager.sortCol}
+                defaultSortOrder={pager.sortDir}
                 onSort={(col, dir) => setPager(p => ({ ...p, sortCol: col, sortDir: dir }))}
                 onFirstColumnClick={row => router.push(`/crm/tasks/task-detail?id=${row.id}`)}
                 loading={loading}

@@ -242,15 +242,17 @@ button.preview-button:hover, button.preview-button:focus {
   color: #fff;
 }
 
-/* Column Selector */
+/* Column Selector — position: fixed escapes overflow:hidden ancestors and avoids table scrollbar */
 .column-selector-menu {
-  max-height: 400px;
+  max-height: 260px;
   overflow-y: auto;
-  z-index: 9;
+  z-index: 1050;
+  position: fixed !important;
 }
 
 .column-selector-menu .dropdown-item {
-  padding: 8px 16px;
+  padding: 5px 12px;
+  font-size: 0.875rem;
 }
 
 .generic-table-actions .btn-link {
@@ -520,6 +522,91 @@ button.preview-button:hover, button.preview-button:focus {
   background: transparent !important;
   color: #000 !important;
   font-weight: 300;
+}
+
+/*
+ * CRM person list (prospects/contacts) — campaign column only.
+ * Root `.crm-crm-personlist-campaign-col` is emitted only from
+ * `crmProspectsContactsListPageTableColumns.tsx` so other GenericTable columns
+ * (e.g. Name, other pages’ “Campaign” columns) are unaffected.
+ */
+.generic-table-td:has(.crm-crm-personlist-campaign-col) {
+  max-width: min(240px, 38vw);
+}
+
+.crm-crm-personlist-campaign-col.gt-campaign-cell {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Long campaign names: ellipsis (name font size follows `.generic-table-td span`) */
+.crm-crm-personlist-campaign-col .gt-campaign-name {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: #2d3748;
+}
+
+.crm-crm-personlist-campaign-col .gt-campaign-name--muted {
+  color: #9ca3af !important;
+  flex: 1 1 0;
+}
+
+/* Chips: Bootstrap `.badge` in td is flattened globally; use dedicated spans here only */
+.crm-crm-personlist-campaign-col .gt-campaign-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  font-size: 10px !important;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  border-radius: 999px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--active {
+  background-color: #15803d !important;
+  color: #ffffff !important;
+}
+
+.crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--inactive {
+  background-color: #b91c1c !important;
+  color: #ffffff !important;
+}
+
+.crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--warning {
+  background-color: #b45309 !important;
+  color: #ffffff !important;
+}
+
+.crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--neutral {
+  background-color: #4b5563 !important;
+  color: #ffffff !important;
+}
+
+.crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--info {
+  background-color: #0369a1 !important;
+  color: #ffffff !important;
+}
+
+.crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--unknown {
+  background-color: #e5e7eb !important;
+  color: #1f2937 !important;
+}
+
+.crm-crm-personlist-campaign-col .gt-campaign-status-chip.gt-campaign-status--none {
+  background-color: #f3f4f6 !important;
+  color: #374151 !important;
+  border: 1px solid #e5e7eb !important;
 }
 
 .generic-table-td .status-badge {

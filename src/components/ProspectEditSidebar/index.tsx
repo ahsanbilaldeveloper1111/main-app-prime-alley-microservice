@@ -46,7 +46,8 @@ export interface ProspectEditSidebarProps {
   ) => void;
   contactFormLoading: boolean;
   contactFormLoadError: string | null;
-  availableCampaigns: Array<{ id: number; label: string }>;
+  /** Matches CRM list loaders: `{ value, label, id }` with stable numeric id in `id` or string id in `value`. */
+  availableCampaigns: Array<{ id?: number; value?: string; label: string }>;
   extensions: any[];
   availableTags: Array<{ value: string; label: string; id: number }>;
   onClose: () => void;
@@ -142,6 +143,20 @@ const PROSPECT_LEGAL_BASIS_OPTIONS = [
   "Public task",
 ] as const;
 
+function campaignSelectOptionValue(c: {
+  id?: number;
+  value?: string;
+}): string | null {
+  if (c.id != null && Number.isFinite(Number(c.id))) {
+    return String(c.id);
+  }
+  const v = c.value;
+  if (v != null && String(v).trim() !== "") {
+    return String(v);
+  }
+  return null;
+}
+
 function toggleProspectLegalBasisOption(
   option: string,
   setContactForm: ProspectEditSidebarProps["setContactForm"],
@@ -179,10 +194,14 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
         Campaign
       </label>
       {(() => {
-        const campaignSelectOptions = availableCampaigns.map((c) => ({
-          value: String(c.id),
-          label: c.label,
-        }));
+        const campaignSelectOptions = availableCampaigns
+          .map((c) => {
+            const value = campaignSelectOptionValue(c);
+            return value ? { value, label: c.label } : null;
+          })
+          .filter(
+            (o): o is { value: string; label: string } => o != null,
+          );
         return (
           <Select
             inputId="prospect-campaign-select"
@@ -193,10 +212,17 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
                     (o) => o.value === String(contactForm.campaign_id),
                   ) ?? null
             }
-            onChange={(opt: any) =>
-              setContactForm({
-                ...contactForm,
-                campaign_id: opt?.value ? Number(opt.value) : null,
+            onChange={(opt: { value: string } | null) =>
+              setContactForm((prev) => {
+                const raw = opt?.value;
+                const nextId =
+                  raw != null && raw !== ""
+                    ? Number(raw)
+                    : Number.NaN;
+                return {
+                  ...prev,
+                  campaign_id: Number.isFinite(nextId) ? nextId : null,
+                };
               })
             }
             options={campaignSelectOptions}
@@ -570,7 +596,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
     </div>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
-        htmlFor="prospect-note-editor"
+        htmlFor="prospect-description-editor"
         className="contact-form-label"
         style={{
           display: "block",
@@ -580,13 +606,13 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
           marginBottom: "8px",
         }}
       >
-        Note
+        Description
       </label>
       <RichNoteEditor
-        id="prospect-note-editor"
+        id="prospect-description-editor"
         value={contactForm.note ?? ""}
         onChange={(html) => setContactForm({ ...contactForm, note: html })}
-        placeholder="Notes about this contact"
+        placeholder="Add a description for this contact"
         height={80}
       />
     </div>

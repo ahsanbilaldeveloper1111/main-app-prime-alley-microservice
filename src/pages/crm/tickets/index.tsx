@@ -146,8 +146,8 @@ const CrmTicketsPage = () => {
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 10,
-    sortColumn: "create_date",
-    sortDirection: "desc" as "asc" | "desc",
+    sortBy: "create_date",
+    sortOrder: "desc" as "asc" | "desc",
   });
 
   const [showTicketSidebar, setShowTicketSidebar] = useState(false);
@@ -672,8 +672,8 @@ const CrmTicketsPage = () => {
                 columns={visibleColumns}
                 showActions={false}
                 sortable={true}
-                defaultSortColumn="create_date"
-                defaultSortDirection="desc"
+                defaultSortBy="create_date"
+                defaultSortOrder="desc"
                 pagination={{
                   currentPage: pagination.currentPage,
                   rowsPerPage: pagination.rowsPerPage,
@@ -690,8 +690,8 @@ const CrmTicketsPage = () => {
                 onSort={(column, direction) => {
                   setPagination((prev) => ({
                     ...prev,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                   }));
                 }}
                 onPreviewClick={(row) => openPreviewSidebar(row)}

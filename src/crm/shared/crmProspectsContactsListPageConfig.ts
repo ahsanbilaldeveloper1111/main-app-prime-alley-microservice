@@ -136,8 +136,8 @@ export type CrmProspectsContactsListPageConfig = {
     pagination: {
       currentPage: number;
       rowsPerPage: number;
-      sortColumn: string;
-      sortDirection: string;
+      sortBy: string;
+      sortOrder: "asc" | "desc";
     },
     overrides?: { page?: number; per_page?: number },
   ) => Record<string, any>;
@@ -171,6 +171,11 @@ export type CrmProspectsContactsListPageConfig = {
   listLoadFailedMessage: string;
   /** When false, the Kanban board toggle and board layout are hidden (table only). */
   enableBoardView: boolean;
+  /**
+   * When set, the list preview sidebar id is stored in localStorage so returning from the
+   * detail page (browser back) can reopen the same preview.
+   */
+  previewPersistenceLocalStorageKey: string;
 };
 
 type PersonListIntegrationsSlice = Pick<
@@ -399,6 +404,7 @@ function buildCrmPersonListPageConfig(
     stats: ui.stats,
     callRecordingExtras: ui.callRecordingExtras,
     enableBoardView: options?.enableBoardView ?? true,
+    previewPersistenceLocalStorageKey: `crm-${e}-list-preview-record-id`,
     ...integrations,
   };
 }

@@ -9,10 +9,42 @@ import {
   getCrmPersonRowDispositionRaw,
 } from "@utils/crmPersonDisposition";
 import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspectsContactsListPageConfig";
+import { CrmPhoneDisplay } from "@components/crm/CrmListPageUi";
+
+function formatCrmCampaignStatusLabel(status: unknown): string {
+  if (typeof status !== "string" || !status.trim()) {
+    return "";
+  }
+  const s = status.trim();
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+/** Root class `crm-crm-personlist-campaign-col` scopes styles to this column only (see GenericTable.css). */
+/** Modifier for `.gt-campaign-status-chip`. */
+function crmCampaignStatusChipModifier(status: unknown): string {
+  if (typeof status !== "string" || !status.trim()) {
+    return "gt-campaign-status--unknown";
+  }
+  const s = status.trim().toLowerCase();
+  if (s === "active") {
+    return "gt-campaign-status--active";
+  }
+  if (s === "inactive" || s === "deactive" || s === "disabled") {
+    return "gt-campaign-status--inactive";
+  }
+  if (s === "draft" || s === "paused") {
+    return "gt-campaign-status--warning";
+  }
+  if (s === "completed" || s === "ended") {
+    return "gt-campaign-status--neutral";
+  }
+  return "gt-campaign-status--info";
+}
 
 export function buildCrmProspectsContactsTableColumns(
   config: CrmProspectsContactsListPageConfig,
   extensions: any[],
+  campaignStatusById: Readonly<Record<number, string>> = {},
 ): TableColumn<any>[] {
   return config.augmentTableColumns([
     {
@@ -32,6 +64,14 @@ export function buildCrmProspectsContactsTableColumns(
       sortable: true,
       type: "custom",
       align: "left",
+      emptyValue: "N/A",
+      render: (row) => {
+        const raw = row.phone;
+        if (raw == null || String(raw).trim() === "") {
+          return <span className="gt-empty-cell">N/A</span>;
+        }
+        return <CrmPhoneDisplay phone={String(raw)} />;
+      },
     },
     {
       key: "source_file",
@@ -65,10 +105,51 @@ export function buildCrmProspectsContactsTableColumns(
       key: "campaign",
       label: "Campaign",
       sortable: true,
-      type: "badge",
+      type: "custom",
+      width: "min(240px, 38vw)",
       accessor: (row) => row.campaign?.name || "No Campaign",
-      badge: {
-        getVariant: (row) => (row.campaign ? "primary" : "info"),
+      render: (row) => {
+        const name = row.campaign?.name;
+        if (!name) {
+          return (
+            <div className="crm-crm-personlist-campaign-col d-flex flex-row justify-content-between align-items-center w-100 min-w-0 gap-2 gt-campaign-cell">
+              <span className="gt-campaign-name gt-campaign-name--muted text-truncate min-w-0">
+                —
+              </span>
+              <span className="gt-campaign-status-chip gt-campaign-status--none flex-shrink-0">
+                No Campaign
+              </span>
+            </div>
+          );
+        }
+        const campaignIdRaw = row.campaign_id ?? row.campaign?.id;
+        const campaignId =
+          campaignIdRaw != null && campaignIdRaw !== ""
+            ? Number(campaignIdRaw)
+            : Number.NaN;
+        const statusFromMap =
+          Number.isFinite(campaignId) && campaignStatusById[campaignId] != null
+            ? campaignStatusById[campaignId]
+            : undefined;
+        const statusRaw = row.campaign?.status ?? statusFromMap;
+        const statusLabel = formatCrmCampaignStatusLabel(statusRaw);
+        const title = statusLabel ? `${name} — ${statusLabel}` : name;
+        return (
+          <div className="crm-crm-personlist-campaign-col d-flex flex-row justify-content-between align-items-center w-100 min-w-0 gap-2 text-start gt-campaign-cell">
+            <span className="gt-campaign-name text-truncate min-w-0" title={title}>
+              {name}
+            </span>
+            {statusLabel ? (
+              <span
+                className={`gt-campaign-status-chip ${crmCampaignStatusChipModifier(statusRaw)} flex-shrink-0`}
+              >
+                {statusLabel}
+              </span>
+            ) : (
+              <span className="text-muted small flex-shrink-0">—</span>
+            )}
+          </div>
+        );
       },
     },
     {

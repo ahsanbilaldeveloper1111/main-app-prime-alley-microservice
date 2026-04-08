@@ -479,8 +479,8 @@ export interface GenericTableProps<T = any> {
 
   // Sorting
   sortable?: boolean;
-  defaultSortColumn?: string;
-  defaultSortDirection?: "asc" | "desc";
+  defaultSortBy?: string;
+  defaultSortOrder?: "asc" | "desc";
   onSort?: (column: string, direction: "asc" | "desc") => void;
 
   // Actions
@@ -1058,8 +1058,8 @@ const GenericTable = <T extends Record<string, any>>({
   pagination,
   onPaginationChange,
   sortable = true,
-  defaultSortColumn = "",
-  defaultSortDirection = "asc",
+  defaultSortBy = "",
+  defaultSortOrder = "asc",
   onSort,
   actions = [],
   showActions = true,
@@ -1100,9 +1100,9 @@ const GenericTable = <T extends Record<string, any>>({
   const columnCustomizerPlaceholderId = useId();
   const columnCustomizerActionsHeaderId = useId();
   // Sorting state (synced from props when parent controls sort, e.g. server-side)
-  const [sortColumn, setSortColumn] = useState(defaultSortColumn);
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
-    defaultSortDirection,
+  const [sortBy, setSortBy] = useState(defaultSortBy);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
+    defaultSortOrder,
   );
   const baseActionsEnabled = showActions && actions.length > 0;
   const allSelectableColumnKeys = useMemo(() => {
@@ -1112,9 +1112,9 @@ const GenericTable = <T extends Record<string, any>>({
   }, [columns, baseActionsEnabled]);
 
   useEffect(() => {
-    setSortColumn(defaultSortColumn);
-    setSortDirection(defaultSortDirection);
-  }, [defaultSortColumn, defaultSortDirection]);
+    setSortBy(defaultSortBy);
+    setSortOrder(defaultSortOrder);
+  }, [defaultSortBy, defaultSortOrder]);
 
   // Column selection state (uncontrolled when selectedColumns prop is not provided)
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
@@ -1239,20 +1239,20 @@ const GenericTable = <T extends Record<string, any>>({
 
   // Sort data (client-side if no onSort provided) — before selection handlers that depend on it
   const sortedData = useMemo(() => {
-    if (onSort || !sortColumn) return data;
+    if (onSort || !sortBy) return data;
 
     return [...data].sort((a, b) => {
-      const aVal = a[sortColumn as keyof T] ?? "";
-      const bVal = b[sortColumn as keyof T] ?? "";
+      const aVal = a[sortBy as keyof T] ?? "";
+      const bVal = b[sortBy as keyof T] ?? "";
 
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
 
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
+      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
-  }, [data, sortColumn, sortDirection, onSort]);
+  }, [data, sortBy, sortOrder, onSort]);
 
   // Check if a row is selected
   const isSelected = (row: T) => {
@@ -1294,9 +1294,9 @@ const GenericTable = <T extends Record<string, any>>({
     if (!sortable) return;
 
     const newDirection =
-      sortColumn === column && sortDirection === "asc" ? "desc" : "asc";
-    setSortColumn(column);
-    setSortDirection(newDirection);
+      sortBy === column && sortOrder === "asc" ? "desc" : "asc";
+    setSortBy(column);
+    setSortOrder(newDirection);
 
     if (onSort) {
       onSort(column, newDirection);
@@ -1305,10 +1305,10 @@ const GenericTable = <T extends Record<string, any>>({
 
   // Render sort icon
   const renderSortIcon = (column: string) => {
-    if (sortColumn !== column) {
+    if (sortBy !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return sortDirection === "asc" ? (
+    return sortOrder === "asc" ? (
       <ArrowUp size={14} className="ms-1" />
     ) : (
       <ArrowDown size={14} className="ms-1" />
@@ -1337,14 +1337,35 @@ const GenericTable = <T extends Record<string, any>>({
     }
   };
 
-  /** Escape scroll/overflow parents (short tables clip `position: absolute` menus). */
-  const columnSelectorMenuPopperConfig = useMemo(
-    () => ({ strategy: "fixed" as const }),
+  /** Always open downward, escape overflow parents, stay within the viewport. */
+  const getColumnSelectorPopperConfig = useMemo(
+    () =>
+      (defaultConfig: Record<string, any>) => ({
+        ...defaultConfig,
+        strategy: "fixed" as const,
+        placement: "bottom-end" as const,
+        modifiers: (defaultConfig.modifiers ?? []).map(
+          (mod: Record<string, any>) => {
+            if (mod.name === "flip") return { ...mod, enabled: false };
+            if (mod.name === "preventOverflow")
+              return {
+                ...mod,
+                options: {
+                  ...mod.options,
+                  boundary: "viewport" as const,
+                  padding: 8,
+                },
+              };
+            return mod;
+          },
+        ),
+      }),
     [],
   );
 
   const renderColumnCustomizerDropdown = (toggleId: string) => (
     <Dropdown
+      drop="down"
       align="end"
       autoClose="outside"
       onClick={(e: React.MouseEvent) => e.stopPropagation()}
@@ -1361,7 +1382,8 @@ const GenericTable = <T extends Record<string, any>>({
       <Dropdown.Menu
         align="end"
         className="column-selector-menu"
-        popperConfig={columnSelectorMenuPopperConfig}
+        renderOnMount
+        popperConfig={getColumnSelectorPopperConfig}
       >
         {columnCatalog.map((c) => (
           <Dropdown.Item key={c.key} as="div">
@@ -1681,8 +1703,8 @@ const GenericTable = <T extends Record<string, any>>({
                           onClick={() => handleSort(col.key)}
                         >
                           {col.label}
-                          {sortColumn === col.key &&
-                            (sortDirection === "asc" ? " ↑" : " ↓")}
+                          {sortBy === col.key &&
+                            (sortOrder === "asc" ? " ↑" : " ↓")}
                         </Dropdown.Item>
                       ))
                     )}

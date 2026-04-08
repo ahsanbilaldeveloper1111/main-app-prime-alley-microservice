@@ -900,8 +900,8 @@ const AuditLogsNewPage = () => { // NOSONAR
               pagination={pagination}
               onPaginationChange={handlePaginationChange}
               sortable
-              defaultSortColumn="formatted_timestamp"
-              defaultSortDirection="desc"
+              defaultSortBy="formatted_timestamp"
+              defaultSortOrder="desc"
               onSort={() => {}}
               onPreviewClick={handlePreviewClick}
               loading={auditLogsLoading}

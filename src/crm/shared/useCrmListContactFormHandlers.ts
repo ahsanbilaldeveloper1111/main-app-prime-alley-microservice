@@ -141,7 +141,7 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
           campaign_id: contactForm.campaign_id ?? null,
           scheduled_call_at: contactForm.scheduled_call_at || undefined,
           company_domain: contactForm.company_domain?.trim() || undefined,
-          source: getSourceValue(contactForm),
+          source_file: getSourceValue(contactForm),
           data: dataPayload,
         });
         fetchCrmData();
@@ -192,7 +192,7 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
         phone: phoneForPayload,
         campaign_id: contactForm.campaign_id ?? null,
         company_domain: contactForm.company_domain?.trim() || undefined,
-        source: getSourceValue(contactForm),
+        source_file: getSourceValue(contactForm),
         scheduled_call_at: contactForm.scheduled_call_at || undefined,
         data: dataPayload,
       });

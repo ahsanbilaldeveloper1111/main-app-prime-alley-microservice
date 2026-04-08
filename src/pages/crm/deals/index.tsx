@@ -1,5 +1,4 @@
 import "@assets/scss/datatable-style.scss";
-import parsePhoneNumber from "libphonenumber-js";
 import { useRouter } from "next/router";
 import React, {
   ReactElement,
@@ -159,99 +158,39 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { useCti } from "@hooks/useCti";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
+import { CrmListExportModalAssignedToSelect } from "@crm/shared/CrmListExportModalAssignedToSelect";
+import {
+  CrmPhoneDisplay as PhoneDisplay,
+  CrmKPICard,
+} from "@components/crm/CrmListPageUi";
+import {
+  buildDealsListSidebarBaseFilterPayload,
+  mergeDealsSidebarFiltersIntoCurrent,
+} from "@crm/deals/dealsListPageFilterHelpers";
+import { CrmDealsListAddTabModal } from "@crm/deals/CrmDealsListAddTabModal";
+import {
+  applyDealTabAllFilters,
+  applyDealTabDeletedFilters,
+  applyDealTabLostFilters,
+  applyDealTabRejectedFilters,
+  applyDealTabStageFilters,
+} from "@crm/deals/dealsListTabFilterHelpers";
+import {
+  buildDealsExportCsvContent,
+  triggerCsvDownload,
+} from "@crm/deals/dealsListCsvExport";
+import {
+  DEALS_EMPTY_FOLLOWUP_FORM,
+  DEALS_EMPTY_MEETING_FORM,
+  dealsFollowupChannelOtherIsInvalid,
+} from "@crm/deals/dealsListModalFormDefaults";
+import {
+  buildDealsListGetDealsExportParams,
+  buildDealsListGetDealsParams,
+} from "@crm/deals/dealsListGetDealsQueryParams";
 
 const ignoredKeys = ["stage_id"];
-// Phone Container Component (with Badge for tables)
-const PhoneContainer = ({ phone }: { phone: string }) => {
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
-  const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-  return (
-    <Badge bg="info" className="bg-opacity-10 text-dark">
-      <div className="d-flex align-items-center gap-2">
-        {phoneNumber?.countryCode && (
-          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-        )}
-        {phoneNumber.phone}
-      </div>
-    </Badge>
-  );
-};
-
-// Phone Display Component (without Badge for view dialogs)
-const PhoneDisplay = ({ phone }: { phone: string }) => {
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
-  const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-  return (
-    <div className="d-flex align-items-center gap-2">
-      {phoneNumber?.countryCode && (
-        <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-      )}
-      {phoneNumber.phone}
-    </div>
-  );
-};
 
 // Helper function to get initials from name (first two words, first two letters, only a-z)
 const getInitials = (name: string): string => {
@@ -303,70 +242,6 @@ const getRandomColor = (name: string): string => {
   const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
 
   return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
-};
-
-// KPI Card Component
-interface KPICardData {
-  title: string;
-  value: string;
-  change?: string;
-  isPositive?: boolean;
-  icon: React.ReactNode;
-  color: string;
-  onClick?: () => void;
-}
-
-const KPICard: React.FC<KPICardData> = ({
-  title,
-  value,
-  change,
-  isPositive,
-  icon,
-  color,
-  onClick,
-}) => {
-  return (
-    <Card
-      className={onClick ? "h-100" : ""}
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        transition: "all 0.2s ease",
-        border: "1px solid #e9ecef",
-      }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }
-      }}
-    >
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
-            <div className={`text-${color}`}>{icon}</div>
-          </div>
-          {change && (
-            <Badge
-              bg={isPositive ? "success" : "danger"}
-              className="bg-opacity-10"
-            >
-              {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-              {change}
-            </Badge>
-          )}
-        </div>
-        <h3 className="mb-1">{value}</h3>
-        <p className="text-muted mb-0 small">{title}</p>
-      </Card.Body>
-    </Card>
-  );
 };
 
 const detailSectionTitleStyle: React.CSSProperties = {
@@ -438,228 +313,7 @@ const DetailField = ({
   </div>
 );
 
-// Filter Bar Component
-interface FilterBarProps {
-  quickFilters: {
-    id: string;
-    label: string;
-    count: number;
-    variant?: string;
-    color?: string;
-    icon?: React.ReactNode;
-  }[];
-  activeFilter?: string;
-  onFilterChange?: (filterId: string) => void;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
-  onSearch?: () => void;
-  searchPlaceholder?: string;
-  showAdvancedFilters?: boolean;
-  onToggleAdvancedFilters?: () => void;
-  advancedFilterCount?: number;
-}
-
-const FilterBar: React.FC<FilterBarProps> = ({
-  quickFilters,
-  activeFilter,
-  onFilterChange,
-  searchValue,
-  onSearchChange,
-  onSearch,
-  searchPlaceholder = "Search...",
-  showAdvancedFilters,
-  onToggleAdvancedFilters,
-  advancedFilterCount = 0,
-}) => {
-  return (
-    <Card className="border-0 shadow-sm mb-3">
-      <Card.Body className="p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color;
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor) {
-                if (isActive) {
-                  const bgColor = filter.color;
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
-
-              return (
-                <Button
-                  key={filter.id}
-                  variant={
-                    hasCustomColor
-                      ? undefined
-                      : isActive
-                        ? filter.variant || "primary"
-                        : "outline-secondary"
-                  }
-                  onClick={() => onFilterChange && onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2"
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  {filter.icon && (
-                    <span className="d-flex align-items-center">
-                      {filter.icon}
-                    </span>
-                  )}
-                  {filter.label}
-                </Button>
-              );
-            })}
-          </div>
-
-          {/* <div className="d-flex flex-column flex-sm-row gap-2 align-items-stretch align-items-sm-center flex-shrink-0">
-            <InputGroup style={{ width: '300px', minWidth: '200px' }} className="flex-shrink-0">
-              <Form.Control
-                style={{ height: '41px' }}
-                type="text"
-                placeholder={searchPlaceholder}
-                value={searchValue}
-                onChange={(e) => onSearchChange(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    onSearch();
-                  }
-                }}
-              />
-              <Button 
-                variant="outline-secondary"
-                onClick={onSearch}
-              >
-                <Search size={16} />
-              </Button>
-            </InputGroup>
-            <Button 
-              variant={showAdvancedFilters ? 'primary' : 'outline-secondary'}
-              onClick={onToggleAdvancedFilters}
-              className="d-flex align-items-center flex-shrink-0"
-            >
-              <Filter size={16} className="me-2" />
-              Filters
-              {advancedFilterCount > 0 && (
-                <Badge bg="light" text="dark" className="ms-2">
-                  {advancedFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </div> */}
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
-type AnyRecord = Record<string, any>;
-
-const addIfTruthyParam = (params: AnyRecord, key: string, value: unknown): void => {
-  if (value) {
-    params[key] = value;
-  }
-};
-
-const addIfDefinedParam = (params: AnyRecord, key: string, value: unknown): void => {
-  if (value !== undefined) {
-    params[key] = value;
-  }
-};
-
-const addIfNumberLikeParam = (
-  params: AnyRecord,
-  key: string,
-  value: unknown,
-): void => {
-  if (value != null && value !== "") {
-    params[key] = Number(value);
-  }
-};
-
-const addIfNotNullOrEmptyParam = (
-  params: AnyRecord,
-  key: string,
-  value: unknown,
-): void => {
-  if (value != null && value !== "") {
-    params[key] = value;
-  }
-};
-
-const resolveUserExtensions = (filters: AnyRecord): unknown[] | undefined => {
-  if (filters.user_extensions?.length) {
-    return filters.user_extensions;
-  }
-  if (filters.assigned_to) {
-    return [filters.assigned_to];
-  }
-  return undefined;
-};
-
-const applyDealsFilters = (params: AnyRecord, filters: AnyRecord): void => {
-  addIfTruthyParam(params, "search", filters.search);
-
-  addIfDefinedParam(params, "include_converted", filters.include_converted);
-  addIfDefinedParam(params, "include_lost", filters.include_lost);
-  addIfDefinedParam(params, "include_archived", filters.include_archived);
-
-  addIfTruthyParam(params, "user_extensions", resolveUserExtensions(filters));
-  addIfTruthyParam(params, "stage_id", filters.stage_id);
-
-  addIfNumberLikeParam(params, "probability_min", filters.probability_min);
-  addIfNumberLikeParam(params, "probability_max", filters.probability_max);
-
-  addIfTruthyParam(params, "business_type_id", filters.business_type_id);
-
-  addIfTruthyParam(params, "expected_close_date_from", filters.expected_close_date_from);
-  addIfTruthyParam(params, "expected_close_date_to", filters.expected_close_date_to);
-
-  addIfTruthyParam(params, "follow_up_date_from", filters.follow_up_date_from);
-  addIfTruthyParam(params, "follow_up_date_to", filters.follow_up_date_to);
-
-  addIfTruthyParam(params, "created_at_from", filters.created_at_from);
-  addIfTruthyParam(params, "created_at_to", filters.created_at_to);
-  addIfTruthyParam(params, "created_at_month", filters.created_at_month);
-
-  addIfNotNullOrEmptyParam(params, "ticket_id", filters.ticket_id);
-
-  addIfDefinedParam(params, "has_meetings", filters.has_meetings);
-
-  addIfTruthyParam(params, "approval_status", filters.approval_status);
-
-  addIfTruthyParam(params, "sort_by", filters.sort_by);
-  addIfTruthyParam(params, "sort_order", filters.sort_order);
-};
-
-const applyTableSorting = (
-  params: AnyRecord,
-  includeTableSorting: boolean,
-  sortColumn: unknown,
-  sortDirection: unknown,
-): void => {
-  if (includeTableSorting && sortColumn) {
-    params.sort_column = sortColumn;
-    params.sort_direction = sortDirection;
-  }
-};
-
-const applyPagination = (
-  params: AnyRecord,
-  pagination?: { page: number; per_page: number },
-): void => {
-  if (!pagination) return;
-  params.page = pagination.page;
-  params.per_page = pagination.per_page;
-};
-
-const CrmDeals = () => {
+const CrmDeals = () => { // NOSONAR
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
@@ -780,16 +434,9 @@ const CrmDeals = () => {
   // Follow-up Modal
   const [showAddFollowupModal, setShowAddFollowupModal] = useState(false);
   const [followUpIdToEdit, setFollowUpIdToEdit] = useState<number | null>(null);
-  const [followupData, setFollowupData] = useState({
-    dealId: null as number | null,
-    dealName: "",
-    followUpDate: "",
-    followUpStatus: "Pending",
-    communicationChannel: "Phone Call",
-    communicationChannelOther: "",
-    notes: "",
-    userExtension: "",
-  });
+  const [followupData, setFollowupData] = useState(() => ({
+    ...DEALS_EMPTY_FOLLOWUP_FORM,
+  }));
   const [loadingFollowUp, setLoadingFollowUp] = useState(false);
 
   // Delete Follow-up Modal
@@ -803,16 +450,9 @@ const CrmDeals = () => {
   // Meeting Modal
   const [showAddMeetingModal, setShowAddMeetingModal] = useState(false);
   const [meetingIdToEdit, setMeetingIdToEdit] = useState<number | null>(null);
-  const [meetingData, setMeetingData] = useState({
-    dealId: null as number | null,
-    dealName: "",
-    meetingName: "",
-    meetingType: "Online",
-    meetingDate: "",
-    meetingTime: "",
-    meetingOutcome: "",
-    extensions: [] as string[],
-  });
+  const [meetingData, setMeetingData] = useState(() => ({
+    ...DEALS_EMPTY_MEETING_FORM,
+  }));
   const [meetingAttendees, setMeetingAttendees] = useState<readonly any[]>([]);
   const [loadingMeeting, setLoadingMeeting] = useState(false);
 
@@ -861,8 +501,8 @@ const CrmDeals = () => {
   const [dealsPagination, setDealsPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [serverPaginationMeta, setServerPaginationMeta] = useState<{
     total: number;
@@ -928,12 +568,10 @@ const CrmDeals = () => {
 
   // Build API params from filters for export (same shape as fetchDeals)
   const buildDealsExportParams = useCallback(
-    (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
-      const params: Record<string, any> = {};
-      applyDealsFilters(params, filters);
-      applyPagination(params, pagination);
-      return params;
-    },
+    (
+      filters: Record<string, any>,
+      pagination?: { page: number; per_page: number },
+    ) => buildDealsListGetDealsExportParams(filters, pagination),
     [],
   );
 
@@ -960,7 +598,6 @@ const CrmDeals = () => {
 
   const handleDealsExport = useCallback(async () => {
     const name = exportFileName.trim() || `deals_${moment().format("YYYY-MM-DD")}`;
-    const ext = name.endsWith(".csv") ? "" : ".csv";
     setExporting(true);
     try {
       const allData = await fetchDealsForExport(exportFilters);
@@ -1038,42 +675,12 @@ const CrmDeals = () => {
           key,
         })),
       ];
-      const csvRows = [
-        exportFields.map((f) => f.label).join(","),
-        ...allData.map((row) =>
-          exportFields
-            .map(({ key }) => {
-              const val =
-                typeof row === "object" && row !== null
-                  ? getRowValue(row as Record<string, any>, key)
-                  : "";
-              if (val == null) return "";
-              let serialized = "";
-              switch (typeof val) {
-                case "string":
-                case "number":
-                case "boolean":
-                case "bigint":
-                  serialized = `${val}`;
-                  break;
-                default:
-                  return "";
-              }
-              const s = serialized.replaceAll('"', '""');
-              return s.includes(",") || s.includes('"') ? `"${s}"` : s;
-            })
-            .join(","),
-        ),
-      ];
-      const blob = new Blob([csvRows.join("\n")], {
-        type: "text/csv;charset=utf-8;",
-      });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name + ext;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      const csvText = buildDealsExportCsvContent(
+        exportFields,
+        allData,
+        getRowValue,
+      );
+      triggerCsvDownload(csvText, name);
       setShowExportModal(false);
       toast.success(`Exported ${allData.length} deals successfully!`);
     } catch (err) {
@@ -1089,19 +696,53 @@ const CrmDeals = () => {
       page = 1,
       perPage = 15,
       includeTableSorting = true,
-    ) => {
-      const params: Record<string, any> = { page, per_page: perPage };
-      applyDealsFilters(params, filters);
-      applyTableSorting(
-        params,
+    ) =>
+      buildDealsListGetDealsParams(filters, {
+        page,
+        perPage,
         includeTableSorting,
-        dealsPagination.sortColumn,
-        dealsPagination.sortDirection,
-      );
-      return params;
-    },
-    [dealsPagination.sortColumn, dealsPagination.sortDirection],
+        tableSort: dealsPagination,
+      }),
+    [dealsPagination.sortBy, dealsPagination.sortOrder],
   );
+
+  const buildDealsSidebarFiltersPayload = useCallback(() => {
+    const filtersToApply = buildDealsListSidebarBaseFilterPayload(
+      dealsSearch,
+      {
+        assignedTo: dealsFilters.assignedTo,
+        stage: dealsFilters.stage,
+        followUpDateFrom: dealsFilters.followUpDateFrom,
+        followUpDateTo: dealsFilters.followUpDateTo,
+        probabilityMin: dealsFilters.probabilityMin,
+        probabilityMax: dealsFilters.probabilityMax,
+        expectedCloseDateFrom: dealsFilters.expectedCloseDateFrom,
+        expectedCloseDateTo: dealsFilters.expectedCloseDateTo,
+        approvalStatus: dealsFilters.approvalStatus,
+      },
+      "includeIfTruthy",
+    );
+    if (dealsFilters.businessType) {
+      filtersToApply.business_type_id = dealsFilters.businessType;
+    }
+    filtersToApply.include_converted = dealsFilters.includeConverted || undefined;
+    filtersToApply.include_lost = dealsFilters.includeLost || undefined;
+    filtersToApply.include_archived = dealsFilters.includeArchived || undefined;
+    filtersToApply.has_meetings = dealsFilters.hasMeetings || undefined;
+    if (dealsFilters.createdAtFrom) {
+      filtersToApply.created_at_from = dealsFilters.createdAtFrom;
+    }
+    if (dealsFilters.createdAtTo) {
+      filtersToApply.created_at_to = dealsFilters.createdAtTo;
+    }
+    if (dealsFilters.created_at_month) {
+      filtersToApply.created_at_month = dealsFilters.created_at_month;
+    }
+    if (dealsFilters.ticketId) {
+      filtersToApply.ticket_id = dealsFilters.ticketId;
+    }
+    return filtersToApply;
+  }, [dealsSearch, dealsFilters]);
 
   // Fetch deals when filters or search change
   const fetchDeals = useCallback(
@@ -1201,77 +842,31 @@ const CrmDeals = () => {
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
   useEffect(() => {
+    const clearStageDropdown = () =>
+      setDealsFilters((prev) => ({ ...prev, stage: null }));
+
     if (activeFilter === "all") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.stage_id;
-        delete newFilters.approval_status;
-        delete newFilters.include_archived;
-        delete newFilters.include_lost;
-        return newFilters;
-      });
-      // Clear stage dropdown
-      setDealsFilters((prev) => ({
-        ...prev,
-        stage: null,
-      }));
+      setCurrentFilters((prev) => applyDealTabAllFilters(prev));
+      clearStageDropdown();
     } else if (activeFilter === "lost") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.stage_id;
-        delete newFilters.include_archived;
-        newFilters.include_lost = true;
-        return newFilters;
-      });
-      // Clear stage dropdown
-      setDealsFilters((prev) => ({
-        ...prev,
-        stage: null,
-      }));
+      setCurrentFilters((prev) => applyDealTabLostFilters(prev));
+      clearStageDropdown();
     } else if (activeFilter === "deleted") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.stage_id;
-        delete newFilters.include_lost;
-        newFilters.include_archived = true;
-        return newFilters;
-      });
-      // Clear stage dropdown
-      setDealsFilters((prev) => ({
-        ...prev,
-        stage: null,
-      }));
+      setCurrentFilters((prev) => applyDealTabDeletedFilters(prev));
+      clearStageDropdown();
     } else if (activeFilter === "rejected") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.stage_id;
-        delete newFilters.include_lost;
-        delete newFilters.include_archived;
-        newFilters.approval_status = "rejected";
-        return newFilters;
-      });
-      // Clear stage dropdown
-      setDealsFilters((prev) => ({
-        ...prev,
-        stage: null,
-      }));
+      setCurrentFilters((prev) => applyDealTabRejectedFilters(prev));
+      clearStageDropdown();
     } else if (activeFilter && stages.length > 0) {
-      // Find stage by id (activeFilter should be stage id as string)
       const selectedStage = stages.find(
         (s: any) => s.id.toString() === activeFilter,
       );
       if (selectedStage) {
-        setCurrentFilters((prev) => {
-          const newFilters = { ...prev };
-          delete newFilters.include_archived;
-          delete newFilters.include_lost;
-          newFilters.stage_id = selectedStage.id.toString();
-          return newFilters;
-        });
-        // Auto-fill stage dropdown
+        const stageId = selectedStage.id.toString();
+        setCurrentFilters((prev) => applyDealTabStageFilters(prev, stageId));
         setDealsFilters((prev) => ({
           ...prev,
-          stage: selectedStage.id.toString(),
+          stage: stageId,
         }));
       }
     }
@@ -1425,190 +1020,9 @@ const CrmDeals = () => {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) => {
-      const newFilters = { ...prev };
-
-      // Handle stage_id filter (single value)
-      if ("stage_id" in filters) {
-        if (filters.stage_id) {
-          newFilters.stage_id = String(filters.stage_id);
-        } else {
-          delete newFilters.stage_id;
-        }
-      }
-
-      // Handle assigned_to filter (single value)
-      if ("assigned_to" in filters) {
-        if (filters.assigned_to) {
-          newFilters.assigned_to = String(filters.assigned_to);
-        } else {
-          delete newFilters.assigned_to;
-        }
-      }
-
-      // Handle search
-      if ("search" in filters) {
-        if (filters.search) {
-          newFilters.search = filters.search;
-        } else {
-          delete newFilters.search;
-        }
-      }
-
-      // Handle is_lost filter
-      if ("is_lost" in filters) {
-        newFilters.is_lost = filters.is_lost;
-      }
-
-      // Handle include_lost filter
-      if ("include_lost" in filters) {
-        if (filters.include_lost) {
-          newFilters.include_lost = true;
-        } else {
-          delete newFilters.include_lost;
-        }
-      }
-
-      // Handle include_archived filter
-      if ("include_archived" in filters) {
-        if (filters.include_archived) {
-          newFilters.include_archived = true;
-        } else {
-          delete newFilters.include_archived;
-        }
-      }
-
-      // Handle follow_up_date_from filter
-      if ("follow_up_date_from" in filters) {
-        if (filters.follow_up_date_from) {
-          newFilters.follow_up_date_from = filters.follow_up_date_from;
-        } else {
-          delete newFilters.follow_up_date_from;
-        }
-      }
-
-      // Handle follow_up_date_to filter
-      if ("follow_up_date_to" in filters) {
-        if (filters.follow_up_date_to) {
-          newFilters.follow_up_date_to = filters.follow_up_date_to;
-        } else {
-          delete newFilters.follow_up_date_to;
-        }
-      }
-
-      // Handle probability_min filter
-      if ("probability_min" in filters) {
-        if (filters.probability_min) {
-          newFilters.probability_min = String(filters.probability_min);
-        } else {
-          delete newFilters.probability_min;
-        }
-      }
-
-      // Handle probability_max filter
-      if ("probability_max" in filters) {
-        if (filters.probability_max) {
-          newFilters.probability_max = String(filters.probability_max);
-        } else {
-          delete newFilters.probability_max;
-        }
-      }
-
-      // Handle approval_status filter
-      if ("approval_status" in filters) {
-        if (filters.approval_status) {
-          newFilters.approval_status = filters.approval_status;
-        } else {
-          delete newFilters.approval_status;
-        }
-      }
-      // Handle business_type_id filter
-      if ("business_type_id" in filters) {
-        if (filters.business_type_id) {
-          newFilters.business_type_id = filters.business_type_id;
-        } else {
-          delete newFilters.business_type_id;
-        }
-      }
-
-      // Handle expected_close_date_from filter
-      if ("expected_close_date_from" in filters) {
-        if (filters.expected_close_date_from) {
-          newFilters.expected_close_date_from =
-            filters.expected_close_date_from;
-        } else {
-          delete newFilters.expected_close_date_from;
-        }
-      }
-
-      // Handle expected_close_date_to filter
-      if ("expected_close_date_to" in filters) {
-        if (filters.expected_close_date_to) {
-          newFilters.expected_close_date_to = filters.expected_close_date_to;
-        } else {
-          delete newFilters.expected_close_date_to;
-        }
-      }
-
-      // Handle include_converted filter
-      if ("include_converted" in filters) {
-        if (filters.include_converted) {
-          newFilters.include_converted = true;
-        } else {
-          delete newFilters.include_converted;
-        }
-      }
-
-      // Handle created_at_from / created_at_to / created_at_month
-      if ("created_at_from" in filters) {
-        if (filters.created_at_from) {
-          newFilters.created_at_from = filters.created_at_from;
-        } else {
-          delete newFilters.created_at_from;
-        }
-      }
-      if ("created_at_to" in filters) {
-        if (filters.created_at_to) {
-          newFilters.created_at_to = filters.created_at_to;
-        } else {
-          delete newFilters.created_at_to;
-        }
-      }
-      if ("created_at_month" in filters) {
-        if (filters.created_at_month) {
-          newFilters.created_at_month = filters.created_at_month;
-        } else {
-          delete newFilters.created_at_month;
-        }
-      }
-
-      // Handle ticket_id and has_meetings
-      if ("ticket_id" in filters) {
-        if (filters.ticket_id != null && filters.ticket_id !== "") {
-          newFilters.ticket_id = filters.ticket_id;
-        } else {
-          delete newFilters.ticket_id;
-        }
-      }
-      if ("has_meetings" in filters) {
-        if (filters.has_meetings) {
-          newFilters.has_meetings = true;
-        } else {
-          delete newFilters.has_meetings;
-        }
-      }
-
-      // Handle user_extensions (array for assignee/creator)
-      if ("user_extensions" in filters) {
-        if (Array.isArray(filters.user_extensions) && filters.user_extensions.length > 0) {
-          newFilters.user_extensions = filters.user_extensions;
-        } else {
-          delete newFilters.user_extensions;
-        }
-      }
-
-      return newFilters;
-    });
+    setCurrentFilters((prev) =>
+      mergeDealsSidebarFiltersIntoCurrent(prev, filters),
+    );
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -1738,7 +1152,7 @@ const CrmDeals = () => {
     }
   }, []);
 
-  const handlePreviewClick = useCallback(
+  const handlePreviewClickBase = useCallback(
     async (deal: any) => {
       const dealId = deal.rawData?.id || deal.id;
       // Set the deal immediately to show sidebar
@@ -1760,6 +1174,31 @@ const CrmDeals = () => {
       }
     },
     [fetchDealFollowUps, fetchDealMeetings],
+  );
+
+  const openDealPreviewById = useCallback(
+    (id: number) => {
+      handlePreviewClickBase({ id, rawData: { id } }).catch((error: unknown) => {
+        console.error("openDealPreviewById:", error);
+      });
+    },
+    [handlePreviewClickBase],
+  );
+
+  const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
+    useCrmListPreviewPersistence({
+      localStorageKey: "crm-deals-list-preview-record-id",
+      listLoading: !isInitialized || loading,
+      openPreviewByNumericId: openDealPreviewById,
+    });
+
+  const handlePreviewClick = useCallback(
+    async (deal: any) => {
+      const dealId = deal.rawData?.id || deal.id;
+      if (dealId) writePreviewIdToStorage(Number(dealId));
+      await handlePreviewClickBase(deal);
+    },
+    [handlePreviewClickBase, writePreviewIdToStorage],
   );
 
   // Handle first column click - navigates to detail page
@@ -1818,6 +1257,12 @@ const CrmDeals = () => {
   const handleCloseDealSidebar = useCallback(() => {
     setShowDealSidebar(false);
     setSelectedDeal(null);
+    clearPreviewIdFromStorage();
+  }, [clearPreviewIdFromStorage]);
+
+  const handleHideDealSidebarKeepPersistence = useCallback(() => {
+    setShowDealSidebar(false);
+    setSelectedDeal(null);
   }, []);
 
   const handleDeleteDeal = useCallback((dealId: number, dealName?: string) => {
@@ -1861,16 +1306,7 @@ const CrmDeals = () => {
       // Reset form and close modal
       setShowAddMeetingModal(false);
       setMeetingIdToEdit(null);
-      setMeetingData({
-        dealId: null,
-        dealName: "",
-        meetingName: "",
-        meetingType: "Online",
-        meetingDate: "",
-        meetingTime: "",
-        meetingOutcome: "",
-        extensions: [],
-      });
+      setMeetingData({ ...DEALS_EMPTY_MEETING_FORM });
       setMeetingAttendees([]);
     } catch (error) {
       console.error("Failed to create meeting:", error);
@@ -1917,16 +1353,7 @@ const CrmDeals = () => {
       // Reset form and close modal
       setShowAddMeetingModal(false);
       setMeetingIdToEdit(null);
-      setMeetingData({
-        dealId: null,
-        dealName: "",
-        meetingName: "",
-        meetingType: "Online",
-        meetingDate: "",
-        meetingTime: "",
-        meetingOutcome: "",
-        extensions: [],
-      });
+      setMeetingData({ ...DEALS_EMPTY_MEETING_FORM });
       setMeetingAttendees([]);
     } catch (error) {
       console.error("Failed to update meeting:", error);
@@ -1981,6 +1408,7 @@ const CrmDeals = () => {
 
       setMeetingIdToEdit(meeting.id);
       setMeetingData({
+        ...DEALS_EMPTY_MEETING_FORM,
         dealId: viewingDeal?.id || null,
         dealName: viewingDeal?.name || "",
         meetingName: meeting.name || "",
@@ -1988,7 +1416,7 @@ const CrmDeals = () => {
         meetingDate: meetingDate,
         meetingTime: meetingTime,
         meetingOutcome: meeting.meeting_outcome || "",
-        extensions: meetingExtensionStrings, // Store extension strings, not objects
+        extensions: meetingExtensionStrings,
       });
       setMeetingAttendees(attendees);
       setShowAddMeetingModal(true);
@@ -2047,10 +1475,7 @@ const CrmDeals = () => {
       { field: "followUpDate", name: "Follow-up Date" },
       { field: "communicationChannel", name: "Communication Channel" },
     ]);
-    if (
-      followupData.communicationChannel === "Other" &&
-      !followupData.communicationChannelOther?.trim()
-    ) {
+    if (dealsFollowupChannelOtherIsInvalid(followupData)) {
       toast.error("Please specify the communication channel");
       return;
     }
@@ -2068,16 +1493,7 @@ const CrmDeals = () => {
       if (followUp) {
         setShowAddFollowupModal(false);
         setFollowUpIdToEdit(null);
-        setFollowupData({
-          dealId: null,
-          dealName: "",
-          followUpDate: "",
-          followUpStatus: "Pending",
-          communicationChannel: "Phone Call",
-          communicationChannelOther: "",
-          notes: "",
-          userExtension: "",
-        });
+        setFollowupData({ ...DEALS_EMPTY_FOLLOWUP_FORM });
         // handleRowClicked(dealId);
         await fetchDealFollowUps(dealId);
       }
@@ -2095,10 +1511,7 @@ const CrmDeals = () => {
       { field: "followUpDate", name: "Follow-up Date" },
       { field: "communicationChannel", name: "Communication Channel" },
     ]);
-    if (
-      followupData.communicationChannel === "Other" &&
-      !followupData.communicationChannelOther?.trim()
-    ) {
+    if (dealsFollowupChannelOtherIsInvalid(followupData)) {
       toast.error("Please specify the communication channel");
       return;
     }
@@ -2116,16 +1529,7 @@ const CrmDeals = () => {
       if (followUp) {
         setShowAddFollowupModal(false);
         setFollowUpIdToEdit(null);
-        setFollowupData({
-          dealId: null,
-          dealName: "",
-          followUpDate: "",
-          followUpStatus: "Pending",
-          communicationChannel: "Phone Call",
-          communicationChannelOther: "",
-          notes: "",
-          userExtension: "",
-        });
+        setFollowupData({ ...DEALS_EMPTY_FOLLOWUP_FORM });
         //handleRowClicked(dealId);
         await fetchDealFollowUps(dealId);
       }
@@ -2253,28 +1657,28 @@ const CrmDeals = () => {
     setPaginationState: (state: any) => void,
   ) => {
     const newDirection =
-      paginationState.sortColumn === column &&
-      paginationState.sortDirection === "asc"
+      paginationState.sortBy === column &&
+      paginationState.sortOrder === "asc"
         ? "desc"
         : "asc";
     setPaginationState({
       ...paginationState,
-      sortColumn: column,
-      sortDirection: newDirection,
+      sortBy: column,
+      sortOrder: newDirection,
       currentPage: 1,
     });
   };
 
   const sortData = <T extends Record<string, any>>(
     data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
+    sortBy: string,
+    sortOrder: "asc" | "desc",
   ): T[] => {
-    if (!sortColumn) return data;
+    if (!sortBy) return data;
 
     return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
 
       if (aVal === undefined) aVal = "";
       if (bVal === undefined) bVal = "";
@@ -2282,8 +1686,8 @@ const CrmDeals = () => {
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
 
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
+      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
   };
@@ -2452,10 +1856,10 @@ const CrmDeals = () => {
   };
 
   const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortColumn !== column) {
+    if (paginationState.sortBy !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return paginationState.sortDirection === "asc" ? (
+    return paginationState.sortOrder === "asc" ? (
       <ArrowUp size={14} className="ms-1" />
     ) : (
       <ArrowDown size={14} className="ms-1" />
@@ -3117,7 +2521,7 @@ const CrmDeals = () => {
                 {/* Summary Stats using KPICard */}
                 <Row className="mb-4">
                   <Col lg={3} md={6} className="mb-3">
-                    <KPICard
+                    <CrmKPICard
                       title="Total Deals"
                       value={analyticsData.total.toString()}
                       icon={<Handshake size={24} />}
@@ -3125,7 +2529,7 @@ const CrmDeals = () => {
                     />
                   </Col>
                   <Col lg={3} md={6} className="mb-3">
-                    <KPICard
+                    <CrmKPICard
                       title="Won Deals"
                       value={analyticsData.won.toString()}
                       icon={<CheckCircle size={24} />}
@@ -3133,7 +2537,7 @@ const CrmDeals = () => {
                     />
                   </Col>
                   <Col lg={3} md={6} className="mb-3">
-                    <KPICard
+                    <CrmKPICard
                       title="In Negotiation"
                       value={analyticsData.inNegotiation.toString()}
                       icon={<Activity size={24} />}
@@ -3141,7 +2545,7 @@ const CrmDeals = () => {
                     />
                   </Col>
                   <Col lg={3} md={6} className="mb-3">
-                    <KPICard
+                    <CrmKPICard
                       title="Total Value"
                       value={`${analyticsData.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
                       icon={<DollarSign size={24} />}
@@ -3272,13 +2676,13 @@ const CrmDeals = () => {
                   });
                 }}
                 sortable={true}
-                defaultSortColumn={dealsPagination.sortColumn}
-                defaultSortDirection={dealsPagination.sortDirection}
+                defaultSortBy={dealsPagination.sortBy}
+                defaultSortOrder={dealsPagination.sortOrder}
                 onSort={(column, direction) => {
                   setDealsPagination({
                     ...dealsPagination,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                   });
                 }}
                 onRowDoubleClick={(row) => {
@@ -3367,7 +2771,7 @@ const CrmDeals = () => {
               onClick: () => {
                 const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
                 if (dealId) {
-                  setShowDealSidebar(false);
+                  handleHideDealSidebarKeepPersistence();
                   router.push(`/crm/detailspage?type=deal&id=${dealId}`);
                 }
               },
@@ -3735,6 +3139,7 @@ const CrmDeals = () => {
                                       selectedDeal?.rawData?.id;
                                     if (dealId) {
                                       setFollowupData({
+                                        ...DEALS_EMPTY_FOLLOWUP_FORM,
                                         dealId: Number(dealId),
                                         dealName: selectedDeal?.name || "",
                                         followUpDate: fu.follow_up_date
@@ -3802,13 +3207,9 @@ const CrmDeals = () => {
                                 selectedDeal?.id || selectedDeal?.rawData?.id;
                               if (dealId) {
                                 setFollowupData({
+                                  ...DEALS_EMPTY_FOLLOWUP_FORM,
                                   dealId: Number(dealId),
                                   dealName: selectedDeal?.name || "",
-                                  followUpDate: "",
-                                  followUpStatus: "Pending",
-                                  communicationChannel: "Phone Call",
-                                  communicationChannelOther: "",
-                                  notes: "",
                                   userExtension:
                                     (session?.user as any)?.extension || "",
                                 });
@@ -3833,13 +3234,9 @@ const CrmDeals = () => {
                               selectedDeal?.id || selectedDeal?.rawData?.id;
                             if (dealId) {
                               setFollowupData({
+                                ...DEALS_EMPTY_FOLLOWUP_FORM,
                                 dealId: Number(dealId),
                                 dealName: selectedDeal?.name || "",
-                                followUpDate: "",
-                                followUpStatus: "Pending",
-                                communicationChannel: "Phone Call",
-                                communicationChannelOther: "",
-                                notes: "",
                                 userExtension:
                                   (session?.user as any)?.extension || "",
                               });
@@ -5257,14 +4654,10 @@ const CrmDeals = () => {
                             }}
                             onClick={() => {
                               setMeetingData({
+                                ...DEALS_EMPTY_MEETING_FORM,
                                 dealId: viewingDeal.id,
                                 dealName: viewingDeal.name,
-                                meetingName: "",
-                                meetingType: "Online",
-                                meetingDate: "",
-                                meetingTime: "",
                                 meetingOutcome: "Scheduled",
-                                extensions: [],
                               });
                               setMeetingAttendees([]);
                               setShowAddMeetingModal(true);
@@ -5462,14 +4855,10 @@ const CrmDeals = () => {
                                 }}
                                 onClick={() => {
                                   setMeetingData({
+                                    ...DEALS_EMPTY_MEETING_FORM,
                                     dealId: viewingDeal.id,
                                     dealName: viewingDeal.name,
-                                    meetingName: "",
-                                    meetingType: "Online",
-                                    meetingDate: "",
-                                    meetingTime: "",
                                     meetingOutcome: "Scheduled",
-                                    extensions: [],
                                   });
                                   setMeetingAttendees([]);
                                   setShowAddMeetingModal(true);
@@ -6353,16 +5742,7 @@ const CrmDeals = () => {
         onHide={() => {
           setShowAddMeetingModal(false);
           setMeetingIdToEdit(null);
-          setMeetingData({
-            dealId: null,
-            dealName: "",
-            meetingName: "",
-            meetingType: "Online",
-            meetingDate: "",
-            meetingTime: "",
-            meetingOutcome: "",
-            extensions: [],
-          });
+          setMeetingData({ ...DEALS_EMPTY_MEETING_FORM });
           setMeetingAttendees([]);
         }}
         size="lg"
@@ -6421,12 +5801,17 @@ const CrmDeals = () => {
                       value: meetingData.meetingType,
                       label: meetingData.meetingType,
                     }}
-                    onChange={(option) =>
+                    onChange={(option) => {
+                      const selected =
+                        option as {
+                          value: string;
+                          label: string;
+                        } | null;
                       setMeetingData({
                         ...meetingData,
-                        meetingType: option?.value || "Online",
-                      })
-                    }
+                        meetingType: selected?.value || "Online",
+                      });
+                    }}
                     options={[
                       { value: "Online", label: "Online" },
                       { value: "In-Person", label: "In-Person" },
@@ -6501,12 +5886,17 @@ const CrmDeals = () => {
                             }
                           : null
                       }
-                      onChange={(option) =>
+                      onChange={(option) => {
+                        const selected =
+                          option as {
+                            value: string;
+                            label: string;
+                          } | null;
                         setMeetingData({
                           ...meetingData,
-                          meetingOutcome: option?.value || "",
-                        })
-                      }
+                          meetingOutcome: selected?.value ?? "",
+                        });
+                      }}
                       options={[
                         { value: "Scheduled", label: "Scheduled" },
                         {
@@ -6578,16 +5968,7 @@ const CrmDeals = () => {
             onClick={() => {
               setShowAddMeetingModal(false);
               setMeetingIdToEdit(null);
-              setMeetingData({
-                dealId: null,
-                dealName: "",
-                meetingName: "",
-                meetingType: "Online",
-                meetingDate: "",
-                meetingTime: "",
-                meetingOutcome: "",
-                extensions: [],
-              });
+              setMeetingData({ ...DEALS_EMPTY_MEETING_FORM });
               setMeetingAttendees([]);
             }}
           >
@@ -6725,16 +6106,7 @@ const CrmDeals = () => {
         onHide={() => {
           setShowAddFollowupModal(false);
           setFollowUpIdToEdit(null);
-          setFollowupData({
-            dealId: null,
-            dealName: "",
-            followUpDate: "",
-            followUpStatus: "Pending",
-            communicationChannel: "Phone Call",
-            communicationChannelOther: "",
-            notes: "",
-            userExtension: "",
-          });
+          setFollowupData({ ...DEALS_EMPTY_FOLLOWUP_FORM });
         }}
         size="lg"
         centered
@@ -6796,12 +6168,17 @@ const CrmDeals = () => {
                       value: followupData.followUpStatus,
                       label: followupData.followUpStatus,
                     }}
-                    onChange={(option) =>
+                    onChange={(option) => {
+                      const selected =
+                        option as {
+                          value: string;
+                          label: string;
+                        } | null;
                       setFollowupData({
                         ...followupData,
-                        followUpStatus: option?.value || "Pending",
-                      })
-                    }
+                        followUpStatus: selected?.value || "Pending",
+                      });
+                    }}
                     options={[
                       { value: "Pending", label: "Pending" },
                       { value: "In Progress", label: "In Progress" },
@@ -6826,13 +6203,18 @@ const CrmDeals = () => {
                       value: followupData.communicationChannel,
                       label: followupData.communicationChannel,
                     }}
-                    onChange={(option) =>
+                    onChange={(option) => {
+                      const selected =
+                        option as {
+                          value: string;
+                          label: string;
+                        } | null;
                       setFollowupData({
                         ...followupData,
-                        communicationChannel: option?.value || "Phone Call",
+                        communicationChannel: selected?.value || "Phone Call",
                         communicationChannelOther: "",
-                      })
-                    }
+                      });
+                    }}
                     options={[
                       { value: "Phone Call", label: "Phone Call" },
                       { value: "Email", label: "Email" },
@@ -6912,16 +6294,7 @@ const CrmDeals = () => {
             onClick={() => {
               setShowAddFollowupModal(false);
               setFollowUpIdToEdit(null);
-              setFollowupData({
-                dealId: null,
-                dealName: "",
-                followUpDate: "",
-                followUpStatus: "Pending",
-                communicationChannel: "Phone Call",
-                communicationChannelOther: "",
-                notes: "",
-                userExtension: "",
-              });
+              setFollowupData({ ...DEALS_EMPTY_FOLLOWUP_FORM });
             }}
           >
             <X size={16} className="me-1" />
@@ -6932,8 +6305,7 @@ const CrmDeals = () => {
             disabled={
               !followupData.followUpDate ||
               !followupData.communicationChannel ||
-              (followupData.communicationChannel === "Other" &&
-                !followupData.communicationChannelOther?.trim()) ||
+              dealsFollowupChannelOtherIsInvalid(followupData) ||
               loadingFollowUp
             }
             onClick={
@@ -6988,48 +6360,17 @@ const CrmDeals = () => {
         <h6 className="mb-3">Export filters</h6>
         <Row>
           <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Owner</Form.Label>
-              <Select
-                options={[
-                  { value: "", label: "All owners" },
-                  ...extensions.map((ext: any) => ({
-                    value: String(ext.id ?? ext.extension),
-                    label:
-                      ext.display_name || ext.name || ext.id || ext.extension || "",
-                  })),
-                ]}
-                value={
-                  exportFilters.assigned_to
-                    ? (() => {
-                        const id = exportFilters.assigned_to;
-                        const ext = extensions.find(
-                          (e: any) => (e.id || e.extension) === id,
-                        );
-                        return {
-                          value: id,
-                          label: ext
-                            ? ext.display_name || ext.name || id
-                            : id,
-                        };
-                      })()
-                    : null
-                }
-                onChange={(selected: { value: string; label: string } | null) => {
-                  const v = selected?.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.assigned_to = v;
-                    else delete next.assigned_to;
-                    return next;
-                  });
-                }}
-                placeholder="Select owner..."
-                isClearable
-                isSearchable
-                styles={customSelectStyles}
-              />
-            </Form.Group>
+            <CrmListExportModalAssignedToSelect
+              extensions={extensions}
+              value={
+                exportFilters.assigned_to != null &&
+                exportFilters.assigned_to !== ""
+                  ? String(exportFilters.assigned_to)
+                  : undefined
+              }
+              setExportFilters={setExportFilters}
+              styles={customSelectStyles}
+            />
           </Col>
           <Col md={6}>
             <Form.Group className="mb-3">
@@ -7051,8 +6392,10 @@ const CrmDeals = () => {
                       })()
                     : null
                 }
-                onChange={(selected: { value: string; label: string } | null) => {
-                  const v = selected?.value;
+                onChange={(selected) => {
+                  const v = (
+                    selected as { value: string; label: string } | null
+                  )?.value;
                   setExportFilters((prev) => {
                     const next = { ...prev };
                     if (v) next.stage_id = v;
@@ -7093,8 +6436,10 @@ const CrmDeals = () => {
                       })()
                     : null
                 }
-                onChange={(selected: { value: string; label: string } | null) => {
-                  const v = selected?.value;
+                onChange={(selected) => {
+                  const v = (
+                    selected as { value: string; label: string } | null
+                  )?.value;
                   setExportFilters((prev) => {
                     const next = { ...prev };
                     if (v) next.approval_status = v;
@@ -7131,8 +6476,10 @@ const CrmDeals = () => {
                       })()
                     : null
                 }
-                onChange={(selected: { value: string; label: string } | null) => {
-                  const v = selected?.value;
+                onChange={(selected) => {
+                  const v = (
+                    selected as { value: string; label: string } | null
+                  )?.value;
                   setExportFilters((prev) => {
                     const next = { ...prev };
                     if (v) next.business_type_id = v;
@@ -7427,63 +6774,7 @@ const CrmDeals = () => {
           },
         ]}
         onApply={() => {
-          // Map dealsFilters to the format expected by handleFiltersChange
-          const filtersToApply: Record<string, any> = {};
-
-          if (dealsSearch) {
-            filtersToApply.search = dealsSearch;
-          }
-          if (dealsFilters.assignedTo) {
-            filtersToApply.assigned_to = dealsFilters.assignedTo;
-          }
-          if (dealsFilters.stage) {
-            filtersToApply.stage_id = dealsFilters.stage;
-          }
-          if (dealsFilters.followUpDateFrom) {
-            filtersToApply.follow_up_date_from = dealsFilters.followUpDateFrom;
-          }
-          if (dealsFilters.followUpDateTo) {
-            filtersToApply.follow_up_date_to = dealsFilters.followUpDateTo;
-          }
-          if (dealsFilters.probabilityMin) {
-            filtersToApply.probability_min = dealsFilters.probabilityMin;
-          }
-          if (dealsFilters.probabilityMax) {
-            filtersToApply.probability_max = dealsFilters.probabilityMax;
-          }
-          if (dealsFilters.approvalStatus) {
-            filtersToApply.approval_status = dealsFilters.approvalStatus;
-          }
-          if (dealsFilters.businessType) {
-            filtersToApply.business_type_id = dealsFilters.businessType;
-          }
-          if (dealsFilters.expectedCloseDateFrom) {
-            filtersToApply.expected_close_date_from =
-              dealsFilters.expectedCloseDateFrom;
-          }
-          if (dealsFilters.expectedCloseDateTo) {
-            filtersToApply.expected_close_date_to =
-              dealsFilters.expectedCloseDateTo;
-          }
-          // Booleans: send explicitly so unchecking clears the filter
-          filtersToApply.include_converted = dealsFilters.includeConverted || undefined;
-          filtersToApply.include_lost = dealsFilters.includeLost || undefined;
-          filtersToApply.include_archived = dealsFilters.includeArchived || undefined;
-          filtersToApply.has_meetings = dealsFilters.hasMeetings || undefined;
-          if (dealsFilters.createdAtFrom) {
-            filtersToApply.created_at_from = dealsFilters.createdAtFrom;
-          }
-          if (dealsFilters.createdAtTo) {
-            filtersToApply.created_at_to = dealsFilters.createdAtTo;
-          }
-          if (dealsFilters.created_at_month) {
-            filtersToApply.created_at_month = dealsFilters.created_at_month;
-          }
-          if (dealsFilters.ticketId) {
-            filtersToApply.ticket_id = dealsFilters.ticketId;
-          }
-
-          handleFiltersChange(filtersToApply);
+          handleFiltersChange(buildDealsSidebarFiltersPayload());
           setDealsPagination({ ...dealsPagination, currentPage: 1 });
           setRefreshKey((prev) => prev + 1);
           setShowFiltersSidebar(false);
@@ -7538,148 +6829,15 @@ const CrmDeals = () => {
         />
       )}
 
-      {/* Add New Tab Modal */}
-      <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Add New Tab</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted mb-3">Select a filter to add as a new tab</p>
-          <div className="d-grid gap-2">
-            {stages.map((stage: any) => {
-              const isAlreadyAdded = customTabs.some(
-                (t) => t.id === stage.id.toString(),
-              );
-              const stageCount = filterCounts[stage.id] || 0;
-              return (
-                <Button
-                  key={stage.id}
-                  variant="outline-primary"
-                  onClick={() => {
-                    if (!isAlreadyAdded) {
-                      setCustomTabs([
-                        ...customTabs,
-                        {
-                          id: stage.id.toString(),
-                          label: stage.name,
-                          count: stageCount,
-                          removable: true,
-                        },
-                      ]);
-                      setShowTabModal(false);
-                      toast.success("Tab added successfully!");
-                    }
-                  }}
-                  disabled={isAlreadyAdded}
-                  className="d-flex align-items-center justify-content-start"
-                  style={{ textAlign: "left" }}
-                >
-                  <Layers size={16} className="me-2" />
-                  {stage.name}
-                  {stageCount > 0 && (
-                    <Badge bg="secondary" className="ms-auto">
-                      {stageCount}
-                    </Badge>
-                  )}
-                </Button>
-              );
-            })}
-            {/* Lost, Deleted and Rejected tabs */}
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.find((t) => t.id === "lost")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "lost",
-                      label: "Lost",
-                      count: filterCounts.lost || 0,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "lost")}
-              className="d-flex align-items-center justify-content-start"
-              style={{ textAlign: "left" }}
-            >
-              <X size={16} className="me-2" />
-              Lost
-              {(filterCounts.lost || 0) > 0 && (
-                <Badge bg="secondary" className="ms-auto">
-                  {filterCounts.lost || 0}
-                </Badge>
-              )}
-            </Button>
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.find((t) => t.id === "deleted")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "deleted",
-                      label: "Deleted",
-                      count: filterCounts.deleted || 0,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "deleted")}
-              className="d-flex align-items-center justify-content-start"
-              style={{ textAlign: "left" }}
-            >
-              <Trash2 size={16} className="me-2" />
-              Deleted
-              {(filterCounts.deleted || 0) > 0 && (
-                <Badge bg="secondary" className="ms-auto">
-                  {filterCounts.deleted || 0}
-                </Badge>
-              )}
-            </Button>
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.some((t) => t.id === "rejected")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "rejected",
-                      label: "Rejected",
-                      count: filterCounts.rejected || 0,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "rejected")}
-              className="d-flex align-items-center justify-content-start"
-              style={{ textAlign: "left" }}
-            >
-              <X size={16} className="me-2" />
-              Rejected
-              {(filterCounts.rejected || 0) > 0 && (
-                <Badge bg="secondary" className="ms-auto">
-                  {filterCounts.rejected || 0}
-                </Badge>
-              )}
-            </Button>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowTabModal(false)}>
-            Cancel
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <CrmDealsListAddTabModal
+        show={showTabModal}
+        onHide={() => setShowTabModal(false)}
+        stages={stages}
+        customTabs={customTabs}
+        setCustomTabs={setCustomTabs}
+        filterCounts={filterCounts}
+        showRejectedTab
+      />
 
       {/* Create Deal Sidebar */}
       {showCreateDealSidebar && (
