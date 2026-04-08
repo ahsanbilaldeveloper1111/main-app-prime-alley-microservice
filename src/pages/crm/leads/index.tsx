@@ -16,11 +16,8 @@ import GenericTable, {
   TabConfig,
 } from "@components/GenericTable";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
-import ColumnEditorModal from "@components/ColumnEditorModal";
-import {
-  parseStoredVisibleColumnKeysLoose,
-  persistVisibleColumnKeys,
-} from "@utils/crmListVisibleColumnsStorage";
+import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
+import { parseStoredVisibleColumnKeysLoose } from "@utils/crmListVisibleColumnsStorage";
 import CrmExportModal from "@components/CrmExportModal";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
@@ -140,6 +137,7 @@ import {
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
+import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 
 import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
 import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
@@ -189,6 +187,69 @@ const DEFAULT_MEETING_FORM = {
   meetingOutcome: "",
   extensions: [] as string[],
 };
+
+const LEADS_FILTER_RULES = [
+  ...CRM_BASE_FILTER_RULES,
+  { key: "business_type_id", kind: "string" },
+  { key: "source", kind: "truthy" },
+  { key: "lead_potential", kind: "truthy" },
+  { key: "campaign_id", kind: "string" },
+  { key: "lost_reason_id", kind: "string" },
+  { key: "lead_score_min", kind: "string" },
+  { key: "lead_score_max", kind: "string" },
+  { key: "date_from", kind: "truthy" },
+  { key: "date_to", kind: "truthy" },
+] as const;
+
+const LEADS_EXPORT_TRUTHY_KEYS = [
+  "date_from",
+  "date_to",
+  "stage_id",
+  "lead_potential",
+  "search",
+  "campaign_id",
+  "source",
+] as const;
+
+const LEADS_EXPORT_DEFINED_KEYS = ["include_lost", "include_archived"] as const;
+
+const LEADS_EXPORT_PRESENT_KEYS = ["lead_score_min", "lead_score_max"] as const;
+
+function addTruthyExportFilters(
+  params: Record<string, any>,
+  filters: Record<string, any>,
+  keys: readonly string[],
+) {
+  keys.forEach((key) => {
+    if (filters[key]) {
+      params[key] = filters[key];
+    }
+  });
+}
+
+function addDefinedExportFilters(
+  params: Record<string, any>,
+  filters: Record<string, any>,
+  keys: readonly string[],
+) {
+  keys.forEach((key) => {
+    if (filters[key] !== undefined) {
+      params[key] = filters[key];
+    }
+  });
+}
+
+function addPresentExportFilters(
+  params: Record<string, any>,
+  filters: Record<string, any>,
+  keys: readonly string[],
+) {
+  keys.forEach((key) => {
+    if (filters[key] != null) {
+      params[key] = filters[key];
+    }
+  });
+}
 
 function leadsToKanbanColumns(
   leads: LeadData[],
@@ -784,151 +845,7 @@ const CrmLeads = () => {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) => {
-      const newFilters = { ...prev };
-
-      // Handle stage_id filter (single value)
-      if ("stage_id" in filters) {
-        if (filters.stage_id) {
-          newFilters.stage_id = String(filters.stage_id);
-        } else {
-          delete newFilters.stage_id;
-        }
-      }
-
-      // Handle user_extension_filter owner filter
-      if ("user_extension_filter" in filters) {
-        if (filters.user_extension_filter) {
-          newFilters.user_extension_filter = String(filters.user_extension_filter);
-        } else {
-          delete newFilters.user_extension_filter;
-        }
-      }
-
-      // Backward compatibility for old assigned_to owner key
-      if ("assigned_to" in filters) {
-        if (filters.assigned_to) {
-          newFilters.user_extension_filter = String(filters.assigned_to);
-        } else {
-          delete newFilters.user_extension_filter;
-        }
-      }
-
-      // Handle search
-      if ("search" in filters) {
-        if (filters.search) {
-          newFilters.search = filters.search;
-        } else {
-          delete newFilters.search;
-        }
-      }
-
-      // Handle is_lost filter
-      if ("is_lost" in filters) {
-        newFilters.is_lost = filters.is_lost;
-      }
-
-      // Handle include_lost filter
-      if ("include_lost" in filters) {
-        if (filters.include_lost) {
-          newFilters.include_lost = true;
-        } else {
-          delete newFilters.include_lost;
-        }
-      }
-
-      // Handle include_archived filter
-      if ("include_archived" in filters) {
-        if (filters.include_archived) {
-          newFilters.include_archived = true;
-        } else {
-          delete newFilters.include_archived;
-        }
-      }
-
-      // Handle business type filter
-      if ("business_type_id" in filters) {
-        if (filters.business_type_id) {
-          newFilters.business_type_id = String(filters.business_type_id);
-        } else {
-          delete newFilters.business_type_id;
-        }
-      }
-
-      // Handle source filter
-      if ("source" in filters) {
-        if (filters.source) {
-          newFilters.source = filters.source;
-        } else {
-          delete newFilters.source;
-        }
-      }
-
-      // Handle lead_potential filter
-      if ("lead_potential" in filters) {
-        if (filters.lead_potential) {
-          newFilters.lead_potential = filters.lead_potential;
-        } else {
-          delete newFilters.lead_potential;
-        }
-      }
-
-      // Handle campaign_id filter
-      if ("campaign_id" in filters) {
-        if (filters.campaign_id) {
-          newFilters.campaign_id = String(filters.campaign_id);
-        } else {
-          delete newFilters.campaign_id;
-        }
-      }
-
-      // Handle lost_reason_id filter
-      if ("lost_reason_id" in filters) {
-        if (filters.lost_reason_id) {
-          newFilters.lost_reason_id = String(filters.lost_reason_id);
-        } else {
-          delete newFilters.lost_reason_id;
-        }
-      }
-
-      // Handle lead_score_min filter
-      if ("lead_score_min" in filters) {
-        if (filters.lead_score_min) {
-          newFilters.lead_score_min = String(filters.lead_score_min);
-        } else {
-          delete newFilters.lead_score_min;
-        }
-      }
-
-      // Handle lead_score_max filter
-      if ("lead_score_max" in filters) {
-        if (filters.lead_score_max) {
-          newFilters.lead_score_max = String(filters.lead_score_max);
-        } else {
-          delete newFilters.lead_score_max;
-        }
-      }
-
-      // Handle date_from filter
-      if ("date_from" in filters) {
-        if (filters.date_from) {
-          newFilters.date_from = filters.date_from;
-        } else {
-          delete newFilters.date_from;
-        }
-      }
-
-      // Handle date_to filter
-      if ("date_to" in filters) {
-        if (filters.date_to) {
-          newFilters.date_to = filters.date_to;
-        } else {
-          delete newFilters.date_to;
-        }
-      }
-
-      return newFilters;
-    });
+    setCurrentFilters((prev) => applyCrmFilterRules(prev, filters, LEADS_FILTER_RULES));
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -936,24 +853,18 @@ const CrmLeads = () => {
   const buildLeadsExportParams = useCallback(
     (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
       const params: Record<string, any> = {};
-      if (filters.user_extension_filter) {
-        params.user_extension_filter = Array.isArray(filters.user_extension_filter)
-          ? filters.user_extension_filter
-          : [filters.user_extension_filter];
-      } else if (filters.assigned_to) {
-        params.user_extension_filter = [filters.assigned_to];
+
+      const ownerFilter = filters.user_extension_filter ?? filters.assigned_to;
+      if (ownerFilter) {
+        params.user_extension_filter = Array.isArray(ownerFilter)
+          ? ownerFilter
+          : [ownerFilter];
       }
-      if (filters.date_from) params.date_from = filters.date_from;
-      if (filters.date_to) params.date_to = filters.date_to;
-      if (filters.stage_id) params.stage_id = filters.stage_id;
-      if (filters.lead_potential) params.lead_potential = filters.lead_potential;
-      if (filters.search) params.search = filters.search;
-      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
-      if (filters.include_archived !== undefined) params.include_archived = filters.include_archived;
-      if (filters.campaign_id) params.campaign_id = filters.campaign_id;
-      if (filters.source) params.source = filters.source;
-      if (filters.lead_score_min != null) params.lead_score_min = filters.lead_score_min;
-      if (filters.lead_score_max != null) params.lead_score_max = filters.lead_score_max;
+
+      addTruthyExportFilters(params, filters, LEADS_EXPORT_TRUTHY_KEYS);
+      addDefinedExportFilters(params, filters, LEADS_EXPORT_DEFINED_KEYS);
+      addPresentExportFilters(params, filters, LEADS_EXPORT_PRESENT_KEYS);
+
       if (pagination) {
         params.page = pagination.page;
         params.per_page = pagination.per_page;
@@ -9591,16 +9502,13 @@ const CrmLeads = () => {
       </Modal>
 
       {/* Column Editor Modal */}
-      <ColumnEditorModal
+      <CrmListColumnEditorModal
         show={showColumnEditor}
         onHide={() => setShowColumnEditor(false)}
-        title="Customize Columns"
         columns={leadsColumns.map((c) => ({ key: c.key, label: c.label }))}
         selectedColumnKeys={selectedLeadsColumns}
-        onApply={(keys) => {
-          setSelectedLeadsColumns(keys);
-          persistVisibleColumnKeys("leadsSelectedColumns", keys);
-        }}
+        storageKey="leadsSelectedColumns"
+        onSelectedKeysChange={setSelectedLeadsColumns}
       />
 
       {/* Export Leads Modal */}

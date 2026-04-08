@@ -18,11 +18,8 @@ import GenericTable, {
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import ColumnEditorModal from "@components/ColumnEditorModal";
-import {
-  parseStoredVisibleColumnKeysLoose,
-  persistVisibleColumnKeys,
-} from "@utils/crmListVisibleColumnsStorage";
+import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
+import { parseStoredVisibleColumnKeysLoose } from "@utils/crmListVisibleColumnsStorage";
 import CrmExportModal from "@components/CrmExportModal";
 import { StatsCardData } from "@components/GenericStatsCards";
 import { EditOrderSidebar } from "@components/EditOrderSidebar";
@@ -133,8 +130,28 @@ import {
   buildCrmOrdersListGetOrdersParams,
 } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
+import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 
 const ignoredKeys = ["order_stage_id"];
+
+const ORDERS_FILTER_RULES = [
+  ...CRM_BASE_FILTER_RULES,
+  { key: "industry", kind: "truthy" },
+  { key: "order_value_min", kind: "string" },
+  { key: "order_value_max", kind: "string" },
+  { key: "order_stage_id", kind: "string" },
+  { key: "order_approval_status", kind: "truthy" },
+  { key: "fulfillment_status", kind: "truthy" },
+  { key: "payment_status", kind: "truthy" },
+  { key: "date_from", kind: "truthy" },
+  { key: "date_to", kind: "truthy" },
+  { key: "created_at_from", kind: "truthy" },
+  { key: "created_at_to", kind: "truthy" },
+  { key: "created_at_month", kind: "truthy" },
+  { key: "ticket_id", kind: "present" },
+  { key: "deal_id", kind: "present" },
+  { key: "status", kind: "truthy" },
+] as const;
 
 function ordersToKanbanColumns(
   orders: any[],
@@ -812,197 +829,7 @@ const CrmOrders = () => { // NOSONAR
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) => {
-      const newFilters = { ...prev };
-
-      // Handle stage_id filter (single value)
-      if ("stage_id" in filters) {
-        if (filters.stage_id) {
-          newFilters.stage_id = String(filters.stage_id);
-        } else {
-          delete newFilters.stage_id;
-        }
-      }
-
-      // Handle user_extension_filter owner filter
-      if ("user_extension_filter" in filters) {
-        if (filters.user_extension_filter) {
-          newFilters.user_extension_filter = String(filters.user_extension_filter);
-        } else {
-          delete newFilters.user_extension_filter;
-        }
-      }
-
-      // Backward compatibility for old assigned_to owner key
-      if ("assigned_to" in filters) {
-        if (filters.assigned_to) {
-          newFilters.user_extension_filter = String(filters.assigned_to);
-        } else {
-          delete newFilters.user_extension_filter;
-        }
-      }
-
-      // Handle search
-      if ("search" in filters) {
-        if (filters.search) {
-          newFilters.search = filters.search;
-        } else {
-          delete newFilters.search;
-        }
-      }
-
-      // Handle is_lost filter
-      if ("is_lost" in filters) {
-        newFilters.is_lost = filters.is_lost;
-      }
-
-      // Handle include_lost filter
-      if ("include_lost" in filters) {
-        if (filters.include_lost) {
-          newFilters.include_lost = true;
-        } else {
-          delete newFilters.include_lost;
-        }
-      }
-
-      // Handle include_archived filter
-      if ("include_archived" in filters) {
-        if (filters.include_archived) {
-          newFilters.include_archived = true;
-        } else {
-          delete newFilters.include_archived;
-        }
-      }
-
-      // Handle industry filter
-      if ("industry" in filters) {
-        if (filters.industry) {
-          newFilters.industry = filters.industry;
-        } else {
-          delete newFilters.industry;
-        }
-      }
-
-      // Handle order_value_min filter
-      if ("order_value_min" in filters) {
-        if (filters.order_value_min) {
-          newFilters.order_value_min = String(filters.order_value_min);
-        } else {
-          delete newFilters.order_value_min;
-        }
-      }
-
-      // Handle order_value_max filter
-      if ("order_value_max" in filters) {
-        if (filters.order_value_max) {
-          newFilters.order_value_max = String(filters.order_value_max);
-        } else {
-          delete newFilters.order_value_max;
-        }
-      }
-
-      // Handle order_stage_id filter (note: this is different from stage_id, it's order_stage_id)
-      if ("order_stage_id" in filters) {
-        if (filters.order_stage_id) {
-          newFilters.order_stage_id = String(filters.order_stage_id);
-        } else {
-          delete newFilters.order_stage_id;
-        }
-      }
-
-      // Handle order_approval_status filter
-      if ("order_approval_status" in filters) {
-        if (filters.order_approval_status) {
-          newFilters.order_approval_status = filters.order_approval_status;
-        } else {
-          delete newFilters.order_approval_status;
-        }
-      }
-
-      // Handle fulfillment_status filter
-      if ("fulfillment_status" in filters) {
-        if (filters.fulfillment_status) {
-          newFilters.fulfillment_status = filters.fulfillment_status;
-        } else {
-          delete newFilters.fulfillment_status;
-        }
-      }
-
-      // Handle payment_status filter
-      if ("payment_status" in filters) {
-        if (filters.payment_status) {
-          newFilters.payment_status = filters.payment_status;
-        } else {
-          delete newFilters.payment_status;
-        }
-      }
-
-      // Handle date_from filter
-      if ("date_from" in filters) {
-        if (filters.date_from) {
-          newFilters.date_from = filters.date_from;
-        } else {
-          delete newFilters.date_from;
-        }
-      }
-
-      // Handle date_to filter
-      if ("date_to" in filters) {
-        if (filters.date_to) {
-          newFilters.date_to = filters.date_to;
-        } else {
-          delete newFilters.date_to;
-        }
-      }
-
-      // Handle created_at_from / created_at_to / created_at_month
-      if ("created_at_from" in filters) {
-        if (filters.created_at_from) {
-          newFilters.created_at_from = filters.created_at_from;
-        } else {
-          delete newFilters.created_at_from;
-        }
-      }
-      if ("created_at_to" in filters) {
-        if (filters.created_at_to) {
-          newFilters.created_at_to = filters.created_at_to;
-        } else {
-          delete newFilters.created_at_to;
-        }
-      }
-      if ("created_at_month" in filters) {
-        if (filters.created_at_month) {
-          newFilters.created_at_month = filters.created_at_month;
-        } else {
-          delete newFilters.created_at_month;
-        }
-      }
-
-      // Handle ticket_id, deal_id, status
-      if ("ticket_id" in filters) {
-        if (filters.ticket_id != null && filters.ticket_id !== "") {
-          newFilters.ticket_id = filters.ticket_id;
-        } else {
-          delete newFilters.ticket_id;
-        }
-      }
-      if ("deal_id" in filters) {
-        if (filters.deal_id != null && filters.deal_id !== "") {
-          newFilters.deal_id = filters.deal_id;
-        } else {
-          delete newFilters.deal_id;
-        }
-      }
-      if ("status" in filters) {
-        if (filters.status) {
-          newFilters.status = filters.status;
-        } else {
-          delete newFilters.status;
-        }
-      }
-
-      return newFilters;
-    });
+    setCurrentFilters((prev) => applyCrmFilterRules(prev, filters, ORDERS_FILTER_RULES));
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -3132,16 +2959,13 @@ const CrmOrders = () => { // NOSONAR
       />
 
       {/* Column Editor Modal */}
-      <ColumnEditorModal
+      <CrmListColumnEditorModal
         show={showColumnEditor}
         onHide={() => setShowColumnEditor(false)}
-        title="Customize Columns"
         columns={ordersColumns.map((c) => ({ key: c.key, label: c.label }))}
         selectedColumnKeys={selectedOrdersColumns}
-        onApply={(keys) => {
-          setSelectedOrdersColumns(keys);
-          persistVisibleColumnKeys("ordersSelectedColumns", keys);
-        }}
+        storageKey="ordersSelectedColumns"
+        onSelectedKeysChange={setSelectedOrdersColumns}
       />
 
       {/* Export Modal */}

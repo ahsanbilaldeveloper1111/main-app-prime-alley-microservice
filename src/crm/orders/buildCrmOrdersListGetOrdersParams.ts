@@ -48,6 +48,47 @@ function addValueIfPresent(params: AnyRecord, key: string, value: unknown) {
   }
 }
 
+function getSearchParamValue(filters: AnyRecord, normalizeSearch: boolean): unknown {
+  if (!normalizeSearch) {
+    return filters.search;
+  }
+  return normalizeSearchQuery(filters.search);
+}
+
+function applyOwnerFilter(
+  params: AnyRecord,
+  filters: AnyRecord,
+  ownerParamStyle: CrmOrdersListOwnerParamStyle,
+) {
+  if (ownerParamStyle === "user_extension_filter") {
+    if (filters.user_extension_filter?.length) {
+      params.user_extension_filter = Array.isArray(filters.user_extension_filter)
+        ? filters.user_extension_filter
+        : [filters.user_extension_filter];
+      return;
+    }
+    if (filters.assigned_to) {
+      params.user_extension_filter = [filters.assigned_to];
+    }
+    return;
+  }
+
+  if (ownerParamStyle === "user_extensions") {
+    if (filters.user_extensions?.length) {
+      params.user_extensions = filters.user_extensions;
+      return;
+    }
+    if (filters.assigned_to) {
+      params.user_extensions = [filters.assigned_to];
+    }
+    return;
+  }
+
+  if (filters.assigned_to) {
+    params.assigned_to = filters.assigned_to;
+  }
+}
+
 export function buildCrmOrdersListGetOrdersParams(
   input: BuildCrmOrdersListGetOrdersParamsInput,
 ): AnyRecord {
@@ -66,33 +107,13 @@ export function buildCrmOrdersListGetOrdersParams(
     per_page: perPage,
   };
 
-  if (normalizeSearch) {
-    const q = normalizeSearchQuery(filters.search);
-    if (q) params.search = q;
-  } else if (filters.search) {
-    params.search = filters.search;
-  }
+  const searchParamValue = getSearchParamValue(filters, normalizeSearch);
+  addIfTruthy(params, "search", searchParamValue);
 
   addIfDefined(params, "include_lost", filters.include_lost);
   addIfDefined(params, "include_archived", filters.include_archived);
 
-  if (ownerParamStyle === "user_extension_filter") {
-    if (filters.user_extension_filter?.length) {
-      params.user_extension_filter = Array.isArray(filters.user_extension_filter)
-        ? filters.user_extension_filter
-        : [filters.user_extension_filter];
-    } else if (filters.assigned_to) {
-      params.user_extension_filter = [filters.assigned_to];
-    }
-  } else if (ownerParamStyle === "user_extensions") {
-    if (filters.user_extensions?.length) {
-      params.user_extensions = filters.user_extensions;
-    } else if (filters.assigned_to) {
-      params.user_extensions = [filters.assigned_to];
-    }
-  } else if (filters.assigned_to) {
-    params.assigned_to = filters.assigned_to;
-  }
+  applyOwnerFilter(params, filters, ownerParamStyle);
 
   addIfDefined(params, "is_lost", filters.is_lost);
   addIfTruthy(params, "industry", filters.industry);

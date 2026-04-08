@@ -134,8 +134,9 @@ import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
-import ColumnEditorModal from "@components/ColumnEditorModal";
+import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
 import CrmExportModal from "@components/CrmExportModal";
+import { parseStoredVisibleColumnKeysLoose } from "@utils/crmListVisibleColumnsStorage";
 import { useCti } from "@hooks/useCti";
 import {
   CrmPhoneDisplay as PhoneDisplay,
@@ -146,6 +147,7 @@ import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 import { CrmListExportModalAssignedToSelect } from "@crm/shared/CrmListExportModalAssignedToSelect";
+import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 import { buildDealsListSidebarBaseFilterPayload } from "@crm/deals/dealsListPageFilterHelpers";
 import {
   buildDealsListGetDealsExportParams,
@@ -172,6 +174,19 @@ const dealApprovalsSelectStyles =
   >;
 
 const ignoredKeys = ["stage_id"];
+
+const APPROVAL_FILTER_RULES = [
+  ...CRM_BASE_FILTER_RULES,
+  { key: "follow_up_date_from", kind: "truthy" },
+  { key: "follow_up_date_to", kind: "truthy" },
+  { key: "probability_min", kind: "string" },
+  { key: "probability_max", kind: "string" },
+  { key: "deal_type", kind: "truthy" },
+  { key: "approval_status", kind: "truthy" },
+  { key: "industry", kind: "truthy" },
+  { key: "expected_close_date_from", kind: "truthy" },
+  { key: "expected_close_date_to", kind: "truthy" },
+] as const;
 
 const dealsToKanbanColumns = (
   deals: any[],
@@ -353,20 +368,24 @@ const CrmDeals = () => { // NOSONAR
   const [customTabs, setCustomTabs] = useState<TabConfig[]>([]);
   const [selectedDealsColumns, setSelectedDealsColumns] = useState<string[]>(
     () => {
-      const saved = localStorage.getItem("dealsSelectedColumns");
-      return saved
-        ? JSON.parse(saved)
-        : [
-            "name",
-            "company",
-            "stage",
-            "approvalStatus",
-            "dealType",
-            "value",
-            "assignedUser",
-            "closeDate",
-            "owner",
-          ];
+      const defaults = [
+        "name",
+        "company",
+        "stage",
+        "approvalStatus",
+        "dealType",
+        "value",
+        "assignedUser",
+        "closeDate",
+        "owner",
+      ];
+      if (globalThis.window === undefined) {
+        return defaults;
+      }
+      const stored = parseStoredVisibleColumnKeysLoose(
+        globalThis.localStorage.getItem("dealsSelectedColumns"),
+      );
+      return stored ?? defaults;
     },
   );
   const [approvalsViewMode, setApprovalsViewMode] = useState<"table" | "board">("table");
@@ -874,152 +893,9 @@ const CrmDeals = () => { // NOSONAR
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) => {
-      const newFilters = { ...prev };
-
-      // Handle stage_id filter (single value)
-      if ("stage_id" in filters) {
-        if (filters.stage_id) {
-          newFilters.stage_id = String(filters.stage_id);
-        } else {
-          delete newFilters.stage_id;
-        }
-      }
-
-      // Handle user_extension_filter owner filter
-      if ("user_extension_filter" in filters) {
-        if (filters.user_extension_filter) {
-          newFilters.user_extension_filter = String(filters.user_extension_filter);
-        } else {
-          delete newFilters.user_extension_filter;
-        }
-      }
-
-      // Backward compatibility for old assigned_to owner key
-      if ("assigned_to" in filters) {
-        if (filters.assigned_to) {
-          newFilters.user_extension_filter = String(filters.assigned_to);
-        } else {
-          delete newFilters.user_extension_filter;
-        }
-      }
-
-      // Handle search
-      if ("search" in filters) {
-        if (filters.search) {
-          newFilters.search = filters.search;
-        } else {
-          delete newFilters.search;
-        }
-      }
-
-      // Handle is_lost filter
-      if ("is_lost" in filters) {
-        newFilters.is_lost = filters.is_lost;
-      }
-
-      // Handle include_lost filter
-      if ("include_lost" in filters) {
-        if (filters.include_lost) {
-          newFilters.include_lost = true;
-        } else {
-          delete newFilters.include_lost;
-        }
-      }
-
-      // Handle include_archived filter
-      if ("include_archived" in filters) {
-        if (filters.include_archived) {
-          newFilters.include_archived = true;
-        } else {
-          delete newFilters.include_archived;
-        }
-      }
-
-      // Handle follow_up_date_from filter
-      if ("follow_up_date_from" in filters) {
-        if (filters.follow_up_date_from) {
-          newFilters.follow_up_date_from = filters.follow_up_date_from;
-        } else {
-          delete newFilters.follow_up_date_from;
-        }
-      }
-
-      // Handle follow_up_date_to filter
-      if ("follow_up_date_to" in filters) {
-        if (filters.follow_up_date_to) {
-          newFilters.follow_up_date_to = filters.follow_up_date_to;
-        } else {
-          delete newFilters.follow_up_date_to;
-        }
-      }
-
-      // Handle probability_min filter
-      if ("probability_min" in filters) {
-        if (filters.probability_min) {
-          newFilters.probability_min = String(filters.probability_min);
-        } else {
-          delete newFilters.probability_min;
-        }
-      }
-
-      // Handle probability_max filter
-      if ("probability_max" in filters) {
-        if (filters.probability_max) {
-          newFilters.probability_max = String(filters.probability_max);
-        } else {
-          delete newFilters.probability_max;
-        }
-      }
-
-      // Handle deal_type filter
-      if ("deal_type" in filters) {
-        if (filters.deal_type) {
-          newFilters.deal_type = filters.deal_type;
-        } else {
-          delete newFilters.deal_type;
-        }
-      }
-
-      // Handle approval_status filter
-      if ("approval_status" in filters) {
-        if (filters.approval_status) {
-          newFilters.approval_status = filters.approval_status;
-        } else {
-          delete newFilters.approval_status;
-        }
-      }
-
-      // Handle industry filter
-      if ("industry" in filters) {
-        if (filters.industry) {
-          newFilters.industry = filters.industry;
-        } else {
-          delete newFilters.industry;
-        }
-      }
-
-      // Handle expected_close_date_from filter
-      if ("expected_close_date_from" in filters) {
-        if (filters.expected_close_date_from) {
-          newFilters.expected_close_date_from =
-            filters.expected_close_date_from;
-        } else {
-          delete newFilters.expected_close_date_from;
-        }
-      }
-
-      // Handle expected_close_date_to filter
-      if ("expected_close_date_to" in filters) {
-        if (filters.expected_close_date_to) {
-          newFilters.expected_close_date_to = filters.expected_close_date_to;
-        } else {
-          delete newFilters.expected_close_date_to;
-        }
-      }
-
-      return newFilters;
-    });
+    setCurrentFilters((prev) =>
+      applyCrmFilterRules(prev, filters, APPROVAL_FILTER_RULES),
+    );
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -7057,21 +6933,13 @@ const CrmDeals = () => { // NOSONAR
       />
 
       {/* Column Editor Modal */}
-      <ColumnEditorModal
+      <CrmListColumnEditorModal
         show={showColumnEditor}
         onHide={() => setShowColumnEditor(false)}
-        title="Customize Columns"
         columns={dealsColumns.map((c) => ({ key: c.key, label: c.label }))}
         selectedColumnKeys={selectedDealsColumns}
-        onApply={(keys) => {
-          setSelectedDealsColumns(keys);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
-              "dealsSelectedColumns",
-              JSON.stringify(keys),
-            );
-          }
-        }}
+        storageKey="dealsSelectedColumns"
+        onSelectedKeysChange={setSelectedDealsColumns}
       />
 
       {/* Export Modal */}
