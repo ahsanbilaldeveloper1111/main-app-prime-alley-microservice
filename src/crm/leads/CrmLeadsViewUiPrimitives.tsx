@@ -278,15 +278,17 @@ export function CrmLeadEditCampaignFieldControl({
   onFieldChange: (fieldKey: string, value: string) => void;
 }>) {
   const raw = values?.[field.field_key];
-  const value =
-    raw === undefined || raw === null
-      ? ""
-      : typeof raw === "string" ||
-          typeof raw === "number" ||
-          typeof raw === "boolean" ||
-          typeof raw === "bigint"
-        ? String(raw)
-        : "";
+  let value = "";
+  if (raw !== undefined && raw !== null) {
+    if (
+      typeof raw === "string" ||
+      typeof raw === "number" ||
+      typeof raw === "boolean" ||
+      typeof raw === "bigint"
+    ) {
+      value = String(raw);
+    }
+  }
   const placeholder = `Enter ${field.field_name.toLowerCase()}`;
 
   switch (field.field_type) {

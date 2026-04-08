@@ -195,6 +195,21 @@ function extractLeadsExportChunkAndPagination(response: unknown): {
   return { chunk, lastPage };
 }
 
+function leadRowPhoneFieldAsString(value: unknown): string {
+  if (value === undefined || value === null || value === "") {
+    return "";
+  }
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "bigint" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+  return "";
+}
+
 function buildLeadRowPhoneDisplay(
   contactPerson: { phone?: string; phone_country_code?: string },
   lead: Record<string, unknown>,
@@ -203,7 +218,9 @@ function buildLeadRowPhoneDisplay(
     return `${contactPerson.phone_country_code || ""} ${contactPerson.phone}`.trim();
   }
   if (lead.contact_phone) {
-    return `${String(lead.contact_phone_country_code || "")} ${String(lead.contact_phone)}`.trim();
+    const code = leadRowPhoneFieldAsString(lead.contact_phone_country_code);
+    const num = leadRowPhoneFieldAsString(lead.contact_phone);
+    return `${code} ${num}`.trim();
   }
   return "";
 }

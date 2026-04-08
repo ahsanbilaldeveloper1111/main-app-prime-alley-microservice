@@ -18,6 +18,108 @@ type Params<T extends Record<string, any>> = Readonly<{
   setDealsFilters: Dispatch<SetStateAction<T>>;
 }>;
 
+function runApprovalsListActiveFilterSync<T extends Record<string, any>>(
+  activeFilter: string,
+  stages: StageLike[],
+  setCurrentFilters: Dispatch<SetStateAction<Record<string, any>>>,
+  setDealsFilters: Dispatch<SetStateAction<T>>,
+  clearStageDropdown: () => void,
+): void {
+  if (activeFilter === "all") {
+    setCurrentFilters((prev) => {
+      const newFilters = { ...prev };
+      delete newFilters.stage_id;
+      delete newFilters.include_archived;
+      delete newFilters.include_lost;
+      return newFilters;
+    });
+    clearStageDropdown();
+    return;
+  }
+  if (activeFilter === "lost") {
+    setCurrentFilters((prev) => {
+      const newFilters = { ...prev };
+      delete newFilters.stage_id;
+      delete newFilters.include_archived;
+      newFilters.include_lost = true;
+      return newFilters;
+    });
+    clearStageDropdown();
+    return;
+  }
+  if (activeFilter === "deleted") {
+    setCurrentFilters((prev) => {
+      const newFilters = { ...prev };
+      delete newFilters.stage_id;
+      delete newFilters.include_lost;
+      newFilters.include_archived = true;
+      return newFilters;
+    });
+    clearStageDropdown();
+    return;
+  }
+  if (!activeFilter || stages.length === 0) {
+    return;
+  }
+  const selectedStage = stages.find((s) => s.id.toString() === activeFilter);
+  if (!selectedStage) {
+    return;
+  }
+  setCurrentFilters((prev) => {
+    const newFilters = { ...prev };
+    delete newFilters.include_archived;
+    delete newFilters.include_lost;
+    newFilters.stage_id = selectedStage.id.toString();
+    return newFilters;
+  });
+  setDealsFilters((prev) => ({
+    ...prev,
+    stage: selectedStage.id.toString(),
+  }));
+}
+
+function runStandardDealsListActiveFilterSync<T extends Record<string, any>>(
+  activeFilter: string,
+  stages: StageLike[],
+  setCurrentFilters: Dispatch<SetStateAction<Record<string, any>>>,
+  setDealsFilters: Dispatch<SetStateAction<T>>,
+  clearStageDropdown: () => void,
+): void {
+  if (activeFilter === "all") {
+    setCurrentFilters((prev) => applyDealTabAllFilters(prev));
+    clearStageDropdown();
+    return;
+  }
+  if (activeFilter === "lost") {
+    setCurrentFilters((prev) => applyDealTabLostFilters(prev));
+    clearStageDropdown();
+    return;
+  }
+  if (activeFilter === "deleted") {
+    setCurrentFilters((prev) => applyDealTabDeletedFilters(prev));
+    clearStageDropdown();
+    return;
+  }
+  if (activeFilter === "rejected") {
+    setCurrentFilters((prev) => applyDealTabRejectedFilters(prev));
+    clearStageDropdown();
+    return;
+  }
+  if (!activeFilter || stages.length === 0) {
+    return;
+  }
+  const selectedStage = stages.find((s) => s.id.toString() === activeFilter);
+  if (!selectedStage) {
+    return;
+  }
+  const stageId = selectedStage.id.toString();
+  setCurrentFilters((prev) => applyDealTabStageFilters(prev, stageId));
+  setDealsFilters((prev) => ({
+    ...prev,
+    stage: stageId,
+  }));
+}
+
 /**
  * Keeps deal list `currentFilters` and sidebar stage dropdown aligned with the active tab
  * (all / lost / deleted / rejected / stage). Extracted to lower cognitive complexity of the page shell.
@@ -34,78 +136,22 @@ export function useDealsListActiveFilterSync<T extends Record<string, any>>({
       setDealsFilters((prev) => ({ ...prev, stage: null }));
 
     if (isApprovalsList) {
-      if (activeFilter === "all") {
-        setCurrentFilters((prev) => {
-          const newFilters = { ...prev };
-          delete newFilters.stage_id;
-          delete newFilters.include_archived;
-          delete newFilters.include_lost;
-          return newFilters;
-        });
-        clearStageDropdown();
-      } else if (activeFilter === "lost") {
-        setCurrentFilters((prev) => {
-          const newFilters = { ...prev };
-          delete newFilters.stage_id;
-          delete newFilters.include_archived;
-          newFilters.include_lost = true;
-          return newFilters;
-        });
-        clearStageDropdown();
-      } else if (activeFilter === "deleted") {
-        setCurrentFilters((prev) => {
-          const newFilters = { ...prev };
-          delete newFilters.stage_id;
-          delete newFilters.include_lost;
-          newFilters.include_archived = true;
-          return newFilters;
-        });
-        clearStageDropdown();
-      } else if (activeFilter && stages.length > 0) {
-        const selectedStage = stages.find(
-          (s) => s.id.toString() === activeFilter,
-        );
-        if (selectedStage) {
-          setCurrentFilters((prev) => {
-            const newFilters = { ...prev };
-            delete newFilters.include_archived;
-            delete newFilters.include_lost;
-            newFilters.stage_id = selectedStage.id.toString();
-            return newFilters;
-          });
-          setDealsFilters((prev) => ({
-            ...prev,
-            stage: selectedStage.id.toString(),
-          }));
-        }
-      }
+      runApprovalsListActiveFilterSync(
+        activeFilter,
+        stages,
+        setCurrentFilters,
+        setDealsFilters,
+        clearStageDropdown,
+      );
       return;
     }
 
-    if (activeFilter === "all") {
-      setCurrentFilters((prev) => applyDealTabAllFilters(prev));
-      clearStageDropdown();
-    } else if (activeFilter === "lost") {
-      setCurrentFilters((prev) => applyDealTabLostFilters(prev));
-      clearStageDropdown();
-    } else if (activeFilter === "deleted") {
-      setCurrentFilters((prev) => applyDealTabDeletedFilters(prev));
-      clearStageDropdown();
-    } else if (activeFilter === "rejected") {
-      setCurrentFilters((prev) => applyDealTabRejectedFilters(prev));
-      clearStageDropdown();
-    } else if (activeFilter && stages.length > 0) {
-      const selectedStage = stages.find(
-        (s) => s.id.toString() === activeFilter,
-      );
-      if (selectedStage) {
-        const stageId = selectedStage.id.toString();
-        setCurrentFilters((prev) => applyDealTabStageFilters(prev, stageId));
-        setDealsFilters((prev) => ({
-          ...prev,
-          stage: stageId,
-        }));
-      }
-    }
+    runStandardDealsListActiveFilterSync(
+      activeFilter,
+      stages,
+      setCurrentFilters,
+      setDealsFilters,
+      clearStageDropdown,
+    );
   }, [activeFilter, isApprovalsList, stages, setCurrentFilters, setDealsFilters]);
 }
