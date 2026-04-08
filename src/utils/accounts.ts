@@ -346,7 +346,13 @@ function appendProductScalarFields(
       form.append(String(key), value ? "1" : "0");
       continue;
     }
-    form.append(String(key), String(value));
+    if (typeof value === "string") {
+      form.append(String(key), value);
+      continue;
+    }
+    if (typeof value === "number") {
+      form.append(String(key), String(value));
+    }
   }
 }
 

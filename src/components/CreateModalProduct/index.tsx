@@ -20,7 +20,6 @@ import {
 } from "@components/shared/modalUiHelpers";
 import { FullScreenModalShell, SubBarButton } from "@components/shared/FullScreenModalShell";
 import { ProductInformationCard } from "@components/shared/ProductInformationCard";
-import { BillingDetailsCard } from "@components/shared/BillingDetailsCard";
 import { PricingConfigurationCard } from "@components/shared/PricingConfigurationCard";
 
 function isCreateProductFailureResponse(
@@ -69,7 +68,6 @@ export default function CreateProductModal({
   onUpdated,
 }: Readonly<CreateProductModalProps>) {
   const [pricingTab, setPricingTab] = useState("flat");
-  const [billingFrequency, setBillingFrequency] = useState("one-time");
   const [productType, setProductType] = useState("");
   const [additionalOpen, setAdditionalOpen] = useState(false);
   const [isActive, setIsActive] = useState(true);
@@ -334,12 +332,6 @@ export default function CreateProductModal({
         existingLogoUrl={existingLogoUrl}
         logoFile={logoFile}
         onLogoFileChange={setLogoFile}
-      />
-
-      <BillingDetailsCard
-        billingFrequency={billingFrequency}
-        onBillingFrequencyChange={setBillingFrequency}
-        idPrefix="cmp"
       />
 
       <PricingConfigurationCard
