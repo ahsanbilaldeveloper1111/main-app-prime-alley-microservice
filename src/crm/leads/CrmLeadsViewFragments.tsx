@@ -25,7 +25,6 @@ import PhoneInput, {
 import "react-phone-number-input/style.css";
 import { Country, State, City } from "country-state-city";
 import {
-  GlobalDateFormat,
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
   RECORD_TYPES,
@@ -202,14 +201,111 @@ function crmLeadsLeadPotentialPieData(potentialCounts: Record<string, number>) {
   }));
 }
 
-function CrmLeadsAnalyticsSection(props: {
-  analyticsData: {
-    total: number;
-    potentialCounts: Record<string, number>;
-    stageCounts: Record<string, number>;
-  };
-  summaryTiles?: { qualified_leads?: number; new_leads?: number };
-}) {
+function crmLeadCrmDataNestedName(
+  crm: { name?: string; data?: { name?: string } } | null | undefined,
+): string | undefined {
+  return crm?.name ?? crm?.data?.name;
+}
+
+function crmLeadCrmDataNestedPhone(
+  crm: { phone?: string; data?: { phone?: string } } | null | undefined,
+): string {
+  return crm?.phone ?? crm?.data?.phone ?? "";
+}
+
+function crmLeadOverviewStatusBadgeVariant(
+  isLost: boolean,
+  status: string | undefined,
+): "danger" | "primary" | "success" {
+  if (isLost) return "danger";
+  if (status === "new") return "primary";
+  return "success";
+}
+
+function editLeadModalBusinessTypeSelectValue(
+  showOther: boolean,
+  businessTypeId: number | null,
+): string {
+  if (showOther) return "other";
+  if (businessTypeId) return String(businessTypeId);
+  return "";
+}
+
+type CrmLeadEditCountryOption = {
+  value: string;
+  label: string;
+  isoCode: string;
+};
+
+function CrmLeadEditCountrySelectFormatOption({
+  option,
+}: Readonly<{ option: CrmLeadEditCountryOption }>) {
+  return (
+    <div className="d-flex align-items-center">
+      <img
+        src={`https://flagcdn.com/w20/${option.isoCode.toLowerCase()}.png`}
+        alt={option.label}
+        className="me-2"
+        style={{ width: "20px", height: "15px" }}
+      />
+      {option.label}
+    </div>
+  );
+}
+
+function CrmLeadEditModalCountrySelectGroup({
+  editSelectedCountry,
+  onCountryChange,
+}: Readonly<{
+  editSelectedCountry: CrmLeadEditCountryOption | null;
+  onCountryChange: (value: unknown) => void;
+}>) {
+  return (
+    <Col md={6}>
+      <Form.Group className="mb-3">
+        <Form.Label>Country</Form.Label>
+        <Select
+          value={editSelectedCountry}
+          onChange={onCountryChange}
+          options={Country.getAllCountries().map((country) => ({
+            value: country.isoCode,
+            label: country.name,
+            isoCode: country.isoCode,
+          }))}
+          placeholder="Select Country"
+          isClearable
+          isSearchable
+          formatOptionLabel={(option) => (
+            <CrmLeadEditCountrySelectFormatOption
+              option={option as CrmLeadEditCountryOption}
+            />
+          )}
+        />
+      </Form.Group>
+    </Col>
+  );
+}
+
+function editLeadContactPersonStableKey(
+  person: { id?: number; name?: string; phone?: string; title?: string },
+  index: number,
+): string {
+  if (person.id != null && Number.isFinite(person.id)) {
+    return `lead-contact-${person.id}`;
+  }
+  return `lead-contact-${person.name ?? ""}-${person.phone ?? ""}-${person.title ?? ""}-i${index}`;
+}
+
+function CrmLeadsAnalyticsSection(
+  props: Readonly<{
+    analyticsData: {
+      total: number;
+      potentialCounts: Record<string, number>;
+      stageCounts: Record<string, number>;
+    };
+    summaryTiles?: { qualified_leads?: number; new_leads?: number };
+  }>,
+) {
   const { analyticsData, summaryTiles } = props;
   const pieData = crmLeadsLeadPotentialPieData(analyticsData.potentialCounts);
   return (
@@ -803,27 +899,18 @@ function CrmLeadViewModalCampaignProspectTab() {
                                     #{viewingLead.crm_data.id}
                                   </CrmLeadPreviewGrayField>
                                 )}
-                                {(viewingLead.crm_data.name ||
-                                  (viewingLead.crm_data.data &&
-                                    viewingLead.crm_data.data.name)) && (
+                                {crmLeadCrmDataNestedName(viewingLead.crm_data) && (
                                   <CrmLeadPreviewGrayField label="Name">
-                                    {viewingLead.crm_data.name ||
-                                      (viewingLead.crm_data.data &&
-                                        viewingLead.crm_data.data.name) ||
+                                    {crmLeadCrmDataNestedName(viewingLead.crm_data) ||
                                       "N/A"}
                                   </CrmLeadPreviewGrayField>
                                 )}
-                                {(viewingLead.crm_data.phone ||
-                                  (viewingLead.crm_data.data &&
-                                    viewingLead.crm_data.data.phone)) && (
+                                {crmLeadCrmDataNestedPhone(viewingLead.crm_data) && (
                                   <CrmLeadPreviewGrayField label="Phone">
                                     <PhoneDisplay
-                                      phone={
-                                        viewingLead.crm_data.phone ||
-                                        (viewingLead.crm_data.data &&
-                                          viewingLead.crm_data.data.phone) ||
-                                        ""
-                                      }
+                                      phone={crmLeadCrmDataNestedPhone(
+                                        viewingLead.crm_data,
+                                      )}
                                     />
                                   </CrmLeadPreviewGrayField>
                                 )}
@@ -3798,13 +3885,10 @@ export function CrmLeadsViewFragment05() {
                       Status
                     </div>
                     <Badge
-                      bg={
-                        viewingLead.is_lost
-                          ? "danger"
-                          : viewingLead.status === "new"
-                            ? "primary"
-                            : "success"
-                      }
+                      bg={crmLeadOverviewStatusBadgeVariant(
+                        Boolean(viewingLead.is_lost),
+                        viewingLead.status,
+                      )}
                       style={{ fontSize: "13px", padding: "6px 12px" }}
                     >
                       {viewingLead.is_lost
@@ -5198,13 +5282,10 @@ export function CrmLeadsViewFragment09() {
                             Business Type <span className="text-danger">*</span>
                           </Form.Label>
                           <Form.Select
-                            value={
-                              editShowOtherBusinessType
-                                ? "other"
-                                : editBusinessTypeId
-                                  ? String(editBusinessTypeId)
-                                  : ""
-                            }
+                            value={editLeadModalBusinessTypeSelectValue(
+                              editShowOtherBusinessType,
+                              editBusinessTypeId,
+                            )}
                             onChange={(e) => {
                               const value = e.target.value;
                               if (value === "other") {
@@ -5253,36 +5334,10 @@ export function CrmLeadsViewFragment09() {
                           </Form.Group>
                         </Col>
                       )}
-                      <Col md={6}>
-                        <Form.Group className="mb-3">
-                          <Form.Label>Country</Form.Label>
-                          <Select
-                            value={editSelectedCountry}
-                            onChange={handleEditCountryChange}
-                            options={Country.getAllCountries().map(
-                              (country: any) => ({
-                                value: country.isoCode,
-                                label: country.name,
-                                isoCode: country.isoCode,
-                              }),
-                            )}
-                            placeholder="Select Country"
-                            isClearable
-                            isSearchable
-                            formatOptionLabel={(option: any) => (
-                              <div className="d-flex align-items-center">
-                                <img
-                                  src={`https://flagcdn.com/w20/${option.isoCode.toLowerCase()}.png`}
-                                  alt={option.label}
-                                  className="me-2"
-                                  style={{ width: "20px", height: "15px" }}
-                                />
-                                {option.label}
-                              </div>
-                            )}
-                          />
-                        </Form.Group>
-                      </Col>
+                      <CrmLeadEditModalCountrySelectGroup
+                        editSelectedCountry={editSelectedCountry}
+                        onCountryChange={handleEditCountryChange}
+                      />
                       <Col md={6}>
                         <Form.Group className="mb-3">
                           <Form.Label>Province/State</Form.Label>
@@ -5403,7 +5458,10 @@ export function CrmLeadsViewFragment09() {
                       </Button>
                     </div>
                     {editFormData.contact_persons.map((person, index) => (
-                      <Card key={index} className="mb-3 border">
+                      <Card
+                        key={editLeadContactPersonStableKey(person, index)}
+                        className="mb-3 border"
+                      >
                         <Card.Body>
                           <div className="d-flex justify-content-between align-items-center mb-3">
                             <h6 className="mb-0">Contact Person {index + 1}</h6>
@@ -5643,7 +5701,6 @@ export function CrmLeadsViewFragment09() {
 
 export function CrmLeadsViewFragment10() {
   const {
-    activeFilter,
     campaigns,
     convertingLeadId,
     customTabs,
@@ -5656,57 +5713,37 @@ export function CrmLeadsViewFragment10() {
     filterBusinessTypes,
     filterCounts,
     handleAddCustomTab,
-    handleConvertLead,
-    handleDeleteFollowUp,
-    handleDeleteMeeting,
     handleFiltersChange,
     handleLeadsExport,
-    handleSidebarCall,
-    handleViewLead,
-    leadFollowUps,
-    leadMeetings,
     lostReasons,
     leadsColumns,
     leadsFilters,
     leadsSearch,
-    router,
-    selectedLead,
     selectedLeadsColumns,
-    session,
     stages,
     setActiveFilter,
     setConvertingLeadId,
     setEditLeadIdForSidebar,
     setExportFileName,
     setExportFilters,
-    setFollowUpIdToEdit,
-    setFollowupData,
     setLeadsFilters,
     setLeadsPagination,
     setLeadsSearch,
-    setMeetingAttendees,
-    setMeetingData,
     setRefreshKey,
-    setSelectedLead,
     setSelectedLeadsColumns,
-    setShowAddFollowupModal,
-    setShowAddMeetingModal,
     setShowColumnEditor,
     setShowConvertToDealModal,
     setShowCreateLeadModal,
     setShowExportModal,
     setShowFiltersSidebar,
-    setShowLeadHistoryModal,
-    setShowLeadSidebar,
     setShowTabModal,
     showColumnEditor,
     showConvertToDealModal,
     showCreateLeadModal,
     showExportModal,
     showFiltersSidebar,
-    showLeadSidebar,
     showTabModal,
-    uniqueSources
+    uniqueSources,
   } = useLeadsPageContext();
   return (
     <>
@@ -6379,11 +6416,10 @@ export function CrmLeadsViewFragment10() {
             label: "Lead Score (Min)",
             type: "text",
             value: leadsFilters.leadScoreMin || "",
-            onChange: (value) => {
-              const minValue = value || null;
+            onChange: (value = "") => {
               setLeadsFilters((prev) => ({
                 ...prev,
-                leadScoreMin: minValue,
+                leadScoreMin: value || null,
               }));
             },
             placeholder: "Minimum score",
@@ -6393,11 +6429,10 @@ export function CrmLeadsViewFragment10() {
             label: "Lead Score (Max)",
             type: "text",
             value: leadsFilters.leadScoreMax || "",
-            onChange: (value) => {
-              const maxValue = value || null;
+            onChange: (value = "") => {
               setLeadsFilters((prev) => ({
                 ...prev,
-                leadScoreMax: maxValue,
+                leadScoreMax: value || null,
               }));
             },
             placeholder: "Maximum score",
@@ -6407,11 +6442,10 @@ export function CrmLeadsViewFragment10() {
             label: "Date (From)",
             type: "date",
             value: leadsFilters.dateFrom || "",
-            onChange: (value) => {
-              const dateFromValue = value || null;
+            onChange: (value = "") => {
               setLeadsFilters((prev) => ({
                 ...prev,
-                dateFrom: dateFromValue,
+                dateFrom: value || null,
               }));
             },
             placeholder: "From date",
@@ -6421,11 +6455,10 @@ export function CrmLeadsViewFragment10() {
             label: "Date (To)",
             type: "date",
             value: leadsFilters.dateTo || "",
-            onChange: (value) => {
-              const dateToValue = value || null;
+            onChange: (value = "") => {
               setLeadsFilters((prev) => ({
                 ...prev,
-                dateTo: dateToValue,
+                dateTo: value || null,
               }));
             },
             placeholder: "To date",

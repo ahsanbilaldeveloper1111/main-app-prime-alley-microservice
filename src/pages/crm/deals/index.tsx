@@ -172,13 +172,6 @@ import {
 } from "@crm/deals/dealsListPageFilterHelpers";
 import { CrmDealsListAddTabModal } from "@crm/deals/CrmDealsListAddTabModal";
 import {
-  applyDealTabAllFilters,
-  applyDealTabDeletedFilters,
-  applyDealTabLostFilters,
-  applyDealTabRejectedFilters,
-  applyDealTabStageFilters,
-} from "@crm/deals/dealsListTabFilterHelpers";
-import {
   buildDealsListFullExportCsvFromApiRows,
   triggerCsvDownload,
 } from "@crm/deals/dealsListCsvExport";
@@ -202,8 +195,10 @@ import {
   DEAL_DETAIL_MODAL_BODY_FILTER_CSS,
 } from "@crm/deals/CrmDealDetailViewModalShared";
 import { loadCrmDealWithOptionalLead } from "@crm/deals/crmDealDetailLoad";
+import { buildCrmDealDetailPagePath } from "@crm/deals/dealsListDetailRoutes";
 import { useCrmDealAttachmentModal } from "@crm/deals/useCrmDealAttachmentModal";
 import { useCrmDealMeetingsAndFollowUps } from "@crm/deals/useCrmDealMeetingsAndFollowUps";
+import { useDealsListActiveFilterSync } from "@crm/deals/useDealsListActiveFilterSync";
 import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 
 const ignoredKeys = ["stage_id"];
@@ -306,9 +301,9 @@ const DetailField = ({
 
 export function CrmDealsListScreen({
   listVariant,
-}: {
+}: Readonly<{
   listVariant: CrmDealsListVariant;
-}) { // NOSONAR — shared with /crm/approvals
+}>) {
   const isApprovalsList = listVariant === "approvals";
   const { data: session } = useSession();
   const router = useRouter();
@@ -433,14 +428,8 @@ export function CrmDealsListScreen({
     showAttachmentModal,
   });
 
-  const {
-    dealMeetings,
-    loadingDealMeetings,
-    fetchDealMeetings,
-    dealFollowUps,
-    loadingDealFollowUps,
-    fetchDealFollowUps,
-  } = useCrmDealMeetingsAndFollowUps();
+  const { fetchDealMeetings, dealFollowUps, fetchDealFollowUps } =
+    useCrmDealMeetingsAndFollowUps();
 
   // Download file modal (table column)
   const [showDownloadFileModal, setShowDownloadFileModal] = useState(false);
@@ -906,86 +895,13 @@ export function CrmDealsListScreen({
     [buildDealsParams, isApprovalsList, stages],
   );
 
-  // Handle activeFilter changes to update currentFilters and stage dropdown
-  useEffect(() => {
-    const clearStageDropdown = () =>
-      setDealsFilters((prev) => ({ ...prev, stage: null }));
-
-    if (isApprovalsList) {
-      if (activeFilter === "all") {
-        setCurrentFilters((prev) => {
-          const newFilters = { ...prev };
-          delete newFilters.stage_id;
-          delete newFilters.include_archived;
-          delete newFilters.include_lost;
-          return newFilters;
-        });
-        clearStageDropdown();
-      } else if (activeFilter === "lost") {
-        setCurrentFilters((prev) => {
-          const newFilters = { ...prev };
-          delete newFilters.stage_id;
-          delete newFilters.include_archived;
-          newFilters.include_lost = true;
-          return newFilters;
-        });
-        clearStageDropdown();
-      } else if (activeFilter === "deleted") {
-        setCurrentFilters((prev) => {
-          const newFilters = { ...prev };
-          delete newFilters.stage_id;
-          delete newFilters.include_lost;
-          newFilters.include_archived = true;
-          return newFilters;
-        });
-        clearStageDropdown();
-      } else if (activeFilter && stages.length > 0) {
-        const selectedStage = stages.find(
-          (s: any) => s.id.toString() === activeFilter,
-        );
-        if (selectedStage) {
-          setCurrentFilters((prev) => {
-            const newFilters = { ...prev };
-            delete newFilters.include_archived;
-            delete newFilters.include_lost;
-            newFilters.stage_id = selectedStage.id.toString();
-            return newFilters;
-          });
-          setDealsFilters((prev) => ({
-            ...prev,
-            stage: selectedStage.id.toString(),
-          }));
-        }
-      }
-      return;
-    }
-
-    if (activeFilter === "all") {
-      setCurrentFilters((prev) => applyDealTabAllFilters(prev));
-      clearStageDropdown();
-    } else if (activeFilter === "lost") {
-      setCurrentFilters((prev) => applyDealTabLostFilters(prev));
-      clearStageDropdown();
-    } else if (activeFilter === "deleted") {
-      setCurrentFilters((prev) => applyDealTabDeletedFilters(prev));
-      clearStageDropdown();
-    } else if (activeFilter === "rejected") {
-      setCurrentFilters((prev) => applyDealTabRejectedFilters(prev));
-      clearStageDropdown();
-    } else if (activeFilter && stages.length > 0) {
-      const selectedStage = stages.find(
-        (s: any) => s.id.toString() === activeFilter,
-      );
-      if (selectedStage) {
-        const stageId = selectedStage.id.toString();
-        setCurrentFilters((prev) => applyDealTabStageFilters(prev, stageId));
-        setDealsFilters((prev) => ({
-          ...prev,
-          stage: stageId,
-        }));
-      }
-    }
-  }, [activeFilter, isApprovalsList, stages]);
+  useDealsListActiveFilterSync({
+    activeFilter,
+    isApprovalsList,
+    stages,
+    setCurrentFilters,
+    setDealsFilters,
+  });
 
   // Read tab from URL on mount and when router is ready
   useEffect(() => {
@@ -1038,7 +954,9 @@ export function CrmDealsListScreen({
       return;
     }
     lastTabTotalsRequestKeyRef.current = tabTotalsRequestKey;
-    fetchTabTotals(tabTotalsBaseFilters);
+    fetchTabTotals(tabTotalsBaseFilters).catch((err) => {
+      console.error("Failed to fetch deal tab totals:", err);
+    });
   }, [fetchTabTotals, tabTotalsBaseFilters, tabTotalsRequestKey]);
 
   // Handle open filters sidebar
@@ -1187,13 +1105,7 @@ export function CrmDealsListScreen({
   const handleFirstColumnClick = useCallback(
     (deal: any) => {
       const id = deal?.id ?? deal?.rawData?.id;
-      router.push(
-        id
-          ? `/crm/detailspage?type=deal&id=${id}${
-              isApprovalsList ? "&approval=1" : ""
-            }`
-          : "/crm/deals",
-      );
+      router.push(buildCrmDealDetailPagePath(id, isApprovalsList));
     },
     [router, isApprovalsList],
   );
@@ -1655,14 +1567,18 @@ export function CrmDealsListScreen({
 
   const handleApproveDeal = useCallback(
     (deal: any) => {
-      void runDealApprovalDecision(deal, "approve");
+      runDealApprovalDecision(deal, "approve").catch((err) => {
+        console.error("Approve deal failed:", err);
+      });
     },
     [runDealApprovalDecision],
   );
 
   const handleRejectDeal = useCallback(
     (deal: any) => {
-      void runDealApprovalDecision(deal, "reject");
+      runDealApprovalDecision(deal, "reject").catch((err) => {
+        console.error("Reject deal failed:", err);
+      });
     },
     [runDealApprovalDecision],
   );
@@ -1705,7 +1621,7 @@ export function CrmDealsListScreen({
         ];
         const hash = name
           .split("")
-          .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+          .reduce((acc, char) => acc + (char.codePointAt(0) ?? 0), 0);
         return colors[hash % colors.length];
       },
     }),
@@ -1961,7 +1877,7 @@ export function CrmDealsListScreen({
             type: "custom",
             render: (row) => (
               <span className="fw-semibold">
-                {row.currency} {parseFloat(String(row.value)).toLocaleString()}
+                {row.currency} {Number.parseFloat(String(row.value)).toLocaleString()}
               </span>
             ),
           },
@@ -2073,7 +1989,7 @@ export function CrmDealsListScreen({
         type: "custom",
         render: (row) => (
           <span className="fw-semibold">
-            {row.currency} {parseFloat(String(row.value)).toLocaleString()}
+            {row.currency} {Number.parseFloat(String(row.value)).toLocaleString()}
           </span>
         ),
       },
@@ -2243,7 +2159,7 @@ export function CrmDealsListScreen({
                           label: "Approve",
                           icon: <CheckCircle size={14} />,
                           onClick: (row: any) => {
-                            void handleApproveDeal(row.rawData || row);
+                            handleApproveDeal(row.rawData || row);
                           },
                           className: "text-success",
                           show: (row: any) =>
@@ -2254,7 +2170,7 @@ export function CrmDealsListScreen({
                           label: "Reject",
                           icon: <XCircle size={14} />,
                           onClick: (row: any) => {
-                            void handleRejectDeal(row.rawData || row);
+                            handleRejectDeal(row.rawData || row);
                           },
                           className: "text-danger",
                           show: (row: any) =>
@@ -2836,7 +2752,7 @@ export function CrmDealsListScreen({
                   {
                     label: "Deal Value",
                     value: selectedDeal?.value
-                      ? `${selectedDeal?.currency || "AED"} ${parseFloat(String(selectedDeal.value)).toLocaleString()}`
+                      ? `${selectedDeal?.currency || "AED"} ${Number.parseFloat(String(selectedDeal.value)).toLocaleString()}`
                       : "N/A",
                     copyable: true,
                     show: !!selectedDeal?.value,
@@ -3232,7 +3148,7 @@ export function CrmDealsListScreen({
             onClose={() => setShowDealViewModal(false)}
             dealName={viewingDeal.name}
             stageName={viewingDeal.stage?.name || "No stage"}
-            valueDisplay={`${viewingDeal.currency || "AED"} ${parseFloat(
+            valueDisplay={`${viewingDeal.currency || "AED"} ${Number.parseFloat(
               String(
                 viewingDeal.net_value || viewingDeal.grand_total || 0,
               ),
@@ -3487,7 +3403,7 @@ export function CrmDealsListScreen({
                                   }}
                                 >
                                   {viewingDeal.currency || "AED"}{" "}
-                                  {parseFloat(
+                                  {Number.parseFloat(
                                     String(
                                       viewingDeal.net_value ||
                                         viewingDeal.grand_total ||
@@ -4288,7 +4204,7 @@ export function CrmDealsListScreen({
                               }}
                             >
                               {viewingDeal.currency || "AED"}{" "}
-                              {parseFloat(
+                              {Number.parseFloat(
                                 String(
                                   viewingDeal.net_value ||
                                     viewingDeal.grand_total ||
@@ -4794,7 +4710,7 @@ export function CrmDealsListScreen({
                       }}
                     >
                       {viewingDeal.currency || "AED"}{" "}
-                      {parseFloat(
+                      {Number.parseFloat(
                         String(
                           viewingDeal.net_value || viewingDeal.grand_total || 0,
                         ),
@@ -6504,8 +6420,9 @@ export function CrmDealsListScreen({
                 expectedCloseDateTo: value,
               })),
           },
-          ...(!isApprovalsList
-            ? [
+          ...(isApprovalsList
+            ? []
+            : [
                 {
                   id: "includeConverted",
                   label: "Include converted",
@@ -6609,8 +6526,7 @@ export function CrmDealsListScreen({
                     },
                   ],
                 },
-              ]
-            : []),
+              ]),
         ]}
         onApply={() => {
           handleFiltersChange(

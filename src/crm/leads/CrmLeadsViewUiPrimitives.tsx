@@ -73,11 +73,16 @@ export function resolveCrmExtensionDisplayName(
   const ext = extensions?.find(
     (e) => e?.id == userExtension || e?.extension == userExtension,
   );
-  const label =
-    ext?.display_name || ext?.name || (userExtension != null && userExtension !== ""
+  const rawExtLabel =
+    ext?.display_name ||
+    ext?.name ||
+    (typeof userExtension === "string" ||
+    typeof userExtension === "number" ||
+    typeof userExtension === "boolean" ||
+    typeof userExtension === "bigint"
       ? String(userExtension)
       : "");
-  return label || fallback;
+  return rawExtLabel || fallback;
 }
 
 const SECTION_TITLE_BAR_BASE: React.CSSProperties = {
@@ -274,7 +279,14 @@ export function CrmLeadEditCampaignFieldControl({
 }>) {
   const raw = values?.[field.field_key];
   const value =
-    raw === undefined || raw === null ? "" : String(raw);
+    raw === undefined || raw === null
+      ? ""
+      : typeof raw === "string" ||
+          typeof raw === "number" ||
+          typeof raw === "boolean" ||
+          typeof raw === "bigint"
+        ? String(raw)
+        : "";
   const placeholder = `Enter ${field.field_name.toLowerCase()}`;
 
   switch (field.field_type) {

@@ -49,7 +49,9 @@ export function useCrmDealAttachmentModal({
 
   useEffect(() => {
     if (showAttachmentModal && selectedDealForAttachments?.id) {
-      void refreshAttachmentsList();
+      refreshAttachmentsList().catch((err) => {
+        console.error("Failed to refresh attachments:", err);
+      });
     } else {
       setAttachments([]);
     }

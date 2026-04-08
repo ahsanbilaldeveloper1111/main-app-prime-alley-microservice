@@ -1,20 +1,27 @@
-import { getDeal, getLead } from "@utils/crm";
+import { getDeal, getLead, type DealData, type LeadData } from "@utils/crm";
+
+/** API may return `contact_persons` as JSON string; we normalize to an array when parsing. */
+type LeadDataWithContactPersons = LeadData & {
+  contact_persons?: string | unknown[] | null;
+};
 
 export type CrmDealWithOptionalLead = {
-  deal: any;
-  relatedLead: any | null;
+  deal: DealData;
+  relatedLead: LeadData | null;
 };
 
 /** Loads a deal and, when `ticket_id` is present, the related lead with parsed `contact_persons`. */
 export async function loadCrmDealWithOptionalLead(
   dealId: number,
 ): Promise<CrmDealWithOptionalLead> {
-  const dealData: any = await getDeal(dealId);
-  let relatedLead: any | null = null;
+  const dealData = await getDeal(dealId);
+  let relatedLead: LeadData | null = null;
 
   if (dealData.ticket_id) {
     try {
-      const leadData: any = await getLead(Number(dealData.ticket_id));
+      const leadData = (await getLead(
+        Number(dealData.ticket_id),
+      )) as LeadDataWithContactPersons;
       if (
         leadData.contact_persons &&
         typeof leadData.contact_persons === "string"
@@ -26,7 +33,7 @@ export async function loadCrmDealWithOptionalLead(
           leadData.contact_persons = [];
         }
       }
-      relatedLead = leadData;
+      relatedLead = leadData as LeadData;
     } catch (error) {
       console.error("Failed to fetch lead:", error);
     }

@@ -95,6 +95,141 @@ import {
   getContactPersonsValidationError,
 } from "./leadsPageShared";
 
+function parseLeadsListApiEnvelope(response: unknown): {
+  leadsArray: unknown[];
+  pagination: Record<string, any>;
+  summary: any;
+  metrics: any;
+} {
+  const empty: unknown[] = [];
+  const emptyPagination: Record<string, any> = {};
+  if (response == null || typeof response !== "object") {
+    return {
+      leadsArray: empty,
+      pagination: emptyPagination,
+      summary: null,
+      metrics: null,
+    };
+  }
+  const root = response as Record<string, unknown>;
+  if (Array.isArray(root.data)) {
+    const pagination: Record<string, any> = {
+      total: root.total,
+      current_page: root.current_page,
+      per_page: root.per_page,
+      last_page: root.last_page,
+    };
+    return {
+      leadsArray: root.data,
+      pagination,
+      summary: root.summary_tiles ?? null,
+      metrics: root.metrics ?? null,
+    };
+  }
+  const responseData = root.data;
+  if (responseData == null || typeof responseData !== "object") {
+    return {
+      leadsArray: empty,
+      pagination: emptyPagination,
+      summary: null,
+      metrics: null,
+    };
+  }
+  const rd = responseData as Record<string, unknown>;
+  const leadsRaw = rd.data;
+  const leadsArray = Array.isArray(leadsRaw) ? leadsRaw : empty;
+  const paginationRaw = rd.pagination;
+  const pagination =
+    paginationRaw != null && typeof paginationRaw === "object"
+      ? (paginationRaw as Record<string, any>)
+      : emptyPagination;
+  return {
+    leadsArray,
+    pagination,
+    summary: rd.summary_tiles ?? null,
+    metrics: rd.metrics ?? null,
+  };
+}
+
+function extractLeadsExportChunkAndPagination(response: unknown): {
+  chunk: unknown[];
+  lastPage: number;
+} {
+  const chunk = (() => {
+    if (response == null || typeof response !== "object") return [];
+    const r = response as Record<string, unknown>;
+    if (Array.isArray(r.data)) return r.data as unknown[];
+    const inner = r.data;
+    if (inner != null && typeof inner === "object") {
+      const rec = inner as Record<string, unknown>;
+      if (Array.isArray(rec.data)) return rec.data;
+      if (Array.isArray(inner)) return inner as unknown[];
+    }
+    return [];
+  })();
+  const pagination = (() => {
+    if (response == null || typeof response !== "object") return {};
+    const r = response as Record<string, unknown>;
+    if (Array.isArray(r.data) && r.last_page != null) {
+      return {
+        last_page: r.last_page,
+        total: r.total,
+        current_page: r.current_page,
+        per_page: r.per_page,
+      } as Record<string, any>;
+    }
+    const inner = r.data;
+    if (inner != null && typeof inner === "object" && !Array.isArray(inner)) {
+      const rec = inner as Record<string, unknown>;
+      if (rec.pagination != null && typeof rec.pagination === "object") {
+        return rec.pagination as Record<string, any>;
+      }
+    }
+    if (r.pagination != null && typeof r.pagination === "object") {
+      return r.pagination as Record<string, any>;
+    }
+    return {} as Record<string, any>;
+  })();
+  const lastPage =
+    typeof pagination.last_page === "number" ? pagination.last_page : 1;
+  return { chunk, lastPage };
+}
+
+function buildLeadRowPhoneDisplay(
+  contactPerson: { phone?: string; phone_country_code?: string },
+  lead: Record<string, unknown>,
+): string {
+  if (contactPerson.phone) {
+    return `${contactPerson.phone_country_code || ""} ${contactPerson.phone}`.trim();
+  }
+  if (lead.contact_phone) {
+    return `${String(lead.contact_phone_country_code || "")} ${String(lead.contact_phone)}`.trim();
+  }
+  return "";
+}
+
+function resolveLeadRowStageAndColor(lead: {
+  is_lost?: boolean;
+  stage?: { name?: string; color?: string };
+  stage_id?: unknown;
+}): { stage: string; stageColor: string } {
+  if (lead.is_lost) {
+    return { stage: "Lost", stageColor: "grey" };
+  }
+  return {
+    stage: lead.stage?.name || (lead.stage_id ? "Unknown" : "New"),
+    stageColor: lead.stage?.color || "grey",
+  };
+}
+
+function leadPotentialToTableBadgeVariant(
+  leadPotential: string | undefined,
+): "danger" | "warning" | "secondary" {
+  if (leadPotential === "Hot") return "danger";
+  if (leadPotential === "Warm") return "warning";
+  return "secondary";
+}
+
 /** Spacing between CRM bootstrap requests to reduce API burst / 429 rate-limit errors. */
 const CRM_LEADS_BOOTSTRAP_STAGGER_MS = 100;
 
@@ -429,17 +564,16 @@ export function useCrmLeadsPageModel() {
       try {
         const params = buildLeadsParams(currentFilters, page, perPage, search, true);
 
-        const response: any = await getLeads(params);
+        const response = await getLeads(params);
         console.log("Raw response from getLeads:", response);
 
-        // Handle nested response structure
-        // The API returns: { code, message, data: { success, data: [...], pagination, summary_tiles } }
-        const responseData: any = (response as any)?.data;
-        // The leads array is at response.data.data (not response.data.data.data)
-        const leadsArray: any[] = responseData?.data || [];
-        const pagination: any = responseData?.pagination || {};
-        const summary: any = responseData?.summary_tiles || null;
-        const metricsFromApi: any = responseData?.metrics || null;
+        const {
+          leadsArray: leadsArrayRaw,
+          pagination,
+          summary,
+          metrics: metricsFromApi,
+        } = parseLeadsListApiEnvelope(response);
+        const leadsArray = leadsArrayRaw;
 
         // Set leads data, total, and summary tiles
         setLeadsData(Array.isArray(leadsArray) ? leadsArray : []);
@@ -710,19 +844,10 @@ export function useCrmLeadsPageModel() {
       let page = 1;
       const allData: any[] = [];
       for (;;) {
-        const response: any = await getLeads(
+        const response = await getLeads(
           buildLeadsExportParams(filters, { page, per_page: PER_PAGE }),
         );
-        const inner = response?.data;
-        const chunk = Array.isArray(inner?.data)
-          ? inner.data
-          : Array.isArray(inner)
-            ? inner
-            : Array.isArray(response?.data)
-              ? response.data
-              : [];
-        const pagination = inner?.pagination ?? response?.pagination ?? {};
-        const lastPage = pagination?.last_page ?? response?.last_page ?? 1;
+        const { chunk, lastPage } = extractLeadsExportChunkAndPagination(response);
         allData.push(...chunk);
         if (page >= lastPage || chunk.length < PER_PAGE) break;
         page += 1;
@@ -747,15 +872,16 @@ export function useCrmLeadsPageModel() {
       const blob = new Blob([csvText], {
         type: "text/csv;charset=utf-8;",
       });
-      const url = window.URL.createObjectURL(blob);
+      const url = globalThis.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       a.download = name + ext;
       a.click();
-      window.URL.revokeObjectURL(url);
+      globalThis.URL.revokeObjectURL(url);
       setShowExportModal(false);
       toast.success(`Exported ${allData.length} leads successfully!`);
     } catch (err) {
+      console.error("Leads export failed:", err);
       toast.error("Failed to export leads");
     } finally {
       setExporting(false);
@@ -982,13 +1108,9 @@ export function useCrmLeadsPageModel() {
 
     // Use contact person data if available, otherwise fall back to top-level fields
     const email = contactPerson.email || "";
-    const phone = contactPerson.phone
-      ? `${contactPerson.phone_country_code || ""} ${
-          contactPerson.phone
-        }`.trim()
-      : lead.contact_phone
-        ? `${lead.contact_phone_country_code || ""} ${lead.contact_phone}`.trim()
-        : "";
+    const phone = buildLeadRowPhoneDisplay(contactPerson, lead);
+
+    const { stage: stageLabel, stageColor } = resolveLeadRowStageAndColor(lead);
 
     return {
       id: lead.id,
@@ -997,10 +1119,8 @@ export function useCrmLeadsPageModel() {
       phone: phone,
       company: lead.company_name || "",
       industry: lead.industry || "",
-      stage: lead.is_lost
-        ? "Lost"
-        : lead.stage?.name || (lead.stage_id ? "Unknown" : "New"),
-      stageColor: lead.is_lost ? "grey" : lead.stage?.color || "grey",
+      stage: stageLabel,
+      stageColor,
       leadPotential: lead?.lead_potential || "Not Set",
       lead_score: lead?.stage?.score || 0,
       assignedUser:
@@ -1086,9 +1206,7 @@ export function useCrmLeadsPageModel() {
       }
       try {
         const result = await dialNumber(phone.trim());
-        if (result.success) {
-          // toast.success(`Calling ${phone}...`);
-        } else {
+        if (!result.success) {
           toast.error(result.error || "Failed to make call");
         }
       } catch (error) {
@@ -1159,7 +1277,6 @@ export function useCrmLeadsPageModel() {
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Lead Deleted");
       setSuccessModalDescription("Lead has been deleted successfully");
-      //window.location.reload();
       setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       console.error("Failed to delete lead:", error);
@@ -1168,7 +1285,7 @@ export function useCrmLeadsPageModel() {
 
   // Restore Lead Handler
   const handleRestoreLead = useCallback(async (leadId: number) => {
-    if (!window.confirm("Are you sure you want to restore this lead?")) return;
+    if (!globalThis.confirm("Are you sure you want to restore this lead?")) return;
 
     try {
       await restoreLead(leadId);
@@ -1195,7 +1312,7 @@ export function useCrmLeadsPageModel() {
   });
   const handleConvertLead = useCallback((lead: any) => {
     router.push(`/crm/deals/create?lead_id=${lead.id}`);
-  }, []);
+  }, [router]);
 
   const handleConvertSubmit = useCallback(async () => {
     if (!leadToConvert) return;
@@ -1212,8 +1329,7 @@ export function useCrmLeadsPageModel() {
         description: "",
       });
       toast.success("Lead converted successfully!");
-      // Refresh the list
-      window.location.reload();
+      globalThis.location.reload();
     } catch (error) {
       console.error("Failed to convert lead:", error);
     }
@@ -1287,8 +1403,6 @@ export function useCrmLeadsPageModel() {
       setShowSuccessfulModal(true);
       setSuccessModalTitle("Lead Marked as Lost");
       setSuccessModalDescription("Lead has been marked as lost successfully");
-      // Refresh the list
-      //window.location.reload();
       setRefreshKey((oldKey) => oldKey + 1);
     } catch (error) {
       console.error("Failed to mark lead as lost:", error);
@@ -1317,7 +1431,7 @@ export function useCrmLeadsPageModel() {
       const leadWithStage = {
         ...leadData,
         stage: leadData.is_lost
-          ? { ...(leadData.stage || {}), name: "Lost" }
+          ? { ...leadData.stage, name: "Lost" }
           : leadData.stage,
       };
       setViewingLead(leadWithStage);
@@ -1785,7 +1899,9 @@ export function useCrmLeadsPageModel() {
         if (mode === "create") {
           await createMeeting(payload);
         } else {
-          await updateMeeting(meetingIdToEdit!, payload);
+          const meetingId = meetingIdToEdit;
+          if (meetingId == null) return;
+          await updateMeeting(meetingId, payload);
         }
 
         if (meetingData.leadId) {
@@ -1916,6 +2032,7 @@ export function useCrmLeadsPageModel() {
       const m = leadMetrics || {};
       const todaysMeetings = m.todays_meetings ?? 0;
       const overdueMeetings = m.overdue_meetings ?? 0;
+      const overdueMeetingsPlural = overdueMeetings === 1 ? "" : "s";
       return [
         {
           title: "All Leads",
@@ -1957,9 +2074,7 @@ export function useCrmLeadsPageModel() {
           iconColor: "#F97316",
           iconBgColor: "#FFEDD5",
           metric: {
-            text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${
-              overdueMeetings === 1 ? "" : "s"
-            }`,
+            text: `${m.overdue_follow_ups ?? 0} Follow-ups / ${overdueMeetings} Meeting${overdueMeetingsPlural}`,
             dotColor: "#F97316",
           },
         },
@@ -1996,12 +2111,13 @@ export function useCrmLeadsPageModel() {
   const uniqueSources = useMemo(() => {
     const sources = new Set<string>();
     leadsData.forEach((lead: any) => {
-      if (lead.source && lead.source.trim()) {
-        sources.add(lead.source.trim());
+      const s = lead.source?.trim();
+      if (s) {
+        sources.add(s);
       }
     });
     return Array.from(sources)
-      .sort()
+      .sort((a, b) => a.localeCompare(b))
       .map((source) => ({
         value: source,
         label: source,
@@ -2109,11 +2225,7 @@ export function useCrmLeadsPageModel() {
         type: "badge",
         badge: {
           getVariant: (lead) =>
-            lead.leadPotential === "Hot"
-              ? "danger"
-              : lead.leadPotential === "Warm"
-                ? "warning"
-                : "secondary",
+            leadPotentialToTableBadgeVariant(lead.leadPotential),
         },
       },
       {

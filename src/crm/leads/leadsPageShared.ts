@@ -121,8 +121,18 @@ const LEADS_EXPORT_OMIT_TOP_LEVEL_KEYS = new Set([
 function serializeLeadsExportCsvCell(val: unknown): string {
   if (val == null) return "";
   if (typeof val === "object") return "";
-  const s = String(val).replaceAll('"', '""');
-  return s.includes(",") || s.includes('"') ? `"${s}"` : s;
+  if (typeof val === "function") return "";
+  if (
+    typeof val === "string" ||
+    typeof val === "number" ||
+    typeof val === "boolean" ||
+    typeof val === "bigint" ||
+    typeof val === "symbol"
+  ) {
+    const s = String(val).replaceAll('"', '""');
+    return s.includes(",") || s.includes('"') ? `"${s}"` : s;
+  }
+  return "";
 }
 
 /** Flat row CSV text for leads list API rows (primitive columns only). */
