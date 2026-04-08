@@ -32,6 +32,12 @@ function mergeUserExtensionsParam(
   target: Record<string, any>,
   filters: Record<string, any>,
 ): void {
+  if (filters.user_extension_filter?.length) {
+    target.user_extension_filter = Array.isArray(filters.user_extension_filter)
+      ? filters.user_extension_filter
+      : [filters.user_extension_filter];
+    return;
+  }
   if (!filters.user_extension?.length) return;
   target.user_extensions = Array.isArray(filters.user_extension)
     ? filters.user_extension

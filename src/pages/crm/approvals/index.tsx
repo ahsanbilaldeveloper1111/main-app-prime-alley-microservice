@@ -886,12 +886,21 @@ const CrmDeals = () => { // NOSONAR
         }
       }
 
-      // Handle assigned_to filter (single value)
+      // Handle user_extension_filter owner filter
+      if ("user_extension_filter" in filters) {
+        if (filters.user_extension_filter) {
+          newFilters.user_extension_filter = String(filters.user_extension_filter);
+        } else {
+          delete newFilters.user_extension_filter;
+        }
+      }
+
+      // Backward compatibility for old assigned_to owner key
       if ("assigned_to" in filters) {
         if (filters.assigned_to) {
-          newFilters.assigned_to = String(filters.assigned_to);
+          newFilters.user_extension_filter = String(filters.assigned_to);
         } else {
-          delete newFilters.assigned_to;
+          delete newFilters.user_extension_filter;
         }
       }
 
@@ -7085,9 +7094,9 @@ const CrmDeals = () => { // NOSONAR
             <CrmListExportModalAssignedToSelect
               extensions={extensions}
               value={
-                exportFilters.assigned_to != null &&
-                exportFilters.assigned_to !== ""
-                  ? String(exportFilters.assigned_to)
+                exportFilters.user_extension_filter != null &&
+                exportFilters.user_extension_filter !== ""
+                  ? String(exportFilters.user_extension_filter)
                   : undefined
               }
               setExportFilters={setExportFilters}

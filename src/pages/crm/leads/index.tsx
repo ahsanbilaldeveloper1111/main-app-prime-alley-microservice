@@ -489,7 +489,7 @@ const CrmLeads = () => {
 
       const truthyFilterKeys = [
         "stage_id",
-        "assigned_to",
+        "user_extension_filter",
         "business_type_id",
         "source",
         "lead_potential",
@@ -765,7 +765,8 @@ const CrmLeads = () => {
     if (showFiltersSidebar) {
       setLeadsFilters((prev) => ({
         ...prev,
-        assignedTo: currentFilters.assigned_to ?? null,
+        assignedTo:
+          currentFilters.user_extension_filter ?? currentFilters.assigned_to ?? null,
         stage: currentFilters.stage_id ?? null,
         businessType: currentFilters.business_type_id ?? null,
         source: currentFilters.source ?? null,
@@ -795,12 +796,21 @@ const CrmLeads = () => {
         }
       }
 
-      // Handle assigned_to filter (single value)
+      // Handle user_extension_filter owner filter
+      if ("user_extension_filter" in filters) {
+        if (filters.user_extension_filter) {
+          newFilters.user_extension_filter = String(filters.user_extension_filter);
+        } else {
+          delete newFilters.user_extension_filter;
+        }
+      }
+
+      // Backward compatibility for old assigned_to owner key
       if ("assigned_to" in filters) {
         if (filters.assigned_to) {
-          newFilters.assigned_to = String(filters.assigned_to);
+          newFilters.user_extension_filter = String(filters.assigned_to);
         } else {
-          delete newFilters.assigned_to;
+          delete newFilters.user_extension_filter;
         }
       }
 
@@ -926,7 +936,13 @@ const CrmLeads = () => {
   const buildLeadsExportParams = useCallback(
     (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
       const params: Record<string, any> = {};
-      if (filters.assigned_to) params.assigned_to = filters.assigned_to;
+      if (filters.user_extension_filter) {
+        params.user_extension_filter = Array.isArray(filters.user_extension_filter)
+          ? filters.user_extension_filter
+          : [filters.user_extension_filter];
+      } else if (filters.assigned_to) {
+        params.user_extension_filter = [filters.assigned_to];
+      }
       if (filters.date_from) params.date_from = filters.date_from;
       if (filters.date_to) params.date_to = filters.date_to;
       if (filters.stage_id) params.stage_id = filters.stage_id;
@@ -3239,7 +3255,7 @@ const CrmLeads = () => {
                                 filtersToApply.search = leadsSearch;
                               }
                               if (leadsFilters.assignedTo) {
-                                filtersToApply.assigned_to =
+                                filtersToApply.user_extension_filter =
                                   leadsFilters.assignedTo;
                               }
                               if (leadsFilters.stage) {
@@ -9426,7 +9442,7 @@ const CrmLeads = () => {
           // Pass all filter keys so handleFiltersChange can both set and clear (like prospects Apply)
           const filtersToApply: Record<string, any> = {
             search: leadsSearch?.trim() || "",
-            assigned_to: leadsFilters.assignedTo ?? undefined,
+            user_extension_filter: leadsFilters.assignedTo ?? undefined,
             stage_id: leadsFilters.stage ?? undefined,
             business_type_id: leadsFilters.businessType ?? undefined,
             source: leadsFilters.source ?? undefined,
@@ -9462,7 +9478,7 @@ const CrmLeads = () => {
           // Pass all filter keys as undefined so handleFiltersChange removes each one
           handleFiltersChange({
             search: undefined,
-            assigned_to: undefined,
+            user_extension_filter: undefined,
             stage_id: undefined,
             business_type_id: undefined,
             source: undefined,
@@ -9608,16 +9624,16 @@ const CrmLeads = () => {
                 <Form.Label>Owner</Form.Label>
                 <Form.Select
                   value={
-                    exportFilters.assigned_to
-                      ? String(exportFilters.assigned_to)
+                    exportFilters.user_extension_filter
+                      ? String(exportFilters.user_extension_filter)
                       : ""
                   }
                   onChange={(e) => {
                     const v = e.target.value;
                     setExportFilters((prev) => {
                       const next = { ...prev };
-                      if (v) next.assigned_to = v;
-                      else delete next.assigned_to;
+                      if (v) next.user_extension_filter = v;
+                      else delete next.user_extension_filter;
                       return next;
                     });
                   }}

@@ -47,14 +47,14 @@ export function CrmProspectsListExportModalFiltersBody({
             <Form.Label>Associate with</Form.Label>
             <Form.Select
               value={
-                exportFilters.user_extension
-                  ? String(exportFilters.user_extension)
+                exportFilters.user_extension_filter
+                  ? String(exportFilters.user_extension_filter)
                   : ""
               }
               onChange={(e) => {
                 const v = e.target.value;
                 setExportFilters((prev) =>
-                  patchExportFilterStringField(prev, "user_extension", v),
+                  patchExportFilterStringField(prev, "user_extension_filter", v),
                 );
               }}
             >

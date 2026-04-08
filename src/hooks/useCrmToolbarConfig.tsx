@@ -15,6 +15,16 @@ function isProspectsLikeEntity(entity: CrmEntityType): boolean {
   return entity === "prospects" || entity === "contacts";
 }
 
+function getProspectsLikeOwnerFilterValue(
+  entity: CrmEntityType,
+  filters: Record<string, any>,
+): unknown {
+  if (entity === "prospects" || entity === "contacts") {
+    return filters.user_extension_filter;
+  }
+  return filters.user_extension;
+}
+
 export interface UseCrmToolbarConfigOptions {
   entity: CrmEntityType;
 
@@ -178,18 +188,22 @@ export function useCrmToolbarConfig(
         : "Associate with";
 
     const isOwnerArray = isProspectsLikeEntity(entity);
+    const prospectsLikeOwnerFilterValue = getProspectsLikeOwnerFilterValue(
+      entity,
+      currentFilters,
+    );
     const hasOwnerFilter = isOwnerArray
-      ? currentFilters.user_extension &&
-        (Array.isArray(currentFilters.user_extension)
-          ? currentFilters.user_extension.length > 0
+      ? prospectsLikeOwnerFilterValue &&
+        (Array.isArray(prospectsLikeOwnerFilterValue)
+          ? prospectsLikeOwnerFilterValue.length > 0
           : true)
       : !!currentFilters.assigned_to;
 
     const ownerActiveLabel = (() => {
       if (isProspectsLikeEntity(entity)) {
-        const extId = Array.isArray(currentFilters.user_extension)
-          ? currentFilters.user_extension[0]
-          : currentFilters.user_extension;
+        const extId = Array.isArray(prospectsLikeOwnerFilterValue)
+          ? prospectsLikeOwnerFilterValue[0]
+          : prospectsLikeOwnerFilterValue;
         if (!extId) return undefined;
         const ext = extensions.find((e: any) => (e.id || e.extension) === extId);
         return ext ? ext.display_name || ext.name || ext.extension : String(extId);
@@ -202,7 +216,14 @@ export function useCrmToolbarConfig(
 
     const clearOwner = () => {
       if (isProspectsLikeEntity(entity)) {
-        handleFiltersChange({ ...currentFilters, user_extension: undefined });
+        const key =
+          entity === "prospects" || entity === "contacts"
+            ? "user_extension_filter"
+            : "user_extension";
+        handleFiltersChange({
+          ...currentFilters,
+          [key]: undefined,
+        });
       } else {
         handleFiltersChange({ ...currentFilters, assigned_to: undefined });
       }
@@ -233,9 +254,13 @@ export function useCrmToolbarConfig(
           value: String(ext.id ?? ext.extension),
           onClick: () => {
             if (isProspectsLikeEntity(entity)) {
+              const key =
+                entity === "prospects" || entity === "contacts"
+                  ? "user_extension_filter"
+                  : "user_extension";
               handleFiltersChange({
                 ...currentFilters,
-                user_extension: [ext.id || ext.extension],
+                [key]: [ext.id || ext.extension],
               });
             } else {
               handleFiltersChange({

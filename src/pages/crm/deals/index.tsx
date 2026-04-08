@@ -143,7 +143,6 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import Link from "next/link";
 import { toast } from "react-toastify";
 import moment from "moment";
 import PhoneInput from "react-phone-number-input";
@@ -6363,9 +6362,9 @@ const CrmDeals = () => { // NOSONAR
             <CrmListExportModalAssignedToSelect
               extensions={extensions}
               value={
-                exportFilters.assigned_to != null &&
-                exportFilters.assigned_to !== ""
-                  ? String(exportFilters.assigned_to)
+                exportFilters.user_extension_filter != null &&
+                exportFilters.user_extension_filter !== ""
+                  ? String(exportFilters.user_extension_filter)
                   : undefined
               }
               setExportFilters={setExportFilters}

@@ -44,7 +44,12 @@ const addIfNotNullOrEmptyParam = (
   }
 };
 
-const resolveUserExtensions = (filters: AnyRecord): unknown[] | undefined => {
+const resolveOwnerFilterValues = (filters: AnyRecord): unknown[] | undefined => {
+  if (filters.user_extension_filter?.length) {
+    return Array.isArray(filters.user_extension_filter)
+      ? filters.user_extension_filter
+      : [filters.user_extension_filter];
+  }
   if (filters.user_extensions?.length) {
     return filters.user_extensions;
   }
@@ -67,8 +72,8 @@ export function applyDealsListApiFilters(
 
   addIfTruthyParam(
     params,
-    "user_extensions",
-    resolveUserExtensions(filters),
+    "user_extension_filter",
+    resolveOwnerFilterValues(filters),
   );
   addIfTruthyParam(params, "stage_id", filters.stage_id);
 

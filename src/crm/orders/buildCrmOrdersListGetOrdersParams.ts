@@ -5,7 +5,10 @@ import { normalizeSearchQuery } from "@utils/Helper";
 
 type AnyRecord = Record<string, any>;
 
-export type CrmOrdersListOwnerParamStyle = "user_extensions" | "assigned_to";
+export type CrmOrdersListOwnerParamStyle =
+  | "user_extension_filter"
+  | "user_extensions"
+  | "assigned_to";
 
 export type BuildCrmOrdersListGetOrdersParamsInput = Readonly<{
   filters: AnyRecord;
@@ -73,7 +76,15 @@ export function buildCrmOrdersListGetOrdersParams(
   addIfDefined(params, "include_lost", filters.include_lost);
   addIfDefined(params, "include_archived", filters.include_archived);
 
-  if (ownerParamStyle === "user_extensions") {
+  if (ownerParamStyle === "user_extension_filter") {
+    if (filters.user_extension_filter?.length) {
+      params.user_extension_filter = Array.isArray(filters.user_extension_filter)
+        ? filters.user_extension_filter
+        : [filters.user_extension_filter];
+    } else if (filters.assigned_to) {
+      params.user_extension_filter = [filters.assigned_to];
+    }
+  } else if (ownerParamStyle === "user_extensions") {
     if (filters.user_extensions?.length) {
       params.user_extensions = filters.user_extensions;
     } else if (filters.assigned_to) {
