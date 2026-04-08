@@ -7,7 +7,7 @@ function normalizeCrmDealDetailId(id: unknown): string | null {
     const s = String(id);
     return s === "" ? null : s;
   }
-  if (typeof id === "object" && "id" in (id as object)) {
+  if (typeof id === "object" && id !== null && "id" in id) {
     return normalizeCrmDealDetailId((id as { id?: unknown }).id);
   }
   return null;
