@@ -1,6 +1,14 @@
 import moment from "moment";
 
 export const ALL_STATUS_VALUE = "All Status";
+const ALL_PROJECTS_VALUE = "All Projects";
+const PRIORITY_MAP: Record<string, string> = {
+  low: "low",
+  medium: "normal",
+  high: "high",
+  urgent: "urgent",
+};
+const TASK_TYPE_FILTERS = new Set(["regular", "todo", "recurring"]);
 
 function toStringFilterValue(value: unknown): string | null {
   if (typeof value === "string") return value;
@@ -19,43 +27,38 @@ export function applyPlannerTaskFiltersToListParams(
   allProjects: Array<{ id: number; name: string }>,
 ) {
   if (filters.priority) {
-    const priorityMap: Record<string, string> = {
-      low: "low",
-      medium: "normal",
-      high: "high",
-      urgent: "urgent",
-    };
     const priorityValue = toStringFilterValue(filters.priority);
     params.priority =
-      (priorityValue ? priorityMap[priorityValue] : undefined) || "normal";
+      (priorityValue ? PRIORITY_MAP[priorityValue] : undefined) || "normal";
   }
   if (filters.due_date_from) params.due_date_from = filters.due_date_from;
   if (filters.due_date_to) params.due_date_to = filters.due_date_to;
 
-  if (filters.project && filters.project !== "All Projects") {
+  if (filters.project && filters.project !== ALL_PROJECTS_VALUE) {
     const proj = allProjects.find((p) => p.name === filters.project);
     if (proj) params.project_id = proj.id;
   }
 
-  if (filters.assignee && Array.isArray(filters.assignee) && filters.assignee.length) {
+  if (
+    filters.assignee &&
+    Array.isArray(filters.assignee) &&
+    filters.assignee.length
+  ) {
     params.assignees = filters.assignee;
   }
 
   const taskTypeFilter = filters.task_type;
-  if (
-    taskTypeFilter &&
-    (taskTypeFilter === "regular" ||
-      taskTypeFilter === "todo" ||
-      taskTypeFilter === "recurring")
-  ) {
+  if (typeof taskTypeFilter === "string" && TASK_TYPE_FILTERS.has(taskTypeFilter)) {
     params.type = taskTypeFilter;
   }
 
-  if (filters.status && filters.status !== ALL_STATUS_VALUE) {
-    const statusId = Number(filters.status);
-    if (Number.isFinite(statusId)) {
-      params.status_id = statusId;
-    }
+  if (!filters.status || filters.status === ALL_STATUS_VALUE) {
+    return;
+  }
+
+  const statusId = Number(filters.status);
+  if (Number.isFinite(statusId)) {
+    params.status_id = statusId;
   }
 }
 

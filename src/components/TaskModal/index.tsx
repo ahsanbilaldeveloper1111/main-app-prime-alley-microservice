@@ -231,6 +231,164 @@ interface TaskModalProps {
   onSave: (taskData: TaskModalSaveTaskData) => void;
 }
 
+type UrlModalType = 'link' | 'image' | null;
+
+type NoteEditorShortcutHandlers = {
+  bold: () => void;
+  italic: () => void;
+  underline: () => void;
+  link: () => void;
+};
+
+function runNoteEditorShortcut(
+  e: React.KeyboardEvent<HTMLDivElement>,
+  handlers: NoteEditorShortcutHandlers,
+) {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const handlerByKey: Record<string, () => void> = {
+    b: handlers.bold,
+    i: handlers.italic,
+    u: handlers.underline,
+    k: handlers.link,
+  };
+  const handler = handlerByKey[e.key.toLowerCase()];
+  if (!handler) return;
+  e.preventDefault();
+  handler();
+}
+
+function focusEditorAndOpenUrlModal(
+  notesElement: HTMLDivElement | null,
+  setUrlModalType: React.Dispatch<React.SetStateAction<'link' | 'image' | null>>,
+  modalType: 'link' | 'image',
+) {
+  if (!notesElement) return;
+  notesElement.focus();
+  setUrlModalType(modalType);
+}
+
+function getSelectedUserExtensionOption(
+  assignedTo: string,
+  extensions: any[],
+): { value: string; label: string } | null {
+  if (!assignedTo || extensions.length === 0) {
+    return null;
+  }
+
+  const assignedId = assignedTo.split(',')[0]?.trim() || '';
+  const matchedExtension = extensions.find(
+    (extension: any) =>
+      extension.id?.toString() === assignedId ||
+      extension.extension?.toString() === assignedId,
+  );
+  if (!matchedExtension) {
+    return null;
+  }
+
+  return {
+    value:
+      matchedExtension.id?.toString() ||
+      matchedExtension.extension?.toString() ||
+      '',
+    label:
+      matchedExtension.display_name ||
+      matchedExtension.name ||
+      `Extension ${matchedExtension.id || matchedExtension.extension}`,
+  };
+}
+
+function useTaskPropertiesOutsideClick(
+  showTaskTypeDropdown: boolean,
+  showPriorityDropdown: boolean,
+  showQueueDropdown: boolean,
+  taskPropertiesRef: React.RefObject<HTMLDivElement | null>,
+  setShowTaskTypeDropdown: React.Dispatch<React.SetStateAction<boolean>>,
+  setShowPriorityDropdown: React.Dispatch<React.SetStateAction<boolean>>,
+  setShowQueueDropdown: React.Dispatch<React.SetStateAction<boolean>>,
+) {
+  useEffect(() => {
+    const anyOpen =
+      showTaskTypeDropdown || showPriorityDropdown || showQueueDropdown;
+    if (!anyOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        taskPropertiesRef.current &&
+        !taskPropertiesRef.current.contains(e.target as Node)
+      ) {
+        setShowTaskTypeDropdown(false);
+        setShowPriorityDropdown(false);
+        setShowQueueDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [
+    showTaskTypeDropdown,
+    showPriorityDropdown,
+    showQueueDropdown,
+    taskPropertiesRef,
+    setShowTaskTypeDropdown,
+    setShowPriorityDropdown,
+    setShowQueueDropdown,
+  ]);
+}
+
+function useMoreFormattingOutsideClick(
+  showMoreFormattingDropdown: boolean,
+  moreFormattingRef: React.RefObject<HTMLDivElement | null>,
+  setShowMoreFormattingDropdown: React.Dispatch<React.SetStateAction<boolean>>,
+) {
+  useEffect(() => {
+    if (!showMoreFormattingDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        moreFormattingRef.current &&
+        !moreFormattingRef.current.contains(e.target as Node)
+      ) {
+        setShowMoreFormattingDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMoreFormattingDropdown, moreFormattingRef, setShowMoreFormattingDropdown]);
+}
+
+interface TaskUrlInputOverlayProps {
+  urlModalType: UrlModalType;
+  onClose: () => void;
+  onInsertHtml: (html: string) => void;
+}
+
+function TaskUrlInputOverlay({
+  urlModalType,
+  onClose,
+  onInsertHtml,
+}: TaskUrlInputOverlayProps) {
+  if (!urlModalType) return null;
+  const isLink = urlModalType === 'link';
+  return (
+    <UrlInputModal
+      isOpen
+      onClose={onClose}
+      title={isLink ? 'Enter URL' : 'Enter image URL'}
+      defaultValue="https://"
+      placeholder="https://"
+      submitLabel={isLink ? 'Insert link' : 'Insert image'}
+      onSubmit={(url) => {
+        const safeUrl = url.trim();
+        if (!safeUrl) return;
+        if (isLink) {
+          onInsertHtml(
+            `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`,
+          );
+          return;
+        }
+        onInsertHtml(`<img src="${safeUrl}" alt="Inserted image" />`);
+      }}
+    />
+  );
+}
+
 const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
   isOpen,
   onClose,
@@ -271,9 +429,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
   const [customTime, setCustomTime] = useState(() =>
     new Date().toTimeString().slice(0, 5),
   );
-  const [urlModalType, setUrlModalType] = useState<'link' | 'image' | null>(
-    null,
-  );
+  const [urlModalType, setUrlModalType] = useState<UrlModalType>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLDivElement>(null);
   const moreFormattingRef = useRef<HTMLDivElement>(null);
@@ -294,23 +450,15 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
     }
   }, [isOpen, initialNotesHtml]);
 
-  useEffect(() => {
-    const anyOpen =
-      showTaskTypeDropdown || showPriorityDropdown || showQueueDropdown;
-    if (!anyOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        taskPropertiesRef.current &&
-        !taskPropertiesRef.current.contains(e.target as Node)
-      ) {
-        setShowTaskTypeDropdown(false);
-        setShowPriorityDropdown(false);
-        setShowQueueDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showTaskTypeDropdown, showPriorityDropdown, showQueueDropdown]);
+  useTaskPropertiesOutsideClick(
+    showTaskTypeDropdown,
+    showPriorityDropdown,
+    showQueueDropdown,
+    taskPropertiesRef,
+    setShowTaskTypeDropdown,
+    setShowPriorityDropdown,
+    setShowQueueDropdown,
+  );
 
   useEffect(() => {
     const fetchExtensions = async () => {
@@ -320,21 +468,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
         );
         const exts = hierarchyData?.extensions || [];
         setActivityAssignedExtensions(exts);
-        if (assignedTo && exts.length > 0) {
-          const id = assignedTo.split(',')[0]?.trim() || '';
-          const ext = exts.find(
-            (e: any) =>
-              e.id?.toString() === id || e.extension?.toString() === id,
-          );
-          if (ext)
-            setSelectedUserExtension({
-              value: ext.id?.toString() || ext.extension?.toString() || '',
-              label:
-                ext.display_name ||
-                ext.name ||
-                `Extension ${ext.id || ext.extension}`,
-            });
-        }
+        setSelectedUserExtension(getSelectedUserExtensionOption(assignedTo, exts));
       } catch (error) {
         console.error('Failed to fetch activity assigned extensions:', error);
       }
@@ -342,19 +476,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
     if (isOpen) fetchExtensions();
   }, [isOpen, assignedTo]);
 
-  useEffect(() => {
-    if (!showMoreFormattingDropdown) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        moreFormattingRef.current &&
-        !moreFormattingRef.current.contains(e.target as Node)
-      ) {
-        setShowMoreFormattingDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMoreFormattingDropdown]);
+  useMoreFormattingOutsideClick(
+    showMoreFormattingDropdown,
+    moreFormattingRef,
+    setShowMoreFormattingDropdown,
+  );
 
   // Sync contentEditable content to state when modal opens
   useEffect(() => {
@@ -417,10 +543,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
   const handleUnderline = () => wrapSelectionWithTag('u');
 
   const handleLink = () => {
-    const el = notesRef.current;
-    if (!el) return;
-    el.focus();
-    setUrlModalType('link');
+    focusEditorAndOpenUrlModal(notesRef.current, setUrlModalType, 'link');
   };
 
   const handleList = () => {
@@ -432,33 +555,16 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
   };
 
   const handleImage = () => {
-    const el = notesRef.current;
-    if (!el) return;
-    el.focus();
-    setUrlModalType('image');
+    focusEditorAndOpenUrlModal(notesRef.current, setUrlModalType, 'image');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.ctrlKey || e.metaKey) {
-      switch (e.key.toLowerCase()) {
-        case 'b':
-          e.preventDefault();
-          handleBold();
-          break;
-        case 'i':
-          e.preventDefault();
-          handleItalic();
-          break;
-        case 'u':
-          e.preventDefault();
-          handleUnderline();
-          break;
-        case 'k':
-          e.preventDefault();
-          handleLink();
-          break;
-      }
-    }
+    runNoteEditorShortcut(e, {
+      bold: handleBold,
+      italic: handleItalic,
+      underline: handleUnderline,
+      link: handleLink,
+    });
   };
 
   const handleSave = () => {
@@ -579,33 +685,11 @@ const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
 
   return (
     <>
-      {urlModalType ? (
-        <UrlInputModal
-          isOpen
-          onClose={() => setUrlModalType(null)}
-          title={
-            urlModalType === 'link' ? 'Enter URL' : 'Enter image URL'
-          }
-          defaultValue="https://"
-          placeholder="https://"
-          submitLabel={
-            urlModalType === 'link' ? 'Insert link' : 'Insert image'
-          }
-          onSubmit={(url) => {
-            const safeUrl = url.trim();
-            if (!safeUrl) return;
-            if (urlModalType === 'link') {
-              insertHtmlAtSelection(
-                `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`,
-              );
-              return;
-            }
-            insertHtmlAtSelection(
-              `<img src="${safeUrl}" alt="Inserted image" />`,
-            );
-          }}
-        />
-      ) : null}
+      <TaskUrlInputOverlay
+        urlModalType={urlModalType}
+        onClose={() => setUrlModalType(null)}
+        onInsertHtml={insertHtmlAtSelection}
+      />
       <div
         style={{
           position: 'fixed',

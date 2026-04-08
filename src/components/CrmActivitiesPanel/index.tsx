@@ -375,6 +375,15 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
     assigned_to: "",
     notes: "",
   });
+  const updateEditingTaskField = <K extends keyof typeof editingTaskForm>(
+    key: K,
+    value: (typeof editingTaskForm)[K],
+  ) => {
+    setEditingTaskForm((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
   const [showMeetingModal, setShowMeetingModal] = useState(false);
   const [smsList, setSmsList] = useState<SmsListItem[]>([]);
   const [smsLoading, setSmsLoading] = useState(false);
@@ -2380,10 +2389,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               type="text"
                               value={editingTaskForm.name}
                               onChange={(e) =>
-                                setEditingTaskForm((p) => ({
-                                  ...p,
-                                  name: e.target.value,
-                                }))
+                                updateEditingTaskField("name", e.target.value)
                               }
                               placeholder="Task name"
                               style={{
@@ -2407,10 +2413,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                 type="date"
                                 value={editingTaskForm.due_date}
                                 onChange={(e) =>
-                                  setEditingTaskForm((p) => ({
-                                    ...p,
-                                    due_date: e.target.value,
-                                  }))
+                                  updateEditingTaskField("due_date", e.target.value)
                                 }
                                 style={{
                                   padding: "8px 12px",
@@ -2423,10 +2426,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                 type="time"
                                 value={editingTaskForm.time}
                                 onChange={(e) =>
-                                  setEditingTaskForm((p) => ({
-                                    ...p,
-                                    time: e.target.value,
-                                  }))
+                                  updateEditingTaskField("time", e.target.value)
                                 }
                                 style={{
                                   padding: "8px 12px",
@@ -2438,13 +2438,13 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               <select
                                 value={editingTaskForm.status}
                                 onChange={(e) =>
-                                  setEditingTaskForm((p) => ({
-                                    ...p,
-                                    status: e.target.value as
+                                  updateEditingTaskField(
+                                    "status",
+                                    e.target.value as
                                       | "pending"
                                       | "completed"
                                       | "failed",
-                                  }))
+                                  )
                                 }
                                 style={{
                                   padding: "8px 12px",
@@ -2460,13 +2460,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               <select
                                 value={editingTaskForm.urgency}
                                 onChange={(e) =>
-                                  setEditingTaskForm((p) => ({
-                                    ...p,
-                                    urgency: e.target.value as
-                                      | "low"
-                                      | "med"
-                                      | "high",
-                                  }))
+                                  updateEditingTaskField(
+                                    "urgency",
+                                    e.target.value as "low" | "med" | "high",
+                                  )
                                 }
                                 style={{
                                   padding: "8px 12px",
@@ -2484,10 +2481,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                                 id="edit-task-assigned-to"
                                 value={editingTaskForm.assigned_to}
                                 onChange={(e) =>
-                                  setEditingTaskForm((p) => ({
-                                    ...p,
-                                    assigned_to: e.target.value,
-                                  }))
+                                  updateEditingTaskField(
+                                    "assigned_to",
+                                    e.target.value,
+                                  )
                                 }
                                 style={{
                                 
@@ -2510,10 +2507,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                               <RichTextEditor
                                 value={editingTaskForm.notes}
                                 onChange={(html: string) =>
-                                  setEditingTaskForm((p) => ({
-                                    ...p,
-                                    notes: html,
-                                  }))
+                                  updateEditingTaskField("notes", html)
                                 }
                                 placeholder="Description / notes"
                                 minHeight="100px"
