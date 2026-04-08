@@ -27,7 +27,7 @@ export type CrmListExportModalAssignedToStyles = StylesConfig<
 
 export type CrmListExportModalAssignedToSelectProps = Readonly<{
   extensions: readonly CrmListExportExtensionLike[];
-  /** Current `assigned_to` filter (extension / user id as string). */
+  /** Current `user_extension_filter` owner filter (extension / user id as string). */
   value: string | undefined;
   setExportFilters: React.Dispatch<
     React.SetStateAction<Record<string, any>>
@@ -38,7 +38,7 @@ export type CrmListExportModalAssignedToSelectProps = Readonly<{
 }>;
 
 /**
- * Shared "Owner" field for CRM list export modals (react-select + assigned_to).
+ * Shared "Owner" field for CRM list export modals (react-select + user_extension_filter).
  * Deduplicates the same block across deals, approvals, orders, etc.
  */
 export function CrmListExportModalAssignedToSelect({
@@ -83,8 +83,8 @@ export function CrmListExportModalAssignedToSelect({
           const v = choice?.value;
           setExportFilters((prev) => {
             const next = { ...prev };
-            if (v) next.assigned_to = v;
-            else delete next.assigned_to;
+            if (v) next.user_extension_filter = v;
+            else delete next.user_extension_filter;
             return next;
           });
         }}

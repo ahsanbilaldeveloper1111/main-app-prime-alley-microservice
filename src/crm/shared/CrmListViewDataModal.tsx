@@ -8,7 +8,6 @@ import {
   Calendar,
   Target,
   Download,
-  X,
   Clock as ClockIcon,
 } from "lucide-react";
 import { FiPlay } from "react-icons/fi";
@@ -34,6 +33,8 @@ import {
   CrmListViewModalSectionLabel,
   crmListViewModalCardHoverLift,
   crmListViewModalQuickActionHover,
+  CrmModalCloseButton,
+  CrmModalAvatar,
 } from "@crm/shared/CrmListViewDataModalPrimitives";
 
 export interface CrmListViewDataModalProps {
@@ -92,67 +93,10 @@ export function CrmListViewDataModal({
           borderBottom: "1px solid #ccc",
         }}
       >
-        <button
-          onClick={onHide}
-          style={{
-            position: "absolute",
-            top: "16px",
-            right: "16px",
-            background: "rgba(255,255,255,0.15)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.2)",
-            color: "black",
-            width: "32px",
-            height: "32px",
-            borderRadius: "8px",
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-            e.currentTarget.style.transform = "scale(1.05)";
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-            e.currentTarget.style.transform = "scale(1.05)";
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-            e.currentTarget.style.transform = "scale(1)";
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-            e.currentTarget.style.transform = "scale(1)";
-          }}
-        >
-          <X size={18} />
-        </button>
+        <CrmModalCloseButton onClick={onHide} />
 
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div
-            style={{
-              width: "64px",
-              height: "64px",
-              borderRadius: "16px",
-              background: "#2563eb",
-              backdropFilter: "blur(10px)",
-              border: "2px solid rgba(255,255,255,0.3)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "28px",
-              fontWeight: "700",
-              flexShrink: 0,
-              color: "#fff",
-            }}
-          >
-            {selectedDataItem.name
-              ? selectedDataItem.name.charAt(0).toUpperCase()
-              : "P"}
-          </div>
+          <CrmModalAvatar name={selectedDataItem.name} fallback="P" background="#2563eb" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2
               style={{

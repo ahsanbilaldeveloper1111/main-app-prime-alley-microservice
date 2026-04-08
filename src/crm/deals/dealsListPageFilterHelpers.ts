@@ -32,7 +32,7 @@ export function buildDealsListSidebarBaseFilterPayload(
     filtersToApply.search = dealsSearch;
   }
   if (dealsFilters.assignedTo) {
-    filtersToApply.assigned_to = dealsFilters.assignedTo;
+    filtersToApply.user_extension_filter = [dealsFilters.assignedTo];
   }
   if (dealsFilters.stage) {
     filtersToApply.stage_id = dealsFilters.stage;
@@ -118,6 +118,16 @@ export function mergeDealsSidebarFiltersIntoCurrent(
   const next: AnyRecord = { ...prev };
 
   mergeTruthyOrDelete(next, filters, "stage_id", true);
+  if ("user_extension_filter" in filters) {
+    const value = filters.user_extension_filter;
+    if (Array.isArray(value) ? value.length > 0 : !!value) {
+      next.user_extension_filter = Array.isArray(value)
+        ? value
+        : [String(value)];
+    } else {
+      delete next.user_extension_filter;
+    }
+  }
   mergeTruthyOrDelete(next, filters, "assigned_to", true);
   mergeTruthyOrDelete(next, filters, "search", false);
 

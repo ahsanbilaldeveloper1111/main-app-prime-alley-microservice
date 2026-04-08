@@ -1,6 +1,7 @@
 import type { FilterPill } from "@components/GenericTable";
 import { getCrmDataCounts } from "@utils/crm";
 import { persistVisibleColumnKeys } from "@utils/crmListVisibleColumnsStorage";
+import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspectsContactsListPageConfig";
 
 type AssignmentFiltersForCounts = {
   selectedCampaigns: ReadonlyArray<{ value: string }> | Set<{ value: string }>;
@@ -62,7 +63,7 @@ export function buildProspectsContactsAppliedFiltersPayload(
     filtersToApply.search = prospectsSearch;
   }
   if (prospectsFilters.assignedTo) {
-    filtersToApply.user_extension = [prospectsFilters.assignedTo];
+    filtersToApply.user_extension_filter = [prospectsFilters.assignedTo];
   }
   if (prospectsFilters.campaigns && prospectsFilters.campaigns.length > 0) {
     filtersToApply.campaign_id = prospectsFilters.campaigns;
