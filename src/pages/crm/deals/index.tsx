@@ -21,6 +21,7 @@ import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
+import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
 import {
   parseStoredVisibleColumnKeysLoose,
   persistVisibleColumnKeys,
@@ -29,30 +30,26 @@ import CrmExportModal from "@components/CrmExportModal";
 import { StatsCardData } from "@components/GenericStatsCards";
 import ConvertDealToOrderModal from "@components/ConvertDealToOrderModal";
 import { CreateDealSidebar } from "@components/renderCreateDealForm";
+import { EditDealApprovalSidebar } from "@components/EditDealApprovalSidebar";
 import {
   getDeals,
   getStages,
   deleteDeal,
   restoreDeal,
   getDeal,
-  getDealAttachments,
-  uploadDealAttachment,
-  deleteDealAttachment,
-  downloadDealAttachment,
   createMeeting,
   updateMeeting,
   deleteMeeting,
   markDealLost,
-  getLead,
   updateDeal,
   getBusinessTypes,
   BusinessTypeData,
   PDFDownloadDeal,
-  getDealFollowUps,
   createDealFollowUp,
   updateDealFollowUp,
   deleteDealFollowUp,
-  getDealMeetings,
+  approveDeal,
+  rejectDeal,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import {
@@ -68,11 +65,15 @@ import {
   Modal,
   Spinner,
 } from "react-bootstrap";
-import Select from "react-select";
+import Select, {
+  type GroupBase,
+  type StylesConfig,
+} from "react-select";
 import {
   GlobalDateFormat,
   ModuleSlug,
   formatDateForTable,
+  formatFileSize,
   checkRequiredFields,
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
@@ -130,6 +131,7 @@ import {
   ArrowLeft,
   Copy,
   Trash,
+  XCircle,
 } from "lucide-react";
 import {
   PieChart,
@@ -157,6 +159,7 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { useCti } from "@hooks/useCti";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 import { CrmListExportModalAssignedToSelect } from "@crm/shared/CrmListExportModalAssignedToSelect";
 import {
@@ -198,8 +201,39 @@ import {
   CrmDealDetailViewModalHeader,
   DEAL_DETAIL_MODAL_BODY_FILTER_CSS,
 } from "@crm/deals/CrmDealDetailViewModalShared";
+import { loadCrmDealWithOptionalLead } from "@crm/deals/crmDealDetailLoad";
+import { useCrmDealAttachmentModal } from "@crm/deals/useCrmDealAttachmentModal";
+import { useCrmDealMeetingsAndFollowUps } from "@crm/deals/useCrmDealMeetingsAndFollowUps";
+import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 
 const ignoredKeys = ["stage_id"];
+
+export type CrmDealsListVariant = "deals" | "approvals";
+
+type DealApprovalsFilterOption = {
+  value: string | number;
+  label: string | number;
+};
+
+const dealApprovalsSelectStyles =
+  customSelectStyles as StylesConfig<
+    DealApprovalsFilterOption,
+    false,
+    GroupBase<DealApprovalsFilterOption>
+  >;
+
+const APPROVAL_FILTER_RULES = [
+  ...CRM_BASE_FILTER_RULES,
+  { key: "follow_up_date_from", kind: "truthy" },
+  { key: "follow_up_date_to", kind: "truthy" },
+  { key: "probability_min", kind: "string" },
+  { key: "probability_max", kind: "string" },
+  { key: "deal_type", kind: "truthy" },
+  { key: "approval_status", kind: "truthy" },
+  { key: "industry", kind: "truthy" },
+  { key: "expected_close_date_from", kind: "truthy" },
+  { key: "expected_close_date_to", kind: "truthy" },
+] as const;
 
 const detailSectionTitleStyle: React.CSSProperties = {
   fontSize: "15px",
@@ -270,7 +304,12 @@ const DetailField = ({
   </div>
 );
 
-const CrmDeals = () => { // NOSONAR
+export function CrmDealsListScreen({
+  listVariant,
+}: {
+  listVariant: CrmDealsListVariant;
+}) { // NOSONAR — shared with /crm/approvals
+  const isApprovalsList = listVariant === "approvals";
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
@@ -305,7 +344,10 @@ const CrmDeals = () => { // NOSONAR
     BusinessTypeData[]
   >([]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(
+    () =>
+      listVariant === "approvals" ? { approval_status: "pending" } : {},
+  );
   const [dealsData, setDealsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalDeals, setTotalDeals] = useState(0);
@@ -352,7 +394,9 @@ const CrmDeals = () => { // NOSONAR
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
-  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">("board");
+  const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">(() =>
+    listVariant === "approvals" ? "table" : "board",
+  );
   const [exportFilters, setExportFilters] = useState<Record<string, any>>({});
   const [exportFileName, setExportFileName] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -360,6 +404,7 @@ const CrmDeals = () => { // NOSONAR
   const [editingDealIdInSidebar, setEditingDealIdInSidebar] = useState<
     number | null
   >(null);
+  const [showEditDealSidebar, setShowEditDealSidebar] = useState(false);
 
   // Add Deals button states
   const [showAddDealsDropdown, setShowAddDealsDropdown] = useState(false);
@@ -369,20 +414,33 @@ const CrmDeals = () => { // NOSONAR
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
   const [selectedDealForAttachments, setSelectedDealForAttachments] =
     useState<any>(null);
-  const [attachments, setAttachments] = useState<any[]>([]);
-  const [loadingAttachments, setLoadingAttachments] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(false);
-  const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(
-    null,
-  );
 
-  // Delete Attachment Modal
-  const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] =
-    useState(false);
-  const [attachmentToDelete, setAttachmentToDelete] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
+  const {
+    attachments,
+    loadingAttachments,
+    uploadingFile,
+    fileInputRef,
+    setFileInputRef,
+    showDeleteAttachmentModal,
+    setShowDeleteAttachmentModal,
+    attachmentToDelete,
+    setAttachmentToDelete,
+    handleFileUpload,
+    confirmDeleteAttachment,
+    handleDownloadAttachment,
+  } = useCrmDealAttachmentModal({
+    selectedDealForAttachments,
+    showAttachmentModal,
+  });
+
+  const {
+    dealMeetings,
+    loadingDealMeetings,
+    fetchDealMeetings,
+    dealFollowUps,
+    loadingDealFollowUps,
+    fetchDealFollowUps,
+  } = useCrmDealMeetingsAndFollowUps();
 
   // Download file modal (table column)
   const [showDownloadFileModal, setShowDownloadFileModal] = useState(false);
@@ -475,6 +533,8 @@ const CrmDeals = () => { // NOSONAR
     followUpDateTo: null as string | null,
     probabilityMin: null as string | null,
     probabilityMax: null as string | null,
+    dealType: null as string | null,
+    industry: null as string | null,
     businessType: null as string | null,
     expectedCloseDateFrom: null as string | null,
     expectedCloseDateTo: null as string | null,
@@ -518,10 +578,14 @@ const CrmDeals = () => { // NOSONAR
     if (showExportModal) {
       setExportFilters({ ...currentFilters });
       if (!exportFileName) {
-        setExportFileName(`deals_${moment().format("YYYY-MM-DD")}`);
+        setExportFileName(
+          isApprovalsList
+            ? `approvals_deals_${moment().format("YYYY-MM-DD")}`
+            : `deals_${moment().format("YYYY-MM-DD")}`,
+        );
       }
     }
-  }, [showExportModal, currentFilters]);
+  }, [showExportModal, currentFilters, isApprovalsList]);
 
   // Build API params from filters for export (same shape as fetchDeals)
   const buildDealsExportParams = useCallback(
@@ -554,7 +618,10 @@ const CrmDeals = () => { // NOSONAR
   );
 
   const handleDealsExport = useCallback(async () => {
-    const name = exportFileName.trim() || `deals_${moment().format("YYYY-MM-DD")}`;
+    const defaultName = isApprovalsList
+      ? `approvals_deals_${moment().format("YYYY-MM-DD")}`
+      : `deals_${moment().format("YYYY-MM-DD")}`;
+    const name = exportFileName.trim() || defaultName;
     setExporting(true);
     try {
       const allData = await fetchDealsForExport(exportFilters);
@@ -571,7 +638,7 @@ const CrmDeals = () => { // NOSONAR
     } finally {
       setExporting(false);
     }
-  }, [exportFileName, exportFilters, fetchDealsForExport]);
+  }, [exportFileName, exportFilters, fetchDealsForExport, isApprovalsList]);
 
   const buildDealsParams = useCallback(
     (
@@ -627,6 +694,31 @@ const CrmDeals = () => { // NOSONAR
     return filtersToApply;
   }, [dealsSearch, dealsFilters]);
 
+  const buildApprovalsSidebarFiltersPayload = useCallback(() => {
+    const filtersToApply = buildDealsListSidebarBaseFilterPayload(
+      dealsSearch,
+      {
+        assignedTo: dealsFilters.assignedTo,
+        stage: dealsFilters.stage,
+        followUpDateFrom: dealsFilters.followUpDateFrom,
+        followUpDateTo: dealsFilters.followUpDateTo,
+        probabilityMin: dealsFilters.probabilityMin,
+        probabilityMax: dealsFilters.probabilityMax,
+        expectedCloseDateFrom: dealsFilters.expectedCloseDateFrom,
+        expectedCloseDateTo: dealsFilters.expectedCloseDateTo,
+        approvalStatus: dealsFilters.approvalStatus,
+      },
+      "alwaysSetNullable",
+    );
+    if (dealsFilters.dealType) {
+      filtersToApply.deal_type = dealsFilters.dealType;
+    }
+    if (dealsFilters.industry) {
+      filtersToApply.industry = dealsFilters.industry;
+    }
+    return filtersToApply;
+  }, [dealsSearch, dealsFilters]);
+
   // Fetch deals when filters or search change
   const fetchDeals = useCallback(
     async (page = 1, perPage = 15) => {
@@ -677,56 +769,196 @@ const CrmDeals = () => { // NOSONAR
     delete baseFilters.stage_id;
     delete baseFilters.include_lost;
     delete baseFilters.include_archived;
-    if (activeFilter === "rejected") {
+    if (!isApprovalsList && activeFilter === "rejected") {
       delete baseFilters.approval_status;
     }
     return baseFilters;
-  }, [activeFilter, currentFilters]);
+  }, [activeFilter, currentFilters, isApprovalsList]);
 
   const tabTotalsRequestKey = useMemo(
     () =>
-      JSON.stringify({
-        filters: tabTotalsBaseFilters,
-        stageIds: stages.map((stage: any) => stage.id),
-      }),
-    [stages, tabTotalsBaseFilters],
+      JSON.stringify(
+        isApprovalsList
+          ? {
+              refreshKey,
+              filters: tabTotalsBaseFilters,
+              stageIds: stages.map((stage: any) => stage.id),
+            }
+          : {
+              filters: tabTotalsBaseFilters,
+              stageIds: stages.map((stage: any) => stage.id),
+            },
+      ),
+    [isApprovalsList, refreshKey, stages, tabTotalsBaseFilters],
   );
   const lastTabTotalsRequestKeyRef = useRef<string>("");
 
-  const fetchTabTotals = useCallback(async (baseFilters: Record<string, any>) => {
-    try {
-      const [allResp, lostResp, deletedResp, rejectedResp, ...stageResponses] =
-        await Promise.all([
+  const fetchTabTotals = useCallback(
+    async (baseFilters: Record<string, any>) => {
+      try {
+        if (isApprovalsList) {
+          const [allResp, lostResp, deletedResp, ...stageResponses] =
+            await Promise.all([
+              getDeals(buildDealsParams(baseFilters, 1, 1, false)),
+              getDeals(
+                buildDealsParams(
+                  { ...baseFilters, include_lost: true },
+                  1,
+                  1,
+                  false,
+                ),
+              ),
+              getDeals(
+                buildDealsParams(
+                  { ...baseFilters, include_archived: true },
+                  1,
+                  1,
+                  false,
+                ),
+              ),
+              ...stages.map((stage: { id: number | string }) =>
+                getDeals(
+                  buildDealsParams(
+                    { ...baseFilters, stage_id: String(stage.id) },
+                    1,
+                    1,
+                    false,
+                  ),
+                ),
+              ),
+            ]);
+
+          const nextTotals: Record<string, number> = {
+            all: allResp?.meta?.total ?? 0,
+            lost: lostResp?.meta?.total ?? 0,
+            deleted: deletedResp?.meta?.total ?? 0,
+            rejected: 0,
+          };
+
+          stages.forEach((stage: { id: number | string }, index: number) => {
+            nextTotals[stage.id] = stageResponses[index]?.meta?.total ?? 0;
+          });
+
+          setTabTotals(nextTotals);
+          return;
+        }
+
+        const [
+          allResp,
+          lostResp,
+          deletedResp,
+          rejectedResp,
+          ...stageResponses
+        ] = await Promise.all([
           getDeals(buildDealsParams(baseFilters, 1, 1, false)),
-          getDeals(buildDealsParams({ ...baseFilters, include_lost: true }, 1, 1, false)),
-          getDeals(buildDealsParams({ ...baseFilters, include_archived: true }, 1, 1, false)),
-          getDeals(buildDealsParams({ ...baseFilters, approval_status: "rejected" }, 1, 1, false)),
-        ...stages.map((stage: any) =>
-          getDeals(buildDealsParams({ ...baseFilters, stage_id: stage.id }, 1, 1, false)),
-        ),
+          getDeals(
+            buildDealsParams(
+              { ...baseFilters, include_lost: true },
+              1,
+              1,
+              false,
+            ),
+          ),
+          getDeals(
+            buildDealsParams(
+              { ...baseFilters, include_archived: true },
+              1,
+              1,
+              false,
+            ),
+          ),
+          getDeals(
+            buildDealsParams(
+              { ...baseFilters, approval_status: "rejected" },
+              1,
+              1,
+              false,
+            ),
+          ),
+          ...stages.map((stage: any) =>
+            getDeals(
+              buildDealsParams(
+                { ...baseFilters, stage_id: stage.id },
+                1,
+                1,
+                false,
+              ),
+            ),
+          ),
         ]);
 
-      const nextTotals: Record<string, number> = {
-        all: allResp?.meta?.total ?? 0,
-        lost: lostResp?.meta?.total ?? 0,
-        deleted: deletedResp?.meta?.total ?? 0,
-        rejected: rejectedResp?.meta?.total ?? 0,
-      };
+        const nextTotals: Record<string, number> = {
+          all: allResp?.meta?.total ?? 0,
+          lost: lostResp?.meta?.total ?? 0,
+          deleted: deletedResp?.meta?.total ?? 0,
+          rejected: rejectedResp?.meta?.total ?? 0,
+        };
 
-      stages.forEach((stage: any, index) => {
-        nextTotals[stage.id] = stageResponses[index]?.meta?.total ?? 0;
-      });
+        stages.forEach((stage: any, index) => {
+          nextTotals[stage.id] = stageResponses[index]?.meta?.total ?? 0;
+        });
 
-      setTabTotals(nextTotals);
-    } catch (error) {
-      console.error("Failed to fetch tab totals:", error);
-    }
-  }, [buildDealsParams, stages]);
+        setTabTotals(nextTotals);
+      } catch (error) {
+        console.error("Failed to fetch tab totals:", error);
+      }
+    },
+    [buildDealsParams, isApprovalsList, stages],
+  );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
   useEffect(() => {
     const clearStageDropdown = () =>
       setDealsFilters((prev) => ({ ...prev, stage: null }));
+
+    if (isApprovalsList) {
+      if (activeFilter === "all") {
+        setCurrentFilters((prev) => {
+          const newFilters = { ...prev };
+          delete newFilters.stage_id;
+          delete newFilters.include_archived;
+          delete newFilters.include_lost;
+          return newFilters;
+        });
+        clearStageDropdown();
+      } else if (activeFilter === "lost") {
+        setCurrentFilters((prev) => {
+          const newFilters = { ...prev };
+          delete newFilters.stage_id;
+          delete newFilters.include_archived;
+          newFilters.include_lost = true;
+          return newFilters;
+        });
+        clearStageDropdown();
+      } else if (activeFilter === "deleted") {
+        setCurrentFilters((prev) => {
+          const newFilters = { ...prev };
+          delete newFilters.stage_id;
+          delete newFilters.include_lost;
+          newFilters.include_archived = true;
+          return newFilters;
+        });
+        clearStageDropdown();
+      } else if (activeFilter && stages.length > 0) {
+        const selectedStage = stages.find(
+          (s: any) => s.id.toString() === activeFilter,
+        );
+        if (selectedStage) {
+          setCurrentFilters((prev) => {
+            const newFilters = { ...prev };
+            delete newFilters.include_archived;
+            delete newFilters.include_lost;
+            newFilters.stage_id = selectedStage.id.toString();
+            return newFilters;
+          });
+          setDealsFilters((prev) => ({
+            ...prev,
+            stage: selectedStage.id.toString(),
+          }));
+        }
+      }
+      return;
+    }
 
     if (activeFilter === "all") {
       setCurrentFilters((prev) => applyDealTabAllFilters(prev));
@@ -753,25 +985,24 @@ const CrmDeals = () => { // NOSONAR
         }));
       }
     }
-  }, [activeFilter, stages]);
+  }, [activeFilter, isApprovalsList, stages]);
 
   // Read tab from URL on mount and when router is ready
   useEffect(() => {
     if (router.isReady && router.query.tab) {
       const tabFromUrl = String(router.query.tab);
-      // Allow "all", "lost", "deleted", "rejected", or any stage ID
       const isValidFilter =
         tabFromUrl === "all" ||
         tabFromUrl === "lost" ||
         tabFromUrl === "deleted" ||
-        tabFromUrl === "rejected" ||
+        (!isApprovalsList && tabFromUrl === "rejected") ||
         (stages.length > 0 &&
           stages.some((s: any) => s.id.toString() === tabFromUrl));
       if (isValidFilter) {
         setActiveFilter((prev) => (prev === tabFromUrl ? prev : tabFromUrl));
       }
     }
-  }, [router.isReady, router.query.tab, stages]);
+  }, [router.isReady, router.query.tab, stages, isApprovalsList]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
@@ -810,104 +1041,23 @@ const CrmDeals = () => { // NOSONAR
     fetchTabTotals(tabTotalsBaseFilters);
   }, [fetchTabTotals, tabTotalsBaseFilters, tabTotalsRequestKey]);
 
-  // Fetch attachments when modal opens
-  useEffect(() => {
-    if (showAttachmentModal && selectedDealForAttachments?.id) {
-      fetchAttachments();
-    } else {
-      setAttachments([]);
-    }
-  }, [showAttachmentModal, selectedDealForAttachments?.id]);
-
-  const fetchAttachments = async () => {
-    if (!selectedDealForAttachments?.id) return;
-    setLoadingAttachments(true);
-    try {
-      const data = await getDealAttachments(selectedDealForAttachments.id);
-      setAttachments(data || []);
-    } catch (error) {
-      console.error("Failed to fetch attachments:", error);
-      setAttachments([]);
-    } finally {
-      setLoadingAttachments(false);
-    }
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
-  };
-
-  const handleFileUpload = async (file: File) => {
-    if (!selectedDealForAttachments?.id) return;
-
-    setUploadingFile(true);
-    try {
-      await uploadDealAttachment(
-        selectedDealForAttachments.id,
-        file,
-        file.name,
-      );
-      await fetchAttachments(); // Refresh attachments list
-      if (fileInputRef) {
-        fileInputRef.value = "";
-      }
-    } catch (error) {
-      console.error("Failed to upload file:", error);
-    } finally {
-      setUploadingFile(false);
-    }
-  };
-
-  const handleDeleteAttachment = useCallback(
-    async (attachmentId: number) => {
-      if (!selectedDealForAttachments?.id) return;
-
-      try {
-        await deleteDealAttachment(selectedDealForAttachments.id, attachmentId);
-        await fetchAttachments(); // Refresh attachments list
-        toast.success("Attachment deleted successfully!");
-      } catch (error) {
-        console.error("Failed to delete attachment:", error);
-        toast.error("Failed to delete attachment");
-      }
-    },
-    [selectedDealForAttachments?.id],
-  );
-
-  const confirmDeleteAttachment = useCallback(async () => {
-    if (!attachmentToDelete) return;
-
-    await handleDeleteAttachment(attachmentToDelete.id);
-    setShowDeleteAttachmentModal(false);
-    setAttachmentToDelete(null);
-  }, [attachmentToDelete, handleDeleteAttachment]);
-
-  const handleDownloadAttachment = async (attachmentId: number) => {
-    if (!selectedDealForAttachments?.id) return;
-
-    try {
-      await downloadDealAttachment(selectedDealForAttachments.id, attachmentId);
-    } catch (error) {
-      console.error("Failed to download attachment:", error);
-    }
-  };
-
   // Handle open filters sidebar
   const handleOpenFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(true);
   }, []);
 
   // Handle filter changes
-  const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) =>
-      mergeDealsSidebarFiltersIntoCurrent(prev, filters),
-    );
-    setRefreshKey((prev) => prev + 1);
-  }, []);
+  const handleFiltersChange = useCallback(
+    (filters: Record<string, any>) => {
+      setCurrentFilters((prev) =>
+        isApprovalsList
+          ? applyCrmFilterRules(prev, filters, APPROVAL_FILTER_RULES)
+          : mergeDealsSidebarFiltersIntoCurrent(prev, filters),
+      );
+      setRefreshKey((prev) => prev + 1);
+    },
+    [isApprovalsList],
+  );
 
   const fetchStages = async () => {
     try {
@@ -953,71 +1103,18 @@ const CrmDeals = () => { // NOSONAR
       setLoadingDeal(true);
       setLoadingLead(true);
       setRelatedLead(null);
-      const dealData: any = await getDeal(dealId);
+      const { deal: dealData, relatedLead: leadData } =
+        await loadCrmDealWithOptionalLead(dealId);
       setViewingDeal(dealData);
       setSelectedDeal(dealData);
       setShowDealSidebar(true);
-
-      // Fetch lead information if ticket_id exists (ticket_id contains the lead_id)
-      if (dealData.ticket_id) {
-        try {
-          const leadData: any = await getLead(Number(dealData.ticket_id));
-
-          // Parse contact_persons if it's a string
-          if (
-            leadData.contact_persons &&
-            typeof leadData.contact_persons === "string"
-          ) {
-            try {
-              leadData.contact_persons = JSON.parse(leadData.contact_persons);
-            } catch (e) {
-              console.error("Failed to parse contact_persons:", e);
-              leadData.contact_persons = [];
-            }
-          }
-
-          setRelatedLead(leadData);
-        } catch (error) {
-          console.error("Failed to fetch lead:", error);
-          // Don't show error toast as lead is optional
-        }
-      }
+      setRelatedLead(leadData);
     } catch (error) {
       console.error("Failed to fetch deal:", error);
       toast.error("Failed to load deal details");
     } finally {
       setLoadingDeal(false);
       setLoadingLead(false);
-    }
-  }, []);
-
-  const [dealMeetings, setDealMeetings] = useState<any[]>([]);
-  const [loadingDealMeetings, setLoadingDealMeetings] = useState(false);
-
-  const fetchDealMeetings = useCallback(async (dealId: number) => {
-    try {
-      setLoadingDealMeetings(true);
-      const dealMeetings = await getDealMeetings({ deal_id: dealId });
-      setDealMeetings(dealMeetings?.data || []);
-    } catch (error) {
-      console.error("Failed to fetch deal meetings:", error);
-    } finally {
-      setLoadingDealMeetings(false);
-    }
-  }, []);
-
-  const [dealFollowUps, setDealFollowUps] = useState<any[]>([]);
-  const [loadingDealFollowUps, setLoadingDealFollowUps] = useState(false);
-
-  const fetchDealFollowUps = useCallback(async (dealId: number) => {
-    try {
-      setLoadingDealFollowUps(true);
-      const dealFollowUps = await getDealFollowUps(dealId);
-      console.log("dealFollowUps", dealFollowUps);
-      setDealFollowUps(dealFollowUps || ([] as any));
-    } catch (error) {
-    } finally {
-      setLoadingDealFollowUps(false);
     }
   }, []);
 
@@ -1033,7 +1130,7 @@ const CrmDeals = () => { // NOSONAR
       console.error("Failed to fetch deal:", error);
       toast.error("Failed to load deal details");
     }
-  }, []);
+  }, [fetchDealFollowUps, fetchDealMeetings]);
 
   const handlePreviewClickBase = useCallback(
     async (deal: any) => {
@@ -1070,7 +1167,9 @@ const CrmDeals = () => { // NOSONAR
 
   const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
     useCrmListPreviewPersistence({
-      localStorageKey: "crm-deals-list-preview-record-id",
+      localStorageKey: isApprovalsList
+        ? "crm-approvals-list-preview-record-id"
+        : "crm-deals-list-preview-record-id",
       listLoading: !isInitialized || loading,
       openPreviewByNumericId: openDealPreviewById,
     });
@@ -1090,11 +1189,13 @@ const CrmDeals = () => { // NOSONAR
       const id = deal?.id ?? deal?.rawData?.id;
       router.push(
         id
-          ? `/crm/detailspage?type=deal&id=${id}`
+          ? `/crm/detailspage?type=deal&id=${id}${
+              isApprovalsList ? "&approval=1" : ""
+            }`
           : "/crm/deals",
       );
     },
-    [router],
+    [router, isApprovalsList],
   );
 
   const handleCallClick = useCallback(
@@ -1527,11 +1628,57 @@ const CrmDeals = () => { // NOSONAR
     }
   }, []);
 
+  const runDealApprovalDecision = useCallback(
+    async (deal: any, decision: "approve" | "reject") => {
+      const dealId = deal?.id ?? deal?.rawData?.id;
+      if (!dealId) return;
+      try {
+        if (decision === "approve") {
+          await approveDeal(dealId);
+          toast.success("Deal approved successfully!");
+        } else {
+          await rejectDeal(dealId);
+          toast.success("Deal rejected successfully!");
+        }
+        setRefreshKey((oldKey) => oldKey + 1);
+      } catch (error) {
+        console.error(`Failed to ${decision} deal:`, error);
+        toast.error(
+          decision === "approve"
+            ? "Failed to approve deal"
+            : "Failed to reject deal",
+        );
+      }
+    },
+    [],
+  );
+
+  const handleApproveDeal = useCallback(
+    (deal: any) => {
+      void runDealApprovalDecision(deal, "approve");
+    },
+    [runDealApprovalDecision],
+  );
+
+  const handleRejectDeal = useCallback(
+    (deal: any) => {
+      void runDealApprovalDecision(deal, "reject");
+    },
+    [runDealApprovalDecision],
+  );
+
   // Edit Deal Handler - Opens sidebar for editing
-  const handleEditDeal = useCallback((dealId: number) => {
-    setEditingDealIdInSidebar(dealId);
-    setShowCreateDealSidebar(true);
-  }, []);
+  const handleEditDeal = useCallback(
+    (dealId: number) => {
+      setEditingDealIdInSidebar(dealId);
+      if (isApprovalsList) {
+        setShowEditDealSidebar(true);
+      } else {
+        setShowCreateDealSidebar(true);
+      }
+    },
+    [isApprovalsList],
+  );
 
   /** Kanban + list avatar style (matches previous in-component helpers). */
   const dealsKanbanStyleAvatar = useMemo(
@@ -1566,16 +1713,18 @@ const CrmDeals = () => { // NOSONAR
   );
 
   const transformDealData = (deal: any) =>
-    transformDealForGenericTableRow(deal, extensions, { includeTicketId: true });
+    transformDealForGenericTableRow(deal, extensions, {
+      includeTicketId: !isApprovalsList,
+    });
 
   const analyticsData = useMemo(() => {
     const transformedDeals = dealsData.map(transformDealData);
     return computeDealsListAnalytics(transformedDeals, summaryTiles, totalDeals);
-  }, [dealsData, extensions, summaryTiles, totalDeals]);
+  }, [dealsData, extensions, summaryTiles, totalDeals, isApprovalsList]);
 
   const filteredDeals = useMemo(() => {
     return dealsData.map(transformDealData);
-  }, [dealsData, extensions]);
+  }, [dealsData, extensions, isApprovalsList]);
 
   const filterCounts = useMemo(() => {
     const transformed = dealsData.map(transformDealData);
@@ -1585,9 +1734,17 @@ const CrmDeals = () => { // NOSONAR
       summaryTiles,
       totalDeals,
       stages,
-      { includeRejectedCount: true },
+      { includeRejectedCount: !isApprovalsList },
     );
-  }, [dealsData, extensions, stages, summaryTiles, tabTotals, totalDeals]);
+  }, [
+    dealsData,
+    extensions,
+    isApprovalsList,
+    stages,
+    summaryTiles,
+    tabTotals,
+    totalDeals,
+  ]);
 
   // Update custom tabs counts when filterCounts change
   useEffect(() => {
@@ -1603,6 +1760,71 @@ const CrmDeals = () => { // NOSONAR
   const dealsStatsCards: StatsCardData[] = useMemo(
     () => {
       const m = dealsMetrics || {};
+      if (isApprovalsList) {
+        return [
+          {
+            title: "All deals submitted",
+            value: m.total_submitted ?? 0,
+            icon: Users,
+            iconColor: "#6366F1",
+            iconBgColor: "#EEF2FF",
+            metric: {
+              text: `${m.total_submitted_last_7_days ?? 0} in last 7 days`,
+              dotColor: "#6366F1",
+            },
+          },
+          {
+            title: "Pending Approval",
+            value: m.pending_approval ?? 0,
+            icon: Calendar,
+            iconColor: "#10B981",
+            iconBgColor: "#D1FAE5",
+            metric: {
+              text: `${m.pending_approval_last_7_days ?? 0} in last 7 days`,
+              dotColor: "#10B981",
+            },
+          },
+          {
+            title: "Approved Deals",
+            value: m.approved_deals ?? 0,
+            icon: Target,
+            iconColor: "#8B5CF6",
+            iconBgColor: "#EDE9FE",
+            metric: {
+              text: `${m.approved_deals_last_7_days ?? 0} in last 7 days`,
+              dotColor: "#8B5CF6",
+            },
+          },
+          {
+            title: "Rejected Deals",
+            value: m.rejected_deals ?? 0,
+            icon: XCircle,
+            iconColor: "#64748B",
+            iconBgColor: "#F1F5F9",
+            metric: {
+              text: `${m.rejected_deals_last_7_days ?? 0} in last 7 days`,
+              dotColor: "#94A3B8",
+            },
+          },
+          {
+            title: "High-Value (Pending)",
+            value: m.high_value_pending ?? 0,
+            icon: Calendar,
+            iconColor: "#10B981",
+            iconBgColor: "#D1FAE5",
+            additionalText: "High-value deals still awaiting approval",
+          },
+          {
+            title: "Recently Reviewed",
+            value: m.recently_reviewed_last_24h ?? 0,
+            icon: Target,
+            iconColor: "#8B5CF6",
+            iconBgColor: "#EDE9FE",
+            additionalText: "Deals approved or rejected in last 24 hours",
+          },
+        ];
+      }
+
       const todaysMeetings = m.todays_meetings ?? 0;
       const overdueMeetings = m.overdue_meetings ?? 0;
 
@@ -1670,12 +1892,120 @@ const CrmDeals = () => { // NOSONAR
         },
       ];
     },
-    [dealsMetrics],
+    [dealsMetrics, isApprovalsList],
   );
 
   // Define columns for GenericTable
   const dealsColumns: TableColumn<any>[] = useMemo(
-    () => [
+    () => {
+      if (isApprovalsList) {
+        return [
+          {
+            key: "name",
+            label: "Deal Name",
+            sortable: true,
+            type: "avatar",
+            avatar: {
+              getInitials: (row) => getInitials(row.name),
+              getColor: (row) => getRandomColor(row.name),
+            },
+            emptyValue: "N/A",
+          },
+          {
+            key: "company",
+            label: "Company",
+            sortable: true,
+            type: "multi-field",
+            fields: {
+              primary: "company",
+              secondary: "industry",
+              secondaryClass: "text-muted small",
+            },
+            emptyValue: "No Company",
+          },
+          {
+            key: "stage",
+            label: "Stage",
+            sortable: true,
+            type: "custom",
+            render: (row) => (
+              <span
+                style={{ backgroundColor: row?.stageColor || "grey" }}
+                className="badge"
+              >
+                {row?.stage}
+              </span>
+            ),
+          },
+          {
+            key: "approvalStatus",
+            label: "Approval Status",
+            sortable: true,
+            type: "text",
+            emptyValue: "-",
+          },
+          {
+            key: "dealType",
+            label: "Deal Type",
+            sortable: true,
+            type: "badge",
+            badge: {
+              getVariant: () => "primary",
+            },
+            emptyValue: "-",
+          },
+          {
+            key: "value",
+            label: "Value",
+            sortable: true,
+            type: "custom",
+            render: (row) => (
+              <span className="fw-semibold">
+                {row.currency} {parseFloat(String(row.value)).toLocaleString()}
+              </span>
+            ),
+          },
+          {
+            key: "closeDate",
+            label: "Expected Close",
+            sortable: true,
+            type: "text",
+            accessor: (row) => row.closeDate || "-",
+            emptyValue: "-",
+          },
+          {
+            key: "followUpDate",
+            label: "Follow-up Date",
+            sortable: true,
+            type: "text",
+            accessor: (row) => row.followUpDate || "-",
+            emptyValue: "-",
+          },
+          {
+            key: "owner",
+            label: "Associate with",
+            sortable: true,
+            type: "text",
+            emptyValue: "-",
+          },
+          {
+            key: "assignedUser",
+            label: "Assigned To",
+            sortable: true,
+            type: "text",
+            emptyValue: "-",
+          },
+          {
+            key: "created",
+            label: "Created",
+            sortable: true,
+            type: "text",
+            emptyValue: "-",
+          },
+        ];
+      }
+
+      return [
       {
         key: "name",
         label: "Deal Name",
@@ -1784,8 +2114,9 @@ const CrmDeals = () => { // NOSONAR
         type: "text",
         emptyValue: "-",
       },
-    ],
-    [dealsKanbanStyleAvatar],
+    ];
+    },
+    [dealsKanbanStyleAvatar, isApprovalsList],
   );
 
   // Define actions for GenericTable
@@ -1840,7 +2171,8 @@ const CrmDeals = () => { // NOSONAR
         variant: "link" as const,
         className: "text-info",
       },
-      ...(session?.user?.permissions?.includes("download-document-crm-deals")
+      ...(!isApprovalsList &&
+      session?.user?.permissions?.includes("download-document-crm-deals")
         ? [
             {
               label: "Download",
@@ -1902,18 +2234,35 @@ const CrmDeals = () => { // NOSONAR
                     onClick: (row: any) => handleMarkLost(row.rawData || row),
                     className: "text-danger",
                   },
-                  // {
-                  //   label: 'Withdraw (with lost reason)',
-                  //   icon: <X size={14} />,
-                  //   onClick: (row: any) => handleMarkLost(row.rawData || row),
-                  //   className: 'text-danger'
-                  // },
-                  // {
-                  //   label: 'Withdraw (For Further Changes)',
-                  //   icon: <X size={14} />,
-                  //   onClick: (row: any) => handleDeleteDeal(row.rawData || row),
-                  //   className: 'text-danger'
-                  // }
+                  ...(isApprovalsList &&
+                  session?.user?.permissions?.includes(
+                    "approve-reject-crm-deals",
+                  )
+                    ? [
+                        {
+                          label: "Approve",
+                          icon: <CheckCircle size={14} />,
+                          onClick: (row: any) => {
+                            void handleApproveDeal(row.rawData || row);
+                          },
+                          className: "text-success",
+                          show: (row: any) =>
+                            (row.rawData?.approval_status ??
+                              row.approval_status) === "pending",
+                        },
+                        {
+                          label: "Reject",
+                          icon: <XCircle size={14} />,
+                          onClick: (row: any) => {
+                            void handleRejectDeal(row.rawData || row);
+                          },
+                          className: "text-danger",
+                          show: (row: any) =>
+                            (row.rawData?.approval_status ??
+                              row.approval_status) === "pending",
+                        },
+                      ]
+                    : []),
                 ],
               },
             },
@@ -1928,6 +2277,9 @@ const CrmDeals = () => { // NOSONAR
     handleRestoreDeal,
     handleDeleteDeal,
     handleMarkLost,
+    handleApproveDeal,
+    handleRejectDeal,
+    isApprovalsList,
   ]);
 
   const getDealCardContextMenuItems = useCallback(
@@ -1936,13 +2288,15 @@ const CrmDeals = () => { // NOSONAR
       const row = transformDealData(card.raw);
       return buildBoundTableContextMenuItems(dealsActions, row);
     },
-    [dealsActions, extensions],
+    [dealsActions, extensions, isApprovalsList],
   );
 
   const dealsToolbarConfig = useCrmToolbarConfig({
-    entity: "deals",
+    entity: isApprovalsList ? "approvals" : "deals",
     searchValue: dealsSearch,
-    searchPlaceholder: "Search deals by name, company, value...",
+    searchPlaceholder: isApprovalsList
+      ? "Search approvals by name, company, value..."
+      : "Search deals by name, company, value...",
     onSearchChange: setDealsSearch,
     onSearch: () => {},
     currentFilters,
@@ -1951,7 +2305,12 @@ const CrmDeals = () => { // NOSONAR
     activeTab: activeFilter,
     onTabChange: handleFilterChange,
     tabs: [
-      { id: "all", label: "All deals", count: filterCounts.all, removable: false },
+      {
+        id: "all",
+        label: isApprovalsList ? "All approvals" : "All deals",
+        count: filterCounts.all,
+        removable: false,
+      },
       ...customTabs,
     ],
     onTabAdd: () => setShowTabModal(true),
@@ -1959,7 +2318,7 @@ const CrmDeals = () => { // NOSONAR
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
       if (activeFilter === tabId) handleFilterChange("all");
     },
-    tabsDropdownLabel: "Deals",
+    tabsDropdownLabel: isApprovalsList ? "Approvals" : "Deals",
     onFiltersClick: handleOpenFiltersSidebar,
     onExportClick: () => setShowExportModal(true),
     onEditColumnsClick: () => setShowColumnEditor(true),
@@ -2027,7 +2386,7 @@ const CrmDeals = () => { // NOSONAR
       <BreadcrumbItem
         mainTitle="CRM"
         mainLink="/crm/dashboard"
-        subTitle="Deals"
+        subTitle={isApprovalsList ? "Deals Approval" : "Deals"}
       />
 
       {/* Main flex container for content and sidebar */}
@@ -2307,7 +2666,11 @@ const CrmDeals = () => { // NOSONAR
                 const dealId = selectedDeal?.id || selectedDeal?.rawData?.id;
                 if (dealId) {
                   handleHideDealSidebarKeepPersistence();
-                  router.push(`/crm/detailspage?type=deal&id=${dealId}`);
+                  router.push(
+                    `/crm/detailspage?type=deal&id=${dealId}${
+                      isApprovalsList ? "&approval=1" : ""
+                    }`,
+                  );
                 }
               },
             }}
@@ -5709,17 +6072,28 @@ const CrmDeals = () => { // NOSONAR
       </Modal>
 
       {/* Column Editor Modal */}
-      <ColumnEditorModal
-        show={showColumnEditor}
-        onHide={() => setShowColumnEditor(false)}
-        title="Customize Columns"
-        columns={dealsColumns.map((c) => ({ key: c.key, label: c.label }))}
-        selectedColumnKeys={selectedDealsColumns}
-        onApply={(keys) => {
-          setSelectedDealsColumns(keys);
-          persistVisibleColumnKeys("dealsSelectedColumns", keys);
-        }}
-      />
+      {isApprovalsList ? (
+        <CrmListColumnEditorModal
+          show={showColumnEditor}
+          onHide={() => setShowColumnEditor(false)}
+          columns={dealsColumns.map((c) => ({ key: c.key, label: c.label }))}
+          selectedColumnKeys={selectedDealsColumns}
+          storageKey="dealsSelectedColumns"
+          onSelectedKeysChange={setSelectedDealsColumns}
+        />
+      ) : (
+        <ColumnEditorModal
+          show={showColumnEditor}
+          onHide={() => setShowColumnEditor(false)}
+          title="Customize Columns"
+          columns={dealsColumns.map((c) => ({ key: c.key, label: c.label }))}
+          selectedColumnKeys={selectedDealsColumns}
+          onApply={(keys) => {
+            setSelectedDealsColumns(keys);
+            persistVisibleColumnKeys("dealsSelectedColumns", keys);
+          }}
+        />
+      )}
 
       {/* Export Modal */}
       <CrmExportModal
@@ -5729,7 +6103,11 @@ const CrmDeals = () => { // NOSONAR
         subtitle="Choose filters to define which deals are exported. Defaults match your current table view."
         fileNameValue={exportFileName}
         onFileNameChange={setExportFileName}
-        fileNamePlaceholder={`deals_${moment().format("YYYY-MM-DD")}`}
+        fileNamePlaceholder={
+          isApprovalsList
+            ? `approvals_deals_${moment().format("YYYY-MM-DD")}`
+            : `deals_${moment().format("YYYY-MM-DD")}`
+        }
         onExportClick={handleDealsExport}
         exporting={exporting}
         exportButtonLabel="Export"
@@ -5747,7 +6125,9 @@ const CrmDeals = () => { // NOSONAR
                   : undefined
               }
               setExportFilters={setExportFilters}
-              styles={customSelectStyles}
+              styles={
+                isApprovalsList ? dealApprovalsSelectStyles : customSelectStyles
+              }
             />
           </Col>
           <Col md={6}>
@@ -6005,35 +6385,103 @@ const CrmDeals = () => { // NOSONAR
               setDealsFilters((prev) => ({ ...prev, probabilityMax: value })),
             placeholder: "100",
           },
-          {
-            id: "approvalStatus",
-            label: "Approval Status",
-            type: "dropdown" as const,
-            value: dealsFilters.approvalStatus || "",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({ ...prev, approvalStatus: value })),
-            options: [
-              { value: "", label: "Select Approval Status" },
-              { value: "pending", label: "Pending" },
-              { value: "approved", label: "Approved" },
-              { value: "rejected", label: "Rejected" },
-            ],
-          },
-          {
-            id: "businessType",
-            label: "Business Type",
-            type: "dropdown" as const,
-            value: dealsFilters.businessType || "",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({ ...prev, businessType: value })),
-            options: [
-              { value: "", label: "Select Business Type" },
-              ...filterBusinessTypes.map((bt: BusinessTypeData) => ({
-                value: bt.id.toString(),
-                label: bt.name,
-              })),
-            ],
-          },
+          ...(isApprovalsList
+            ? [
+                {
+                  id: "dealType",
+                  label: "Deal Type",
+                  type: "dropdown" as const,
+                  value: dealsFilters.dealType || "",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({ ...prev, dealType: value })),
+                  options: [
+                    { value: "", label: "Select Deal Type" },
+                    { value: "new_sale", label: "New Sale" },
+                    { value: "renewal", label: "Renewal" },
+                    { value: "migration", label: "Migration" },
+                    { value: "upsell", label: "Upsell" },
+                  ],
+                },
+                {
+                  id: "approvalStatus",
+                  label: "Approval Status",
+                  type: "dropdown" as const,
+                  value: dealsFilters.approvalStatus || "",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      approvalStatus: value,
+                    })),
+                  options: [
+                    { value: "", label: "Select Approval Status" },
+                    { value: "pending", label: "Pending" },
+                    { value: "approved", label: "Approved" },
+                    { value: "rejected", label: "Rejected" },
+                  ],
+                },
+                {
+                  id: "industry",
+                  label: "Industry",
+                  type: "dropdown" as const,
+                  value: dealsFilters.industry || "",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({ ...prev, industry: value })),
+                  options: [
+                    { value: "", label: "Select Industry" },
+                    { value: "Technology", label: "Technology" },
+                    { value: "Healthcare", label: "Healthcare" },
+                    { value: "Finance", label: "Finance" },
+                    {
+                      value: "Banking & Financial Services",
+                      label: "Banking & Financial Services",
+                    },
+                    { value: "Manufacturing", label: "Manufacturing" },
+                    { value: "Retail", label: "Retail" },
+                    { value: "Education", label: "Education" },
+                    { value: "Real Estate", label: "Real Estate" },
+                    { value: "Telecommunications", label: "Telecommunications" },
+                    { value: "Construction", label: "Construction" },
+                    { value: "Other", label: "Other" },
+                  ],
+                },
+              ]
+            : [
+                {
+                  id: "approvalStatus",
+                  label: "Approval Status",
+                  type: "dropdown" as const,
+                  value: dealsFilters.approvalStatus || "",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      approvalStatus: value,
+                    })),
+                  options: [
+                    { value: "", label: "Select Approval Status" },
+                    { value: "pending", label: "Pending" },
+                    { value: "approved", label: "Approved" },
+                    { value: "rejected", label: "Rejected" },
+                  ],
+                },
+                {
+                  id: "businessType",
+                  label: "Business Type",
+                  type: "dropdown" as const,
+                  value: dealsFilters.businessType || "",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      businessType: value,
+                    })),
+                  options: [
+                    { value: "", label: "Select Business Type" },
+                    ...filterBusinessTypes.map((bt: BusinessTypeData) => ({
+                      value: bt.id.toString(),
+                      label: bt.name,
+                    })),
+                  ],
+                },
+              ]),
           {
             id: "expectedCloseDateFrom",
             label: "Expected Close Date From",
@@ -6056,131 +6504,177 @@ const CrmDeals = () => { // NOSONAR
                 expectedCloseDateTo: value,
               })),
           },
-          {
-            id: "includeConverted",
-            label: "Include converted",
-            type: "dropdown" as const,
-            value: dealsFilters.includeConverted ? "true" : "false",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({
-                ...prev,
-                includeConverted: value === "true",
-              })),
-            options: [
-              { value: "false", label: "No (exclude deals with orders)" },
-              { value: "true", label: "Yes" },
-            ],
-          },
-          {
-            id: "includeLost",
-            label: "Include lost",
-            type: "dropdown" as const,
-            value: dealsFilters.includeLost ? "true" : "false",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({
-                ...prev,
-                includeLost: value === "true",
-              })),
-            options: [
-              { value: "false", label: "No" },
-              { value: "true", label: "Yes (show only lost deals)" },
-            ],
-          },
-          {
-            id: "includeArchived",
-            label: "Include deleted records",
-            type: "dropdown" as const,
-            value: dealsFilters.includeArchived ? "true" : "false",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({
-                ...prev,
-                includeArchived: value === "true",
-              })),
-            options: [
-              { value: "false", label: "No" },
-              { value: "true", label: "Yes (show only deleted records)" },
-            ],
-          },
-          {
-            id: "createdAtFrom",
-            label: "Created date from",
-            type: "date" as const,
-            value: dealsFilters.createdAtFrom || "",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({
-                ...prev,
-                createdAtFrom: value || null,
-              })),
-          },
-          {
-            id: "createdAtTo",
-            label: "Created date to",
-            type: "date" as const,
-            value: dealsFilters.createdAtTo || "",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({
-                ...prev,
-                createdAtTo: value || null,
-              })),
-          },
-          {
-            id: "ticketId",
-            label: "Ticket ID (source)",
-            type: "text" as const,
-            value: dealsFilters.ticketId || "",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({
-                ...prev,
-                ticketId: value || null,
-              })),
-            placeholder: "Filter by source ticket ID",
-          },
-          {
-            id: "hasMeetings",
-            label: "Has meetings",
-            type: "dropdown" as const,
-            value: dealsFilters.hasMeetings ? "true" : "false",
-            onChange: (value) =>
-              setDealsFilters((prev) => ({
-                ...prev,
-                hasMeetings: value === "true",
-              })),
-            options: [
-              { value: "false", label: "No" },
-              { value: "true", label: "Yes (only deals with meetings)" },
-            ],
-          },
+          ...(!isApprovalsList
+            ? [
+                {
+                  id: "includeConverted",
+                  label: "Include converted",
+                  type: "dropdown" as const,
+                  value: dealsFilters.includeConverted ? "true" : "false",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      includeConverted: value === "true",
+                    })),
+                  options: [
+                    { value: "false", label: "No (exclude deals with orders)" },
+                    { value: "true", label: "Yes" },
+                  ],
+                },
+                {
+                  id: "includeLost",
+                  label: "Include lost",
+                  type: "dropdown" as const,
+                  value: dealsFilters.includeLost ? "true" : "false",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      includeLost: value === "true",
+                    })),
+                  options: [
+                    { value: "false", label: "No" },
+                    {
+                      value: "true",
+                      label: "Yes (show only lost deals)",
+                    },
+                  ],
+                },
+                {
+                  id: "includeArchived",
+                  label: "Include deleted records",
+                  type: "dropdown" as const,
+                  value: dealsFilters.includeArchived ? "true" : "false",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      includeArchived: value === "true",
+                    })),
+                  options: [
+                    { value: "false", label: "No" },
+                    {
+                      value: "true",
+                      label: "Yes (show only deleted records)",
+                    },
+                  ],
+                },
+                {
+                  id: "createdAtFrom",
+                  label: "Created date from",
+                  type: "date" as const,
+                  value: dealsFilters.createdAtFrom || "",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      createdAtFrom: value || null,
+                    })),
+                },
+                {
+                  id: "createdAtTo",
+                  label: "Created date to",
+                  type: "date" as const,
+                  value: dealsFilters.createdAtTo || "",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      createdAtTo: value || null,
+                    })),
+                },
+                {
+                  id: "ticketId",
+                  label: "Ticket ID (source)",
+                  type: "text" as const,
+                  value: dealsFilters.ticketId || "",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      ticketId: value || null,
+                    })),
+                  placeholder: "Filter by source ticket ID",
+                },
+                {
+                  id: "hasMeetings",
+                  label: "Has meetings",
+                  type: "dropdown" as const,
+                  value: dealsFilters.hasMeetings ? "true" : "false",
+                  onChange: (value: string) =>
+                    setDealsFilters((prev) => ({
+                      ...prev,
+                      hasMeetings: value === "true",
+                    })),
+                  options: [
+                    { value: "false", label: "No" },
+                    {
+                      value: "true",
+                      label: "Yes (only deals with meetings)",
+                    },
+                  ],
+                },
+              ]
+            : []),
         ]}
         onApply={() => {
-          handleFiltersChange(buildDealsSidebarFiltersPayload());
+          handleFiltersChange(
+            isApprovalsList
+              ? buildApprovalsSidebarFiltersPayload()
+              : buildDealsSidebarFiltersPayload(),
+          );
           setDealsPagination({ ...dealsPagination, currentPage: 1 });
           setRefreshKey((prev) => prev + 1);
           setShowFiltersSidebar(false);
         }}
         onReset={() => {
           setDealsSearch("");
-          setDealsFilters({
-            assignedTo: null,
-            stage: null,
-            followUpDateFrom: null,
-            followUpDateTo: null,
-            probabilityMin: null,
-            probabilityMax: null,
-            businessType: null,
-            expectedCloseDateFrom: null,
-            expectedCloseDateTo: null,
-            approvalStatus: null,
-            includeConverted: false,
-            includeLost: false,
-            includeArchived: false,
-            createdAtFrom: null,
-            createdAtTo: null,
-            created_at_month: null,
-            ticketId: null,
-            hasMeetings: false,
-          });
-          handleFiltersChange({});
-          setCurrentFilters({});
+          if (isApprovalsList) {
+            setDealsFilters({
+              assignedTo: null,
+              stage: null,
+              followUpDateFrom: null,
+              followUpDateTo: null,
+              probabilityMin: null,
+              probabilityMax: null,
+              dealType: null,
+              approvalStatus: null,
+              industry: null,
+              businessType: null,
+              expectedCloseDateFrom: null,
+              expectedCloseDateTo: null,
+              includeConverted: false,
+              includeLost: false,
+              includeArchived: false,
+              createdAtFrom: null,
+              createdAtTo: null,
+              created_at_month: null,
+              ticketId: null,
+              hasMeetings: false,
+            });
+            handleFiltersChange({});
+            setCurrentFilters({ approval_status: "pending" });
+          } else {
+            setDealsFilters({
+              assignedTo: null,
+              stage: null,
+              followUpDateFrom: null,
+              followUpDateTo: null,
+              probabilityMin: null,
+              probabilityMax: null,
+              dealType: null,
+              industry: null,
+              businessType: null,
+              expectedCloseDateFrom: null,
+              expectedCloseDateTo: null,
+              approvalStatus: null,
+              includeConverted: false,
+              includeLost: false,
+              includeArchived: false,
+              createdAtFrom: null,
+              createdAtTo: null,
+              created_at_month: null,
+              ticketId: null,
+              hasMeetings: false,
+            });
+            handleFiltersChange({});
+            setCurrentFilters({});
+          }
           setActiveFilter("all");
           setDealsPagination({ ...dealsPagination, currentPage: 1 });
           setRefreshKey((prev) => prev + 1);
@@ -6214,11 +6708,11 @@ const CrmDeals = () => { // NOSONAR
         customTabs={customTabs}
         setCustomTabs={setCustomTabs}
         filterCounts={filterCounts}
-        showRejectedTab
+        showRejectedTab={!isApprovalsList}
       />
 
       {/* Create Deal Sidebar */}
-      {showCreateDealSidebar && (
+      {showCreateDealSidebar && !isApprovalsList && (
         <CreateDealSidebar
           onClose={() => {
             setShowCreateDealSidebar(false);
@@ -6230,12 +6724,27 @@ const CrmDeals = () => { // NOSONAR
           }}
         />
       )}
+
+      {showEditDealSidebar && isApprovalsList && (
+        <EditDealApprovalSidebar
+          onClose={() => {
+            setShowEditDealSidebar(false);
+            setEditingDealIdInSidebar(null);
+          }}
+          dealId={editingDealIdInSidebar}
+          onSuccess={() => setRefreshKey((prev) => prev + 1)}
+        />
+      )}
     </React.Fragment>
   );
-};
+}
 
-CrmDeals.getLayout = (page: ReactElement) => {
+function CrmDealsPage() {
+  return <CrmDealsListScreen listVariant="deals" />;
+}
+
+CrmDealsPage.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
 };
 
-export default CrmDeals;
+export default CrmDealsPage;

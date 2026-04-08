@@ -1,4 +1,99 @@
 import React from "react";
+import { X } from "lucide-react";
+
+/* ─── Close button (top-right of modal header) ─── */
+
+const CLOSE_BTN_STYLE: React.CSSProperties = {
+  position: "absolute",
+  top: "16px",
+  right: "16px",
+  background: "rgba(255,255,255,0.15)",
+  backdropFilter: "blur(10px)",
+  border: "1px solid rgba(255,255,255,0.2)",
+  color: "black",
+  width: "32px",
+  height: "32px",
+  borderRadius: "8px",
+  cursor: "pointer",
+  transition: "all 0.2s ease",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const closeBtnHoverHandlers = {
+  onMouseOver: (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+    e.currentTarget.style.transform = "scale(1.05)";
+  },
+  onFocus: (e: React.FocusEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+    e.currentTarget.style.transform = "scale(1.05)";
+  },
+  onMouseOut: (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+    e.currentTarget.style.transform = "scale(1)";
+  },
+  onBlur: (e: React.FocusEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+    e.currentTarget.style.transform = "scale(1)";
+  },
+};
+
+export function CrmModalCloseButton({
+  onClick,
+  ariaLabel,
+}: Readonly<{
+  onClick: () => void;
+  ariaLabel?: string;
+}>) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+      style={CLOSE_BTN_STYLE}
+      {...closeBtnHoverHandlers}
+    >
+      <X size={18} />
+    </button>
+  );
+}
+
+/* ─── Avatar circle (modal header) ─── */
+
+export function CrmModalAvatar({
+  name,
+  fallback = "D",
+  background = "#10b981",
+}: Readonly<{
+  name?: string;
+  fallback?: string;
+  background?: string;
+}>) {
+  const initial = name ? name.charAt(0).toUpperCase() : fallback;
+  return (
+    <div
+      style={{
+        width: "64px",
+        height: "64px",
+        borderRadius: "16px",
+        background,
+        backdropFilter: "blur(10px)",
+        border: "2px solid rgba(255,255,255,0.3)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "28px",
+        fontWeight: "700",
+        flexShrink: 0,
+        color: "#fff",
+      }}
+    >
+      {initial}
+    </div>
+  );
+}
 
 export const CRM_LIST_VIEW_MODAL_INFO_CARD_BASE_STYLE: React.CSSProperties = {
   background: "#f9fafb",

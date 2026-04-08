@@ -1,5 +1,9 @@
 import React from "react";
-import { Handshake, X } from "lucide-react";
+import { Handshake } from "lucide-react";
+import {
+  CrmModalCloseButton,
+  CrmModalAvatar,
+} from "../shared/CrmListViewDataModalPrimitives";
 
 /** Injected once inside deal view modal body (shared by deals + approvals lists). */
 export const DEAL_DETAIL_MODAL_BODY_FILTER_CSS = `
@@ -69,7 +73,6 @@ export function CrmDealDetailViewModalHeader({
   createdLabel,
 }: Readonly<CrmDealDetailViewModalHeaderProps>) {
   const title = dealName || "";
-  const initial = title ? title.charAt(0).toUpperCase() : "D";
 
   return (
     <div
@@ -84,66 +87,10 @@ export function CrmDealDetailViewModalHeader({
         borderBottom: "1px solid #ccc",
       }}
     >
-      <button
-        type="button"
-        onClick={onClose}
-        style={{
-          position: "absolute",
-          top: "16px",
-          right: "16px",
-          background: "rgba(255,255,255,0.15)",
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          color: "black",
-          width: "32px",
-          height: "32px",
-          borderRadius: "8px",
-          cursor: "pointer",
-          transition: "all 0.2s ease",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-          e.currentTarget.style.transform = "scale(1.05)";
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-          e.currentTarget.style.transform = "scale(1.05)";
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-          e.currentTarget.style.transform = "scale(1)";
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-          e.currentTarget.style.transform = "scale(1)";
-        }}
-      >
-        <X size={18} />
-      </button>
+      <CrmModalCloseButton onClick={onClose} />
 
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        <div
-          style={{
-            width: "64px",
-            height: "64px",
-            borderRadius: "16px",
-            background: "#10b981",
-            backdropFilter: "blur(10px)",
-            border: "2px solid rgba(255,255,255,0.3)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "28px",
-            fontWeight: "700",
-            flexShrink: 0,
-            color: "#fff",
-          }}
-        >
-          {initial}
-        </div>
+        <CrmModalAvatar name={title} fallback="D" background="#10b981" />
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2
             style={{
