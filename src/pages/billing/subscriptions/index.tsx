@@ -15,26 +15,27 @@ import { Button, Form } from "react-bootstrap";
 import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import {
-  createCustomer,
-  deleteCustomerProductPricing,
-  getCustomer,
-  getCustomerProductPricingList,
-} from "@utils/accounts";
+import { deleteCustomerProductPricing, getCustomerProductPricingList } from "@utils/accounts";
 import CreateSubscriptionModal from "@components/CreateSubscriptionModal";
 import type { CustomerProductPricingDataItem } from "@utils/accounts";
 import { getMinifiedCompanies } from "@utils/crm";
 import moment from "moment";
-import { formatNumber, GlobalDateFormat } from "@utils/Helper";
+import {
+  formatDateTimeGlobal,
+  formatNumber,
+  GlobalDateFormat,
+} from "@utils/Helper";
 import { Package, FileText, Calendar, Plus } from "lucide-react";
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
 import { toDateInputValue } from "@utils/dateInputValue";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import GenericSidebar from "@components/GenericSidebarNew";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 
@@ -225,40 +226,14 @@ const ProductDetails = () => {
     fetchCompanyOptions();
   }, []);
 
-  // Resolve selected customer first (mandatory)
-  useEffect(() => {
-    let cancelled = false;
-    if (!selectedCompanyId) {
-      return;
-    }
+  const onAccountingCustomerCreated = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
 
-    (async () => {
-      try {
-        const customer: any = await getCustomer(selectedCompanyId);
-        if (cancelled) return;
-
-        if (customer?.success === false && customer?.message === "Not Found") {
-          await createCustomer({
-            crm_company_id: selectedCompanyId,
-            profile: { vat_exemption: false },
-          });
-          if (cancelled) return;
-          // Customer created for this selectedCompanyId; refetch pricing list
-          setRefreshKey((k) => k + 1);
-        }
-      } catch (e) {
-        if (cancelled) return;
-        toast.error(`Failed to load customer: ${getErrorMessage(e)}`, {
-          toastId: "billing_subscriptions_load_customer_failed",
-        });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedCompanyId, setRefreshKey]);
-    
+  useEnsureCustomerForCrmCompany(selectedCompanyId, {
+    onCreated: onAccountingCustomerCreated,
+    errorToastId: "billing_subscriptions_load_customer_failed",
+  });
 
   const [subscriptionSearch, setSubscriptionSearch] = useState("");
   const [totalAllSubscriptions, setTotalAllSubscriptions] = useState(0);
@@ -887,7 +862,7 @@ const ProductDetails = () => {
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
           totalRows: totalRecords,
-          pageSizeOptions: [10, 15, 25, 50],
+          pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
         }}
         onPaginationChange={(page, rowsPerPage) => {
           setPagination((prev) => ({
@@ -990,14 +965,18 @@ const ProductDetails = () => {
               },
               {
                 label: "Current Period Start",
-                value: selectedProductView?.renewal_start_date ?? null,
-                type: "date",
+                value: formatDateTimeGlobal(
+                  selectedProductView?.renewal_start_date,
+                ),
+                type: "datetime",
                 icon: Calendar,
               },
               {
                 label: "Current Period End",
-                value: selectedProductView?.renewal_end_date ?? null,
-                type: "date",
+                value: formatDateTimeGlobal(
+                  selectedProductView?.renewal_end_date,
+                ),
+                type: "datetime",
                 icon: Calendar,
               },
               {

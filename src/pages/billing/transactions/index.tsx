@@ -13,8 +13,10 @@ import moment from "moment";
 import { GlobalDateFormat } from "@utils/Helper";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 
 const ProductDetails = () => {
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
@@ -39,6 +41,16 @@ const ProductDetails = () => {
 
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const onAccountingCustomerCreated = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(selectedCompanyId, {
+    onCreated: onAccountingCustomerCreated,
+    errorToastId: "billing_transactions_ensure_customer_failed",
+  });
+
   const [currentFilters, setCurrentFilters] = useState<{
     search?: string;
     status?: string;
@@ -398,7 +410,7 @@ const ProductDetails = () => {
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
           totalRows: totalRecords,
-          pageSizeOptions: [10, 15, 25, 50],
+          pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
         }}
         onPaginationChange={(page, rowsPerPage) => {
           setPagination((prev) => ({

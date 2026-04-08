@@ -22,15 +22,17 @@ import SelectBox, { type SelectBoxOption } from "@components/SelectBox";
 import { getErrorMessage } from "@utils/errors";
 import { getMinifiedCompanies } from "@utils/crm";
 import {
-  createCustomer,
   createCustomerProductPricingBulk,
   type CustomerProductPricingDataItem,
   type CustomerProductPricingUpsertPayload,
-  getCustomer,
   getProducts,
   type ProductData,
   upsertCustomerProductPricing,
 } from "@utils/accounts";
+import {
+  ensureCustomerExistsForCrmCompany,
+  shouldCreateCustomerAfterGetResponse,
+} from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { toDateInputValue } from "@utils/dateInputValue";
 
 interface CreateSubscriptionModalProps {
@@ -93,6 +95,12 @@ const BILLING_CYCLE_OPTIONS: SelectBoxOption[] = [
   { value: "quarterly", label: "Quarterly" },
   { value: "yearly", label: "Yearly" },
 ];
+
+const CUSTOM_DESCRIPTION_MAX_LENGTH = 500;
+
+function clampCustomDescriptionState(value: unknown): string {
+  return String(value ?? "").slice(0, CUSTOM_DESCRIPTION_MAX_LENGTH);
+}
 
 function parseDiscountValue(
   value: string | number | (string | number)[] | null,
@@ -273,15 +281,27 @@ function PricingRowFormFields({
       </Field>
       <Field label="Custom description" fullWidth>
         <textarea
+          id={`subscription-custom-desc-${row.product_id}`}
           value={row.custom_description}
+          maxLength={CUSTOM_DESCRIPTION_MAX_LENGTH}
           onChange={(e) =>
-            updateRow(row.product_id, { custom_description: e.target.value })
+            updateRow(row.product_id, {
+              custom_description: clampCustomDescriptionState(e.target.value),
+            })
           }
           disabled={submitting}
           style={FIELD_TEXTAREA_SMALL ?? FIELD_TEXTAREA}
           rows={2}
           placeholder="Enter custom description"
+          aria-describedby={`subscription-custom-desc-${row.product_id}-hint`}
         />
+        <div
+          id={`subscription-custom-desc-${row.product_id}-hint`}
+          style={{ fontSize: 11, color: "#888", marginTop: 4, fontWeight: 300 }}
+        >
+          {String(row.custom_description ?? "").length} / {CUSTOM_DESCRIPTION_MAX_LENGTH}{" "}
+          characters maximum
+        </div>
       </Field>
       {showRemoveButton && onRemove && (
         <Field label="" fullWidth>
@@ -324,9 +344,13 @@ export default function CreateSubscriptionModal({
   const [products, setProducts] = useState<ProductData[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
 
-  const [pricingData, setPricingData] = useState<CustomerProductPricingDataItem[]>(
-    () => initialPricingData ?? [],
-  );
+  const [pricingData, setPricingData] = useState<CustomerProductPricingDataItem[]>(() => {
+    const data = initialPricingData ?? [];
+    return data.map((r) => ({
+      ...r,
+      custom_description: clampCustomDescriptionState(r.custom_description),
+    }));
+  });
   const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
 
   const [submitting, setSubmitting] = useState(false);
@@ -361,7 +385,12 @@ export default function CreateSubscriptionModal({
 
   useEffect(() => {
     if (!initialPricingData) return;
-    setPricingData(initialPricingData);
+    setPricingData(
+      initialPricingData.map((r) => ({
+        ...r,
+        custom_description: clampCustomDescriptionState(r.custom_description),
+      })),
+    );
     setExpandedRows(
       Object.fromEntries(initialPricingData.map((r) => [r.product_id, true])),
     );
@@ -429,26 +458,9 @@ export default function CreateSubscriptionModal({
 
     (async () => {
       try {
-        const existing: any = await getCustomer(selectedCompanyId);
+        const { customer } = await ensureCustomerExistsForCrmCompany(selectedCompanyId);
         if (cancelled) return;
-
-        const message = String(existing?.message ?? existing?.mesg ?? "").trim();
-        const isNotFound =
-          existing?.success === false && message.toLowerCase() === "not found";
-
-        if (isNotFound) {
-          await createCustomer({
-            crm_company_id: selectedCompanyId,
-            profile: { vat_exemption: false },
-          });
-          if (cancelled) return;
-          const createdOrFetched: any = await getCustomer(selectedCompanyId);
-          if (cancelled) return;
-          setCustomerReady(createdOrFetched?.success !== false);
-          return;
-        }
-
-        setCustomerReady(true);
+        setCustomerReady(!shouldCreateCustomerAfterGetResponse(customer));
       } catch (error) {
         if (cancelled) return;
         setSubmitError(getErrorMessage(error, "Failed to load customer"));
@@ -517,7 +529,8 @@ export default function CreateSubscriptionModal({
   ): CustomerProductPricingUpsertPayload => ({
     product_id: String(row.product_id),
     selling_price: Number(row.selling_price),
-    custom_description: String(row.custom_description ?? "").trim() ? row.custom_description : null,
+    custom_description:
+      clampCustomDescriptionState(row.custom_description).trim() || null,
     is_active: Boolean(row.is_active),
     discount_applicability_id: row.discount_applicability_id ?? null,
     renewal_start_date: toDateInputValue(row.renewal_start_date) || null,

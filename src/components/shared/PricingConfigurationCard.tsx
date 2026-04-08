@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import {
   BASE_BUTTON,
   FIELD_INPUT,
@@ -9,8 +9,29 @@ import {
 } from "@components/shared/productModalStyles";
 import { onBorderBlur, onBorderFocus, SelectCaret } from "@components/shared/modalUiHelpers";
 import { SubBarButton } from "@components/shared/FullScreenModalShell";
+import {
+  GetCompanyDetails,
+  getProfileCurrencyFromCompanyDetails,
+} from "@utils/accounting";
 
 type PricingTabId = "flat" | "tiered";
+
+const BASE_PRICE_MIN = 1;
+
+/**
+ * @returns Error message if invalid, or `null` if the value is a usable base price (≥ {@link BASE_PRICE_MIN}).
+ */
+export function getProductBasePriceAedError(value: string): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) {
+    return "Base price is mandatory";
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < BASE_PRICE_MIN) {
+    return `Base price must be at least ${BASE_PRICE_MIN} (cannot be zero or negative).`;
+  }
+  return null;
+}
 
 export function PricingConfigurationCard({
   pricingTab,
@@ -21,7 +42,12 @@ export function PricingConfigurationCard({
   onPriceAedChange,
   submitting,
   onManageCurrencies,
+  crmCompanyId,
+  syncCurrencyFromCompanyProfile = true,
+  /** When true, currency is read-only (set from company profile or loaded product). */
+  currencySelectDisabled = true,
   idPrefix = "cmp",
+  priceAedError = null,
 }: Readonly<{
   pricingTab: PricingTabId;
   onPricingTabChange: (tab: PricingTabId) => void;
@@ -31,7 +57,17 @@ export function PricingConfigurationCard({
   onPriceAedChange: (value: string) => void;
   submitting: boolean;
   onManageCurrencies?: () => void;
+  /** Passed through to {@link GetCompanyDetails} when syncing currency. */
+  crmCompanyId?: string | number;
+  /**
+   * When true, sets currency from `GetCompanyDetails` → `data.profile.currency` on mount.
+   * Set false in edit mode so loaded product currency is kept.
+   */
+  syncCurrencyFromCompanyProfile?: boolean;
+  currencySelectDisabled?: boolean;
   idPrefix?: string;
+  /** Inline validation message under the base price field (optional). */
+  priceAedError?: string | null;
 }>) {
   const handlePricingTabEnter = useCallback(
     (tabId: PricingTabId, e: React.MouseEvent<HTMLButtonElement>) => {
@@ -54,6 +90,28 @@ export function PricingConfigurationCard({
     },
     [onManageCurrencies],
   );
+
+  useEffect(() => {
+    if (!syncCurrencyFromCompanyProfile) {
+      return undefined;
+    }
+    let cancelled = false;
+    GetCompanyDetails(
+      crmCompanyId === undefined || crmCompanyId === ""
+        ? {}
+        : { crm_company_id: crmCompanyId },
+    )
+      .then((details) => {
+        if (cancelled) return;
+        onCurrencyChange(getProfileCurrencyFromCompanyDetails(details));
+      })
+      .catch(() => {
+        /* parent keeps current currency; toast handled by GetCompanyDetails */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [syncCurrencyFromCompanyProfile, crmCompanyId, onCurrencyChange]);
 
   return (
     <div style={SECTION_CARD}>
@@ -109,10 +167,18 @@ export function PricingConfigurationCard({
               <select
                 value={currency}
                 onChange={(e) => onCurrencyChange(e.target.value === "USD" ? "USD" : "AED")}
-                style={{ ...FIELD_SELECT, height: "34px", paddingInline: "10px", paddingRight: "28px" }}
+                style={{
+                  ...FIELD_SELECT,
+                  height: "34px",
+                  paddingInline: "10px",
+                  paddingRight: "28px",
+                  ...(submitting || currencySelectDisabled
+                    ? { cursor: "not-allowed", opacity: 0.85 }
+                    : {}),
+                }}
                 onFocus={onBorderFocus}
                 onBlur={onBorderBlur}
-                disabled={submitting}
+                disabled={submitting || currencySelectDisabled}
               >
                 <option value="AED">AED</option>
                 <option value="USD">USD</option>
@@ -136,7 +202,7 @@ export function PricingConfigurationCard({
               padding: 0,
               border: "none",
               background: "transparent",
-              cursor: "pointer",
+              cursor: "not-allowed",
             }}
           >
             Manage currencies <span style={{ fontSize: "10px" }}>↗</span>
@@ -153,13 +219,33 @@ export function PricingConfigurationCard({
             id={`${idPrefix}-product-base-price`}
             type="number"
             value={priceAed}
+            min={BASE_PRICE_MIN}
+            step={0.01}
             onChange={(e) => onPriceAedChange(e.target.value)}
             style={FIELD_INPUT}
             onFocus={onBorderFocus}
             onBlur={onBorderBlur}
-            placeholder="0.00"
+            placeholder="1.00"
             disabled={submitting}
+            aria-invalid={priceAedError ? true : undefined}
+            aria-describedby={
+              priceAedError ? `${idPrefix}-product-base-price-error` : undefined
+            }
           />
+          {priceAedError ? (
+            <div
+              id={`${idPrefix}-product-base-price-error`}
+              role="alert"
+              style={{
+                fontSize: "11px",
+                color: "#e53e3e",
+                marginTop: "4px",
+                fontWeight: 300,
+              }}
+            >
+              {priceAedError}
+            </div>
+          ) : null}
         </div>
       ) : (
         <div

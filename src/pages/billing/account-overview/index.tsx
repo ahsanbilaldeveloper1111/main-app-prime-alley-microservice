@@ -19,7 +19,12 @@ import "@assets/scss/tabs.scss";
 import countries from "world-countries";
 
 import { GetPaymentMethods,UpdateCompanyDetails,GetDashboardCounters,GetPayments, GetCurrencies } from "@utils/accounting";
-import { createCustomer, getCustomer, getInvoices, updateCustomer } from "@utils/accounts";
+import { getInvoices, updateCustomer } from "@utils/accounts";
+import {
+  ensureCustomerExistsForCrmCompany,
+  type EnsureCustomerSettledResult,
+  useEnsureCustomerForCrmCompany,
+} from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { getMinifiedCompanies } from "@utils/crm";
 import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
@@ -130,61 +135,72 @@ const AccountOverview = () => {
     });
   }, []);
 
-  const loadCustomerAndCurrencies = useCallback(async () => {
-    if (!selectedCompanyId) return;
-    setIsLoadingCustomer(true);
-    try {
-      let existingCustomer: any = await getCustomer(selectedCompanyId);
-
-      if (existingCustomer?.success === false && existingCustomer?.message === "Not Found") {
-        await createCustomer({
-          crm_company_id: selectedCompanyId,
-          profile: { vat_exemption: false },
-        });
-        existingCustomer = await getCustomer(selectedCompanyId);
-      }
-
-      setCustomerData(existingCustomer);
-      const existingCurrency = String(
-        existingCustomer?.profile?.currency ??
-          existingCustomer?.profile?.currency_code ??
-          ""
-      );
-      setCustomerCurrency(existingCurrency);
-      setCompanyDetails(existingCustomer);
-    } catch (err) {
-      toast.error(`Failed to load customer: ${getErrorMessage(err)}`, {
-        toastId: "billing_overview_load_customer_failed",
-      });
+  useEffect(() => {
+    if (!selectedCompanyId) {
       setCustomerData(null);
+      setCompanyDetails(null);
       setCustomerCurrency("");
-    } finally {
       setIsLoadingCustomer(false);
+      return;
     }
+    setIsLoadingCustomer(true);
+  }, [selectedCompanyId]);
 
-    if (currencyOptions.length > 0) return;
-    setIsLoadingCurrencies(true);
-    try {
-      const currencies = await GetCurrencies();
-      const normalized = normalizeCurrencyOptions(currencies);
-      setCurrencyOptions(normalized);
-    } catch (err) {
-      toast.error(`Failed to load currencies: ${getErrorMessage(err)}`, {
-        toastId: "billing_overview_load_currencies_failed",
-      });
-      setCurrencyOptions([]);
-    } finally {
-      setIsLoadingCurrencies(false);
-    }
-  }, [selectedCompanyId, currencyOptions.length, normalizeCurrencyOptions]);
+  const onAccountingCustomerSettled = useCallback((result: EnsureCustomerSettledResult) => {
+    const { customer } = result;
+    setCustomerData(customer);
+    setCompanyDetails(customer);
+    const existingCurrency = String(
+      customer?.profile?.currency ?? customer?.profile?.currency_code ?? "",
+    );
+    setCustomerCurrency(existingCurrency);
+  }, []);
+
+  const onAccountingCustomerFailed = useCallback(() => {
+    setCustomerData(null);
+    setCustomerCurrency("");
+  }, []);
+
+  const onAccountingCustomerFinished = useCallback(() => {
+    setIsLoadingCustomer(false);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(selectedCompanyId, {
+    onSettled: onAccountingCustomerSettled,
+    onFailed: onAccountingCustomerFailed,
+    onFinished: onAccountingCustomerFinished,
+    errorToastId: "billing_overview_load_customer_failed",
+  });
 
   useEffect(() => {
-    loadCustomerAndCurrencies().catch((err) => {
-      toast.error(`Failed to load customer/currencies: ${getErrorMessage(err)}`, {
-        toastId: "billing_overview_load_customer_currencies_failed",
-      });
-    });
-  }, [loadCustomerAndCurrencies]);
+    if (!selectedCompanyId || currencyOptions.length > 0) return undefined;
+
+    let cancelled = false;
+    setIsLoadingCurrencies(true);
+
+    const run = async () => {
+      try {
+        const currencies = await GetCurrencies();
+        if (cancelled) return;
+        const normalized = normalizeCurrencyOptions(currencies);
+        setCurrencyOptions(normalized);
+      } catch (err) {
+        if (cancelled) return;
+        toast.error(`Failed to load currencies: ${getErrorMessage(err)}`, {
+          toastId: "billing_overview_load_currencies_failed",
+        });
+        setCurrencyOptions([]);
+      } finally {
+        if (!cancelled) setIsLoadingCurrencies(false);
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCompanyId, currencyOptions.length, normalizeCurrencyOptions]);
 
   const isCurrencyLocked = useMemo(() => {
     const profileCurrency = customerData?.profile?.currency ?? customerData?.profile?.currency_code;
@@ -207,12 +223,18 @@ const AccountOverview = () => {
 
       setIsSavingCurrency(true);
       try {
-        const nextProfile = {  currency: nextCurrency };
-        await updateCustomer(selectedCompanyId, { crm_company_id: selectedCompanyId,profile: nextProfile });
+        await ensureCustomerExistsForCrmCompany(selectedCompanyId);
+        const nextProfile = { currency: nextCurrency };
+        await updateCustomer(selectedCompanyId, {
+          crm_company_id: selectedCompanyId,
+          profile: nextProfile,
+        });
         toast.success("Customer currency updated");
 
         try {
-          const refreshedCustomer = await getCustomer(selectedCompanyId);
+          const { customer: refreshedCustomer } = await ensureCustomerExistsForCrmCompany(
+            selectedCompanyId,
+          );
           setCustomerData(refreshedCustomer);
           setCompanyDetails(refreshedCustomer);
           const refreshedCurrency = String(

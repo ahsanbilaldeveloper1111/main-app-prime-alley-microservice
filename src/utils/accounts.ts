@@ -6,6 +6,140 @@ import {
   peelAccountingResponseBody,
 } from "./accountingResponseHelpers";
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+function firstNonEmptyString(...candidates: unknown[]): string | undefined {
+  for (const c of candidates) {
+    if (typeof c === "string") {
+      const t = c.trim();
+      if (t.length > 0) {
+        return t;
+      }
+    }
+  }
+  return undefined;
+}
+
+function joinValidationErrors(errors: Record<string, unknown>): string | undefined {
+  const parts: string[] = [];
+  for (const v of Object.values(errors)) {
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (typeof item === "string" && item.trim()) {
+          parts.push(item.trim());
+        }
+      }
+    } else if (typeof v === "string" && v.trim()) {
+      parts.push(v.trim());
+    }
+  }
+  if (parts.length === 0) {
+    return undefined;
+  }
+  return parts.join(" ");
+}
+
+function messageFromNestedData(inner: Record<string, unknown>): string | undefined {
+  const innerErrors = inner["errors"];
+  if (isPlainObject(innerErrors)) {
+    const joined = joinValidationErrors(innerErrors);
+    if (joined) {
+      return joined;
+    }
+  }
+  return firstNonEmptyString(inner["message"]);
+}
+
+function messageFromResponseData(data: unknown): string | undefined {
+  if (typeof data === "string") {
+    const t = data.trim();
+    return t.length > 0 ? t : undefined;
+  }
+  if (!isPlainObject(data)) {
+    return undefined;
+  }
+
+  const inner = data["data"];
+  if (isPlainObject(inner)) {
+    const fromInner = messageFromNestedData(inner);
+    if (fromInner) {
+      return fromInner;
+    }
+  }
+
+  const errs = data["errors"];
+  if (isPlainObject(errs)) {
+    const joined = joinValidationErrors(errs);
+    if (joined) {
+      return joined;
+    }
+  }
+
+  const rootMsg = firstNonEmptyString(data["message"]);
+  if (rootMsg) {
+    return rootMsg;
+  }
+
+  return firstNonEmptyString(data["error"]);
+}
+
+function hasAxiosResponse(
+  error: unknown,
+): error is { response: { data?: unknown }; message?: string } {
+  if (!isPlainObject(error) || !("response" in error)) {
+    return false;
+  }
+  return error["response"] !== undefined && error["response"] !== null;
+}
+
+const ACCOUNTS_AXIOS_STATUS_MESSAGE = /^request failed with status code \d+/i;
+
+/** Removes Axios boilerplate if it was concatenated with an API message. */
+function stripAxiosStatusNoise(text: string): string {
+  return text
+    .replaceAll(/\s*Request failed with status code \d+\s*/gi, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * User-facing message from axios errors for accounting/accounts API calls.
+ * Prefers response body over the generic "Request failed with status code …" string.
+ */
+export function getAccountsAxiosErrorMessage(error: unknown, fallback: string): string {
+  let resolved = fallback;
+
+  if (hasAxiosResponse(error)) {
+    const data = (error.response as { data?: unknown }).data;
+    const fromBody = messageFromResponseData(data);
+    if (fromBody) {
+      resolved = fromBody;
+    }
+  }
+
+  if (resolved === fallback && isPlainObject(error) && typeof error["message"] === "string") {
+    const raw = error["message"].trim();
+    if (raw.length > 0 && !ACCOUNTS_AXIOS_STATUS_MESSAGE.test(raw)) {
+      resolved = raw;
+    }
+  }
+
+  if (resolved === fallback && error instanceof Error) {
+    const raw = error.message.trim();
+    if (raw.length > 0 && !ACCOUNTS_AXIOS_STATUS_MESSAGE.test(raw)) {
+      resolved = raw;
+    }
+  }
+
+  const cleaned = stripAxiosStatusNoise(resolved);
+  if (!cleaned || ACCOUNTS_AXIOS_STATUS_MESSAGE.test(cleaned)) {
+    return fallback;
+  }
+  return cleaned;
+}
+
 // API body: legacy `{ code, data: inner }` or direct `inner` ({ success, data, message?, ... }).
 interface ControlhubResponse<T> {
   code: number;
@@ -1525,23 +1659,62 @@ export const createProduct = async (
         body instanceof FormData ? { "Content-Type": "multipart/form-data" } : {},
     });
     return extractData<ProductData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to create product");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to create product"));
     throw error;
   }
 };
 
-export const getProductCategoriesList = async (params: PaginationParams = {}): Promise<
-  ProductCategoryData[]
-> => {
+export const getProductCategoriesList = async (
+  params: PaginationParams = {},
+): Promise<PaginationWrapper<ProductCategoryData>> => {
   try {
     const response = await axiosInstance.get(
       "/accounting/products/categories-list",
-      { params }
+      { params },
     );
-    return extractData<ProductCategoryData[]>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to fetch product categories list");
+
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const raw = env.data;
+      const categoriesData = listRowsFromEnvelopePayload(raw) as ProductCategoryData[];
+      const pg = paginationFromAccountingEnvelope(env, raw);
+      return {
+        data: categoriesData,
+        summary: summaryFromAccountingEnvelope(env, raw),
+        pagination: {
+          current_page: pg.page || 1,
+          page: pg.page || 1,
+          limit: pg.limit || categoriesData.length,
+          per_page: pg.limit || categoriesData.length,
+          total: pg.total ?? categoriesData.length,
+          last_page: pg.last_page || 1,
+          from: pg.from || 1,
+          to: pg.to || categoriesData.length,
+        },
+      };
+    }
+
+    const categoriesData = extractData<ProductCategoryData[]>(response.data);
+    const peeled = peelAccountingResponseBody(response.data);
+    return {
+      data: Array.isArray(categoriesData) ? categoriesData : [],
+      summary: peeled?.summary,
+      pagination: {
+        current_page: 1,
+        page: 1,
+        limit: Array.isArray(categoriesData) ? categoriesData.length : 0,
+        per_page: Array.isArray(categoriesData) ? categoriesData.length : 0,
+        total: Array.isArray(categoriesData) ? categoriesData.length : 0,
+        last_page: 1,
+        from: 1,
+        to: Array.isArray(categoriesData) ? categoriesData.length : 0,
+      },
+    };
+  } catch (error: unknown) {
+    toast.error(
+      getAccountsAxiosErrorMessage(error, "Failed to fetch product categories list"),
+    );
     throw error;
   }
 };
@@ -1555,8 +1728,8 @@ export const createProductCategory = async (
       data
     );
     return extractData<ProductCategoryData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to create product category");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to create product category"));
     throw error;
   }
 };
@@ -1571,8 +1744,8 @@ export const updateProductCategory = async (
       data
     );
     return extractData<ProductCategoryData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to update product category");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to update product category"));
     throw error;
   }
 };
@@ -1580,8 +1753,8 @@ export const updateProductCategory = async (
 export const deleteProductCategory = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`/accounting/products/categories/${id}`);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to delete product category");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to delete product category"));
     throw error;
   }
 };
@@ -1591,8 +1764,10 @@ export const softDeleteProductCategory = async (id: number): Promise<void> => {
     await axiosInstance.post(
       `/accounting/products/categories/${id}/soft-delete`
     );
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to soft delete product category");
+  } catch (error: unknown) {
+    toast.error(
+      getAccountsAxiosErrorMessage(error, "Failed to soft delete product category"),
+    );
     throw error;
   }
 };
@@ -1600,8 +1775,8 @@ export const softDeleteProductCategory = async (id: number): Promise<void> => {
 export const restoreProductCategory = async (id: number): Promise<void> => {
   try {
     await axiosInstance.post(`/accounting/products/categories/${id}/restore`);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to restore product category");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to restore product category"));
     throw error;
   }
 };
@@ -1632,8 +1807,8 @@ export const updateProduct = async (
       },
     );
     return extractData<ProductData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to update product");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to update product"));
     throw error;
   }
 };
@@ -1641,8 +1816,8 @@ export const updateProduct = async (
 export const deleteProduct = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`/accounting/products/${id}`);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to delete product");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to delete product"));
     throw error;
   }
 };
@@ -1696,8 +1871,8 @@ export const getProductCategories = async (
         to: categoriesData.length,
       },
     };
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to fetch product categories");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to fetch product categories"));
     throw error;
   }
 };
@@ -2052,8 +2227,25 @@ export const getCustomer = async (
   customer: number | string,
 ): Promise<CustomerData> => {
   try {
-    const response = await axiosInstance.get(`/accounting/customers/${customer}`);
-    return extractData<CustomerData>(response.data);
+    const response = await axiosInstance.get(`/accounting/customers/${customer}`, {
+      /** Without this, axios rejects on 404 and you never get `response.data` in this block. */
+      validateStatus: (status) =>
+        (status >= 200 && status < 300) || status === 404,
+    });
+    console.log("getCustomer", response.data);
+
+    const raw = response.data;
+    const envelope = peelAccountingResponseBody(raw);
+    if (
+      envelope != null &&
+      typeof envelope === "object" &&
+      !Array.isArray(envelope) &&
+      envelope.success === false
+    ) {
+      return envelope as unknown as CustomerData;
+    }
+
+    return extractData<CustomerData>(raw);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch customer");
     throw error;

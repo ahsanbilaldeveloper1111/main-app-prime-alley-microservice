@@ -17,6 +17,7 @@ import { useInvoicePaymentModal } from "@components/billings/InvoicePaymentModal
 import { getMinifiedCompanies } from "@utils/crm";
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
+import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 
 const font = BILLING_FONT;
 
@@ -942,6 +943,16 @@ export default function BillingHistoryPage({
     [],
   );
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
+  const [ensureCustomerRefreshKey, setEnsureCustomerRefreshKey] = useState(0);
+
+  const bumpInvoicesAfterCustomerCreated = useCallback(() => {
+    setEnsureCustomerRefreshKey((k) => k + 1);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(customerCompanyPicker ? selectedCompanyId : null, {
+    onCreated: bumpInvoicesAfterCustomerCreated,
+    errorToastId: "billing_history_ensure_customer_failed",
+  });
 
   const selectedCompanyLabel = useMemo(() => {
     if (!selectedCompanyId) return "";
@@ -1079,6 +1090,7 @@ export default function BillingHistoryPage({
     statusFilter,
     paymentStatusFilter,
     selectedCompanyId,
+    ensureCustomerRefreshKey,
   ]);
 
   const filters = [

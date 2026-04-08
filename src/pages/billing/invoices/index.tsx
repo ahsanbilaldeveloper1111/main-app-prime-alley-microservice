@@ -19,6 +19,7 @@ import GenericTable, {
   TableColumn,
   ToolbarConfig,
 } from "@components/GenericTable";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -37,6 +38,7 @@ import {
   PostInvoiceStripePaymentLink,
 } from "@utils/accounting";
 import { getMinifiedCompanies } from "@utils/crm";
+import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { formatNumber } from "@utils/Helper";
 
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
@@ -676,6 +678,16 @@ const InvoiceList = () => {
 
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+
+  const onAccountingCustomerCreated = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(selectedCompanyId, {
+    onCreated: onAccountingCustomerCreated,
+    errorToastId: "billing_invoices_ensure_customer_failed",
+  });
+
   const { openInvoicePayment: handlePayInvoice, invoicePaymentModal } = useInvoicePaymentModal({
     companyOptions,
     onPaymentSuccess: () => setRefreshKey((prev) => prev + 1),
@@ -1399,7 +1411,7 @@ const InvoiceList = () => {
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
           totalRows: totalRecords,
-          pageSizeOptions: [10, 15, 25, 50],
+          pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
         }}
         onPaginationChange={(page, rowsPerPage) => {
           setPagination((prev) => ({ ...prev, currentPage: page, rowsPerPage }));

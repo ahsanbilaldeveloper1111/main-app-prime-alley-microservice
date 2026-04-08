@@ -8,9 +8,7 @@ import { getErrorMessage } from "@utils/errors";
 import { isValidEmail } from "@utils/Helper";
 import { isOptionalWorkforcePhoneValid } from "@utils/workforcePhoneValidation";
 import {
-  createCustomer,
   createInvoice,
-  getCustomer,
   getCustomerProductPricingList,
   getInvoice,
   updateCustomer,
@@ -20,6 +18,7 @@ import {
   type ProductPricingData,
   type InvoiceItemAPIPayload,
 } from "@utils/accounts";
+import { ensureCustomerExistsForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 
 export interface InvoiceLineItem {
   id: string;
@@ -303,6 +302,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
         setCustomerModalOpen(false);
         return;
       }
+      await ensureCustomerExistsForCrmCompany(crmCompanyId);
       const updated = await updateCustomer(crmCompanyId, payload);
       setCustomerData(updated);
       const ccy = String(updated?.profile?.currency_code ?? updated?.profile?.currency ?? "").trim().toUpperCase();
@@ -459,14 +459,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
   const resolveCustomerForCompany = useCallback(async (crmCompanyId: string) => {
     setResolvingCustomer(true);
     try {
-      const existing: any = await getCustomer(crmCompanyId);
-      const message = String(existing?.message ?? existing?.mesg ?? "").trim().toLowerCase();
-      const isNotFound = existing?.success === false && message === "not found";
-      let customer = existing;
-      if (isNotFound) {
-        await createCustomer({ crm_company_id: crmCompanyId, profile: { vat_exemption: false } });
-        customer = await getCustomer(crmCompanyId);
-      }
+      const { customer } = await ensureCustomerExistsForCrmCompany(crmCompanyId);
       setCustomerData(customer);
       const customerName = String(customer?.name ?? "").trim();
       if (customerName && !/^\d+$/.test(customerName)) {
