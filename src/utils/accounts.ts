@@ -1,7 +1,12 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
+import {
+  accountingEnvelopeSuccess,
+  extractAccountingApiData,
+  peelAccountingResponseBody,
+} from "./accountingResponseHelpers";
 
-// API Response Structure from Controlhub
+// API body: legacy `{ code, data: inner }` or direct `inner` ({ success, data, message?, ... }).
 interface ControlhubResponse<T> {
   code: number;
   message: string;
@@ -281,6 +286,8 @@ export interface ProductData {
   id: number;
   name: string;
   description?: string;
+  /** Public URL for product logo/image when returned by the API */
+  logo_url?: string;
   currency_code?: string;
   currency?: string;
   created_at?: string;
@@ -324,6 +331,41 @@ export interface ProductCreateUpdatePayload {
   is_active?: boolean;
   is_service: boolean;
   currency: string;
+  /** Sent as multipart field `logo_file` when provided */
+  logo_file?: File;
+}
+
+function appendProductScalarFields(
+  form: FormData,
+  data: Omit<ProductCreateUpdatePayload, "logo_file">,
+): void {
+  const entries = Object.entries(data) as [keyof typeof data, unknown][];
+  for (const [key, value] of entries) {
+    if (value === undefined) continue;
+    if (typeof value === "boolean") {
+      form.append(String(key), value ? "1" : "0");
+      continue;
+    }
+    if (typeof value === "string") {
+      form.append(String(key), value);
+      continue;
+    }
+    if (typeof value === "number") {
+      form.append(String(key), String(value));
+    }
+  }
+}
+
+function buildProductMultipartBody(
+  data: ProductCreateUpdatePayload,
+): FormData {
+  const { logo_file: logoFile, ...fields } = data;
+  const form = new FormData();
+  appendProductScalarFields(form, fields);
+  if (logoFile instanceof File) {
+    form.append("logo_file", logoFile, logoFile.name);
+  }
+  return form;
 }
 
 export interface InventoryData {
@@ -684,25 +726,58 @@ export interface PaginationParams extends Record<string, any> {
   limit?: number;
 }
 
-// Helper function to extract data from controlhub response
+// Unwrap legacy `{ code, data }` or direct success envelopes (see accountingResponseHelpers).
 function extractData<T>(response: any): T {
-  
-  // Handle successful response with nested data structure
-  if (response?.code === 200 && response?.data?.success) {
-    return response.data.data;
+  return extractAccountingApiData<T>(response);
+}
+
+/** `env.data` may be a bare list or `{ data: rows, pagination?, summary? }`. */
+function listRowsFromEnvelopePayload(raw: unknown): any[] {
+  if (Array.isArray(raw)) {
+    return raw;
   }
-
-  // Handle direct data response (fallback)
-  if (response?.data) {
-   
-    return response.data;
+  if (raw != null && typeof raw === "object" && "data" in raw) {
+    const inner = (raw as { data: unknown }).data;
+    return Array.isArray(inner) ? inner : [];
   }
+  return [];
+}
 
-  console.error("Failed to extract data from response:", response);
+function paginationFromAccountingEnvelope(
+  env: Record<string, any>,
+  raw: unknown,
+): Record<string, any> {
+  if (
+    !Array.isArray(raw) &&
+    raw != null &&
+    typeof raw === "object" &&
+    "pagination" in raw
+  ) {
+    const nested = (raw as { pagination?: Record<string, any> }).pagination;
+    if (nested != null && typeof nested === "object") {
+      return nested;
+    }
+  }
+  const fromEnv = env.pagination;
+  return fromEnv != null && typeof fromEnv === "object" ? fromEnv : {};
+}
 
-  throw new Error(
-    response?.data?.message || response?.message || "API request failed"
-  );
+function summaryFromAccountingEnvelope(
+  env: Record<string, any>,
+  raw: unknown,
+): unknown {
+  if (env.summary !== undefined && env.summary !== null) {
+    return env.summary;
+  }
+  if (
+    !Array.isArray(raw) &&
+    raw != null &&
+    typeof raw === "object" &&
+    "summary" in raw
+  ) {
+    return (raw as { summary: unknown }).summary;
+  }
+  return undefined;
 }
 
 // Reseller Management
@@ -751,37 +826,38 @@ export const getCompanies = async (
   try {
     const response = await axiosInstance.get("/accounting/company", { params });
 
-    // Handle the actual API response structure based on your example
-    if (response.data?.code === 200 && response.data?.data?.success) {
-      const companiesData = response.data.data.data; // The company array
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const raw = env.data;
+      const companiesData = listRowsFromEnvelopePayload(raw) as CompanyData[];
+      const pg = paginationFromAccountingEnvelope(env, raw);
       return {
         data: companiesData,
-        summary: response.data.data.summary,
+        summary: summaryFromAccountingEnvelope(env, raw),
         pagination: {
-          current_page: response.data.data.pagination?.page || 1,
-          page: response.data.data.pagination?.page || 1,
-          limit: response.data.data.pagination?.limit || companiesData.length,
-          per_page:
-            response.data.data.pagination?.limit || companiesData.length,
-          total: response.data.data.pagination?.total || companiesData.length,
-          last_page: response.data.data.pagination?.last_page || 1,
-          from: response.data.data.pagination?.from || 1,
-          to: response.data.data.pagination?.to || companiesData.length,
+          current_page: pg.page || 1,
+          page: pg.page || 1,
+          limit: pg.limit || companiesData.length,
+          per_page: pg.limit || companiesData.length,
+          total: pg.total || companiesData.length,
+          last_page: pg.last_page || 1,
+          from: pg.from || 1,
+          to: pg.to || companiesData.length,
         },
       };
     }
 
-    // Fallback to extractData if structure is different
     const companiesData = extractData<CompanyData[]>(response.data);
+    const peeled = peelAccountingResponseBody(response.data);
     return {
       data: companiesData,
-      summary: response.data.data.summary,
+      summary: peeled?.summary,
       pagination: {
         current_page: 1,
         per_page: companiesData.length,
         total: companiesData.length,
         last_page: 1,
-        from: 1,  
+        from: 1,
         to: companiesData.length,
         page: 1,
         limit: companiesData.length,
@@ -915,25 +991,27 @@ export const getInvoices = async (
       params,
     });
 
-    // Handle the nested response structure
-    if (response.data?.code === 200 && response.data?.data?.success) {
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const raw = env.data;
+      const rows = listRowsFromEnvelopePayload(raw);
+      const pg = paginationFromAccountingEnvelope(env, raw);
       return {
-        data: response.data.data.data, // The invoice array
-        summary: response.data.data.summary,
+        data: rows,
+        summary: summaryFromAccountingEnvelope(env, raw),
         pagination: {
-          current_page: response.data.data.pagination?.page || 1,
-          page: response.data.data.pagination?.page || 1,
-          limit: response.data.data.pagination?.limit || response.data.data.data.length,
-          per_page: response.data.data.pagination.limit,
-          total: response.data.data.pagination.total,
-          last_page: response.data.data.pagination.last_page,
-          from: response.data.data.pagination.from,
-          to: response.data.data.pagination.to,
+          current_page: pg.page || 1,
+          page: pg.page || 1,
+          limit: pg.limit || rows.length,
+          per_page: pg.per_page ?? pg.limit,
+          total: pg.total ?? rows.length,
+          last_page: pg.last_page || 1,
+          from: pg.from ?? 1,
+          to: pg.to ?? rows.length,
         },
       };
     }
 
-    // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<InvoiceData>>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch invoices");
@@ -1189,25 +1267,31 @@ export const getExpenses = async (
       params,
     });
 
-    // Handle the actual API response structure
-    if (response.data?.code === 200 && response.data?.data?.success) {
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const d = env.data;
+      const expenseRows = Array.isArray(d) ? d : d?.data ?? [];
+      const meta =
+        Array.isArray(d) || d == null || typeof d !== "object"
+          ? env.pagination ?? {}
+          : d;
+      const pg = meta && typeof meta === "object" ? meta : {};
       return {
-        data: response.data.data.data.data, // The expense array (nested data)
-        summary: response.data.data.summary,
+        data: expenseRows,
+        summary: env.summary,
         pagination: {
-          current_page: response.data.data.data.current_page || 1,
-          page: response.data.data.data.page || 1,
-          limit: response.data.data.data.limit || response.data.data.data.data.length,
-          per_page: response.data.data.data.per_page,
-          total: response.data.data.data.total,
-          last_page: response.data.data.data.last_page,
-          from: response.data.data.data.from,
-          to: response.data.data.data.to,
+          current_page: pg.current_page || pg.page || 1,
+          page: pg.page || pg.current_page || 1,
+          limit: pg.limit || expenseRows.length,
+          per_page: pg.per_page,
+          total: pg.total ?? expenseRows.length,
+          last_page: pg.last_page || 1,
+          from: pg.from ?? 1,
+          to: pg.to ?? expenseRows.length,
         },
       };
     }
 
-    // Fallback to extractData if structure is different
     return extractData<PaginationWrapper<ExpenseData>>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch expenses");
@@ -1243,13 +1327,19 @@ export const uploadCompanyFile = async (
           : {},
     });
     
-    // Handle the actual API response structure
-    if (response.data?.code === 200 && response.data?.data?.success === false) {
-      // Show error toast for failed upload
-      // toast.error(response.data.data.message || "File upload failed");
-      throw new Error(response.data.data.message || "File upload failed");
+    const peeled = peelAccountingResponseBody(response.data) ?? response.data;
+    if (
+      typeof peeled === "object" &&
+      peeled !== null &&
+      peeled.success === false
+    ) {
+      throw new Error(
+        typeof peeled.message === "string" && peeled.message.trim()
+          ? peeled.message
+          : "File upload failed",
+      );
     }
-    
+
     return extractData<any>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to upload company file");
@@ -1380,32 +1470,33 @@ export const getProducts = async (
       params: { ...params },
     });
 
-    // Handle the actual API response structure
-    if (response.data?.code === 200 && response.data?.data?.success) {
-      const rawList = response.data.data.data;
-      const productsData = Array.isArray(rawList) ? rawList : [];
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const rawList = env.data;
+      const productsData = listRowsFromEnvelopePayload(rawList) as ProductData[];
+      const pg = paginationFromAccountingEnvelope(env, rawList);
       return {
-        summary: response?.data?.data?.summary,
+        summary: summaryFromAccountingEnvelope(env, rawList),
         data: productsData,
         pagination: {
-          current_page: response.data.data.pagination?.page || 1,
-          page: response.data.data.pagination?.page || 1,
-          limit: response.data.data.pagination?.limit || productsData.length,
-          per_page: response.data.data.pagination?.limit || productsData.length,
-          total: response.data.data.pagination?.total || productsData.length,
-          last_page: response.data.data.pagination?.last_page || 1,
-          from: response.data.data.pagination?.from || 1,
-          to: response.data.data.pagination?.to || productsData.length,
+          current_page: pg.page || 1,
+          page: pg.page || 1,
+          limit: pg.limit || productsData.length,
+          per_page: pg.limit || productsData.length,
+          total: pg.total || productsData.length,
+          last_page: pg.last_page || 1,
+          from: pg.from || 1,
+          to: pg.to || productsData.length,
         },
       };
     }
 
-    // Fallback to extractData if structure is different
     const extracted = extractData<ProductData[]>(response.data);
     const productsData = Array.isArray(extracted) ? extracted : [];
+    const peeled = peelAccountingResponseBody(response.data);
     return {
       data: productsData,
-      summary: response?.data?.data?.summary,
+      summary: peeled?.summary,
       pagination: {
         current_page: 1,
         page: 1,
@@ -1427,7 +1518,12 @@ export const createProduct = async (
   data: ProductCreateUpdatePayload
 ): Promise<ProductData> => {
   try {
-    const response = await axiosInstance.post("/accounting/products", data);
+    const isMultipart = data.logo_file instanceof File;
+    const body = isMultipart ? buildProductMultipartBody(data) : data;
+    const response = await axiosInstance.post("/accounting/products", body, {
+      headers:
+        body instanceof FormData ? { "Content-Type": "multipart/form-data" } : {},
+    });
     return extractData<ProductData>(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to create product");
@@ -1525,9 +1621,15 @@ export const updateProduct = async (
   data: ProductCreateUpdatePayload
 ): Promise<ProductData> => {
   try {
+    const isMultipart = data.logo_file instanceof File;
+    const body = isMultipart ? buildProductMultipartBody(data) : data;
     const response = await axiosInstance.put(
       `/accounting/products/${id}`,
-      data
+      body,
+      {
+        headers:
+          body instanceof FormData ? { "Content-Type": "multipart/form-data" } : {},
+      },
     );
     return extractData<ProductData>(response.data);
   } catch (error: any) {
@@ -1557,31 +1659,32 @@ export const getProductCategories = async (
       params,
     });
 
-    // Handle the actual API response structure
-    if (response.data?.code === 200 && response.data?.data?.success) {
-      const categoriesData = response.data.data.data; // The category array
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const raw = env.data;
+      const categoriesData = listRowsFromEnvelopePayload(raw) as ProductCategoryData[];
+      const pg = paginationFromAccountingEnvelope(env, raw);
       return {
         data: categoriesData,
-        summary: response?.data?.data?.summary,
+        summary: summaryFromAccountingEnvelope(env, raw),
         pagination: {
-          current_page: response.data.data.pagination?.page || 1,
-          page: response.data.data.pagination?.page || 1,
-          limit: response.data.data.pagination?.limit || categoriesData.length,
-          per_page:
-            response.data.data.pagination?.limit || categoriesData.length,
-          total: response.data.data.pagination?.total || categoriesData.length,
-          last_page: response.data.data.pagination?.last_page || 1,
-          from: response.data.data.pagination?.from || 1,
-          to: response.data.data.pagination?.to || categoriesData.length,
+          current_page: pg.page || 1,
+          page: pg.page || 1,
+          limit: pg.limit || categoriesData.length,
+          per_page: pg.limit || categoriesData.length,
+          total: pg.total || categoriesData.length,
+          last_page: pg.last_page || 1,
+          from: pg.from || 1,
+          to: pg.to || categoriesData.length,
         },
       };
     }
 
-    // Fallback to extractData if structure is different
     const categoriesData = extractData<ProductCategoryData[]>(response.data);
+    const peeled = peelAccountingResponseBody(response.data);
     return {
       data: categoriesData,
-      summary: response?.data?.data?.summary,
+      summary: peeled?.summary,
       pagination: {
         current_page: 1,
         page: 1,
@@ -1609,9 +1712,14 @@ export const getPaymentMethods = async (
       `/accounting/stripe/payment-methods/${profileId}`
     );
 
-    // Handle the actual API response structure
-    if (response.data?.code === 200 && response.data?.data?.success) {
-      const paymentMethods = response.data.data.data.payment_methods || [];
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const d = env.data as { payment_methods?: unknown } | unknown[] | null;
+      const rawList =
+        d != null && typeof d === "object" && !Array.isArray(d) && "payment_methods" in d
+          ? (d as { payment_methods: unknown[] }).payment_methods
+          : d;
+      const paymentMethods = Array.isArray(rawList) ? rawList : [];
 
       // Transform the response to match our PaymentMethodData interface
       return paymentMethods.map((pm: any) => ({
@@ -1762,9 +1870,9 @@ export const createAndConfirmPaymentMethod = async (
       data
     );
 
-    // Handle the actual API response structure
-    if (response.data?.code === 200 && response.data?.data?.success) {
-      const pm = response.data.data.data;
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env?.data != null) {
+      const pm = env.data as Record<string, any>;
 
       // Transform the response to match our PaymentMethodData interface
       return {
@@ -1960,17 +2068,11 @@ export const createDirectPayment = async (data: CreateDirectPaymentData): Promis
       data
     );
     
-    // Handle the actual API response structure
-    
-    if (response.data?.code === 200 && response.data?.data?.success) {
-      // The actual payment intent data should be in response.data.data.data
-      // If it's an empty array, we might need to handle this case
-      const paymentData = response.data.data;
-
-      return paymentData as PaymentIntentResponse;
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      return env as PaymentIntentResponse;
     }
-    
-    // Fallback to extractData if structure is different
+
     return extractData<PaymentIntentResponse>(response.data);
   } catch (error: any) {
     console.log(error, "error.createDirectPayment");

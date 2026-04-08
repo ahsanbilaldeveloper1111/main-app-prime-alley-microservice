@@ -1,7 +1,9 @@
 import { toast } from "react-toastify";
 import axiosInstance, { getClientBearerAuthorization } from "./axios";
-
-
+import {
+  extractAccountingApiData,
+  peelAccountingResponseBody,
+} from "./accountingResponseHelpers";
 
 export interface PaginationParams extends Record<string, any> {
   page?: number;
@@ -9,27 +11,8 @@ export interface PaginationParams extends Record<string, any> {
   search?: string;
 }
 
-// Helper function to extract data from controlhub response
 function extractData<T>(response: any): T {
-  
-
-  // Handle successful response with nested data structure
-  if (response?.code === 200 && response?.data?.success) {
-    
-    return response.data.data;
-  }
-
-  // Handle direct data response (fallback)
-  if (response?.data) {
-    
-    return response.data;
-  }
-
-  console.error("Failed to extract data from response:", response);
-
-  throw new Error(
-    response?.data?.message || response?.message || "API request failed"
-  );
+  return extractAccountingApiData<T>(response);
 }
 
 interface ApiResponse {
@@ -68,8 +51,8 @@ interface TransformedResponse {
   };
 }
 const transformApiResponse = (apiResponse: any): TransformedResponse => {
-   const response = apiResponse?.data;
-  
+  const response = peelAccountingResponseBody(apiResponse) ?? apiResponse;
+
   if (response?.success === true) {
     return {
       draw: 1,
@@ -366,7 +349,7 @@ export const DeleteCompanyDocument = async (
     const response = await axiosInstance.delete(
       `${companyDocumentsBasePath(companyId)}/${documentId}`
     );
-    return response?.data?.data;
+    return extractAccountingApiData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to delete company document");
     throw error;
@@ -399,7 +382,7 @@ export const PostInvoiceStripeHostedCheckout = async (
       `accounting/invoices/${id}/stripe-hosted-checkout`,
       { main_app: true }
     );
-    return response?.data?.data;
+    return extractAccountingApiData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to generate Stripe hosted checkout");
     throw error;
@@ -415,7 +398,7 @@ export const PostInvoiceStripePaymentLink = async (
       `accounting/invoices/${id}/stripe-payment-link`,
       { main_app: true }
     );
-    return response?.data?.data;
+    return extractAccountingApiData(response.data);
   } catch (error: any) {
     toast.error(error?.message || "Failed to generate Stripe payment link");
     throw error;
