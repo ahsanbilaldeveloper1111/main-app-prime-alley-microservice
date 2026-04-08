@@ -124,7 +124,7 @@ export function buildDealsListFullExportCsvFromApiRows(allData: any[]): string {
           : [],
       ),
     ),
-  ).sort();
+  ).sort((a, b) => a.localeCompare(b));
 
   const exportFields = [
     ...availablePreferredFields,

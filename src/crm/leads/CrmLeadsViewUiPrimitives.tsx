@@ -80,11 +80,15 @@ export function resolveCrmExtensionDisplayName(
   return label || fallback;
 }
 
-const SECTION_TITLE_BAR_STYLE: React.CSSProperties = {
+const SECTION_TITLE_BAR_BASE: React.CSSProperties = {
   width: "4px",
   height: "18px",
-  background: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
   borderRadius: "2px",
+};
+
+const SECTION_TITLE_ACCENT: Record<"default" | "danger", string> = {
+  default: "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+  danger: "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
 };
 
 const SECTION_TITLE_HEADING_STYLE: React.CSSProperties = {
@@ -100,10 +104,19 @@ const SECTION_TITLE_HEADING_STYLE: React.CSSProperties = {
 /** Section heading with gradient accent bar (lead detail modal). */
 export function CrmLeadViewSectionTitle({
   children,
-}: Readonly<{ children: ReactNode }>) {
+  accent = "default",
+}: Readonly<{
+  children: ReactNode;
+  accent?: keyof typeof SECTION_TITLE_ACCENT;
+}>) {
   return (
     <h5 style={SECTION_TITLE_HEADING_STYLE}>
-      <div style={SECTION_TITLE_BAR_STYLE} />
+      <div
+        style={{
+          ...SECTION_TITLE_BAR_BASE,
+          background: SECTION_TITLE_ACCENT[accent],
+        }}
+      />
       {children}
     </h5>
   );

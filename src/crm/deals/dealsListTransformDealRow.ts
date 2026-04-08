@@ -11,6 +11,24 @@ export type DealsListExtensionLike = {
   name?: string;
 };
 
+function matchIdToDisplayFallback(matchId: unknown): string {
+  if (matchId === undefined || matchId === null) return "";
+  if (typeof matchId === "object") {
+    const id = (matchId as { id?: unknown }).id;
+    if (typeof id === "string" || typeof id === "number") return String(id);
+    return "";
+  }
+  if (
+    typeof matchId === "string" ||
+    typeof matchId === "number" ||
+    typeof matchId === "boolean" ||
+    typeof matchId === "bigint"
+  ) {
+    return String(matchId);
+  }
+  return "";
+}
+
 function extensionDisplayName(
   extensions: DealsListExtensionLike[],
   matchId: unknown,
@@ -21,7 +39,7 @@ function extensionDisplayName(
   return (
     ext?.display_name ||
     ext?.name ||
-    (matchId !== undefined && matchId !== null ? String(matchId) : "") ||
+    matchIdToDisplayFallback(matchId) ||
     ""
   );
 }

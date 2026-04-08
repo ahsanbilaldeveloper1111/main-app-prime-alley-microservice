@@ -65,6 +65,7 @@ import {
   GlobalDateFormat,
   ModuleSlug,
   formatDateForTable,
+  formatCrmPreviewDate,
   checkRequiredFields,
   RECORD_TYPES,
 } from "@utils/Helper";
@@ -155,6 +156,10 @@ import {
 import { transformDealForGenericTableRow } from "@crm/deals/dealsListTransformDealRow";
 import { DEALS_EMPTY_MEETING_FORM } from "@crm/deals/dealsListModalFormDefaults";
 import { CrmDealsListAddTabModal } from "@crm/deals/CrmDealsListAddTabModal";
+import {
+  CrmDealDetailViewModalHeader,
+  DEAL_DETAIL_MODAL_BODY_FILTER_CSS,
+} from "@crm/deals/CrmDealDetailViewModalShared";
 
 /** Option shape for single-value react-select filters on this page. Keeps `onChange` typed (avoids `{}`). */
 type DealApprovalsFilterOption = {
@@ -3168,129 +3173,21 @@ const CrmDeals = () => { // NOSONAR
           centered
           className="deal-view-modal"
         >
-          {/* Modern Header with Gradient */}
-          <div
-            style={{
-              background: "#fff",
-              color: "black",
-              padding: "24px 32px",
-              position: "relative",
-              borderTopLeftRadius: "12px",
-              borderTopRightRadius: "12px",
-              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-              borderBottom: "1px solid #ccc",
-            }}
-          >
-            <button
-              onClick={() => setShowDealViewModal(false)}
-              style={{
-                position: "absolute",
-                top: "16px",
-                right: "16px",
-                background: "rgba(255,255,255,0.15)",
-                backdropFilter: "blur(10px)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                color: "black",
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-                e.currentTarget.style.transform = "scale(1.05)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              <X size={18} />
-            </button>
-
-            {/* Header Content */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-              <div
-                style={{
-                  width: "64px",
-                  height: "64px",
-                  borderRadius: "16px",
-                  background: "#10b981",
-                  backdropFilter: "blur(10px)",
-                  border: "2px solid rgba(255,255,255,0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "28px",
-                  fontWeight: "700",
-                  flexShrink: 0,
-                  color: "#fff",
-                }}
-              >
-                {viewingDeal.name
-                  ? viewingDeal.name.charAt(0).toUpperCase()
-                  : "D"}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    fontWeight: 700,
-                    fontSize: "26px",
-                    textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {viewingDeal.name}
-                </h2>
-                <div
-                  style={{
-                    marginTop: "6px",
-                    opacity: 0.95,
-                    fontSize: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                    color: "#000",
-                  }}
-                >
-                  <span
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <Handshake size={14} />
-                    {viewingDeal.stage?.name || "No stage"}
-                  </span>
-                  <span>•</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {viewingDeal.currency || "AED"}{" "}
-                    {parseFloat(
-                      String(
-                        viewingDeal.net_value || viewingDeal.grand_total || 0,
-                      ),
-                    ).toLocaleString()}
-                  </span>
-                  <span>•</span>
-                  <span>
-                    Created{" "}
-                    {viewingDeal.created_at
-                      ? moment(viewingDeal.created_at).format("MMM DD, YYYY")
-                      : "N/A"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <CrmDealDetailViewModalHeader
+            onClose={() => setShowDealViewModal(false)}
+            dealName={viewingDeal.name}
+            stageName={viewingDeal.stage?.name || "No stage"}
+            valueDisplay={`${viewingDeal.currency || "AED"} ${parseFloat(
+              String(
+                viewingDeal.net_value || viewingDeal.grand_total || 0,
+              ),
+            ).toLocaleString()}`}
+            createdLabel={
+              viewingDeal.created_at
+                ? formatCrmPreviewDate(viewingDeal.created_at) || "N/A"
+                : "N/A"
+            }
+          />
 
           <Modal.Body
             style={{
@@ -3321,56 +3218,7 @@ const CrmDeals = () => { // NOSONAR
               </div>
             ) : (
               <>
-                <style>{`
-            .deal-detail-filter-buttons {
-              display: flex;
-              flex-direction: row;
-              align-items: center;
-              gap: 12px;
-              flex-wrap: wrap;
-              margin-bottom: 0;
-              padding: 0;
-              width: 100%;
-            }
-
-            .deal-detail-filter-button {
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              padding: 10px 20px;
-              border-radius: 8px;
-              border: 1px solid;
-              font-weight: 500;
-              font-size: 14px;
-              cursor: pointer;
-              transition: all 0.2s ease;
-              background: white;
-              white-space: nowrap;
-            }
-
-            .deal-detail-filter-button:hover {
-              transform: translateY(-1px);
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            }
-
-            .deal-detail-filter-button.active {
-              color: white;
-            }
-
-            .deal-detail-filter-button.active .filter-icon {
-              color: white;
-            }
-
-            .deal-detail-filter-button:not(.active) .filter-icon {
-              color: inherit;
-            }
-
-            .filter-icon {
-              width: 18px;
-              height: 18px;
-              flex-shrink: 0;
-            }
-          `}</style>
+                <style>{DEAL_DETAIL_MODAL_BODY_FILTER_CSS}</style>
 
                 {/* Main Content Grid */}
                 <div

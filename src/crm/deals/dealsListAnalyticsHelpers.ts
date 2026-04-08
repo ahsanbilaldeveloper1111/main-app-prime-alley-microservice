@@ -22,7 +22,10 @@ export function computeDealsListAnalytics(
   ).length;
 
   const totalValue = transformedDeals.reduce((sum, d) => {
-    const value = parseFloat(String(d.value).replace(/[^0-9.-]/g, "")) || 0;
+    const value =
+      Number.parseFloat(
+        String(d.value).replaceAll(/[^0-9.-]/g, ""),
+      ) || 0;
     return sum + value;
   }, 0);
 

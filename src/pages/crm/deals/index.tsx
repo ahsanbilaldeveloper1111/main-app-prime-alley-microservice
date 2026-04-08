@@ -194,60 +194,12 @@ import {
   buildDealsListGetDealsExportParams,
   buildDealsListGetDealsParams,
 } from "@crm/deals/dealsListGetDealsQueryParams";
+import {
+  CrmDealDetailViewModalHeader,
+  DEAL_DETAIL_MODAL_BODY_FILTER_CSS,
+} from "@crm/deals/CrmDealDetailViewModalShared";
 
 const ignoredKeys = ["stage_id"];
-
-// Helper function to get initials from name (first two words, first two letters, only a-z)
-const getInitials = (name: string): string => {
-  if (!name) return "NA";
-
-  // Split by spaces and take up to first two words
-  const words = name.trim().split(/\s+/).slice(0, 2);
-
-  // Check if we have two words and the second word has at least one letter
-  const hasSecondWord = words.length >= 2;
-  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
-
-  if (hasSecondWord && secondWordHasLetter) {
-    // First letter of first two words
-    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
-    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
-
-    if (firstLetter1 && firstLetter2) {
-      return (firstLetter1 + firstLetter2).toUpperCase();
-    }
-  }
-
-  // If no second word or second word is only numbers, use first two letters of first word
-  if (words[0]) {
-    const letters = words[0].match(/[a-z]/gi) || [];
-    if (letters.length >= 2) {
-      return (letters[0] + letters[1]).toUpperCase();
-    } else if (letters.length === 1) {
-      return letters[0].toUpperCase();
-    }
-  }
-
-  return "NA";
-};
-
-// Helper function to generate a random background color based on name
-const getRandomColor = (name: string): string => {
-  if (!name) return "#6c757d";
-
-  // Generate a consistent color based on the name
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
-  }
-
-  // Generate a color with good contrast (avoid too light colors)
-  const hue = Math.abs(hash) % 360;
-  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
-  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
-
-  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
-};
 
 const detailSectionTitleStyle: React.CSSProperties = {
   fontSize: "15px",
@@ -2913,129 +2865,21 @@ const CrmDeals = () => { // NOSONAR
           centered
           className="deal-view-modal"
         >
-          {/* Modern Header with Gradient */}
-          <div
-            style={{
-              background: "#fff",
-              color: "black",
-              padding: "24px 32px",
-              position: "relative",
-              borderTopLeftRadius: "12px",
-              borderTopRightRadius: "12px",
-              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-              borderBottom: "1px solid #ccc",
-            }}
-          >
-            <button
-              onClick={() => setShowDealViewModal(false)}
-              style={{
-                position: "absolute",
-                top: "16px",
-                right: "16px",
-                background: "rgba(255,255,255,0.15)",
-                backdropFilter: "blur(10px)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                color: "black",
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-                e.currentTarget.style.transform = "scale(1.05)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              <X size={18} />
-            </button>
-
-            {/* Header Content */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-              <div
-                style={{
-                  width: "64px",
-                  height: "64px",
-                  borderRadius: "16px",
-                  background: "#10b981",
-                  backdropFilter: "blur(10px)",
-                  border: "2px solid rgba(255,255,255,0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "28px",
-                  fontWeight: "700",
-                  flexShrink: 0,
-                  color: "#fff",
-                }}
-              >
-                {viewingDeal.name
-                  ? viewingDeal.name.charAt(0).toUpperCase()
-                  : "D"}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    fontWeight: 700,
-                    fontSize: "26px",
-                    textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {viewingDeal.name}
-                </h2>
-                <div
-                  style={{
-                    marginTop: "6px",
-                    opacity: 0.95,
-                    fontSize: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                    color: "#000",
-                  }}
-                >
-                  <span
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <Handshake size={14} />
-                    {viewingDeal.stage?.name || "No stage"}
-                  </span>
-                  <span>•</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {viewingDeal.currency || "AED"}{" "}
-                    {parseFloat(
-                      String(
-                        viewingDeal.net_value || viewingDeal.grand_total || 0,
-                      ),
-                    ).toLocaleString()}
-                  </span>
-                  <span>•</span>
-                  <span>
-                    Created{" "}
-                    {viewingDeal.created_at
-                      ? formatCrmPreviewDate(viewingDeal.created_at) || "N/A"
-                      : "N/A"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          <CrmDealDetailViewModalHeader
+            onClose={() => setShowDealViewModal(false)}
+            dealName={viewingDeal.name}
+            stageName={viewingDeal.stage?.name || "No stage"}
+            valueDisplay={`${viewingDeal.currency || "AED"} ${parseFloat(
+              String(
+                viewingDeal.net_value || viewingDeal.grand_total || 0,
+              ),
+            ).toLocaleString()}`}
+            createdLabel={
+              viewingDeal.created_at
+                ? formatCrmPreviewDate(viewingDeal.created_at) || "N/A"
+                : "N/A"
+            }
+          />
 
           <Modal.Body
             style={{
@@ -3066,56 +2910,7 @@ const CrmDeals = () => { // NOSONAR
               </div>
             ) : (
               <>
-                <style>{`
-            .deal-detail-filter-buttons {
-              display: flex;
-              flex-direction: row;
-              align-items: center;
-              gap: 12px;
-              flex-wrap: wrap;
-              margin-bottom: 0;
-              padding: 0;
-              width: 100%;
-            }
-
-            .deal-detail-filter-button {
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              padding: 10px 20px;
-              border-radius: 8px;
-              border: 1px solid;
-              font-weight: 500;
-              font-size: 14px;
-              cursor: pointer;
-              transition: all 0.2s ease;
-              background: white;
-              white-space: nowrap;
-            }
-
-            .deal-detail-filter-button:hover {
-              transform: translateY(-1px);
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            }
-
-            .deal-detail-filter-button.active {
-              color: white;
-            }
-
-            .deal-detail-filter-button.active .filter-icon {
-              color: white;
-            }
-
-            .deal-detail-filter-button:not(.active) .filter-icon {
-              color: inherit;
-            }
-
-            .filter-icon {
-              width: 18px;
-              height: 18px;
-              flex-shrink: 0;
-            }
-          `}</style>
+                <style>{DEAL_DETAIL_MODAL_BODY_FILTER_CSS}</style>
 
                 {/* Main Content Grid */}
                 <div

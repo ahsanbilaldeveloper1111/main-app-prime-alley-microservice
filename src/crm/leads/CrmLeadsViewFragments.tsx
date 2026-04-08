@@ -1,54 +1,12 @@
-import { useRouter } from "next/router";
-import React, {
-  ReactElement,
-  useState,
-  useCallback,
-  useMemo,
-  useEffect,
-  useRef,
-} from "react";
-import Layout from "@layout/index";
+import { useMemo } from "react";
+import type { FocusEvent, MouseEvent } from "react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, {
-  TableColumn,
-  TableAction,
-  TabConfig,
-} from "@components/GenericTable";
-import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
-import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
-import { parseStoredVisibleColumnKeysLoose } from "@utils/crmListVisibleColumnsStorage";
+import GenericTable from "@components/GenericTable";
 import CrmExportModal from "@components/CrmExportModal";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import {
-  getLeads,
-  getLead,
-  deleteLead,
-  convertLead,
-  markLeadLost,
-  getStages,
-  createLeadFollowUp,
-  updateLeadFollowUp,
-  deleteLeadFollowUp,
-  createMeeting,
-  updateMeeting,
-  deleteMeeting,
-  restoreLead,
-  updateLead,
-  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
-  getCampaigns,
-  getCampaignById,
-  getBusinessTypes,
-  getLeadFollowUps,
-  getMeetings,
-} from "./leadsPageCrmBundle";
-import type {
-  StageData,
-  CampaignData,
-  CrmDataItem,
-  BusinessTypeData,
-} from "./leadsPageCrmBundle";
-import { GetHierarchyData } from "@utils/users";
+import { updateLead } from "./leadsPageCrmBundle";
+import type { BusinessTypeData } from "./leadsPageCrmBundle";
 import {
   Button,
   Row,
@@ -61,23 +19,12 @@ import {
 } from "react-bootstrap";
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
-
-function getCrmLeadsStringSelectValue(selected: unknown): string | undefined {
-  if (selected && typeof selected === "object" && "value" in selected) {
-    const v = (selected as { value: unknown }).value;
-    if (v == null) return undefined;
-    return typeof v === "string" ? v : String(v);
-  }
-  return undefined;
-}
-import PhoneInput from "react-phone-number-input";
-import { parsePhoneNumber as parsePhoneLib } from "react-phone-number-input";
+import PhoneInput, {
+  parsePhoneNumber as parsePhoneLib,
+} from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { Country, State, City } from "country-state-city";
 import {
-  ModuleSlug,
-  formatDateForTable,
-  checkRequiredFields,
   GlobalDateFormat,
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
@@ -88,7 +35,6 @@ import {
   CheckCircle,
   TrendingUp,
   Plus,
-  Eye,
   Edit,
   Trash2,
   Handshake,
@@ -110,7 +56,6 @@ import {
   DollarSign,
   UserCheck,
   AlertCircle,
-  RotateCcw,
 } from "lucide-react";
 import {
   PieChart,
@@ -131,9 +76,7 @@ import moment from "moment";
 import FormModal from "../../pages/partial/FormModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { useSession } from "next-auth/react";
-import { useCti } from "../../contexts/CtiContext";
-import type { StatsCardData } from "@components/GenericStatsCards";
+import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
 import CreateLeadModal from "@components/CreateLeadModal";
 import {
   CrmPhoneDisplay as PhoneDisplay,
@@ -142,13 +85,10 @@ import {
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
-import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
-import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 
 import ConvertLeadToDealModal from "@components/ConvertLeadToDealModal";
-import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
+import KanbanBoard from "@components/KanbanBoard";
 import { useLeadsPageContext } from "./leadsPageContext";
-import type { LeadData } from "./leadsPageShared";
 import { ignoredKeys, leadsToKanbanColumns } from "./leadsPageShared";
 import {
   CrmLeadEditCampaignFieldControl,
@@ -160,6 +100,1808 @@ import {
   crmMeetingTimelineDotFill,
   resolveCrmExtensionDisplayName,
 } from "./CrmLeadsViewUiPrimitives";
+
+function getCrmLeadsStringSelectValue(selected: unknown): string | undefined {
+  if (selected && typeof selected === "object" && "value" in selected) {
+    const v = (selected as { value: unknown }).value;
+    if (v == null) return undefined;
+    if (typeof v === "string") return v;
+    if (typeof v === "number" || typeof v === "boolean") return String(v);
+    return undefined;
+  }
+  return undefined;
+}
+
+function crmSidebarLeadPotentialBadgeVariant(
+  leadPotential: string | undefined,
+  leadPotentialAlt: string | undefined,
+): "danger" | "warning" | "secondary" {
+  if (leadPotential === "Hot" || leadPotentialAlt === "Hot") return "danger";
+  if (leadPotential === "Warm" || leadPotentialAlt === "Warm")
+    return "warning";
+  return "secondary";
+}
+
+function crmLeadDetailPotentialBadgeBg(
+  potential: string | undefined,
+): "danger" | "warning" | "secondary" {
+  if (potential === "Hot") return "danger";
+  if (potential === "Warm") return "warning";
+  return "secondary";
+}
+
+function formatCrmSidebarLeadScoreValue(
+  stageScore: unknown,
+  leadScore: unknown,
+): string {
+  if (stageScore) return `${stageScore as string | number}%`;
+  if (leadScore) return `${leadScore as string | number}%`;
+  return "N/A";
+}
+
+function crmFollowUpTimelineStatusBadgeBg(
+  status: string | undefined,
+): "success" | "primary" | "warning" {
+  if (status === "Completed") return "success";
+  if (status === "In Progress") return "primary";
+  return "warning";
+}
+
+function crmLeadHistoryAuditEventLabel(event: string): string {
+  if (event === "created") return "Created";
+  if (event === "updated") return "Updated";
+  return event;
+}
+
+/** Pairs onMouseOver/onMouseOut with onFocus/onBlur for keyboard parity (Sonar accessibility). */
+const crmLeadIconSoftSurfaceHoverHandlers = {
+  onMouseOver(e: MouseEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = "#eff6ff";
+  },
+  onMouseOut(e: MouseEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = "transparent";
+  },
+  onFocus(e: FocusEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = "#eff6ff";
+  },
+  onBlur(e: FocusEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = "transparent";
+  },
+};
+
+const crmLeadPrimaryBlueCtaHoverHandlers = {
+  onMouseOver(e: MouseEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = "#1d4ed8";
+  },
+  onMouseOut(e: MouseEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = "#2563eb";
+  },
+  onFocus(e: FocusEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = "#1d4ed8";
+  },
+  onBlur(e: FocusEvent<HTMLButtonElement>) {
+    e.currentTarget.style.background = "#2563eb";
+  },
+};
+
+const LEAD_POTENTIAL_PIE_SLICES = [
+  { name: "Hot" as const, color: "#dc3545" },
+  { name: "Warm" as const, color: "#ffc107" },
+  { name: "Cold" as const, color: "#0dcaf0" },
+];
+
+function crmLeadsLeadPotentialPieData(potentialCounts: Record<string, number>) {
+  return LEAD_POTENTIAL_PIE_SLICES.map((s) => ({
+    name: s.name,
+    value: potentialCounts[s.name] || 0,
+    color: s.color,
+  }));
+}
+
+function CrmLeadsAnalyticsSection(props: {
+  analyticsData: {
+    total: number;
+    potentialCounts: Record<string, number>;
+    stageCounts: Record<string, number>;
+  };
+  summaryTiles?: { qualified_leads?: number; new_leads?: number };
+}) {
+  const { analyticsData, summaryTiles } = props;
+  const pieData = crmLeadsLeadPotentialPieData(analyticsData.potentialCounts);
+  return (
+    <>
+      <Row className="mb-4">
+        <Col lg={3} md={6} className="mb-3">
+          <KPICard
+            title="Total Leads"
+            value={analyticsData.total.toString()}
+            icon={<Target size={24} />}
+            color="primary"
+          />
+        </Col>
+        <Col lg={3} md={6} className="mb-3">
+          <KPICard
+            title="Qualified Leads"
+            value={summaryTiles?.qualified_leads?.toString() || "0"}
+            icon={<CheckCircle size={24} />}
+            color="success"
+          />
+        </Col>
+        <Col lg={3} md={6} className="mb-3">
+          <KPICard
+            title="New Leads"
+            value={summaryTiles?.new_leads?.toString() || "0"}
+            icon={<TrendingUp size={24} />}
+            color="danger"
+          />
+        </Col>
+      </Row>
+      <Row className="mb-4">
+        <Col md={6} className="mb-3">
+          <Card className="border-0 shadow-sm h-100">
+            <Card.Body>
+              <h6 className="fw-bold mb-3">Lead Potential Distribution</h6>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={(props: any) =>
+                      `${props.name}: ${((props.percent as number) * 100).toFixed(0)}%`
+                    }
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {pieData.map((entry) => (
+                      <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={6} className="mb-3">
+          <Card className="border-0 shadow-sm h-100">
+            <Card.Body>
+              <h6 className="fw-bold mb-3">Lead Stage Distribution</h6>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart
+                  data={Object.entries(analyticsData.stageCounts).map(
+                    ([stage, count]) => ({ stage, count }),
+                  )}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="stage" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#0d6efd" />
+                </BarChart>
+              </ResponsiveContainer>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+    </>
+  );
+}
+
+function CrmLeadViewModalGeneralInfoTab() {
+  const { viewingLead, extensions } = useLeadsPageContext();
+  if (!viewingLead) {
+    return null;
+  }
+  return (
+                      <div>
+                        {/* Quick Info Cards */}
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "repeat(2, 1fr)",
+                            gap: "16px",
+                            marginBottom: "28px",
+                          }}
+                        >
+                          <CrmLeadViewQuickStatCard
+                            accentColor="#2563eb"
+                            label="Assigned To"
+                            icon={<User size={20} style={{ color: "white" }} />}
+                          >
+                            {resolveCrmExtensionDisplayName(
+                              extensions,
+                              viewingLead?.user_extension,
+                            )}
+                          </CrmLeadViewQuickStatCard>
+
+                          <CrmLeadViewQuickStatCard
+                            accentColor="#0284c7"
+                            label="Lead Potential"
+                            icon={
+                              <Target size={20} style={{ color: "white" }} />
+                            }
+                          >
+                            <Badge
+                              bg={crmLeadDetailPotentialBadgeBg(
+                                viewingLead.lead_potential,
+                              )}
+                              style={{
+                                padding: "6px 14px",
+                                borderRadius: "20px",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {viewingLead.lead_potential || "N/A"}
+                            </Badge>
+                          </CrmLeadViewQuickStatCard>
+
+                          <CrmLeadViewQuickStatCard
+                            accentColor={
+                              viewingLead.stage?.color || "#6c757d"
+                            }
+                            labelColor="#6b7280"
+                            label="Stage"
+                            icon={
+                              <Target size={20} style={{ color: "white" }} />
+                            }
+                          >
+                            {viewingLead.stage?.name || "Not assigned"}
+                          </CrmLeadViewQuickStatCard>
+
+                          <CrmLeadViewQuickStatCard
+                            accentColor="#10b981"
+                            label="Lead Score"
+                            icon={
+                              <ChartLine
+                                size={20}
+                                style={{ color: "white" }}
+                              />
+                            }
+                          >
+                            {viewingLead?.lead_score == null
+                              ? "Not Set"
+                              : `${viewingLead.lead_score}%`}
+                          </CrmLeadViewQuickStatCard>
+                        </div>
+
+                        {/* Lead Information Section */}
+                        <div style={{ marginBottom: "28px" }}>
+                          <CrmLeadViewSectionTitle>
+                            Lead Details
+                          </CrmLeadViewSectionTitle>
+                          <div
+                            style={{
+                              background: "#f9fafb",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "12px",
+                              padding: "20px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "140px 1fr",
+                                gap: "16px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  color: "#6b7280",
+                                  fontSize: "14px",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <User size={16} style={{ color: "#2563eb" }} />
+                                Lead Name
+                              </div>
+                              <div
+                                style={{
+                                  color: "#1f2937",
+                                  fontSize: "15px",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {viewingLead.name}
+                              </div>
+
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "8px",
+                                  color: "#6b7280",
+                                  fontSize: "14px",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                <Calendar
+                                  size={16}
+                                  style={{ color: "#2563eb" }}
+                                />
+                                Created
+                              </div>
+                              <div
+                                style={{
+                                  color: "#1f2937",
+                                  fontSize: "15px",
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {viewingLead.created_at
+                                  ? formatCrmPreviewDateTime(
+                                      viewingLead.created_at,
+                                    ) || "N/A"
+                                  : "N/A"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Company Information Section */}
+                        {viewingLead.company_name && (
+                          <div style={{ marginBottom: "28px" }}>
+                            <CrmLeadViewSectionTitle>
+                              Company Information
+                            </CrmLeadViewSectionTitle>
+                            <div
+                              style={{
+                                background: "#f9fafb",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: "12px",
+                                padding: "20px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr 1fr",
+                                  gap: "16px 24px",
+                                }}
+                              >
+                                <CrmLeadPreviewGrayField label="Company Name">
+                                  <>
+                                    <Building2
+                                      size={14}
+                                      style={{
+                                        color: "#2563eb",
+                                        marginRight: "6px",
+                                        display: "inline",
+                                      }}
+                                    />
+                                    {viewingLead.company_name}
+                                  </>
+                                </CrmLeadPreviewGrayField>
+                                {viewingLead.industry && (
+                                  <CrmLeadPreviewGrayField label="Industry">
+                                    {viewingLead.industry}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                                {viewingLead.business_type && (
+                                  <CrmLeadPreviewGrayField label="Business Type">
+                                    {viewingLead.business_type}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                                {viewingLead.company_size && (
+                                  <CrmLeadPreviewGrayField label="Company Size">
+                                    {viewingLead.company_size}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                                {viewingLead.company_city && (
+                                  <CrmLeadPreviewGrayField label="Location">
+                                    {[
+                                      viewingLead.company_city,
+                                      viewingLead.company_country,
+                                    ]
+                                      .filter(Boolean)
+                                      .join(", ") || "N/A"}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Contact Persons Section */}
+                        {viewingLead.contact_persons &&
+                          Array.isArray(viewingLead.contact_persons) &&
+                          viewingLead.contact_persons.length > 0 && (
+                            <div style={{ marginBottom: "28px" }}>
+                              <CrmLeadViewSectionTitle>
+                                Contact Persons
+                                <Badge
+                                  bg="secondary"
+                                  style={{
+                                    marginLeft: "8px",
+                                    fontSize: "11px",
+                                    fontWeight: 600,
+                                    padding: "4px 10px",
+                                    borderRadius: "6px",
+                                  }}
+                                >
+                                  {viewingLead.contact_persons.length}
+                                </Badge>
+                              </CrmLeadViewSectionTitle>
+                              <div
+                                style={{
+                                  background: "#f9fafb",
+                                  border: "1px solid #e5e7eb",
+                                  borderRadius: "12px",
+                                  padding: "20px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: "16px",
+                                  }}
+                                >
+                                  {viewingLead.contact_persons.map(
+                                    (person: any, index: number) => (
+                                      <div
+                                        key={`${person.id ?? person.email ?? "p"}-${person.name ?? ""}-${index}`}
+                                        style={{
+                                          background: "white",
+                                          padding: "16px",
+                                          borderRadius: "8px",
+                                          border: "1px solid #e5e7eb",
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            fontSize: "14px",
+                                            fontWeight: 600,
+                                            color: "#1f2937",
+                                            marginBottom: "8px",
+                                          }}
+                                        >
+                                          {person.title} {person.name}
+                                        </div>
+                                        {person.email && (
+                                          <div
+                                            style={{
+                                              fontSize: "13px",
+                                              color: "#6b7280",
+                                              marginBottom: "4px",
+                                            }}
+                                          >
+                                            <Mail
+                                              size={12}
+                                              style={{
+                                                marginRight: "6px",
+                                                display: "inline",
+                                              }}
+                                            />
+                                            {person.email}
+                                          </div>
+                                        )}
+                                        {person.phone && (
+                                          <div
+                                            style={{
+                                              fontSize: "13px",
+                                              color: "#6b7280",
+                                            }}
+                                          >
+                                            <PhoneDisplay
+                                              phone={
+                                                person.phone_country_code &&
+                                                person.phone
+                                                  ? `${person.phone_country_code}${person.phone}`
+                                                  : person.phone
+                                              }
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    ),
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                        {/* Description */}
+                        {viewingLead.description && (
+                          <div style={{ marginBottom: "28px" }}>
+                            <CrmLeadViewSectionTitle>
+                              Description
+                            </CrmLeadViewSectionTitle>
+                            <div
+                              style={{
+                                background: "#fffbeb",
+                                border: "1px solid #fcd34d",
+                                borderRadius: "12px",
+                                padding: "16px 20px",
+                                fontSize: "14px",
+                                color: "#78350f",
+                                lineHeight: "1.6",
+                                whiteSpace: "pre-wrap",
+                              }}
+                            >
+                              {viewingLead.description}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Lost Reason */}
+                        {viewingLead.is_lost && viewingLead.lost_reason && (
+                          <div style={{ marginBottom: "28px" }}>
+                            <CrmLeadViewSectionTitle accent="danger">
+                              Lead Lost Information
+                            </CrmLeadViewSectionTitle>
+                            <div
+                              style={{
+                                background: "#fee2e2",
+                                border: "1px solid #fecaca",
+                                borderRadius: "12px",
+                                padding: "16px 20px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: "14px",
+                                  fontWeight: 600,
+                                  color: "#dc2626",
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                Reason: {viewingLead.lost_reason.name}
+                              </div>
+                              {viewingLead.lost_feedback && (
+                                <div
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "#991b1b",
+                                    lineHeight: "1.6",
+                                  }}
+                                >
+                                  Feedback: {viewingLead.lost_feedback}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+  );
+}
+
+function CrmLeadViewModalCampaignProspectTab() {
+  const { viewingLead } = useLeadsPageContext();
+  if (!viewingLead) {
+    return null;
+  }
+  return (
+                      <div>
+                        {/* Campaign Information Section */}
+                        <div style={{ marginBottom: "28px" }}>
+                          <CrmLeadViewSectionTitle>
+                            Campaign Information
+                          </CrmLeadViewSectionTitle>
+                          {viewingLead.campaign ? (
+                            <div
+                              style={{
+                                background: "#f9fafb",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: "12px",
+                                padding: "20px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr 1fr",
+                                  gap: "16px 24px",
+                                }}
+                              >
+                                <div>
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                      marginBottom: "6px",
+                                    }}
+                                  >
+                                    Campaign Name
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "14px",
+                                      color: "#1f2937",
+                                      fontWeight: 500,
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    {viewingLead.campaign.name}
+                                  </div>
+                                </div>
+                                {viewingLead.campaign_field_values &&
+                                  Object.keys(viewingLead.campaign_field_values)
+                                    .length > 0 &&
+                                  Object.entries(
+                                    viewingLead.campaign_field_values,
+                                  ).map(([key, value]: [string, any]) => (
+                                    <div key={key}>
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          fontWeight: 700,
+                                          color: "#6b7280",
+                                          textTransform: "uppercase",
+                                          letterSpacing: "0.5px",
+                                          marginBottom: "6px",
+                                        }}
+                                      >
+                                        {key}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: "14px",
+                                          color: "#1f2937",
+                                          fontWeight: 500,
+                                          wordBreak: "break-word",
+                                        }}
+                                      >
+                                        {String(value)}
+                                      </div>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                padding: "40px",
+                                textAlign: "center",
+                                color: "#6b7280",
+                                background: "#f9fafb",
+                                border: "2px dashed #d1d5db",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              No campaign information available
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Prospect Information Section */}
+                        <div style={{ marginBottom: "28px" }}>
+                          <CrmLeadViewSectionTitle>
+                            Prospect Information
+                          </CrmLeadViewSectionTitle>
+                          {viewingLead.crm_data ? (
+                            <div
+                              style={{
+                                background: "#f9fafb",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: "12px",
+                                padding: "20px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr 1fr",
+                                  gap: "16px 24px",
+                                }}
+                              >
+                                {viewingLead.crm_data.id && (
+                                  <CrmLeadPreviewGrayField label="CRM Data ID">
+                                    #{viewingLead.crm_data.id}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                                {(viewingLead.crm_data.name ||
+                                  (viewingLead.crm_data.data &&
+                                    viewingLead.crm_data.data.name)) && (
+                                  <CrmLeadPreviewGrayField label="Name">
+                                    {viewingLead.crm_data.name ||
+                                      (viewingLead.crm_data.data &&
+                                        viewingLead.crm_data.data.name) ||
+                                      "N/A"}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                                {(viewingLead.crm_data.phone ||
+                                  (viewingLead.crm_data.data &&
+                                    viewingLead.crm_data.data.phone)) && (
+                                  <CrmLeadPreviewGrayField label="Phone">
+                                    <PhoneDisplay
+                                      phone={
+                                        viewingLead.crm_data.phone ||
+                                        (viewingLead.crm_data.data &&
+                                          viewingLead.crm_data.data.phone) ||
+                                        ""
+                                      }
+                                    />
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                                {viewingLead.crm_data.source_file && (
+                                  <CrmLeadPreviewGrayField label="Source File">
+                                    {viewingLead.crm_data.source_file}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                                {viewingLead.crm_data.uploaded_by && (
+                                  <CrmLeadPreviewGrayField label="Uploaded By">
+                                    <User
+                                      size={14}
+                                      style={{
+                                        color: "#2563eb",
+                                        marginRight: "6px",
+                                        display: "inline",
+                                      }}
+                                    />
+                                    {viewingLead.crm_data.uploaded_by}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                                {viewingLead?.crm_data?.scheduled_call_at && (
+                                  <CrmLeadPreviewGrayField label="Scheduled Call">
+                                    <Calendar
+                                      size={14}
+                                      style={{
+                                        color: "#2563eb",
+                                        marginRight: "6px",
+                                        display: "inline",
+                                      }}
+                                    />
+                                    {(() => {
+                                      const scheduledAt =
+                                        viewingLead.crm_data.scheduled_call_at;
+                                      const isOverdue = moment(
+                                        scheduledAt,
+                                      ).isBefore(moment());
+                                      const isNextHour = moment(
+                                        scheduledAt,
+                                      ).isBefore(moment().add(1, "hour"));
+                                      return (
+                                        <span>
+                                          {moment(scheduledAt).format(
+                                            "MMM DD, YYYY HH:mm",
+                                          )}
+                                          {isOverdue && (
+                                            <Badge
+                                              bg="danger"
+                                              className="ms-2"
+                                              style={{
+                                                fontSize: "10px",
+                                                padding: "2px 6px",
+                                              }}
+                                            >
+                                              Overdue
+                                            </Badge>
+                                          )}
+                                          {isNextHour && isOverdue === false && (
+                                            <Badge
+                                              bg="warning"
+                                              className="ms-2"
+                                              style={{
+                                                fontSize: "10px",
+                                                padding: "2px 6px",
+                                              }}
+                                            >
+                                              Soon
+                                            </Badge>
+                                          )}
+                                        </span>
+                                      );
+                                    })()}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                                {viewingLead.crm_data?.created_at && (
+                                  <CrmLeadPreviewGrayField label="Created At">
+                                    <Calendar
+                                      size={14}
+                                      style={{
+                                        color: "#2563eb",
+                                        marginRight: "6px",
+                                        display: "inline",
+                                      }}
+                                    />
+                                    {formatCrmPreviewDate(
+                                      viewingLead.crm_data?.created_at,
+                                    )}
+                                  </CrmLeadPreviewGrayField>
+                                )}
+                              </div>
+
+                              {/* Scheduled Call Notes */}
+                              {viewingLead.crm_data?.note && (
+                                <div
+                                  style={{
+                                    marginTop: "20px",
+                                    paddingTop: "20px",
+                                    borderTop: "1px solid #e5e7eb",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: "12px",
+                                      fontWeight: 700,
+                                      color: "#6b7280",
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.5px",
+                                      marginBottom: "8px",
+                                    }}
+                                  >
+                                    Scheduled Call Notes
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: "14px",
+                                      color: "#1f2937",
+                                      lineHeight: "1.6",
+                                      whiteSpace: "pre-wrap",
+                                    }}
+                                  >
+                                    {viewingLead.crm_data.note}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                padding: "40px",
+                                textAlign: "center",
+                                color: "#6b7280",
+                                background: "#f9fafb",
+                                border: "2px dashed #d1d5db",
+                                borderRadius: "12px",
+                              }}
+                            >
+                              No prospect information available
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Prospect Fields Section */}
+                        {viewingLead.crm_data?.data &&
+                          typeof viewingLead.crm_data.data === "object" &&
+                          Object.keys(viewingLead.crm_data.data).length > 0 && (
+                            <div style={{ marginBottom: "28px" }}>
+                              <CrmLeadViewSectionTitle>
+                                Prospect Fields
+                              </CrmLeadViewSectionTitle>
+                              <div
+                                style={{
+                                  background: "#f9fafb",
+                                  border: "1px solid #e5e7eb",
+                                  borderRadius: "12px",
+                                  padding: "20px",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 1fr",
+                                    gap: "16px 24px",
+                                  }}
+                                >
+                                  {Object.entries(viewingLead.crm_data.data)
+                                    .filter(
+                                      ([key]) =>
+                                        key.toLowerCase() !== "name" &&
+                                        key.toLowerCase() !== "phone",
+                                    )
+                                    .map(([key, value]: [string, any]) => (
+                                      <CrmLeadPreviewGrayField
+                                        key={key}
+                                        label={key}
+                                      >
+                                        {String(value || "N/A")}
+                                      </CrmLeadPreviewGrayField>
+                                    ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                      </div>
+  );
+}
+
+function CrmLeadViewModalRightPanel() {
+  const {
+    activeFilter,
+    handleConvertLead,
+    session,
+    setEditLeadIdForSidebar,
+    setFollowupData,
+    setMeetingAttendees,
+    setMeetingData,
+    setShowAddFollowupModal,
+    setShowAddMeetingModal,
+    setShowCreateLeadModal,
+    setShowLeadHistoryModal,
+    setShowLeadViewModal,
+    viewingLead,
+  } = useLeadsPageContext();
+  if (!viewingLead) {
+    return null;
+  }
+  return (
+                  <div
+                    style={{
+                      padding: "32px 24px",
+                      background: "#fafbfc",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "24px",
+                    }}
+                  >
+                    {/* Quick Actions */}
+                    <div>
+                      <h6
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#6b7280",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        Quick Actions
+                      </h6>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "10px",
+                        }}
+                      >
+                        {session?.user?.permissions?.includes(
+                          "edit-crm-leads",
+                        ) && (
+                          <button
+                            style={{
+                              background: "white",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "10px",
+                              padding: "12px 16px",
+                              cursor:
+                                activeFilter === "lost"
+                                  ? "not-allowed"
+                                  : "pointer",
+                              opacity: activeFilter === "lost" ? 0.6 : 1,
+                              transition: "all 0.2s ease",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                              fontSize: "14px",
+                              fontWeight: 500,
+                              color: "#1f2937",
+                            }}
+                            onClick={() => {
+                              if (activeFilter === "lost") return;
+                              setShowLeadViewModal(false);
+                              setEditLeadIdForSidebar(viewingLead.id);
+                              setShowCreateLeadModal(true);
+                            }}
+                            disabled={activeFilter === "lost"}
+                            onMouseOver={(e) => {
+                              if (activeFilter === "lost") return;
+                              e.currentTarget.style.borderColor = "#2563eb";
+                              e.currentTarget.style.background = "#eff6ff";
+                              e.currentTarget.style.transform =
+                                "translateX(4px)";
+                            }}
+                            onMouseOut={(e) => {
+                              if (activeFilter === "lost") return;
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.background = "white";
+                              e.currentTarget.style.transform = "translateX(0)";
+                            }}
+                            onFocus={(e) => {
+                              if (activeFilter === "lost") return;
+                              e.currentTarget.style.borderColor = "#2563eb";
+                              e.currentTarget.style.background = "#eff6ff";
+                              e.currentTarget.style.transform =
+                                "translateX(4px)";
+                            }}
+                            onBlur={(e) => {
+                              if (activeFilter === "lost") return;
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.background = "white";
+                              e.currentTarget.style.transform = "translateX(0)";
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "8px",
+                                background: "#2563eb",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Edit size={16} style={{ color: "white" }} />
+                            </div>
+                            Edit Lead
+                          </button>
+                        )}
+
+                        {session?.user?.permissions?.includes(
+                          "add-crm-deals",
+                        ) && (
+                          <button
+                            disabled={activeFilter === "lost"}
+                            style={{
+                              background: "white",
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "10px",
+                              padding: "12px 16px",
+                              cursor:
+                                activeFilter === "lost"
+                                  ? "not-allowed"
+                                  : "pointer",
+                              transition: "all 0.2s ease",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                              fontSize: "14px",
+                              fontWeight: 500,
+                              color: "#1f2937",
+                              opacity: activeFilter === "lost" ? 0.6 : 1,
+                            }}
+                            onClick={() => {
+                              if (activeFilter !== "lost") {
+                                setShowLeadViewModal(false);
+                                handleConvertLead(viewingLead);
+                              }
+                            }}
+                            onMouseOver={(e) => {
+                              if (activeFilter !== "lost") {
+                                e.currentTarget.style.borderColor = "#10b981";
+                                e.currentTarget.style.background = "#f0fdf4";
+                                e.currentTarget.style.transform =
+                                  "translateX(4px)";
+                              }
+                            }}
+                            onMouseOut={(e) => {
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.background = "white";
+                              e.currentTarget.style.transform = "translateX(0)";
+                            }}
+                            onFocus={(e) => {
+                              if (activeFilter !== "lost") {
+                                e.currentTarget.style.borderColor = "#10b981";
+                                e.currentTarget.style.background = "#f0fdf4";
+                                e.currentTarget.style.transform =
+                                  "translateX(4px)";
+                              }
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.background = "white";
+                              e.currentTarget.style.transform = "translateX(0)";
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: "32px",
+                                height: "32px",
+                                borderRadius: "8px",
+                                background: "#10b981",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <Handshake size={16} style={{ color: "white" }} />
+                            </div>
+                            Convert to Deal
+                          </button>
+                        )}
+
+                        <button
+                          style={{
+                            background: "white",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "10px",
+                            padding: "12px 16px",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                            color: "#1f2937",
+                          }}
+                          onClick={() => setShowLeadHistoryModal(true)}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.borderColor = "#2563eb";
+                            e.currentTarget.style.background = "#eff6ff";
+                            e.currentTarget.style.transform = "translateX(4px)";
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.borderColor = "#e5e7eb";
+                            e.currentTarget.style.background = "white";
+                            e.currentTarget.style.transform = "translateX(0)";
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = "#2563eb";
+                            e.currentTarget.style.background = "#eff6ff";
+                            e.currentTarget.style.transform = "translateX(4px)";
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = "#e5e7eb";
+                            e.currentTarget.style.background = "white";
+                            e.currentTarget.style.transform = "translateX(0)";
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "8px",
+                              background:
+                                "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <History size={16} style={{ color: "white" }} />
+                          </div>
+                          View History
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Status Overview */}
+                    <div>
+                      <h6
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 700,
+                          color: "#6b7280",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        Status Overview
+                      </h6>
+                      <div
+                        style={{
+                          background: "white",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "10px",
+                          padding: "16px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "14px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Stage
+                            </span>
+                            <Badge
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 600,
+                                padding: "4px 10px",
+                                borderRadius: "6px",
+                                backgroundColor:
+                                  viewingLead.stage?.color || "#6c757d",
+                              }}
+                            >
+                              {viewingLead.stage?.name || "N/A"}
+                            </Badge>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Lead Score
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {viewingLead?.lead_score == null
+                                ? "N/A"
+                                : `${viewingLead.lead_score}%`}
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Follow-ups
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {viewingLead.follow_ups?.length || 0}
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: "13px",
+                                color: "#6b7280",
+                                fontWeight: 500,
+                              }}
+                            >
+                              Meetings
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "14px",
+                                color: "#1f2937",
+                                fontWeight: 600,
+                              }}
+                            >
+                              {viewingLead.meetings?.length || 0}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Follow-ups Timeline */}
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        <h6
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            margin: 0,
+                          }}
+                        >
+                          Recent Follow-ups
+                        </h6>
+                        {session?.user?.permissions?.includes(
+                          "add-follow-up-crm-leads",
+                        ) && (
+                          <button
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#2563eb",
+                              cursor: "pointer",
+                              padding: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "6px",
+                              transition: "all 0.2s ease",
+                            }}
+                            onClick={() => {
+                              setFollowupData({
+                                leadId: viewingLead.id,
+                                leadName: viewingLead.name,
+                                followUpDate: "",
+                                followUpStatus: "Pending",
+                                communicationChannel: "Phone Call",
+                                communicationChannelOther: "",
+                                notes: "",
+                                userExtension:
+                                  (session?.user as any)?.extension || "admin",
+                              });
+                              setShowAddFollowupModal(true);
+                            }}
+                            type="button"
+                            aria-label="Add follow-up"
+                            title="Add Follow-up"
+                            {...crmLeadIconSoftSurfaceHoverHandlers}
+                          >
+                            <Plus size={16} />
+                          </button>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          background: "white",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "10px",
+                          padding: "16px",
+                          maxHeight: "300px",
+                          overflowY: "auto",
+                        }}
+                      >
+                        {viewingLead.follow_ups &&
+                        viewingLead.follow_ups.length > 0 ? (
+                          <div style={{ position: "relative" }}>
+                            {/* Timeline line */}
+                            <div
+                              style={{
+                                position: "absolute",
+                                left: "7px",
+                                top: "8px",
+                                bottom: "8px",
+                                width: "2px",
+                                background: "#e5e7eb",
+                              }}
+                            />
+
+                            {viewingLead.follow_ups
+                              .slice(0, 5)
+                              .map((followUp: any, index: number) => {
+                                const isCompleted =
+                                  followUp.follow_up_status === "Completed";
+                                return (
+                                  <div
+                                    key={followUp.id || index}
+                                    style={{
+                                      position: "relative",
+                                      paddingLeft: "28px",
+                                      paddingBottom:
+                                        index <
+                                        Math.min(
+                                          viewingLead.follow_ups.length,
+                                          5,
+                                        ) -
+                                          1
+                                          ? "16px"
+                                          : "0",
+                                    }}
+                                  >
+                                    {/* Timeline dot */}
+                                    <div
+                                      style={{
+                                        position: "absolute",
+                                        left: "0",
+                                        top: "4px",
+                                        width: "16px",
+                                        height: "16px",
+                                        borderRadius: "50%",
+                                        background: isCompleted
+                                          ? "#10b981"
+                                          : "#2563eb",
+                                        border: "3px solid white",
+                                        boxShadow: "0 0 0 1px #e5e7eb",
+                                      }}
+                                    />
+
+                                    <div>
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "#1f2937",
+                                          fontWeight: 600,
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {followUp.communication_channel ===
+                                        "Other"
+                                          ? followUp.communication_channel_other
+                                          : followUp.communication_channel}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: "11px",
+                                          color: "#6b7280",
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {followUp.follow_up_date
+                                          ? formatCrmPreviewDate(
+                                              followUp.follow_up_date,
+                                            ) || "N/A"
+                                          : "N/A"}
+                                      </div>
+                                      <Badge
+                                        bg={crmFollowUpTimelineStatusBadgeBg(
+                                          followUp.follow_up_status,
+                                        )}
+                                        style={{
+                                          fontSize: "10px",
+                                          padding: "2px 8px",
+                                        }}
+                                      >
+                                        {followUp.follow_up_status}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                            {viewingLead.follow_ups.length > 5 && (
+                              <div
+                                style={{
+                                  textAlign: "center",
+                                  marginTop: "12px",
+                                  paddingTop: "12px",
+                                  borderTop: "1px solid #f3f4f6",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#2563eb",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {`+${viewingLead.follow_ups.length - 5} more follow-ups`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              textAlign: "center",
+                              padding: "20px",
+                              color: "#9ca3af",
+                            }}
+                          >
+                            <History
+                              size={32}
+                              style={{ marginBottom: "8px", opacity: 0.5 }}
+                            />
+                            <div style={{ fontSize: "13px" }}>
+                              No follow-ups yet
+                            </div>
+                            {session?.user?.permissions?.includes(
+                              "add-follow-up-crm-leads",
+                            ) && (
+                              <button
+                                style={{
+                                  marginTop: "12px",
+                                  padding: "8px 16px",
+                                  background: "#2563eb",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "6px",
+                                  fontSize: "12px",
+                                  fontWeight: 500,
+                                  cursor: "pointer",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  transition: "all 0.2s ease",
+                                }}
+                                onClick={() => {
+                                  setFollowupData({
+                                    leadId: viewingLead.id,
+                                    leadName: viewingLead.name,
+                                    followUpDate: "",
+                                    followUpStatus: "Pending",
+                                    communicationChannel: "Phone Call",
+                                    communicationChannelOther: "",
+                                    notes: "",
+                                    userExtension:
+                                      (session?.user as any)?.extension ||
+                                      "admin",
+                                  });
+                                  setShowAddFollowupModal(true);
+                                }}
+                                type="button"
+                                {...crmLeadPrimaryBlueCtaHoverHandlers}
+                              >
+                                <Plus size={14} />
+                                Add Follow-up
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Meetings Timeline */}
+                    <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: "14px",
+                        }}
+                      >
+                        <h6
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: "#6b7280",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.5px",
+                            margin: 0,
+                          }}
+                        >
+                          Recent Meetings
+                        </h6>
+                        {session?.user?.permissions?.includes(
+                          "add-meeting-crm-leads",
+                        ) && (
+                          <button
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "#2563eb",
+                              cursor: "pointer",
+                              padding: "4px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              borderRadius: "6px",
+                              transition: "all 0.2s ease",
+                            }}
+                            onClick={() => {
+                              setMeetingData({
+                                leadId: viewingLead.id,
+                                leadName: viewingLead.name,
+                                meetingName: "",
+                                meetingType: "Online",
+                                meetingDate: "",
+                                meetingTime: "",
+                                meetingOutcome: "Scheduled",
+                                extensions: [],
+                              });
+                              setMeetingAttendees([]);
+                              setShowAddMeetingModal(true);
+                            }}
+                            type="button"
+                            aria-label="Schedule meeting"
+                            title="Schedule Meeting"
+                            {...crmLeadIconSoftSurfaceHoverHandlers}
+                          >
+                            <Plus size={16} />
+                          </button>
+                        )}
+                      </div>
+                      <div
+                        style={{
+                          background: "white",
+                          border: "1px solid #e5e7eb",
+                          borderRadius: "10px",
+                          padding: "16px",
+                          maxHeight: "300px",
+                          overflowY: "auto",
+                        }}
+                      >
+                        {viewingLead.meetings &&
+                        viewingLead.meetings.length > 0 ? (
+                          <div style={{ position: "relative" }}>
+                            {/* Timeline line */}
+                            <div
+                              style={{
+                                position: "absolute",
+                                left: "7px",
+                                top: "8px",
+                                bottom: "8px",
+                                width: "2px",
+                                background: "#e5e7eb",
+                              }}
+                            />
+
+                            {viewingLead.meetings
+                              .slice(0, 5)
+                              .map((meeting: any, index: number) => (
+                                  <div
+                                    key={meeting.id || index}
+                                    style={{
+                                      position: "relative",
+                                      paddingLeft: "28px",
+                                      paddingBottom:
+                                        index <
+                                        Math.min(
+                                          viewingLead.meetings.length,
+                                          5,
+                                        ) -
+                                          1
+                                          ? "16px"
+                                          : "0",
+                                    }}
+                                  >
+                                    {/* Timeline dot */}
+                                    <div
+                                      style={{
+                                        position: "absolute",
+                                        left: "0",
+                                        top: "4px",
+                                        width: "16px",
+                                        height: "16px",
+                                        borderRadius: "50%",
+                                        background: crmMeetingTimelineDotFill(
+                                          meeting.meeting_outcome,
+                                        ),
+                                        border: "3px solid white",
+                                        boxShadow: "0 0 0 1px #e5e7eb",
+                                      }}
+                                    />
+
+                                    <div>
+                                      <div
+                                        style={{
+                                          fontSize: "12px",
+                                          color: "#1f2937",
+                                          fontWeight: 600,
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {meeting.name}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: "11px",
+                                          color: "#6b7280",
+                                          marginBottom: "4px",
+                                        }}
+                                      >
+                                        {meeting.meeting_date
+                                          ? formatCrmPreviewDate(
+                                              meeting.meeting_date,
+                                            ) || "N/A"
+                                          : "N/A"}
+                                      </div>
+                                      {meeting.meeting_outcome && (
+                                        <Badge
+                                          bg={crmMeetingOutcomeToBadgeBg(
+                                            meeting.meeting_outcome,
+                                          )}
+                                          style={{
+                                            fontSize: "10px",
+                                            padding: "2px 8px",
+                                          }}
+                                        >
+                                          {meeting.meeting_outcome}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+
+                            {viewingLead.meetings.length > 5 && (
+                              <div
+                                style={{
+                                  textAlign: "center",
+                                  marginTop: "12px",
+                                  paddingTop: "12px",
+                                  borderTop: "1px solid #f3f4f6",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#2563eb",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {`+${viewingLead.meetings.length - 5} more meetings`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              textAlign: "center",
+                              padding: "20px",
+                              color: "#9ca3af",
+                            }}
+                          >
+                            <Users
+                              size={32}
+                              style={{ marginBottom: "8px", opacity: 0.5 }}
+                            />
+                            <div style={{ fontSize: "13px" }}>
+                              No meetings yet
+                            </div>
+                            {session?.user?.permissions?.includes(
+                              "add-meeting-crm-leads",
+                            ) && (
+                              <button
+                                style={{
+                                  marginTop: "12px",
+                                  padding: "8px 16px",
+                                  background: "#2563eb",
+                                  color: "white",
+                                  border: "none",
+                                  borderRadius: "6px",
+                                  fontSize: "12px",
+                                  fontWeight: 500,
+                                  cursor: "pointer",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "6px",
+                                  transition: "all 0.2s ease",
+                                }}
+                                onClick={() => {
+                                  setMeetingData({
+                                    leadId: viewingLead.id,
+                                    leadName: viewingLead.name,
+                                    meetingName: "",
+                                    meetingType: "Online",
+                                    meetingDate: "",
+                                    meetingTime: "",
+                                    meetingOutcome: "Scheduled",
+                                    extensions: [],
+                                  });
+                                  setMeetingAttendees([]);
+                                  setShowAddMeetingModal(true);
+                                }}
+                                type="button"
+                                {...crmLeadPrimaryBlueCtaHoverHandlers}
+                              >
+                                <Plus size={14} />
+                                Schedule Meeting
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+  );
+}
 
 export function CrmLeadsViewFragment01() {
   useLeadsPageContext();
@@ -1196,14 +2938,10 @@ export function CrmLeadsViewFragment02() {
                       selectedLead?.leadPotential ||
                       "N/A",
                     type: "badge",
-                    badgeVariant:
-                      selectedLead?.lead_potential === "Hot" ||
-                      selectedLead?.leadPotential === "Hot"
-                        ? "danger"
-                        : selectedLead?.lead_potential === "Warm" ||
-                            selectedLead?.leadPotential === "Warm"
-                          ? "warning"
-                          : "secondary",
+                    badgeVariant: crmSidebarLeadPotentialBadgeVariant(
+                      selectedLead?.lead_potential,
+                      selectedLead?.leadPotential,
+                    ),
                   },
                   {
                     label: "Owner",
@@ -1215,11 +2953,10 @@ export function CrmLeadsViewFragment02() {
                   },
                   {
                     label: "Lead Score",
-                    value: selectedLead?.stage?.score
-                      ? `${selectedLead.stage.score}%`
-                      : selectedLead?.lead_score
-                        ? `${selectedLead.lead_score}%`
-                        : "N/A",
+                    value: formatCrmSidebarLeadScoreValue(
+                      selectedLead?.stage?.score,
+                      selectedLead?.lead_score,
+                    ),
                     show: !!(
                       selectedLead?.stage?.score || selectedLead?.lead_score
                     ),
@@ -1231,23 +2968,23 @@ export function CrmLeadsViewFragment02() {
                   },
                   {
                     label: "Created Date",
-                    value:
-                      selectedLead?.created_at || selectedLead?.created
-                        ? formatCrmPreviewDate(
-                            selectedLead.created_at || selectedLead.created,
-                          ) || "N/A"
-                        : "N/A",
+                    value: (() => {
+                      const raw =
+                        selectedLead?.created_at || selectedLead?.created;
+                      if (!raw) return "N/A";
+                      return formatCrmPreviewDate(raw) || "N/A";
+                    })(),
                     type: "date",
                   },
                   {
                     label: "Last Updated",
-                    value:
-                      selectedLead?.updated_at || selectedLead?.last_activity_at
-                        ? formatCrmPreviewDate(
-                            selectedLead.updated_at ||
-                              selectedLead.last_activity_at,
-                          ) || "N/A"
-                        : "N/A",
+                    value: (() => {
+                      const raw =
+                        selectedLead?.updated_at ||
+                        selectedLead?.last_activity_at;
+                      if (!raw) return "N/A";
+                      return formatCrmPreviewDate(raw) || "N/A";
+                    })(),
                     type: "date",
                   },
                 ],
@@ -1584,7 +3321,6 @@ export function CrmLeadsViewFragment03() {
         desc="Please fill in the details below to convert the lead to an opportunity."
         size="lg"
         formHtml={
-          <>
             <Form>
               <Row>
                 <Col md={6}>
@@ -1669,7 +3405,6 @@ export function CrmLeadsViewFragment03() {
                 />
               </Form.Group>
             </Form>
-          </>
         }
         onSubmit={handleConvertSubmit}
         onCancel={() => setShowConvertModal(false)}
@@ -1781,6 +3516,8 @@ export function CrmLeadsViewFragment04() {
             }}
           >
             <button
+              type="button"
+              aria-label="Close lead view"
               onClick={() => setShowLeadViewModal(false)}
               style={{
                 position: "absolute",
@@ -1804,6 +3541,14 @@ export function CrmLeadsViewFragment04() {
                 e.currentTarget.style.transform = "scale(1.05)";
               }}
               onMouseOut={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+                e.currentTarget.style.transform = "scale(1.05)";
+              }}
+              onBlur={(e) => {
                 e.currentTarget.style.background = "rgba(255,255,255,0.15)";
                 e.currentTarget.style.transform = "scale(1)";
               }}
@@ -2037,13 +3782,9 @@ export function CrmLeadsViewFragment04() {
                             }
                           >
                             <Badge
-                              bg={
-                                viewingLead.lead_potential === "Hot"
-                                  ? "danger"
-                                  : viewingLead.lead_potential === "Warm"
-                                    ? "warning"
-                                    : "secondary"
-                              }
+                              bg={crmLeadDetailPotentialBadgeBg(
+                                viewingLead.lead_potential,
+                              )}
                               style={{
                                 padding: "6px 14px",
                                 borderRadius: "20px",
@@ -2078,9 +3819,9 @@ export function CrmLeadsViewFragment04() {
                               />
                             }
                           >
-                            {viewingLead?.lead_score !== null
-                              ? `${viewingLead?.lead_score}%`
-                              : "Not Set"}
+                            {viewingLead?.lead_score == null
+                              ? "Not Set"
+                              : `${viewingLead.lead_score}%`}
                           </CrmLeadViewQuickStatCard>
                         </div>
 
@@ -2163,28 +3904,9 @@ export function CrmLeadsViewFragment04() {
                         {/* Company Information Section */}
                         {viewingLead.company_name && (
                           <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
+                            <CrmLeadViewSectionTitle>
                               Company Information
-                            </h5>
+                            </CrmLeadViewSectionTitle>
                             <div
                               style={{
                                 background: "#f9fafb",
@@ -2248,26 +3970,7 @@ export function CrmLeadsViewFragment04() {
                           Array.isArray(viewingLead.contact_persons) &&
                           viewingLead.contact_persons.length > 0 && (
                             <div style={{ marginBottom: "28px" }}>
-                              <h5
-                                style={{
-                                  fontSize: "15px",
-                                  fontWeight: 700,
-                                  color: "#1f2937",
-                                  marginBottom: "16px",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: "4px",
-                                    height: "18px",
-                                    background:
-                                      "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                                    borderRadius: "2px",
-                                  }}
-                                />
+                              <CrmLeadViewSectionTitle>
                                 Contact Persons
                                 <Badge
                                   bg="secondary"
@@ -2281,7 +3984,7 @@ export function CrmLeadsViewFragment04() {
                                 >
                                   {viewingLead.contact_persons.length}
                                 </Badge>
-                              </h5>
+                              </CrmLeadViewSectionTitle>
                               <div
                                 style={{
                                   background: "#f9fafb",
@@ -2300,7 +4003,7 @@ export function CrmLeadsViewFragment04() {
                                   {viewingLead.contact_persons.map(
                                     (person: any, index: number) => (
                                       <div
-                                        key={index}
+                                        key={`${person.id ?? person.email ?? "p"}-${person.name ?? ""}-${index}`}
                                         style={{
                                           background: "white",
                                           padding: "16px",
@@ -2364,28 +4067,9 @@ export function CrmLeadsViewFragment04() {
                         {/* Description */}
                         {viewingLead.description && (
                           <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
+                            <CrmLeadViewSectionTitle>
                               Description
-                            </h5>
+                            </CrmLeadViewSectionTitle>
                             <div
                               style={{
                                 background: "#fffbeb",
@@ -2406,28 +4090,9 @@ export function CrmLeadsViewFragment04() {
                         {/* Lost Reason */}
                         {viewingLead.is_lost && viewingLead.lost_reason && (
                           <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
+                            <CrmLeadViewSectionTitle accent="danger">
                               Lead Lost Information
-                            </h5>
+                            </CrmLeadViewSectionTitle>
                             <div
                               style={{
                                 background: "#fee2e2",
@@ -2467,28 +4132,9 @@ export function CrmLeadsViewFragment04() {
                       <div>
                         {/* Campaign Information Section */}
                         <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #2563eb 0%, #0284c7 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
+                          <CrmLeadViewSectionTitle>
                             Campaign Information
-                          </h5>
+                          </CrmLeadViewSectionTitle>
                           {viewingLead.campaign ? (
                             <div
                               style={{
@@ -2682,7 +4328,7 @@ export function CrmLeadsViewFragment04() {
                                               Overdue
                                             </Badge>
                                           )}
-                                          {isNextHour && !isOverdue && (
+                                          {isNextHour && isOverdue === false && (
                                             <Badge
                                               bg="warning"
                                               className="ms-2"
@@ -2699,7 +4345,7 @@ export function CrmLeadsViewFragment04() {
                                     })()}
                                   </CrmLeadPreviewGrayField>
                                 )}
-                                {viewingLead.crm_data.created_at && (
+                                {viewingLead.crm_data?.created_at && (
                                   <CrmLeadPreviewGrayField label="Created At">
                                     <Calendar
                                       size={14}
@@ -2710,7 +4356,7 @@ export function CrmLeadsViewFragment04() {
                                       }}
                                     />
                                     {formatCrmPreviewDate(
-                                      viewingLead.crm_data.created_at,
+                                      viewingLead.crm_data?.created_at,
                                     )}
                                   </CrmLeadPreviewGrayField>
                                 )}
@@ -2884,6 +4530,19 @@ export function CrmLeadsViewFragment04() {
                               e.currentTarget.style.background = "white";
                               e.currentTarget.style.transform = "translateX(0)";
                             }}
+                            onFocus={(e) => {
+                              if (activeFilter === "lost") return;
+                              e.currentTarget.style.borderColor = "#2563eb";
+                              e.currentTarget.style.background = "#eff6ff";
+                              e.currentTarget.style.transform =
+                                "translateX(4px)";
+                            }}
+                            onBlur={(e) => {
+                              if (activeFilter === "lost") return;
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.background = "white";
+                              e.currentTarget.style.transform = "translateX(0)";
+                            }}
                           >
                             <div
                               style={{
@@ -2945,6 +4604,19 @@ export function CrmLeadsViewFragment04() {
                               e.currentTarget.style.background = "white";
                               e.currentTarget.style.transform = "translateX(0)";
                             }}
+                            onFocus={(e) => {
+                              if (activeFilter !== "lost") {
+                                e.currentTarget.style.borderColor = "#10b981";
+                                e.currentTarget.style.background = "#f0fdf4";
+                                e.currentTarget.style.transform =
+                                  "translateX(4px)";
+                              }
+                            }}
+                            onBlur={(e) => {
+                              e.currentTarget.style.borderColor = "#e5e7eb";
+                              e.currentTarget.style.background = "white";
+                              e.currentTarget.style.transform = "translateX(0)";
+                            }}
                           >
                             <div
                               style={{
@@ -2986,6 +4658,16 @@ export function CrmLeadsViewFragment04() {
                             e.currentTarget.style.transform = "translateX(4px)";
                           }}
                           onMouseOut={(e) => {
+                            e.currentTarget.style.borderColor = "#e5e7eb";
+                            e.currentTarget.style.background = "white";
+                            e.currentTarget.style.transform = "translateX(0)";
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = "#2563eb";
+                            e.currentTarget.style.background = "#eff6ff";
+                            e.currentTarget.style.transform = "translateX(4px)";
+                          }}
+                          onBlur={(e) => {
                             e.currentTarget.style.borderColor = "#e5e7eb";
                             e.currentTarget.style.background = "white";
                             e.currentTarget.style.transform = "translateX(0)";
@@ -3093,9 +4775,9 @@ export function CrmLeadsViewFragment04() {
                                 fontWeight: 600,
                               }}
                             >
-                              {viewingLead?.lead_score !== null
-                                ? `${viewingLead?.lead_score}%`
-                                : "N/A"}
+                              {viewingLead?.lead_score == null
+                                ? "N/A"
+                                : `${viewingLead.lead_score}%`}
                             </span>
                           </div>
 
@@ -3208,13 +4890,10 @@ export function CrmLeadsViewFragment04() {
                               });
                               setShowAddFollowupModal(true);
                             }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = "#eff6ff";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = "transparent";
-                            }}
+                            type="button"
+                            aria-label="Add follow-up"
                             title="Add Follow-up"
+                            {...crmLeadIconSoftSurfaceHoverHandlers}
                           >
                             <Plus size={16} />
                           </button>
@@ -3312,15 +4991,9 @@ export function CrmLeadsViewFragment04() {
                                           : "N/A"}
                                       </div>
                                       <Badge
-                                        bg={
-                                          followUp.follow_up_status ===
-                                          "Completed"
-                                            ? "success"
-                                            : followUp.follow_up_status ===
-                                                "In Progress"
-                                              ? "primary"
-                                              : "warning"
-                                        }
+                                        bg={crmFollowUpTimelineStatusBadgeBg(
+                                          followUp.follow_up_status,
+                                        )}
                                         style={{
                                           fontSize: "10px",
                                           padding: "2px 8px",
@@ -3349,8 +5022,7 @@ export function CrmLeadsViewFragment04() {
                                     fontWeight: 600,
                                   }}
                                 >
-                                  +{viewingLead.follow_ups.length - 5} more
-                                  follow-ups
+                                  {`+${viewingLead.follow_ups.length - 5} more follow-ups`}
                                 </span>
                               </div>
                             )}
@@ -3404,12 +5076,8 @@ export function CrmLeadsViewFragment04() {
                                   });
                                   setShowAddFollowupModal(true);
                                 }}
-                                onMouseOver={(e) => {
-                                  e.currentTarget.style.background = "#1d4ed8";
-                                }}
-                                onMouseOut={(e) => {
-                                  e.currentTarget.style.background = "#2563eb";
-                                }}
+                                type="button"
+                                {...crmLeadPrimaryBlueCtaHoverHandlers}
                               >
                                 <Plus size={14} />
                                 Add Follow-up
@@ -3472,13 +5140,10 @@ export function CrmLeadsViewFragment04() {
                               setMeetingAttendees([]);
                               setShowAddMeetingModal(true);
                             }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.background = "#eff6ff";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.background = "transparent";
-                            }}
+                            type="button"
+                            aria-label="Schedule meeting"
                             title="Schedule Meeting"
+                            {...crmLeadIconSoftSurfaceHoverHandlers}
                           >
                             <Plus size={16} />
                           </button>
@@ -3602,8 +5267,7 @@ export function CrmLeadsViewFragment04() {
                                     fontWeight: 600,
                                   }}
                                 >
-                                  +{viewingLead.meetings.length - 5} more
-                                  meetings
+                                  {`+${viewingLead.meetings.length - 5} more meetings`}
                                 </span>
                               </div>
                             )}
@@ -3656,12 +5320,8 @@ export function CrmLeadsViewFragment04() {
                                   setMeetingAttendees([]);
                                   setShowAddMeetingModal(true);
                                 }}
-                                onMouseOver={(e) => {
-                                  e.currentTarget.style.background = "#1d4ed8";
-                                }}
-                                onMouseOut={(e) => {
-                                  e.currentTarget.style.background = "#2563eb";
-                                }}
+                                type="button"
+                                {...crmLeadPrimaryBlueCtaHoverHandlers}
                               >
                                 <Plus size={14} />
                                 Schedule Meeting
@@ -3714,6 +5374,16 @@ export function CrmLeadsViewFragment04() {
                 e.currentTarget.style.color = "#6c757d";
                 e.currentTarget.style.background = "white";
               }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#2563eb";
+                e.currentTarget.style.color = "#2563eb";
+                e.currentTarget.style.background = "#eff6ff";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#e5e7eb";
+                e.currentTarget.style.color = "#6c757d";
+                e.currentTarget.style.background = "white";
+              }}
             >
               Close
             </Button>
@@ -3753,6 +5423,8 @@ export function CrmLeadsViewFragment05() {
             }}
           >
             <button
+              type="button"
+              aria-label="Close lead history"
               onClick={() => {
                 setShowLeadHistoryModal(false);
               }}
@@ -3777,6 +5449,14 @@ export function CrmLeadsViewFragment05() {
                 e.currentTarget.style.transform = "rotate(90deg)";
               }}
               onMouseOut={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+                e.currentTarget.style.transform = "rotate(0deg)";
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.3)";
+                e.currentTarget.style.transform = "rotate(90deg)";
+              }}
+              onBlur={(e) => {
                 e.currentTarget.style.background = "rgba(255,255,255,0.2)";
                 e.currentTarget.style.transform = "rotate(0deg)";
               }}
@@ -4014,7 +5694,7 @@ export function CrmLeadsViewFragment05() {
 
                   return (
                     <div
-                      key={audit.id || index}
+                      key={String(audit.id ?? `audit-${index}`)}
                       style={{
                         position: "relative",
                         paddingLeft: "60px",
@@ -4045,23 +5725,7 @@ export function CrmLeadsViewFragment05() {
                       />
 
                       {/* Activity Card */}
-                      <Card
-                        className="border-0 shadow-sm"
-                        style={{
-                          transition: "all 0.3s",
-                          cursor: "pointer",
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = "translateX(5px)";
-                          e.currentTarget.style.boxShadow =
-                            "0 4px 12px rgba(0,0,0,0.15)";
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = "translateX(0)";
-                          e.currentTarget.style.boxShadow =
-                            "0 1px 3px rgba(0,0,0,0.1)";
-                        }}
-                      >
+                      <Card className="border-0 shadow-sm crm-lead-history-audit-card">
                         <Card.Body style={{ padding: "16px" }}>
                           <div
                             style={{
@@ -4109,11 +5773,9 @@ export function CrmLeadsViewFragment05() {
                                       color: "#1f2937",
                                     }}
                                   >
-                                    {audit.event === "created"
-                                      ? "Created"
-                                      : audit.event === "updated"
-                                        ? "Updated"
-                                        : audit.event}
+                                    {crmLeadHistoryAuditEventLabel(
+                                      audit.event,
+                                    )}
                                   </span>
                                   <div
                                     style={{
@@ -4238,6 +5900,13 @@ export function CrmLeadsViewFragment05() {
                   opacity: 1;
                   transform: translateX(0);
                 }
+              }
+              .crm-lead-history-audit-card {
+                transition: all 0.3s;
+              }
+              .crm-lead-history-audit-card:hover {
+                transform: translateX(5px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
               }
             `}</style>
           </Modal.Body>
@@ -4520,9 +6189,10 @@ export function CrmLeadsViewFragment06() {
           >
             {loadingFollowUp ? (
               <>
-                <div
-                  className="spinner-border spinner-border-sm me-1"
-                  role="status"
+                <output
+                  className="spinner-border spinner-border-sm me-1 d-inline-block"
+                  aria-live="polite"
+                  aria-label="Loading"
                 />
                 {followUpIdToEdit ? "Updating..." : "Adding..."}
               </>
@@ -4818,9 +6488,10 @@ export function CrmLeadsViewFragment07() {
           >
             {loadingMeeting ? (
               <>
-                <div
-                  className="spinner-border spinner-border-sm me-1"
-                  role="status"
+                <output
+                  className="spinner-border spinner-border-sm me-1 d-inline-block"
+                  aria-live="polite"
+                  aria-label="Loading"
                 />
                 {meetingIdToEdit ? "Updating..." : "Scheduling..."}
               </>
@@ -4925,11 +6596,11 @@ export function CrmLeadsViewFragment08() {
           >
             {loadingChangeStage ? (
               <>
-                <span
-                  className="spinner-border spinner-border-sm me-2"
-                  role="status"
-                  aria-hidden="true"
-                ></span>
+                <output
+                  className="spinner-border spinner-border-sm me-2 d-inline-block"
+                  aria-live="polite"
+                  aria-label="Loading"
+                />
                 Updating...
               </>
             ) : (
@@ -5002,9 +6673,12 @@ export function CrmLeadsViewFragment09() {
         <Modal.Body>
           {editFetching ? (
             <div className="text-center py-5">
-              <div className="spinner-border text-primary" role="status">
+              <output
+                className="spinner-border text-primary d-inline-block"
+                aria-live="polite"
+              >
                 <span className="visually-hidden">Loading...</span>
-              </div>
+              </output>
               <p className="mt-3">Loading lead data...</p>
             </div>
           ) : (
@@ -5035,10 +6709,16 @@ export function CrmLeadsViewFragment09() {
                     { step: 2, label: "Contact Persons" },
                     { step: 3, label: "Other Info" },
                   ].map(({ step, label }) => (
-                    <div
+                    <button
                       key={step}
-                      className="d-flex flex-column align-items-center position-relative"
-                      style={{ zIndex: 1, cursor: "pointer" }}
+                      type="button"
+                      className="d-flex flex-column align-items-center position-relative btn btn-link p-0 border-0 bg-transparent"
+                      style={{
+                        zIndex: 1,
+                        cursor: "pointer",
+                        color: "inherit",
+                        textDecoration: "none",
+                      }}
                       onClick={() => setEditFormStep(step)}
                     >
                       <div
@@ -5068,7 +6748,7 @@ export function CrmLeadsViewFragment09() {
                       >
                         {label}
                       </small>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -5694,11 +7374,11 @@ export function CrmLeadsViewFragment09() {
             >
               {editLoading ? (
                 <>
-                  <span
-                    className="spinner-border spinner-border-sm me-2"
-                    role="status"
-                    aria-hidden="true"
-                  ></span>
+                  <output
+                    className="spinner-border spinner-border-sm me-2 d-inline-block"
+                    aria-live="polite"
+                    aria-label="Loading"
+                  />
                   Updating...
                 </>
               ) : (

@@ -1,6 +1,7 @@
 import type { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
 import { CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { isValidEmail } from "@utils/Helper";
 
 export interface LeadData {
   id: any;
@@ -154,8 +155,6 @@ export function buildLeadsListExportCsvText(allData: unknown[]): string {
   return [headerRow, ...dataRows].join("\n");
 }
 
-const CONTACT_PERSON_EMAIL_RE = /\S+@\S+\.\S+/;
-
 export type ContactPersonFieldsForValidation = {
   title?: string;
   name?: string;
@@ -181,7 +180,7 @@ export function getContactPersonsValidationError(
     if (!person?.email?.trim()) {
       return `Contact person ${i + 1}: Email is required`;
     }
-    if (!CONTACT_PERSON_EMAIL_RE.test(person.email)) {
+    if (!isValidEmail(person.email)) {
       return `Contact person ${i + 1}: Invalid email format`;
     }
   }

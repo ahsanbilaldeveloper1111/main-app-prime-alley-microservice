@@ -13,7 +13,9 @@ import {
   CrmLeadsViewFragment10,
 } from "./CrmLeadsViewFragments";
 
-export function CrmLeadsPageView({ page }: { page: CrmLeadsPageModel }) {
+type CrmLeadsPageViewProps = Readonly<{ page: CrmLeadsPageModel }>;
+
+export function CrmLeadsPageView({ page }: CrmLeadsPageViewProps) {
   return (
     <LeadsPageContext.Provider value={page}>
       <CrmLeadsViewFragment01 />
