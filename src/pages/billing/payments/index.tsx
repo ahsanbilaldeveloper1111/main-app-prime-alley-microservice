@@ -5,7 +5,7 @@ import BillingHistoryPage from "@components/billings/BillingHistoryPage";
 /**
  * Standalone route for payment / billing history (same UI and data as Account & Billing → Billing History).
  */
-const PaymentsPage = () => <BillingHistoryPage />;
+const PaymentsPage = () => <BillingHistoryPage customerCompanyPicker />;
 
 PaymentsPage.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;

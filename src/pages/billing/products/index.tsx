@@ -1110,7 +1110,6 @@ const BillingManagement = () => {
     // Handle create product
     const handleCreateProduct = useCallback(() => {
         
-        toast.success("Product created successfully!");
         setShowCreateProductModal(false);
         fetchCrmData();
       }, [fetchCrmData]);
@@ -1118,7 +1117,6 @@ const BillingManagement = () => {
       // Handle create product and add another
       const handleCreateProductAndAddAnother = useCallback(() => {
         
-        toast.success("Product created successfully!");
         setCreateProductModalKey((k) => k + 1);
         fetchCrmData();
         // Don't close modal, just reset form
