@@ -1613,7 +1613,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
 
       {activityFilter === "emails" && (
         <>
-          {emailsLoading ? (
+          {(() => {
+            if (emailsLoading) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -1627,7 +1629,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 Loading emails…
               </p>
             </div>
-          ) : emailsError ? (
+              );
+            }
+            if (emailsError) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -1645,7 +1650,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 {emailsError}
               </p>
             </div>
-          ) : emailsList.length === 0 ? (
+              );
+            }
+            if (emailsList.length === 0) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -1670,7 +1678,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 Emails sent to this contact will appear here.
               </p>
             </div>
-          ) : (
+              );
+            }
+            return (
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
@@ -1920,13 +1930,16 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   </div>
                 )}
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
       {activityFilter === "notes" && (
         <>
-          {notesLoading ? (
+          {(() => {
+            if (notesLoading) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -1940,7 +1953,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 Loading notes…
               </p>
             </div>
-          ) : notesError ? (
+              );
+            }
+            if (notesError) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -1958,7 +1974,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 {notesError}
               </p>
             </div>
-          ) : notesList.length === 0 ? (
+              );
+            }
+            if (notesList.length === 0) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -1984,7 +2003,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 if you need to.
               </p>
             </div>
-          ) : (
+              );
+            }
+            return (
             <div>
               {notesList.map((note) => {
                 const updatedAt = note.updated_at
@@ -2158,7 +2179,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 );
               })}
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
@@ -2244,7 +2266,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
               Create task
             </button>
           </div>
-          {tasksLoading ? (
+          {(() => {
+            if (tasksLoading) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -2258,7 +2282,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 Loading tasks…
               </p>
             </div>
-          ) : tasksError ? (
+              );
+            }
+            if (tasksError) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -2276,7 +2303,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 {tasksError}
               </p>
             </div>
-          ) : tasksList.length === 0 ? (
+              );
+            }
+            if (tasksList.length === 0) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -2301,7 +2331,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 Create and manage tasks related to this contact.
               </p>
             </div>
-          ) : (
+              );
+            }
+            return (
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
@@ -2660,13 +2692,16 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 );
               })}
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
       {activityFilter === "meetings" && (
         <>
-          {meetingsLoading ? (
+          {(() => {
+            if (meetingsLoading) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -2680,7 +2715,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 Loading meetings…
               </p>
             </div>
-          ) : meetingsError ? (
+              );
+            }
+            if (meetingsError) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -2698,7 +2736,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 {meetingsError}
               </p>
             </div>
-          ) : meetingsList.length === 0 ? (
+              );
+            }
+            if (meetingsList.length === 0) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -2723,7 +2764,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 Schedule and track meetings with this contact.
               </p>
             </div>
-          ) : (
+              );
+            }
+            return (
             <div>
               {meetingsList.map((meeting) => {
                 const meetingUpdatedAt = meeting.updated_at
@@ -2759,7 +2802,6 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <>
                           <p
                             style={{
                               fontSize: "14px",
@@ -2787,13 +2829,27 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                             {meeting.status ? ` · ${meeting.status}` : ""}
                           </p>
                           {meeting.meet_link && (
-                            <p style={{ fontSize: '13px', color: '#2563eb', margin: '6px 0 0 0', lineHeight: '1.5' }}>
-                              <a href={meeting.meet_link} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>
+                            <p
+                              style={{
+                                fontSize: "13px",
+                                color: "#2563eb",
+                                margin: "6px 0 0 0",
+                                lineHeight: "1.5",
+                              }}
+                            >
+                              <a
+                                href={meeting.meet_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  color: "inherit",
+                                  textDecoration: "underline",
+                                }}
+                              >
                                 Join meeting
                               </a>
                             </p>
                           )}
-                        </>
                       </div>
                       <div
                         style={{
@@ -2835,13 +2891,16 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 );
               })}
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
       {activityFilter === "sms" && (
         <>
-          {smsLoading ? (
+          {(() => {
+            if (smsLoading) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -2855,7 +2914,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 Loading SMS…
               </p>
             </div>
-          ) : smsError ? (
+              );
+            }
+            if (smsError) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -2873,7 +2935,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 {smsError}
               </p>
             </div>
-          ) : smsList.length === 0 ? (
+              );
+            }
+            if (smsList.length === 0) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -2898,7 +2963,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 SMS sent to this contact will appear here.
               </p>
             </div>
-          ) : (
+              );
+            }
+            return (
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
@@ -3134,13 +3201,16 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
       {activityFilter === "whatsapp" && (
         <>
-          {whatsappChatsLoading ? (
+          {(() => {
+            if (whatsappChatsLoading) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -3154,7 +3224,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 Loading WhatsApp chats…
               </p>
             </div>
-          ) : whatsappChatsError ? (
+              );
+            }
+            if (whatsappChatsError) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -3172,7 +3245,10 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 {whatsappChatsError}
               </p>
             </div>
-          ) : whatsappChats.length === 0 ? (
+              );
+            }
+            if (whatsappChats.length === 0) {
+              return (
             <div
               style={{
                 backgroundColor: "#fff",
@@ -3197,7 +3273,9 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 WhatsApp chats with this contact will appear here.
               </p>
             </div>
-          ) : (
+              );
+            }
+            return (
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
@@ -3304,7 +3382,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 );
               })}
             </div>
-          )}
+            );
+          })()}
         </>
       )}
 
@@ -3858,15 +3937,22 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                 maxHeight: canSendWhatsApp ? "280px" : "320px",
               }}
             >
-              {whatsappMessagesLoading ? (
-                <p style={{ fontSize: "14px", color: "#718096", margin: 0 }}>
-                  Loading messages…
-                </p>
-              ) : whatsappMessages.length === 0 ? (
-                <p style={{ fontSize: "14px", color: "#718096", margin: 0 }}>
-                  No messages in this chat
-                </p>
-              ) : (
+              {(() => {
+                if (whatsappMessagesLoading) {
+                  return (
+                    <p style={{ fontSize: "14px", color: "#718096", margin: 0 }}>
+                      Loading messages…
+                    </p>
+                  );
+                }
+                if (whatsappMessages.length === 0) {
+                  return (
+                    <p style={{ fontSize: "14px", color: "#718096", margin: 0 }}>
+                      No messages in this chat
+                    </p>
+                  );
+                }
+                return (
                 <div
                   style={{
                     display: "flex",
@@ -3927,7 +4013,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                     );
                   })}
                 </div>
-              )}
+                );
+              })()}
             </div>
             {canSendWhatsApp && (
               <div

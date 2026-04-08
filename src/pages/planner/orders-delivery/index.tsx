@@ -17,7 +17,6 @@ import {
   OrderEditModal,
   type TableColumn,
   type TableAction,
-  type StatsCardData,
 } from "@crm/orders/orderListOrderPageFrame";
 import {
   FiUpload,
@@ -71,6 +70,10 @@ import {
 import Select, { type SingleValue } from "@components/AppSelect";
 
 type OrdersDeliverySelectOption = { value: string | number; label: string };
+const toOptionalSelectString = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined) return null;
+  return String(value);
+};
 import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,
@@ -1841,8 +1844,7 @@ const CrmOrders = () => {
                     onChange={(selected) => {
                       const opt =
                         selected as SingleValue<OrdersDeliverySelectOption>;
-                      const assignedToValue =
-                        opt?.value != null ? String(opt.value) : null;
+                      const assignedToValue = toOptionalSelectString(opt?.value);
                       setOrdersFilters((prev) => ({
                         ...prev,
                         assignedTo: assignedToValue,
@@ -1880,8 +1882,7 @@ const CrmOrders = () => {
                     onChange={(selected) => {
                       const opt =
                         selected as SingleValue<OrdersDeliverySelectOption>;
-                      const stageValue =
-                        opt?.value != null ? String(opt.value) : null;
+                      const stageValue = toOptionalSelectString(opt?.value);
                       setOrdersFilters((prev) => ({
                         ...prev,
                         stage: stageValue,
@@ -2710,8 +2711,7 @@ const CrmOrders = () => {
             onChange: (selected) => {
               const opt =
                 selected as SingleValue<OrdersDeliverySelectOption>;
-              const assignedToValue =
-                opt?.value != null ? String(opt.value) : null;
+              const assignedToValue = toOptionalSelectString(opt?.value);
               setOrdersFilters(prev => ({
                 ...prev,
                 assignedTo: assignedToValue
@@ -2740,8 +2740,7 @@ const CrmOrders = () => {
             onChange: (selected) => {
               const opt =
                 selected as SingleValue<OrdersDeliverySelectOption>;
-              const stageValue =
-                opt?.value != null ? String(opt.value) : null;
+              const stageValue = toOptionalSelectString(opt?.value);
               setOrdersFilters(prev => ({
                 ...prev,
                 stage: stageValue

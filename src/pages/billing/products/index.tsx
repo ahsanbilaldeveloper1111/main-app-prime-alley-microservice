@@ -250,10 +250,10 @@ const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
 function BillingProductsToolbarButton({
   onClick,
   children,
-}: {
+}: Readonly<{
   onClick: () => void;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <button
       type="button"

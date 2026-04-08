@@ -2,6 +2,14 @@ import moment from "moment";
 
 export const ALL_STATUS_VALUE = "All Status";
 
+function toStringFilterValue(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return null;
+}
+
 /**
  * Mutates Planner listTasks params from sidebar / quick filter state.
  */
@@ -17,8 +25,9 @@ export function applyPlannerTaskFiltersToListParams(
       high: "high",
       urgent: "urgent",
     };
+    const priorityValue = toStringFilterValue(filters.priority);
     params.priority =
-      priorityMap[String(filters.priority)] || "normal";
+      (priorityValue ? priorityMap[priorityValue] : undefined) || "normal";
   }
   if (filters.due_date_from) params.due_date_from = filters.due_date_from;
   if (filters.due_date_to) params.due_date_to = filters.due_date_to;

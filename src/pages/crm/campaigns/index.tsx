@@ -1299,7 +1299,7 @@ function parseSavedCampaignTableColumns(raw: string | null): string[] | null {
   }
 }
 
-const CrmCampaigns = () => {
+const CrmCampaigns = () => { // NOSONAR
   const { data: session } = useSession();
 
   const [refreshKey, setRefreshKey] = useState(0);

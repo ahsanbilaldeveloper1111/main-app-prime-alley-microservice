@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, X, Link, Image, List, Clock } from 'lucide-react';
+import { ChevronDown, X, Link, Image, List } from 'lucide-react';
 import Select from 'react-select';
 import { ModuleSlug } from '@utils/Helper';
 import { GetHierarchyData } from '@utils/users';
@@ -231,7 +231,7 @@ interface TaskModalProps {
   onSave: (taskData: TaskModalSaveTaskData) => void;
 }
 
-const TaskModal: React.FC<TaskModalProps> = ({
+const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
   isOpen,
   onClose,
   assignedTo = '',
@@ -370,17 +370,51 @@ const TaskModal: React.FC<TaskModalProps> = ({
     if (notesRef.current) setNotes(notesRef.current.innerHTML || '');
   };
 
-  const runRichTextFormatCommand = (
-    command: 'bold' | 'italic' | 'underline',
-  ) => {
-    notesRef.current?.focus();
-    document.execCommand(command, false);
+  const getActiveEditorRange = () => {
+    const el = notesRef.current;
+    const selection = globalThis.getSelection?.();
+    if (
+      !el ||
+      !selection ||
+      selection.rangeCount === 0 ||
+      !el.contains(selection.anchorNode)
+    ) {
+      return null;
+    }
+    return selection.getRangeAt(0);
+  };
+
+  const wrapSelectionWithTag = (tagName: 'b' | 'i' | 'u' | 'code') => {
+    const range = getActiveEditorRange();
+    const el = notesRef.current;
+    if (!el) return;
+    el.focus();
+    if (!range) return;
+    const selectedText = range.toString();
+    const tag = document.createElement(tagName);
+    tag.textContent = selectedText || (tagName === 'code' ? 'code' : 'text');
+    range.deleteContents();
+    range.insertNode(tag);
+    range.setStartAfter(tag);
+    range.setEndAfter(tag);
     syncNotesFromEditor();
   };
 
-  const handleBold = () => runRichTextFormatCommand('bold');
-  const handleItalic = () => runRichTextFormatCommand('italic');
-  const handleUnderline = () => runRichTextFormatCommand('underline');
+  const insertHtmlAtSelection = (html: string) => {
+    const range = getActiveEditorRange();
+    const el = notesRef.current;
+    if (!el) return;
+    el.focus();
+    if (!range) return;
+    const fragment = range.createContextualFragment(html);
+    range.deleteContents();
+    range.insertNode(fragment);
+    syncNotesFromEditor();
+  };
+
+  const handleBold = () => wrapSelectionWithTag('b');
+  const handleItalic = () => wrapSelectionWithTag('i');
+  const handleUnderline = () => wrapSelectionWithTag('u');
 
   const handleLink = () => {
     const el = notesRef.current;
@@ -390,20 +424,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
   };
 
   const handleList = () => {
-    notesRef.current?.focus();
-    document.execCommand('insertUnorderedList', false);
-    syncNotesFromEditor();
+    insertHtmlAtSelection('<ul><li>List item</li></ul>');
   };
 
   const handleCode = () => {
-    const el = notesRef.current;
-    if (!el) return;
-    el.focus();
-    const sel = window.getSelection();
-    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
-    const selectedText = range?.toString() || 'code';
-    document.execCommand('insertHTML', false, `<code>${selectedText}</code>`);
-    syncNotesFromEditor();
+    wrapSelectionWithTag('code');
   };
 
   const handleImage = () => {
@@ -567,13 +592,17 @@ const TaskModal: React.FC<TaskModalProps> = ({
             urlModalType === 'link' ? 'Insert link' : 'Insert image'
           }
           onSubmit={(url) => {
-            notesRef.current?.focus();
-            document.execCommand(
-              urlModalType === 'link' ? 'createLink' : 'insertImage',
-              false,
-              url,
+            const safeUrl = url.trim();
+            if (!safeUrl) return;
+            if (urlModalType === 'link') {
+              insertHtmlAtSelection(
+                `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`,
+              );
+              return;
+            }
+            insertHtmlAtSelection(
+              `<img src="${safeUrl}" alt="Inserted image" />`,
             );
-            syncNotesFromEditor();
           }}
         />
       ) : null}

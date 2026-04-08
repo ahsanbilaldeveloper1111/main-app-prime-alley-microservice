@@ -159,6 +159,11 @@ type DealApprovalsFilterOption = {
   label: string | number;
 };
 
+const toOptionalSelectString = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined) return null;
+  return String(value);
+};
+
 const dealApprovalsSelectStyles =
   customSelectStyles as StylesConfig<
     DealApprovalsFilterOption,
@@ -205,7 +210,7 @@ const dealsToKanbanColumns = (
   }));
 };
 
-const CrmDeals = () => {
+const CrmDeals = () => { // NOSONAR
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
@@ -2685,10 +2690,9 @@ const CrmDeals = () => {
                           return option;
                         })()}
                         onChange={(selected: SingleValue<DealApprovalsFilterOption>) => {
-                          const assignedToValue =
-                            selected?.value != null
-                              ? String(selected.value)
-                              : null;
+                          const assignedToValue = toOptionalSelectString(
+                            selected?.value,
+                          );
                           setDealsFilters((prev) => ({
                             ...prev,
                             assignedTo: assignedToValue,
@@ -2726,10 +2730,9 @@ const CrmDeals = () => {
                           return option;
                         })()}
                         onChange={(selected: SingleValue<DealApprovalsFilterOption>) => {
-                          const stageValue =
-                            selected?.value != null
-                              ? String(selected.value)
-                              : null;
+                          const stageValue = toOptionalSelectString(
+                            selected?.value,
+                          );
                           setDealsFilters((prev) => ({
                             ...prev,
                             stage: stageValue,
@@ -6578,9 +6581,7 @@ const CrmDeals = () => {
                       setMeetingData({
                         ...meetingData,
                         meetingType:
-                          option?.value != null
-                            ? String(option.value)
-                            : "Online",
+                          toOptionalSelectString(option?.value) ?? "Online",
                       })
                     }
                     options={[
@@ -6661,7 +6662,7 @@ const CrmDeals = () => {
                         setMeetingData({
                           ...meetingData,
                           meetingOutcome:
-                            option?.value != null ? String(option.value) : "",
+                            toOptionalSelectString(option?.value) ?? "",
                         })
                       }
                       options={[

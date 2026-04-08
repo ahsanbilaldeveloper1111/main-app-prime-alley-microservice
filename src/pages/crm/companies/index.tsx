@@ -845,12 +845,24 @@ const CrmCompanyManagement = () => {
         per_page: pagination.rowsPerPage,
         ...overrides,
       };
-      if (memoizedFilters.search) params.search = memoizedFilters.search;
-      if (memoizedFilters.campaign_id?.length)
-        params.campaign_ids = memoizedFilters.campaign_id;
-      if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
-      if (memoizedFilters.assignment_status)
-        params.assignment_status = memoizedFilters.assignment_status;
+      const assignWhenTruthy = (sourceKey: string, targetKey = sourceKey) => {
+        const value = memoizedFilters[sourceKey];
+        if (value) {
+          params[targetKey] = value;
+        }
+      };
+
+      const assignArrayWhenNotEmpty = (sourceKey: string, targetKey = sourceKey) => {
+        const value = memoizedFilters[sourceKey];
+        if (Array.isArray(value) && value.length > 0) {
+          params[targetKey] = value;
+        }
+      };
+
+      assignWhenTruthy("search");
+      assignArrayWhenNotEmpty("campaign_id", "campaign_ids");
+      assignArrayWhenNotEmpty("tags");
+      assignWhenTruthy("assignment_status");
       if (memoizedFilters.user_extension?.length) {
         const ownerValues = Array.isArray(memoizedFilters.user_extension)
           ? memoizedFilters.user_extension
@@ -866,31 +878,22 @@ const CrmCompanyManagement = () => {
         memoizedFilters.is_viewed !== ""
       )
         params.is_viewed = memoizedFilters.is_viewed;
-      // Create date filter: backend expects date_from / date_to
-      if (memoizedFilters.created_at_from)
-        params.date_from = memoizedFilters.created_at_from;
-      if (memoizedFilters.created_at_to)
-        params.date_to = memoizedFilters.created_at_to;
-      if (memoizedFilters.last_called_at_from)
-        params.last_called_at_from = memoizedFilters.last_called_at_from;
-      if (memoizedFilters.last_called_at_to)
-        params.last_called_at_to = memoizedFilters.last_called_at_to;
-      if (memoizedFilters.has_scheduled_calls !== undefined)
+      assignWhenTruthy("created_at_from", "date_from");
+      assignWhenTruthy("created_at_to", "date_to");
+      assignWhenTruthy("last_called_at_from");
+      assignWhenTruthy("last_called_at_to");
+      if (memoizedFilters.has_scheduled_calls !== undefined) {
         params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
-      if (memoizedFilters.has_tickets !== undefined)
+      }
+      if (memoizedFilters.has_tickets !== undefined) {
         params.has_tickets = memoizedFilters.has_tickets;
-      if (memoizedFilters.scheduled_call_status)
-        params.scheduled_call_status = memoizedFilters.scheduled_call_status;
-      if (memoizedFilters.scheduled_call_from)
-        params.scheduled_call_from = memoizedFilters.scheduled_call_from;
-      if (memoizedFilters.scheduled_call_to)
-        params.scheduled_call_to = memoizedFilters.scheduled_call_to;
-      if (memoizedFilters.source_file)
-        params.source_file = memoizedFilters.source_file;
-      if (memoizedFilters.tag_ids?.length)
-        params.tag_ids = memoizedFilters.tag_ids;
-      if (memoizedFilters.disposition)
-        params.disposition = memoizedFilters.disposition;
+      }
+      assignWhenTruthy("scheduled_call_status");
+      assignWhenTruthy("scheduled_call_from");
+      assignWhenTruthy("scheduled_call_to");
+      assignWhenTruthy("source_file");
+      assignArrayWhenNotEmpty("tag_ids");
+      assignWhenTruthy("disposition");
       if (pagination.sortBy) {
         params.sort_by = pagination.sortBy;
         params.sort_order = pagination.sortOrder;

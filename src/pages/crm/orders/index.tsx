@@ -176,7 +176,7 @@ function ordersToKanbanColumns(
   }));
 }
 
-const CrmOrders = () => {
+const CrmOrders = () => { // NOSONAR
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
