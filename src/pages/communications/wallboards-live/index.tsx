@@ -627,7 +627,6 @@ const LiveCallDashboard = () => {
         callId: lastEvent.callId,
       })
       clearMonitoringState(monitoredDn, 'call dropped')
-      return
     }
   }, [eventLog, activeMonitoring.dn, activeMonitoring.deviceName, activeMonitoring.monitor, clearMonitoringState])
 

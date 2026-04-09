@@ -469,9 +469,12 @@ const Layout = ({ children }: LayoutProps) => {
     const preferredName = incomingCall.controllerDeviceName?.trim() || null;
     const activeDevice = pickControllerDevice(userDevices, preferredName);
     if (!activeDevice) {
-      toast.error("No CTI device available to answer. Check that your phone is registered.", {
-        toastId: "layout_attend_no_device",
-      });
+      toast.error(
+        "No CTI device available to answer. Check that your phone is registered.",
+        {
+          toastId: "layout_attend_no_device",
+        },
+      );
       return;
     }
 
@@ -501,7 +504,8 @@ const Layout = ({ children }: LayoutProps) => {
         closeIncomingCallModal();
       } else {
         const errMsg =
-          (result as { error?: string }).error || "Could not answer the call. Please try again.";
+          (result as { error?: string }).error ||
+          "Could not answer the call. Please try again.";
         toast.error(errMsg, { toastId: "layout_attend_api_failed" });
       }
     } catch (error) {
@@ -537,8 +541,9 @@ const Layout = ({ children }: LayoutProps) => {
       if (!controllerDevice || !hasReliableCtiCallId(rejectCallId)) return;
 
       const rowForReject =
-        Array.from(activeCalls.values()).find((c) => c.callId === rejectCallId) ??
-        matchingActiveCall;
+        Array.from(activeCalls.values()).find(
+          (c) => c.callId === rejectCallId,
+        ) ?? matchingActiveCall;
       const callingDeviceName = rowForReject?.callingDeviceName || "";
       const callingDeviceType = rowForReject?.callingDeviceType || "";
 

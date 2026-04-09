@@ -26,7 +26,8 @@ export function isSameCtiCallForActiveLookup(
     return active.callId === incoming.callId;
   }
   return (
-    active.callingAddress === incoming.callingAddress && active.calledAddress === incoming.calledAddress
+    active.callingAddress === incoming.callingAddress &&
+    active.calledAddress === incoming.calledAddress
   );
 }
 
@@ -43,7 +44,10 @@ export function shouldDismissIncomingModalForAnsweredElsewhere(
   if (active.status !== "connected" && active.status !== "onHold") {
     return false;
   }
-  if (!hasReliableCtiCallId(active.callId) || !hasReliableCtiCallId(incoming.callId)) {
+  if (
+    !hasReliableCtiCallId(active.callId) ||
+    !hasReliableCtiCallId(incoming.callId)
+  ) {
     return false;
   }
   return active.callId === incoming.callId;
@@ -54,7 +58,10 @@ export function shouldCloseIncomingModalOnCallEndEvent(
   eventData: CtiCallPartyLike,
   incoming: IncomingCallMatchable,
 ): boolean {
-  if (!hasReliableCtiCallId(eventData.callId) || !hasReliableCtiCallId(incoming.callId)) {
+  if (
+    !hasReliableCtiCallId(eventData.callId) ||
+    !hasReliableCtiCallId(incoming.callId)
+  ) {
     return false;
   }
   return eventData.callId === incoming.callId;
@@ -78,14 +85,16 @@ export type CtiCallStateEntryForAttend = Readonly<{
 
 export type ResolveCallIdForAttendApiOptions = Readonly<{
   /** From `useCti().callStateMap` — needed when aggregate row `status` is onHold/connected but a party is still RINGING (transfer target). */
-  callStateMap?: Readonly<Record<string, CtiCallStateEntryForAttend | undefined>>;
+  callStateMap?: Readonly<
+    Record<string, CtiCallStateEntryForAttend | undefined>
+  >;
 }>;
 
 const ANSWER_ELIGIBLE_LOCAL_STATUSES = new Set(["ringing", "dialing"]);
 
 function normalizeAddressDigitsTail(address?: string): string {
   if (!address) return "";
-  const digitsOnly = address.replace(/\D/g, "");
+  const digitsOnly = address.replaceAll(/\D/g, "");
   if (!digitsOnly) return "";
   return digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
 }
@@ -117,7 +126,8 @@ function hasRingingPartyForIncomingCallee(
   const parties = callStateMap[callId]?.parties;
   if (!parties?.length) return false;
   return parties.some((p) => {
-    if (!addressesMatchForAttend(p.calledAddress, incoming.calledAddress)) return false;
+    if (!addressesMatchForAttend(p.calledAddress, incoming.calledAddress))
+      return false;
     const s = (p.callStatus || "").toUpperCase();
     return s === "RINGING" || s === "ALERTING" || s === "PROCEEDING";
   });
@@ -139,12 +149,28 @@ function compareAttendCandidates(
   incoming: IncomingCallMatchable,
   callStateMap: ResolveCallIdForAttendApiOptions["callStateMap"],
 ): number {
-  const ringA = hasRingingPartyForIncomingCallee(a.callId, incoming, callStateMap);
-  const ringB = hasRingingPartyForIncomingCallee(b.callId, incoming, callStateMap);
+  const ringA = hasRingingPartyForIncomingCallee(
+    a.callId,
+    incoming,
+    callStateMap,
+  );
+  const ringB = hasRingingPartyForIncomingCallee(
+    b.callId,
+    incoming,
+    callStateMap,
+  );
   if (ringA !== ringB) return ringA ? -1 : 1;
   const sa = (a.status || "").toLowerCase();
   const sb = (b.status || "").toLowerCase();
-  const rank = (s: string) => (s === "ringing" ? 0 : s === "dialing" ? 1 : 2);
+  const rank = (s: string) => {
+    if (s === "ringing") {
+      return 0;
+    } else if (s === "dialing") {
+      return 1;
+    } else {
+      return 2;
+    }
+  };
   return rank(sa) - rank(sb);
 }
 
@@ -161,7 +187,9 @@ export function resolveCallIdForAttendApi(
 ): { callId: string; resolvedFrom: "incoming" | "activeCalls" | "unresolved" } {
   const callStateMap = options?.callStateMap;
 
-  const partyMatches = activeCallRows.filter((c) => rowPartiesMatchIncoming(c, incoming));
+  const partyMatches = activeCallRows.filter((c) =>
+    rowPartiesMatchIncoming(c, incoming),
+  );
 
   let answerEligible = partyMatches.filter((c) =>
     isRowAnswerEligibleForAttend(c, incoming, callStateMap),
@@ -180,7 +208,7 @@ export function resolveCallIdForAttendApi(
   );
 
   if (sorted.length > 0) {
-    let chosen = sorted[0]!;
+    let chosen = sorted[0];
     if (sorted.length > 1 && hasReliableCtiCallId(incoming.callId)) {
       const divergent = sorted.find((c) => c.callId !== incoming.callId);
       if (divergent) {
@@ -208,9 +236,12 @@ export function isDuplicateRingingEventForOpenModal(
   cur: IncomingCallMatchable,
 ): boolean {
   if (hasReliableCtiCallId(cur.callId)) {
-    return hasReliableCtiCallId(eventData.callId) && eventData.callId === cur.callId;
+    return (
+      hasReliableCtiCallId(eventData.callId) && eventData.callId === cur.callId
+    );
   }
   return (
-    eventData.callingAddress === cur.callingAddress && eventData.calledAddress === cur.calledAddress
+    eventData.callingAddress === cur.callingAddress &&
+    eventData.calledAddress === cur.calledAddress
   );
 }
