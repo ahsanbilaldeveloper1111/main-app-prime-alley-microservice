@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   X,
   Briefcase,
   Calendar,
-  Clock,
   Check,
   ChevronDown,
   Bell,
@@ -27,6 +26,7 @@ import { Form, Modal } from "react-bootstrap";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment";
+import { JOURNEY_STATUS_OPTIONS as STATUS_OPTIONS } from "@utils/workforce/journeyStatusOptions";
 
 /** API journey step shape */
 interface JourneyStepRecord {
@@ -62,9 +62,11 @@ interface OnboardingEmployee {
   startDate: string;
   stages: string[];
   progress: number;
-  status: 'In Progress' | 'On Track' | 'Overdue' | 'Completed';
+  status: "In Progress" | "On Track" | "Completed";
   role?: string;
   department?: string;
+  total_steps_count?: string | number;
+  completed_steps_count?: string | number;
 }
 
 interface OnboardingDetailSidebarProps {
@@ -73,25 +75,52 @@ interface OnboardingDetailSidebarProps {
   onRefreshJourneys?: () => void;
 }
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "in_progress", label: "In Progress" },
-  { value: "on_track", label: "On Track" },
-  { value: "overdue", label: "Overdue" },
-  { value: "completed", label: "Completed" },
-];
-
 function statusDisplayToApiValue(display: string): string {
   const map: Record<string, string> = {
     "In Progress": "in_progress",
     "On Track": "on_track",
-    Overdue: "overdue",
-    Completed: "completed",
+    "Completed": "completed",
   };
   return map[display] ?? "in_progress";
 }
 
+function isEmployeeJourneyDisplayCompleted(status: string): boolean {
+  return status.trim().toLowerCase() === "completed";
+}
+
+/** e.g. `in_progress` → `In Progress` */
+function formatJourneyStepStatusForDisplay(status: string): string {
+  return status
+    .split("_")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function logJourneySidebarError(context: string, error: unknown): void {
+  console.error(`[OnboardingDetailSidebar] ${context}`, error);
+}
+
+/** `journey.start_date` (ISO) → `YYYY-MM-DD` for `<input type="date" min>` (UTC calendar date). */
+function journeyStartDateToInputMin(iso: string | null | undefined): string | undefined {
+  if (iso == null || String(iso).trim() === "") return undefined;
+  const trimmed = String(iso).trim();
+  if (Number.isNaN(Date.parse(trimmed))) return undefined;
+  return moment.utc(trimmed).format("YYYY-MM-DD");
+}
+
+function readJourneyStartDateFromPayload(data: unknown): string | null {
+  if (data == null || typeof data !== "object") return null;
+  const s = (data as { start_date?: unknown }).start_date;
+  return typeof s === "string" && s.trim() !== "" ? s.trim() : null;
+}
+
+function clampDueDateToJourneyMin(due: string, min: string | undefined): string {
+  if (min == null || min === "") return due;
+  return due < min ? min : due;
+}
+
 const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ employee, onClose, onRefreshJourneys }) => {
-  const [activeTab, setActiveTab] = useState<"Onboarding" | "Audit & Risk Center">("Onboarding");
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const [statusValue, setStatusValue] = useState<string>(() =>
     statusDisplayToApiValue(employee.status)
@@ -103,7 +132,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
   const [showAddStepForm, setShowAddStepForm] = useState(false);
   const [addStepSubmitting, setAddStepSubmitting] = useState(false);
   const [addStepForm, setAddStepForm] = useState({
-    stage: "General",
+    stage: "",
     title: "",
     description: "",
     due_date: new Date().toISOString().slice(0, 10),
@@ -113,7 +142,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
 
   const [editingStep, setEditingStep] = useState<JourneyStepRecord | null>(null);
   const [editStepForm, setEditStepForm] = useState({
-    stage: "General",
+    stage: "",
     title: "",
     description: "",
     due_date: "",
@@ -124,27 +153,46 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
   const [deletingStepId, setDeletingStepId] = useState<number | null>(null);
   const [deletingJourney, setDeletingJourney] = useState(false);
   const [showDeleteJourneyModal, setShowDeleteJourneyModal] = useState(false);
+  const [showDeleteStepModal, setShowDeleteStepModal] = useState(false);
+  const [stepPendingDelete, setStepPendingDelete] = useState<JourneyStepRecord | null>(null);
+  const [journeyStartDateIso, setJourneyStartDateIso] = useState<string | null>(null);
 
   useEffect(() => {
     setStatusValue(statusDisplayToApiValue(employee.status));
   }, [employee.id, employee.status]);
+
+  const isJourneyCompleted = useMemo(
+    () => statusValue === "completed" || isEmployeeJourneyDisplayCompleted(employee.status),
+    [statusValue, employee.status],
+  );
+
+  const journeyDueDateMin = useMemo(
+    () => journeyStartDateToInputMin(journeyStartDateIso),
+    [journeyStartDateIso],
+  );
 
   const journeyId = Number(employee.id);
   const canUpdateJourney = Number.isInteger(journeyId) && journeyId > 0;
 
   useEffect(() => {
     if (!canUpdateJourney) return;
+    setJourneyStartDateIso(null);
     let cancelled = false;
     setStepsLoading(true);
     getJourney(journeyId)
       .then((data) => {
         if (cancelled) return;
-        const raw = data as { steps?: JourneyStepRecord[] };
+        const raw = data as { steps?: JourneyStepRecord[]; start_date?: string };
         const list = Array.isArray(raw?.steps) ? raw.steps : [];
         setJourneySteps(list);
+        setJourneyStartDateIso(readJourneyStartDateFromPayload(raw));
       })
-      .catch(() => {
-        if (!cancelled) setJourneySteps([]);
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          logJourneySidebarError("getJourney failed", error);
+          setJourneySteps([]);
+          setJourneyStartDateIso(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setStepsLoading(false);
@@ -154,8 +202,28 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
     };
   }, [journeyId, canUpdateJourney]);
 
+  useEffect(() => {
+    if (!showAddStepForm || journeyDueDateMin == null) return;
+    setAddStepForm((f) =>
+      f.due_date < journeyDueDateMin ? { ...f, due_date: journeyDueDateMin } : f,
+    );
+  }, [showAddStepForm, journeyDueDateMin]);
+
   const handleAddStepSubmit = async () => {
     if (!canUpdateJourney) return;
+
+    if(!addStepForm.title.trim()) {
+      toast.error("Task is required");
+      return;
+    }
+    if (
+      journeyDueDateMin != null &&
+      addStepForm.due_date !== "" &&
+      addStepForm.due_date < journeyDueDateMin
+    ) {
+      toast.error("Due date cannot be before the journey start date.");
+      return;
+    }
     setAddStepSubmitting(true);
     try {
       await createJourneyStep(journeyId, {
@@ -169,11 +237,15 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
       });
       toast.success("Step added.");
       setShowAddStepForm(false);
+      const nextDue = clampDueDateToJourneyMin(
+        new Date().toISOString().slice(0, 10),
+        journeyDueDateMin,
+      );
       setAddStepForm({
-        stage: "General",
+        stage: "",
         title: "",
         description: "",
-        due_date: new Date().toISOString().slice(0, 10),
+        due_date: nextDue,
         status: "pending",
         sort_order: journeySteps.length,
       });
@@ -181,20 +253,21 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
       const list = Array.isArray(data?.steps) ? data.steps : [];
       setJourneySteps(list);
       onRefreshJourneys?.();
-    } catch {
-      // createJourneyStep handles error toast
+    } catch (error: unknown) {
+      logJourneySidebarError("createJourneyStep failed", error);
     } finally {
       setAddStepSubmitting(false);
     }
   };
 
   const openEditStep = (step: JourneyStepRecord) => {
-    const due = step.due_date
+    const dueRaw = step.due_date
       ? moment(step.due_date).format("YYYY-MM-DD")
       : new Date().toISOString().slice(0, 10);
+    const due = clampDueDateToJourneyMin(dueRaw, journeyDueDateMin);
     setEditingStep(step);
     setEditStepForm({
-      stage: step.stage ?? "General",
+      stage: step.stage ?? "",
       title: step.title ?? "",
       description: step.description ?? "",
       due_date: due,
@@ -205,6 +278,14 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
 
   const handleEditStepSubmit = async () => {
     if (!editingStep?.id || !canUpdateJourney) return;
+    if (
+      journeyDueDateMin != null &&
+      editStepForm.due_date !== "" &&
+      editStepForm.due_date < journeyDueDateMin
+    ) {
+      toast.error("Due date cannot be before the journey start date.");
+      return;
+    }
     setEditStepSubmitting(true);
     try {
       await updateJourneyStep(journeyId, editingStep.id, {
@@ -221,16 +302,26 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
       const data = (await getJourney(journeyId)) as { steps?: JourneyStepRecord[] };
       setJourneySteps(Array.isArray(data?.steps) ? data.steps : []);
       onRefreshJourneys?.();
-    } catch {
-      // updateJourneyStep handles error toast
+    } catch (error: unknown) {
+      logJourneySidebarError("updateJourneyStep failed", error);
     } finally {
       setEditStepSubmitting(false);
     }
   };
 
-  const handleDeleteStep = async (step: JourneyStepRecord) => {
-    if (step.id == null || !canUpdateJourney) return;
-    // if (!window.confirm("Delete this step?")) return;
+  const openDeleteStepModal = (step: JourneyStepRecord) => {
+    if (step.id == null) return;
+    setStepPendingDelete(step);
+    setShowDeleteStepModal(true);
+  };
+
+  const confirmDeleteStep = useCallback(async () => {
+    const step = stepPendingDelete;
+    if (step?.id == null || !canUpdateJourney) {
+      setShowDeleteStepModal(false);
+      setStepPendingDelete(null);
+      return;
+    }
     setDeletingStepId(step.id);
     try {
       await deleteJourneyStep(journeyId, step.id);
@@ -238,11 +329,18 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
       const data = (await getJourney(journeyId)) as { steps?: JourneyStepRecord[] };
       setJourneySteps(Array.isArray(data?.steps) ? data.steps : []);
       onRefreshJourneys?.();
-    } catch {
-      // deleteJourneyStep handles error toast
+      setShowDeleteStepModal(false);
+      setStepPendingDelete(null);
+    } catch (error: unknown) {
+      logJourneySidebarError("deleteJourneyStep failed", error);
     } finally {
       setDeletingStepId(null);
     }
+  }, [stepPendingDelete, journeyId, canUpdateJourney, onRefreshJourneys]);
+
+  const closeDeleteStepModal = () => {
+    setShowDeleteStepModal(false);
+    setStepPendingDelete(null);
   };
 
   const handleDeleteJourney = async () => {
@@ -254,8 +352,8 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
       setShowDeleteJourneyModal(false);
       onRefreshJourneys?.();
       onClose();
-    } catch {
-      // deleteJourney handles error toast
+    } catch (error: unknown) {
+      logJourneySidebarError("deleteJourney failed", error);
     } finally {
       setDeletingJourney(false);
     }
@@ -263,15 +361,15 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
 
   const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
-    if (!canUpdateJourney) return;
+    if (!canUpdateJourney || isJourneyCompleted) return;
     setStatusUpdating(true);
     try {
       await updateJourney(journeyId, { status: newStatus });
       setStatusValue(newStatus);
       toast.success("Status updated.");
       onRefreshJourneys?.();
-    } catch {
-      // updateJourney handles error toast
+    } catch (error: unknown) {
+      logJourneySidebarError("updateJourney failed", error);
     } finally {
       setStatusUpdating(false);
     }
@@ -311,19 +409,8 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
     }
   ];
 
-  const handleSubmit = () => {
-    console.log('Submit clicked');
-    alert('Onboarding submitted successfully');
-  };
-
-  const handleCancel = () => {
-    console.log('Cancel clicked');
-    alert('Onboarding cancelled');
-  };
-
   const handleSendReminder = () => {
-    console.log('Send reminder clicked');
-    alert(`Reminder sent to ${employee.name}`);
+    toast.info(`Reminder sent to ${employee.name}`);
   };
 
   return (
@@ -413,7 +500,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                 margin: '0 0 4px 0',
                 fontWeight: '500'
               }}>
-                New Hire
+                {employee.status}
               </p>
               {employee.role && (
                 <p style={{ 
@@ -659,11 +746,11 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                 zIndex: 10
               }}>
                 {['Hassan Mir', 'Adeel Raza', 'Farah Ahmed'].map(person => (
-                  <div
+                  <button
                     key={person}
+                    type="button"
                     onClick={() => {
                       setShowAssigneeDropdown(false);
-                      console.log('Selected:', person);
                     }}
                     style={{
                       padding: '10px 16px',
@@ -671,10 +758,14 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                       fontSize: '14px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '8px',
+                      width: '100%',
+                      border: 'none',
+                      backgroundColor: 'white',
+                      textAlign: 'left',
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f9fafb'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'white'; }}
                   >
                     <div style={{
                       width: '24px',
@@ -688,7 +779,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                       <User size={14} color="white" />
                     </div>
                     {person}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -752,7 +843,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {suggestions.map(suggestion => (
-              <div
+              <article
                 key={suggestion.id}
                 style={{
                   display: 'flex',
@@ -760,12 +851,9 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                   padding: '16px',
                   backgroundColor: 'white',
                   borderRadius: '8px',
-                  cursor: 'pointer',
                   transition: 'all 0.2s',
                   border: '1px solid #e9d5ff'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fefcff'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
               >
                 <div style={{
                   width: '40px',
@@ -796,7 +884,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                     {suggestion.description}
                   </div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         </div>
@@ -805,23 +893,27 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
       {/* Status */}
       {canUpdateJourney && (
         <div style={{ padding: "16px 24px", borderTop: "1px solid #e9d5ff" }}>
-          <label style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}>
+          <label
+            htmlFor="journey-sidebar-journey-status"
+            style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}
+          >
             Status
           </label>
           <select
+            id="journey-sidebar-journey-status"
             className="form-select"
             value={statusValue}
             onChange={handleStatusChange}
-            disabled={statusUpdating}
+            disabled={statusUpdating || isJourneyCompleted}
             style={{
               width: "100%",
               padding: "10px 12px",
               fontSize: "14px",
               border: "1px solid #e5e7eb",
               borderRadius: "8px",
-              backgroundColor: "white",
+              backgroundColor: isJourneyCompleted ? "#f9fafb" : "white",
               color: "#1f2937",
-              cursor: statusUpdating ? "not-allowed" : "pointer",
+              cursor: statusUpdating || isJourneyCompleted ? "not-allowed" : "pointer",
             }}
           >
             {STATUS_OPTIONS.map((opt) => (
@@ -840,40 +932,49 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
       {canUpdateJourney && (
         <div style={{ padding: "16px 24px", borderTop: "1px solid #e9d5ff", flex: 1, overflow: "auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <label style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>Steps</label>
-            <button
-              type="button"
-              onClick={() => {
-                setAddStepForm((f) => ({ ...f, sort_order: journeySteps.length }));
-                setShowAddStepForm(true);
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "8px 12px",
-                backgroundColor: "#6366f1",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-              }}
-            >
-              <Plus size={16} />
-              Add step
-            </button>
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>Steps</span>
+           
+            {!isEmployeeJourneyDisplayCompleted(employee.status) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAddStepForm((f) => ({
+                    ...f,
+                    sort_order: journeySteps.length,
+                    due_date: clampDueDateToJourneyMin(f.due_date, journeyDueDateMin),
+                  }));
+                  setShowAddStepForm(true);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 12px",
+                  backgroundColor: "#6366f1",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: "600",
+                  cursor: "pointer",
+                }}
+              >
+                <Plus size={16} />
+                Add step
+              </button>
+            )}
           </div>
-          {stepsLoading ? (
+          {stepsLoading && (
             <div style={{ fontSize: "13px", color: "#6b7280" }}>Loading steps…</div>
-          ) : journeySteps.length === 0 && !showAddStepForm ? (
+          )}
+          {!stepsLoading && journeySteps.length === 0 && !showAddStepForm && (
             <div style={{ fontSize: "13px", color: "#6b7280" }}>No steps yet.</div>
-          ) : (
+          )}
+          {!stepsLoading && (journeySteps.length > 0 || showAddStepForm) && (
             <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {journeySteps.map((step) => (
+              {journeySteps.map((step, stepIndex) => (
                 <li
-                  key={step.id ?? step.title ?? String(Math.random())}
+                  key={step.id == null ? `journey-step-fallback-${stepIndex}` : `journey-step-${step.id}`}
                   style={{
                     padding: "12px",
                     marginBottom: "8px",
@@ -891,7 +992,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                         {step.stage && <span style={{ marginRight: "8px" }}>{step.stage}</span>}
                         {step.status && (
                           <span style={{ padding: "2px 6px", backgroundColor: "#e5e7eb", borderRadius: "4px" }}>
-                            {step.status}
+                            {formatJourneyStepStatusForDisplay(step.status)}
                           </span>
                         )}
                       </div>
@@ -904,45 +1005,47 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                         </div>
                       )}
                     </div>
-                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditStep(step);
-                        }}
-                        title="Edit"
-                        style={{
-                          padding: "6px",
-                          border: "none",
-                          borderRadius: "6px",
-                          backgroundColor: "#e0e7ff",
-                          color: "#4338ca",
-                          cursor: "pointer",
-                        }}
-                      >
-                        <Pencil size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteStep(step);
-                        }}
-                        disabled={deletingStepId === step.id}
-                        title="Delete"
-                        style={{
-                          padding: "6px",
-                          border: "none",
-                          borderRadius: "6px",
-                          backgroundColor: "#fee2e2",
-                          color: "#b91c1c",
-                          cursor: deletingStepId === step.id ? "not-allowed" : "pointer",
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+                    {!isEmployeeJourneyDisplayCompleted(employee.status) && (
+                      <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditStep(step);
+                          }}
+                          title="Edit"
+                          style={{
+                            padding: "6px",
+                            border: "none",
+                            borderRadius: "6px",
+                            backgroundColor: "#e0e7ff",
+                            color: "#4338ca",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDeleteStepModal(step);
+                          }}
+                          disabled={deletingStepId === step.id}
+                          title="Delete"
+                          style={{
+                            padding: "6px",
+                            border: "none",
+                            borderRadius: "6px",
+                            backgroundColor: "#fee2e2",
+                            color: "#b91c1c",
+                            cursor: deletingStepId === step.id ? "not-allowed" : "pointer",
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </li>
               ))}
@@ -958,16 +1061,16 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                   <Form.Label>Stage</Form.Label>
                   <Form.Control
                     type="text"
-                    placeholder="Stage"
+                    placeholder="Type the stage"
                     value={addStepForm.stage}
                     onChange={(e) => setAddStepForm((f) => ({ ...f, stage: e.target.value }))}
                   />
                 </Form.Group>
                 <Form.Group className="mb-3">
-                  <Form.Label>Title</Form.Label>
+                  <Form.Label>Task <span className="text-danger">*</span></Form.Label>
                   <Form.Control
                     type="text"
-                    placeholder="Title"
+                    placeholder="Type the task"
                     value={addStepForm.title}
                     onChange={(e) => setAddStepForm((f) => ({ ...f, title: e.target.value }))}
                   />
@@ -986,8 +1089,14 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                   <Form.Label>Due Date</Form.Label>
                   <Form.Control
                     type="date"
+                    min={journeyDueDateMin}
                     value={addStepForm.due_date}
-                    onChange={(e) => setAddStepForm((f) => ({ ...f, due_date: e.target.value }))}
+                    onChange={(e) =>
+                      setAddStepForm((f) => ({
+                        ...f,
+                        due_date: clampDueDateToJourneyMin(e.target.value, journeyDueDateMin),
+                      }))
+                    }
                   />
                 </Form.Group>
                 {/* <Form.Group className="mb-3">
@@ -1035,7 +1144,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
               <button
                 type="button"
                 onClick={handleAddStepSubmit}
-                disabled={addStepSubmitting}
+                disabled={addStepSubmitting || !addStepForm.title.trim()}
                 style={{
                   padding: "8px 16px",
                   backgroundColor: "#6366f1",
@@ -1044,7 +1153,7 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                   borderRadius: "6px",
                   fontSize: "13px",
                   fontWeight: "600",
-                  cursor: addStepSubmitting ? "not-allowed" : "pointer",
+                  cursor: addStepSubmitting || !addStepForm.title.trim() ? "not-allowed" : "pointer",
                 }}
               >
                 {addStepSubmitting ? "Adding…" : "Add step"}
@@ -1089,8 +1198,14 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
                 <Form.Label>Due Date</Form.Label>
                 <Form.Control
                   type="date"
+                  min={journeyDueDateMin}
                   value={editStepForm.due_date}
-                  onChange={(e) => setEditStepForm((f) => ({ ...f, due_date: e.target.value }))}
+                  onChange={(e) =>
+                    setEditStepForm((f) => ({
+                      ...f,
+                      due_date: clampDueDateToJourneyMin(e.target.value, journeyDueDateMin),
+                    }))
+                  }
                 />
               </Form.Group>
               <Form.Group className="mb-3">
@@ -1203,6 +1318,18 @@ const OnboardingDetailSidebar: React.FC<OnboardingDetailSidebarProps> = ({ emplo
         </button>
       </div> */}
 
+      <DeleteConfirmationModal
+        show={showDeleteStepModal}
+        onHide={closeDeleteStepModal}
+        onConfirm={confirmDeleteStep}
+        itemName={
+          stepPendingDelete?.title?.trim()
+            ? `step "${stepPendingDelete.title.trim()}"`
+            : "this journey step"
+        }
+        itemType="step"
+        loading={deletingStepId != null}
+      />
       <DeleteConfirmationModal
         show={showDeleteJourneyModal}
         onHide={() => setShowDeleteJourneyModal(false)}

@@ -134,8 +134,8 @@
     border: none !important;
     transition: all 0.2s ease !important;
     display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+    align-items: center;
+    justify-content: center;
     gap: 6px !important;
     font-family: inherit !important;
   }
@@ -288,13 +288,13 @@
   select {
     padding: 8px 12px;
     
-    /* border-radius: 4px; */
+   
     font-size: 13px ;
     color: var(--color-text-primary);
     font-family: inherit;
     outline: none !important;
     transition: border-color 0.2s ease;
-    /* background: var(--color-bg-white); */
+    
   }
   
   input[type="text"]:focus,

@@ -1,30 +1,46 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useSession } from 'next-auth/react';
 import {
   canManageProjectFromMembers,
   getSessionPhoneOrExtension,
 } from '@planner/projectMemberRole';
+import { sortStringsLocale } from '@planner/projectTabsContentUtils';
 import {
   Plus,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   SlidersHorizontal,
   FileText,
   MapPin,
   Mail,
   ExternalLink,
 } from 'lucide-react';
+import { Dropdown } from 'react-bootstrap';
 import { formatDateForTable } from '@utils/Helper';
 import { updateTask, getTask } from '@utils/tasks';
 import { toast } from 'react-toastify';
 import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
-import GenericFilterSidebar, { FilterField } from '@components/GenericFilterSidebar';
 
 const FONT = "'Lexend Deca', Helvetica, Arial, sans-serif";
 const TEAL = "#006162";
 const HEADER_H = 34;
 const ARROW_W = 10;
+
+/** Map key for extension lookups; avoids `String(object)` → `[object Object]`. */
+function extensionNumberToMapKey(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'string') return value.trim();
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return String(value).trim();
+  }
+  return '';
+}
 
 interface BoardViewProps {
   selectedProject: any;
@@ -41,6 +57,8 @@ interface BoardViewProps {
   setBoardSelectedPriority: (priority: string) => void;
   boardSelectedLabel: string;
   setBoardSelectedLabel: (label: string) => void;
+  boardSelectedStatus: string;
+  setBoardSelectedStatus: (status: string) => void;
   showCompletedTasks: boolean;
   setShowCompletedTasks: (show: boolean) => void;
   onClearFilters: () => void;
@@ -372,6 +390,8 @@ const BoardView: React.FC<BoardViewProps> = ({
   setBoardSelectedPriority,
   boardSelectedLabel,
   setBoardSelectedLabel,
+  boardSelectedStatus,
+  setBoardSelectedStatus,
   showCompletedTasks,
   setShowCompletedTasks,
   onClearFilters,
@@ -398,7 +418,15 @@ const BoardView: React.FC<BoardViewProps> = ({
   const [draggedTask, setDraggedTask] = useState<any>(null);
   const [dragOverStatus, setDragOverStatus] = useState<number | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showFilterSidebar, setShowFilterSidebar] = useState(false);
+  const [showFilterRow, setShowFilterRow] = useState(false);
+  /** Draft values for the filter sidebar; applied to the board only after Search (Apply). */
+  const [boardFilterDraft, setBoardFilterDraft] = useState({
+    search: '',
+    assignee: 'All Assignees',
+    priority: 'All Priorities',
+    status: 'All Statuses',
+    label: 'All Labels',
+  });
   const [savingTaskMove, setSavingTaskMove] = useState(false);
 
   const extensionNameByNumber = useMemo(() => {
@@ -411,11 +439,24 @@ const BoardView: React.FC<BoardViewProps> = ({
     return map;
   }, [hierarchyDataExtensions]);
 
-  const getUserNameFromExtension = (extensionNumber: any): string => {
-    const key = String(extensionNumber || '').trim();
-    if (!key) return '';
-    return extensionNameByNumber.get(key) || key;
-  };
+  const getUserNameFromExtension = useCallback(
+    (extensionNumber: unknown): string => {
+      const key = extensionNumberToMapKey(extensionNumber);
+      if (!key) return '';
+      return extensionNameByNumber.get(key) || key;
+    },
+    [extensionNameByNumber],
+  );
+
+  /** Project members + board task assignees + hierarchy extensions (for full filter list). */
+  const boardAssigneeFilterIds = useMemo(() => {
+    const ids = new Set<string>(getAllBoardAssignees());
+    (hierarchyDataExtensions || []).forEach((ext: any) => {
+      const key = extensionNumberToMapKey(ext?.extension_number ?? ext?.id);
+      if (key) ids.add(key);
+    });
+    return Array.from(ids).sort(sortStringsLocale);
+  }, [getAllBoardAssignees, hierarchyDataExtensions]);
 
   const getAssigneeDisplayName = (assignee: any): string => {
     if (!assignee) return '';
@@ -499,6 +540,28 @@ const BoardView: React.FC<BoardViewProps> = ({
     setDragOverStatus(null);
   };
 
+  const openOrToggleFilters = useCallback(() => {
+    setShowFilterRow((prev) => {
+      const next = !prev;
+      if (next) {
+        setBoardFilterDraft({
+          search: boardSearchTerm,
+          assignee: boardSelectedAssignee,
+          priority: boardSelectedPriority,
+          status: boardSelectedStatus,
+          label: boardSelectedLabel,
+        });
+      }
+      return next;
+    });
+  }, [
+    boardSearchTerm,
+    boardSelectedAssignee,
+    boardSelectedPriority,
+    boardSelectedStatus,
+    boardSelectedLabel,
+  ]);
+
   const handleDrop = async (e: React.DragEvent, targetStatusId: number) => {
     e.preventDefault();
     setDragOverStatus(null);
@@ -527,12 +590,52 @@ const BoardView: React.FC<BoardViewProps> = ({
     }
   };
 
-  const boardFilterFields: FilterField[] = useMemo(() => [
-    { id: 'search', label: 'Search', type: 'text', value: boardSearchTerm, onChange: (v: string) => setBoardSearchTerm(v ?? ''), placeholder: 'Search tasks...' },
-    { id: 'assignee', label: 'Assignee', type: 'dropdown', value: boardSelectedAssignee, onChange: (v) => setBoardSelectedAssignee(v ?? 'All Assignees'), options: [{ value: 'All Assignees', label: 'All Assignees' }, ...getAllBoardAssignees().map((a) => ({ value: a, label: a }))] },
-    { id: 'priority', label: 'Priority', type: 'dropdown', value: boardSelectedPriority, onChange: (v) => setBoardSelectedPriority(v ?? 'All Priorities'), options: [{ value: 'All Priorities', label: 'All Priorities' }, ...getAllBoardPriorities().map((p) => ({ value: p, label: p }))] },
-    { id: 'label', label: 'Label', type: 'dropdown', value: boardSelectedLabel, onChange: (v) => setBoardSelectedLabel(v ?? 'All Labels'), options: [{ value: 'All Labels', label: 'All Labels' }, ...(labels || []).map((l: any) => ({ value: l.name, label: l.name }))] },
-  ], [boardSearchTerm, boardSelectedAssignee, boardSelectedPriority, boardSelectedLabel, labels, getAllBoardAssignees, getAllBoardPriorities]);
+  const handleApplyBoardFilters = useCallback(() => {
+    setBoardSearchTerm(boardFilterDraft.search);
+    setBoardSelectedAssignee(boardFilterDraft.assignee);
+    setBoardSelectedPriority(boardFilterDraft.priority);
+    setBoardSelectedStatus(boardFilterDraft.status);
+    setBoardSelectedLabel(boardFilterDraft.label);
+  }, [
+    boardFilterDraft.search,
+    boardFilterDraft.assignee,
+    boardFilterDraft.priority,
+    boardFilterDraft.status,
+    boardFilterDraft.label,
+    setBoardSearchTerm,
+    setBoardSelectedAssignee,
+    setBoardSelectedPriority,
+    setBoardSelectedStatus,
+    setBoardSelectedLabel,
+  ]);
+
+  const handleResetBoardFilters = useCallback(() => {
+    setBoardFilterDraft({
+      search: '',
+      assignee: 'All Assignees',
+      priority: 'All Priorities',
+      status: 'All Statuses',
+      label: 'All Labels',
+    });
+    onClearFilters();
+    setShowFilterRow(false);
+  }, [onClearFilters]);
+
+  const boardHasActiveFilters = useMemo(() => {
+    return (
+      (boardSearchTerm || '').trim().length > 0 ||
+      boardSelectedAssignee !== 'All Assignees' ||
+      boardSelectedPriority !== 'All Priorities' ||
+      boardSelectedStatus !== 'All Statuses' ||
+      boardSelectedLabel !== 'All Labels'
+    );
+  }, [
+    boardSearchTerm,
+    boardSelectedAssignee,
+    boardSelectedPriority,
+    boardSelectedStatus,
+    boardSelectedLabel,
+  ]);
 
   const [collapsedColumns, setCollapsedColumns] = useState<Record<number, boolean>>({});
   const [hoveredTaskId, setHoveredTaskId] = useState<number | null>(null);
@@ -551,11 +654,9 @@ const BoardView: React.FC<BoardViewProps> = ({
     column: {
       display: 'flex',
       flexDirection: 'column' as const,
-      flexShrink: 0,
-      minWidth: '280px',
       maxHeight: '100%',
       overflow: 'hidden',
-      transition: 'width .15s ease',
+      transition: 'flex-basis .15s ease, min-width .15s ease',
       backgroundColor: '#ffffff'
     },
     addButton: {
@@ -702,61 +803,288 @@ const BoardView: React.FC<BoardViewProps> = ({
         alignItems: 'center',
         marginBottom: '1rem',
         flexWrap: 'wrap',
-        gap: '0.75rem'
+        gap: '0.75rem',
+        padding: '0 20px'
       }}>
         <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#1F2937' }}>
           {selectedProject?.name ? `${selectedProject.name} - Board` : 'Board'}
         </div>
         <button
           type="button"
-          onClick={() => setShowFilterSidebar(true)}
+          onClick={openOrToggleFilters}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.5rem 1rem',
-            backgroundColor: 'white',
-            color: '#4680FF',
-            border: '1px solid #4680FF',
+            padding: '0.5rem 0.9rem',
+            backgroundColor: showFilterRow ? '#141414' : '#ffffff',
+            color: showFilterRow ? '#ffffff' : '#141414',
+            border: '1px solid #d0d7de',
             borderRadius: '6px',
             fontWeight: '500',
             fontSize: '0.9rem',
             cursor: 'pointer',
             transition: 'all 0.2s'
           }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.backgroundColor = '#F9FAFB';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.backgroundColor = 'white';
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.backgroundColor = '#F9FAFB';
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.backgroundColor = 'white';
-          }}
+        
         >
           <SlidersHorizontal size={18} />
-          Filters
+          Filters{boardHasActiveFilters ? ' *' : ''}
         </button>
       </div>
 
-      <GenericFilterSidebar
-        isOpen={showFilterSidebar}
-        onClose={() => setShowFilterSidebar(false)}
-        title="Filters"
-        subtitle="Filter board tasks"
-        filters={boardFilterFields}
-        onApply={() => setShowFilterSidebar(false)}
-        onReset={() => {
-          onClearFilters();
-          setShowFilterSidebar(false);
-        }}
-        width="400px"
-        showApplyButton
-        showResetButton
-      />
+      {showFilterRow && (
+        <div
+          style={{
+            margin: '0 20px 12px 20px',
+            background: '#ffffff',
+          }}
+        >
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
+                .board-filter-pill-toggle.dropdown-toggle::after {
+                  display: none !important;
+                }
+                .board-filter-search-input {
+                  min-width: 350px;
+                  height: 37px;
+                  border-radius: 20px;
+                  border: 1px solid #ccc;
+                  padding: 0px 14px;
+                  font-size: 14px;
+                  color: rgb(20, 20, 20);
+                  font-family: 'Lexend Deca', Helvetica, Arial, sans-serif;
+                  flex: 1 1 420px;
+                  max-width: 330px;
+                  font-weight: 100;
+                }
+                @media (max-width: 992px) {
+                  .board-filter-search-input {
+                    min-width: 0 !important;
+                    max-width: 100% !important;
+                    width: 100%;
+                    flex: 1 1 100%;
+                  }
+                }
+              `,
+            }}
+          />
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+              }}
+            >
+              <input
+                type="text"
+                className="board-filter-search-input"
+                value={boardFilterDraft.search}
+                onChange={(e) =>
+                  setBoardFilterDraft((d) => ({ ...d, search: e.target.value }))
+                }
+                placeholder="Search tasks..."
+              />
+
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={handleResetBoardFilters}
+                  style={{
+                    height: 34,
+                    padding: '0 12px',
+                    borderRadius: 6,
+                    border: '1px solid #d0d7de',
+                    background: '#fff',
+                    color: '#141414',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    fontFamily: FONT,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyBoardFilters}
+                  style={{
+                    height: 34,
+                    padding: '0 14px',
+                    borderRadius: 6,
+                    border: '1px solid #141414',
+                    background: '#141414',
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    fontFamily: FONT,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Search
+                </button>
+              </div>
+            </div>
+
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+            <Dropdown>
+              <Dropdown.Toggle
+                as="button"
+                id="board-filter-assignee"
+                className="board-filter-pill-toggle"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: '4px 6px',
+                  borderRadius: 6,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#141414',
+                  fontFamily: FONT,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0,
+                  cursor: 'pointer',
+                }}
+              >
+                {`Assignee: ${boardFilterDraft.assignee === 'All Assignees' ? 'All' : (getUserNameFromExtension(boardFilterDraft.assignee) || boardFilterDraft.assignee)}`}<ChevronDown size={14} />
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => setBoardFilterDraft((d) => ({ ...d, assignee: 'All Assignees' }))}>
+                  All Assignees
+                </Dropdown.Item>
+                {boardAssigneeFilterIds.map((ext) => (
+                  <Dropdown.Item key={ext} onClick={() => setBoardFilterDraft((d) => ({ ...d, assignee: ext }))}>
+                    {getUserNameFromExtension(ext) || ext}
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown>
+
+            <Dropdown>
+              <Dropdown.Toggle
+                as="button"
+                id="board-filter-priority"
+                className="board-filter-pill-toggle"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: '4px 6px',
+                  borderRadius: 6,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#141414',
+                  fontFamily: FONT,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0,
+                  cursor: 'pointer',
+                }}
+              >
+                {`Priority: ${boardFilterDraft.priority === 'All Priorities' ? 'All' : boardFilterDraft.priority}`}<ChevronDown size={14} />
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => setBoardFilterDraft((d) => ({ ...d, priority: 'All Priorities' }))}>
+                  All Priorities
+                </Dropdown.Item>
+                {getAllBoardPriorities().map((p) => (
+                  <Dropdown.Item key={p} onClick={() => setBoardFilterDraft((d) => ({ ...d, priority: p }))}>
+                    {p}
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown>
+
+            <Dropdown>
+              <Dropdown.Toggle
+                as="button"
+                id="board-filter-status"
+                className="board-filter-pill-toggle"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: '4px 6px',
+                  borderRadius: 6,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#141414',
+                  fontFamily: FONT,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0,
+                  cursor: 'pointer',
+                }}
+              >
+                {`Status: ${boardFilterDraft.status === 'All Statuses' ? 'All' : (statuses.find((s: any) => String(s.id) === String(boardFilterDraft.status))?.name || boardFilterDraft.status)}`}<ChevronDown size={14} />
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => setBoardFilterDraft((d) => ({ ...d, status: 'All Statuses' }))}>
+                  All Statuses
+                </Dropdown.Item>
+                {(statuses || []).map((s: any) => (
+                  <Dropdown.Item key={String(s.id)} onClick={() => setBoardFilterDraft((d) => ({ ...d, status: String(s.id) }))}>
+                    {String(s.name ?? s.id)}
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown>
+
+            <Dropdown>
+              <Dropdown.Toggle
+                as="button"
+                id="board-filter-label"
+                className="board-filter-pill-toggle"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: '4px 6px',
+                  borderRadius: 6,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: '#141414',
+                  fontFamily: FONT,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0,
+                  cursor: 'pointer',
+                }}
+              >
+                {`Label: ${boardFilterDraft.label === 'All Labels' ? 'All' : boardFilterDraft.label}`}<ChevronDown size={14} />
+              </Dropdown.Toggle>
+              <Dropdown.Menu>
+                <Dropdown.Item onClick={() => setBoardFilterDraft((d) => ({ ...d, label: 'All Labels' }))}>
+                  All Labels
+                </Dropdown.Item>
+                {(labels || []).map((l: any) => (
+                  <Dropdown.Item key={String(l.name)} onClick={() => setBoardFilterDraft((d) => ({ ...d, label: String(l.name) }))}>
+                    {String(l.name)}
+                  </Dropdown.Item>
+                ))}
+              </Dropdown.Menu>
+            </Dropdown>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Kanban Board */}
       <div style={{ position: 'relative', width: '100%' }}>
@@ -797,8 +1125,19 @@ const BoardView: React.FC<BoardViewProps> = ({
               key={status.id} 
               style={{
                 ...styles.column,
-                width: isCollapsed ? '46px' : '280px',
-                minWidth: isCollapsed ? '46px' : '280px',
+                ...(isCollapsed
+                  ? {
+                      flex: '0 0 46px',
+                      width: '46px',
+                      minWidth: '46px',
+                      maxWidth: '46px',
+                    }
+                  : {
+                      flex: '1 1 280px',
+                      minWidth: '280px',
+                      width: 'auto',
+                      maxWidth: 'none',
+                    }),
                 borderRight: isCollapsed ? '1px solid #e5e7eb' : 'none'
               }}
             >
@@ -1099,6 +1438,8 @@ const BoardView: React.FC<BoardViewProps> = ({
           name: status.name,
           icon: '',
           color: status.color || '',
+          is_default:
+            status.is_default === true || status.is_deefault === true,
         }))}
         project={
           selectedProject
@@ -1114,7 +1455,6 @@ const BoardView: React.FC<BoardViewProps> = ({
         }
         task={selectedTask}
         isEdit
-        taskType="regular"
         taskTypeChoices={['regular', 'recurring']}
         lockProjectSelection
       />

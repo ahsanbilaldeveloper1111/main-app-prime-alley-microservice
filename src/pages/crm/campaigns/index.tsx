@@ -10,6 +10,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
 import {
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
   getCampaigns,
   deleteCampaign,
   createCampaign,
@@ -59,6 +60,7 @@ import {
   Briefcase,
   UserPlus,
   Plus,
+  Check,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import Select from "react-select";
@@ -69,9 +71,15 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { ModuleSlug, checkRequiredFields } from "@utils/Helper";
+import { ModuleSlug, checkRequiredFields, formatDateForTable } from "@utils/Helper";
 import { useSession } from "next-auth/react";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
+import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from "@components/crm/crmDialogActionButtonStyles";
 import moment from "moment";
 
 function consumeHandledApiError(error: unknown, source: string): void {
@@ -96,6 +104,72 @@ function getErrorMessageFromUnknown(error: unknown, fallback: string): string {
   }
   if (error instanceof Error && error.message) return error.message;
   return fallback;
+}
+
+function sumCrmCustomDistributionCounts(dist: Record<string, number>): number {
+  return Object.values(dist).reduce((sum, count) => sum + count, 0);
+}
+
+function crmCustomAllocationMismatchMessage(
+  recordsToAssign: number,
+  customDistribution: Record<string, number>,
+): string | null {
+  const total = sumCrmCustomDistributionCounts(customDistribution);
+  if (total === recordsToAssign) {
+    return null;
+  }
+  return `Custom allocation must equal total records to assign (${recordsToAssign}). Current total: ${total}`;
+}
+
+type CrmDataAssignmentSubmitValidationInput = {
+  assignmentTargetType: string;
+  recordsToAssign: number;
+  maxRecords: number;
+  distributionMode: string;
+  assignToCampaigns: string[];
+  selectedUserExtensions: readonly unknown[];
+  customDistribution: Record<string, number>;
+};
+
+function getCrmDataAssignmentSubmitValidationError(
+  input: CrmDataAssignmentSubmitValidationInput,
+): string | null {
+  const {
+    assignmentTargetType,
+    recordsToAssign,
+    maxRecords,
+    distributionMode,
+    assignToCampaigns,
+    selectedUserExtensions,
+    customDistribution,
+  } = input;
+
+  if (!assignmentTargetType) {
+    return "Please select assignment target (Campaigns or Users)";
+  }
+  if (recordsToAssign === 0 || recordsToAssign > maxRecords) {
+    return `Please enter a valid number of records (max: ${maxRecords})`;
+  }
+
+  if (assignmentTargetType === "campaigns") {
+    if (!distributionMode || assignToCampaigns.length === 0) {
+      return "Please select distribution mode and target campaigns";
+    }
+    return distributionMode === "custom"
+      ? crmCustomAllocationMismatchMessage(recordsToAssign, customDistribution)
+      : null;
+  }
+
+  if (assignmentTargetType === "users") {
+    if (!distributionMode || selectedUserExtensions.length === 0) {
+      return "Please select distribution mode and at least one user";
+    }
+    return distributionMode === "custom"
+      ? crmCustomAllocationMismatchMessage(recordsToAssign, customDistribution)
+      : null;
+  }
+
+  return null;
 }
 
 function laterCalendarIsoDate(isoDayA: string, isoDayB: string): string {
@@ -224,6 +298,17 @@ function buildCrmDataAssignmentPayload(args: {
   }
 
   payload.custom_extensions = extensionArray;
+  payload.distribution_mode = distributionMode === "custom" ? "custom" : distributionMode;
+
+  if (distributionMode === "custom") {
+    const dist: Record<number, number> = {};
+    Object.entries(customDistribution).forEach(([v, count]) => {
+      const id = Number.parseInt(v, 10);
+      if (id > 0 && count > 0) dist[id] = count;
+    });
+    payload.extension_distribution = dist;
+  }
+
   return { ok: true, payload };
 }
 
@@ -247,10 +332,10 @@ function campaignFieldOptionKey(fieldName: string, option: string, optionIndex: 
 
 function viewModalDateRangeText(selected: { start_date?: string; end_date?: string }): string {
   if (selected.start_date && selected.end_date) {
-    return `${new Date(selected.start_date).toLocaleDateString()} - ${new Date(selected.end_date).toLocaleDateString()}`;
+    return `${formatDateForTable(selected.start_date)} - ${formatDateForTable(selected.end_date)}`;
   }
   if (selected.start_date) {
-    return `Starts: ${new Date(selected.start_date).toLocaleDateString()}`;
+    return `Starts: ${formatDateForTable(selected.start_date)}`;
   }
   return "Not set";
 }
@@ -371,16 +456,37 @@ function buildCrmCampaignListFilters(
   return filters;
 }
 
-function createCustomDistributionAmountChangeHandler(
-  campaignValueKey: string,
+function sumCustomDistributionValues(dist: Record<string, number>): number {
+  return Object.values(dist).reduce((s, c) => s + (typeof c === "number" && Number.isFinite(c) ? c : 0), 0);
+}
+
+/** Max allowed for one target key: remaining records plus what this key already holds. */
+function maxCustomDistributionForKey(
+  dist: Record<string, number>,
+  valueKey: string,
   recordsToAssign: number,
-  handleNumberChange: (value: string, max: number, setter: (val: number) => void) => void,
+): number {
+  const current = dist[valueKey] ?? 0;
+  const totalOthers = sumCustomDistributionValues(dist) - current;
+  return Math.max(0, recordsToAssign - totalOthers);
+}
+
+function createCustomDistributionAmountChangeHandler(
+  valueKey: string,
+  recordsToAssign: number,
   setCustomDistribution: React.Dispatch<React.SetStateAction<Record<string, number>>>,
 ): (value: string) => void {
   return (value: string) => {
-    handleNumberChange(value, recordsToAssign, (v) =>
-      setCustomDistribution((prev) => ({ ...prev, [campaignValueKey]: v })),
-    );
+    setCustomDistribution((prev) => {
+      const maxForKey = maxCustomDistributionForKey(prev, valueKey, recordsToAssign);
+      const cleaned = value.replaceAll(/\D/g, "");
+      if (cleaned === "") {
+        return { ...prev, [valueKey]: 0 };
+      }
+      const numValue = Number.parseInt(cleaned, 10);
+      const clamped = Math.min(Math.max(0, numValue), maxForKey);
+      return { ...prev, [valueKey]: clamped };
+    });
   };
 }
 
@@ -416,6 +522,13 @@ function validateCampaignFormBeforeSave(
   if (formData.start_date && formData.end_date && formData.start_date >= formData.end_date) {
     toast.error("End date must be after start date");
     return false;
+  }
+  if (formData.status === "active") {
+    const todayIso = getTodayDate();
+    if (!formData.end_date || formData.end_date <= todayIso) {
+      toast.error("To activate a campaign, set the end date to a future date (after today).");
+      return false;
+    }
   }
   return true;
 }
@@ -501,7 +614,7 @@ type ToolbarFactoryArgs = {
   campaignsSearch: string;
   setCampaignsSearch: (v: string) => void;
   handleFiltersChange: (filters: Record<string, any>) => void;
-  setCampaignsPagination: React.Dispatch<React.SetStateAction<{ currentPage: number; rowsPerPage: number; sortColumn: string; sortDirection: "asc" | "desc" }>>;
+  setCampaignsPagination: React.Dispatch<React.SetStateAction<{ currentPage: number; rowsPerPage: number; sortBy: string; sortOrder: "asc" | "desc" }>>;
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
   filterCounts: { all: number; active: number; inactive: number };
   activeFilter: string;
@@ -865,31 +978,31 @@ const KPICard: React.FC<Readonly<KPICardData>> = ({
 
 function CrmProportionalDistributionRows(
   props: Readonly<{
-    assignToCampaigns: string[];
-    availableCampaignsForUpload: Array<{ value: string; label: string; id: number }>;
+    items: Array<{ valueKey: string; label: string }>;
     recordsToAssign: number;
     customDistribution: Record<string, number>;
     handleNumberKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
-    handleNumberChange: (value: string, max: number, setter: (val: number) => void) => void;
     setCustomDistribution: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   }>,
 ) {
   return (
     <>
-      {props.assignToCampaigns.map((c) => {
-        const opt = props.availableCampaignsForUpload.find((ac) => ac.label === c);
-        if (!opt) return null;
+      {props.items.map(({ valueKey, label }) => {
+        const maxForRow = maxCustomDistributionForKey(
+          props.customDistribution,
+          valueKey,
+          props.recordsToAssign,
+        );
         return (
           <CustomDistributionAmountRow
-            key={opt.value}
-            label={c}
-            recordsToAssign={props.recordsToAssign}
-            amount={props.customDistribution[opt.value] || 0}
+            key={valueKey}
+            label={label}
+            maxAllowed={maxForRow}
+            amount={props.customDistribution[valueKey] || 0}
             onKeyDown={props.handleNumberKeyDown}
             onAmountChange={createCustomDistributionAmountChangeHandler(
-              opt.value,
+              valueKey,
               props.recordsToAssign,
-              props.handleNumberChange,
               props.setCustomDistribution,
             )}
           />
@@ -901,13 +1014,13 @@ function CrmProportionalDistributionRows(
 
 function CustomDistributionAmountRow({
   label,
-  recordsToAssign,
+  maxAllowed,
   amount,
   onKeyDown,
   onAmountChange,
 }: Readonly<{
   label: string;
-  recordsToAssign: number;
+  maxAllowed: number;
   amount: number;
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
   onAmountChange: (value: string) => void;
@@ -922,7 +1035,7 @@ function CustomDistributionAmountRow({
           <Form.Control
             type="number"
             min={0}
-            max={recordsToAssign}
+            max={maxAllowed}
             value={amount}
             onKeyDown={onKeyDown}
             onChange={(e) => onAmountChange(e.target.value)}
@@ -1013,7 +1126,10 @@ function useCrmCampaignBootstrapData(
   useEffect(() => {
     const loadCampaignOptions = async () => {
       try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
+        const campaignsResponse = await getCampaigns({
+          per_page: 1000,
+          filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+        });
         setAvailableCampaignsForUpload(
           campaignsResponse.data.map((campaign) => ({
             value: campaign.id.toString(),
@@ -1055,7 +1171,7 @@ function useCrmCampaignBootstrapData(
 
 type CrmCampaignListQueryParams = {
   refreshKey: number;
-  campaignsPagination: { currentPage: number; rowsPerPage: number; sortColumn: string; sortDirection: "asc" | "desc" };
+  campaignsPagination: { currentPage: number; rowsPerPage: number; sortBy: string; sortOrder: "asc" | "desc" };
   memoizedFilters: Record<string, any>;
   campaignFilters: {
     status: string[];
@@ -1070,7 +1186,7 @@ type CrmCampaignListQueryParams = {
 };
 
 type CrmCampaignListSetters = {
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setListLoading: React.Dispatch<React.SetStateAction<boolean>>;
   setCampaignsData: React.Dispatch<React.SetStateAction<any[]>>;
   setMetrics: React.Dispatch<React.SetStateAction<CampaignMetrics>>;
   setTotalCampaigns: React.Dispatch<React.SetStateAction<number>>;
@@ -1082,11 +1198,11 @@ function useCrmCampaignListQueryEffect(
   setters: CrmCampaignListSetters,
 ) {
   const { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch } = query;
-  const { setLoading, setCampaignsData, setMetrics, setTotalCampaigns } = setters;
+  const { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns } = setters;
   useEffect(() => {
     const loadCampaigns = async () => {
       try {
-        setLoading(true);
+        setListLoading(true);
         const filters = buildCrmCampaignListFilters(activeFilter, campaignFilters, memoizedFilters);
         const response = await getCampaigns({
           page: campaignsPagination.currentPage,
@@ -1105,7 +1221,7 @@ function useCrmCampaignListQueryEffect(
         consumeHandledApiError(error, "CrmCampaigns.loadCampaigns");
         toast.error("Failed to load campaigns");
       } finally {
-        setLoading(false);
+        setListLoading(false);
       }
     };
 
@@ -1144,7 +1260,46 @@ function useCrmAssignmentCountsRefetch(
   }, [assignmentFilterCampaigns, assignmentFilterTags, calculateEntryCounts, showDataAssignmentModal, setAssignmentCounts, setRecordsToAssign]);
 }
 
-const CrmCampaigns = () => {
+const CAMPAIGN_TABLE_COLUMN_STORAGE_KEY = "campaignsSelectedColumns";
+
+const CAMPAIGN_SELECTABLE_COLUMN_KEYS = [
+  "name",
+  "description",
+  "status",
+  "start_date",
+  "user_extensions",
+  "created_by",
+  "created_at",
+  "actions",
+] as const;
+
+const DEFAULT_CAMPAIGN_SELECTED_COLUMNS: string[] = [
+  "name",
+  "description",
+  "status",
+  "start_date",
+  "user_extensions",
+  "created_by",
+  "created_at",
+  "actions",
+];
+
+function parseSavedCampaignTableColumns(raw: string | null): string[] | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const allowed = new Set<string>(CAMPAIGN_SELECTABLE_COLUMN_KEYS);
+    const next = parsed.filter(
+      (k): k is string => typeof k === "string" && allowed.has(k),
+    );
+    return next.length > 0 ? next : null;
+  } catch {
+    return null;
+  }
+}
+
+const CrmCampaigns = () => { // NOSONAR
   const { data: session } = useSession();
 
   const [refreshKey, setRefreshKey] = useState(0);
@@ -1163,9 +1318,19 @@ const CrmCampaigns = () => {
   const [campaignsPagination, setCampaignsPagination] = useState({
     currentPage: 1,
     rowsPerPage: 10,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
+  const [selectedCampaignTableColumns, setSelectedCampaignTableColumns] =
+    useState<string[]>(() => {
+      if (globalThis.window === undefined) {
+        return [...DEFAULT_CAMPAIGN_SELECTED_COLUMNS];
+      }
+      const saved = parseSavedCampaignTableColumns(
+        globalThis.localStorage.getItem(CAMPAIGN_TABLE_COLUMN_STORAGE_KEY),
+      );
+      return saved ?? [...DEFAULT_CAMPAIGN_SELECTED_COLUMNS];
+    });
   const [campaignFilters, setCampaignFilters] = useState({
     status: [] as string[],
     dateFrom: null as string | null,
@@ -1181,6 +1346,7 @@ const CrmCampaigns = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<any>(null);
+  const [listLoading, setListLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Form data
@@ -1264,6 +1430,21 @@ const CrmCampaigns = () => {
     return `${userNames.slice(0, maxDisplay).join(", ")} +${userNames.length - maxDisplay} more`;
   }, [extensions]);
 
+  const getCreatedByName = useCallback((campaign: any) => {
+    const createdBy = campaign?.created_by;
+    const matchedExtension = extensions.find(
+      (ext) => sameExtensionId(ext.id, createdBy) || sameExtensionId(ext.extension, createdBy),
+    );
+    return (
+      matchedExtension?.display_name ||
+      matchedExtension?.name ||
+      campaign?.created_by_name ||
+      campaign?.creator_name ||
+      createdBy ||
+      "Unknown"
+    );
+  }, [extensions]);
+
   const getMaxRecords = () => includeAssignedRecords ? assignmentCounts.total : assignmentCounts.unassigned;
 
   const handleNumberKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1296,7 +1477,7 @@ const CrmCampaigns = () => {
   useCrmCampaignListQueryEffect(
     listCampaignsPermission,
     { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch },
-    { setLoading, setCampaignsData, setMetrics, setTotalCampaigns },
+    { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns },
   );
 
   // Modal handlers
@@ -1312,7 +1493,6 @@ const CrmCampaigns = () => {
 
   const handleEditCampaign = useCallback(async (campaign: any) => {
     try {
-      setLoading(true);
       const campaignData = await getCampaign(campaign.id);
       setSelectedCampaign(campaignData);
       const draft = deriveEditorStateFromCampaignApi(campaignData, extensions, industries, dealTemplates);
@@ -1326,22 +1506,17 @@ const CrmCampaigns = () => {
     } catch (error: unknown) {
       consumeHandledApiError(error, "CrmCampaigns.handleEditCampaign");
       toast.error("Failed to fetch campaign details");
-    } finally {
-      setLoading(false);
     }
   }, [extensions, industries, dealTemplates]);
 
   const handleViewCampaign = useCallback(async (campaign: any) => {
     try {
-      setLoading(true);
       const campaignData = await getCampaign(campaign.id);
       setSelectedCampaign(campaignData);
       setShowViewModal(true);
     } catch (error: unknown) {
       consumeHandledApiError(error, "CrmCampaigns.handleViewCampaign");
       toast.error("Failed to fetch campaign details");
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -1594,15 +1769,20 @@ const CrmCampaigns = () => {
   }, []);
 
   const handleDataAssignmentSubmit = useCallback(async () => {
-    if (!assignmentTargetType) { toast.error("Please select assignment target (Campaigns or Users)"); return; }
     const maxRecords = getMaxRecords();
-    if (recordsToAssign === 0 || recordsToAssign > maxRecords) { toast.error(`Please enter a valid number of records (max: ${maxRecords})`); return; }
-    if (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) { toast.error("Please select distribution mode and target campaigns"); return; }
-    if (assignmentTargetType === "campaigns" && distributionMode === "custom") {
-      const total = Object.values(customDistribution).reduce((sum, count) => sum + count, 0);
-      if (total !== recordsToAssign) { toast.error(`Custom allocation must equal total records to assign (${recordsToAssign}). Current total: ${total}`); return; }
+    const validationError = getCrmDataAssignmentSubmitValidationError({
+      assignmentTargetType,
+      recordsToAssign,
+      maxRecords,
+      distributionMode,
+      assignToCampaigns,
+      selectedUserExtensions,
+      customDistribution,
+    });
+    if (validationError) {
+      toast.error(validationError);
+      return;
     }
-    if (assignmentTargetType === "users" && selectedUserExtensions.length === 0) { toast.error("Please select at least one user"); return; }
 
     setAssigningData(true);
     try {
@@ -1646,16 +1826,36 @@ const CrmCampaigns = () => {
   }, [assignmentTargetType, recordsToAssign, distributionMode, assignToCampaigns, selectedUserExtensions, assignmentFilterCampaigns, assignmentFilterTags, availableTags, availableCampaignsForUpload, includeAssignedRecords, customDistribution]);
 
   const handleAutoFillEqualDistribution = useCallback(() => {
-    if (assignToCampaigns.length === 0) return;
-    const eq = Math.floor(recordsToAssign / assignToCampaigns.length);
-    const rem = recordsToAssign % assignToCampaigns.length;
-    const dist: Record<string, number> = {};
-    assignToCampaigns.forEach((c, i) => {
-      const opt = availableCampaignsForUpload.find((ac) => ac.label === c);
-      if (opt) dist[opt.value] = eq + (i < rem ? 1 : 0);
-    });
-    setCustomDistribution(dist);
-  }, [recordsToAssign, assignToCampaigns, availableCampaignsForUpload]);
+    if (assignmentTargetType === "campaigns") {
+      if (assignToCampaigns.length === 0) return;
+      const eq = Math.floor(recordsToAssign / assignToCampaigns.length);
+      const rem = recordsToAssign % assignToCampaigns.length;
+      const dist: Record<string, number> = {};
+      assignToCampaigns.forEach((c, i) => {
+        const opt = availableCampaignsForUpload.find((ac) => ac.label === c);
+        if (opt) dist[opt.value] = eq + (i < rem ? 1 : 0);
+      });
+      setCustomDistribution(dist);
+      return;
+    }
+    if (assignmentTargetType === "users" && selectedUserExtensions.length > 0) {
+      const n = selectedUserExtensions.length;
+      const eq = Math.floor(recordsToAssign / n);
+      const rem = recordsToAssign % n;
+      const dist: Record<string, number> = {};
+      selectedUserExtensions.forEach((opt: { value?: string }, i: number) => {
+        const key = opt.value?.toString() ?? "";
+        if (key) dist[key] = eq + (i < rem ? 1 : 0);
+      });
+      setCustomDistribution(dist);
+    }
+  }, [
+    assignmentTargetType,
+    recordsToAssign,
+    assignToCampaigns,
+    availableCampaignsForUpload,
+    selectedUserExtensions,
+  ]);
 
   // --- GenericTable columns ---
   const campaignsTableColumns = useMemo<TableColumn<any>[]>(() => [
@@ -1664,17 +1864,23 @@ const CrmCampaigns = () => {
       label: "Campaign Name",
       sortable: true,
       type: "custom",
+      width: "min(240px, 28vw)",
       render: (campaign: any) => (
-        <div>
-          <div className="fw-semibold">{campaign.name || "Unnamed Campaign"}</div>
-          <div
-            className="small text-muted mt-1"
-            title={campaign.description || "No Description"}
-            style={{ maxWidth: "300px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}
-          >
-            {campaign.description || "No Description"}
-          </div>
-        </div>
+        <div className="fw-semibold">{campaign.name || "Unnamed Campaign"}</div>
+      ),
+    },
+    {
+      key: "description",
+      label: "Description",
+      sortable: true,
+      type: "custom",
+      width: "min(280px, 32vw)",
+      render: (campaign: any) => (
+        <CrmTruncatedDescriptionCell
+          text={campaign.description}
+          emptyDisplay="No Description"
+          className="small text-muted"
+        />
       ),
     },
     {
@@ -1696,10 +1902,10 @@ const CrmCampaigns = () => {
       render: (campaign: any) => (
         <div>
           <div className="fw-semibold small">
-            {campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : "No start date"}
+            {campaign.start_date ? formatDateForTable(campaign.start_date) : "No start date"}
           </div>
           <small className="text-muted">
-            to {campaign.end_date ? new Date(campaign.end_date).toLocaleDateString() : "No end date"}
+            to {campaign.end_date ? formatDateForTable(campaign.end_date) : "No end date"}
           </small>
         </div>
       ),
@@ -1714,17 +1920,26 @@ const CrmCampaigns = () => {
       ),
     },
     {
+      key: "created_by",
+      label: "Created By",
+      sortable: true,
+      type: "custom",
+      render: (campaign: any) => (
+        <small className="text-muted">{getCreatedByName(campaign)}</small>
+      ),
+    },
+    {
       key: "created_at",
       label: "Created",
       sortable: true,
       type: "custom",
       render: (campaign: any) => (
         <small className="text-muted">
-          {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : "Unknown"}
+          {campaign.created_at ? formatDateForTable(campaign.created_at) : "Unknown"}
         </small>
       ),
     },
-  ], [extensions, getUserNames]);
+  ], [getCreatedByName, getUserNames]);
 
   const campaignsTableActions = useMemo(() => {
     const actions: any[] = [];
@@ -1735,7 +1950,7 @@ const CrmCampaigns = () => {
         icon: <Eye size={16} />,
         onClick: (campaign: any) => handleViewCampaign(campaign),
         variant: "link",
-        className: "p-1",
+        className: "p-1 text-primary",
       });
     }
     if (session?.user?.permissions?.includes("edit-crm-campaigns")) {
@@ -1811,7 +2026,7 @@ const CrmCampaigns = () => {
   }, []);
 
   const handleCampaignsSort = useCallback((column: string, direction: "asc" | "desc") => {
-    setCampaignsPagination((prev) => ({ ...prev, sortColumn: column, sortDirection: direction, currentPage: 1 }));
+    setCampaignsPagination((prev) => ({ ...prev, sortBy: column, sortOrder: direction, currentPage: 1 }));
   }, []);
 
   const closeCreateEditModal = () => {
@@ -1855,10 +2070,10 @@ const CrmCampaigns = () => {
           showActions={campaignsTableActions.length > 0}
           actionsLabel="Actions"
           sortable
-          defaultSortColumn={campaignsPagination.sortColumn}
-          defaultSortDirection={campaignsPagination.sortDirection}
+          defaultSortBy={campaignsPagination.sortBy}
+          defaultSortOrder={campaignsPagination.sortOrder}
           onSort={handleCampaignsSort}
-          loading={loading}
+          loading={listLoading}
           emptyMessage="No campaigns found matching your criteria"
           pagination={{
             currentPage: campaignsPagination.currentPage,
@@ -1868,8 +2083,18 @@ const CrmCampaigns = () => {
           }}
           onPaginationChange={handleCampaignsPaginationChange}
           customizableColumns
-          defaultSelectedColumns={["name", "status", "start_date", "user_extensions", "created_at"]}
-          columnStorageKey="campaignsSelectedColumns"
+          selectedColumns={selectedCampaignTableColumns}
+          defaultSelectedColumns={DEFAULT_CAMPAIGN_SELECTED_COLUMNS}
+          onColumnChange={(cols) => {
+            const allowed = new Set<string>(CAMPAIGN_SELECTABLE_COLUMN_KEYS);
+            const filtered = cols.filter((c) => allowed.has(c));
+            setSelectedCampaignTableColumns(filtered);
+            globalThis.localStorage.setItem(
+              CAMPAIGN_TABLE_COLUMN_STORAGE_KEY,
+              JSON.stringify(filtered),
+            );
+          }}
+          columnStorageKey={CAMPAIGN_TABLE_COLUMN_STORAGE_KEY}
           showToolbar
           toolbar={toolbarConfig}
           showToolbarActions={false}
@@ -1889,7 +2114,9 @@ const CrmCampaigns = () => {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Campaign Name *</Form.Label>
+                  <Form.Label>
+                    Campaign Name <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Control type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Enter campaign name" />
                 </Form.Group>
               </Col>
@@ -1906,14 +2133,18 @@ const CrmCampaigns = () => {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Start Date *</Form.Label>
+                  <Form.Label>
+                    Start Date <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Control type="date" value={formData.start_date} onChange={handleStartDateChange} min={showEditModal ? getTodayDate(formData.start_date || "") : getTodayDate()} />
                   <Form.Text className="text-muted">{showEditModal ? "Campaign start date" : "Must be today or a future date"}</Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>End Date *</Form.Label>
+                  <Form.Label>
+                    End Date <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Control type="date" value={formData.end_date} onChange={handleEndDateChange} min={showEditModal ? undefined : getMinEndDate()} />
                   <Form.Text className="text-muted">Must be after start date</Form.Text>
                 </Form.Group>
@@ -2039,141 +2270,195 @@ const CrmCampaigns = () => {
             </div>
           </Form>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={closeCreateEditModal}>Cancel</Button>
-          <Button variant="primary" onClick={handleFormSubmit} disabled={loading}>
-            {campaignFormSubmitButtonLabel(loading, showEditModal)}
-          </Button>
+        <Modal.Footer className="border-0 pt-2">
+          <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
+            <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
+              <AlertCircle size={14} />
+              <span style={{ fontSize: "0.813rem" }}>
+                Fields marked with <span className="text-danger fw-bold">*</span> are required
+              </span>
+            </Form.Text>
+            <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
+              <Button
+                variant="primary"
+                onClick={handleFormSubmit}
+                disabled={loading}
+                style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+              >
+                {loading ? (
+                  campaignFormSubmitButtonLabel(true, showEditModal)
+                ) : (
+                  <>
+                    <Check size={16} aria-hidden />
+                    {campaignFormSubmitButtonLabel(false, showEditModal)}
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline-secondary"
+                onClick={closeCreateEditModal}
+                disabled={loading}
+                style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         </Modal.Footer>
       </Modal>
 
       {/* View Campaign Modal */}
-      {selectedCampaign && (
-        <Modal show={showViewModal} onHide={() => { setShowViewModal(false); setSelectedCampaign(null); }} size="xl" centered>
-          <div style={{ color: "black", padding: "30px", position: "relative", borderTopLeftRadius: "8px", borderTopRightRadius: "8px", borderBottom: "1px solid #e5e7eb" }}>
-            <button
-              type="button"
-              aria-label="Close campaign details"
-              onClick={() => { setShowViewModal(false); setSelectedCampaign(null); }}
-              style={{ position: "absolute", top: "20px", right: "20px", background: "rgba(255,255,255,0.2)", border: "none", color: "black", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", transition: "all 0.3s", display: "flex", alignItems: "center", justifyContent: "center" }}
-              onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
-              onMouseOut={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
-              onFocus={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
-              onBlur={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
-            >
-              <X size={20} aria-hidden />
-            </button>
-            <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>{selectedCampaign.name}</h3>
-            <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>Campaign Details</p>
-          </div>
-          <Modal.Body style={{ padding: "30px" }}>
-            {loading ? (
-              <output className="text-center py-4 d-block" aria-live="polite">
-                <span className="spinner-border d-inline-block" aria-hidden />
-                <span className="visually-hidden">Loading...</span>
-              </output>
-            ) : (
-              <>
-                <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <Megaphone size={18} style={{ color: "#4680ff" }} /> Campaign Information
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
-                  {[
-                    { label: "Campaign Name", value: selectedCampaign.name },
-                    { label: "Status", value: <Badge bg={selectedCampaign.status === "active" ? "success" : "secondary"} style={{ padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>{selectedCampaign.status?.charAt(0).toUpperCase() + selectedCampaign.status?.slice(1) || "Inactive"}</Badge> },
-                  ].map((item) => (
-                    <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
-                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{item.label}</div>
-                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{item.value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {selectedCampaign.description && (
-                  <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px", marginBottom: "30px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Description</div>
-                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500, wordWrap: "break-word", whiteSpace: "pre-wrap" }}>{selectedCampaign.description}</div>
+      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="xl" centered>
+        {selectedCampaign && (
+          <>
+            <div style={{ color: "black", padding: "30px", position: "relative", borderTopLeftRadius: "8px", borderTopRightRadius: "8px", borderBottom: "1px solid #e5e7eb" }}>
+              <button
+                type="button"
+                aria-label="Close campaign details"
+                onClick={() => { setShowViewModal(false); setSelectedCampaign(null); }}
+                style={{ position: "absolute", top: "20px", right: "20px", background: "rgba(255,255,255,0.2)", border: "none", color: "black", width: "36px", height: "36px", borderRadius: "50%", cursor: "pointer", transition: "all 0.3s", display: "flex", alignItems: "center", justifyContent: "center" }}
+                onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
+                onFocus={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.3)"; e.currentTarget.style.transform = "rotate(90deg)"; }}
+                onBlur={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.transform = "rotate(0deg)"; }}
+              >
+                <X size={20} aria-hidden />
+              </button>
+              <h3 style={{ margin: 0, fontWeight: 600, fontSize: "24px" }}>{selectedCampaign.name}</h3>
+              <p style={{ margin: "8px 0 0 0", opacity: 0.9, fontSize: "14px" }}>Campaign Details</p>
+            </div>
+            <Modal.Body style={{ padding: "30px" }}>
+              {loading ? (
+                <output className="text-center py-4 d-block" aria-live="polite">
+                  <span className="spinner-border d-inline-block" aria-hidden />
+                  <span className="visually-hidden">Loading...</span>
+                </output>
+              ) : (
+                <>
+                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <Megaphone size={18} style={{ color: "#4680ff" }} /> Campaign Information
                   </div>
-                )}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+                    {[
+                      { label: "Campaign Name", value: selectedCampaign.name },
+                      { label: "Status", value: <Badge bg={selectedCampaign.status === "active" ? "success" : "secondary"} style={{ padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 }}>{selectedCampaign.status?.charAt(0).toUpperCase() + selectedCampaign.status?.slice(1) || "Inactive"}</Badge> },
+                    ].map((item) => (
+                      <div key={item.label} style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>{item.label}</div>
+                        <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{item.value}</div>
+                      </div>
+                    ))}
+                  </div>
 
-                <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <Calendar size={18} style={{ color: "#4680ff" }} /> Date Information
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
-                  <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Date Range</div>
-                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
-                      {viewModalDateRangeText(selectedCampaign)}
+                  <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Description</div>
+                  <CrmDescriptionDetailsBlock
+                    text={selectedCampaign.description}
+                    emptyDisplay="No description"
+                  />
+
+                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <Calendar size={18} style={{ color: "#4680ff" }} /> Date Information
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Date Range</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                        {viewModalDateRangeText(selectedCampaign)}
+                      </div>
+                    </div>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Created Date</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{selectedCampaign.created_at ? formatDateForTable(selectedCampaign.created_at) : "N/A"}</div>
                     </div>
                   </div>
-                  <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Created Date</div>
-                    <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>{selectedCampaign.created_at ? new Date(selectedCampaign.created_at).toLocaleDateString() : "N/A"}</div>
-                  </div>
-                </div>
 
-                {selectedCampaign.user_extensions?.length > 0 && (
-                  <>
-                    <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
-                      <Users size={18} style={{ color: "#4680ff" }} /> Campaign Users ({selectedCampaign.user_extensions.length})
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "30px" }}>
-                      {selectedCampaign.user_extensions.map((ue: { user_extension: unknown }) => {
-                        const ext = extensions.find((e) => sameExtensionId(e.id, ue.user_extension));
-                        return (
-                          <div key={`ue-${String(ue.user_extension)}`} style={{ background: "#f8f9fa", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 500 }}>
-                            {ext?.display_name || ext?.name || `Extension ${ue.user_extension}`}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-
-                <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
-                  <FileText size={18} style={{ color: "#4680ff" }} /> Campaign Fields ({selectedCampaign.fields?.length || 0})
-                </div>
-                {selectedCampaign.fields?.length > 0 ? (
-                  <div className="table-responsive mb-4">
-                    <table className="table table-bordered">
-                      <thead>
-                        <tr><th>Field Name</th><th>Type</th><th>Required</th><th>Options</th></tr>
-                      </thead>
-                      <tbody>
-                        {selectedCampaign.fields.map((field: any, index: number) => (
-                          <tr key={campaignFieldRowKey(field, index)}>
-                            <td>{field.field_name}</td>
-                            <td><Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge></td>
-                            <td>{field.is_required ? <Badge bg="danger">Required</Badge> : <Badge bg="secondary">Optional</Badge>}</td>
-                            <td>
-                              {field.field_type === "dropdown" && field.field_options
-                                ? field.field_options.map((opt: string, i: number) => (
-                                  <Badge key={campaignFieldOptionKey(field.field_name, opt, i)} bg="info" className="me-1">{opt}</Badge>
-                                ))
-                                : <span className="text-muted">N/A</span>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <Alert variant="info" className="mb-4">No custom fields defined for this campaign.</Alert>
-                )}
-
-                <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end", paddingTop: "20px", borderTop: "1px solid #e5e7eb" }}>
-                  <Button variant="outline-secondary" onClick={() => { setShowViewModal(false); setSelectedCampaign(null); }} style={{ borderRadius: "8px", padding: "10px 24px", fontWeight: 500 }}>Close</Button>
-                  {session?.user?.permissions?.includes("edit-crm-campaigns") && (
-                    <Button variant="primary" onClick={() => { setShowViewModal(false); handleEditCampaign(selectedCampaign); }} style={{ borderRadius: "8px", padding: "10px 24px", fontWeight: 500, display: "flex", alignItems: "center", gap: "8px" }}>
-                      <Edit size={16} /> Edit Campaign
-                    </Button>
+                  {selectedCampaign.user_extensions?.length > 0 && (
+                    <>
+                      <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                        <Users size={18} style={{ color: "#4680ff" }} /> Campaign Users ({selectedCampaign.user_extensions.length})
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "30px" }}>
+                        {selectedCampaign.user_extensions.map((ue: { user_extension: unknown }) => {
+                          const ext = extensions.find((e) => sameExtensionId(e.id, ue.user_extension));
+                          return (
+                            <div key={`ue-${String(ue.user_extension)}`} style={{ background: "#f8f9fa", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 500 }}>
+                              {ext?.display_name || ext?.name || `Extension ${ue.user_extension}`}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
-                </div>
-              </>
-            )}
-          </Modal.Body>
-        </Modal>
-      )}
+
+                  <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
+                    <FileText size={18} style={{ color: "#4680ff" }} /> Campaign Fields ({selectedCampaign.fields?.length || 0})
+                  </div>
+                  {selectedCampaign.fields?.length > 0 ? (
+                    <div className="table-responsive mb-4">
+                      <table className="table table-bordered">
+                        <thead>
+                          <tr><th>Field Name</th><th>Type</th><th>Required</th><th>Options</th></tr>
+                        </thead>
+                        <tbody>
+                          {selectedCampaign.fields.map((field: any, index: number) => (
+                            <tr key={campaignFieldRowKey(field, index)}>
+                              <td>{field.field_name}</td>
+                              <td><Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge></td>
+                              <td>{field.is_required ? <Badge bg="danger">Required</Badge> : <Badge bg="secondary">Optional</Badge>}</td>
+                              <td>
+                                {field.field_type === "dropdown" && field.field_options
+                                  ? field.field_options.map((opt: string, i: number) => (
+                                    <Badge key={campaignFieldOptionKey(field.field_name, opt, i)} bg="info" className="me-1">{opt}</Badge>
+                                  ))
+                                  : <span className="text-muted">N/A</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <Alert variant="info" className="mb-4">No custom fields defined for this campaign.</Alert>
+                  )}
+
+                  <div
+                    style={{
+                      ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                      justifyContent: "flex-end",
+                      paddingTop: "20px",
+                      borderTop: "1px solid #e5e7eb",
+                    }}
+                  >
+                    {session?.user?.permissions?.includes("edit-crm-campaigns") && (
+                      <Button
+                        variant="primary"
+                        onClick={() => {
+                          setShowViewModal(false);
+                          handleEditCampaign(selectedCampaign);
+                        }}
+                        style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                      >
+                        <Edit size={16} aria-hidden />
+                        Edit Campaign
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline-secondary"
+                      onClick={() => {
+                        setShowViewModal(false);
+                        setSelectedCampaign(null);
+                      }}
+                      style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </>
+              )}
+            </Modal.Body>
+          </>
+        )}
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal
@@ -2188,7 +2473,7 @@ const CrmCampaigns = () => {
 
       {/* Upload Modal */}
       {session?.user?.permissions?.includes("add-crm-data-management") && (
-        <Modal show={showUploadModal} onHide={() => { setShowUploadModal(false); setSelectedFile(null); setFieldTags([]); setUploadSelectedCampaigns([]); setAutoDistributeToUsers(false); }} size="lg" centered>
+        <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} size="lg" centered>
           <Modal.Header closeButton className="border-bottom bg-light">
             <Modal.Title>Upload CSV - Import Prospects</Modal.Title>
           </Modal.Header>
@@ -2232,6 +2517,12 @@ const CrmCampaigns = () => {
             </Form>
           </Modal.Body>
           <Modal.Footer>
+            <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 me-auto">
+              <AlertCircle size={14} />
+              <span style={{ fontSize: "0.813rem" }}>
+                Fields marked with <span className="text-danger fw-bold">*</span> are required
+              </span>
+            </Form.Text>
             <Button variant="secondary" onClick={() => { setShowUploadModal(false); setSelectedFile(null); setFieldTags([]); setUploadSelectedCampaigns([]); setAutoDistributeToUsers(false); }}>Cancel</Button>
             <Button variant="primary" onClick={handleUpload} disabled={uploading || !selectedFile}>
               {uploading ? (
@@ -2289,8 +2580,8 @@ const CrmCampaigns = () => {
               <Form.Group className="mb-3">
                 <Form.Label className="fw-semibold small text-muted mb-2">Assign To <span className="text-danger">*</span></Form.Label>
                 <div>
-                  <Form.Check type="radio" id="assign-campaigns" name="assignTarget" label="Campaigns" value="campaigns" checked={assignmentTargetType === "campaigns"} onChange={() => { setAssignmentTargetType("campaigns"); setDistributionMode("equal"); setAssignToCampaigns([]); setSelectedUserExtensions([]); }} className="mb-2" />
-                  <Form.Check type="radio" id="assign-users" name="assignTarget" label="Users" value="users" checked={assignmentTargetType === "users"} onChange={() => { setAssignmentTargetType("users"); setDistributionMode(""); setAssignToCampaigns([]); setSelectedUserExtensions([]); }} />
+                  <Form.Check type="radio" id="assign-campaigns" name="assignTarget" label="Campaigns" value="campaigns" checked={assignmentTargetType === "campaigns"} onChange={() => { setAssignmentTargetType("campaigns"); setDistributionMode("equal"); setAssignToCampaigns([]); setSelectedUserExtensions([]); setCustomDistribution({}); }} className="mb-2" />
+                  <Form.Check type="radio" id="assign-users" name="assignTarget" label="Users" value="users" checked={assignmentTargetType === "users"} onChange={() => { setAssignmentTargetType("users"); setDistributionMode("equal"); setAssignToCampaigns([]); setSelectedUserExtensions([]); setCustomDistribution({}); }} />
                 </div>
               </Form.Group>
 
@@ -2323,12 +2614,13 @@ const CrmCampaigns = () => {
                           <div className="border rounded p-3 bg-light">
                             <p className="small text-muted mb-3">Total: <strong>{recordsToAssign}</strong> | Allocated: <strong>{Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong> | Remaining: <strong>{recordsToAssign - Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong></p>
                             <CrmProportionalDistributionRows
-                              assignToCampaigns={assignToCampaigns}
-                              availableCampaignsForUpload={availableCampaignsForUpload}
+                              items={assignToCampaigns.flatMap((c) => {
+                                const opt = availableCampaignsForUpload.find((ac) => ac.label === c);
+                                return opt ? [{ valueKey: opt.value, label: c }] : [];
+                              })}
                               recordsToAssign={recordsToAssign}
                               customDistribution={customDistribution}
                               handleNumberKeyDown={handleNumberKeyDown}
-                              handleNumberChange={handleNumberChange}
                               setCustomDistribution={setCustomDistribution}
                             />
                           </div>
@@ -2351,10 +2643,65 @@ const CrmCampaigns = () => {
                     <Col md={6}>
                       <Form.Group>
                         <Form.Label className="fw-semibold small text-muted mb-2">Select Users <span className="text-danger">*</span></Form.Label>
-                        <Select isMulti options={dataManagementExtensions.map((ext: any) => ({ value: ext.id?.toString() || ext.extension?.toString() || "", label: ext.display_name || ext.name || `Extension ${ext.id || ext.extension}`, extension: ext }))} value={selectedUserExtensions} onChange={(s) => setSelectedUserExtensions(s || [])} placeholder="Select users..." styles={CRM_CAMPAIGNS_SELECT_STYLES} />
+                        <Select
+                          isMulti
+                          options={dataManagementExtensions.map((ext: any) => ({
+                            value: ext.id?.toString() || ext.extension?.toString() || "",
+                            label: ext.display_name || ext.name || `Extension ${ext.id || ext.extension}`,
+                            extension: ext,
+                          }))}
+                          value={selectedUserExtensions}
+                          onChange={(s) => {
+                            const next = s || [];
+                            const allowed = new Set(next.map((o: { value?: string }) => String(o.value ?? "")));
+                            setSelectedUserExtensions(next);
+                            setCustomDistribution((prev) => {
+                              const pruned: Record<string, number> = {};
+                              for (const [k, v] of Object.entries(prev)) {
+                                if (allowed.has(k)) pruned[k] = v;
+                              }
+                              return pruned;
+                            });
+                          }}
+                          placeholder="Select users..."
+                          styles={CRM_CAMPAIGNS_SELECT_STYLES}
+                        />
                       </Form.Group>
                     </Col>
                   </Row>
+                  {distributionMode === "custom" && selectedUserExtensions.length > 0 && (
+                    <Row className="mt-3">
+                      <Col md={12}>
+                        <Form.Group>
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <Form.Label className="mb-0 fw-semibold small text-muted">Proportional Distribution</Form.Label>
+                            <Button variant="outline-secondary" size="sm" onClick={handleAutoFillEqualDistribution}>
+                              Auto-fill Equal
+                            </Button>
+                          </div>
+                          <div className="border rounded p-3 bg-light">
+                            <p className="small text-muted mb-3">
+                              Total: <strong>{recordsToAssign}</strong> | Allocated:{" "}
+                              <strong>{Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong> | Remaining:{" "}
+                              <strong>{recordsToAssign - Object.values(customDistribution).reduce((s, c) => s + c, 0)}</strong>
+                            </p>
+                            <CrmProportionalDistributionRows
+                              items={selectedUserExtensions
+                                .map((opt: { value?: string; label?: string }) => ({
+                                  valueKey: String(opt.value ?? ""),
+                                  label: String(opt.label ?? opt.value ?? "User"),
+                                }))
+                                .filter((row: { valueKey: string }) => row.valueKey.length > 0)}
+                              recordsToAssign={recordsToAssign}
+                              customDistribution={customDistribution}
+                              handleNumberKeyDown={handleNumberKeyDown}
+                              setCustomDistribution={setCustomDistribution}
+                            />
+                          </div>
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  )}
                 </div>
               )}
             </div>
@@ -2388,8 +2735,14 @@ const CrmCampaigns = () => {
           </Form>
         </Modal.Body>
         <Modal.Footer className="border-0 pt-0 px-4 pb-4">
+          <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 me-auto">
+            <AlertCircle size={14} />
+            <span style={{ fontSize: "0.813rem" }}>
+              Fields marked with <span className="text-danger fw-bold">*</span> are required
+            </span>
+          </Form.Text>
           <Button variant="light" onClick={handleDataAssignmentModalClose} disabled={assigningData} className="px-4 fw-semibold">Cancel</Button>
-          <Button variant="primary" disabled={assigningData || !assignmentTargetType || recordsToAssign === 0 || recordsToAssign > getMaxRecords() || (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) || (assignmentTargetType === "users" && selectedUserExtensions.length === 0)} onClick={handleDataAssignmentSubmit} className="px-4 fw-semibold d-flex align-items-center gap-2">
+          <Button variant="primary" disabled={assigningData || !assignmentTargetType || recordsToAssign === 0 || recordsToAssign > getMaxRecords() || (assignmentTargetType === "campaigns" && (!distributionMode || assignToCampaigns.length === 0)) || (assignmentTargetType === "users" && (!distributionMode || selectedUserExtensions.length === 0))} onClick={handleDataAssignmentSubmit} className="px-4 fw-semibold d-flex align-items-center gap-2">
             {assigningData ? (
               <output className="d-inline-flex align-items-center gap-2 mb-0" aria-live="polite">
                 <span className="spinner-border spinner-border-sm" aria-hidden />

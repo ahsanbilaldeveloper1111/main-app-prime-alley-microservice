@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useProjectSettingsTabListState, paginatedSlice } from '@planner/projectTabTableShared';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
 import { UserPlus, Edit, Trash2, Users, Filter } from 'lucide-react';
 import { addMember, updateMemberRole, removeMember } from '@utils/tasks';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import type { StatsCardData } from '@components/GenericStatsCards';
+import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 
 interface MembersTabProps {
   selectedProject: any;
@@ -60,16 +62,15 @@ const MembersTab: React.FC<MembersTabProps> = ({
   const [formData, setFormData] = useState({ extension_number: '', role: 'member' });
   const [processing, setProcessing] = useState(false);
 
-  // Pagination and search states
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortColumn: '',
-    sortDirection: 'asc' as 'asc' | 'desc',
-  });
-  const [searchValue, setSearchValue] = useState('');
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [selectedColumns] = useState<string[]>(['member', 'extension_number', 'role']);
+  const {
+    pagination,
+    setPagination,
+    searchValue,
+    setSearchValue,
+    selectedItems,
+    setSelectedItems,
+    selectedColumns,
+  } = useProjectSettingsTabListState(['member', 'extension_number', 'role']);
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -254,6 +255,23 @@ const MembersTab: React.FC<MembersTabProps> = ({
     return { value: extNum, label };
   }, [selectedMember, allExtensionOptions]);
 
+  const removeMemberModalItemName = useMemo(() => {
+    if (selectedMember) {
+      return resolveMemberUser(selectedMember).name;
+    }
+    if (selectedItems.length > 0) {
+      return `${selectedItems.length} selected members`;
+    }
+    return undefined;
+  }, [selectedMember, selectedItems.length]);
+
+  const removeMemberModalAdditionalInfo =
+    selectedMember && String(selectedMember.extension_number || '').trim() ? (
+      <p className="text-muted small mb-0">
+        Extension <span className="font-monospace">{String(selectedMember.extension_number)}</span>
+      </p>
+    ) : undefined;
+
   const reactSelectStyles = {
     control: (base: any, state: any) => ({
       ...base,
@@ -338,11 +356,15 @@ const MembersTab: React.FC<MembersTabProps> = ({
     return result;
   }, [enrichedMembers, searchValue, roleFilter]);
 
-  const paginatedMembers = useMemo(() => {
-    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
-    const end = start + pagination.rowsPerPage;
-    return filteredMembers.slice(start, end);
-  }, [filteredMembers, pagination.currentPage, pagination.rowsPerPage]);
+  const paginatedMembers = useMemo(
+    () =>
+      paginatedSlice(
+        filteredMembers,
+        pagination.currentPage,
+        pagination.rowsPerPage,
+      ),
+    [filteredMembers, pagination.currentPage, pagination.rowsPerPage],
+  );
 
   const countMembersByRole = useCallback((role: string) => {
     const r = role.toLowerCase();
@@ -636,13 +658,13 @@ const MembersTab: React.FC<MembersTabProps> = ({
           
           // Sorting
           sortable={true}
-          defaultSortColumn={pagination.sortColumn}
-          defaultSortDirection={pagination.sortDirection}
+          defaultSortBy={pagination.sortBy}
+          defaultSortOrder={pagination.sortOrder}
           onSort={(column, direction) => {
             setPagination((prev) => ({
               ...prev,
-              sortColumn: column,
-              sortDirection: direction,
+              sortBy: column,
+              sortOrder: direction,
               currentPage: 1,
             }));
           }}
@@ -763,24 +785,18 @@ const MembersTab: React.FC<MembersTabProps> = ({
         </Modal.Footer>
       </Modal>
 
-      {/* ── Remove Confirmation Modal ── */}
-      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Remove Member</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p>
-            Are you sure you want to remove{' '}
-            <strong>{selectedMember?.user?.name || selectedMember?.extension_number}</strong> from this project?
-          </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
-          <Button variant="danger" onClick={handleRemoveMember} disabled={processing}>
-            {processing ? <Spinner size="sm" animation="border" /> : 'Remove Member'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setSelectedMember(null);
+        }}
+        onConfirm={handleRemoveMember}
+        itemName={removeMemberModalItemName}
+        itemType="member"
+        additionalInfo={removeMemberModalAdditionalInfo}
+        loading={processing}
+      />
     </>
   );
 };

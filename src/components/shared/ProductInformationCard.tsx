@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProductCategoryData } from "@utils/accounts";
 import {
   BASE_BUTTON,
@@ -10,6 +10,164 @@ import {
   SECTION_TITLE,
 } from "@components/shared/productModalStyles";
 import { onBorderBlur, onBorderFocus, SelectCaret } from "@components/shared/modalUiHelpers";
+
+const PRODUCT_NAME_MAX_LENGTH = 150;
+const PRODUCT_SKU_MAX_LENGTH = 150;
+const PRODUCT_DESCRIPTION_MAX_LENGTH = 500;
+
+const FIELD_CHAR_COUNT_HINT: React.CSSProperties = {
+  fontSize: "11px",
+  color: "#888",
+  marginTop: "4px",
+  fontWeight: 300,
+};
+
+function ProductLogoField({
+  idPrefix,
+  submitting,
+  existingLogoUrl,
+  logoFile,
+  onLogoFileChange,
+}: Readonly<{
+  idPrefix: string;
+  submitting: boolean;
+  existingLogoUrl?: string | null;
+  logoFile: File | null;
+  onLogoFileChange: (file: File | null) => void;
+}>) {
+  const [dragOver, setDragOver] = useState(false);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const remoteLogoUrl = existingLogoUrl?.trim() || null;
+
+  useEffect(() => {
+    if (!logoFile) {
+      setFilePreviewUrl(null);
+      return undefined;
+    }
+    const url = URL.createObjectURL(logoFile);
+    setFilePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logoFile]);
+
+  const displayImageSrc = filePreviewUrl ?? remoteLogoUrl;
+
+  const pickImageFile = (file: File | null | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return;
+    onLogoFileChange(file);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (submitting) return;
+    pickImageFile(e.dataTransfer.files?.[0]);
+  };
+
+  const openFilePicker = () => {
+    if (submitting) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleRemoveNewUpload = () => {
+    onLogoFileChange(null);
+    const input = fileInputRef.current;
+    if (input) input.value = "";
+  };
+
+  const dropZoneBorder = `1.5px dashed ${dragOver ? "#2d6ae0" : "rgb(138,138,138)"}`;
+  const dropZoneBg = dragOver ? "#f0f5ff" : "#fafafa";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", flexShrink: 0 }}>
+      <input
+        ref={fileInputRef}
+        id={`${idPrefix}-product-logo-file`}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        tabIndex={-1}
+        disabled={submitting}
+        onChange={(e) => {
+          pickImageFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        aria-label="Upload product image"
+        disabled={submitting}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!submitting) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        onClick={openFilePicker}
+        style={{
+          padding: 0,
+          border: dropZoneBorder,
+          width: "180px",
+          height: "120px",
+          borderRadius: "4px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: "8px",
+          backgroundColor: dropZoneBg,
+          cursor: submitting ? "not-allowed" : "pointer",
+          transition: "150ms ease-out",
+          flexShrink: 0,
+          overflow: "hidden",
+          boxSizing: "border-box",
+        }}
+      >
+        {displayImageSrc ? (
+          <img src={displayImageSrc} alt="product" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          <>
+            <span style={{ ...BASE_BUTTON }}>Upload</span>
+            <span
+              style={{
+                fontSize: "12px",
+                color: "#2d6ae0",
+                fontWeight: 300,
+                textDecoration: "underline",
+                cursor: "pointer",
+              }}
+            >
+              Browse images
+            </span>
+          </>
+        )}
+      </button>
+      {logoFile && remoteLogoUrl ? (
+        <button
+          type="button"
+          onClick={handleRemoveNewUpload}
+          disabled={submitting}
+          style={{
+            marginTop: "6px",
+            padding: 0,
+            border: "none",
+            background: "none",
+            cursor: submitting ? "not-allowed" : "pointer",
+            fontSize: "11px",
+            color: "#2d6ae0",
+            textDecoration: "underline",
+            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+            fontWeight: 300,
+          }}
+        >
+          Use saved logo
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 export function ProductInformationCard({
   title = "Product information",
@@ -31,6 +189,9 @@ export function ProductInformationCard({
   onAdditionalOpenChange,
   idPrefix = "cmp",
   disableSku = false,
+  existingLogoUrl = null,
+  logoFile,
+  onLogoFileChange,
 }: Readonly<{
   title?: string;
   error?: string | null;
@@ -52,23 +213,27 @@ export function ProductInformationCard({
   idPrefix?: string;
   /** When true (e.g. editing an existing product), SKU cannot be changed. */
   disableSku?: boolean;
+  /** URL from API for edit mode (shown until the user picks a new file). */
+  existingLogoUrl?: string | null;
+  logoFile: File | null;
+  onLogoFileChange: (file: File | null) => void;
 }>) {
-  const [dragOver, setDragOver] = useState(false);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (productName.length <= PRODUCT_NAME_MAX_LENGTH) return;
+    onProductNameChange(productName.slice(0, PRODUCT_NAME_MAX_LENGTH));
+  }, [productName, onProductNameChange]);
 
-  const handleImageUpload = (file: File | null | undefined) => {
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setUploadedImage(url);
-  };
+  useEffect(() => {
+    if (productSku.length <= PRODUCT_SKU_MAX_LENGTH) return;
+    onProductSkuChange(productSku.slice(0, PRODUCT_SKU_MAX_LENGTH));
+  }, [productSku, onProductSkuChange]);
 
-  const handleDrop = (e: React.DragEvent<HTMLElement>) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleImageUpload(file);
-  };
+  useEffect(() => {
+    if (productDescription.length <= PRODUCT_DESCRIPTION_MAX_LENGTH) return;
+    onProductDescriptionChange(
+      productDescription.slice(0, PRODUCT_DESCRIPTION_MAX_LENGTH),
+    );
+  }, [productDescription, onProductDescriptionChange]);
 
   return (
     <div style={SECTION_CARD}>
@@ -96,11 +261,18 @@ export function ProductInformationCard({
             id={`${idPrefix}-product-name`}
             type="text"
             value={productName}
-            onChange={(e) => onProductNameChange(e.target.value)}
+            maxLength={PRODUCT_NAME_MAX_LENGTH}
+            onChange={(e) =>
+              onProductNameChange(e.target.value.slice(0, PRODUCT_NAME_MAX_LENGTH))
+            }
             style={FIELD_INPUT}
             onFocus={onBorderFocus}
             onBlur={onBorderBlur}
+            aria-describedby={`${idPrefix}-product-name-hint`}
           />
+          <div id={`${idPrefix}-product-name-hint`} style={FIELD_CHAR_COUNT_HINT}>
+            {productName.length} / {PRODUCT_NAME_MAX_LENGTH} characters maximum
+          </div>
         </div>
 
         <div>
@@ -111,68 +283,28 @@ export function ProductInformationCard({
             id={`${idPrefix}-product-sku`}
             type="text"
             value={productSku}
-            onChange={(e) => onProductSkuChange(e.target.value)}
-            style={{...FIELD_INPUT, cursor: disableSku ? "not-allowed" : "pointer"}}
+            maxLength={PRODUCT_SKU_MAX_LENGTH}
+            onChange={(e) =>
+              onProductSkuChange(e.target.value.slice(0, PRODUCT_SKU_MAX_LENGTH))
+            }
+            style={{ ...FIELD_INPUT, cursor: disableSku ? "not-allowed" : "pointer" }}
             onFocus={onBorderFocus}
             onBlur={onBorderBlur}
             disabled={disableSku}
+            aria-describedby={`${idPrefix}-product-sku-hint`}
           />
+          <div id={`${idPrefix}-product-sku-hint`} style={FIELD_CHAR_COUNT_HINT}>
+            {productSku.length} / {PRODUCT_SKU_MAX_LENGTH} characters maximum
+          </div>
         </div>
 
-        <button
-          type="button"
-          aria-label="Upload product image"
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          style={{
-            padding: 0,
-            border: `1.5px dashed ${dragOver ? "#2d6ae0" : "rgb(138,138,138)"}`,
-            width: "180px",
-            height: "120px",
-            borderRadius: "4px",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "8px",
-            backgroundColor: dragOver ? "#f0f5ff" : "#fafafa",
-            cursor: "pointer",
-            transition: "150ms ease-out",
-            flexShrink: 0,
-            overflow: "hidden",
-          }}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            style={{ display: "none" }}
-            onChange={(e) => handleImageUpload(e.target.files?.[0])}
-          />
-          {uploadedImage ? (
-            <img src={uploadedImage} alt="product" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <>
-              <span style={{ ...BASE_BUTTON }}>Upload</span>
-              <span
-                style={{
-                  fontSize: "12px",
-                  color: "#2d6ae0",
-                  fontWeight: 300,
-                  textDecoration: "underline",
-                  cursor: "pointer",
-                }}
-              >
-                Browse images
-              </span>
-            </>
-          )}
-        </button>
+        <ProductLogoField
+          idPrefix={idPrefix}
+          submitting={submitting}
+          existingLogoUrl={existingLogoUrl}
+          logoFile={logoFile}
+          onLogoFileChange={onLogoFileChange}
+        />
       </div>
 
       <div style={{ marginTop: "20px", maxWidth: "calc(100% - 200px)" }}>
@@ -182,11 +314,20 @@ export function ProductInformationCard({
         <textarea
           id={`${idPrefix}-product-description`}
           value={productDescription}
-          onChange={(e) => onProductDescriptionChange(e.target.value)}
+          maxLength={PRODUCT_DESCRIPTION_MAX_LENGTH}
+          onChange={(e) =>
+            onProductDescriptionChange(
+              e.target.value.slice(0, PRODUCT_DESCRIPTION_MAX_LENGTH),
+            )
+          }
           style={FIELD_TEXTAREA}
           onFocus={onBorderFocus}
           onBlur={onBorderBlur}
+          aria-describedby={`${idPrefix}-product-description-hint`}
         />
+        <div id={`${idPrefix}-product-description-hint`} style={FIELD_CHAR_COUNT_HINT}>
+          {productDescription.length} / {PRODUCT_DESCRIPTION_MAX_LENGTH} characters maximum
+        </div>
       </div>
 
       <div style={{ marginTop: "20px", maxWidth: "calc(100% - 200px)" }}>

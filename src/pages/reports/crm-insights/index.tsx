@@ -52,6 +52,7 @@ import {
   getOrderStageDurationReport,
   getOrderCancellationReport,
   getStages,
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
   getCampaigns,
   type LeadOverviewReport,
   type LeadSourceReport,
@@ -173,7 +174,11 @@ const CrmReports = () => {
         const [stagesData, hierarchyData, campaignsData] = await Promise.all([
           getStages(getStageType(selectedReportModule)),
           GetHierarchyData(getModuleSlug(selectedReportModule)),
-          getCampaigns({ per_page: 1000, module_slug: ModuleSlug.CRM_CAMPAIGNS })
+          getCampaigns({
+            per_page: 1000,
+            module_slug: ModuleSlug.CRM_CAMPAIGNS,
+            filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+          })
         ]);
         setStages(stagesData || []);
         if (hierarchyData?.extensions) {

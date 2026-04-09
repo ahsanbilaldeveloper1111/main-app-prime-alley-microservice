@@ -31,6 +31,7 @@ import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, GripVertical, FolderTree } from "lucide-react";
 import Select from "@components/AppSelect";
 import GenericTable from "@components/GenericTable";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 
 /** Permission key duplicated in UI checks — single source avoids typos (Sonar S1192). */
@@ -60,6 +61,20 @@ const CONDITION_OPS: { value: FieldConditionOp; label: string }[] = [
 ];
 
 const OPTION_TYPES = new Set<UserRequestCategoryFieldType>(["select", "multiselect", "radio", "checkbox"]);
+
+function requestCategoryFieldTypeLabel(type: string | null | undefined): string {
+  const raw = String(type ?? "").trim();
+  if (raw === "") return "—";
+  const normalized = raw.toLowerCase();
+  const found = FIELD_TYPES.find((t) => t.value === normalized);
+  if (found) return found.label;
+  return raw
+    .replaceAll("_", " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
 
 function formatTrackingLabel(row: UserRequestCategory): string {
   return row.tracking_enabled === true ? "Enabled" : "Disabled";
@@ -140,6 +155,33 @@ function normalizeWorkflowLevelsForPayload(
   }));
 }
 
+function isSubCategoryForm(form: CategoryFormState): boolean {
+  return form.parent_id != null && form.parent_id !== 0;
+}
+
+/** Non-null message blocks submit (name + sub-category workflow rules). */
+function getCategoryFormSubmitValidationError(form: CategoryFormState): string | null {
+  if ((form.name?.trim() ?? "").length === 0) {
+    return "Category name is required.";
+  }
+  if (!isSubCategoryForm(form)) {
+    return null;
+  }
+  const workflowLevels = form.workflow_levels ?? [];
+  if (
+    workflowLevels.every(
+      (lvl) => !(lvl.assignees ?? []).some((a) => (a.user_id ?? "").trim() !== ""),
+    )
+  ) {
+    return "Sub-categories require at least one approval workflow level with at least one assignee.";
+  }
+  return null;
+}
+
+function isCategoryFormReadyForSubmit(form: CategoryFormState): boolean {
+  return getCategoryFormSubmitValidationError(form) == null;
+}
+
 /**
  * UI catch blocks reset local state after API helpers toast/rethrow. Report for observability (Sentry dedupes similar events).
  */
@@ -155,6 +197,22 @@ function slugifyForKey(label: string): string {
     .replaceAll(/[^a-z0-9_]/g, "");
   if (!s) return "";
   return /^[a-z]/.test(s) ? s : `field_${s}`;
+}
+
+function getFieldFormSubmitValidationError(f: UserRequestCategoryFieldPayload): string | null {
+  const trimmedLabel = f.label?.trim() ?? "";
+  if (!trimmedLabel) {
+    return "Label is required";
+  }
+  const effectiveKey = (f.key?.trim() ?? "") || slugifyForKey(trimmedLabel);
+  if (!effectiveKey) {
+    return "Failed to generate field key from label";
+  }
+  return null;
+}
+
+function isFieldFormReadyForSubmit(f: UserRequestCategoryFieldPayload): boolean {
+  return getFieldFormSubmitValidationError(f) == null;
 }
 
 const defaultCategoryForm: UserRequestCategoryPayload & { workflow_levels?: WorkflowLevelPayload[] } = {
@@ -411,7 +469,7 @@ function SubCategoryWorkflowForm({ categoryForm, setCategoryForm, mainAppUsers }
   return (
     <div className="col-12">
       <div className="d-flex align-items-center justify-content-between mb-2">
-        <Form.Label className="mb-0 fw-semibold">Approval workflow (level & order) *</Form.Label>
+        <Form.Label className="mb-0">Approval workflow (level & order) <span className="text-danger">*</span></Form.Label>
 
         {workflowLevels.length > 0 && (
           <Button
@@ -582,17 +640,12 @@ const RequestCategories = () => {
 
   const handleSaveCategory = async (e: React.FormEvent) => {
     e.preventDefault();
+    const validationError = getCategoryFormSubmitValidationError(categoryForm);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
     const trimmedName = categoryForm.name?.trim() ?? "";
-    if (!trimmedName) {
-      toast.error("Category name is required.");
-      return;
-    }
-    const isSubCategory = categoryForm.parent_id != null && categoryForm.parent_id !== 0;
-    const workflowLevels = categoryForm.workflow_levels ?? [];
-    if (isSubCategory && (!workflowLevels.length || workflowLevels.every((lvl) => !(lvl.assignees ?? []).filter((a) => (a.user_id ?? "").trim()).length))) {
-      toast.error("Sub-categories require at least one approval workflow level with at least one assignee.");
-      return;
-    }
     const payload: UserRequestCategoryPayload = {
       name: trimmedName,
       code: categoryForm.code?.trim() || undefined,
@@ -614,6 +667,7 @@ const RequestCategories = () => {
         toast.success("Category created");
       }
       setShowCategoryModal(false);
+      setShowChildrenModal(false);
       loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
       if (categoryForChildren) loadChildren(categoryForChildren.id);
     } catch (error: unknown) {
@@ -630,15 +684,26 @@ const RequestCategories = () => {
 
   const handleDeleteCategory = async () => {
     if (!categoryToDelete) return;
-    const parentId = categoryToDelete.parent_id;
-    const wasChildOfOpenParent = categoryForChildren && parentId === categoryForChildren.id;
+    const deletedId = categoryToDelete.id;
+    const deletedParentId = categoryToDelete.parent_id;
+    const openParentId = categoryForChildren?.id;
+    const parentMatchesOpenModal =
+      openParentId != null &&
+      deletedParentId != null &&
+      Number(deletedParentId) === Number(openParentId);
+    const deletedRowWasInChildrenTable =
+      showChildrenModal &&
+      openParentId != null &&
+      childrenList.some((c) => Number(c.id) === Number(deletedId));
+    const shouldRefreshChildrenList =
+      showChildrenModal && openParentId != null && (parentMatchesOpenModal || deletedRowWasInChildrenTable);
     setDeleting(true);
     try {
       await deleteUserRequestCategory(categoryToDelete.id);
       setShowDeleteModal(false);
       setCategoryToDelete(null);
-      loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
-      if (wasChildOfOpenParent && categoryForChildren) loadChildren(categoryForChildren.id);
+      await loadCategories(pagination?.page ?? 1, pagination?.limit ?? 10);
+      if (shouldRefreshChildrenList) await loadChildren(openParentId);
     } catch (error: unknown) {
       consumeHandledApiError(error, "RequestCategories.handleDeleteCategory");
     } finally {
@@ -721,21 +786,18 @@ const RequestCategories = () => {
   const handleSaveField = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fieldsCategoryId) return;
-    const trimmedLabel = fieldForm.label?.trim() ?? "";
-    if (!trimmedLabel) {
-      toast.error("Label is required");
+    const validationError = getFieldFormSubmitValidationError(fieldForm);
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
+    const trimmedLabel = fieldForm.label?.trim() ?? "";
     const generatedKey = slugifyForKey(trimmedLabel);
     const payloadForSave: UserRequestCategoryFieldPayload = {
       ...fieldForm,
       label: trimmedLabel,
       key: fieldForm.key?.trim() || generatedKey,
     };
-    if (!payloadForSave.key) {
-      toast.error("Failed to generate field key from label");
-      return;
-    }
     setSavingField(true);
     try {
       if (editingField) {
@@ -798,10 +860,10 @@ const RequestCategories = () => {
 
   let childrenModalMain: React.ReactNode;
   if (loadingChildren) {
-    childrenModalMain = <p className="text-muted mb-0">Loading children…</p>;
+    childrenModalMain = <p className="text-muted mb-0">Loading sub-categories…</p>;
   } else if (childrenList.length === 0) {
     childrenModalMain = (
-      <p className="text-muted mb-0">No child categories yet. Click &quot;Add child&quot; to create one.</p>
+      <p className="text-muted mb-0">No sub-categories yet. Click &quot;Add sub-category&quot; to create one.</p>
     );
   } else {
     childrenModalMain = (
@@ -914,7 +976,11 @@ const RequestCategories = () => {
           },
           
           { key: "label", label: "Label", type: "text" },
-          { key: "type", label: "Type", type: "text" },
+          {
+            key: "type",
+            label: "Type",
+            render: (row) => <span>{requestCategoryFieldTypeLabel(row.type)}</span>,
+          },
           {
             key: "required",
             label: "Required",
@@ -989,6 +1055,11 @@ const RequestCategories = () => {
             key: "tracking_enabled",
             label: "Tracking",
             render: (row) => <span>{formatTrackingLabel(row)}</span>,
+          },
+          {
+            key: "code_prefix",
+            label: "Code Prefix",
+            render: (row) => <span>{row.tracking_code_prefix ?? "—"}</span>,
           },
           {
             key: "is_active",
@@ -1127,7 +1198,11 @@ const RequestCategories = () => {
               <Button variant="light" type="button" onClick={() => setShowCategoryModal(false)}>
                 Cancel
               </Button>
-              <Button variant="primary" type="submit" disabled={savingCategory}>
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={savingCategory || !isCategoryFormReadyForSubmit(categoryForm)}
+              >
                 {categorySaveButtonLabel(savingCategory, editingCategory)}
               </Button>
             </div>
@@ -1135,59 +1210,39 @@ const RequestCategories = () => {
         </Form>
       </Modal>
 
-      {/* Delete Category Confirmation Modal */}
-      <Modal show={showDeleteModal} onHide={() => !deleting && setShowDeleteModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Delete Category</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {categoryToDelete && (
-            <p className="mb-0">
-              Are you sure you want to delete <strong>{categoryToDelete.name}</strong>? This action cannot be undone.
-            </p>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleDeleteCategory} disabled={deleting}>
-            {deleting ? "Deleting…" : "Delete"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Delete field confirmation (avoids window/globalThis.confirm) */}
-      <Modal
+      <DeleteConfirmationModal
+        show={showDeleteModal}
+        onHide={() => {
+          if (deleting) return;
+          setShowDeleteModal(false);
+          setCategoryToDelete(null);
+        }}
+        onConfirm={handleDeleteCategory}
+        itemName={categoryToDelete?.name?.trim() || undefined}
+        itemType="category"
+        loading={deleting}
+      />
+      <DeleteConfirmationModal
         show={showDeleteFieldModal}
-        onHide={() => !deletingField && setShowDeleteFieldModal(false)}
-        centered
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Delete field</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {fieldPendingDelete && (
-            <p className="mb-0">
-              Are you sure you want to delete the field <strong>{fieldPendingDelete.label ?? fieldPendingDelete.key}</strong>? This
-              action cannot be undone.
-            </p>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDeleteFieldModal(false)} disabled={deletingField}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={handleConfirmDeleteField} disabled={deletingField}>
-            {deletingField ? "Deleting…" : "Delete"}
-          </Button>
-        </Modal.Footer>
-      </Modal>
+        onHide={() => {
+          if (deletingField) return;
+          setShowDeleteFieldModal(false);
+          setFieldPendingDelete(null);
+        }}
+        onConfirm={handleConfirmDeleteField}
+        itemName={
+          fieldPendingDelete
+            ? (fieldPendingDelete.label ?? fieldPendingDelete.key ?? "").trim() || undefined
+            : undefined
+        }
+        itemType="field"
+        loading={deletingField}
+      />
 
       {/* Children Modal */}
       <Modal show={showChildrenModal} onHide={() => setShowChildrenModal(false)} size="lg" centered>
         <Modal.Header closeButton>
-          <Modal.Title>Children: {categoryForChildren?.name ?? "—"}</Modal.Title>
+          <Modal.Title>{categoryForChildren?.name ?? "—"} Sub-categories</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <div className="d-flex justify-content-between align-items-center mb-3">
@@ -1259,7 +1314,7 @@ const RequestCategories = () => {
               </div>
               <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label>Type</Form.Label>
+                  <Form.Label>Type <span className="text-danger">*</span></Form.Label>
                   <Form.Select
                     value={fieldForm.type}
                     onChange={(e) => setFieldForm((f) => ({ ...f, type: e.target.value as UserRequestCategoryFieldType }))}
@@ -1274,7 +1329,7 @@ const RequestCategories = () => {
               </div>
               <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label>Is Required</Form.Label>
+                  <Form.Label>Is Required <span className="text-danger">*</span></Form.Label>
                   <Form.Select
                     value={fieldForm.required === true ? "true" : "false"}
                     onChange={(e) => setFieldForm((f) => ({ ...f, required: e.target.value === "true" }))}
@@ -1287,7 +1342,7 @@ const RequestCategories = () => {
               
               <div className="col-md-6">
                 <Form.Group>
-                  <Form.Label>Active</Form.Label>
+                  <Form.Label>Active <span className="text-danger">*</span></Form.Label>
                   <Form.Select
                     value={fieldForm.is_active === false ? "false" : "true"}
                     onChange={(e) => setFieldForm((f) => ({ ...f, is_active: e.target.value === "true" }))}
@@ -1597,7 +1652,11 @@ const RequestCategories = () => {
             <Button variant="secondary" onClick={() => setShowFieldModal(false)}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit" disabled={savingField}>
+            <Button
+              variant="primary"
+              type="submit"
+              disabled={savingField || !isFieldFormReadyForSubmit(fieldForm)}
+            >
               {fieldModalPrimaryButtonLabel(savingField, editingField)}
             </Button>
           </Modal.Footer>

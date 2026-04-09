@@ -18,6 +18,7 @@ import {
 import {
   createLead,
   getStages,
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
   getCampaigns,
   getCampaignById,
   getCrmDataById,
@@ -166,7 +167,10 @@ const ConvertToLeadModal: React.FC<ConvertToLeadModalProps> = ({
       ] = await Promise.all([
         getStages("lead"),
         GetHierarchyData(ModuleSlug.CRM_LEADS),
-        getCampaigns({ per_page: 100 }),
+        getCampaigns({
+          per_page: 100,
+          filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+        }),
         getBusinessTypes({ per_page: 1000 }),
         getCrmDataById(prospectId),
       ]);

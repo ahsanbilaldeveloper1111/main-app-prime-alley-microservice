@@ -117,7 +117,7 @@ function getSidebarCustomStyles(isSidebarExpanded: boolean, activeModule: string
       z-index: 9999; transition: width 0.3s ease-in-out;
     }
     @media (max-width: 1199px) {
-      .sidebar-container { transform: translateX(-100%); top: 0; height: 100vh; z-index: 1001; width: 235px; }
+      .sidebar-container {  top: 0; height: 100vh; z-index: 1001;  }
       .sidebar-container:not(.mobile-hidden) { transform: translateX(0); }
     }
     .sidebar-backdrop {
@@ -926,13 +926,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/workforce/dashboard', 
           permission: PERMISSIONS.VIEW_EMPLOYEES_DASHBOARD_STAFF_MANAGEMENT 
         },
-        { 
-          id: 'workforce-org-chart', 
-          title: 'Org Chart', 
-          icon: <Layers2 size={16} />, 
-          url: '/workforce/org-chart', 
-          permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
-        },
         {
           id: 'workforce-employees',
           title: 'Employees',
@@ -960,6 +953,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <CheckCheck size={16} />, 
           url: '/workforce/approval-requests', 
           permission: PERMISSIONS.VIEW_EMPLOYEES_APPROVAL_REQUEST_STAFF_MANAGEMENT 
+        },
+        { 
+          id: 'workforce-org-chart', 
+          title: 'Org Chart', 
+          icon: <Layers2 size={16} />, 
+          url: '/workforce/org-chart', 
+          permission: PERMISSIONS.VIEW_EMPLOYEES_ORGANIZATIONAL_CHART_STAFF_MANAGEMENT 
         },
       ].filter(item => !item.permission || hasPermission(item.permission))
     }, 
@@ -1300,7 +1300,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       {/* Backdrop for mobile and submenu */}
       <button
         type="button"
-        className={`sidebar-backdrop ${(sidebarOpen || activeModule || isFlyoutPinned) ? 'show' : ''}`}
+        className={`sidebar-backdrop `}
         onClick={() => {
           setSidebarOpen(false);
           setActiveModule(null);

@@ -38,9 +38,8 @@ const RichNoteEditor: React.FC<RichNoteEditorProps> = ({
 
   const exec = useCallback(
     (cmd: string, value?: string) => {
-      // NOSONAR: document.execCommand is deprecated but still needed for this lightweight rich text editor.
-      // document.execCommand(cmd, false, value ?? undefined);
       editorRef.current?.focus();
+      document.execCommand(cmd, false, value ?? undefined); // NOSONAR: no modern replacement for contentEditable formatting
       emitChange();
     },
     [emitChange],

@@ -319,7 +319,7 @@ const ProductDetails = () => {
         per_page: pagination.rowsPerPage,
         search: currentFilters.search || "",
         status: currentFilters.status || undefined,
-        sort_direction: "desc",
+        sort_order: "desc",
         billing_cycle: currentFilters.billing_cycle || undefined,
         renewal_start_date: currentFilters.renewal_start_date || undefined,
         renewal_end_date: currentFilters.renewal_end_date || undefined,

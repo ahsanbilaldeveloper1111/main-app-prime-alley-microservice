@@ -3,6 +3,7 @@ import React, { ReactElement, useState, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
+import CrmColorCell from "@components/crm/crmColorCell";
 import {
   getLostReasons,
   createLostReason,
@@ -23,6 +24,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
+import { formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
 
 interface LostReason {
   id: number;
@@ -59,13 +61,15 @@ const LostReasonsManagement = () => {
     async (page = 1, perPage = 15, search = "") => {
       try {
         const reasonsData = await getLostReasons();
-        const searchTerm = currentFilters.search || search;
+        const searchTerm = normalizeSearchQuery(
+          currentFilters.search || search,
+        );
+        const query = searchTerm.toLowerCase();
         const filteredReasons = reasonsData.filter((reason) => {
           if (!searchTerm) return true;
-          return (
-            !!reason.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            !!reason.description?.toLowerCase().includes(searchTerm.toLowerCase())
-          );
+          const nameNorm = normalizeSearchQuery(reason.name).toLowerCase();
+          const descNorm = normalizeSearchQuery(reason.description).toLowerCase();
+          return nameNorm.includes(query) || descNorm.includes(query);
         });
 
         return {
@@ -183,20 +187,7 @@ const LostReasonsManagement = () => {
         name: "Color",
         selector: (row: LostReason) => row.color,
         sortable: false,
-        cell: (props: LostReason) => (
-          <div className="d-flex align-items-center">
-            <div
-              className="me-2"
-              style={{
-                width: "20px",
-                height: "20px",
-                backgroundColor: props.color,
-                borderRadius: "4px",
-              }}
-            />
-            <span className="status-badge info">{props.color}</span>
-          </div>
-        ),
+        cell: (props: LostReason) => <CrmColorCell color={props.color} />,
       },
       {
         key: "description",
@@ -216,7 +207,7 @@ const LostReasonsManagement = () => {
         sortable: true,
         cell: (props: LostReason) => (
           <p>
-            {new Date(props.created_at).toLocaleDateString()}
+            {formatDateForTable(props.created_at)}
           </p>
         ),
       },

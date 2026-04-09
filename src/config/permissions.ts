@@ -362,6 +362,7 @@ export const routePermissions: RoutePermission[] = [
 
    
     {path: '/audit-logs',permissions: ['']},
+    {path: '/privacy-policy',permissions: ['']},
 
     
     {

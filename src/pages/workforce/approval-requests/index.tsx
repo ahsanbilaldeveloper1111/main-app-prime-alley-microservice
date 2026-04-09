@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "react";
+import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
@@ -313,6 +313,9 @@ const ApprovalRequest = () => {
   const [requestedBySearchTerm, setRequestedBySearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
+  const rowsPerPageRef = useRef(rowsPerPage);
+  rowsPerPageRef.current = rowsPerPage;
   const [selectedRequest, setSelectedRequest] = useState<UserRequest | null>(null);
 
   const [categories, setCategories] = useState<UserRequestCategory[]>([]);
@@ -349,7 +352,7 @@ const ApprovalRequest = () => {
     async () => {
       setLoadingCategories(true);
       try {
-        const { data } = await getUserRequestCategories({ limit: 1000 });
+        const { data } = await getUserRequestCategories({ limit: 100,is_active:true });
         setCategories(data ?? []);
         setCategoryFields({});
         if (data?.length) {
@@ -392,7 +395,7 @@ const ApprovalRequest = () => {
         const status = TAB_TO_STATUS[activeTab] ?? "";
         const params: Record<string, unknown> = {
           page,
-          limit: 10,
+          limit: rowsPerPage,
           status,
         };
         if (searchTerm?.trim()) params.search = searchTerm.trim();
@@ -417,8 +420,17 @@ const ApprovalRequest = () => {
         setLoadingRequests(false);
       }
     },
-    [activeTab, searchTerm, selectedType, selectedRequestedByUserId, selectedDate, categories]
+    [activeTab, searchTerm, selectedType, selectedRequestedByUserId, selectedDate, categories, rowsPerPage]
   );
+
+  const handlePaginationChange = useCallback((page: number, limit: number) => {
+    if (rowsPerPageRef.current !== limit) {
+      setRowsPerPage(limit);
+      setCurrentPage(1);
+      return;
+    }
+    setCurrentPage(page);
+  }, []);
 
   useEffect(() => {
     loadRequests(currentPage);
@@ -695,7 +707,7 @@ const ApprovalRequest = () => {
 
   const requestedByDropdownContent = useMemo(
     () => (
-      <div style={{ minWidth: "260px", maxHeight: "320px", overflow: "hidden" }}>
+      <div style={{ minWidth: "260px" }}>
         <input
           type="text"
           placeholder="Search user..."
@@ -710,7 +722,7 @@ const ApprovalRequest = () => {
             fontSize: "13px",
           }}
         />
-        <div style={{ maxHeight: "200px", overflowY: "auto", marginBottom: "8px" }}>
+        <div style={{ marginBottom: "8px" }}>
           <label
             style={{
               display: "flex",
@@ -808,7 +820,7 @@ const ApprovalRequest = () => {
   const typeDropdownContent = useMemo(
     () => (
       <div style={{ minWidth: "220px" }}>
-        <div style={{ maxHeight: "240px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "4px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           <button
             type="button"
             onClick={() => {
@@ -1008,7 +1020,7 @@ const ApprovalRequest = () => {
   const requestsSummary =
     totalRequests === 0
       ? "Showing 0 of 0 requests"
-      : `Showing ${((currentPage - 1) * (requestsPagination?.limit ?? 10)) + 1}-${Math.min(currentPage * (requestsPagination?.limit ?? 10), totalRequests)} of ${totalRequests} requests`;
+      : `Showing ${((currentPage - 1) * (requestsPagination?.limit ?? rowsPerPage)) + 1}-${Math.min(currentPage * (requestsPagination?.limit ?? rowsPerPage), totalRequests)} of ${totalRequests} requests`;
 
   return (
     <React.Fragment>
@@ -1067,11 +1079,11 @@ const ApprovalRequest = () => {
             uniqueKey="id"
             pagination={{
               currentPage,
-              rowsPerPage: requestsPagination?.limit ?? 10,
+              rowsPerPage: requestsPagination?.limit ?? rowsPerPage,
               totalRows: totalRequests,
-              pageSizeOptions: [10],
+              pageSizeOptions: [15, 25, 50, 100],
             }}
-            onPaginationChange={(page) => setCurrentPage(page)}
+            onPaginationChange={handlePaginationChange}
             onRowClick={(request) => {
               setSelectedRequest(request);
               getUserRequest(request.id)

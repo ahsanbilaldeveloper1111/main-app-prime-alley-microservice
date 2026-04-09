@@ -1,5 +1,4 @@
 import "@assets/scss/datatable-style.scss";
-import parsePhoneNumber from "libphonenumber-js";
 import { useRouter } from "next/router";
 import React, {
   ReactElement,
@@ -19,7 +18,8 @@ import GenericTable, {
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import ColumnEditorModal from "@components/ColumnEditorModal";
+import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
+import { parseStoredVisibleColumnKeysLoose } from "@utils/crmListVisibleColumnsStorage";
 import CrmExportModal from "@components/CrmExportModal";
 import { StatsCardData } from "@components/GenericStatsCards";
 import { EditOrderSidebar } from "@components/EditOrderSidebar";
@@ -58,6 +58,7 @@ import {
   ModuleSlug,
   RECORD_TYPES,
   formatDateForTable,
+  formatCrmPreviewDate,
 } from "@utils/Helper";
 import {
   Target,
@@ -116,9 +117,41 @@ import { useSession } from "next-auth/react";
 import moment from "moment";
 import { useCti } from "@hooks/useCti";
 import KanbanBoard, { KanbanColumnDef, KanbanCardData } from "@components/KanbanBoard";
+import {
+  CrmPhoneDisplay as PhoneDisplay,
+  CrmKPICard as KPICard,
+  CrmFilterBar as FilterBar,
+} from "@components/crm/CrmListPageUi";
+import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { CrmListExportModalAssignedToSelect } from "@crm/shared/CrmListExportModalAssignedToSelect";
+import {
+  buildCrmOrdersListExportParams,
+  buildCrmOrdersListGetOrdersParams,
+} from "@crm/orders/buildCrmOrdersListGetOrdersParams";
+import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
+import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
 
-// Phone Container Component (with Badge for tables)
 const ignoredKeys = ["order_stage_id"];
+
+const ORDERS_FILTER_RULES = [
+  ...CRM_BASE_FILTER_RULES,
+  { key: "industry", kind: "truthy" },
+  { key: "order_value_min", kind: "string" },
+  { key: "order_value_max", kind: "string" },
+  { key: "order_stage_id", kind: "string" },
+  { key: "order_approval_status", kind: "truthy" },
+  { key: "fulfillment_status", kind: "truthy" },
+  { key: "payment_status", kind: "truthy" },
+  { key: "date_from", kind: "truthy" },
+  { key: "date_to", kind: "truthy" },
+  { key: "created_at_from", kind: "truthy" },
+  { key: "created_at_to", kind: "truthy" },
+  { key: "created_at_month", kind: "truthy" },
+  { key: "ticket_id", kind: "present" },
+  { key: "deal_id", kind: "present" },
+  { key: "status", kind: "truthy" },
+] as const;
 
 function ordersToKanbanColumns(
   orders: any[],
@@ -159,299 +192,8 @@ function ordersToKanbanColumns(
     cards: buckets[String(stage.id)] ?? [],
   }));
 }
-const PhoneContainer = ({ phone }: { phone: string }) => {
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
-  const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
 
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-  return (
-    <Badge bg="info" className="bg-opacity-10 text-dark">
-      <div className="d-flex align-items-center gap-2">
-        {phoneNumber?.countryCode && (
-          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-        )}
-        {phoneNumber.phone}
-      </div>
-    </Badge>
-  );
-};
-
-// Phone Display Component (without Badge for view dialogs)
-const PhoneDisplay = ({ phone }: { phone: string }) => {
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
-  const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-  return (
-    <div className="d-flex align-items-center gap-2">
-      {phoneNumber?.countryCode && (
-        <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-      )}
-      {phoneNumber.phone}
-    </div>
-  );
-};
-
-// Helper function to get initials from name (first two words, first two letters, only a-z)
-const getInitials = (name: string): string => {
-  if (!name) return "NA";
-
-  // Split by spaces and take up to first two words
-  const words = name.trim().split(/\s+/).slice(0, 2);
-
-  // Check if we have two words and the second word has at least one letter
-  const hasSecondWord = words.length >= 2;
-  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
-
-  if (hasSecondWord && secondWordHasLetter) {
-    // First letter of first two words
-    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
-    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
-
-    if (firstLetter1 && firstLetter2) {
-      return (firstLetter1 + firstLetter2).toUpperCase();
-    }
-  }
-
-  // If no second word or second word is only numbers, use first two letters of first word
-  if (words[0]) {
-    const letters = words[0].match(/[a-z]/gi) || [];
-    if (letters.length >= 2) {
-      return (letters[0] + letters[1]).toUpperCase();
-    } else if (letters.length === 1) {
-      return letters[0].toUpperCase();
-    }
-  }
-
-  return "NA";
-};
-
-// Helper function to generate a random background color based on name
-const getRandomColor = (name: string): string => {
-  if (!name) return "#6c757d";
-
-  // Generate a consistent color based on the name
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
-  }
-
-  // Generate a color with good contrast (avoid too light colors)
-  const hue = Math.abs(hash) % 360;
-  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
-  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
-
-  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
-};
-
-// KPI Card Component
-interface KPICardData {
-  title: string;
-  value: string;
-  change?: string;
-  isPositive?: boolean;
-  icon: React.ReactNode;
-  color: string;
-  onClick?: () => void;
-}
-
-const KPICard: React.FC<KPICardData> = ({
-  title,
-  value,
-  change,
-  isPositive,
-  icon,
-  color,
-  onClick,
-}) => {
-  return (
-    <Card
-      className={onClick ? "h-100" : ""}
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        transition: "all 0.2s ease",
-        border: "1px solid #e9ecef",
-      }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }
-      }}
-    >
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
-            <div className={`text-${color}`}>{icon}</div>
-          </div>
-          {change && (
-            <Badge
-              bg={isPositive ? "success" : "danger"}
-              className="bg-opacity-10"
-            >
-              {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-              {change}
-            </Badge>
-          )}
-        </div>
-        <h3 className="mb-1">{value}</h3>
-        <p className="text-muted mb-0 small">{title}</p>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Filter Bar Component
-interface FilterBarProps {
-  quickFilters: {
-    id: string;
-    label: string;
-    count: number;
-    variant?: string;
-    color?: string;
-    icon?: React.ReactNode;
-  }[];
-  activeFilter?: string;
-  onFilterChange?: (filterId: string) => void;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
-  onSearch?: () => void;
-  searchPlaceholder?: string;
-  showAdvancedFilters?: boolean;
-  onToggleAdvancedFilters?: () => void;
-  advancedFilterCount?: number;
-}
-
-const FilterBar: React.FC<FilterBarProps> = ({
-  quickFilters,
-  activeFilter,
-  onFilterChange,
-  searchValue,
-  onSearchChange,
-  onSearch,
-  searchPlaceholder = "Search...",
-  showAdvancedFilters,
-  onToggleAdvancedFilters,
-  advancedFilterCount = 0,
-}) => {
-  return (
-    <Card className="border-0 shadow-sm mb-3">
-      <Card.Body className="p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color;
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor) {
-                if (isActive) {
-                  const bgColor = filter.color;
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
-
-              return (
-                <Button
-                  key={filter.id}
-                  variant={
-                    hasCustomColor
-                      ? undefined
-                      : isActive
-                        ? filter.variant || "primary"
-                        : "outline-secondary"
-                  }
-                  onClick={() => onFilterChange && onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2"
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  {filter.icon && (
-                    <span className="d-flex align-items-center">
-                      {filter.icon}
-                    </span>
-                  )}
-                  {filter.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
-
-const CrmOrders = () => {
+const CrmOrders = () => { // NOSONAR
   const { data: session } = useSession();
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
@@ -557,28 +299,32 @@ const CrmOrders = () => {
   const [ordersSearch, setOrdersSearch] = useState("");
   const [selectedOrdersColumns, setSelectedOrdersColumns] = useState<string[]>(
     () => {
-      const saved = localStorage.getItem("ordersSelectedColumns");
-      return saved
-        ? JSON.parse(saved)
-        : [
-            "orderNumber",
-            "customer",
-            "deal",
-            "stage",
-            "value",
-            "approvalStatus",
-            "fulfillmentStatus",
-            "assignedUser",
-            "orderDate",
-            "owner",
-          ];
+      const defaults = [
+        "orderNumber",
+        "customer",
+        "deal",
+        "stage",
+        "value",
+        "approvalStatus",
+        "fulfillmentStatus",
+        "assignedUser",
+        "orderDate",
+        "owner",
+      ];
+      if (globalThis.window === undefined) {
+        return defaults;
+      }
+      const stored = parseStoredVisibleColumnKeysLoose(
+        globalThis.localStorage.getItem("ordersSelectedColumns"),
+      );
+      return stored ?? defaults;
     },
   );
   const [ordersPagination, setOrdersPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [ordersFilters, setOrdersFilters] = useState({
     assignedTo: null as string | null,
@@ -613,40 +359,15 @@ const CrmOrders = () => {
 
   // Build API params from filters for export (per Orders API spec)
   const buildOrdersExportParams = useCallback(
-    (filters: Record<string, any>, pagination?: { page: number; per_page: number }) => {
-      const params: Record<string, any> = {};
-      if (filters.include_lost !== undefined) params.include_lost = filters.include_lost;
-      if (filters.include_archived !== undefined) params.include_archived = filters.include_archived;
-      if (filters.user_extensions?.length) {
-        params.user_extensions = filters.user_extensions;
-      } else if (filters.assigned_to) {
-        params.user_extensions = [filters.assigned_to];
-      }
-      if (filters.industry) params.industry = filters.industry;
-      if (filters.order_value_min != null && filters.order_value_min !== "") params.order_value_min = Number(filters.order_value_min);
-      if (filters.order_value_max != null && filters.order_value_max !== "") params.order_value_max = Number(filters.order_value_max);
-      if (filters.order_stage_id) params.order_stage_id = filters.order_stage_id;
-      if (filters.stage_id) params.stage_id = filters.stage_id;
-      if (filters.order_approval_status) params.order_approval_status = filters.order_approval_status;
-      if (filters.fulfillment_status) params.fulfillment_status = filters.fulfillment_status;
-      if (filters.payment_status) params.payment_status = filters.payment_status;
-      if (filters.status) params.status = filters.status;
-      if (filters.ticket_id != null && filters.ticket_id !== "") params.ticket_id = filters.ticket_id;
-      if (filters.deal_id != null && filters.deal_id !== "") params.deal_id = filters.deal_id;
-      if (filters.date_from) params.date_from = filters.date_from;
-      if (filters.date_to) params.date_to = filters.date_to;
-      if (filters.created_at_from) params.created_at_from = filters.created_at_from;
-      if (filters.created_at_to) params.created_at_to = filters.created_at_to;
-      if (filters.created_at_month) params.created_at_month = filters.created_at_month;
-      if (filters.search) params.search = filters.search;
-      if (filters.sort_by) params.sort_by = filters.sort_by;
-      if (filters.sort_order) params.sort_order = filters.sort_order;
-      if (pagination) {
-        params.page = pagination.page;
-        params.per_page = pagination.per_page;
-      }
-      return params;
-    },
+    (
+      filters: Record<string, any>,
+      pagination?: { page: number; per_page: number },
+    ) =>
+      buildCrmOrdersListExportParams(
+        filters,
+        pagination,
+        "user_extension_filter",
+      ),
     [],
   );
 
@@ -729,45 +450,14 @@ const CrmOrders = () => {
     async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
-        const params: any = {
+        const params = buildCrmOrdersListGetOrdersParams({
+          filters: currentFilters,
           page,
-          per_page: perPage,
-        };
-
-        // Orders API: include_lost, include_archived, user_extensions, assigned_to, industry,
-        // order_value_min/max, order_stage_id, stage_id, order_approval_status, fulfillment_status,
-        // payment_status, status, ticket_id, deal_id, date_from/to, created_at_from/to/month, search, sort_by, sort_order
-        if (currentFilters.search) params.search = currentFilters.search;
-        if (currentFilters.include_lost !== undefined) params.include_lost = currentFilters.include_lost;
-        if (currentFilters.include_archived !== undefined) params.include_archived = currentFilters.include_archived;
-        if (currentFilters.user_extensions?.length) {
-          params.user_extensions = currentFilters.user_extensions;
-        } else if (currentFilters.assigned_to) {
-          params.user_extensions = [currentFilters.assigned_to];
-        }
-        if (currentFilters.industry) params.industry = currentFilters.industry;
-        if (currentFilters.order_value_min != null && currentFilters.order_value_min !== "") params.order_value_min = Number(currentFilters.order_value_min);
-        if (currentFilters.order_value_max != null && currentFilters.order_value_max !== "") params.order_value_max = Number(currentFilters.order_value_max);
-        if (currentFilters.order_stage_id) params.order_stage_id = currentFilters.order_stage_id;
-        if (currentFilters.stage_id) params.stage_id = currentFilters.stage_id;
-        if (currentFilters.order_approval_status) params.order_approval_status = currentFilters.order_approval_status;
-        if (currentFilters.fulfillment_status) params.fulfillment_status = currentFilters.fulfillment_status;
-        if (currentFilters.payment_status) params.payment_status = currentFilters.payment_status;
-        if (currentFilters.status) params.status = currentFilters.status;
-        if (currentFilters.ticket_id != null && currentFilters.ticket_id !== "") params.ticket_id = currentFilters.ticket_id;
-        if (currentFilters.deal_id != null && currentFilters.deal_id !== "") params.deal_id = currentFilters.deal_id;
-        if (currentFilters.date_from) params.date_from = currentFilters.date_from;
-        if (currentFilters.date_to) params.date_to = currentFilters.date_to;
-        if (currentFilters.created_at_from) params.created_at_from = currentFilters.created_at_from;
-        if (currentFilters.created_at_to) params.created_at_to = currentFilters.created_at_to;
-        if (currentFilters.created_at_month) params.created_at_month = currentFilters.created_at_month;
-        if (currentFilters.sort_by) params.sort_by = currentFilters.sort_by;
-        if (currentFilters.sort_order) params.sort_order = currentFilters.sort_order;
-
-        if (ordersPagination.sortColumn) {
-          params.sort_column = ordersPagination.sortColumn;
-          params.sort_direction = ordersPagination.sortDirection;
-        }
+          perPage,
+          tableSort: ordersPagination,
+          normalizeSearch: true,
+          ownerParamStyle: "user_extension_filter",
+        });
 
         const response: any = await getOrders(params);
         console.log("Raw response from getOrders:", response);
@@ -811,7 +501,7 @@ const CrmOrders = () => {
         setLoading(false);
       }
     },
-    [currentFilters, ordersPagination.sortColumn, ordersPagination.sortDirection],
+    [currentFilters, ordersPagination.sortBy, ordersPagination.sortOrder],
   );
 
   // initiate call
@@ -1139,188 +829,7 @@ const CrmOrders = () => {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) => {
-      const newFilters = { ...prev };
-
-      // Handle stage_id filter (single value)
-      if ("stage_id" in filters) {
-        if (filters.stage_id) {
-          newFilters.stage_id = String(filters.stage_id);
-        } else {
-          delete newFilters.stage_id;
-        }
-      }
-
-      // Handle assigned_to filter (single value)
-      if ("assigned_to" in filters) {
-        if (filters.assigned_to) {
-          newFilters.assigned_to = String(filters.assigned_to);
-        } else {
-          delete newFilters.assigned_to;
-        }
-      }
-
-      // Handle search
-      if ("search" in filters) {
-        if (filters.search) {
-          newFilters.search = filters.search;
-        } else {
-          delete newFilters.search;
-        }
-      }
-
-      // Handle is_lost filter
-      if ("is_lost" in filters) {
-        newFilters.is_lost = filters.is_lost;
-      }
-
-      // Handle include_lost filter
-      if ("include_lost" in filters) {
-        if (filters.include_lost) {
-          newFilters.include_lost = true;
-        } else {
-          delete newFilters.include_lost;
-        }
-      }
-
-      // Handle include_archived filter
-      if ("include_archived" in filters) {
-        if (filters.include_archived) {
-          newFilters.include_archived = true;
-        } else {
-          delete newFilters.include_archived;
-        }
-      }
-
-      // Handle industry filter
-      if ("industry" in filters) {
-        if (filters.industry) {
-          newFilters.industry = filters.industry;
-        } else {
-          delete newFilters.industry;
-        }
-      }
-
-      // Handle order_value_min filter
-      if ("order_value_min" in filters) {
-        if (filters.order_value_min) {
-          newFilters.order_value_min = String(filters.order_value_min);
-        } else {
-          delete newFilters.order_value_min;
-        }
-      }
-
-      // Handle order_value_max filter
-      if ("order_value_max" in filters) {
-        if (filters.order_value_max) {
-          newFilters.order_value_max = String(filters.order_value_max);
-        } else {
-          delete newFilters.order_value_max;
-        }
-      }
-
-      // Handle order_stage_id filter (note: this is different from stage_id, it's order_stage_id)
-      if ("order_stage_id" in filters) {
-        if (filters.order_stage_id) {
-          newFilters.order_stage_id = String(filters.order_stage_id);
-        } else {
-          delete newFilters.order_stage_id;
-        }
-      }
-
-      // Handle order_approval_status filter
-      if ("order_approval_status" in filters) {
-        if (filters.order_approval_status) {
-          newFilters.order_approval_status = filters.order_approval_status;
-        } else {
-          delete newFilters.order_approval_status;
-        }
-      }
-
-      // Handle fulfillment_status filter
-      if ("fulfillment_status" in filters) {
-        if (filters.fulfillment_status) {
-          newFilters.fulfillment_status = filters.fulfillment_status;
-        } else {
-          delete newFilters.fulfillment_status;
-        }
-      }
-
-      // Handle payment_status filter
-      if ("payment_status" in filters) {
-        if (filters.payment_status) {
-          newFilters.payment_status = filters.payment_status;
-        } else {
-          delete newFilters.payment_status;
-        }
-      }
-
-      // Handle date_from filter
-      if ("date_from" in filters) {
-        if (filters.date_from) {
-          newFilters.date_from = filters.date_from;
-        } else {
-          delete newFilters.date_from;
-        }
-      }
-
-      // Handle date_to filter
-      if ("date_to" in filters) {
-        if (filters.date_to) {
-          newFilters.date_to = filters.date_to;
-        } else {
-          delete newFilters.date_to;
-        }
-      }
-
-      // Handle created_at_from / created_at_to / created_at_month
-      if ("created_at_from" in filters) {
-        if (filters.created_at_from) {
-          newFilters.created_at_from = filters.created_at_from;
-        } else {
-          delete newFilters.created_at_from;
-        }
-      }
-      if ("created_at_to" in filters) {
-        if (filters.created_at_to) {
-          newFilters.created_at_to = filters.created_at_to;
-        } else {
-          delete newFilters.created_at_to;
-        }
-      }
-      if ("created_at_month" in filters) {
-        if (filters.created_at_month) {
-          newFilters.created_at_month = filters.created_at_month;
-        } else {
-          delete newFilters.created_at_month;
-        }
-      }
-
-      // Handle ticket_id, deal_id, status
-      if ("ticket_id" in filters) {
-        if (filters.ticket_id != null && filters.ticket_id !== "") {
-          newFilters.ticket_id = filters.ticket_id;
-        } else {
-          delete newFilters.ticket_id;
-        }
-      }
-      if ("deal_id" in filters) {
-        if (filters.deal_id != null && filters.deal_id !== "") {
-          newFilters.deal_id = filters.deal_id;
-        } else {
-          delete newFilters.deal_id;
-        }
-      }
-      if ("status" in filters) {
-        if (filters.status) {
-          newFilters.status = filters.status;
-        } else {
-          delete newFilters.status;
-        }
-      }
-
-      return newFilters;
-    });
+    setCurrentFilters((prev) => applyCrmFilterRules(prev, filters, ORDERS_FILTER_RULES));
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -1446,8 +955,8 @@ const CrmOrders = () => {
     }
   }, []);
 
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback(
+  // Handle preview button click - shows sidebar (persistence wrapper below)
+  const handlePreviewClickBase = useCallback(
     async (order: any) => {
       const orderId = order.rawData?.id || order.id;
       // Set the order immediately to show sidebar
@@ -1470,8 +979,42 @@ const CrmOrders = () => {
     [fetchOrderDetails],
   );
 
+  const openOrderPreviewById = useCallback(
+    (id: number) => {
+      handlePreviewClickBase({ id, rawData: { id } }).catch((error: unknown) => {
+        console.error("openOrderPreviewById:", error);
+      });
+    },
+    [handlePreviewClickBase],
+  );
+
+  const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
+    useCrmListPreviewPersistence({
+      localStorageKey: "crm-orders-list-preview-record-id",
+      listLoading: !isInitialized || loading,
+      openPreviewByNumericId: openOrderPreviewById,
+    });
+
+  const handlePreviewClick = useCallback(
+    async (order: any) => {
+      const orderId = order.rawData?.id || order.id;
+      if (orderId) writePreviewIdToStorage(Number(orderId));
+      await handlePreviewClickBase(order);
+    },
+    [handlePreviewClickBase, writePreviewIdToStorage],
+  );
+
   // Handle close order sidebar
   const handleCloseOrderSidebar = useCallback(() => {
+    setShowOrderSidebar(false);
+    setSelectedOrder(null);
+    setViewingOrder(null);
+    setRelatedDeal(null);
+    setRelatedLead(null);
+    clearPreviewIdFromStorage();
+  }, [clearPreviewIdFromStorage]);
+
+  const handleHideOrderSidebarKeepPersistence = useCallback(() => {
     setShowOrderSidebar(false);
     setSelectedOrder(null);
     setViewingOrder(null);
@@ -1570,28 +1113,28 @@ const CrmOrders = () => {
     setPaginationState: (state: any) => void,
   ) => {
     const newDirection =
-      paginationState.sortColumn === column &&
-      paginationState.sortDirection === "asc"
+      paginationState.sortBy === column &&
+      paginationState.sortOrder === "asc"
         ? "desc"
         : "asc";
     setPaginationState({
       ...paginationState,
-      sortColumn: column,
-      sortDirection: newDirection,
+      sortBy: column,
+      sortOrder: newDirection,
       currentPage: 1,
     });
   };
 
   const sortData = <T extends Record<string, any>>(
     data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
+    sortBy: string,
+    sortOrder: "asc" | "desc",
   ): T[] => {
-    if (!sortColumn) return data;
+    if (!sortBy) return data;
 
     return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
 
       if (aVal === undefined) aVal = "";
       if (bVal === undefined) bVal = "";
@@ -1599,8 +1142,8 @@ const CrmOrders = () => {
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
 
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
+      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
   };
@@ -1752,10 +1295,10 @@ const CrmOrders = () => {
   };
 
   const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortColumn !== column) {
+    if (paginationState.sortBy !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return paginationState.sortDirection === "asc" ? (
+    return paginationState.sortOrder === "asc" ? (
       <ArrowUp size={14} className="ms-1" />
     ) : (
       <ArrowDown size={14} className="ms-1" />
@@ -1987,45 +1530,6 @@ const CrmOrders = () => {
     },
     [ordersMetrics],
   );
-
-  // Custom select styles
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "45px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused
-        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
-        : "none",
-      "&:hover": {
-        borderColor: "#86b7fe",
-      },
-    }),
-    multiValue: (provided: any) => ({
-      ...provided,
-      backgroundColor: "#0d6efd",
-      color: "white",
-      fontSize: "0.813rem",
-    }),
-    multiValueLabel: (provided: any) => ({
-      ...provided,
-      color: "white",
-      padding: "2px 6px",
-    }),
-    multiValueRemove: (provided: any) => ({
-      ...provided,
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#0b5ed7",
-        color: "white",
-      },
-    }),
-    menu: (provided: any) => ({
-      ...provided,
-      fontSize: "0.875rem",
-    }),
-  };
 
   // Define columns for GenericTable
   const ordersColumns: TableColumn<any>[] = useMemo(
@@ -2910,7 +2414,7 @@ const CrmOrders = () => {
                               filtersToApply.search = ordersSearch;
                             }
                             if (ordersFilters.assignedTo) {
-                              filtersToApply.assigned_to =
+                              filtersToApply.user_extension_filter =
                                 ordersFilters.assignedTo;
                             }
                             if (ordersFilters.stage) {
@@ -3041,13 +2545,13 @@ const CrmOrders = () => {
                   });
                 }}
                 sortable={true}
-                defaultSortColumn={ordersPagination.sortColumn}
-                defaultSortDirection={ordersPagination.sortDirection}
+                defaultSortBy={ordersPagination.sortBy}
+                defaultSortOrder={ordersPagination.sortOrder}
                 onSort={(column, direction) => {
                   setOrdersPagination({
                     ...ordersPagination,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                   });
                 }}
                 onPreviewClick={(order) => handlePreviewClick(order)}
@@ -3142,7 +2646,7 @@ const CrmOrders = () => {
               onClick: () => {
                 const orderId = selectedOrder?.id || selectedOrder?.rawData?.id;
                 if (orderId) {
-                  setShowOrderSidebar(false);
+                  handleHideOrderSidebarKeepPersistence();
                   router.push(`/crm/detailspage?type=order&id=${orderId}`);
                 }
               },
@@ -3297,9 +2801,12 @@ const CrmOrders = () => {
                   {
                     label: "Order Date",
                     value:
-                      selectedOrder?.order_date ||
-                      selectedOrder?.created_at ||
-                      "N/A",
+                      selectedOrder?.order_date || selectedOrder?.created_at
+                        ? formatCrmPreviewDate(
+                            selectedOrder.order_date ||
+                              selectedOrder.created_at,
+                          ) || "N/A"
+                        : "N/A",
                     type: "date",
                     show: !!(
                       selectedOrder?.order_date || selectedOrder?.created_at
@@ -3307,7 +2814,11 @@ const CrmOrders = () => {
                   },
                   {
                     label: "Expected Delivery",
-                    value: selectedOrder?.expected_delivery_date || "N/A",
+                    value: selectedOrder?.expected_delivery_date
+                      ? formatCrmPreviewDate(
+                          selectedOrder.expected_delivery_date,
+                        ) || "N/A"
+                      : "N/A",
                     type: "date",
                     show: !!selectedOrder?.expected_delivery_date,
                   },
@@ -3448,21 +2959,13 @@ const CrmOrders = () => {
       />
 
       {/* Column Editor Modal */}
-      <ColumnEditorModal
+      <CrmListColumnEditorModal
         show={showColumnEditor}
         onHide={() => setShowColumnEditor(false)}
-        title="Customize Columns"
         columns={ordersColumns.map((c) => ({ key: c.key, label: c.label }))}
         selectedColumnKeys={selectedOrdersColumns}
-        onApply={(keys) => {
-          setSelectedOrdersColumns(keys);
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
-              "ordersSelectedColumns",
-              JSON.stringify(keys),
-            );
-          }
-        }}
+        storageKey="ordersSelectedColumns"
+        onSelectedKeysChange={setSelectedOrdersColumns}
       />
 
       {/* Export Modal */}
@@ -3482,48 +2985,17 @@ const CrmOrders = () => {
         <h6 className="mb-3">Export filters</h6>
         <Row>
           <Col md={6}>
-            <Form.Group className="mb-3">
-              <Form.Label>Owner</Form.Label>
-              <Select
-                options={[
-                  { value: "", label: "All owners" },
-                  ...extensions.map((ext: any) => ({
-                    value: String(ext.id ?? ext.extension),
-                    label:
-                      ext.display_name || ext.name || ext.id || ext.extension || "",
-                  })),
-                ]}
-                value={
-                  exportFilters.assigned_to
-                    ? (() => {
-                        const id = exportFilters.assigned_to;
-                        const ext = extensions.find(
-                          (e: any) => (e.id || e.extension) === id,
-                        );
-                        return {
-                          value: id,
-                          label: ext
-                            ? ext.display_name || ext.name || id
-                            : id,
-                        };
-                      })()
-                    : null
-                }
-                onChange={(selected: { value: string; label: string } | null) => {
-                  const v = selected?.value;
-                  setExportFilters((prev) => {
-                    const next = { ...prev };
-                    if (v) next.assigned_to = v;
-                    else delete next.assigned_to;
-                    return next;
-                  });
-                }}
-                placeholder="Select owner..."
-                isClearable
-                isSearchable
-                styles={customSelectStyles}
-              />
-            </Form.Group>
+            <CrmListExportModalAssignedToSelect
+              extensions={extensions}
+              value={
+                exportFilters.user_extension_filter != null &&
+                exportFilters.user_extension_filter !== ""
+                  ? String(exportFilters.user_extension_filter)
+                  : undefined
+              }
+              setExportFilters={setExportFilters}
+              styles={customSelectStyles}
+            />
           </Col>
           <Col md={6}>
             <Form.Group className="mb-3">
@@ -3813,7 +3285,7 @@ const CrmOrders = () => {
             filtersToApply.search = ordersSearch;
           }
           if (ordersFilters.assignedTo) {
-            filtersToApply.assigned_to = ordersFilters.assignedTo;
+            filtersToApply.user_extension_filter = ordersFilters.assignedTo;
           }
           if (ordersFilters.stage) {
             filtersToApply.order_stage_id = ordersFilters.stage;
@@ -4048,7 +3520,7 @@ const CrmOrders = () => {
                   <span>•</span>
                   <span>
                     {viewingOrder.order_date
-                      ? moment(viewingOrder.order_date).format("MMM DD, YYYY")
+                      ? formatCrmPreviewDate(viewingOrder.order_date) || "N/A"
                       : "N/A"}
                   </span>
                 </div>
@@ -4520,9 +3992,9 @@ const CrmOrders = () => {
                                   }}
                                 >
                                   {viewingOrder.order_date
-                                    ? formatDateForTable(
+                                    ? formatCrmPreviewDate(
                                         viewingOrder.order_date,
-                                      )
+                                      ) || "N/A"
                                     : "N/A"}
                                 </div>
                               </div>
@@ -4621,7 +4093,7 @@ const CrmOrders = () => {
                                       fontWeight: 500,
                                     }}
                                   >
-                                    {formatDateForTable(
+                                    {formatCrmPreviewDate(
                                       viewingOrder.expected_delivery_date,
                                     )}
                                   </div>
@@ -6763,9 +6235,7 @@ const CrmOrders = () => {
                                   fontWeight: 500,
                                 }}
                               >
-                                {moment(viewingOrder.order_date).format(
-                                  "MMM DD, YYYY",
-                                )}
+                                {formatCrmPreviewDate(viewingOrder.order_date)}
                               </div>
                             </div>
                           )}
@@ -6791,9 +6261,9 @@ const CrmOrders = () => {
                                   fontWeight: 500,
                                 }}
                               >
-                                {moment(
+                                {formatCrmPreviewDate(
                                   viewingOrder.expected_delivery_date,
-                                ).format("MMM DD, YYYY")}
+                                )}
                               </div>
                             </div>
                           )}

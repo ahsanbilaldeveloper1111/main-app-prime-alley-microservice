@@ -16,6 +16,8 @@ interface BoardTabProps {
   setBoardSelectedPriority: (priority: string) => void;
   boardSelectedLabel: string;
   setBoardSelectedLabel: (label: string) => void;
+  boardSelectedStatus: string;
+  setBoardSelectedStatus: (status: string) => void;
   showCompletedTasks: boolean;
   setShowCompletedTasks: (show: boolean) => void;
   onCreateTask: (statusId: number | null) => void;
@@ -47,6 +49,8 @@ const BoardTab: React.FC<BoardTabProps> = ({
   setBoardSelectedPriority,
   boardSelectedLabel,
   setBoardSelectedLabel,
+  boardSelectedStatus,
+  setBoardSelectedStatus,
   showCompletedTasks,
   setShowCompletedTasks,
   onCreateTask,
@@ -79,6 +83,8 @@ const BoardTab: React.FC<BoardTabProps> = ({
         setBoardSelectedPriority={setBoardSelectedPriority}
         boardSelectedLabel={boardSelectedLabel}
         setBoardSelectedLabel={setBoardSelectedLabel}
+        boardSelectedStatus={boardSelectedStatus}
+        setBoardSelectedStatus={setBoardSelectedStatus}
         showCompletedTasks={showCompletedTasks}
         setShowCompletedTasks={setShowCompletedTasks}
         onClearFilters={() => {
@@ -86,6 +92,7 @@ const BoardTab: React.FC<BoardTabProps> = ({
           setBoardSelectedAssignee('All Assignees');
           setBoardSelectedPriority('All Priorities');
           setBoardSelectedLabel('All Labels');
+          setBoardSelectedStatus('All Statuses');
           setShowCompletedTasks(false);
         }}
         onCreateTask={onCreateTask}

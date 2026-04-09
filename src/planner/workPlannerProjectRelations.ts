@@ -8,9 +8,12 @@ export const WORK_PLANNER_PROJECT_DETAIL_RELATIONS = [
   "members.user",
   "tasks",
   "tasks.assignees",
+  "tasks.watchers",
   "tasks.labels",
   "tasks.status",
   "tasks.children",
+  "tasks.children.assignees",
+  "tasks.children.watchers",
   "owner",
 ] as const;
 

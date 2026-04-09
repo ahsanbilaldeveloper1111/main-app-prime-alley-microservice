@@ -19,11 +19,6 @@ export function PricingConfigurationCard({
   onCurrencyChange,
   priceAed,
   onPriceAedChange,
-  priceUsd,
-  onPriceUsdChange,
-  unitCost,
-  onUnitCostChange,
-  marginText,
   submitting,
   onManageCurrencies,
   idPrefix = "cmp",
@@ -34,11 +29,6 @@ export function PricingConfigurationCard({
   onCurrencyChange: (currency: "AED" | "USD") => void;
   priceAed: string;
   onPriceAedChange: (value: string) => void;
-  priceUsd: string;
-  onPriceUsdChange: (value: string) => void;
-  unitCost: string;
-  onUnitCostChange: (value: string) => void;
-  marginText: string;
   submitting: boolean;
   onManageCurrencies?: () => void;
   idPrefix?: string;
@@ -155,122 +145,22 @@ export function PricingConfigurationCard({
       </div>
 
       {pricingTab === "flat" ? (
-        <>
-          <div
-            style={{
-              border: "1px solid #e0e0e0",
-              borderRadius: "4px",
-              overflow: "hidden",
-              marginBottom: "20px",
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                borderBottom: "1px solid #e0e0e0",
-                backgroundColor: "#fafafa",
-              }}
-            >
-              <div
-                style={{
-                  padding: "10px 16px",
-                  fontSize: "12px",
-                  fontWeight: 400,
-                  color: "#141414",
-                  borderRight: "1px solid #e0e0e0",
-                }}
-              >
-                Price AED <span style={{ color: "#e53e3e" }}>*</span>
-              </div>
-              <div
-                style={{
-                  padding: "10px 16px",
-                  fontSize: "12px",
-                  fontWeight: 400,
-                  color: "#141414",
-                }}
-              >
-                Price USD
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
-              <div style={{ padding: "12px 16px", borderRight: "1px solid #e0e0e0" }}>
-                <input
-                  type="number"
-                  value={priceAed}
-                  onChange={(e) => onPriceAedChange(e.target.value)}
-                  style={FIELD_INPUT}
-                  onFocus={onBorderFocus}
-                  onBlur={onBorderBlur}
-                  placeholder="0.00"
-                />
-              </div>
-              <div style={{ padding: "12px 16px" }}>
-                <input
-                  type="number"
-                  value={priceUsd}
-                  onChange={(e) => onPriceUsdChange(e.target.value)}
-                  style={FIELD_INPUT}
-                  onFocus={onBorderFocus}
-                  onBlur={onBorderBlur}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
-            <div>
-              <label
-                style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}
-                htmlFor={`${idPrefix}-product-unit-cost`}
-              >
-                Unit cost{" "}
-                <span style={{ fontSize: "11px", color: "#888", cursor: "help" }} title="The cost to produce this unit">
-                  ⓘ
-                </span>
-              </label>
-              <input
-                id={`${idPrefix}-product-unit-cost`}
-                type="number"
-                value={unitCost}
-                onChange={(e) => onUnitCostChange(e.target.value)}
-                style={FIELD_INPUT}
-                placeholder="0.00"
-                onFocus={onBorderFocus}
-                onBlur={onBorderBlur}
-              />
-            </div>
-            <div>
-              <div style={{ ...FIELD_LABEL, display: "flex", alignItems: "center", gap: "5px" }}>
-                Margin{" "}
-                <span style={{ fontSize: "11px", color: "#888", cursor: "help" }} title="Calculated margin based on price and unit cost">
-                  ⓘ
-                </span>
-              </div>
-              <div
-                style={{
-                  height: "42px",
-                  border: "1px solid #e0e0e0",
-                  borderRadius: "4px",
-                  backgroundColor: "#f5f5f5",
-                  display: "flex",
-                  alignItems: "center",
-                  padding: "0 12px",
-                  fontSize: "14px",
-                  fontWeight: 100,
-                  color: "#141414",
-                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                  boxSizing: "border-box",
-                }}
-              >
-                {marginText}
-              </div>
-            </div>
-          </div>
-        </>
+        <div>
+          <label style={FIELD_LABEL} htmlFor={`${idPrefix}-product-base-price`}>
+            Base price <span style={{ color: "#e53e3e" }}>*</span>
+          </label>
+          <input
+            id={`${idPrefix}-product-base-price`}
+            type="number"
+            value={priceAed}
+            onChange={(e) => onPriceAedChange(e.target.value)}
+            style={FIELD_INPUT}
+            onFocus={onBorderFocus}
+            onBlur={onBorderBlur}
+            placeholder="0.00"
+            disabled={submitting}
+          />
+        </div>
       ) : (
         <div
           style={{

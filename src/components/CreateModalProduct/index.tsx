@@ -4,6 +4,7 @@ import {
   getProduct,
   getProductCategoriesList,
   type ProductCategoryData,
+  type ProductCreateUpdatePayload,
   updateProduct,
 } from "@utils/accounts";
 import { getErrorMessage } from "@utils/errors";
@@ -19,9 +20,35 @@ import {
 } from "@components/shared/modalUiHelpers";
 import { FullScreenModalShell, SubBarButton } from "@components/shared/FullScreenModalShell";
 import { ProductInformationCard } from "@components/shared/ProductInformationCard";
-import { BillingDetailsCard } from "@components/shared/BillingDetailsCard";
 import { PricingConfigurationCard } from "@components/shared/PricingConfigurationCard";
-import { formatAedMargin } from "@components/shared/pricingUtils";
+
+function isCreateProductFailureResponse(
+  result: unknown,
+): result is { success: false; message?: string } {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    "success" in result &&
+    (result as { success: unknown }).success === false
+  );
+}
+
+function createProductErrorMessage(
+  result: { success: false; message?: string },
+): string {
+  const raw = typeof result.message === "string" ? result.message.trim() : "";
+  return raw || "Failed to create product";
+}
+
+function applyCreateProductSuccess(
+  mode: "create" | "create_and_add_another",
+  onCreateAndAddAnother: () => void,
+  onCreate: () => void,
+): void {
+  toast.success("Product created successfully!");
+  if (mode === "create_and_add_another") onCreateAndAddAnother();
+  else onCreate();
+}
 
 interface CreateProductModalProps {
   onClose: () => void;
@@ -41,13 +68,12 @@ export default function CreateProductModal({
   onUpdated,
 }: Readonly<CreateProductModalProps>) {
   const [pricingTab, setPricingTab] = useState("flat");
-  const [billingFrequency, setBillingFrequency] = useState("one-time");
   const [productType, setProductType] = useState("");
   const [additionalOpen, setAdditionalOpen] = useState(false);
   const [isActive, setIsActive] = useState(true);
-  const [unitCost, setUnitCost] = useState("");
   const [priceAED, setPriceAED] = useState("");
-  const [priceUSD, setPriceUSD] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
 
   const [productName, setProductName] = useState("");
   const [productSku, setProductSku] = useState("");
@@ -61,7 +87,11 @@ export default function CreateProductModal({
 
   const isEditMode = typeof productId === "number" && Number.isFinite(productId);
 
-  const margin = formatAedMargin({ unitCost, priceAed: priceAED });
+  useEffect(() => {
+    if (isEditMode) return;
+    setLogoFile(null);
+    setExistingLogoUrl(null);
+  }, [isEditMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +132,9 @@ export default function CreateProductModal({
         const currencyCode =
           (p as { currency_code?: string }).currency_code ?? p?.currency ?? "AED";
         setCurrency(currencyCode === "USD" ? "USD" : "AED");
+        setLogoFile(null);
+        const logoUrl = typeof p?.logo_url === "string" ? p.logo_url.trim() : "";
+        setExistingLogoUrl(logoUrl || null);
         setProductType(p?.is_service ? "service" : "");
         const maybeRecord = p as unknown as Record<string, unknown>;
         const maybeIsActive = maybeRecord["is_active"];
@@ -142,7 +175,7 @@ export default function CreateProductModal({
       setSubmitting(true);
       setSubmitError(null);
       try {
-        const payload = {
+        const payload: ProductCreateUpdatePayload = {
           name: productName.trim(),
           sku: productSku.trim() ? productSku.trim() : undefined,
           description: productDescription.trim() ? productDescription.trim() : undefined,
@@ -151,6 +184,7 @@ export default function CreateProductModal({
           is_active: isActive,
           is_service: productType === "service",
           currency,
+          ...(logoFile ? { logo_file: logoFile } : {}),
         };
 
         if (isEditMode) {
@@ -161,10 +195,15 @@ export default function CreateProductModal({
           return;
         }
 
-        await createProduct(payload);
-        toast.success("Product created successfully!");
-        if (mode === "create_and_add_another") onCreateAndAddAnother();
-        else onCreate();
+        const productResponse = await createProduct(payload);
+        if (isCreateProductFailureResponse(productResponse)) {
+          const msg = createProductErrorMessage(productResponse);
+          toast.error(msg);
+          setSubmitError(msg);
+          return;
+        }
+
+        applyCreateProductSuccess(mode, onCreateAndAddAnother, onCreate);
       } catch (e) {
         const msg = getErrorMessage(
           e,
@@ -183,6 +222,7 @@ export default function CreateProductModal({
       onCreate,
       onCreateAndAddAnother,
       onUpdated,
+      logoFile,
       priceAED,
       productDescription,
       productName,
@@ -289,12 +329,9 @@ export default function CreateProductModal({
         onAdditionalOpenChange={setAdditionalOpen}
         idPrefix="cmp"
         disableSku={isEditMode}
-      />
-
-      <BillingDetailsCard
-        billingFrequency={billingFrequency}
-        onBillingFrequencyChange={setBillingFrequency}
-        idPrefix="cmp"
+        existingLogoUrl={existingLogoUrl}
+        logoFile={logoFile}
+        onLogoFileChange={setLogoFile}
       />
 
       <PricingConfigurationCard
@@ -304,11 +341,6 @@ export default function CreateProductModal({
         onCurrencyChange={setCurrency}
         priceAed={priceAED}
         onPriceAedChange={setPriceAED}
-        priceUsd={priceUSD}
-        onPriceUsdChange={setPriceUSD}
-        unitCost={unitCost}
-        onUnitCostChange={setUnitCost}
-        marginText={margin}
         submitting={submitting}
         idPrefix="cmp"
       />

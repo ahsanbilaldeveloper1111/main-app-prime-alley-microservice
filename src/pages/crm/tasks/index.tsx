@@ -37,7 +37,7 @@ import {
   Spinner,
 } from "react-bootstrap";
 import Select from 'react-select';
-import { ModuleSlug } from "@utils/Helper";
+import { ModuleSlug, formatCrmPreviewDate, normalizeSearchQuery } from "@utils/Helper";
 import {
   CheckCircle,
   BarChart3,
@@ -260,8 +260,8 @@ const CrmTasks = () => {
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 10,
-    sortColumn: '',
-    sortDirection: 'asc' as 'asc' | 'desc',
+    sortBy: '',
+    sortOrder: 'asc' as 'asc' | 'desc',
   });
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
@@ -351,9 +351,9 @@ const CrmTasks = () => {
         per_page: pagination.rowsPerPage,
       };
 
-      // Add search param
-      if (currentFilters.search) {
-        params.search = currentFilters.search;
+      const searchQuery = normalizeSearchQuery(currentFilters.search);
+      if (searchQuery) {
+        params.search = searchQuery;
       }
 
       // Add urgency filter
@@ -395,19 +395,19 @@ const CrmTasks = () => {
   const handleSort = (column: string) => {
     setPagination(prev => ({
       ...prev,
-      sortColumn: column,
-      sortDirection: prev.sortColumn === column && prev.sortDirection === 'asc' ? 'desc' : 'asc',
+      sortBy: column,
+      sortOrder: prev.sortBy === column && prev.sortOrder === 'asc' ? 'desc' : 'asc',
     }));
   };
 
   // Sort data
-  const sortData = <T extends Record<string, any>>(data: T[], sortColumn: string, sortDirection: 'asc' | 'desc'): T[] => {
-    if (!sortColumn) return data;
+  const sortData = <T extends Record<string, any>>(data: T[], sortBy: string, sortOrder: 'asc' | 'desc'): T[] => {
+    if (!sortBy) return data;
     return [...data].sort((a, b) => {
-      const aVal = a[sortColumn];
-      const bVal = b[sortColumn];
+      const aVal = a[sortBy];
+      const bVal = b[sortBy];
       if (aVal === bVal) return 0;
-      if (sortDirection === 'asc') {
+      if (sortOrder === 'asc') {
         return aVal < bVal ? -1 : 1;
       } else {
         return aVal > bVal ? -1 : 1;
@@ -524,10 +524,10 @@ const CrmTasks = () => {
 
   // Render sort icon
   const renderSortIcon = (column: string) => {
-    if (pagination.sortColumn !== column) {
+    if (pagination.sortBy !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return pagination.sortDirection === 'asc' ? 
+    return pagination.sortOrder === 'asc' ? 
       <ArrowUp size={14} className="ms-1" /> : 
       <ArrowDown size={14} className="ms-1" />;
   };
@@ -1124,7 +1124,7 @@ const CrmTasks = () => {
                           </thead>
                           <tbody>
                             {(() => {
-                              const sorted = sortData(filteredTasks, pagination.sortColumn, pagination.sortDirection);
+                              const sorted = sortData(filteredTasks, pagination.sortBy, pagination.sortOrder);
                               
                               if (sorted.length === 0) {
                                 return (
@@ -1646,7 +1646,7 @@ const CrmTasks = () => {
               }}>Due Date</div>
               <div style={{ fontSize: '15px', color: '#1f2937', fontWeight: 500 }}>
                 <Calendar size={14} style={{ color: '#4680ff', marginRight: '6px' }} />
-                {viewingTask && viewingTask.due_date ? moment(viewingTask.due_date).format('MMM DD, YYYY') : 'N/A'}
+                {viewingTask && viewingTask.due_date ? formatCrmPreviewDate(viewingTask.due_date) || 'N/A' : 'N/A'}
               </div>
             </div>
             {viewingTask?.time && (

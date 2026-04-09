@@ -482,6 +482,11 @@ export const createCrmNote = async (payload: {
   record_id: number;
   text: string;
   attachments?: File[];
+  create_follow_up_task?: boolean;
+  /** UTC `YYYY-MM-DD`. */
+  follow_up_task_due_date?: string | null;
+  /** UTC `HH:mm:ssZ`. */
+  follow_up_task_due_time?: string | null;
 }): Promise<any> => {
   try {
     const hasAttachments = payload.attachments && payload.attachments.length > 0;
@@ -493,6 +498,24 @@ export const createCrmNote = async (payload: {
       payload.attachments!.forEach((file) => {
         formData.append("attachments[]", file, file.name);
       });
+      if (payload.create_follow_up_task !== undefined) {
+        formData.append(
+          "create_follow_up_task",
+          payload.create_follow_up_task ? "1" : "0",
+        );
+      }
+      if (payload.follow_up_task_due_date !== undefined) {
+        formData.append(
+          "follow_up_task_due_date",
+          payload.follow_up_task_due_date ?? "",
+        );
+      }
+      if (payload.follow_up_task_due_time !== undefined) {
+        formData.append(
+          "follow_up_task_due_time",
+          payload.follow_up_task_due_time ?? "",
+        );
+      }
       const response = await axiosInstance.post("/crm/notes", formData);
       return extractData<any>(response.data);
     }
@@ -968,7 +991,7 @@ export const createCrmData = async (payload: {
   scheduled_call_at?: string;
   company_domain?: string;
   company_name?: string;
-  source?: string;
+  source_file?: string;
   tag_ids?: number[];
   directory?: string;
 }): Promise<any> => {
@@ -1031,7 +1054,7 @@ export const updateCrmData = async (
     scheduled_call_at?: string;
     company_domain?: string;
     company_name?: string;
-    source?: string;
+    source_file?: string;
     tag_ids?: number[];
   },
 ): Promise<any> => {
@@ -1488,9 +1511,45 @@ export const bulkDeleteCrmData = async (
       ids: ids,
     });
 
-    if (response.data.success) {
-      toast.success(response.data.message);
+    const asRecord = (value: unknown): Record<string, unknown> | null =>
+      value !== undefined && value !== null && typeof value === "object"
+        ? (value as Record<string, unknown>)
+        : null;
+
+    const root: Record<string, unknown> = response.data ?? {};
+    const nested = asRecord(root.data);
+    const innerPayload = nested ? asRecord(nested.data) : null;
+
+    const failureExplicit =
+      root.success === false ||
+      nested?.success === false ||
+      innerPayload?.success === false;
+
+    const messageFromApi = [
+      root.message,
+      nested?.message,
+      innerPayload?.message,
+    ].find((m): m is string => typeof m === "string" && m.trim().length > 0);
+
+    const deletedCountRaw =
+      nested?.deleted_count ?? innerPayload?.deleted_count ?? root.deleted_count;
+    const deletedCount =
+      typeof deletedCountRaw === "number" ? deletedCountRaw : undefined;
+
+    if (failureExplicit) {
+      toast.error(messageFromApi || "Failed to delete CRM data");
+      return response.data;
     }
+
+    // Single-item delete always toasts on HTTP success; bulk previously only checked
+    // response.data.success, so Controlhub-style bodies (success on nested data) showed no toast.
+    const displayMessage =
+      messageFromApi ||
+      (deletedCount === undefined
+        ? `Successfully deleted ${ids.length} record(s).`
+        : `Successfully deleted ${deletedCount} record(s).`);
+
+    toast.success(displayMessage);
 
     return response.data;
   } catch (error: any) {
@@ -1666,6 +1725,20 @@ export interface CampaignMetrics {
   active_campaigns: number;
   inactive_campaigns: number;
 }
+
+/**
+ * Use with `getCampaigns({ filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY, ... })` for assign/create
+ * and filter dropdowns. Matches CRM campaigns list API (`status` query).
+ *
+ * Used by: prospect/contact list sidebars (`crmListResourceLoadEffects`), lead create/edit/modals,
+ * convert-to-lead, ticket + unified CRM detail contact edit, CRM filter components, campaigns CSV
+ * upload picker, CRM insights report filters. Deal/order create flows do not list campaigns here;
+ * they resolve the linked lead’s campaign via `getCampaignById`.
+ *
+ * Do not merge into `filters` when calling `getCampaigns` with an `ids` batch (name lookup for
+ * inactive campaigns) or when loading all campaigns for audit display (`CrmActivitiesPanel`).
+ */
+export const CRM_CAMPAIGNS_LIST_ACTIVE_ONLY = { status: "active" as const };
 
 export const getCampaigns = async (
   params: PaginationParams = {},
@@ -3346,6 +3419,11 @@ export const createTask = async (data: {
   notes?: Array<{ note: string }>;
   record_type?: "prospect" | "lead" | "deal" | "order" | "company";
   record_id?: number;
+  /** Aligned with activity modals; optional for older callers. */
+  create_follow_up_task?: boolean;
+  follow_up_task_due_date?: string | null;
+  /** UTC `HH:mm:ssZ`. */
+  follow_up_task_due_time?: string | null;
 }): Promise<TaskData> => {
   try {
     const response = await axiosInstance.post("/crm/tasks", data);

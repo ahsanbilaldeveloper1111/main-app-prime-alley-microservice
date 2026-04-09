@@ -3,66 +3,74 @@ import React, {
   ReactElement,
   useState,
   useEffect,
-  useRef
+  useRef,
+  useCallback,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { 
-  Plus, LayoutGrid, ChevronDown,
-  MoreVertical, Folder
-} from 'lucide-react';
-import { Button, Spinner } from 'react-bootstrap';
+import { Plus, LayoutGrid, ChevronDown, Folder } from "lucide-react";
+import { Spinner } from "react-bootstrap";
 import ProjectTabsContent, { type ProjectTabsContentRef } from '../projects/partials/ProjectTabsContent';
 import { listProjects } from '@utils/tasks';
 import { ModuleSlug } from '@utils/Helper';
-import { useHierarchyData } from '@components/filters/useHierarchyData';
+import { useHierarchyData } from "@components/filters/useHierarchyData";
+
+/** List row from `listProjects`; index fields required, rest passed through for project tabs. */
+type DashboardProjectRow = { id: number; name: string } & Record<string, unknown>;
 
 const WorkPlannerProjectsDashboard = () => {
-    const [selectedProject, setSelectedProject] = useState<any>(null);
-    const [projects, setProjects] = useState<any[]>([]);
+    const [selectedProject, setSelectedProject] = useState<DashboardProjectRow | null>(null);
+    const [projects, setProjects] = useState<DashboardProjectRow[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(true);
     const [showProjectDropdown, setShowProjectDropdown] = useState(false);
     const projectTabsContentRef = useRef<ProjectTabsContentRef>(null);
     
     // Fetch extensions for CreateTaskModal
-    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+    const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
     
     // Fetch projects list
     useEffect(() => {
-      const fetchProjects = async () => {
+      let cancelled = false;
+      const fetchDashboardProjects = async () => {
         try {
           setLoadingProjects(true);
           const response = await listProjects({ page: 1, limit: 100 });
-          if (response && response.success === true && response.data && Array.isArray(response.data)) {
-            setProjects(response.data);
-            // Auto-select first project if available
-            if (response.data.length > 0 && !selectedProject) {
-              handleProjectSelect(response.data[0]);
-            }
+          const rows = response?.data;
+          if (
+            cancelled ||
+            response?.success !== true ||
+            !Array.isArray(rows)
+          ) {
+            return;
           }
+          setProjects(rows as DashboardProjectRow[]);
+          setSelectedProject((prev) =>
+            prev == null && rows.length > 0 ? (rows[0] as DashboardProjectRow) : prev,
+          );
         } catch (error) {
-          console.error('Error fetching projects:', error);
+          console.error("Error fetching projects:", error);
         } finally {
-          setLoadingProjects(false);
+          if (!cancelled) {
+            setLoadingProjects(false);
+          }
         }
       };
-      
-      fetchProjects();
+
+      fetchDashboardProjects().catch(() => undefined);
+      return () => {
+        cancelled = true;
+      };
     }, []);
-    
-    // Handle project selection - just set the selected project
-    // The partial component will handle fetching project data
-    const handleProjectSelect = (project: any) => {
+
+    const handleProjectSelect = useCallback((project: DashboardProjectRow) => {
       setSelectedProject(project);
-    };
-    
-    // Handle task creation - the partial component will refresh its own data
-    const handleCreateTask = async (formData: any) => {
-      // The partial component handles refreshing its own data
-      // This is just a placeholder that can be used for additional logic if needed
-    };
+    }, []);
+
+    const handleCreateTask = useCallback(async (formData: unknown) => {
+      await Promise.resolve(formData);
+    }, []);
   
     const styles = {
       container: { backgroundColor: '#F4F7FA', minHeight: '100vh', paddingBottom: '2rem' },
@@ -262,34 +270,40 @@ const WorkPlannerProjectsDashboard = () => {
         </div>
       ) : (
         projects.map((project, index) => (
-          <div
+          <button
             key={project.id}
+            type="button"
             onClick={() => {
               handleProjectSelect(project);
               setShowProjectDropdown(false);
             }}
             style={{
-              padding: '10px 14px',
+              display: "block",
+              width: "100%",
+              padding: "10px 14px",
               fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
-              fontSize: '14px',
+              fontSize: "14px",
               fontWeight: selectedProject?.id === project.id ? 500 : 300,
-              color: selectedProject?.id === project.id ? '#141414' : '#4B5563',
-              borderBottom: index === projects.length - 1 ? 'none' : '1px solid #F3F4F6',
-              cursor: 'pointer',
-              transition: 'background 0.12s',
-              background: selectedProject?.id === project.id ? '#f5f5f5' : '#fff',
+              color: selectedProject?.id === project.id ? "#141414" : "#4B5563",
+              border: "none",
+              borderBottom: index === projects.length - 1 ? "none" : "1px solid #F3F4F6",
+              cursor: "pointer",
+              transition: "background 0.12s",
+              background: selectedProject?.id === project.id ? "#f5f5f5" : "#fff",
+              textAlign: "left",
             }}
-            onMouseEnter={e => {
-              if (selectedProject?.id !== project.id)
-                e.currentTarget.style.background = '#f9f9f9';
+            onMouseEnter={(e) => {
+              if (selectedProject?.id !== project.id) {
+                e.currentTarget.style.background = "#f9f9f9";
+              }
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               e.currentTarget.style.background =
-                selectedProject?.id === project.id ? '#f5f5f5' : '#fff';
+                selectedProject?.id === project.id ? "#f5f5f5" : "#fff";
             }}
           >
             {project.name}
-          </div>
+          </button>
         ))
       )}
     </div>
@@ -298,114 +312,85 @@ const WorkPlannerProjectsDashboard = () => {
 </div>
             
             <div style={styles.headerRight}>
-              {/* <Button 
-                variant="primary" 
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              <button
+                type="button"
+                style={{
+                  cursor: selectedProject && !hierarchyLoading ? "pointer" : "not-allowed",
+                  transition: "150ms ease-out",
+                  display: "inline-flex",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  backgroundColor: "rgb(20, 20, 20)",
+                  borderColor: "rgba(20, 20, 20, 0)",
+                  color: "rgb(255, 255, 255)",
+                  textDecoration: "none",
+                  borderRadius: "4px",
+                  borderWidth: "1px",
+                  borderStyle: "solid",
+                  verticalAlign: "middle",
+                  paddingBlock: "8px",
+                  paddingInline: "16px",
+                  maxWidth: "100%",
+                  fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+                  fontSize: "12px",
+                  fontWeight: 300,
+                  letterSpacing: "0px",
+                  lineHeight: "14px",
+                  WebkitFontSmoothing: "antialiased",
+                  textUnderlineOffset: "24%",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
                 onClick={() => {
-                  if (!selectedProject) {
-                    alert('Please select a project first');
-                    return;
+                  if (selectedProject) {
+                    projectTabsContentRef.current?.openCreateTaskModal();
+                  } else {
+                    alert("Please select a project first");
                   }
                 }}
                 disabled={!selectedProject || hierarchyLoading}
               >
                 <Plus size={18} />
                 <span>Create Task</span>
-              </Button>
-              
-              <Button 
-                variant="outline-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              </button>
+
+              <button
+                type="button"
+                style={{
+                  cursor: selectedProject ? "pointer" : "not-allowed",
+                  transition: "150ms ease-out",
+                  display: "inline-flex",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  backgroundColor: "rgb(255, 255, 255)",
+                  borderColor: "rgb(20, 20, 20)",
+                  color: "rgb(20, 20, 20)",
+                  textDecoration: "none",
+                  borderRadius: "4px",
+                  borderWidth: "1px",
+                  borderStyle: "solid",
+                  verticalAlign: "middle",
+                  paddingBlock: "8px",
+                  paddingInline: "16px",
+                  maxWidth: "100%",
+                  fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+                  fontSize: "12px",
+                  fontWeight: 300,
+                  letterSpacing: "0px",
+                  lineHeight: "14px",
+                  WebkitFontSmoothing: "antialiased",
+                  textUnderlineOffset: "24%",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
                 disabled={!selectedProject}
                 onClick={() => projectTabsContentRef.current?.switchToBoardView()}
               >
                 <LayoutGrid size={18} />
-                Board View
-              </Button> */}
-
-                {!selectedProject || hierarchyLoading && (
-<button
-  style={{
-    cursor: "pointer",
-    transition: "150ms ease-out",
-    display: "inline-flex",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    backgroundColor: "rgb(20, 20, 20)", // Black
-    borderColor: "rgba(20, 20, 20, 0)",
-    color: "rgb(255, 255, 255)", // White text
-    textDecoration: "none",
-    borderRadius: "4px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    verticalAlign: "middle",
-    paddingBlock: "8px",
-    paddingInline: "16px",
-    maxWidth: "100%",
-    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
-    fontSize: "12px",
-    fontWeight: 300,
-    letterSpacing: "0px",
-    lineHeight: "14px",
-    WebkitFontSmoothing: "antialiased",
-    textUnderlineOffset: "24%",
-    alignItems: "center",
-    gap: "0.5rem"
-  }}
-  onClick={() => {
-    if (!selectedProject) {
-      alert("Please select a project first");
-      return;
-    }
-  }}
-  disabled={!selectedProject || hierarchyLoading}
->
-  <Plus size={18} />
-  <span>Create Task</span>
-</button>
-                )}
-
-                {!selectedProject || hierarchyLoading && (
-
-<button
-  style={{
-    cursor: "pointer",
-    transition: "150ms ease-out",
-    display: "inline-flex",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    backgroundColor: "rgb(255, 255, 255)", // White
-    borderColor: "rgb(20, 20, 20)",
-    color: "rgb(20, 20, 20)", // Black text
-    textDecoration: "none",
-    borderRadius: "4px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    verticalAlign: "middle",
-    paddingBlock: "8px",
-    paddingInline: "16px",
-    maxWidth: "100%",
-    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
-    fontSize: "12px",
-    fontWeight: 300,
-    letterSpacing: "0px",
-    lineHeight: "14px",
-    WebkitFontSmoothing: "antialiased",
-    textUnderlineOffset: "24%",
-    alignItems: "center",
-    gap: "0.5rem"
-  }}
-  disabled={!selectedProject}
-  onClick={() => projectTabsContentRef.current?.switchToBoardView()}
->
-  <LayoutGrid size={18} />
-  <span>Board View</span>
-                  </button>
-                )}
-              
-            
+                <span>Board View</span>
+              </button>
             </div>
           </div>
         </div>

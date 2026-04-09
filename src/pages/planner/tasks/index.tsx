@@ -13,8 +13,7 @@ import { Button, Modal, Form, Dropdown } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { FiSearch } from "react-icons/fi";
-import { Plus, X, ChevronDown, Filter, MoreVertical, Settings, Trash2 } from "lucide-react";
+import { Plus, ChevronDown, Filter, MoreVertical, Settings, Trash2 } from "lucide-react";
 import GenericTable, { TableColumn, TableAction, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -22,18 +21,43 @@ import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import {
   listTasks,
   listProjects,
+  getProject,
   deleteTask as deleteTaskApi,
   completeTask,
   incompleteTask,
   type ListTasksSummary,
 } from "@utils/tasks";
+import { listStatuses } from "@utils/work-planner";
 import {
   canManageProjectFromMembers,
   getSessionPhoneOrExtension,
 } from "@planner/projectMemberRole";
+import {
+  computePlannerTaskRowPermissions,
+  plannerTaskRowDeleteDeniedTitle,
+  plannerTaskRowEditDeniedTitle,
+} from "@planner/taskRowPermissions";
+import { extensionOrIdToTrimmedString } from "@planner/projectTabsContentUtils";
 import { useSession } from "next-auth/react";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { ModuleSlug } from "@utils/Helper";
+import { useTasksListingPager } from "@hooks/useTasksListingPager";
+import {
+  ALL_STATUS_VALUE,
+  applyPlannerTaskFiltersToListParams,
+  applyPlannerTaskTabToListParams,
+  plannerTaskListTodayTriple,
+} from "@utils/taskListing/plannerTasksQueryParams";
+import {
+  buildTaskListingPageStyleTag,
+  formatTaskDueDateCellParts,
+  TaskCompleteCircleButton,
+  TaskListingAssigneeCell,
+  TaskListingSearchRow,
+  TASK_LIST_BTN_OUTLINE,
+  TASK_LIST_CELL,
+  TASK_PRIORITY_DOT_COLORS,
+} from "@utils/taskListing/taskListUiPrimitives";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -69,7 +93,12 @@ interface ApiTask {
     owner_extension_number?: string | null;
   } | null;
   status?: { id: number; name: string } | null;
-  assignees?: Array<{ extension_number: string }>;
+  assignees?: Array<{ extension_number?: string | number | null }>;
+  /** Creator / owner extension when API sends it (matches session `user.phone` for edit/delete). */
+  extension_number?: string;
+  owner_extension_number?: string | null;
+  created_by_extension_number?: string | null;
+  extension_numbers?: string[];
   is_completed?: boolean;
   type?: string;
 }
@@ -79,6 +108,52 @@ type HierarchyExtension = {
   extension_number?: string;
   name?: string;
 };
+
+function lookupHierarchyExtensionDisplayName(
+  extNumber: string | number | null | undefined,
+  hierarchyDataExtensions: unknown[] | null | undefined,
+): string {
+  const trimmed =
+    extNumber == null || extNumber === "" ? "" : String(extNumber).trim();
+  if (!trimmed) return "";
+  if (!Array.isArray(hierarchyDataExtensions)) return trimmed;
+  const ext = hierarchyDataExtensions.find((e) => {
+    const item = e as HierarchyExtension;
+    const id = item.id == null ? "" : String(item.id).trim();
+    const en =
+      item.extension_number == null ? "" : String(item.extension_number).trim();
+    return id === trimmed || en === trimmed;
+  }) as HierarchyExtension | undefined;
+  const name = ext?.name?.trim();
+  return name && name.length > 0 ? name : trimmed;
+}
+
+/** Names for the Assigned to column from `rawData.assignees[].extension_number` + hierarchy directory. */
+function assigneeDisplayNamesForTaskRow(
+  row: Task,
+  hierarchyDataExtensions: unknown[] | null | undefined,
+): string[] {
+  const raw = row.rawData as ApiTask | undefined;
+  const assignees = raw?.assignees;
+  if (Array.isArray(assignees) && assignees.length > 0) {
+    const names = assignees
+      .map((a) =>
+        lookupHierarchyExtensionDisplayName(
+          a?.extension_number,
+          hierarchyDataExtensions,
+        ),
+      )
+      .filter((n) => n.length > 0);
+    if (names.length > 0) return names;
+  }
+  if (row.assigned_to) {
+    const resolved =
+      row.assigned_to_name ||
+      lookupHierarchyExtensionDisplayName(row.assigned_to, hierarchyDataExtensions);
+    return resolved ? [resolved] : [];
+  }
+  return [];
+}
 
 export interface TasksListingPageProps {
   /** When true (e.g. embedded on project details list tab), To-do is omitted from filters and create/edit sidebar. */
@@ -120,22 +195,25 @@ const PRIORITY_OPTIONS = [
   { value: "urgent", label: "Urgent" },
 ];
 
-const STATUS_OPTIONS = [
-  { value: "All Status", label: "All Status" },
-  { value: "To Do", label: "To Do" },
-  { value: "In Progress", label: "In Progress" },
-  { value: "In Review", label: "In Review" },
-  { value: "Overdue", label: "Overdue" },
-  { value: "Completed", label: "Completed" },
-];
+/** Planner workflow status from GET /statuses */
+type PlannerWorkflowStatusRow = { id: number; name: string };
 
-const PRIORITY_COLOR: Record<string, string> = {
-  low: "#22c55e",
-  medium: "#f59e0b",
-  normal: "#f59e0b",
-  high: "#ef4444",
-  urgent: "#ef4444",
-};
+function normalizePlannerStatusesFromApi(raw: unknown): PlannerWorkflowStatusRow[] {
+  if (!Array.isArray(raw)) return [];
+  const out: PlannerWorkflowStatusRow[] = [];
+  for (const item of raw) {
+    if (item == null || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const idNum = typeof o.id === "number" ? o.id : Number(o.id);
+    if (!Number.isFinite(idNum)) continue;
+    const name = extensionOrIdToTrimmedString(o.name);
+    out.push({ id: idNum, name: name || String(idNum) });
+  }
+  return out;
+}
+
+/** Relations for GET /projects/:id — statuses for filter dropdown. */
+const PROJECT_DETAILS_STATUS_WITH = ["statuses", "statuses.tasks"] as const;
 
 const INITIAL_FILTER_FORM = {
   task_type: null as any,
@@ -145,7 +223,7 @@ const INITIAL_FILTER_FORM = {
   due_date_to: "",
   project: "All Projects",
   assignee: [] as string[],
-  status: "All Status",
+  status: ALL_STATUS_VALUE,
 };
 
 const TASKS_TABLE_COLUMN_STORAGE_KEY = "planner-tasks-listing-visible-columns-v1";
@@ -291,77 +369,6 @@ function createTaskRowActionsToggleHandler(
   };
 }
 
-function applyFiltersToParams(
-  params: Record<string, any>,
-  filters: Record<string, any>,
-  allProjects: Array<{ id: number; name: string }>,
-  currentTasks: Task[]
-) {
-  if (filters.priority) {
-    const priorityMap: Record<string, string> = {
-      low: "low",
-      medium: "normal",
-      high: "high",
-      urgent: "urgent",
-    };
-    params.priority = priorityMap[String(filters.priority)] || "normal";
-  }
-  if (filters.due_date_from) params.due_date_from = filters.due_date_from;
-  if (filters.due_date_to) params.due_date_to = filters.due_date_to;
-
-  if (filters.project && filters.project !== "All Projects") {
-    const proj = allProjects.find((p) => p.name === filters.project);
-    if (proj) params.project_id = proj.id;
-  }
-
-  if (filters.assignee?.length) params.assignees = filters.assignee;
-
-  const taskTypeFilter = filters.task_type;
-  if (
-    taskTypeFilter &&
-    (taskTypeFilter === "regular" ||
-      taskTypeFilter === "todo" ||
-      taskTypeFilter === "recurring")
-  ) {
-    params.type = taskTypeFilter;
-  }
-
-  if (filters.status && filters.status !== "All Status") {
-    const statusId = currentTasks.find((t) => t.rawData?.status?.name === filters.status)?.rawData?.status?.id;
-    if (statusId) params.status_id = statusId;
-  }
-}
-
-function applyTabToParams(
-  params: Record<string, any>,
-  activeTab: string,
-  dates: { today: string; yesterday: string; tomorrow: string }
-) {
-  if (activeTab === "due_today") {
-    params.due_date_from = dates.today;
-    params.due_date_to = dates.today;
-    return;
-  }
-  if (activeTab === "overdue") {
-    params.due_date_to = dates.yesterday;
-    params.is_completed = false;
-    return;
-  }
-  if (activeTab === "upcoming") {
-    params.due_date_from = dates.tomorrow;
-    return;
-  }
-  if (activeTab === "completed") {
-    params.is_completed = true;
-    return;
-  }
-  if (activeTab === "pending") {
-    params.is_completed = false;
-    // Pending should exclude overdue tasks.
-    params.due_date_from = dates.today;
-  }
-}
-
 /** Tab bar order matches POSSIBLE_TABS. */
 function normalizeVisibleTabIdsForStorage(ids: string[]): string[] {
   const set = new Set(ids);
@@ -396,30 +403,6 @@ function getInitialVisibleTabIds(): string[] {
   }
 }
 
-const BTN_BASE: React.CSSProperties = {
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  fontSize: 12,
-  fontWeight: 400,
-  borderRadius: 4,
-  border: "1px solid #8a8a8a",
-  padding: "8px 16px",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  whiteSpace: "nowrap",
-  outline: "none",
-  backgroundColor: "#fff",
-  color: "#141414",
-};
-
-const CELL_STYLE: React.CSSProperties = {
-  fontSize: 13,
-  color: "#374151",
-  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-  fontWeight: 300,
-};
-
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 const TasksListingPage = ({
@@ -437,7 +420,7 @@ const TasksListingPage = ({
     );
     const isProjectScopedEmbed = Boolean(sidebarProject?.id);
     const { hierarchyDataExtensions: hierarchyFromApi } = useHierarchyData(
-      ModuleSlug.USER_DIRECTORY,
+      ModuleSlug.WORK_PLANNER,
       !isProjectScopedEmbed,
     );
     const hierarchyDataExtensions = useMemo(() => {
@@ -468,19 +451,16 @@ const TasksListingPage = ({
       const p = (apiTask.priority || "normal").toLowerCase();
       const priority = priorityMap[p] ?? "medium";
 
-      const findExtensionName = (extNumber: string): string => {
-        if (!extNumber || !Array.isArray(hierarchyDataExtensions)) return extNumber;
-        const ext = hierarchyDataExtensions.find((e) => {
-          const item = e as HierarchyExtension;
-          return item.id === extNumber || item.extension_number === extNumber;
-        }) as HierarchyExtension | undefined;
-        return ext?.name || extNumber;
-      };
-
       const assignees = apiTask.assignees || [];
-      const firstExt = assignees[0]?.extension_number;
-      const assigned_to = firstExt || null;
-      const assigned_to_name = firstExt ? findExtensionName(firstExt) : undefined;
+      const firstExtRaw = assignees[0]?.extension_number;
+      const firstExt =
+        firstExtRaw == null || firstExtRaw === ""
+          ? null
+          : String(firstExtRaw).trim() || null;
+      const assigned_to = firstExt;
+      const assigned_to_name = firstExt
+        ? lookupHierarchyExtensionDisplayName(firstExt, hierarchyDataExtensions)
+        : undefined;
 
       let dueDate: string | null = null;
       if (apiTask.due_date) {
@@ -603,21 +583,22 @@ const TasksListingPage = ({
     const [search, setSearch]         = useState("");
   
   
-    const [pager, setPager] = useState({
-      page: 1, perPage: 25,
-      sortCol: "due_date", sortDir: "asc" as "asc" | "desc",
-    });
+    const { pager, setPager } = useTasksListingPager();
   
     // ── Filter sidebar ────────────────────────────────────────────────────────────
     const [showSidebar, setShowSidebar]   = useState(false);
     const [allProjects, setAllProjects]  = useState<Array<{ id: number; name: string }>>([]);
     const [fForm, setFForm] = useState(INITIAL_FILTER_FORM);
+    const [workflowStatuses, setWorkflowStatuses] = useState<PlannerWorkflowStatusRow[]>([]);
     const [openQuickFilter, setOpenQuickFilter] = useState<string | null>(null);
     const quickFilterRef = useRef<HTMLDivElement | null>(null);
   
     // ── Create/edit task sidebar ──────────────────────────────────────────────────
     const [showCreate, setShowCreate]   = useState(false);
     const [editingTask, setEditingTask] = useState<Task | null>(null);
+    const [editingTaskEditScope, setEditingTaskEditScope] = useState<
+      "none" | "limited" | "full"
+    >("full");
   
     // ── Delete confirmation ──────────────────────────────────────────────────────
     const [showDelete, setShowDelete] = useState(false);
@@ -627,9 +608,6 @@ const TasksListingPage = ({
     const [visibleTaskColumnKeys, setVisibleTaskColumnKeys] = useState<string[]>(
       () => [...DEFAULT_TASK_TABLE_COLUMN_KEYS],
     );
-
-    const tasksRef = useRef<Task[]>([]);
-    useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
     useLayoutEffect(() => {
       const fromStorage = readVisibleTaskColumnKeysFromStorage();
@@ -692,14 +670,59 @@ const TasksListingPage = ({
       ? embeddedProjectsForFilters
       : allProjects;
 
+    /** Project used for task list context: embed uses sidebar; otherwise filter project when not "All Projects". */
+    const resolvedProjectIdForStatuses = useMemo((): number | null => {
+      if (sidebarProject?.id != null) {
+        const n = Number(sidebarProject.id);
+        return Number.isFinite(n) ? n : null;
+      }
+      if (fForm.project === "All Projects") return null;
+      const match = allProjects.find((p) => p.name === fForm.project);
+      if (match == null) return null;
+      const n = Number(match.id);
+      return Number.isFinite(n) ? n : null;
+    }, [sidebarProject?.id, fForm.project, allProjects]);
+
+    useEffect(() => {
+      let cancelled = false;
+      const load = async () => {
+        try {
+          if (resolvedProjectIdForStatuses != null) {
+            const data = await getProject(resolvedProjectIdForStatuses, [...PROJECT_DETAILS_STATUS_WITH]);
+            if (cancelled) return;
+            const statuses = (data as { statuses?: unknown } | null)?.statuses;
+            setWorkflowStatuses(normalizePlannerStatusesFromApi(statuses));
+            return;
+          }
+          const raw = await listStatuses();
+          if (cancelled) return;
+          setWorkflowStatuses(normalizePlannerStatusesFromApi(raw));
+        } catch {
+          if (!cancelled) setWorkflowStatuses([]);
+        }
+      };
+      void load();
+      return () => {
+        cancelled = true;
+      };
+    }, [resolvedProjectIdForStatuses]);
+
+    useEffect(() => {
+      if (fForm.status === ALL_STATUS_VALUE) return;
+      const stillValid = workflowStatuses.some((s) => String(s.id) === fForm.status);
+      if (stillValid) return;
+      setFForm((prev) => ({ ...prev, status: ALL_STATUS_VALUE }));
+      setFilters((prev) => {
+        const next = { ...prev };
+        delete next.status;
+        return next;
+      });
+    }, [workflowStatuses, fForm.status]);
+
     // ── Fetch ─────────────────────────────────────────────────────────────────────
     const fetchTasks = useCallback(async () => {
       setLoading(true);
       try {
-        const today = moment().format("YYYY-MM-DD");
-        const yesterday = moment().subtract(1, "day").format("YYYY-MM-DD");
-        const tomorrow = moment().add(1, "day").format("YYYY-MM-DD");
-
         const params: any = {
           page: pager.page,
           limit: pager.perPage,
@@ -708,8 +731,12 @@ const TasksListingPage = ({
           withRelations: ["project", "status", "assignees"],
         };
 
-        applyFiltersToParams(params, filters, projectsForApplyFilters, tasksRef.current);
-        applyTabToParams(params, activeTab, { today, yesterday, tomorrow });
+        applyPlannerTaskFiltersToListParams(params, filters, projectsForApplyFilters);
+        applyPlannerTaskTabToListParams(
+          params,
+          activeTab,
+          plannerTaskListTodayTriple(),
+        );
 
         if (sidebarProject?.id) {
           params.project_id = sidebarProject.id;
@@ -791,9 +818,10 @@ const TasksListingPage = ({
       [isProjectScopedEmbed, sidebarProject],
     );
 
-    const canEditTaskByProjectMembers = useCallback(
+    const getTaskRowPermissions = useCallback(
       (row: Task) =>
-        canManageProjectFromMembers(
+        computePlannerTaskRowPermissions(
+          row.rawData,
           resolveProjectForMemberCheck(row),
           sessionUserPhoneOrExtension,
         ),
@@ -808,68 +836,88 @@ const TasksListingPage = ({
       );
     }, [isProjectScopedEmbed, sidebarProject, sessionUserPhoneOrExtension]);
   
-    const openEdit = useCallback((row: Task) => {
-      if (!canEditTaskByProjectMembers(row)) return;
-      setEditingTask(row);
-      setShowCreate(true);
-    }, [canEditTaskByProjectMembers]);
+    const openEdit = useCallback(
+      (row: Task) => {
+        const perms = getTaskRowPermissions(row);
+        if (!perms.canOpenTaskEdit) return;
+        setEditingTask(row);
+        setEditingTaskEditScope(perms.taskEditScope);
+        setShowCreate(true);
+      },
+      [getTaskRowPermissions],
+    );
 
-    const openDeleteConfirm = useCallback((row: Task) => {
-      setToDelete(row);
-      setShowDelete(true);
-    }, []);
+    const openDeleteConfirm = useCallback(
+      (row: Task) => {
+        if (!getTaskRowPermissions(row).canDeleteTask) return;
+        setToDelete(row);
+        setShowDelete(true);
+      },
+      [getTaskRowPermissions],
+    );
 
     const handleDelete = async () => {
       if (!toDelete) return;
+      if (!getTaskRowPermissions(toDelete).canDeleteTask) {
+        toast.error("You cannot delete this task");
+        return;
+      }
       try {
         await deleteTaskApi(toDelete.id);
         setShowDelete(false);
         setToDelete(null);
         fetchTasks();
-        toast.success("Task deleted");
       } catch {
         toast.error("Failed to delete task");
       }
     };
 
-    const handleToggleComplete = useCallback(async (row: Task) => {
-      try {
-        if (row.status === "completed") {
-          await incompleteTask(row.id);
-        } else {
-          await completeTask(row.id);
+    const handleToggleComplete = useCallback(
+      async (row: Task) => {
+        if (!getTaskRowPermissions(row).canOpenTaskEdit) {
+          toast.error("You are not authorized to update this task");
+          return;
         }
-        fetchTasks();
-      } catch {
-        toast.error("Failed to update task");
-      }
-    }, [fetchTasks]);
+        try {
+          if (row.status === "completed") {
+            await incompleteTask(row.id);
+          } else {
+            await completeTask(row.id);
+          }
+          fetchTasks();
+        } catch {
+          toast.error("Failed to update task");
+        }
+      },
+      [fetchTasks, getTaskRowPermissions],
+    );
   
     // ── Columns ───────────────────────────────────────────────────────────────────
     const columns: TableColumn<Task>[] = useMemo(() => [
       {
         key: "complete", label: "Done", sortable: false, type: "custom",
-        render: (row) => (
-          <button
-            onClick={async e => {
-              e.stopPropagation();
-              await handleToggleComplete(row);
-            }}
-            title={row.status === "completed" ? "Mark incomplete" : "Mark complete"}
-            style={{
-              background: "transparent", border: "1.5px solid #9ca3af",
-              borderRadius: "50%", width: 20, height: 20, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", padding: 0,
-            }}
-          >
-            {row.status === "completed" && (
-              <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                <path d="M1 4L3.5 6.5L9 1" stroke="#6b7280" strokeWidth="1.5"
-                  strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </button>
-        ),
+        render: (row) => {
+          const canToggleComplete = getTaskRowPermissions(row).canOpenTaskEdit;
+          let completeBtnTitle = "Mark complete";
+          if (row.status === "completed") {
+            completeBtnTitle = "Mark incomplete";
+          }
+          if (!canToggleComplete) {
+            completeBtnTitle = plannerTaskRowEditDeniedTitle(false) ?? "";
+          }
+          return (
+            <TaskCompleteCircleButton
+              isCompleted={row.status === "completed"}
+              title={completeBtnTitle}
+              disabled={!canToggleComplete}
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (!canToggleComplete) return;
+                await handleToggleComplete(row);
+              }}
+            />
+          );
+        },
       },
       {
         key: "title", label: "Title", sortable: true, type: "custom",
@@ -890,13 +938,13 @@ const TasksListingPage = ({
               {row.title}
             </a>
 
-            {canEditTaskByProjectMembers(row) && (
+            {getTaskRowPermissions(row).canOpenTaskEdit && (
               <button
                 className="task-edit-btn"
                 type="button"
                 onClick={e => { e.stopPropagation(); openEdit(row); }}
                 style={{
-                  ...BTN_BASE,
+                  ...TASK_LIST_BTN_OUTLINE,
                   paddingTop: 3, paddingBottom: 3, paddingLeft: 9, paddingRight: 9, fontSize: 11,
                   flexShrink: 0,
                 }}
@@ -910,7 +958,7 @@ const TasksListingPage = ({
       {
         key: "task_type", label: "Task Type", sortable: true, type: "custom",
         render: (row) => (
-          <span style={CELL_STYLE}>
+          <span style={TASK_LIST_CELL}>
             {TASK_TYPE_OPTIONS.find(t => t.value === row.task_type)?.label || row.task_type}
           </span>
         ),
@@ -918,31 +966,20 @@ const TasksListingPage = ({
       {
         key: "assigned_to", label: "Assigned to", sortable: true, type: "custom",
         render: (row) => {
-          if (!row.assigned_to) return <span style={{ ...CELL_STYLE, color: "#9ca3af" }}>—</span>;
-          const name = row.assigned_to_name || row.assigned_to;
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div style={{
-                width: 22, height: 22, borderRadius: "50%", background: "#10b981",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
-              }}>{name.charAt(0).toUpperCase()}</div>
-              <span style={{ ...CELL_STYLE, maxWidth: 130, overflow: "hidden",
-                textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
-                title={name}>{name}</span>
-            </div>
-          );
+          const names = assigneeDisplayNamesForTaskRow(row, hierarchyDataExtensions);
+          const display = names.length > 0 ? names.join(", ") : "";
+          return <TaskListingAssigneeCell label={display} />;
         },
       },
       {
         key: "priority", label: "Priority", sortable: true, type: "custom",
         render: (row) => {
-          if (!row.priority) return <span style={{ ...CELL_STYLE, color: "#9ca3af" }}>—</span>;
+          if (!row.priority) return <span style={{ ...TASK_LIST_CELL, color: "#9ca3af" }}>—</span>;
           return (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, display: "inline-block",
-                backgroundColor: PRIORITY_COLOR[row.priority] }} />
-              <span style={CELL_STYLE}>{row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}</span>
+                backgroundColor: TASK_PRIORITY_DOT_COLORS[row.priority] }} />
+              <span style={TASK_LIST_CELL}>{row.priority.charAt(0).toUpperCase() + row.priority.slice(1)}</span>
             </div>
           );
         },
@@ -950,20 +987,24 @@ const TasksListingPage = ({
       {
         key: "due_date", label: "Due date", sortable: true, type: "custom",
         render: (row) => {
-          if (!row.due_date) return <span style={{ ...CELL_STYLE, color: "#9ca3af" }}>—</span>;
-          const overdue = moment(row.due_date).isBefore(moment()) && row.status !== "completed";
-          const isToday    = moment(row.due_date).isSame(moment(), "day");
-          const isTomorrow = moment(row.due_date).isSame(moment().add(1, "day"), "day");
-          let label = moment(row.due_date).format("D MMMM YYYY HH:mm");
-          if (isToday) label = `Today at ${moment(row.due_date).format("HH:mm")}`;
-          else if (isTomorrow) label = `Tomorrow at ${moment(row.due_date).format("HH:mm")}`;
-          return <span style={{ ...CELL_STYLE, color: overdue ? "#ef4444" : "#374151", fontWeight: overdue ? 500 : 300 }}>{label}</span>;
+          const parts = formatTaskDueDateCellParts(row.due_date, row.status);
+          return (
+            <span
+              style={{
+                ...TASK_LIST_CELL,
+                color: parts.color,
+                fontWeight: parts.fontWeight,
+              }}
+            >
+              {parts.label}
+            </span>
+          );
         },
       },
       {
         key: "notes", label: "Notes", sortable: true, type: "custom",
         render: (row) => (
-          <span style={{ ...CELL_STYLE, maxWidth: 200, overflow: "hidden",
+          <span style={{ ...TASK_LIST_CELL, maxWidth: 200, overflow: "hidden",
             textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }}
             title={row.notes || ""}>{row.notes || "—"}</span>
         ),
@@ -971,14 +1012,14 @@ const TasksListingPage = ({
       {
         key: "workflow_status", label: "Status", sortable: false, type: "custom",
         render: (row) => (
-          <span style={CELL_STYLE}>{taskStatusColumnLabel(row)}</span>
+          <span style={TASK_LIST_CELL}>{taskStatusColumnLabel(row)}</span>
         ),
       },
       {
         key: "repeat_status", label: "Repeat Status", sortable: false, type: "custom",
         render: (row) => {
           const label = formatRepeatStatusLabel(row.repeat_status);
-          return <span style={CELL_STYLE}>{label || "—"}</span>;
+          return <span style={TASK_LIST_CELL}>{label || "—"}</span>;
         },
       },
       {
@@ -987,7 +1028,9 @@ const TasksListingPage = ({
         sortable: false,
         type: "custom",
         render: (row) => {
-          const canManage = canEditTaskByProjectMembers(row);
+          const perms = getTaskRowPermissions(row);
+          const canEditRow = perms.canOpenTaskEdit;
+          const canDeleteRow = perms.canDeleteTask;
           return (
             <Dropdown
               show={openTaskActionsId === row.id}
@@ -1008,9 +1051,15 @@ const TasksListingPage = ({
                 <Dropdown.Item
                   as="button"
                   type="button"
-                  disabled={!canManage}
-                  title={canManage ? undefined : "You cannot edit tasks in this project"}
+                  aria-disabled={!canEditRow}
+                  className={canEditRow ? undefined : "text-muted"}
+                  style={{
+                    cursor: canEditRow ? "pointer" : "not-allowed",
+                    opacity: canEditRow ? 1 : 0.65,
+                  }}
+                  title={plannerTaskRowEditDeniedTitle(canEditRow)}
                   onClick={() => {
+                    if (!canEditRow) return;
                     setOpenTaskActionsId(null);
                     openEdit(row);
                   }}
@@ -1022,10 +1071,15 @@ const TasksListingPage = ({
                 <Dropdown.Item
                   as="button"
                   type="button"
-                  className="text-danger"
-                  disabled={!canManage}
-                  title={canManage ? undefined : "You cannot delete tasks in this project"}
+                  aria-disabled={!canDeleteRow}
+                  className={canDeleteRow ? "text-danger" : "text-muted"}
+                  style={{
+                    cursor: canDeleteRow ? "pointer" : "not-allowed",
+                    opacity: canDeleteRow ? 1 : 0.65,
+                  }}
+                  title={plannerTaskRowDeleteDeniedTitle(perms)}
                   onClick={() => {
+                    if (!canDeleteRow) return;
                     setOpenTaskActionsId(null);
                     openDeleteConfirm(row);
                   }}
@@ -1044,8 +1098,9 @@ const TasksListingPage = ({
       handleToggleComplete,
       openEdit,
       openDeleteConfirm,
-      canEditTaskByProjectMembers,
+      getTaskRowPermissions,
       openTaskActionsId,
+      hierarchyDataExtensions,
     ]);
 
     const tableColumnsForGrid = useMemo(() => {
@@ -1089,6 +1144,19 @@ const TasksListingPage = ({
       ...allProjects.map(p => ({ value: p.name, label: p.name })),
     ], [allProjects]);
 
+    const statusFilterOptions = useMemo(
+      () => [
+        { value: ALL_STATUS_VALUE, label: ALL_STATUS_VALUE },
+        ...workflowStatuses.map((s) => ({ value: String(s.id), label: s.name })),
+      ],
+      [workflowStatuses],
+    );
+
+    const statusFilterPillLabel = useMemo(() => {
+      if (fForm.status === ALL_STATUS_VALUE) return ALL_STATUS_VALUE;
+      return statusFilterOptions.find((o) => o.value === fForm.status)?.label ?? fForm.status;
+    }, [fForm.status, statusFilterOptions]);
+
     useEffect(() => {
       const onDocClick = (event: MouseEvent) => {
         if (!quickFilterRef.current) return;
@@ -1111,8 +1179,8 @@ const TasksListingPage = ({
         onChange: (opts: Array<{ value: string; label: string }>) => setFForm(p => ({ ...p, assignee: opts?.length ? opts.map(o => o.value) : [] })),
         options: assigneeOptions, placeholder: "Select assignees...", isClearable: true },
       { id: "status", label: "Status", type: "dropdown", value: fForm.status,
-        onChange: v => setFForm(p => ({ ...p, status: v ?? "All Status" })),
-        options: STATUS_OPTIONS },
+        onChange: v => setFForm(p => ({ ...p, status: v ?? ALL_STATUS_VALUE })),
+        options: statusFilterOptions },
       { id: "task_type", label: "Task Type", type: "select", value: fForm.task_type,
         onChange: v => setFForm(p => ({ ...p, task_type: v })),
         options: taskTypeFilterOptions, placeholder: "Select task type...", isClearable: true },
@@ -1152,7 +1220,7 @@ const TasksListingPage = ({
       },
       {
         id: "status",
-        label: fForm.status,
+        label: statusFilterPillLabel,
         icon: <ChevronDown size={12} />,
         showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "status" ? null : "status")),
@@ -1188,25 +1256,13 @@ const TasksListingPage = ({
       <React.Fragment>
   
         {/* ── Global style overrides ── */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          body, .tasks-page, .tasks-page * { box-sizing: border-box; }
-  
-          /* Kill GenericTable toolbar — we render our own */
-          .tasks-page .gt-toolbar-container { display: none !important; }
-
-          .tasks-page .task-title-cell .task-edit-btn { visibility: hidden; }
-          .tasks-page .task-title-cell:hover .task-edit-btn { visibility: visible; }
-  
-          /* Flatten card so our sections sit flush */
-          .tasks-page .generic-table-card,
-          .tasks-page .generic-table-container,
-          .tasks-page .card-body {
-            border-radius: 0 !important;
-            box-shadow: none !important;
-            border: none !important;
-            background: #fff !important;
-          }
-        `}} />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: buildTaskListingPageStyleTag({
+              showTitleHoverEditButton: true,
+            }),
+          }}
+        />
   
         <BreadcrumbItem mainTitle="Planner" mainLink="/planner/dashboard" subTitle="Tasks" />
   
@@ -1246,7 +1302,7 @@ const TasksListingPage = ({
                   type="button"
                   onClick={() => { setEditingTask(null); setShowCreate(true); }}
                   style={{
-                    ...BTN_BASE,
+                    ...TASK_LIST_BTN_OUTLINE,
                     backgroundColor: "#000",
                     background: "#000",
                     borderColor: "#000",
@@ -1311,7 +1367,7 @@ const TasksListingPage = ({
                 }}
               >
                 {tab.label}
-                {tab.id === "all" && <X size={13} color="#9ca3af" />}
+                {tab.id === "all"}
               </button>
             ))}
 
@@ -1650,14 +1706,14 @@ const TasksListingPage = ({
                         boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
                         padding: 6,
                       }}>
-                        {STATUS_OPTIONS.map((option) => (
+                        {statusFilterOptions.map((option) => (
                           <button
                             key={option.value}
                             onClick={() => {
                               setFForm({ ...fForm, status: option.value });
 
                               const nextFilters = { ...filters };
-                              if (option.value === "All Status") delete nextFilters.status;
+                              if (option.value === ALL_STATUS_VALUE) delete nextFilters.status;
                               else nextFilters.status = option.value;
                               setFilters(nextFilters);
 
@@ -1804,84 +1860,23 @@ const TasksListingPage = ({
           {/* ══════════════════════════════════════════════════════
               ROW 4 — Search + Edit columns
           ══════════════════════════════════════════════════════ */}
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "8px 16px",
-            backgroundColor: "#fff",
-            borderBottom: "1px solid #e5e7eb",
-            flexShrink: 0,
-          }}>
-            {/* Search — height 41px, rounded, with an outline-secondary search button beside it */}
-            <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
-              {/* Input wrapper */}
-              <div style={{ position: "relative" }}>
-                <FiSearch size={14} style={{
-                  position: "absolute", left: 12, top: "50%",
-                  transform: "translateY(-50%)", color: "#9ca3af", pointerEvents: "none",
-                }} />
-                <input
-                  className="task-search-input"
-                  type="text"
-                  placeholder="Search task title and notes"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === "Enter") {
-                      setFilters(p => ({ ...p, search }));
-                      setPager(p => ({ ...p, page: 1 }));
-                    }
-                  }}
-                  style={{
-                    /* height 41px matches search button height per spec */
-                    height: 41,
-                    width: 260,
-                    padding: "0 12px 0 34px",
-                    border: "1px solid #d1d5db",
-                    /* left side rounded only — right abuts the search button */
-                    borderRadius: "20px 0 0 20px",
-                    borderRight: "none",
-                    fontSize: 13,
-                    color: "#374151",
-                    outline: "none",
-                    backgroundColor: "#fff",
-                    fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                  }}
-                />
-              </div>
-  
-              {/* Bootstrap outline-secondary search button */}
-              <Button
-                variant="outline-secondary"
-                onClick={() => {
-                  setFilters(p => ({ ...p, search }));
-                  setPager(p => ({ ...p, page: 1 }));
-                }}
-                style={{
-                  height: 41,
-                  padding: "0 16px",
-                  borderRadius: "0 20px 20px 0",
-                  border: "1px solid #d1d5db",
-                  borderLeft: "none",
-                  backgroundColor: "#fff",
-                  color: "#6b7280",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  fontSize: 13,
-                  fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
-                }}
-              >
-                <FiSearch size={15} />
-              </Button>
-            </div>
-  
+          <TaskListingSearchRow
+            search={search}
+            onSearchChange={setSearch}
+            onSubmitSearch={() => {
+              setFilters((p) => ({ ...p, search }));
+              setPager((p) => ({ ...p, page: 1 }));
+            }}
+            wrapperStyle={{
+              borderBottom: "1px solid #e5e7eb",
+            }}
+            editColumnsSlot={(
             <Dropdown align="end" autoClose="outside">
               <Dropdown.Toggle
                 variant="outline-secondary"
                 id="tasks-edit-columns-dropdown"
                 style={{
-                  ...BTN_BASE,
+                  ...TASK_LIST_BTN_OUTLINE,
                   fontSize: 12,
                   backgroundColor: "#fff",
                   borderColor: "#8a8a8a",
@@ -1916,7 +1911,8 @@ const TasksListingPage = ({
                 </Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
-          </div>
+            )}
+          />
   
           {/* ══════════════════════════════════════════════════════
               ROW 5 — Table (fills remaining height)
@@ -1940,8 +1936,8 @@ const TasksListingPage = ({
                 setPager(p => ({ ...p, page, perPage }))
               }
               sortable
-              defaultSortColumn={pager.sortCol}
-              defaultSortDirection={pager.sortDir}
+              defaultSortBy={pager.sortCol}
+              defaultSortOrder={pager.sortDir}
               onSort={(col, dir) => setPager(p => ({ ...p, sortCol: col, sortDir: dir }))}
               onFirstColumnClick={row => router.push(`/planner/tasks/task-detail?id=${row.id}`)}
               loading={loading}
@@ -1969,7 +1965,7 @@ const TasksListingPage = ({
             const f: Record<string, any> = {};
             if (fForm.project && fForm.project !== "All Projects") f.project = fForm.project;
             if (fForm.assignee?.length) f.assignee = fForm.assignee;
-            if (fForm.status && fForm.status !== "All Status") f.status = fForm.status;
+            if (fForm.status && fForm.status !== ALL_STATUS_VALUE) f.status = fForm.status;
             if (fForm.task_type)    f.task_type    = fForm.task_type.value;
             if (fForm.priority)     f.priority     = fForm.priority.value;
             if (fForm.due_date_from) f.due_date_from = fForm.due_date_from;
@@ -1993,10 +1989,12 @@ const TasksListingPage = ({
           onClose={() => {
             setShowCreate(false);
             setEditingTask(null);
+            setEditingTaskEditScope("full");
           }}
           onCreate={async () => {
             setShowCreate(false);
             setEditingTask(null);
+            setEditingTaskEditScope("full");
             await fetchTasks();
           }}
           extensions={hierarchyDataExtensions as any}
@@ -2015,11 +2013,11 @@ const TasksListingPage = ({
           }
           task={editingTask?.rawData ?? editingTask}
           isEdit={!!editingTask}
-          taskType="regular"
           taskTypeChoices={
             omitTodoTaskType ? (["regular", "recurring"] as const) : undefined
           }
           lockProjectSelection={Boolean(sidebarProject)}
+          taskEditScope={editingTask ? editingTaskEditScope : "full"}
         />
   
         {/* ── Delete confirmation ── */}

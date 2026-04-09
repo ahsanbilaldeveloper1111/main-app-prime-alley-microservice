@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef, ReactElement } from 'react';
 import { useSession } from 'next-auth/react';
-import {
-  canManageProjectFromMembers,
-  getSessionPhoneOrExtension,
-} from '@planner/projectMemberRole';
+import { getSessionPhoneOrExtension } from '@planner/projectMemberRole';
+import { computePlannerTaskRowPermissions } from '@planner/taskRowPermissions';
 import { useRouter } from 'next/router';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
@@ -48,6 +46,7 @@ import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { ModuleSlug } from '@utils/Helper';
 import CreateTaskSidebar from '@components/CreatePlannerTaskSidebar';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
+import { toast } from 'react-toastify';
 
 const WITH_RELATIONS = [
   'project',
@@ -180,7 +179,6 @@ function formatPlannerDetailDateTime(iso: string | null | undefined): string {
 }
 
 function taskTypeBadgeLabel(kind: 'todo' | 'regular' | 'recurring'): string {
-  console.log('kind', kind);
   if (kind === 'todo') return 'Todo';
   if (kind === 'recurring') return 'Recurring';
   return 'Regular';
@@ -766,6 +764,109 @@ function TaskDetailRecurringSchedulePanel({
   );
 }
 
+type PlannerTaskDetailKind = ReturnType<typeof plannerTaskTypeFromTask>;
+
+type PlannerTaskDetailViewModel = Readonly<{
+  taskId: string;
+  statusName: string;
+  priorityVal: string;
+  projectName: string;
+  watchers: any[];
+  taskRecord: Record<string, unknown>;
+  detailTaskKind: PlannerTaskDetailKind;
+  showRecurringBlock: boolean;
+  startDateDisplay: string | null;
+  endDateDisplay: string | null;
+  dueTimeDetailLabel: string;
+  lastRunAt: string | undefined;
+  nextRunAt: string | undefined;
+}>;
+
+function buildPlannerTaskDetailViewModel(task: any): PlannerTaskDetailViewModel {
+  const taskId = task.task_id || `#${task.id}`;
+  const statusName = task.status?.name || task.status || 'N/A';
+  const priorityVal = task.priority || 'normal';
+  const projectName = task.project?.name || 'No Project';
+  const watchers =
+    task.watchers ??
+    (task.watcher_numbers?.map((extNum: string) => ({ extension_number: extNum })) ?? []);
+
+  const taskRecord = task as Record<string, unknown>;
+  const detailTaskKind = plannerTaskTypeFromTask(taskRecord);
+  const pickScalar = (key: string) => pickTaskScalar(taskRecord, key);
+  const lastRunAt = readTaskScheduleField(taskRecord, 'last_run_at');
+  const nextRunAt = readTaskScheduleField(taskRecord, 'next_run_at');
+  const freqScalar = pickScalar('frequency');
+  const showRecurringBlock =
+    detailTaskKind === 'recurring' ||
+    lastRunAt != null ||
+    nextRunAt != null ||
+    (typeof freqScalar === 'string' && freqScalar.trim() !== '');
+  const startDateDisplay =
+    (typeof task.start_date === 'string' && task.start_date.trim() !== ''
+      ? task.start_date
+      : null) ??
+    (typeof pickScalar('start_date') === 'string' ? String(pickScalar('start_date')) : null);
+  const endDateDisplay =
+    (typeof task.due_date === 'string' && task.due_date.trim() !== '' ? task.due_date : null) ??
+    (typeof pickScalar('end_date') === 'string' ? String(pickScalar('end_date')) : null);
+  const dueTimeDetailLabel = formatDueTimeForDetail(task.due_time);
+
+  return {
+    taskId,
+    statusName,
+    priorityVal,
+    projectName,
+    watchers,
+    taskRecord,
+    detailTaskKind,
+    showRecurringBlock,
+    startDateDisplay,
+    endDateDisplay,
+    dueTimeDetailLabel,
+    lastRunAt,
+    nextRunAt,
+  };
+}
+
+/** Loads the recent-activities strip for a task id (complexity isolated for Sonar). */
+function usePlannerTaskActivitiesPreview(taskId: number | string | undefined | null) {
+  const [taskActivities, setTaskActivities] = useState<any[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+
+  useEffect(() => {
+    if (taskId == null || taskId === '') {
+      setTaskActivities([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setLoadingActivities(true);
+      try {
+        const activitiesResponse = await getTaskActivities(taskId, 1, 5);
+        if (!cancelled && activitiesResponse != null) {
+          setTaskActivities(Array.isArray(activitiesResponse) ? activitiesResponse : []);
+        }
+      } catch (err) {
+        console.error('Error loading task activities:', err);
+        if (!cancelled) {
+          setTaskActivities([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingActivities(false);
+        }
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId]);
+
+  return { taskActivities, loadingActivities };
+}
+
 const TaskDetailPage = () => {
   const router = useRouter();
   const { id } = router.query;
@@ -774,8 +875,7 @@ const TaskDetailPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [taskActivities, setTaskActivities] = useState<any[]>([]);
-  const [loadingActivities, setLoadingActivities] = useState(false);
+  const { taskActivities, loadingActivities } = usePlannerTaskActivitiesPreview(task?.id);
   const [activeDetailTab, setActiveDetailTab] = useState<'activity' | 'comments' | 'documents'>('activity');
   const [taskComments, setTaskComments] = useState<any[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -791,7 +891,7 @@ const TaskDetailPage = () => {
   const [loadingAllActivities, setLoadingAllActivities] = useState(false);
   const documentInputRef = useRef<HTMLInputElement>(null);
 
-  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+  const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.WORK_PLANNER);
 
   const sidebarProjectFromTask = useMemo(() => {
     const p = task?.project;
@@ -805,10 +905,6 @@ const TaskDetailPage = () => {
       labels: Array.isArray(p.labels) ? p.labels : undefined,
     };
   }, [task?.project]);
-
-  const editSidebarTaskType = task
-    ? plannerTaskTypeFromTask(task as Record<string, unknown>)
-    : 'regular';
 
   const { data: session } = useSession();
   const sessionUserPhoneOrExtension = useMemo(
@@ -834,47 +930,22 @@ const TaskDetailPage = () => {
     fetchTask();
   }, [fetchTask]);
 
-  const canManageTaskProject = useMemo(
+  const taskDetailPermissions = useMemo(
     () =>
-      canManageProjectFromMembers(
+      computePlannerTaskRowPermissions(
+        task,
         task?.project ?? null,
         sessionUserPhoneOrExtension,
       ),
-    [task?.project, sessionUserPhoneOrExtension],
+    [task, sessionUserPhoneOrExtension],
   );
 
-  useEffect(() => {
-    if (!task?.id) {
-      setTaskActivities([]);
+  const handleDelete = async () => {
+    if (!task?.id) return;
+    if (!taskDetailPermissions.canDeleteTask) {
+      toast.error('You cannot delete this task');
       return;
     }
-    let cancelled = false;
-    const load = async () => {
-      setLoadingActivities(true);
-      try {
-        const activitiesResponse = await getTaskActivities(task.id, 1, 5);
-        if (!cancelled && activitiesResponse != null) {
-          setTaskActivities(Array.isArray(activitiesResponse) ? activitiesResponse : []);
-        }
-      } catch (err) {
-        console.error('Error loading task activities:', err);
-        if (!cancelled) {
-          setTaskActivities([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingActivities(false);
-        }
-      }
-    };
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [task?.id]);
-
-  const handleDelete = async () => {
-    if (!task?.id || !canManageTaskProject) return;
     try {
       setDeleting(true);
       await deleteTask(task.id);
@@ -882,6 +953,7 @@ const TaskDetailPage = () => {
       router.push('/planner/tasks');
     } catch (err) {
       console.error('Error deleting task:', err);
+      toast.error('Failed to delete task');
     } finally {
       setDeleting(false);
     }
@@ -1016,35 +1088,21 @@ const TaskDetailPage = () => {
     );
   }
 
-  const taskId = task.task_id || `#${task.id}`;
-  const statusName = task.status?.name || task.status || 'N/A';
-  const priorityVal = task.priority || 'normal';
-  const projectName = task.project?.name || 'No Project';
-  const watchers =
-    task.watchers ??
-    (task.watcher_numbers?.map((extNum: string) => ({ extension_number: extNum })) ?? []);
-
-  const taskRecord = task as Record<string, unknown>;
-  console.log('taskRecord', taskRecord);
-  const detailTaskKind = plannerTaskTypeFromTask(taskRecord);
-  console.log('detailTaskKind', detailTaskKind);
-  const pickScalar = (key: string) => pickTaskScalar(taskRecord, key);
-  const lastRunAt = readTaskScheduleField(taskRecord, 'last_run_at');
-  const nextRunAt = readTaskScheduleField(taskRecord, 'next_run_at');
-  const showRecurringBlock =
-    detailTaskKind === 'recurring' ||
-    lastRunAt != null ||
-    nextRunAt != null ||
-    (typeof pickScalar('frequency') === 'string' && String(pickScalar('frequency')).trim() !== '');
-  const startDateDisplay =
-    (typeof task.start_date === 'string' && task.start_date.trim() !== ''
-      ? task.start_date
-      : null) ??
-    (typeof pickScalar('start_date') === 'string' ? String(pickScalar('start_date')) : null);
-  const endDateDisplay =
-    (typeof task.due_date === 'string' && task.due_date.trim() !== '' ? task.due_date : null) ??
-    (typeof pickScalar('end_date') === 'string' ? String(pickScalar('end_date')) : null);
-  const dueTimeDetailLabel = formatDueTimeForDetail(task.due_time);
+  const {
+    taskId,
+    statusName,
+    priorityVal,
+    projectName,
+    watchers,
+    taskRecord,
+    detailTaskKind,
+    showRecurringBlock,
+    startDateDisplay,
+    endDateDisplay,
+    dueTimeDetailLabel,
+    lastRunAt,
+    nextRunAt,
+  } = buildPlannerTaskDetailViewModel(task);
 
   return (
     <>
@@ -1065,25 +1123,30 @@ const TaskDetailPage = () => {
             <ArrowLeft size={16} />
             Back to list
           </Button>
-          {canManageTaskProject && (
-          <div className="d-flex align-items-center gap-1">
-              <Button
-                variant="link"
-                className="text-primary p-0"
-                onClick={() => setShowEditModal(true)}
-                title="Edit Task"
-              >
-              <Edit size={20} />
-            </Button>
-              <Button
-                variant="link"
-                className="text-danger p-0"
-                onClick={() => setShowDeleteModal(true)}
-                title="Delete Task"
-              >
-              <Trash2 size={20} />
-            </Button>
-          </div>
+          {(taskDetailPermissions.canOpenTaskEdit ||
+            taskDetailPermissions.canDeleteTask) && (
+            <div className="d-flex align-items-center gap-1">
+              {taskDetailPermissions.canOpenTaskEdit && (
+                <Button
+                  variant="link"
+                  className="text-primary p-0"
+                  onClick={() => setShowEditModal(true)}
+                  title="Edit task"
+                >
+                  <Edit size={20} />
+                </Button>
+              )}
+              {taskDetailPermissions.canDeleteTask && (
+                <Button
+                  variant="link"
+                  className="text-danger p-0"
+                  onClick={() => setShowDeleteModal(true)}
+                  title="Delete task"
+                >
+                  <Trash2 size={20} />
+                </Button>
+              )}
+            </div>
           )}
         </div>
 
@@ -1152,56 +1215,59 @@ const TaskDetailPage = () => {
               />
             )}
 
-            <div className="p-3 bg-light rounded border mb-3">
-              <div className="small text-muted text-uppercase fw-semibold mb-2">Assignees</div>
-              <div className="d-flex flex-wrap gap-2 align-items-center">
-                {(task.assignees || []).map((assignee: any) => {
-                  const extNumber = assignee.extension_number || '';
-                  const { name, initials } = getExtensionDisplay(extNumber, hierarchyDataExtensions);
-                  const assigneeKey =
-                    assignee.id === undefined || assignee.id === null
-                      ? `assignee-ext-${extNumber || 'unknown'}`
-                      : `assignee-${assignee.id}`;
-                  return (
-                    <div
-                      key={assigneeKey}
-                      title={name}
+            {detailTaskKind !== 'todo' && (
+              <div className="p-3 bg-light rounded border mb-3">
+                <div className="small text-muted text-uppercase fw-semibold mb-2">Assignees</div>
+                <div className="d-flex flex-wrap gap-2 align-items-center">
+                  {(task.assignees || []).map((assignee: any) => {
+                    const extNumber = assignee.extension_number || '';
+                    const { name, initials } = getExtensionDisplay(extNumber, hierarchyDataExtensions);
+                    const assigneeKey =
+                      assignee.id === undefined || assignee.id === null
+                        ? `assignee-ext-${extNumber || 'unknown'}`
+                        : `assignee-${assignee.id}`;
+                    return (
+                      <div
+                        key={assigneeKey}
+                        title={name}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {initials || 'UN'}
+                      </div>
+                    );
+                  })}
+                  {taskDetailPermissions.canOpenTaskEdit &&
+                    taskDetailPermissions.taskEditScope === 'full' && (
+                    <Button
+                      type="button"
+                      variant="light"
+                      aria-label="Edit assignees"
+                      className="d-flex align-items-center justify-content-center rounded-circle p-0 border-0"
                       style={{
                         width: 36,
                         height: 36,
-                        borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
+                        backgroundColor: '#e2e8f0',
+                        color: '#64748b',
                       }}
+                      onClick={() => setShowEditModal(true)}
                     >
-                      {initials || 'UN'}
-                    </div>
-                  );
-                })}
-                {canManageTaskProject && (
-                  <Button
-                    type="button"
-                    variant="light"
-                    aria-label="Edit assignees"
-                    className="d-flex align-items-center justify-content-center rounded-circle p-0 border-0"
-                  style={{
-                    width: 36,
-                    height: 36,
-                    backgroundColor: '#e2e8f0',
-                    color: '#64748b',
-                  }}
-                    onClick={() => setShowEditModal(true)}
-                >
-                  <Plus size={16} />
-                  </Button>
-                )}
+                      <Plus size={16} />
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {watchers.length > 0 && (
               <div className="p-3 bg-light rounded border mb-3">
@@ -1450,18 +1516,25 @@ const TaskDetailPage = () => {
         project={sidebarProjectFromTask}
         statuses={
           sidebarProjectFromTask?.statuses?.map(
-            (s: { id: number; name: string; color?: string }) => ({
+            (s: {
+              id: number;
+              name: string;
+              color?: string;
+              is_default?: boolean;
+              is_deefault?: boolean;
+            }) => ({
               id: s.id,
               name: s.name,
               icon: '',
               color: s.color || '#3b82f6',
+              is_default: s.is_default === true || s.is_deefault === true,
             }),
           ) ?? []
         }
         task={task ? { ...task, rawData: task } : undefined}
         isEdit={Boolean(showEditModal && task)}
-        taskType={editSidebarTaskType}
         lockProjectSelection={false}
+        taskEditScope={task ? taskDetailPermissions.taskEditScope : 'full'}
       />
 
       <DeleteConfirmationModal

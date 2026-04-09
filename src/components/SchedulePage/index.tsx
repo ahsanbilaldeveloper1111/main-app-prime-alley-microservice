@@ -730,12 +730,12 @@ function CalendarHourRow({
   );
 }
 
-export type CalendarRangeMode = "week" | "two_weeks" | "month" | "custom";
+export type CalendarRangeMode = "week" | "this_month" | "last_month" | "custom";
 
 const RANGE_MODE_OPTIONS: { value: CalendarRangeMode; label: string }[] = [
   { value: "week", label: "Week" },
-  { value: "two_weeks", label: "2 Weeks" },
-  { value: "month", label: "Month" },
+  { value: "this_month", label: "This Month" },
+  { value: "last_month", label: "Last Month" },
   { value: "custom", label: "Custom Range" },
 ];
 
@@ -747,10 +747,9 @@ interface CalendarRangeModeSelectProps {
 
 function calendarNavBackAriaLabel(mode: CalendarRangeMode): string {
   switch (mode) {
-    case "month":
+    case "this_month":
+    case "last_month":
       return "Previous month";
-    case "two_weeks":
-      return "Previous two weeks";
     case "custom":
       return "Previous range";
     default:
@@ -760,10 +759,9 @@ function calendarNavBackAriaLabel(mode: CalendarRangeMode): string {
 
 function calendarNavForwardAriaLabel(mode: CalendarRangeMode): string {
   switch (mode) {
-    case "month":
+    case "this_month":
+    case "last_month":
       return "Next month";
-    case "two_weeks":
-      return "Next two weeks";
     case "custom":
       return "Next range";
     default:
@@ -822,18 +820,6 @@ function computeWeekRange(p: Readonly<CalendarRangeDerivedParams>): CalendarRang
   const fetchEnd = addDays(p.weekStart, 6);
   const n = weekViewDayCount(p.hideWeekends);
   const rawDays = Array.from({ length: n }, (_, i) => addDays(p.weekStart, i));
-  return {
-    fetchStart,
-    fetchEnd,
-    rawDays,
-    title: formatHeaderRangeClosed(fetchStart, fetchEnd),
-  };
-}
-
-function computeTwoWeeksRange(p: Readonly<CalendarRangeDerivedParams>): CalendarRangeComputation {
-  const fetchStart = p.weekStart;
-  const fetchEnd = addDays(p.weekStart, 13);
-  const rawDays = Array.from({ length: 14 }, (_, i) => addDays(p.weekStart, i));
   return {
     fetchStart,
     fetchEnd,
@@ -904,9 +890,8 @@ function computeRawCalendarRange(
   switch (p.rangeMode) {
     case "week":
       return computeWeekRange(p);
-    case "two_weeks":
-      return computeTwoWeeksRange(p);
-    case "month":
+    case "this_month":
+    case "last_month":
       return computeMonthRange(p);
     case "custom":
       return computeCustomRange(p, fallbackWs);
@@ -1052,10 +1037,13 @@ export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePag
 
   const handleRangeModeChange = useCallback((mode: CalendarRangeMode) => {
     setRangeMode(mode);
-    if (mode === "week" || mode === "two_weeks") {
-      setWeekStart(getWeekStart(new Date()));
-    } else if (mode === "month") {
-      setMonthAnchor(startOfMonthCalendar(weekStart));
+    const now = new Date();
+    if (mode === "week") {
+      setWeekStart(getWeekStart(now));
+    } else if (mode === "this_month") {
+      setMonthAnchor(startOfMonthCalendar(now));
+    } else if (mode === "last_month") {
+      setMonthAnchor(addMonthsCalendar(startOfMonthCalendar(now), -1));
     } else {
       const ws = getWeekStart(weekStart);
       setCustomStartStr(toDateInputValue(ws));
@@ -1066,9 +1054,7 @@ export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePag
   const navigateCalendarBack = useCallback(() => {
     if (rangeMode === "week") {
       setWeekStart((w) => addDays(w, -7));
-    } else if (rangeMode === "two_weeks") {
-      setWeekStart((w) => addDays(w, -14));
-    } else if (rangeMode === "month") {
+    } else if (rangeMode === "this_month" || rangeMode === "last_month") {
       setMonthAnchor((m) => addMonthsCalendar(m, -1));
     } else {
       const start = parseDateInputLocal(customStartStr);
@@ -1091,9 +1077,7 @@ export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePag
   const navigateCalendarForward = useCallback(() => {
     if (rangeMode === "week") {
       setWeekStart((w) => addDays(w, 7));
-    } else if (rangeMode === "two_weeks") {
-      setWeekStart((w) => addDays(w, 14));
-    } else if (rangeMode === "month") {
+    } else if (rangeMode === "this_month" || rangeMode === "last_month") {
       setMonthAnchor((m) => addMonthsCalendar(m, 1));
     } else {
       const start = parseDateInputLocal(customStartStr);
@@ -1115,10 +1099,12 @@ export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePag
 
   const goToday = useCallback(() => {
     const now = new Date();
-    if (rangeMode === "week" || rangeMode === "two_weeks") {
+    if (rangeMode === "week") {
       setWeekStart(getWeekStart(now));
-    } else if (rangeMode === "month") {
+    } else if (rangeMode === "this_month") {
       setMonthAnchor(startOfMonthCalendar(now));
+    } else if (rangeMode === "last_month") {
+      setMonthAnchor(addMonthsCalendar(startOfMonthCalendar(now), -1));
     } else {
       const ws = getWeekStart(now);
       setCustomStartStr(toDateInputValue(ws));
@@ -1475,14 +1461,14 @@ export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePag
       />
 
       {/* ── Got feedback ── */}
-      <div style={{
+      {/* <div style={{
         position: "fixed", bottom: "16px", right: "16px",
         backgroundColor: "#fff", border: "1px solid #e0e0e0", borderRadius: "4px",
         padding: "8px 14px", fontSize: "12px", color: PRIMARY, cursor: "pointer",
         boxShadow: "0 2px 8px rgba(0,0,0,0.08)", fontFamily: FONT, zIndex: 100,
       }}>
         Got feedback?
-      </div>
+      </div> */}
     </div>
   );
 }

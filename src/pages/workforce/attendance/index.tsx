@@ -4,13 +4,13 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
   FilterPill,
-  TableAction,
   TableColumn,
   ToolbarConfig,
 } from "@components/GenericTable";
@@ -30,7 +30,7 @@ import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
-import { Calendar, Clock, LogIn, LogOut, Trash2 } from "lucide-react";
+import { Calendar, Clock, LogIn, LogOut } from "lucide-react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -115,6 +115,9 @@ const AttendancePage = () => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
+  const rowsPerPageRef = useRef(rowsPerPage);
+  rowsPerPageRef.current = rowsPerPage;
   const [pagination, setPagination] = useState<{
     page: number;
     limit: number;
@@ -135,7 +138,7 @@ const AttendancePage = () => {
     try {
       const params: { page: number; limit: number; user_id?: string; date_from?: string; date_to?: string } = {
         page,
-        limit: ITEMS_PER_PAGE,
+        limit: rowsPerPage,
       };
       if (selectedUserId.trim()) params.user_id = selectedUserId.trim();
       const dateRange = getDateRangeForOption(selectedDate ?? "");
@@ -163,7 +166,16 @@ const AttendancePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedUserId, selectedDate]);
+  }, [selectedUserId, selectedDate, rowsPerPage]);
+
+  const handlePaginationChange = useCallback((page: number, limit: number) => {
+    if (rowsPerPageRef.current !== limit) {
+      setRowsPerPage(limit);
+      setCurrentPage(1);
+      return;
+    }
+    setCurrentPage(page);
+  }, []);
 
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -223,11 +235,6 @@ const AttendancePage = () => {
       setCheckInOutLoading(false);
     }
   };
-
-  const openDeleteModal = useCallback((record: AttendanceRecord) => {
-    setRecordToDelete(record);
-    setShowDeleteModal(true);
-  }, []);
 
   const handleConfirmDelete = async () => {
     if (!recordToDelete) return;
@@ -358,19 +365,6 @@ const AttendancePage = () => {
     [getDisplayName],
   );
 
-  const attendanceActions = useMemo<TableAction<AttendanceRecord>[]>(
-    () => [
-      {
-        label: "Delete",
-        icon: <Trash2 size={16} />,
-        onClick: (row) => openDeleteModal(row),
-        variant: "link",
-        className: "text-danger",
-      },
-    ],
-    [openDeleteModal],
-  );
-
   const attendanceToolbar = useMemo<ToolbarConfig>(
     () => ({
       showFilterPills: true,
@@ -459,40 +453,44 @@ const AttendancePage = () => {
           </div>
           {session?.user?.permissions?.includes("check-in-out-attendence-staff-management") && (
           <div style={{ display: "flex", gap: "10px" }}>
-            <Button
-              variant="success"
-              size="sm"
-              disabled={statusLoading || checkInOutLoading || isCheckedIn}
-              onClick={handleCheckIn}
-              style={{
-                fontWeight: "600",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <LogIn size={18} />
-              {checkInOutLoading ? "…" : "Check In"}
-            </Button>
-            <Button
-              variant="warning"
-              size="sm"
-              disabled={statusLoading || checkInOutLoading || !isCheckedIn}
-              onClick={handleCheckOut}
-              style={{
-                fontWeight: "600",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <LogOut size={18} />
-              {checkInOutLoading ? "…" : "Check Out"}
-            </Button>
+            {!isCheckedIn && (
+              <Button
+                variant="success"
+                size="sm"
+                disabled={statusLoading || checkInOutLoading}
+                onClick={handleCheckIn}
+                style={{
+                  fontWeight: "600",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <LogIn size={18} />
+                {checkInOutLoading ? "…" : "Check In"}
+              </Button>
+            )}
+            {isCheckedIn && (
+              <Button
+                variant="warning"
+                size="sm"
+                disabled={statusLoading || checkInOutLoading}
+                onClick={handleCheckOut}
+                style={{
+                  fontWeight: "600",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <LogOut size={18} />
+                {checkInOutLoading ? "…" : "Check Out"}
+              </Button>
+            )}
           </div>
           )}
 
@@ -532,7 +530,6 @@ const AttendancePage = () => {
         <GenericTable<AttendanceRecord>
           data={records}
           columns={attendanceColumns}
-          actions={attendanceActions}
           showActions={true}
           actionsLabel="Actions"
           loading={loading}
@@ -544,13 +541,13 @@ const AttendancePage = () => {
             pagination
               ? {
                   currentPage: pagination.page,
-                  rowsPerPage: ITEMS_PER_PAGE,
+                  rowsPerPage: pagination.limit ?? rowsPerPage,
                   totalRows: pagination.total,
-                  pageSizeOptions: [ITEMS_PER_PAGE],
+                  pageSizeOptions: [15, 25, 50, 100],
                 }
               : undefined
           }
-          onPaginationChange={(page) => setCurrentPage(page)}
+          onPaginationChange={handlePaginationChange}
           showToolbar={true}
           toolbar={attendanceToolbar}
           showToolbarActions={false}

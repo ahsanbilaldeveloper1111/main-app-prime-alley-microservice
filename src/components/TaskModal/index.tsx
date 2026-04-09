@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, X, Link, Image, List, Clock } from 'lucide-react';
+import { ChevronDown, X, Link, Image, List } from 'lucide-react';
 import Select from 'react-select';
 import { ModuleSlug } from '@utils/Helper';
 import { GetHierarchyData } from '@utils/users';
+import {
+  buildFollowUpTaskFields,
+  type FollowUpTaskFields,
+} from '@utils/crmFollowUpTaskDue';
 
 // ============================================================================
 // URL INPUT MODAL (for link/image URL entry)
@@ -203,6 +207,20 @@ const UrlInputModal: React.FC<UrlInputModalProps> = ({
 // TASK MODAL
 // ============================================================================
 
+/** Payload from Task modal save; includes aligned follow-up keys (always true for this flow). */
+export type TaskModalSaveTaskData = {
+  title: string;
+  activityDate: string;
+  activityTime: string;
+  reminder: string;
+  repeat: boolean;
+  taskType: string;
+  priority: string;
+  queue: string;
+  assignedTo: string;
+  notes: string;
+} & FollowUpTaskFields;
+
 interface TaskModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -210,21 +228,168 @@ interface TaskModalProps {
   assignedToName?: string;
   /** Optional HTML string used to prefill the notes editor (e.g. when editing an existing task). */
   initialNotesHtml?: string;
-  onSave: (taskData: {
-    title: string;
-    activityDate: string;
-    activityTime: string;
-    reminder: string;
-    repeat: boolean;
-    taskType: string;
-    priority: string;
-    queue: string;
-    assignedTo: string;
-    notes: string;
-  }) => void;
+  onSave: (taskData: TaskModalSaveTaskData) => void;
 }
 
-const TaskModal: React.FC<TaskModalProps> = ({
+type UrlModalType = 'link' | 'image' | null;
+
+type NoteEditorShortcutHandlers = {
+  bold: () => void;
+  italic: () => void;
+  underline: () => void;
+  link: () => void;
+};
+
+function runNoteEditorShortcut(
+  e: React.KeyboardEvent<HTMLDivElement>,
+  handlers: NoteEditorShortcutHandlers,
+) {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const handlerByKey: Record<string, () => void> = {
+    b: handlers.bold,
+    i: handlers.italic,
+    u: handlers.underline,
+    k: handlers.link,
+  };
+  const handler = handlerByKey[e.key.toLowerCase()];
+  if (!handler) return;
+  e.preventDefault();
+  handler();
+}
+
+function focusEditorAndOpenUrlModal(
+  notesElement: HTMLDivElement | null,
+  setUrlModalType: React.Dispatch<React.SetStateAction<'link' | 'image' | null>>,
+  modalType: 'link' | 'image',
+) {
+  if (!notesElement) return;
+  notesElement.focus();
+  setUrlModalType(modalType);
+}
+
+function getSelectedUserExtensionOption(
+  assignedTo: string,
+  extensions: any[],
+): { value: string; label: string } | null {
+  if (!assignedTo || extensions.length === 0) {
+    return null;
+  }
+
+  const assignedId = assignedTo.split(',')[0]?.trim() || '';
+  const matchedExtension = extensions.find(
+    (extension: any) =>
+      extension.id?.toString() === assignedId ||
+      extension.extension?.toString() === assignedId,
+  );
+  if (!matchedExtension) {
+    return null;
+  }
+
+  return {
+    value:
+      matchedExtension.id?.toString() ||
+      matchedExtension.extension?.toString() ||
+      '',
+    label:
+      matchedExtension.display_name ||
+      matchedExtension.name ||
+      `Extension ${matchedExtension.id || matchedExtension.extension}`,
+  };
+}
+
+function useTaskPropertiesOutsideClick(
+  showTaskTypeDropdown: boolean,
+  showPriorityDropdown: boolean,
+  showQueueDropdown: boolean,
+  taskPropertiesRef: React.RefObject<HTMLDivElement | null>,
+  setShowTaskTypeDropdown: React.Dispatch<React.SetStateAction<boolean>>,
+  setShowPriorityDropdown: React.Dispatch<React.SetStateAction<boolean>>,
+  setShowQueueDropdown: React.Dispatch<React.SetStateAction<boolean>>,
+) {
+  useEffect(() => {
+    const anyOpen =
+      showTaskTypeDropdown || showPriorityDropdown || showQueueDropdown;
+    if (!anyOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        taskPropertiesRef.current &&
+        !taskPropertiesRef.current.contains(e.target as Node)
+      ) {
+        setShowTaskTypeDropdown(false);
+        setShowPriorityDropdown(false);
+        setShowQueueDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [
+    showTaskTypeDropdown,
+    showPriorityDropdown,
+    showQueueDropdown,
+    taskPropertiesRef,
+    setShowTaskTypeDropdown,
+    setShowPriorityDropdown,
+    setShowQueueDropdown,
+  ]);
+}
+
+function useMoreFormattingOutsideClick(
+  showMoreFormattingDropdown: boolean,
+  moreFormattingRef: React.RefObject<HTMLDivElement | null>,
+  setShowMoreFormattingDropdown: React.Dispatch<React.SetStateAction<boolean>>,
+) {
+  useEffect(() => {
+    if (!showMoreFormattingDropdown) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        moreFormattingRef.current &&
+        !moreFormattingRef.current.contains(e.target as Node)
+      ) {
+        setShowMoreFormattingDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMoreFormattingDropdown, moreFormattingRef, setShowMoreFormattingDropdown]);
+}
+
+interface TaskUrlInputOverlayProps {
+  urlModalType: UrlModalType;
+  onClose: () => void;
+  onInsertHtml: (html: string) => void;
+}
+
+function TaskUrlInputOverlay({
+  urlModalType,
+  onClose,
+  onInsertHtml,
+}: Readonly<TaskUrlInputOverlayProps>) {
+  if (!urlModalType) return null;
+  const isLink = urlModalType === 'link';
+  return (
+    <UrlInputModal
+      isOpen
+      onClose={onClose}
+      title={isLink ? 'Enter URL' : 'Enter image URL'}
+      defaultValue="https://"
+      placeholder="https://"
+      submitLabel={isLink ? 'Insert link' : 'Insert image'}
+      onSubmit={(url) => {
+        const safeUrl = url.trim();
+        if (!safeUrl) return;
+        if (isLink) {
+          onInsertHtml(
+            `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${safeUrl}</a>`,
+          );
+          return;
+        }
+        onInsertHtml(`<img src="${safeUrl}" alt="Inserted image" />`);
+      }}
+    />
+  );
+}
+
+const TaskModal: React.FC<TaskModalProps> = ({ // NOSONAR
   isOpen,
   onClose,
   assignedTo = '',
@@ -264,9 +429,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [customTime, setCustomTime] = useState(() =>
     new Date().toTimeString().slice(0, 5),
   );
-  const [urlModalType, setUrlModalType] = useState<'link' | 'image' | null>(
-    null,
-  );
+  const [urlModalType, setUrlModalType] = useState<UrlModalType>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLDivElement>(null);
   const moreFormattingRef = useRef<HTMLDivElement>(null);
@@ -287,23 +450,15 @@ const TaskModal: React.FC<TaskModalProps> = ({
     }
   }, [isOpen, initialNotesHtml]);
 
-  useEffect(() => {
-    const anyOpen =
-      showTaskTypeDropdown || showPriorityDropdown || showQueueDropdown;
-    if (!anyOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        taskPropertiesRef.current &&
-        !taskPropertiesRef.current.contains(e.target as Node)
-      ) {
-        setShowTaskTypeDropdown(false);
-        setShowPriorityDropdown(false);
-        setShowQueueDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showTaskTypeDropdown, showPriorityDropdown, showQueueDropdown]);
+  useTaskPropertiesOutsideClick(
+    showTaskTypeDropdown,
+    showPriorityDropdown,
+    showQueueDropdown,
+    taskPropertiesRef,
+    setShowTaskTypeDropdown,
+    setShowPriorityDropdown,
+    setShowQueueDropdown,
+  );
 
   useEffect(() => {
     const fetchExtensions = async () => {
@@ -313,21 +468,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         );
         const exts = hierarchyData?.extensions || [];
         setActivityAssignedExtensions(exts);
-        if (assignedTo && exts.length > 0) {
-          const id = assignedTo.split(',')[0]?.trim() || '';
-          const ext = exts.find(
-            (e: any) =>
-              e.id?.toString() === id || e.extension?.toString() === id,
-          );
-          if (ext)
-            setSelectedUserExtension({
-              value: ext.id?.toString() || ext.extension?.toString() || '',
-              label:
-                ext.display_name ||
-                ext.name ||
-                `Extension ${ext.id || ext.extension}`,
-            });
-        }
+        setSelectedUserExtension(getSelectedUserExtensionOption(assignedTo, exts));
       } catch (error) {
         console.error('Failed to fetch activity assigned extensions:', error);
       }
@@ -335,19 +476,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
     if (isOpen) fetchExtensions();
   }, [isOpen, assignedTo]);
 
-  useEffect(() => {
-    if (!showMoreFormattingDropdown) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        moreFormattingRef.current &&
-        !moreFormattingRef.current.contains(e.target as Node)
-      ) {
-        setShowMoreFormattingDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMoreFormattingDropdown]);
+  useMoreFormattingOutsideClick(
+    showMoreFormattingDropdown,
+    moreFormattingRef,
+    setShowMoreFormattingDropdown,
+  );
 
   // Sync contentEditable content to state when modal opens
   useEffect(() => {
@@ -363,76 +496,75 @@ const TaskModal: React.FC<TaskModalProps> = ({
     if (notesRef.current) setNotes(notesRef.current.innerHTML || '');
   };
 
-  const handleBold = () => {
-    notesRef.current?.focus();
-    document.execCommand('bold', false);
-    syncNotesFromEditor();
+  const getActiveEditorRange = () => {
+    const el = notesRef.current;
+    const selection = globalThis.getSelection?.();
+    if (
+      !el ||
+      !selection ||
+      selection.rangeCount === 0 ||
+      !el.contains(selection.anchorNode)
+    ) {
+      return null;
+    }
+    return selection.getRangeAt(0);
   };
 
-  const handleItalic = () => {
-    notesRef.current?.focus();
-    document.execCommand('italic', false);
-    syncNotesFromEditor();
-  };
-
-  const handleUnderline = () => {
-    notesRef.current?.focus();
-    document.execCommand('underline', false);
-    syncNotesFromEditor();
-  };
-
-  const handleLink = () => {
+  const wrapSelectionWithTag = (tagName: 'b' | 'i' | 'u' | 'code') => {
+    const range = getActiveEditorRange();
     const el = notesRef.current;
     if (!el) return;
     el.focus();
-    setUrlModalType('link');
+    if (!range) return;
+    const selectedText = range.toString();
+    const tag = document.createElement(tagName);
+    tag.textContent = selectedText || (tagName === 'code' ? 'code' : 'text');
+    range.deleteContents();
+    range.insertNode(tag);
+    range.setStartAfter(tag);
+    range.setEndAfter(tag);
+    syncNotesFromEditor();
+  };
+
+  const insertHtmlAtSelection = (html: string) => {
+    const range = getActiveEditorRange();
+    const el = notesRef.current;
+    if (!el) return;
+    el.focus();
+    if (!range) return;
+    const fragment = range.createContextualFragment(html);
+    range.deleteContents();
+    range.insertNode(fragment);
+    syncNotesFromEditor();
+  };
+
+  const handleBold = () => wrapSelectionWithTag('b');
+  const handleItalic = () => wrapSelectionWithTag('i');
+  const handleUnderline = () => wrapSelectionWithTag('u');
+
+  const handleLink = () => {
+    focusEditorAndOpenUrlModal(notesRef.current, setUrlModalType, 'link');
   };
 
   const handleList = () => {
-    notesRef.current?.focus();
-    document.execCommand('insertUnorderedList', false);
-    syncNotesFromEditor();
+    insertHtmlAtSelection('<ul><li>List item</li></ul>');
   };
 
   const handleCode = () => {
-    const el = notesRef.current;
-    if (!el) return;
-    el.focus();
-    const sel = window.getSelection();
-    const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
-    const selectedText = range?.toString() || 'code';
-    document.execCommand('insertHTML', false, `<code>${selectedText}</code>`);
-    syncNotesFromEditor();
+    wrapSelectionWithTag('code');
   };
 
   const handleImage = () => {
-    const el = notesRef.current;
-    if (!el) return;
-    el.focus();
-    setUrlModalType('image');
+    focusEditorAndOpenUrlModal(notesRef.current, setUrlModalType, 'image');
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.ctrlKey || e.metaKey) {
-      switch (e.key.toLowerCase()) {
-        case 'b':
-          e.preventDefault();
-          handleBold();
-          break;
-        case 'i':
-          e.preventDefault();
-          handleItalic();
-          break;
-        case 'u':
-          e.preventDefault();
-          handleUnderline();
-          break;
-        case 'k':
-          e.preventDefault();
-          handleLink();
-          break;
-      }
-    }
+    runNoteEditorShortcut(e, {
+      bold: handleBold,
+      italic: handleItalic,
+      underline: handleUnderline,
+      link: handleLink,
+    });
   };
 
   const handleSave = () => {
@@ -443,6 +575,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
     const dateToSend = activityDate === 'Custom...' ? customDate : activityDate;
     const timeToSend = activityDate === 'Custom...' ? customTime : activityTime;
+    const followUp = buildFollowUpTaskFields(
+      true,
+      activityDate,
+      customDate,
+      timeToSend,
+    );
 
     onSave({
       title,
@@ -455,6 +593,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       queue,
       assignedTo: selectedUserExtension?.value ?? '',
       notes,
+      ...followUp,
     });
 
     const now = new Date();
@@ -546,33 +685,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   return (
     <>
-      <UrlInputModal
-        isOpen={urlModalType === 'link'}
+      <TaskUrlInputOverlay
+        urlModalType={urlModalType}
         onClose={() => setUrlModalType(null)}
-        title="Enter URL"
-        defaultValue="https://"
-        placeholder="https://"
-        submitLabel="Insert link"
-        onSubmit={(url) => {
-          notesRef.current?.focus();
-          document.execCommand('createLink', false, url);
-          syncNotesFromEditor();
-          setUrlModalType(null);
-        }}
-      />
-      <UrlInputModal
-        isOpen={urlModalType === 'image'}
-        onClose={() => setUrlModalType(null)}
-        title="Enter image URL"
-        defaultValue="https://"
-        placeholder="https://"
-        submitLabel="Insert image"
-        onSubmit={(url) => {
-          notesRef.current?.focus();
-          document.execCommand('insertImage', false, url);
-          syncNotesFromEditor();
-          setUrlModalType(null);
-        }}
+        onInsertHtml={insertHtmlAtSelection}
       />
       <div
         style={{

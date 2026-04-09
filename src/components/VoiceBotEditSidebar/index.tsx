@@ -12,7 +12,9 @@ import {
 import {
   getTrunks,
   getVoicebot,
+  postVoicebots,
   putVoicebot,
+  type CreateVoicebotPayload,
   type UpdateVoicebotPayload,
 } from "@utils/voicebot/outbound";
 import { toFormString, firstString } from "@utils/voicebot/formDisplay";
@@ -47,7 +49,7 @@ interface OutboundVoicebotFormState {
 export interface VoicebotEditSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  botId: string;
+  botId?: string;
   companyId?: string;
   onSaved?: () => void;
 }
@@ -112,6 +114,18 @@ function buildUpdatePayload(form: OutboundVoicebotFormState): UpdateVoicebotPayl
     idle_timeout_seconds: form.idle_timeout_seconds,
     max_call_duration_seconds: form.max_call_duration_seconds,
     status: form.status || undefined,
+  };
+}
+
+function buildCreatePayload(form: OutboundVoicebotFormState): CreateVoicebotPayload {
+  const base = buildUpdatePayload(form);
+  return {
+    ...base,
+    company_id: form.company_id,
+    name: form.name.trim(),
+    trunk_id: form.trunk_id?.trim() ?? "",
+    default_greeting: form.first_message?.trim() ?? "",
+    default_system_prompt: form.system_prompt?.trim() ?? "",
   };
 }
 
@@ -259,6 +273,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
     (session?.user as { company_identifier?: string })?.company_identifier ?? "";
   const userCompanyName =
     (session?.user as { company_name?: string })?.company_name ?? userCompanyIdentifier;
+  const isEditMode = Boolean(botId);
 
   const [form, setForm] = useState<OutboundVoicebotFormState>({ ...defaultForm });
   const [loadingBot, setLoadingBot] = useState(false);
@@ -314,7 +329,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
     }
   }, []);
 
-  // Load bot data when sidebar opens
+  // Load bot data for edit mode when sidebar opens
   useEffect(() => {
     if (!isOpen || !botId) return;
     setLoadingBot(true);
@@ -366,13 +381,43 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
       .finally(() => setLoadingBot(false));
   }, [isOpen, botId, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Initialize create mode (no prefilled bot data).
+  useEffect(() => {
+    if (!isOpen || isEditMode) return;
+
+    setForm({
+      ...defaultForm,
+      company_id: companyId || (isAdmin ? "" : userCompanyIdentifier),
+    });
+    setLoadingBot(false);
+    setExpandedSections({
+      basic: true,
+      voice: true,
+      prompts: true,
+      call: true,
+    });
+    fetchCompanies();
+    fetchTrunks();
+  }, [
+    isOpen,
+    isEditMode,
+    companyId,
+    isAdmin,
+    userCompanyIdentifier,
+    fetchCompanies,
+    fetchTrunks,
+  ]);
+
   const handleSave = () => {
     const err = getSubmitError(form);
     if (err) { toast.error(err); return; }
     setSubmitting(true);
-    putVoicebot(botId, buildUpdatePayload(form))
+    (isEditMode
+      ? putVoicebot(String(botId), buildUpdatePayload(form))
+      : postVoicebots(buildCreatePayload(form))
+    )
       .then(() => {
-        toast.success("Voice bot updated");
+        toast.success(isEditMode ? "Voice bot updated" : "Voice bot created");
         onSaved?.();
         onClose();
       })
@@ -394,6 +439,18 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
 
   const toggleSection = (section: SectionKey) => {
     setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const getSaveButtonContent = () => {
+    if (submitting) {
+      return (
+        <>
+          <Spinner animation="border" size="sm" className="me-1" />
+          Saving…
+        </>
+      );
+    }
+    return isEditMode ? "Update Voice Bot" : "Create Voice Bot";
   };
 
   const renderSectionCard = (
@@ -467,7 +524,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
         {/* Header */}
         <div style={sidebarStyles.header}>
           <div style={sidebarStyles.headerInner}>
-            <h2 style={sidebarStyles.title}>Edit Voice Bot</h2>
+            <h2 style={sidebarStyles.title}>{isEditMode ? "Edit Voice Bot" : "Create Voice Bot"}</h2>
             <button
               style={sidebarStyles.closeBtn}
               className="vb-edit-close-btn"
@@ -766,14 +823,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
               borderColor: "#141414",
             }}
           >
-            {submitting ? (
-              <>
-                <Spinner animation="border" size="sm" className="me-1" />
-                Saving…
-              </>
-            ) : (
-              "Update Voice Bot"
-            )}
+            {getSaveButtonContent()}
           </Button>
         </div>
       </div>
