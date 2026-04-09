@@ -298,6 +298,11 @@ MENU_COLORS: {
     REPORTS_SERVICES: 'reports-services',
     AUDIT_LOGS_SERVICES: 'audit-logs-services-services',
     GENERAL_SERVICES: 'general-services-services',
+    PRODUCT_UPDATES_SERVICES: 'product-updates-services',
+    USERS_TEAMS_SERVICES: 'users-teams_services',
+    FOR_VIEW_HELP_CENTER_SERVICES: 'view-help-center-general-general',
+
+    
     //OLD
     CONTROL_HUB_SERVICES: 'control-hub-services',
     VIEW_USERS_CONTROLHUB: 'view-users',

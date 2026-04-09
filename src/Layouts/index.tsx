@@ -1346,7 +1346,7 @@ font-weight:600;
                     </button>
                   )}
 
-                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
                     <button
                       type="button"
                       className="crm-prime-topbar-icon"
@@ -1359,7 +1359,6 @@ font-weight:600;
                     </button>
                   )}
 
-                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
                     <button
                       type="button"
                       className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
@@ -1369,9 +1368,9 @@ font-weight:600;
                     >
                       <Bell size={14} />
                     </button>
-                  )}
+                  
 
-                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.FOR_VIEW_HELP_CENTER_SERVICES) && (   
                     <button
                       type="button"
                       className="crm-prime-topbar-icon"
@@ -1380,9 +1379,10 @@ font-weight:600;
                     >
                       <HelpCircle size={18} />
                     </button>
-                  )}
+                    )}
+                  
 
-                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.GENERAL_SERVICES) && (
                     <button
                       type="button"
                       className="crm-prime-topbar-icon"
@@ -1464,7 +1464,7 @@ font-weight:600;
                         </button>
                       )}
 
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
+                      {session?.user?.permissions?.includes(PERMISSIONS.GENERAL_SERVICES) && (
                         <button
                           type="button"
                           className="topbar-overflow-item"
@@ -1492,7 +1492,7 @@ font-weight:600;
 
               {/* Assistant Icon */}
                 {/* <button className="crm-prime-topbar-icon" title="AI Assistant" style={{ width: 'auto', padding: '0 12px', gap: '6px' }}> */}
-                {session?.user?.permissions?.includes(PERMISSIONS.LIVE_CHAT_USERS) && (
+                {session?.user?.permissions?.includes(PERMISSIONS.AI_ML_SERVICES) && (
               <button 
                 type="button"
                 className="crm-prime-topbar-icon" 
@@ -1613,7 +1613,7 @@ font-weight:600;
                       {/* Links */}
                       <div className="user-dropdown-section">
                         
-                          {session?.user?.permissions?.includes('tickets-tickets') && (
+                          {session?.user?.permissions?.includes(PERMISSIONS.TICKETS_SERVICES) && (
                             <button
                               type="button"
                               className="user-dropdown-item"
@@ -1627,7 +1627,7 @@ font-weight:600;
                             </button>
                           )}
                           
-                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_PRICING_FEATURES) && (
+                          {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
                         <button type="button" className="user-dropdown-item" onClick={() => router.push('/pricing')}>
                           {/* <CreditCard className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Pricing & Features</span>
@@ -1635,7 +1635,7 @@ font-weight:600;
                             </button>
                           )}
                           
-                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING) && (
+                          {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
                         <button type="button" className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Account & Billing</span>
@@ -1643,7 +1643,7 @@ font-weight:600;
                         )}
 
                           
-{session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
+{session?.user?.permissions?.includes(PERMISSIONS.WORK_PLANNER_SERVICES) && (
                         <button type="button" className="user-dropdown-item" onClick={() => router.push('/planner/tasks')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Tasks</span>
@@ -1658,25 +1658,28 @@ font-weight:600;
 
 
 
-                          
+                    {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
                         <button type="button" className="user-dropdown-item user-dropdown-credits-head">
                           <div className="d-flex align-items-center justify-content-between w-100 gap-2">
                             <span className="user-dropdown-item-text">Prime Credits</span>
                             <span className="user-dropdown-item-badge">New</span>
-                          </div>
-                            
-                          
+                          </div>                 
                           <div className="user-dropdown-credits-count">0 of 0 credits available</div>
                         </button>
-                        <button type="button" className="user-dropdown-item">
+                        )}
+                        {session?.user?.permissions?.includes(PERMISSIONS.PRODUCT_UPDATES_SERVICES) && (
+                          <button type="button" className="user-dropdown-item">
                           {/* <Briefcase className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Product Updates</span>
                         </button>
+                        )}
                         
-                        <button type="button" className="user-dropdown-item" onClick={() => router.push('/main-settings')}>
-                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
-                          <span className="user-dropdown-item-text">Settings</span>
-                        </button>
+                        {session?.user?.permissions?.includes(PERMISSIONS.GENERAL_SERVICES) && (
+                          <button type="button" className="user-dropdown-item" onClick={() => router.push('/main-settings')}>
+                            {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                            <span className="user-dropdown-item-text">Settings</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Footer with Sign out and Privacy */}
