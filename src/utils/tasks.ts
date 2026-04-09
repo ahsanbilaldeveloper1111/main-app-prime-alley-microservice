@@ -11,7 +11,8 @@ interface ListProjectsParams {
   limit?: number;
   search?: string;
   status?: string;
-  user_extensions?: string[];
+  /** Filter projects by owner / PM extension numbers (query: extension_numbers[]) */
+  extension_numbers?: string[];
   start_date_from?: string;
   end_date_to?: string;
 }
@@ -58,6 +59,8 @@ interface UpdateStatusData {
   name?: string;
   color?: string;
   order?: number;
+  is_default?: boolean;
+  is_completed?: boolean;
 }
 
 interface ReorderStatusesData {
@@ -289,7 +292,7 @@ const validateArrayResponse = (
  */
 export const listProjects = async (params: ListProjectsParams = {}) => {
   try {
-    const { page = 1, limit = 20, search = "", status, user_extensions, start_date_from, end_date_to } = params;
+    const { page = 1, limit = 20, search = "", status, start_date_from, end_date_to } = params;
 
     // Ensure array params use `param[]` formatting
     const formattedParams = new URLSearchParams();
@@ -310,12 +313,6 @@ export const listProjects = async (params: ListProjectsParams = {}) => {
 
     if (end_date_to) {
       formattedParams.append('end_date_to', end_date_to);
-    }
-
-    if (Array.isArray(user_extensions) && user_extensions.length > 0) {
-      user_extensions.forEach((ext) => {
-        if (ext) formattedParams.append('user_extensions[]', String(ext));
-      });
     }
 
     const queryString = formattedParams.toString();

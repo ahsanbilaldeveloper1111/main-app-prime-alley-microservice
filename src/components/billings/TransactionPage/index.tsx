@@ -362,6 +362,7 @@ export default function TransactionsPage() {
         invoice={selectedInvoiceForView}
         loading={isInvoiceLoading}
         companyName={session?.user?.company_name || ""}
+        isTenantInvoice={true}
       />
 
     </div>

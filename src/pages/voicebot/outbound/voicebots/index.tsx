@@ -13,7 +13,6 @@ import { GetCompanies } from "@utils/users";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
-import { useRouter } from "next/router";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import VoicebotEditSidebar from "@components/VoiceBotEditSidebar";
@@ -52,7 +51,6 @@ function listFromResponse<T>(res: unknown): T[] {
 const VoicebotsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
-  const router = useRouter();
   const [data, setData] = useState<VoicebotRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -350,7 +348,11 @@ const VoicebotsPage = () => {
                   <button
                    
                     className="add-voicebot-btn"
-                    onClick={() => router.push("/voicebot/outbound/voicebots/create")}
+                    onClick={() => {
+                      setEditBotId("");
+                      setEditCompanyId("");
+                      setEditSidebarOpen(true);
+                    }}
                   >
                     <Plus size={18} /> Add Voice Bot
                   </button>

@@ -42,6 +42,18 @@ interface WhatsAppChatWindowInfo {
   window_minutes_remaining?: number;
 }
 
+type RefreshChatsRef = { current: () => void };
+
+const isKeyboardClick = (event: React.KeyboardEvent) => event.key === "Enter" || event.key === " ";
+
+const handleKeyboardClick = (event: React.KeyboardEvent, onActivate: () => void) => {
+  if (!isKeyboardClick(event)) {
+    return;
+  }
+  event.preventDefault();
+  onActivate();
+};
+
 // ── Avatar ─────────────────────────────────────────────────────────────────
 const Avatar = ({
   initials,
@@ -206,7 +218,13 @@ const Dropdown = ({
   }, []);
   return (
     <div ref={ref} style={{ position: "relative", display: "inline-flex" }}>
-      <div onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>{trigger}</div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{ cursor: "pointer", border: "none", background: "transparent", padding: 0 }}
+      >
+        {trigger}
+      </button>
       {open && (
         <div style={{
           position: "absolute",
@@ -220,16 +238,24 @@ const Dropdown = ({
           marginTop: menuPlacement === "bottom" ? 4 : 0,
           marginBottom: menuPlacement === "top" ? 4 : 0,
         }}>
-          {items.map((item, i) => (
-            <div key={i} onClick={() => { item.onClick?.(); setOpen(false); }} style={{
+          {items.map((item, index) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => { item.onClick?.(); setOpen(false); }}
+              style={{
+              width: "100%",
+              textAlign: "left",
+              border: "none",
+              background: "transparent",
               padding: "8px 14px", fontSize: 13, color: "#141414", cursor: "pointer",
-              borderBottom: i < items.length - 1 ? "1px solid #f0f0f0" : "none",
+              borderBottom: index < items.length - 1 ? "1px solid #f0f0f0" : "none",
             }}
               onMouseEnter={e => (e.currentTarget.style.background = "#f7fafc")}
               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
             >
               {item.label}
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -275,10 +301,13 @@ const LeftSidebar = ({ onNewChat }: { onNewChat: () => void }) => {
       </div>
       {/* Sections */}
       {sections.map(s => (
-        <div 
+        <button
+          type="button"
           key={s.label} 
           onClick={() => setActiveSection(s.label)} 
           style={{
+            width: "100%",
+            border: "none",
             padding: "7px 16px", 
             display: "flex", 
             justifyContent: "space-between", 
@@ -288,13 +317,14 @@ const LeftSidebar = ({ onNewChat }: { onNewChat: () => void }) => {
             fontWeight: activeSection === s.label ? 500 : 300,
             fontSize: 14, 
             color: "#141414",
+            textAlign: "left",
           }}
           onMouseEnter={e => { if (activeSection !== s.label) e.currentTarget.style.background = "#e8e8e8"; }}
           onMouseLeave={e => { if (activeSection !== s.label) e.currentTarget.style.background = "transparent"; }}
         >
           <span>{s.label}</span>
           <span style={{ fontSize: 12, color: "#7c98b6" }}>{s.count}</span>
-        </div>
+        </button>
       ))}
       <div style={{ padding: "6px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "#414141", cursor: "pointer", fontWeight: 300 }}>
@@ -306,9 +336,9 @@ const LeftSidebar = ({ onNewChat }: { onNewChat: () => void }) => {
       <div style={{ marginTop: "auto", padding: "12px 16px", borderTop: "1px solid #cccccc", display: "flex", gap: 8 }}>
         <Dropdown
           trigger={
-            <button className="btn btn-secondary" style={{ flex: 1, fontWeight: 300 }}>
+            <span className="btn btn-secondary" style={{ flex: 1, fontWeight: 300, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
               Actions <Icon name="chevronDown" size={10} color="#141414" />
-            </button>
+            </span>
           }
           menuPlacement="top"
           items={[
@@ -374,15 +404,36 @@ function payloadToMessage(payload: WhatsAppSocketPayload): WhatsAppMessage {
   };
 }
 
+function getConversationListWidth(isMobile: boolean, isTablet: boolean): string | number {
+  if (isMobile) {
+    return "100%";
+  }
+  if (isTablet) {
+    return 320;
+  }
+  return 400;
+}
+
+function getConversationMode(isMobile: boolean, isCompact: boolean): "desktop" | "tablet" | "mobile" {
+  if (isMobile) {
+    return "mobile";
+  }
+  if (isCompact) {
+    return "tablet";
+  }
+  return "desktop";
+}
+
 /** Derive display props from API/socket message at render time (no stored shape). */
 function getMessageDisplay(m: WhatsAppMessage, contactName: string) {
+  const sender = m.direction === "inbound" ? "contact" : "agent";
   const time = m.created_at
     ? new Date(m.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
     : "";
   const text = m.message?.trim() || (m.message_type === "template" ? "Template sent" : "");
   return {
     id: m.id,
-    sender: (m.direction === "inbound" ? "contact" : "agent") as "contact" | "agent",
+    sender,
     name: m.direction === "inbound" ? contactName : "You",
     time,
     text,
@@ -396,10 +447,12 @@ const ConversationList = ({
   selectedChat,
   onSelectChat,
   refreshChatsRef,
+  compactMode = "desktop",
 }: {
   selectedChat: WhatsAppChatItem | null;
   onSelectChat: (chat: WhatsAppChatItem) => void;
-  refreshChatsRef: React.MutableRefObject<() => void>;
+  refreshChatsRef: RefreshChatsRef;
+  compactMode?: "desktop" | "tablet" | "mobile";
 }) => {
   const [chats, setChats] = useState<WhatsAppChatItem[]>([]);
   const [chatsLoading, setChatsLoading] = useState(true);
@@ -407,6 +460,9 @@ const ConversationList = ({
   const [sortOpen, setSortOpen] = useState(false);
   const sortRef = useRef<HTMLDivElement>(null);
   const [didAutoSelectFromUrl, setDidAutoSelectFromUrl] = useState(false);
+
+  const isTablet = compactMode === "tablet";
+  const isMobile = compactMode === "mobile";
 
   const initialChatIdFromUrl = useRef<number | null>(null);
   const initialPhoneFromUrl = useRef<string | null>(null);
@@ -488,14 +544,81 @@ const ConversationList = ({
 
   /** Initials from phone (last 2 digits or first 2 chars of number) */
   const initialsForPhone = (phone: string) => {
-    const digits = (phone || "").replace(/\D/g, "").slice(-2);
+    const digits = (phone || "").replaceAll(/\D/g, "").slice(-2);
     return digits || "??";
+  };
+
+  const renderConversationListBody = () => {
+    if (chatsLoading) {
+      return (
+        <div style={{ padding: 24, textAlign: "center", fontSize: 14, color: "#718096" }}>
+          Loading chats...
+        </div>
+      );
+    }
+    if (chatsError) {
+      return (
+        <div style={{ padding: 24, textAlign: "center", fontSize: 14, color: "#718096" }}>
+          {chatsError}
+        </div>
+      );
+    }
+    if (chats.length === 0) {
+      return (
+        <div style={{ padding: 24, textAlign: "center", fontSize: 14, color: "#718096" }}>
+          No WhatsApp chats yet
+        </div>
+      );
+    }
+
+    return chats.map((chat) => {
+      const selected = selectedChat?.id === chat.id;
+      return (
+        <button
+          type="button"
+          key={chat.id}
+          onClick={() => onSelectChat(chat)}
+          style={{
+            width: "100%",
+            border: "none",
+            padding: "15px 16px 26px 16px", borderBottom: "1px solid #e2e8f0",
+            background: selected ? "#ebebeb" : "#fff", cursor: "pointer", display: "flex", gap: 10,
+            textAlign: "left",
+          }}
+          onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f7fafc"; }}
+          onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "#fff"; }}
+        >
+          <input type="checkbox" style={{ marginTop: 2, flexShrink: 0 }} onClick={e => e.stopPropagation()} />
+          <Avatar initials={initialsForPhone(chat.phone_number)} size={36} color="#efe7f0" textColor="#6b46c1" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontWeight: 300, fontSize: 16, color: "#141414" }}>{chat.phone_number || "Unknown"}</span>
+              <span style={{ fontSize: 11, color: "#718096" }}>{formatChatTime(chat.last_message_at)}</span>
+            </div>
+            <div style={{ fontSize: 14, color: "#141414", display: "flex", alignItems: "center", gap: 4, marginTop: 2, fontWeight: 300 }}>
+              <Icon name="reply" size={11} color="#141414" />
+              <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {chat.last_message_preview || "No messages"}
+              </span>
+            </div>
+          </div>
+        </button>
+      );
+    });
   };
 
   return (
     <div style={{
-      width: 400, borderRight: "1px solid #cccccc", display: "flex", flexDirection: "column",
-      flexShrink: 0, height: "100%", background: "#fff", overflow: "hidden",
+      width: getConversationListWidth(isMobile, isTablet),
+      borderRight: isMobile ? "none" : "1px solid #cccccc",
+      borderBottom: isMobile ? "1px solid #cccccc" : "none",
+      display: "flex",
+      flexDirection: "column",
+      flexShrink: 0,
+      height: isMobile ? "42%" : "100%",
+      minHeight: isMobile ? 220 : 0,
+      background: "#fff",
+      overflow: "hidden",
     }}>
       {/* Sort bar */}
       <div style={{ padding: "10px 16px", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
@@ -512,15 +635,19 @@ const ConversationList = ({
               border: "1px solid #e2e8f0", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
               minWidth: 140, zIndex: 100, marginTop: 4,
             }}>
-              {["Newest", "Oldest", "Last reply"].map((opt, i) => (
-                <div key={i} onClick={() => setSortOpen(false)} style={{
+              {["Newest", "Oldest", "Last reply"].map((opt) => (
+                <button key={opt} type="button" onClick={() => setSortOpen(false)} style={{
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  background: "transparent",
                   padding: "7px 14px", fontSize: 13, cursor: "pointer", color: "#141414",
                 }}
                   onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                 >
                   {opt}
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -528,50 +655,7 @@ const ConversationList = ({
       </div>
       {/* Conversation list */}
       <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-        {chatsLoading ? (
-          <div style={{ padding: 24, textAlign: "center", fontSize: 14, color: "#718096" }}>
-            Loading chats...
-          </div>
-        ) : chatsError ? (
-          <div style={{ padding: 24, textAlign: "center", fontSize: 14, color: "#718096" }}>
-            {chatsError}
-          </div>
-        ) : chats.length === 0 ? (
-          <div style={{ padding: 24, textAlign: "center", fontSize: 14, color: "#718096" }}>
-            No WhatsApp chats yet
-          </div>
-        ) : (
-          chats.map((chat) => {
-            const selected = selectedChat?.id === chat.id;
-            return (
-              <div
-                key={chat.id}
-                onClick={() => onSelectChat(chat)}
-                style={{
-                  padding: "15px 16px 26px 16px", borderBottom: "1px solid #e2e8f0",
-                  background: selected ? "#ebebeb" : "#fff", cursor: "pointer", display: "flex", gap: 10,
-                }}
-                onMouseEnter={e => { if (!selected) e.currentTarget.style.background = "#f7fafc"; }}
-                onMouseLeave={e => { if (!selected) e.currentTarget.style.background = "#fff"; }}
-              >
-                <input type="checkbox" style={{ marginTop: 2, flexShrink: 0 }} onClick={e => e.stopPropagation()} />
-                <Avatar initials={initialsForPhone(chat.phone_number)} size={36} color="#efe7f0" textColor="#6b46c1" />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontWeight: 300, fontSize: 16, color: "#141414" }}>{chat.phone_number || "Unknown"}</span>
-                    <span style={{ fontSize: 11, color: "#718096" }}>{formatChatTime(chat.last_message_at)}</span>
-                  </div>
-                  <div style={{ fontSize: 14, color: "#141414", display: "flex", alignItems: "center", gap: 4, marginTop: 2, fontWeight: 300 }}>
-                    <Icon name="reply" size={11} color="#141414" />
-                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {chat.last_message_preview || "No messages"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
+        {renderConversationListBody()}
       </div>
     </div>
   );
@@ -583,7 +667,7 @@ const MessageThread = ({
   refreshChatsRef,
 }: {
   selectedChat: WhatsAppChatItem | null;
-  refreshChatsRef: React.MutableRefObject<() => void>;
+  refreshChatsRef: RefreshChatsRef;
 }) => {
   const [activeTab, setActiveTab] = useState<"whatsapp" | "comment">("whatsapp");
   const [message, setMessage] = useState("");
@@ -593,7 +677,7 @@ const MessageThread = ({
   const [showInsertMenu, setShowInsertMenu] = useState(false);
   const [showWhatsappMenu, setShowWhatsappMenu] = useState(false);
   const [chatWindowInfo, setChatWindowInfo] = useState<WhatsAppChatWindowInfo | null>(null);
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const insertRef = useRef<HTMLDivElement>(null);
   const waRef = useRef<HTMLDivElement>(null);
@@ -630,12 +714,12 @@ const MessageThread = ({
 
   const onMessageReceived = useCallback(
     (payload: WhatsAppSocketPayload) => {
-      const rawChatId = payload.whats_app_chat_id;
+      const rawChatId = payload?.whats_app_chat_id;
       if (rawChatId == null) return;
       const chatIdNum = Number(rawChatId);
       if (Number.isNaN(chatIdNum)) return;
       const msg = payloadToMessage(payload);
-      if (selectedChat != null && chatIdNum === selectedChat.id) {
+      if (selectedChat?.id === chatIdNum) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
           // Replace optimistic outbound (temp id < 0) with same text when real message arrives
@@ -654,10 +738,10 @@ const MessageThread = ({
 
   const onStatusUpdated = useCallback(
     (payload: WhatsAppSocketPayload) => {
-      const rawChatId = payload.whats_app_chat_id;
-      if (rawChatId == null || payload.message_sid == null) return;
+      const rawChatId = payload?.whats_app_chat_id;
+      if (rawChatId == null || payload?.message_sid == null) return;
       const chatIdNum = Number(rawChatId);
-      if (selectedChat == null || chatIdNum !== selectedChat.id) return;
+      if (selectedChat?.id !== chatIdNum) return;
       setMessages((prev) =>
         prev.map((m) =>
           String(m.id) === String(payload.message_sid) || (payload.id != null && m.id === payload.id)
@@ -717,17 +801,109 @@ const MessageThread = ({
   const dateLabel = hasMessages ? new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "";
 
   // 24h window countdown (backend keys: window_minutes_remaining or window_started_at)
-  let minutesRemaining: number | null = chatWindowInfo?.window_minutes_remaining ?? null;
-  if (minutesRemaining == null && chatWindowInfo?.window_started_at) {
+  const minutesRemaining = React.useMemo(() => {
+    const remainingFromApi = chatWindowInfo?.window_minutes_remaining;
+    if (remainingFromApi != null) {
+      return remainingFromApi;
+    }
+    if (!chatWindowInfo?.window_started_at) {
+      return null;
+    }
     const start = new Date(chatWindowInfo.window_started_at).getTime();
     const end = start + 24 * 60 * 60 * 1000;
-    minutesRemaining = Math.max(0, Math.floor((end - Date.now()) / 60000));
-  }
+    return Math.max(0, Math.floor((end - Date.now()) / 60000));
+  }, [chatWindowInfo, tick]);
+
   const show24hTimer = selectedChat && chatWindowInfo?.is_within_24h_window !== false && minutesRemaining != null && minutesRemaining > 0;
   const timerLabel =
     minutesRemaining != null && minutesRemaining > 0
       ? `${Math.floor(minutesRemaining / 60)}h ${minutesRemaining % 60}m remaining`
       : "";
+
+  const renderMessageContent = () => {
+    if (selectedChat == null) {
+      return (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200, fontSize: 14, color: "#718096" }}>
+          Select a chat to view messages.
+        </div>
+      );
+    }
+    if (messagesLoading) {
+      return (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200, fontSize: 14, color: "#718096" }}>
+          Loading messages...
+        </div>
+      );
+    }
+
+    return (
+      <>
+        {dateLabel && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "12px 0 20px" }}>
+            <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+            <span style={{
+              fontSize: 12, color: "#141414", background: "#fff", padding: "2px 10px",
+              border: "1px solid #e2e8f0", borderRadius: 12,
+            }}>{dateLabel}</span>
+            <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+          </div>
+        )}
+
+        {messages.map((m) => {
+          const d = getMessageDisplay(m, contactName);
+          return (
+            <div key={m.id} style={{
+              marginBottom: 16, display: "flex", flexDirection: d.sender === "contact" ? "row" : "row-reverse",
+              alignItems: "flex-start", gap: 10,
+            }}>
+              {d.sender === "contact" && (
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%", background: "#4a90d9",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
+                }}>{(d.name || "").replaceAll(/\D/g, "").slice(-2) || "??"}</div>
+              )}
+              {d.sender === "agent" && (
+                <Avatar initials="You" size={28} color="#efe7f0" textColor="#6b46c1" />
+              )}
+              <div style={{ maxWidth: "70%" }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8,
+                  flexDirection: d.sender === "contact" ? "row" : "row-reverse",
+                  marginBottom: 4,
+                }}>
+                  <span style={{ fontWeight: 600, fontSize: 14, color: "#141414" }}>{d.name}</span>
+                  <span style={{ fontSize: 11, color: "#718096" }}>{d.time}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                    <Icon name="whatsapp" size={12} color="#25D366" />
+                    <span style={{ fontSize: 11, color: "#718096" }}>{d.channel}</span>
+                    <Icon name="chevronDown" size={10} color="#141414" />
+                  </div>
+                </div>
+                <div style={{
+                  padding: "8px 12px",
+                  fontSize: 14, color: "#141414", lineHeight: 1.5,
+                }}>
+                  {d.text}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {(() => {
+          const last = messages.at(-1);
+          const lastD = last ? getMessageDisplay(last, contactName) : null;
+          return lastD?.isRead ? (
+            <div style={{ textAlign: "right", fontSize: 11, color: "#718096", marginTop: 4 }}>
+              Read at {lastD.time}
+            </div>
+          ) : null;
+        })()}
+        <div ref={bottomRef} />
+      </>
+    );
+  };
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "#fff", minWidth: 0, height: "100%", overflow: "hidden" }}>
@@ -743,81 +919,7 @@ const MessageThread = ({
       )}
       {/* Messages */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", minHeight: 0 }}>
-        {!selectedChat ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200, fontSize: 14, color: "#718096" }}>
-            Select a chat to view messages.
-          </div>
-        ) : messagesLoading ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", minHeight: 200, fontSize: 14, color: "#718096" }}>
-            Loading messages...
-          </div>
-        ) : (
-          <>
-            {dateLabel && (
-              <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "12px 0 20px" }}>
-                <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
-                <span style={{
-                  fontSize: 12, color: "#141414", background: "#fff", padding: "2px 10px",
-                  border: "1px solid #e2e8f0", borderRadius: 12,
-                }}>{dateLabel}</span>
-                <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
-              </div>
-            )}
-
-            {messages.map((m) => {
-              const d = getMessageDisplay(m, contactName);
-              return (
-                <div key={m.id} style={{
-                  marginBottom: 16, display: "flex", flexDirection: d.sender === "contact" ? "row" : "row-reverse",
-                  alignItems: "flex-start", gap: 10,
-                }}>
-                  {d.sender === "contact" && (
-                    <div style={{
-                      width: 28, height: 28, borderRadius: "50%", background: "#4a90d9",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0,
-                    }}>{(d.name || "").replace(/\D/g, "").slice(-2) || "??"}</div>
-                  )}
-                  {d.sender === "agent" && (
-                    <Avatar initials="You" size={28} color="#efe7f0" textColor="#6b46c1" />
-                  )}
-                  <div style={{ maxWidth: "70%" }}>
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: 8,
-                      flexDirection: d.sender === "contact" ? "row" : "row-reverse",
-                      marginBottom: 4,
-                    }}>
-                      <span style={{ fontWeight: 600, fontSize: 14, color: "#141414" }}>{d.name}</span>
-                      <span style={{ fontSize: 11, color: "#718096" }}>{d.time}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                        <Icon name="whatsapp" size={12} color="#25D366" />
-                        <span style={{ fontSize: 11, color: "#718096" }}>{d.channel}</span>
-                        <Icon name="chevronDown" size={10} color="#141414" />
-                      </div>
-                    </div>
-                    <div style={{
-                      padding: "8px 12px",
-                      fontSize: 14, color: "#141414", lineHeight: 1.5,
-                    }}>
-                      {d.text}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {(() => {
-              const last = messages[messages.length - 1];
-              const lastD = last ? getMessageDisplay(last, contactName) : null;
-              return lastD?.isRead ? (
-                <div style={{ textAlign: "right", fontSize: 11, color: "#718096", marginTop: 4 }}>
-                  Read at {lastD.time}
-                </div>
-              ) : null;
-            })()}
-            <div ref={bottomRef} />
-          </>
-        )}
+        {renderMessageContent()}
       </div>
 
       {/* Composer */}
@@ -832,7 +934,7 @@ const MessageThread = ({
               borderBottom: activeTab === "whatsapp" ? "2px solid #141414" : "2px solid transparent",
               color: activeTab === "whatsapp" ? "#141414" : "#718096", fontSize: 14, fontWeight: 500,
             }}>
-              <Icon name="whatsapp" size={14} color={activeTab === "whatsapp" ? "#141414" : "#141414"} />
+              <Icon name="whatsapp" size={14} color="#141414" />
               WhatsApp
               <Icon name="chevronDown" size={10} color="#141414" />
             </button>
@@ -842,15 +944,19 @@ const MessageThread = ({
                 border: "1px solid #e2e8f0", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                 minWidth: 150, zIndex: 100,
               }}>
-                {["WhatsApp", "Email", "Live Chat"].map((opt, i) => (
-                  <div key={i} onClick={() => setShowWhatsappMenu(false)} style={{
+                {["WhatsApp", "Email", "Live Chat"].map((opt) => (
+                  <button key={opt} type="button" onClick={() => setShowWhatsappMenu(false)} style={{
+                    width: "100%",
+                    textAlign: "left",
+                    border: "none",
+                    background: "transparent",
                     padding: "7px 14px", fontSize: 13, cursor: "pointer", color: "#141414",
                   }}
                     onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
                     {opt}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -858,7 +964,7 @@ const MessageThread = ({
           <button onClick={() => setActiveTab("comment")} style={{
             background: "none", border: "none", cursor: "pointer", padding: "10px 0",
             borderBottom: activeTab === "comment" ? "2px solid #141414" : "2px solid transparent",
-            color: activeTab === "comment" ? "#141414" : "#141414", fontSize: 14, fontWeight: 300,
+            color: "#141414", fontSize: 14, fontWeight: 300,
           }}>
             Comment
           </button>
@@ -926,13 +1032,19 @@ const MessageThread = ({
                 border: "1px solid #e2e8f0", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
                 minWidth: 160, zIndex: 100,
               }}>
-                {["Saved reply", "Knowledge article", "Video", "Meeting link"].map((opt, i) => (
-                  <div key={i} style={{ padding: "7px 14px", fontSize: 13, cursor: "pointer", color: "#141414" }}
+                {["Saved reply", "Knowledge article", "Video", "Meeting link"].map((opt) => (
+                  <button key={opt} type="button" style={{
+                    width: "100%",
+                    textAlign: "left",
+                    border: "none",
+                    background: "transparent",
+                    padding: "7px 14px", fontSize: 13, cursor: "pointer", color: "#141414"
+                  }}
                     onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
                     {opt}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -954,13 +1066,16 @@ const MessageThread = ({
             </button>
             <Dropdown
               trigger={
-                <button style={{
+                <span style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   padding: "6px 8px", background: message.trim() ? "#2a2a2a" : "#d4d4d4",
                   border: "none", borderLeft: "1px solid rgba(255,255,255,0.2)",
                   borderRadius: "0 4px 4px 0", cursor: "pointer",
                 }}>
                   <Icon name="chevronDown" size={12} color={message.trim() ? "#fff" : "#999"} />
-                </button>
+                </span>
               }
               items={[
                 { label: "Send and close" },
@@ -1054,7 +1169,7 @@ const ContactPanel = () => {
           <div style={{ marginBottom: 8 }}>
             <div style={{ fontSize: 11, color: "#718096", marginBottom: 4 }}>Legal basis for processing contact's data</div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#eaf0f6", padding: "3px 8px", borderRadius: 12, fontSize: 12, color: "#141414" }}>
-              Legitimate interest - Lead
+              <span>Legitimate interest - Lead</span>
               <button style={{ background: "none", border: "none", cursor: "pointer", padding: 0, lineHeight: 1 }}>
                 <Icon name="x" size={10} color="#141414" />
               </button>
@@ -1139,6 +1254,7 @@ const TopBar = ({ selectedChat }: { selectedChat: WhatsAppChatItem | null }) => 
       height: 60, borderBottom: "1px solid #cccccc", background: "#fff",
       display: "flex", alignItems: "center", padding: "0 16px", gap: 12,
       flexShrink: 0,
+      overflow: "visible",
     }}>
       {/* Logo */}
       <div style={{
@@ -1147,11 +1263,17 @@ const TopBar = ({ selectedChat }: { selectedChat: WhatsAppChatItem | null }) => 
         fontSize: 8, color: "#fff", fontWeight: 700, flexShrink: 0,
       }}>PA</div>
       {/* Contact info */}
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: "#141414", display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+        <div style={{
+          fontSize: 16, fontWeight: 600, color: "#141414", display: "flex", alignItems: "center", gap: 6,
+          minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        }}>
           {selectedChat ? selectedChat.phone_number : "Rizwan haider"}
         </div>
-        <div style={{ fontSize: 14, color: "#141414", display: "flex", alignItems: "center", gap: 4, fontWeight: 300 }}>
+        <div style={{
+          fontSize: 14, color: "#141414", display: "flex", alignItems: "center", gap: 4, fontWeight: 300,
+          minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flexWrap: "nowrap",
+        }}>
           {selectedChat ? (
             <span>WhatsApp</span>
           ) : (
@@ -1183,12 +1305,118 @@ const TopBar = ({ selectedChat }: { selectedChat: WhatsAppChatItem | null }) => 
           ]}
         />
       </div> */}
-      <div style={{ flex: 1 }} />
-      {/* Action buttons */}
-      <button className="btn btn-secondary">
-        <Icon name="check" size={13} color="#141414" />
-        Close conversation
-      </button>
+      <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Action buttons */}
+        <button className="btn btn-secondary" style={{ whiteSpace: "nowrap" }}>
+          <Icon name="check" size={13} color="#141414" />
+          Close conversation
+        </button>
+        <div ref={actRef} style={{ position: "relative" }}>
+          <button onClick={() => setActionsOpen(!actionsOpen)} className="btn-icon">
+            <Icon name="more" size={14} color="#141414" />
+          </button>
+          {actionsOpen && (
+            <div style={{
+              position: "absolute", right: 0, top: "100%", background: "#fff",
+              border: "1px solid #e2e8f0", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+              minWidth: 160, zIndex: 100, marginTop: 4,
+            }}>
+              {["Snooze", "Merge", "Print", "Move to spam", "Delete"].map((opt) => (
+                <button key={opt} type="button" onClick={() => setActionsOpen(false)} style={{
+                  width: "100%",
+                  textAlign: "left",
+                  border: "none",
+                  background: "transparent",
+                  padding: "7px 14px", fontSize: 13, cursor: "pointer",
+                  color: opt === "Delete" ? "#f44336" : "#141414",
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f7fafc"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button className="btn-icon">
+          <Icon name="info" size={14} color="#141414" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ResponsiveTopBar = ({
+  selectedChat,
+  compact,
+  onNewChat,
+}: {
+  selectedChat: WhatsAppChatItem | null;
+  compact: boolean;
+  onNewChat: () => void;
+}) => {
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const actRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (actRef.current && !actRef.current.contains(e.target as Node)) setActionsOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  if (!compact) {
+    return <TopBar selectedChat={selectedChat} />;
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: 52,
+        borderBottom: "1px solid #cccccc",
+        background: "#fff",
+        display: "flex",
+        alignItems: "center",
+        padding: "8px 10px",
+        gap: 8,
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          width: 24,
+          height: 24,
+          background: "#141414",
+          borderRadius: 4,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 7,
+          color: "#fff",
+          fontWeight: 700,
+          flexShrink: 0,
+        }}
+      >
+        PA
+      </div>
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#141414",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {selectedChat ? selectedChat.phone_number : "Rizwan haider"}
+        </div>
+        <div style={{ fontSize: 12, color: "#141414", fontWeight: 300 }}>WhatsApp</div>
+      </div>
+
       <div ref={actRef} style={{ position: "relative" }}>
         <button onClick={() => setActionsOpen(!actionsOpen)} className="btn-icon">
           <Icon name="more" size={14} color="#141414" />
@@ -1199,8 +1427,12 @@ const TopBar = ({ selectedChat }: { selectedChat: WhatsAppChatItem | null }) => 
             border: "1px solid #e2e8f0", borderRadius: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
             minWidth: 160, zIndex: 100, marginTop: 4,
           }}>
-            {["Snooze", "Merge", "Print", "Move to spam", "Delete"].map((opt, i) => (
-              <div key={i} onClick={() => setActionsOpen(false)} style={{
+            {["Snooze", "Merge", "Print", "Move to spam", "Delete"].map((opt) => (
+              <button key={opt} type="button" onClick={() => setActionsOpen(false)} style={{
+                width: "100%",
+                textAlign: "left",
+                border: "none",
+                background: "transparent",
                 padding: "7px 14px", fontSize: 13, cursor: "pointer",
                 color: opt === "Delete" ? "#f44336" : "#141414",
               }}
@@ -1208,11 +1440,45 @@ const TopBar = ({ selectedChat }: { selectedChat: WhatsAppChatItem | null }) => 
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
               >
                 {opt}
-              </div>
+              </button>
             ))}
           </div>
         )}
       </div>
+
+      <button
+        style={{
+          background: "none",
+          border: "1px solid #cccccc",
+          borderRadius: 4,
+          cursor: "pointer",
+          padding: "4px 8px",
+          fontSize: 12,
+          color: "#141414",
+          fontWeight: 500,
+          whiteSpace: "nowrap",
+        }}
+      >
+        Close conversation
+      </button>
+
+      <button
+        onClick={onNewChat}
+        style={{
+          background: "none",
+          border: "1px solid #cccccc",
+          borderRadius: 4,
+          cursor: "pointer",
+          padding: "4px 8px",
+          fontSize: 12,
+          color: "#141414",
+          fontWeight: 500,
+          whiteSpace: "nowrap",
+        }}
+      >
+        New chat
+      </button>
+
       <button className="btn-icon">
         <Icon name="info" size={14} color="#141414" />
       </button>
@@ -1604,9 +1870,21 @@ const NewChatModal = ({
 function CRMInbox() {
   const [selectedChat, setSelectedChat] = useState<WhatsAppChatItem | null>(null);
   const refreshChatsRef = useRef<() => void>(() => {});
+  const [viewportWidth, setViewportWidth] = useState<number | null>(null);
 
   const [showNewChatModal, setShowNewChatModal] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const updateViewportWidth = () => setViewportWidth(window.innerWidth);
+    updateViewportWidth();
+    window.addEventListener("resize", updateViewportWidth);
+    return () => window.removeEventListener("resize", updateViewportWidth);
+  }, []);
+
+  const isMobile = viewportWidth !== null && viewportWidth <= 768;
+  const isCompact = viewportWidth !== null && viewportWidth <= 1200;
+  const conversationMode = getConversationMode(isMobile, isCompact);
 
   const handleNewChatSend = async (data: {
     number: string;
@@ -1644,14 +1922,17 @@ function CRMInbox() {
       marginTop: "-15px", marginLeft: "-15px"
     }}>
       {/* Grid 1: Left sidebar */}
-      <LeftSidebar onNewChat={() => setShowNewChatModal(true)} />
+      {!isCompact && <LeftSidebar onNewChat={() => setShowNewChatModal(true)} />}
 
       {/* Grid 2: Conversation list (WhatsApp chats from API) */}
-      <ConversationList
-        selectedChat={selectedChat}
-        onSelectChat={setSelectedChat}
-        refreshChatsRef={refreshChatsRef}
-      />
+      {!isCompact && (
+        <ConversationList
+          selectedChat={selectedChat}
+          onSelectChat={setSelectedChat}
+          refreshChatsRef={refreshChatsRef}
+          compactMode="desktop"
+        />
+      )}
 
       <NewChatModal
         isOpen={showNewChatModal}
@@ -1661,12 +1942,31 @@ function CRMInbox() {
 
       {/* Grids 3+4 share a column with top bar */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <TopBar selectedChat={selectedChat} />
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <ResponsiveTopBar
+          selectedChat={selectedChat}
+          compact={isCompact}
+          onNewChat={() => setShowNewChatModal(true)}
+        />
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            overflow: "hidden",
+          }}
+        >
+          {isCompact && (
+            <ConversationList
+              selectedChat={selectedChat}
+              onSelectChat={setSelectedChat}
+              refreshChatsRef={refreshChatsRef}
+              compactMode={conversationMode}
+            />
+          )}
           {/* Grid 3: Message thread */}
           <MessageThread selectedChat={selectedChat} refreshChatsRef={refreshChatsRef} />
           {/* Grid 4: Contact panel */}
-          <ContactPanel />
+          {!isCompact && <ContactPanel />}
         </div>
       </div>
     </div>

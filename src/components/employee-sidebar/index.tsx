@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { X, Phone, Mail, Calendar, ChevronDown, Video, List, Grid, ChevronRight, FileText, Archive, Lock, MapPin, Clock, Shield, AlertTriangle, User } from 'lucide-react';
+import { X, Phone, Mail, Calendar, ChevronDown, Video, List, Grid, ChevronRight, FileText, Archive, Lock, MapPin, Clock, Shield, User, IdCard } from 'lucide-react';
+import { formatPhoneForDisplay } from '@utils/phoneDisplay';
+import {
+  SidebarContactRow,
+  SidebarLabeledField,
+  SidebarNarrativeListRow,
+  SidebarToolbarIconButton,
+  sidebarToolbarIconButtonStyle,
+} from './sidebarUi';
 
 interface ActivityItem {
   id: string;
@@ -55,6 +63,8 @@ interface DepartmentOption {
 interface UserOption {
   id: number;
   name: string;
+  /** When provided (e.g. main app users), match profile.user_id by phone first, then by id */
+  phone?: string;
 }
 
 export interface EmployeeDetailSidebarProps {
@@ -62,6 +72,38 @@ export interface EmployeeDetailSidebarProps {
   departments: DepartmentOption[];
   users: UserOption[];
   onClose?: () => void;
+}
+
+/** Matches workforce employees table Status column styling */
+function EmployeeProfileStatusBadge({ status }: Readonly<{ status?: string | null }>) {
+  const statusText = String(status ?? "Active");
+  const isActive = statusText.toLowerCase() === "active";
+  return (
+    <span
+      style={{
+        padding: "4px 12px",
+        backgroundColor: isActive ? "#d1fae5" : "#fee2e2",
+        color: isActive ? "#065f46" : "#991b1b",
+        borderRadius: "16px",
+        fontSize: "13px",
+        fontWeight: "500",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "6px",
+        textTransform: "capitalize",
+      }}
+    >
+      <span
+        style={{
+          width: "6px",
+          height: "6px",
+          borderRadius: "50%",
+          backgroundColor: isActive ? "#10b981" : "#ef4444",
+        }}
+      />
+      {statusText}
+    </span>
+  );
 }
 
 const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, departments, users, onClose }) => {
@@ -123,6 +165,28 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
     }
   ];
 
+  let displayName = "—";
+  if (profile) {
+    const userId = profile.user_id;
+    let nameFromUsers: string | undefined;
+    if (userId != null && String(userId).trim() !== "" && users.length > 0) {
+      const uid = String(userId);
+      const match =
+        users.find((u) => String(u.phone ?? "") === uid) ?? users.find((u) => String(u.id) === uid);
+      nameFromUsers = match?.name;
+    }
+    displayName = nameFromUsers ?? String(profile.user_id ?? profile.employee_code ?? profile.id ?? "—");
+  }
+
+  let departmentName: string | null = null;
+  if (profile) {
+    const deptId = profile.department_id;
+    if (deptId !== undefined && deptId !== null) {
+      const dept = departments.find((d) => String(d.id) === String(deptId));
+      departmentName = dept?.name ?? String(deptId);
+    }
+  }
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'Personal':
@@ -173,19 +237,24 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                         minWidth: '150px'
                       }}>
                         {['Last 30 days', 'Last 90 days', 'Last 180 days', 'Last 360 days'].map(period => (
-                          <div
+                          <button
+                            type="button"
                             key={period}
                             onClick={() => setShow360Dropdown(false)}
                             style={{
                               padding: '10px 16px',
                               cursor: 'pointer',
-                              fontSize: '13px'
+                              fontSize: '13px',
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              backgroundColor: 'white'
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                           >
                             {period}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -214,31 +283,21 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                 </button>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
+                    type="button"
                     onClick={() => setViewMode('list')}
                     style={{
-                      padding: '6px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
+                      ...sidebarToolbarIconButtonStyle,
                       backgroundColor: viewMode === 'list' ? '#f3f4f6' : 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
                     }}
                   >
                     <List size={16} color={viewMode === 'list' ? '#6366f1' : '#6b7280'} />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setViewMode('grid')}
                     style={{
-                      padding: '6px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
+                      ...sidebarToolbarIconButtonStyle,
                       backgroundColor: viewMode === 'grid' ? '#f3f4f6' : 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
                     }}
                   >
                     <Grid size={16} color={viewMode === 'grid' ? '#6366f1' : '#6b7280'} />
@@ -331,98 +390,26 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                   Recent Activity
                 </h3>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    style={{
-                      padding: '6px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Calendar size={16} color="#6b7280" />
-                  </button>
-                  <button
-                    style={{
-                      padding: '6px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <ChevronRight size={16} color="#6b7280" />
-                  </button>
+                  <SidebarToolbarIconButton icon={Calendar} ariaLabel="Calendar" />
+                  <SidebarToolbarIconButton icon={ChevronRight} ariaLabel="More" />
                 </div>
               </div>
 
               {/* Activity Items */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {activityItems.map(item => (
-                  <div
+                {activityItems.map((item) => (
+                  <SidebarNarrativeListRow
                     key={item.id}
-                    style={{
-                      display: 'flex',
-                      gap: '12px',
-                      padding: '12px',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                  >
-                    <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '50%',
-                      backgroundColor: '#e0e7ff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <User size={18} color="#6366f1" />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ 
-                        fontSize: '14px', 
-                        fontWeight: '500', 
-                        color: '#1f2937',
-                        marginBottom: '2px'
-                      }}>
-                        {item.title}
-                      </div>
-                      <div style={{ 
-                        fontSize: '12px', 
-                        color: '#6b7280',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {item.subtitle}
-                      </div>
-                    </div>
-                    <div style={{ 
-                      fontSize: '12px', 
-                      color: '#9ca3af',
-                      whiteSpace: 'nowrap',
-                      alignSelf: 'flex-start',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
-                    }}>
-                      <Clock size={12} />
-                      {item.timestamp}
-                    </div>
-                  </div>
+                    variant="activity"
+                    title={item.title}
+                    subtitle={item.subtitle}
+                    trailing={
+                      <>
+                        <Clock size={12} />
+                        {item.timestamp}
+                      </>
+                    }
+                  />
                 ))}
               </div>
             </div>
@@ -465,101 +452,21 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    style={{
-                      padding: '6px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <FileText size={16} color="#6b7280" />
-                  </button>
-                  <button
-                    style={{
-                      padding: '6px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Archive size={16} color="#6b7280" />
-                  </button>
-                  <button
-                    style={{
-                      padding: '6px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      backgroundColor: 'white',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <ChevronRight size={16} color="#6b7280" />
-                  </button>
+                  <SidebarToolbarIconButton icon={FileText} ariaLabel="Documents" />
+                  <SidebarToolbarIconButton icon={Archive} ariaLabel="Archive" />
+                  <SidebarToolbarIconButton icon={ChevronRight} ariaLabel="More" />
                 </div>
               </div>
 
               {/* Risk Items */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {riskItems.map(item => (
-                  <div
+                {riskItems.map((item) => (
+                  <SidebarNarrativeListRow
                     key={item.id}
-                    style={{
-                      display: 'flex',
-                      gap: '12px',
-                      padding: '12px',
-                      backgroundColor: '#fef2f2',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      borderLeft: '3px solid #ef4444'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#fef2f2'}
-                  >
-                    <div style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '50%',
-                      backgroundColor: '#fecaca',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <AlertTriangle size={18} color="#dc2626" />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ 
-                        fontSize: '14px', 
-                        fontWeight: '500', 
-                        color: '#1f2937',
-                        marginBottom: '2px'
-                      }}>
-                        {item.title}
-                      </div>
-                      <div style={{ 
-                        fontSize: '12px', 
-                        color: '#6b7280',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                      }}>
-                        {item.subtitle}
-                      </div>
-                    </div>
-                  </div>
+                    variant="risk"
+                    title={item.title}
+                    subtitle={item.subtitle}
+                  />
                 ))}
               </div>
             </div>
@@ -574,39 +481,33 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {profile?.job_title != null && profile.job_title !== '' && (
-                <div>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Job title</span>
-                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.job_title)}</div>
-                </div>
+                <SidebarLabeledField label="Job title">{String(profile.job_title)}</SidebarLabeledField>
               )}
               {profile?.department_id != null && (
-                <div>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Department</span>
-                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>
-                    {departments.find((d) => String(d.id) === String(profile.department_id))?.name ?? String(profile.department_id)}
-                  </div>
-                </div>
+                <SidebarLabeledField label="Department">
+                  {departmentName ?? String(profile.department_id)}
+                </SidebarLabeledField>
               )}
               {profile?.designation != null && profile.designation !== '' && (
-                <div>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Designation</span>
-                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.designation)}</div>
-                </div>
+                <SidebarLabeledField label="Designation">{String(profile.designation)}</SidebarLabeledField>
               )}
               {profile?.employment_type != null && profile.employment_type !== '' && (
-                <div>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Employment type</span>
-                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.employment_type)}</div>
-                </div>
+                <SidebarLabeledField label="Employment type">{String(profile.employment_type)}</SidebarLabeledField>
               )}
-              
               {profile?.contract_type != null && profile.contract_type !== '' && (
-                <div>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Contract type</span>
-                  <div style={{ fontSize: '14px', color: '#1f2937', fontWeight: '500' }}>{String(profile.contract_type)}</div>
-                </div>
+                <SidebarLabeledField label="Contract type">{String(profile.contract_type)}</SidebarLabeledField>
               )}
-              {!profile?.job_title && profile?.department_id == null && !profile?.employment_type && !profile?.contract_type && (
+              <div>
+                <span style={{ fontSize: '13px', color: '#6b7280' }}>Status</span>
+                <div style={{ marginTop: '2px' }}>
+                  <EmployeeProfileStatusBadge status={profile?.status} />
+                </div>
+              </div>
+              {!profile?.job_title &&
+                profile?.department_id == null &&
+                !(profile?.designation != null && profile.designation !== '') &&
+                !profile?.employment_type &&
+                !profile?.contract_type && (
                 <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>No job details</p>
               )}
             </div>
@@ -650,9 +551,6 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
         return null;
     }
   };
-
-  const displayName = profile ? (users.find((u) => String(u.id) === String(profile.user_id))?.name ?? String(profile.user_id ?? profile.employee_code ?? profile.id ?? "—")) : "—";
-  const departmentName = profile?.department_id != null ? (departments.find((d) => String(d.id) === String(profile.department_id))?.name ?? String(profile.department_id)) : null;
 
   return (
     <div style={{
@@ -698,17 +596,17 @@ const EmployeeDetailSidebar: React.FC<EmployeeDetailSidebarProps> = ({ profile, 
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {profile?.phone != null && profile.phone !== '' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Phone size={16} color="#6b7280" />
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{String(profile.phone)}</span>
-                </div>
+                <SidebarContactRow icon={Phone}>{formatPhoneForDisplay(profile.phone)}</SidebarContactRow>
               )}
               {(profile as { email?: string })?.email != null && (profile as { email?: string }).email !== '' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Mail size={16} color="#6b7280" />
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>{(profile as { email?: string }).email}</span>
-                </div>
+                <SidebarContactRow icon={Mail}>{(profile as { email?: string }).email}</SidebarContactRow>
               )}
+              {(profile as { identification_number?: string })?.identification_number != null &&
+                (profile as { identification_number?: string }).identification_number !== '' && (
+                  <SidebarContactRow icon={IdCard}>
+                    {(profile as { identification_number?: string }).identification_number}
+                  </SidebarContactRow>
+                )}
             </div>
           </div>
 

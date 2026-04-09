@@ -59,7 +59,12 @@ import { LineChart, Line,} from 'recharts';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { GlobalDateTimeFormat,formatNumber , ModuleSlug } from "@utils/Helper";
+import {
+  formatCrmPreviewDate,
+  formatCrmPreviewDateTime,
+  formatNumber,
+  ModuleSlug,
+} from "@utils/Helper";
 
 // KPI Card Component
 interface KPICardData {
@@ -126,6 +131,20 @@ const getRecordTypeFromAuditableType = (auditableType: unknown): string => {
   if (typeof auditableType !== "string" || !auditableType.trim()) return "";
   const typeParts = auditableType.split("\\").filter(Boolean);
   return typeParts.at(-1) || "";
+};
+
+const getLeadToOrderConversionPercentage = (
+  apiValue: unknown,
+  leadsCount: number,
+  ordersCount: number,
+): number => {
+  if (typeof apiValue === "number" && !Number.isNaN(apiValue)) {
+    return apiValue;
+  }
+  if (leadsCount > 0) {
+    return (ordersCount / leadsCount) * 100;
+  }
+  return 0;
 };
 
 const getMeetingRecordNavigation = (
@@ -455,8 +474,12 @@ const CrmDashboard = () => {
   const leadsCount = dashboardData?.counts?.leads || 0;
   const dealsCount = dashboardData?.counts?.deals || 0;
   const ordersCount = dashboardData?.counts?.orders || 0;
-  const leadToDealConversionPercentage = dashboardData?.conversion_ratios?.lead_to_deal || 0;
-  
+  const leadToOrderConversionPercentage = getLeadToOrderConversionPercentage(
+    dashboardData?.conversion_ratios?.lead_to_order,
+    leadsCount,
+    ordersCount,
+  );
+
   const prospectsPercentage = prospectsCount > 0 ? 100 : 0;
   const leadsPercentage = prospectsCount > 0 ? Math.round((leadsCount / prospectsCount) * 100) : 0;
   const dealsPercentage = prospectsCount > 0 ? Math.round((dealsCount / prospectsCount) * 100) : 0;
@@ -722,7 +745,7 @@ const CrmDashboard = () => {
                   </div>
                 </div>
 
-                <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Leads → Deals conversion: {leadToDealConversionPercentage?.toFixed(2) || 0}%</p>
+                <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>Leads → Orders conversion: {leadToOrderConversionPercentage.toFixed(2)}%</p>
               </Card.Body>
             </Card>
 
@@ -762,10 +785,9 @@ const CrmDashboard = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
                               <div>
                                 <span style={{ fontSize: '13px', color: '#64748B' }}>
-                                  {(() => {
-                                    const formatted = moment.utc(activity.created_at).local().format('DD MMM YYYY,hh:mm:ss A');
-                                    return formatted.replace(/(\d{2} )(\w{3})( \d{4})/, (match, day, month, year) => `${day}${month.toUpperCase()}${year}`);
-                                  })()}
+                                  {activity.created_at
+                                    ? formatCrmPreviewDateTime(activity.created_at)
+                                    : ""}
                                 </span>
                                 <span style={{ fontSize: '14px', color: '#1E293B', marginLeft: '8px', fontWeight: 500 }}>
                                   {activity.description || 'Activity'}
@@ -806,9 +828,9 @@ const CrmDashboard = () => {
               <Card.Body>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h5 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: '#1E293B' }}>Upcoming Meetings</h5>
-                  <a href="#" style={{ fontSize: '14px', color: '#3B82F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Link href="/planner/calendar" style={{ fontSize: '14px', color: '#3B82F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     View Calendar <ChevronRight size={16} />
-                  </a>
+                  </Link>
                 </div>
 
                 <ListGroup variant="flush">
@@ -848,7 +870,9 @@ const CrmDashboard = () => {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Calendar size={14} color="#94A3B8" />
-                            <span style={{ fontSize: '13px', color: '#64748B' }}>{moment(meeting.meeting_date).format('MMM DD, YYYY')}</span>
+                            <span style={{ fontSize: '13px', color: '#64748B' }}>
+                              {formatCrmPreviewDate(meeting.meeting_date)}
+                            </span>
                           </div>
                         </div>
                       </ListGroup.Item>
@@ -975,7 +999,9 @@ const CrmDashboard = () => {
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', backgroundColor: bgColor, borderRadius: '6px',textTransform: 'uppercase' }}>
                             <Calendar size={14} color={textColor} />
-                            <span style={{ fontSize: '13px', color: textColor, fontWeight: 500 }}>{moment(task.due_date).format(GlobalDateTimeFormat)}</span>
+                            <span style={{ fontSize: '13px', color: textColor, fontWeight: 500 }}>
+                              {task.due_date ? formatCrmPreviewDate(task.due_date) : "—"}
+                            </span>
                           </div>
                         </div>
                       </ListGroup.Item>
@@ -1083,7 +1109,9 @@ const CrmDashboard = () => {
                           </div>
                           <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>{companyName}</span>
                           <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>{currency} {formatNumber(Number(dealValue))}</span>
-                          <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>{moment(deal.created_at).format('MMM DD, YYYY')}</span>
+                          <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>
+                            {deal.created_at ? formatCrmPreviewDate(deal.created_at) : "—"}
+                          </span>
                         </div>
                       </ListGroup.Item>
                     );

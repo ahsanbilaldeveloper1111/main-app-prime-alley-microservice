@@ -14,6 +14,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
 } from "react";
@@ -44,11 +45,17 @@ import {
   getSessionPhoneOrExtension,
 } from "@planner/projectMemberRole";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { ModuleSlug, getAutoTimezone } from "@utils/Helper";
+import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
+import {
+  ModuleSlug,
+  getAutoTimezone,
+  formatDateGlobal,
+  formatDateTimeGlobal,
+} from "@utils/Helper";
 import { toast } from "react-toastify";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { StatsCardData } from "@components/GenericStatsCards";
-import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+import GenericFilterSidebar, { type FilterOption, FilterField } from "@components/GenericFilterSidebar";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import GenericTable, {
   TableColumn,
@@ -129,6 +136,8 @@ type ProjectStatusFilter = "active" | "completed" | "archived" | "all";
 
 type ProjectFormStatus = "active" | "archived" | "completed";
 
+const PROJECT_NAME_MAX_LENGTH = 150;
+
 interface ProjectFormState {
   name: string;
   description: string;
@@ -153,8 +162,51 @@ function createEmptyProjectForm(): ProjectFormState {
 
 function formatApiDateForProjectInput(value: string | null | undefined): string {
   if (value == null || value === "") return "";
-  const d = new Date(value);
+  const trimmed = String(value).trim();
+  /** `new Date("YYYY-MM-DD")` is UTC and shifts the local calendar day in many timezones. */
+  const isoDay = /^(\d{4})-(\d{2})-(\d{2})/.exec(trimmed);
+  if (isoDay) {
+    const y = Number(isoDay[1]);
+    const mo = Number(isoDay[2]);
+    const day = Number(isoDay[3]);
+    if (
+      Number.isFinite(y) &&
+      Number.isFinite(mo) &&
+      Number.isFinite(day) &&
+      mo >= 1 &&
+      mo <= 12 &&
+      day >= 1 &&
+      day <= 31
+    ) {
+      const local = new Date(y, mo - 1, day);
+      if (local.getFullYear() === y && local.getMonth() === mo - 1 && local.getDate() === day) {
+        return `${y}-${String(mo).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
+    }
+  }
+  const d = new Date(trimmed);
   if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Formats API date strings for the project detail sidebar (`formatDateGlobal` / `GlobalDateFormat`).
+ * Returns `null` when missing or invalid so callers can show "—".
+ */
+function formatProjectSidebarDate(iso: string | null | undefined): string | null {
+  if (iso == null) return null;
+  const s = String(iso).trim();
+  if (s === "") return null;
+  const formatted = formatDateGlobal(s);
+  return formatted === "" ? null : formatted;
+}
+
+/** `YYYY-MM-DD` for today's local calendar date (for `<input type="date" min>`). */
+function todayYmdLocal(): string {
+  const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -211,6 +263,9 @@ export interface SubTask {
   assignee?: string;
   dueDate?: string;
   description?: string;
+  /** From API `assignees[].extension_number` when row was mapped from a nested task */
+  assigneeExtensionNumbers?: string[];
+  watcherExtensionNumbers?: string[];
 }
 
 export interface Task {
@@ -230,6 +285,10 @@ export interface Task {
   sub_task_count?: number;
   /** From API when `sub_task_count` is requested */
   completed_sub_task_count?: number;
+  /** `assignees[].extension_number` for table display */
+  assigneeExtensionNumbers?: string[];
+  /** `watchers` + optional `watcher_numbers` */
+  watcherExtensionNumbers?: string[];
 }
 
 /** Safe string for API scalar fields; avoids `[object Object]` from `String(object)`. */
@@ -267,6 +326,62 @@ function readApiNumericCount(v: unknown): number | undefined {
     return Number.isFinite(n) ? n : undefined;
   }
   return undefined;
+}
+
+function extensionStringFromApiField(value: unknown): string | null {
+  const s = stringifyApiScalar(value).trim();
+  return s === "" ? null : s;
+}
+
+function collectAssigneeExtensionNumbers(
+  assignees: Array<Record<string, unknown>> | undefined,
+): string[] {
+  if (!Array.isArray(assignees)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const row of assignees) {
+    const ext = extensionStringFromApiField(row?.extension_number);
+    if (ext != null && !seen.has(ext)) {
+      seen.add(ext);
+      out.push(ext);
+    }
+  }
+  return out;
+}
+
+function collectWatcherExtensionNumbers(api: Record<string, unknown>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (ext: string | null) => {
+    if (ext != null && !seen.has(ext)) {
+      seen.add(ext);
+      out.push(ext);
+    }
+  };
+  const watchers = api.watchers as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(watchers)) {
+    for (const w of watchers) {
+      push(extensionStringFromApiField(w?.extension_number));
+    }
+  }
+  const flat = api.watcher_numbers;
+  if (Array.isArray(flat)) {
+    for (const n of flat) {
+      push(extensionStringFromApiField(n));
+    }
+  }
+  return out;
+}
+
+/** Distinct assignee extensions from API, or 1 when only a legacy display name exists. */
+function countAssignees(
+  extensionNumbers: string[] | undefined,
+  assigneeDisplayLabel: string | undefined,
+): number {
+  const n = extensionNumbers?.length ?? 0;
+  if (n > 0) return n;
+  if (assigneeDisplayLabel != null && assigneeDisplayLabel.trim() !== "") return 1;
+  return 0;
 }
 
 function mapApiTaskToPlannerTask(
@@ -321,6 +436,9 @@ function mapApiTaskToPlannerTask(
   const assignee =
     user?.name || user?.display_name || (first?.extension_number as string | undefined);
 
+  const assigneeExtensionNumbers = collectAssigneeExtensionNumbers(assignees);
+  const watcherExtensionNumbers = collectWatcherExtensionNumbers(api);
+
   const labelObjs = (api.labels as Array<{ name?: string }> | undefined) ?? [];
   const labels = labelObjs.map((l) => l.name).filter((n): n is string => Boolean(n));
 
@@ -346,6 +464,10 @@ function mapApiTaskToPlannerTask(
     children,
     sub_task_count: readApiNumericCount(api.sub_task_count),
     completed_sub_task_count: readApiNumericCount(api.completed_sub_task_count),
+    assigneeExtensionNumbers:
+      assigneeExtensionNumbers.length > 0 ? assigneeExtensionNumbers : undefined,
+    watcherExtensionNumbers:
+      watcherExtensionNumbers.length > 0 ? watcherExtensionNumbers : undefined,
   };
 }
 
@@ -424,6 +546,8 @@ function plannerChildTasksToSubTasks(children: Task[]): SubTask[] {
     assignee: c.assignee,
     dueDate: c.dueDate,
     description: c.description,
+    assigneeExtensionNumbers: c.assigneeExtensionNumbers,
+    watcherExtensionNumbers: c.watcherExtensionNumbers,
   }));
 }
 
@@ -581,31 +705,11 @@ const TaskRow: React.FC<TaskRowProps> = ({
           </div>
         </td>
 
-        {/* Members */}
-        <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-          {task.assignee ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <div
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: "50%",
-                  backgroundColor: "#667eea",
-                  color: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "0.65rem",
-                  fontWeight: 600,
-                }}
-              >
-                {task.assignee.substring(0, 1).toUpperCase()}
-              </div>
-              <span style={{ fontSize: "0.8rem" }}>{task.assignee}</span>
-            </div>
-          ) : (
-            <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>—</span>
-          )}
+        {/* Members column: assignee count for tasks (matches project member badge) */}
+        <td>
+          <div className="member-avatar bg-primary">
+            {countAssignees(task.assigneeExtensionNumbers, task.assignee)}
+          </div>
         </td>
 
         {/* Open (subtask count as "open") */}
@@ -624,10 +728,10 @@ const TaskRow: React.FC<TaskRowProps> = ({
 
         {/* Due date */}
         <td style={{ fontSize: "0.8rem", color: "#64748b" }}>
-          {task.dueDate
-            ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-            : "—"}
+          {task.dueDate ? formatDateGlobal(task.dueDate) || "—" : "—"}
         </td>
+
+        <td className="generic-table-actions-cell" />
       </tr>
 
       {/* Nested child task rows (API `children`) or legacy `subtasks` */}
@@ -755,30 +859,10 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
         </div>
       </td>
 
-      <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>
-        {subtask.assignee ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: "50%",
-                backgroundColor: "#a78bfa",
-                color: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.6rem",
-                fontWeight: 600,
-              }}
-            >
-              {subtask.assignee.substring(0, 1).toUpperCase()}
-            </div>
-            <span style={{ fontSize: "0.775rem" }}>{subtask.assignee}</span>
-          </div>
-        ) : (
-          "—"
-        )}
+      <td>
+        <div className="member-avatar bg-primary">
+          {countAssignees(subtask.assigneeExtensionNumbers, subtask.assignee)}
+        </div>
       </td>
       <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>—</td>
       <td style={{ fontSize: "0.8rem" }}>
@@ -787,10 +871,9 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
         ) : "—"}
       </td>
       <td style={{ fontSize: "0.8rem", color: "#9ca3af" }}>
-        {subtask.dueDate
-          ? new Date(subtask.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-          : "—"}
+        {subtask.dueDate ? formatDateGlobal(subtask.dueDate) || "—" : "—"}
       </td>
+      <td className="generic-table-actions-cell" />
     </tr>
   );
 };
@@ -915,9 +998,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ task, show, onHide })
             <DetailBox label="Due Date">
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.875rem", fontWeight: 500 }}>
                 <Calendar size={14} style={{ color: "#6b7280" }} />
-                {task.dueDate
-                  ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                  : "No due date"}
+                {task.dueDate ? formatDateGlobal(task.dueDate) || "No due date" : "No due date"}
               </div>
             </DetailBox>
           </Col>
@@ -1509,7 +1590,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         }
         task={fetchedEditTask ?? undefined}
         isEdit={!!fetchedEditTask}
-        taskType="regular"
       />
 
       {/* Use GenericTable only for toolbar + pagination; render our own table body */}
@@ -1578,8 +1658,9 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                   </th>
                   <th className="generic-table-th">Project Name</th>
                   <th className="generic-table-th">Members</th>
-                  <th className="generic-table-th">Open</th>
-                  <th className="generic-table-th">Overdue</th>
+
+                  <th className="generic-table-th">Open Tasks</th>
+                  <th className="generic-table-th">Overdue Tasks</th>
                   <th className="generic-table-th">Last Update</th>
                   <th className="generic-table-th generic-table-actions-header">Actions</th>
                 </tr>
@@ -1639,6 +1720,9 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
   const resolvedStatus =
     selectedProjectDetails ? getProjectStatusFromApiStatus(selectedProjectDetails.status) : selectedProject?.status;
 
+  const activityActorDisplayName = (extension: string) =>
+    extension === "system" ? "System" : getUserNameFromExtension(extension);
+
   const recentActivityContent = (() => {
     if (loadingActivities) return <Spinner animation="border" size="sm" />;
     if (projectActivities.length === 0) {
@@ -1674,7 +1758,7 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: "0.875rem", color: "#334155" }}>
-                  <span style={{ fontWeight: 600 }}>{ext === "system" ? "System" : ext}</span>{" "}
+                  <span style={{ fontWeight: 600 }}>{activityActorDisplayName(ext)}</span>{" "}
                   {activity.description || `${activity.action} task`}
                   {activity.task && (
                     <span style={{ fontWeight: 600, color: "#3b82f6" }}>
@@ -1727,7 +1811,7 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
                 </span>
               </div>
               <div style={{ fontSize: "0.875rem", color: "#475569", marginBottom: "0.25rem" }}>
-                <span style={{ fontWeight: 600 }}>{ext === "system" ? "System" : ext}</span>
+                <span style={{ fontWeight: 600 }}>{activityActorDisplayName(ext)}</span>
                 {activity.task && (
                   <>
                     {" "}
@@ -1757,6 +1841,15 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
     }
 
     if (!selectedProject) return null;
+
+    const sidebarStartDate = formatProjectSidebarDate(
+      selectedProjectDetails?.start_date ?? selectedProject.apiData?.start_date ?? undefined,
+    );
+    const sidebarEndDate = formatProjectSidebarDate(
+      selectedProjectDetails?.end_date ?? selectedProject.apiData?.end_date ?? undefined,
+    );
+    const sidebarProjectColor =
+      selectedProjectDetails?.color?.trim() || selectedProject.iconColor;
 
     return (
       <>
@@ -1893,11 +1986,7 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
                 <Calendar size={16} className="me-2 text-muted" />
                 <span>
                   {selectedProjectDetails?.updated_at
-                    ? new Date(selectedProjectDetails.updated_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
+                    ? formatDateGlobal(selectedProjectDetails.updated_at) || selectedProject.lastUpdate
                     : selectedProject.lastUpdate}
                 </span>
               </div>
@@ -1905,10 +1994,78 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
           </Col>
         </Row>
 
-        {selectedProjectDetails?.description && (
+        <Row className="g-2 mb-3">
+          <Col xs={12} sm={4}>
+            <div className="detail-section">
+              <div className="detail-label">Start date</div>
+              <div
+                className="d-flex align-items-center"
+                style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}
+              >
+                <Calendar size={16} className="me-2 text-muted flex-shrink-0" />
+                <span>{sidebarStartDate ?? "—"}</span>
+              </div>
+            </div>
+          </Col>
+          <Col xs={12} sm={4}>
+            <div className="detail-section">
+              <div className="detail-label">End date</div>
+              <div
+                className="d-flex align-items-center"
+                style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}
+              >
+                <CalendarDays size={16} className="me-2 text-muted flex-shrink-0" />
+                <span>{sidebarEndDate ?? "—"}</span>
+              </div>
+            </div>
+          </Col>
+          <Col xs={12} sm={4}>
+            <div className="detail-section">
+              <div className="detail-label">Color</div>
+              <div className="d-flex align-items-center gap-2 flex-wrap" style={{ marginTop: 4 }}>
+                <span
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    backgroundColor: sidebarProjectColor,
+                    border: "1px solid #e2e8f0",
+                    flexShrink: 0,
+                  }}
+                  title={sidebarProjectColor}
+                  aria-hidden
+                />
+                <span
+                  style={{
+                    fontSize: "0.8125rem",
+                    color: "#64748b",
+                    fontFamily: "ui-monospace, monospace",
+                  }}
+                >
+                  {sidebarProjectColor.toUpperCase()}
+                </span>
+              </div>
+            </div>
+          </Col>
+        </Row>
+
+        {selectedProjectDetails?.description?.trim() && (
           <div className="detail-section">
             <div className="detail-label">Description</div>
-            <div style={{ fontSize: "0.875rem", color: "#475569" }}>{selectedProjectDetails.description}</div>
+            <div
+              className="task-description-html"
+              style={{
+                fontSize: "0.875rem",
+                color: "#475569",
+                lineHeight: 1.6,
+                margin: 0,
+                overflowX: "auto",
+                wordBreak: "break-word",
+              }}
+              dangerouslySetInnerHTML={{
+                __html: String(selectedProjectDetails.description).trim(),
+              }}
+            />
           </div>
         )}
 
@@ -2009,6 +2166,26 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
       </Offcanvas.Header>
 
       <Offcanvas.Body>
+        <style>{`
+          .project-detail-panel .task-description-html ul,
+          .project-detail-panel .task-description-html ol {
+            padding-left: 1.25rem;
+            margin: 0.5rem 0;
+          }
+          .project-detail-panel .task-description-html p {
+            margin: 0.35rem 0;
+          }
+          .project-detail-panel .task-description-html p:first-child {
+            margin-top: 0;
+          }
+          .project-detail-panel .task-description-html p:last-child {
+            margin-bottom: 0;
+          }
+          .project-detail-panel .task-description-html a {
+            color: #4680ff;
+            text-decoration: underline;
+          }
+        `}</style>
         {bodyContent}
       </Offcanvas.Body>
     </Offcanvas>
@@ -2020,15 +2197,18 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
 // (mostly unchanged from original — search for "CHANGED" comments)
 // ============================================================
 
-type SelectOption = { value: string; label: string };
 type AppliedProjectFilters = {
   search: string;
   status: ProjectStatusFilter;
-  owner: string;
+  /** Selected owner / PM extension numbers; empty means no filter (all owners). */
+  ownerExtensionNumbers: string[];
   team: string;
   startDateFrom: string;
   endDateTo: string;
 };
+
+/** Optional `page` avoids stale `pagination` when resetting to page 1 in the same tick as `fetchProjects`. */
+type ProjectListFetchParams = Partial<AppliedProjectFilters> & { page?: number };
 
 const WorkPlannerProjects = () => {
   const { data: session } = useSession();
@@ -2039,7 +2219,7 @@ const WorkPlannerProjects = () => {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
+  const { hierarchyDataExtensions, loading: hierarchyLoading } = useHierarchyData(ModuleSlug.WORK_PLANNER);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showFilterSidebar, setShowFilterSidebar] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -2052,15 +2232,15 @@ const WorkPlannerProjects = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, last_page: 1, from: 0, to: 0 });
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<ProjectStatusFilter>("active");
-  const [filterOwner, setFilterOwner] = useState("All Owners");
+  const [filterStatus, setFilterStatus] = useState<ProjectStatusFilter>("all");
+  const [filterOwnerExtensions, setFilterOwnerExtensions] = useState<string[]>([]);
   const [filterTeam, setFilterTeam] = useState("All Teams");
   const [filterStartDateFrom, setFilterStartDateFrom] = useState("");
   const [filterEndDateTo, setFilterEndDateTo] = useState("");
   const [appliedFilters, setAppliedFilters] = useState<AppliedProjectFilters>({
     search: "",
-    status: "active",
-    owner: "All Owners",
+    status: "all",
+    ownerExtensionNumbers: [],
     team: "All Teams",
     startDateFrom: "",
     endDateTo: "",
@@ -2088,29 +2268,33 @@ const WorkPlannerProjects = () => {
       fetchProjects({
         search: searchTerm,
         status: filterStatus,
-        owner: filterOwner,
+        ownerExtensionNumbers: filterOwnerExtensions,
         startDateFrom: filterStartDateFrom,
         endDateTo: filterEndDateTo,
       });
     }
   }, [pagination.page, pagination.limit, hierarchyLoading]);
 
-  const fetchProjects = async (filters?: Partial<AppliedProjectFilters>) => {
+  const fetchProjects = async (filters?: ProjectListFetchParams) => {
     try {
       setLoading(true);
+      const pageForRequest = typeof filters?.page === "number" ? filters.page : pagination.page;
       const statusParam = filters?.status && filters.status !== "all" ? filters.status : undefined;
-      const ownerParam = filters?.owner && filters.owner !== "All Owners" ? [filters.owner] : undefined;
+      const extensionNumbers =
+        filters?.ownerExtensionNumbers && filters.ownerExtensionNumbers.length > 0
+          ? filters.ownerExtensionNumbers.map((ext) => String(ext).trim()).filter(Boolean)
+          : undefined;
       let startFrom = filters?.startDateFrom?.trim() || undefined;
       let endTo = filters?.endDateTo?.trim() || undefined;
       if (startFrom && endTo && endTo < startFrom) {
         endTo = startFrom;
       }
       const response = await listProjects({
-        page: pagination.page,
+        page: pageForRequest,
         limit: pagination.limit,
         search: filters?.search || "",
         status: statusParam,
-        user_extensions: ownerParam,
+        extension_numbers: extensionNumbers,
         start_date_from: startFrom,
         end_date_to: endTo,
       });
@@ -2151,7 +2335,7 @@ const WorkPlannerProjects = () => {
     });
 
     const lastUpdate = apiProject.updated_at
-      ? new Date(apiProject.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      ? formatDateGlobal(apiProject.updated_at) || "N/A"
       : "N/A";
 
     type IconComponent = typeof Folder;
@@ -2191,7 +2375,7 @@ const WorkPlannerProjects = () => {
     setEditingProject(project);
     const api = project.apiData;
     setProjectFormData({
-      name: project.name,
+      name: project.name.slice(0, PROJECT_NAME_MAX_LENGTH),
       description: api?.description || "",
       start_date: formatApiDateForProjectInput(api?.start_date ?? undefined),
       end_date: formatApiDateForProjectInput(api?.end_date ?? undefined),
@@ -2235,6 +2419,10 @@ const WorkPlannerProjects = () => {
       toast.error("Start date is required");
       return;
     }
+    if (editingProject == null && start < todayYmdLocal()) {
+      toast.error("Start date cannot be in the past");
+      return;
+    }
     if (end && end < start) {
       toast.error("End date cannot be before start date");
       return;
@@ -2242,7 +2430,7 @@ const WorkPlannerProjects = () => {
     try {
       setSubmitting(true);
       const projectData: Parameters<typeof createProject>[0] = {
-        name: projectFormData.name.trim(),
+        name: projectFormData.name.trim().slice(0, PROJECT_NAME_MAX_LENGTH),
         description: projectFormData.description.trim() || undefined,
         color: projectFormData.color,
         status: projectFormData.status,
@@ -2297,11 +2485,10 @@ const WorkPlannerProjects = () => {
     if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
     if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
-    return new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return formatDateGlobal(dateString);
   };
 
-  const formatDateTime = (dateString: string) =>
-    new Date(dateString).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  const formatDateTime = (dateString: string) => formatDateTimeGlobal(dateString);
 
   const getUserNameFromExtension = (extensionNumber: string): string => {
     if (!extensionNumber || !hierarchyDataExtensions || hierarchyDataExtensions.length === 0) return extensionNumber || "Unknown";
@@ -2333,21 +2520,22 @@ const WorkPlannerProjects = () => {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setFilterStatus("active");
-    setFilterOwner("All Owners");
+    setActiveTab("all");
+    setFilterStatus("all");
+    setFilterOwnerExtensions([]);
     setFilterTeam("All Teams");
     setFilterStartDateFrom("");
     setFilterEndDateTo("");
     const cleared: AppliedProjectFilters = {
       search: "",
-      status: "active",
-      owner: "All Owners",
+      status: "all",
+      ownerExtensionNumbers: [],
       team: "All Teams",
       startDateFrom: "",
       endDateTo: "",
     };
     setAppliedFilters(cleared);
-    fetchProjects(cleared);
+    fetchProjects({ ...cleared, page: 1 });
   };
 
   const handleApplyFilters = () => {
@@ -2355,13 +2543,13 @@ const WorkPlannerProjects = () => {
     const next: AppliedProjectFilters = {
       search: searchTerm,
       status: filterStatus,
-      owner: filterOwner,
+      ownerExtensionNumbers: filterOwnerExtensions,
       team: filterTeam,
       startDateFrom: filterStartDateFrom,
       endDateTo: filterEndDateTo,
     };
     setAppliedFilters(next);
-    fetchProjects(next);
+    fetchProjects({ ...next, page: 1 });
   };
 
   const applyProjectStatusFromPill = (status: ProjectStatusFilter) => {
@@ -2370,13 +2558,13 @@ const WorkPlannerProjects = () => {
     const next: AppliedProjectFilters = {
       search: searchTerm,
       status,
-      owner: filterOwner,
+      ownerExtensionNumbers: filterOwnerExtensions,
       team: filterTeam,
       startDateFrom: filterStartDateFrom,
       endDateTo: filterEndDateTo,
     };
     setAppliedFilters(next);
-    fetchProjects(next);
+    fetchProjects({ ...next, page: 1 });
   };
 
   const clearDateFiltersAndRefetch = () => {
@@ -2386,13 +2574,13 @@ const WorkPlannerProjects = () => {
     const next: AppliedProjectFilters = {
       search: searchTerm,
       status: filterStatus,
-      owner: filterOwner,
+      ownerExtensionNumbers: filterOwnerExtensions,
       team: filterTeam,
       startDateFrom: "",
       endDateTo: "",
     };
     setAppliedFilters(next);
-    fetchProjects(next);
+    fetchProjects({ ...next, page: 1 });
   };
 
   const handleProjectStartDateChange = (value = "") => {
@@ -2431,8 +2619,21 @@ const WorkPlannerProjects = () => {
       completed: "completed",
       archived: "archived",
     };
-    if (statusMap[tabId]) setFilterStatus(statusMap[tabId]);
+    const status = statusMap[tabId];
+    if (!status) return;
+
+    setFilterStatus(status);
     setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status,
+      ownerExtensionNumbers: filterOwnerExtensions,
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
+    setAppliedFilters(next);
+    fetchProjects({ ...next, page: 1 });
   };
 
   const filteredProjects = projects.filter((project) => {
@@ -2440,7 +2641,9 @@ const WorkPlannerProjects = () => {
     const projectStatusKey = String(project.apiData?.status || project.status || "").toLowerCase();
     const matchesStatus = appliedFilters.status === "all" || projectStatusKey === appliedFilters.status;
     const projectOwnerExt = project.apiData?.owner_extension_number || project.owner;
-    const matchesOwner = appliedFilters.owner === "All Owners" || String(projectOwnerExt || "") === String(appliedFilters.owner);
+    const matchesOwner =
+      appliedFilters.ownerExtensionNumbers.length === 0 ||
+      appliedFilters.ownerExtensionNumbers.some((ext) => String(projectOwnerExt || "") === String(ext));
     const projectMembers = (project.apiData?.members || project.members || []) as any[];
     const matchesTeam = appliedFilters.team === "All Teams" || projectMembers.some((m: any) => String(m?.extension_number || m?.name || "") === String(appliedFilters.team));
     return matchesSearch && matchesStatus && matchesOwner && matchesTeam;
@@ -2455,7 +2658,43 @@ const WorkPlannerProjects = () => {
       .sort((a, b) => a.label.localeCompare(b.label));
   })();
 
-  const ownerSelectOptions: SelectOption[] = [{ value: "All Owners", label: "All Owners" }, ...userOptions];
+  const clearOwnerFilterAndRefetch = () => {
+    setFilterOwnerExtensions([]);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status: filterStatus,
+      ownerExtensionNumbers: [],
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
+    setAppliedFilters(next);
+    fetchProjects({ ...next, page: 1 });
+  };
+
+  const applyOwnerExtensionsAndRefetch = (extensions: string[]) => {
+    const trimmed = extensions.map((ext) => String(ext).trim()).filter((ext) => ext.length > 0);
+    setFilterOwnerExtensions(trimmed);
+    setPagination((prev) => ({ ...prev, page: 1 }));
+    const next: AppliedProjectFilters = {
+      search: searchTerm,
+      status: filterStatus,
+      ownerExtensionNumbers: trimmed,
+      team: filterTeam,
+      startDateFrom: filterStartDateFrom,
+      endDateTo: filterEndDateTo,
+    };
+    setAppliedFilters(next);
+    fetchProjects({ ...next, page: 1 });
+  };
+
+  const applyOwnerExtensionsRef = useRef(applyOwnerExtensionsAndRefetch);
+  applyOwnerExtensionsRef.current = applyOwnerExtensionsAndRefetch;
+  const clearOwnerFilterRef = useRef(clearOwnerFilterAndRefetch);
+  clearOwnerFilterRef.current = clearOwnerFilterAndRefetch;
+
+ 
 
   const statuses: Array<{ value: ProjectStatusFilter; label: string }> = [
     { value: "all", label: "All Status" },
@@ -2467,7 +2706,27 @@ const WorkPlannerProjects = () => {
   const filterFields: FilterField[] = [
     { id: "search", label: "Search", type: "text", value: searchTerm, onChange: (v: string) => setSearchTerm(v ?? ""), placeholder: "Search projects..." },
     { id: "status", label: "Status", type: "dropdown", value: filterStatus, onChange: (v) => setFilterStatus(coerceProjectStatusFilter(v)), options: statuses },
-    { id: "owner", label: "Owner / PM", type: "dropdown", value: filterOwner, onChange: (v) => setFilterOwner(v ?? "All Owners"), options: ownerSelectOptions },
+    {
+      id: "owner",
+      label: "Owner / PM",
+      type: "multi-select",
+      value: filterOwnerExtensions.map((ext) => ({
+        value: ext,
+        label: getUserNameFromExtension(ext) || ext,
+      })),
+      onChange: (selected: unknown) => {
+        if (!selected || !Array.isArray(selected)) {
+          setFilterOwnerExtensions([]);
+          return;
+        }
+        setFilterOwnerExtensions(
+          (selected as FilterOption[]).map((o) => String(o.value)).filter((v) => v.length > 0),
+        );
+      },
+      options: userOptions,
+      placeholder: "Select users (by extension)",
+      isClearable: true,
+    },
     {
       id: "start_date_from",
       label: "Start date (from)",
@@ -2516,13 +2775,16 @@ const WorkPlannerProjects = () => {
       ],
       onClear: () => applyProjectStatusFromPill("all"),
     },
-    {
-      id: "owner",
-      label: filterOwner === "All Owners" ? "Owner / PM" : filterOwner,
-      active: filterOwner !== "All Owners",
-      activeLabel: filterOwner === "All Owners" ? undefined : getUserNameFromExtension(filterOwner),
-      onClear: () => setFilterOwner("All Owners"),
-    },
+    // {
+    //   id: "owner",
+    //   label: "Owner / PM",
+    //   active: filterOwnerExtensions.length > 0,
+    //   activeLabel: ownerFilterPillActiveLabel,
+    //   showDropdown: true,
+    //   searchable: true,
+    //   dropdownOptions: ownerFilterPillOptions,
+    //   onClear: filterOwnerExtensions.length > 0 ? () => clearOwnerFilterRef.current() : undefined,
+    // },
     {
       id: "date_range",
       label: "Dates",
@@ -2738,11 +3000,41 @@ const WorkPlannerProjects = () => {
             <Form onSubmit={handleSubmitProject}>
               <Form.Group className="mb-3">
                 <Form.Label>Project Name <span className="text-danger">*</span></Form.Label>
-                <Form.Control type="text" value={projectFormData.name} onChange={(e) => setProjectFormData({ ...projectFormData, name: e.target.value })} placeholder="Enter project name" required />
+                <Form.Control
+                  type="text"
+                  value={projectFormData.name}
+                  maxLength={PROJECT_NAME_MAX_LENGTH}
+                  onChange={(e) =>
+                    setProjectFormData((prev) => ({
+                      ...prev,
+                      name: e.target.value.slice(0, PROJECT_NAME_MAX_LENGTH),
+                    }))
+                  }
+                  placeholder="Enter project name"
+                  required
+                />
+                <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+                  <Form.Text className="text-muted mb-0">
+                    Maximum {PROJECT_NAME_MAX_LENGTH} characters.
+                  </Form.Text>
+                  <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
+                    {projectFormData.name.length}/{PROJECT_NAME_MAX_LENGTH}
+                  </Form.Text>
+                </div>
               </Form.Group>
               <Form.Group className="mb-3">
                 <Form.Label>Description</Form.Label>
-                <Form.Control as="textarea" rows={3} value={projectFormData.description} onChange={(e) => setProjectFormData({ ...projectFormData, description: e.target.value })} placeholder="Enter project description" />
+                <RichTextEditor
+                  buttonSize="sm"
+                  value={projectFormData.description || ""}
+                  onChange={(html) =>
+                    setProjectFormData((prev) => ({ ...prev, description: html }))
+                  }
+                  placeholder="Enter project description"
+                  minHeight="100px"
+                  maxHeight="220px"
+                  maxLength={5000}
+                />
               </Form.Group>
               <Row className="mb-3 g-2">
                 <Col md={6}>
@@ -2753,9 +3045,15 @@ const WorkPlannerProjects = () => {
                     <Form.Control
                       type="date"
                       required
+                      min={editingProject == null ? todayYmdLocal() : undefined}
                       value={projectFormData.start_date}
                       onChange={(e) => {
                         const newStart = e.target.value;
+                        const today = todayYmdLocal();
+                        if (editingProject == null && newStart && newStart < today) {
+                          toast.error("Start date cannot be in the past");
+                          return;
+                        }
                         setProjectFormData((prev) => {
                           let nextEnd = prev.end_date;
                           if (newStart && nextEnd && nextEnd < newStart) {
@@ -2765,6 +3063,9 @@ const WorkPlannerProjects = () => {
                         });
                       }}
                     />
+                    {editingProject == null ? (
+                      <Form.Text className="text-muted">Start date must be today or a future date.</Form.Text>
+                    ) : null}
                   </Form.Group>
                 </Col>
                 <Col md={6}>
@@ -2772,7 +3073,7 @@ const WorkPlannerProjects = () => {
                     <Form.Label>End date</Form.Label>
                     <Form.Control
                       type="date"
-                      min={projectFormData.start_date || undefined}
+                      min={projectFormData.start_date || todayYmdLocal()}
                       value={projectFormData.end_date}
                       onChange={(e) => {
                         const v = e.target.value;
@@ -2820,7 +3121,12 @@ const WorkPlannerProjects = () => {
                   disabled={
                     submitting ||
                     !projectFormData.name.trim() ||
-                    !projectFormData.start_date.trim()
+                    !projectFormData.start_date.trim() ||
+                    (!editingProject && projectFormData.start_date.trim() < todayYmdLocal()) ||
+                    Boolean(
+                      projectFormData.end_date.trim() &&
+                        projectFormData.end_date.trim() < projectFormData.start_date.trim()
+                    )
                   }
                 >
                   {submitting ? (

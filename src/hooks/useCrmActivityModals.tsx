@@ -8,13 +8,20 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { createCrmNote, createMeeting, createTask } from "@utils/crm";
 import { sendEmail, sendSms, sendWhatsApp } from "@utils/communication";
-import NotesModal from "@components/NotesModal";
+import NotesModal, {
+  type NotesModalSavePayload,
+} from "@components/NotesModal";
+import {
+  followUpTaskFieldsToApiPayload,
+  resolveFollowUpDueDateYmd,
+} from "@utils/crmFollowUpTaskDue";
 import EmailModal from "@components/EmailModal";
-import TaskModal from "@components/TaskModal";
+import TaskModal, { type TaskModalSaveTaskData } from "@components/TaskModal";
 import MeetingModal from "@components/MeetingModal";
 import LogSmsModal from "@components/LogSms";
 import WhatsAppMessageModal from "@components/WhatsAppMessageModalNew";
 import { toast } from "react-toastify";
+import { getCrmSessionUserContext } from "@crm/shared/crmSessionUserContext";
 
 export type CrmRecordType = "prospect" | "lead" | "deal" | "order" | "company";
 
@@ -66,18 +73,8 @@ export function useCrmActivityModals({
 }: UseCrmActivityModalsParams): UseCrmActivityModalsReturn {
   const { data: session } = useSession();
   const router = useRouter();
-  const userEmail =
-    (session?.user as { email?: string } | undefined)?.email ?? "user@example.com";
-  const userName =
-    (session?.user as { name?: string } | undefined)?.name ?? "Your Name";
-  const extension =
-    (session?.user as { extension?: string; phone?: string } | undefined)?.extension ??
-    (session?.user as { extension?: string; phone?: string } | undefined)?.phone ??
-    "unknown";
-  const tenantId =
-    (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant_id ??
-    (session?.user as { tenant_id?: string; tenant?: string } | undefined)?.tenant ??
-    "default";
+  const { userEmail, userName, extension, tenantId } =
+    getCrmSessionUserContext(session);
 
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
@@ -94,18 +91,19 @@ export function useCrmActivityModals({
   const openWhatsApp = useCallback(() => setShowWhatsAppModal(true), []);
 
   const handleNoteSave = useCallback(
-    async (
-      note: string,
-      _createTask: boolean,
-      _taskDueDate?: string,
-    ) => {
-      const text = note.trim();
+    async (payload: NotesModalSavePayload) => {
+      const text = payload.note.trim();
       if (!text) return;
       try {
         await createCrmNote({
           record_type: recordType,
           record_id: recordId,
           text,
+          ...followUpTaskFieldsToApiPayload({
+            createFollowUpTask: payload.createFollowUpTask,
+            followUpTaskDueDate: payload.followUpTaskDueDate,
+            followUpTaskDueTime: payload.followUpTaskDueTime,
+          }),
         });
         setShowNotesModal(false);
         toast.success("Note created successfully");
@@ -183,8 +181,9 @@ export function useCrmActivityModals({
       bcc: string[];
       subject: string;
       body: string;
-      createTask: boolean;
-      taskDueDate?: string;
+      createFollowUpTask: boolean;
+      followUpTaskDueDate: string | null;
+      followUpTaskDueTime: string | null;
       attachments?: File[];
     }) => {
       if (!emailData.to?.length) return;
@@ -197,6 +196,14 @@ export function useCrmActivityModals({
           content: emailData.body ?? "",
           ...(recordId != null && { record_id: Number(recordId) }),
           ...(recordType && { record_type: recordType }),
+          ...(emailData.attachments?.length
+            ? { attachmentFiles: emailData.attachments }
+            : {}),
+          ...followUpTaskFieldsToApiPayload({
+            createFollowUpTask: emailData.createFollowUpTask,
+            followUpTaskDueDate: emailData.followUpTaskDueDate,
+            followUpTaskDueTime: emailData.followUpTaskDueTime,
+          }),
         });
         setShowEmailModal(false);
         onEmailSent?.();
@@ -207,43 +214,16 @@ export function useCrmActivityModals({
     [recordType, recordId, onEmailSent],
   );
 
-  const parseTaskDueDate = useCallback(
-    (activityDate: string, _activityTime: string): string => {
-      const today = new Date();
-      const y = today.getFullYear();
-      const m = String(today.getMonth() + 1).padStart(2, "0");
-      const d = String(today.getDate()).padStart(2, "0");
-      const base = `${y}-${m}-${d}`;
-      if (activityDate === "Today") return base;
-      const addDays = (n: number) => {
-        const t = new Date(today);
-        t.setDate(t.getDate() + n);
-        return t.toISOString().slice(0, 10);
-      };
-      if (activityDate === "Tomorrow") return addDays(1);
-      if (activityDate?.includes("3 business") || activityDate?.includes("Friday"))
-        return addDays(3);
-      if (activityDate === "In 1 week") return addDays(7);
-      if (activityDate === "In 2 weeks") return addDays(14);
-      if (activityDate === "In 1 month") return addDays(30);
-      return addDays(3);
-    },
-    [],
-  );
-
   const handleTaskSave = useCallback(
-    async (taskForm: {
-      title: string;
-      activityDate: string;
-      activityTime: string;
-      priority: string;
-      assignedTo: string;
-      notes: string;
-    }) => {
-      const due_date = parseTaskDueDate(
-        taskForm.activityDate,
-        taskForm.activityTime,
-      );
+    async (taskForm: TaskModalSaveTaskData) => {
+      const due_date =
+        taskForm.followUpTaskDueDate ??
+        resolveFollowUpDueDateYmd(taskForm.activityDate, "");
+      const timeSlice =
+        taskForm.followUpTaskDueTime ??
+        (taskForm.activityTime?.length >= 5
+          ? taskForm.activityTime.slice(0, 5)
+          : undefined);
       const urgency =
         taskForm.priority === "High"
           ? "high"
@@ -258,16 +238,18 @@ export function useCrmActivityModals({
           created_by: extension,
           urgency,
           due_date,
-          time:
-            taskForm.activityTime?.length >= 5
-              ? taskForm.activityTime.slice(0, 5)
-              : undefined,
+          time: timeSlice,
           status: "pending",
           notes: taskForm.notes?.trim()
             ? [{ note: taskForm.notes.trim() }]
             : undefined,
           record_type: recordType,
           record_id: recordId,
+          ...followUpTaskFieldsToApiPayload({
+            createFollowUpTask: taskForm.createFollowUpTask,
+            followUpTaskDueDate: taskForm.followUpTaskDueDate,
+            followUpTaskDueTime: taskForm.followUpTaskDueTime,
+          }),
         });
         setShowTaskModal(false);
         onTaskCreated?.();
@@ -279,7 +261,6 @@ export function useCrmActivityModals({
       recordType,
       recordId,
       extension,
-      parseTaskDueDate,
       onTaskCreated,
     ],
   );
@@ -289,8 +270,9 @@ export function useCrmActivityModals({
       message: string;
       contacts: Array<{ id: string; name: string; email?: string }>;
       activityDate: string;
-      createTask: boolean;
-      taskDueDate?: string;
+      createFollowUpTask: boolean;
+      followUpTaskDueDate: string | null;
+      followUpTaskDueTime: string | null;
       attachments: File[];
     }) => {
       const to = (recordPhone ?? "").replace(/\s/g, "").trim();
@@ -311,6 +293,11 @@ export function useCrmActivityModals({
           extension,
           ...(recordType && { record_type: recordType }),
           ...(recordId != null && { record_id: Number(recordId) }),
+          ...followUpTaskFieldsToApiPayload({
+            createFollowUpTask: smsData.createFollowUpTask,
+            followUpTaskDueDate: smsData.followUpTaskDueDate,
+            followUpTaskDueTime: smsData.followUpTaskDueTime,
+          }),
         });
         setShowSmsModal(false);
       } catch {

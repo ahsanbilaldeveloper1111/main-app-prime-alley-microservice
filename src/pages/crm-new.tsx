@@ -78,6 +78,11 @@ import {
   Download as DownloadIcon,
   SlidersHorizontal
 } from 'lucide-react';
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from '@components/crm/crmDialogActionButtonStyles';
 import { 
   PieChart, 
   Pie, 
@@ -777,14 +782,14 @@ const CRMPortal = () => {
   });
 
   // Pagination & Sorting States
-  const [prospectsPagination, setProspectsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
-  const [leadsPagination, setLeadsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
-  const [dealsPagination, setDealsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
-  const [ordersPagination, setOrdersPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
-  const [campaignsPagination, setCampaignsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
-  const [tasksPagination, setTasksPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
-  const [stagesPagination, setStagesPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
-  const [productsPagination, setProductsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortColumn: '', sortDirection: 'asc' as 'asc' | 'desc' });
+  const [prospectsPagination, setProspectsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' });
+  const [leadsPagination, setLeadsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' });
+  const [dealsPagination, setDealsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' });
+  const [ordersPagination, setOrdersPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' });
+  const [campaignsPagination, setCampaignsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' });
+  const [tasksPagination, setTasksPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' });
+  const [stagesPagination, setStagesPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' });
+  const [productsPagination, setProductsPagination] = useState({ currentPage: 1, rowsPerPage: 10, sortBy: '', sortOrder: 'asc' as 'asc' | 'desc' });
 
   // Search States for all pages
   const [prospectsSearch, setProspectsSearch] = useState('');
@@ -1131,16 +1136,16 @@ const CRMPortal = () => {
 
   // Sorting & Pagination Helper Functions
   const handleSort = (column: string, paginationState: any, setPaginationState: (state: any) => void) => {
-    const newDirection = paginationState.sortColumn === column && paginationState.sortDirection === 'asc' ? 'desc' : 'asc';
-    setPaginationState({ ...paginationState, sortColumn: column, sortDirection: newDirection, currentPage: 1 });
+    const newDirection = paginationState.sortBy === column && paginationState.sortOrder === 'asc' ? 'desc' : 'asc';
+    setPaginationState({ ...paginationState, sortBy: column, sortOrder: newDirection, currentPage: 1 });
   };
 
-  const sortData = <T extends Record<string, any>>(data: T[], sortColumn: string, sortDirection: 'asc' | 'desc'): T[] => {
-    if (!sortColumn) return data;
+  const sortData = <T extends Record<string, any>>(data: T[], sortBy: string, sortOrder: 'asc' | 'desc'): T[] => {
+    if (!sortBy) return data;
     
     return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
       
       // Handle nested properties (e.g., 'firstName' + 'lastName')
       if (aVal === undefined) aVal = '';
@@ -1150,8 +1155,8 @@ const CRMPortal = () => {
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
       
-      if (aStr < bStr) return sortDirection === 'asc' ? -1 : 1;
-      if (aStr > bStr) return sortDirection === 'asc' ? 1 : -1;
+      if (aStr < bStr) return sortOrder === 'asc' ? -1 : 1;
+      if (aStr > bStr) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
   };
@@ -1263,10 +1268,10 @@ const CRMPortal = () => {
   };
 
   const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortColumn !== column) {
+    if (paginationState.sortBy !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return paginationState.sortDirection === 'asc' ? 
+    return paginationState.sortOrder === 'asc' ? 
       <ArrowUp size={14} className="ms-1" /> : 
       <ArrowDown size={14} className="ms-1" />;
   };
@@ -10373,7 +10378,7 @@ const CRMPortal = () => {
                             
                             return matchesSearch && matchesAssignedTo && matchesPhone && matchesCampaigns && matchesCallStatus && matchesDisposition && matchesViewStatus && matchesSourceType && matchesSourceFile && matchesTags;
                           });
-                          const sorted = sortData(filtered, prospectsPagination.sortColumn, prospectsPagination.sortDirection);
+                          const sorted = sortData(filtered, prospectsPagination.sortBy, prospectsPagination.sortOrder);
                           const paginated = paginateData(sorted, prospectsPagination.currentPage, prospectsPagination.rowsPerPage);
                           return paginated.length > 0 && paginated.every(p => selectedProspects.includes(p.id));
                         })()}
@@ -10412,7 +10417,7 @@ const CRMPortal = () => {
                             
                             return matchesSearch && matchesAssignedTo && matchesPhone && matchesCampaigns && matchesCallStatus && matchesDisposition && matchesViewStatus && matchesSourceType && matchesSourceFile && matchesTags;
                           });
-                          const sorted = sortData(filtered, prospectsPagination.sortColumn, prospectsPagination.sortDirection);
+                          const sorted = sortData(filtered, prospectsPagination.sortBy, prospectsPagination.sortOrder);
                           const paginated = paginateData(sorted, prospectsPagination.currentPage, prospectsPagination.rowsPerPage);
                           
                           if (e.target.checked) {
@@ -10550,7 +10555,7 @@ const CRMPortal = () => {
                       return matchesSearch && matchesAssignedTo && matchesPhone && matchesCampaigns && matchesCallStatus && matchesDisposition && matchesViewStatus && matchesSourceType && matchesSourceFile && matchesTags;
                     });
 
-                    const sorted = sortData(filtered, prospectsPagination.sortColumn, prospectsPagination.sortDirection);
+                    const sorted = sortData(filtered, prospectsPagination.sortBy, prospectsPagination.sortOrder);
                     const paginated = paginateData(sorted, prospectsPagination.currentPage, prospectsPagination.rowsPerPage);
                     
                     if (filtered.length === 0) {
@@ -11813,7 +11818,7 @@ const CRMPortal = () => {
                             matchesSource && matchesPotential && matchesCampaign && 
                             matchesLeadScoreMin && matchesLeadScoreMax && matchesDateRange;
                         });
-                        const sorted = sortData(filtered, leadsPagination.sortColumn, leadsPagination.sortDirection);
+                        const sorted = sortData(filtered, leadsPagination.sortBy, leadsPagination.sortOrder);
                         const paginated = paginateData(sorted, leadsPagination.currentPage, leadsPagination.rowsPerPage);
                         return paginated.length > 0 && paginated.every(l => selectedLeads.includes(l.id));
                       })()}
@@ -11855,7 +11860,7 @@ const CRMPortal = () => {
                             matchesSource && matchesPotential && matchesCampaign && 
                             matchesLeadScoreMin && matchesLeadScoreMax && matchesDateRange;
                         });
-                        const sorted = sortData(filtered, leadsPagination.sortColumn, leadsPagination.sortDirection);
+                        const sorted = sortData(filtered, leadsPagination.sortBy, leadsPagination.sortOrder);
                         const paginated = paginateData(sorted, leadsPagination.currentPage, leadsPagination.rowsPerPage);
                         
                         if (e.target.checked) {
@@ -11998,7 +12003,7 @@ const CRMPortal = () => {
                       matchesLeadScoreMin && matchesLeadScoreMax && matchesDateRange;
                   });
 
-                  const sorted = sortData(filtered, leadsPagination.sortColumn, leadsPagination.sortDirection);
+                  const sorted = sortData(filtered, leadsPagination.sortBy, leadsPagination.sortOrder);
                   const paginated = paginateData(sorted, leadsPagination.currentPage, leadsPagination.rowsPerPage);
                   
                   if (filtered.length === 0) {
@@ -13607,7 +13612,7 @@ const CRMPortal = () => {
                           
                           return matchesSearch && matchesStage && matchesDealType && matchesOwner && matchesIndustry && matchesMinValue && matchesCloseDate;
                         });
-                        const sorted = sortData(filtered, dealsPagination.sortColumn, dealsPagination.sortDirection);
+                        const sorted = sortData(filtered, dealsPagination.sortBy, dealsPagination.sortOrder);
                         const paginated = paginateData(sorted, dealsPagination.currentPage, dealsPagination.rowsPerPage);
                         return paginated.length > 0 && paginated.every(d => selectedDeals.includes(d.id));
                       })()}
@@ -13643,7 +13648,7 @@ const CRMPortal = () => {
                           
                           return matchesSearch && matchesStage && matchesDealType && matchesOwner && matchesIndustry && matchesMinValue && matchesCloseDate;
                         });
-                        const sorted = sortData(filtered, dealsPagination.sortColumn, dealsPagination.sortDirection);
+                        const sorted = sortData(filtered, dealsPagination.sortBy, dealsPagination.sortOrder);
                         const paginated = paginateData(sorted, dealsPagination.currentPage, dealsPagination.rowsPerPage);
                         
                         if (e.target.checked) {
@@ -13710,7 +13715,7 @@ const CRMPortal = () => {
                       matchesOwner && matchesIndustry && matchesMinValue && matchesCloseDate;
                   });
                   
-                  const sorted = sortData(filteredDeals, dealsPagination.sortColumn, dealsPagination.sortDirection);
+                  const sorted = sortData(filteredDeals, dealsPagination.sortBy, dealsPagination.sortOrder);
                   const paginated = paginateData(sorted, dealsPagination.currentPage, dealsPagination.rowsPerPage);
                   
                   if (filteredDeals.length === 0) {
@@ -14852,7 +14857,7 @@ const CRMPortal = () => {
                               matchesPriority && matchesFulfillment && matchesBilling;
                           });
                           
-                          const sorted = sortData(filteredOrders, ordersPagination.sortColumn, ordersPagination.sortDirection);
+                          const sorted = sortData(filteredOrders, ordersPagination.sortBy, ordersPagination.sortOrder);
                           const paginated = paginateData(sorted, ordersPagination.currentPage, ordersPagination.rowsPerPage);
                           return paginated.length > 0 && paginated.every((order: any) => selectedOrders.includes(order.id));
                         })()}
@@ -14889,7 +14894,7 @@ const CRMPortal = () => {
                               matchesPriority && matchesFulfillment && matchesBilling;
                           });
                           
-                          const sorted = sortData(filteredOrders, ordersPagination.sortColumn, ordersPagination.sortDirection);
+                          const sorted = sortData(filteredOrders, ordersPagination.sortBy, ordersPagination.sortOrder);
                           const paginated = paginateData(sorted, ordersPagination.currentPage, ordersPagination.rowsPerPage);
                           
                           if (e.target.checked) {
@@ -14953,7 +14958,7 @@ const CRMPortal = () => {
                       matchesPriority && matchesFulfillment && matchesBilling;
                   });
                   
-                  const sorted = sortData(filteredOrders, ordersPagination.sortColumn, ordersPagination.sortDirection);
+                  const sorted = sortData(filteredOrders, ordersPagination.sortBy, ordersPagination.sortOrder);
                   const paginated = paginateData(sorted, ordersPagination.currentPage, ordersPagination.rowsPerPage);
                   
                   if (filteredOrders.length === 0) {
@@ -15690,7 +15695,7 @@ const CRMPortal = () => {
                             return matchesSearch;
                           });
                           
-                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortBy, campaignsPagination.sortOrder);
                           const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
                           return paginated.length > 0 && paginated.every((campaign: any) => selectedCampaigns.includes(campaign.id));
                         })()}
@@ -15718,7 +15723,7 @@ const CRMPortal = () => {
                             return matchesSearch;
                           });
                           
-                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                          const sorted = sortData(filteredCampaigns, campaignsPagination.sortBy, campaignsPagination.sortOrder);
                           const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
                           
                           if (e.target.checked) {
@@ -15765,7 +15770,7 @@ const CRMPortal = () => {
                       return matchesSearch;
                     });
                     
-                    const sorted = sortData(filteredCampaigns, campaignsPagination.sortColumn, campaignsPagination.sortDirection);
+                    const sorted = sortData(filteredCampaigns, campaignsPagination.sortBy, campaignsPagination.sortOrder);
                     const paginated = paginateData(sorted, campaignsPagination.currentPage, campaignsPagination.rowsPerPage);
                     
                     if (filteredCampaigns.length === 0) {
@@ -16406,7 +16411,7 @@ const CRMPortal = () => {
                             return matchesSearch;
                           });
                           
-                          const sorted = sortData(filteredTasks, tasksPagination.sortColumn, tasksPagination.sortDirection);
+                          const sorted = sortData(filteredTasks, tasksPagination.sortBy, tasksPagination.sortOrder);
                           const paginated = paginateData(sorted, tasksPagination.currentPage, tasksPagination.rowsPerPage);
                           return paginated.length > 0 && paginated.every((task: any) => selectedTasks.includes(task.id));
                         })()}
@@ -16429,7 +16434,7 @@ const CRMPortal = () => {
                             return matchesSearch;
                           });
                           
-                          const sorted = sortData(filteredTasks, tasksPagination.sortColumn, tasksPagination.sortDirection);
+                          const sorted = sortData(filteredTasks, tasksPagination.sortBy, tasksPagination.sortOrder);
                           const paginated = paginateData(sorted, tasksPagination.currentPage, tasksPagination.rowsPerPage);
                           
                           if (e.target.checked) {
@@ -16473,7 +16478,7 @@ const CRMPortal = () => {
                       return matchesSearch;
                     });
                     
-                    const sorted = sortData(filteredTasks, tasksPagination.sortColumn, tasksPagination.sortDirection);
+                    const sorted = sortData(filteredTasks, tasksPagination.sortBy, tasksPagination.sortOrder);
                     const paginated = paginateData(sorted, tasksPagination.currentPage, tasksPagination.rowsPerPage);
                     
                     if (filteredTasks.length === 0) {
@@ -17043,12 +17048,12 @@ const CRMPortal = () => {
                       <Form.Check 
                         type="checkbox"
                         checked={(() => {
-                          const sorted = sortData(pipelineStages, stagesPagination.sortColumn, stagesPagination.sortDirection);
+                          const sorted = sortData(pipelineStages, stagesPagination.sortBy, stagesPagination.sortOrder);
                           const paginated = paginateData(sorted, stagesPagination.currentPage, stagesPagination.rowsPerPage);
                           return paginated.length > 0 && paginated.every((stage: any) => selectedStages.includes(stage.id));
                         })()}
                         onChange={(e) => {
-                          const sorted = sortData(pipelineStages, stagesPagination.sortColumn, stagesPagination.sortDirection);
+                          const sorted = sortData(pipelineStages, stagesPagination.sortBy, stagesPagination.sortOrder);
                           const paginated = paginateData(sorted, stagesPagination.currentPage, stagesPagination.rowsPerPage);
                           
                           if (e.target.checked) {
@@ -17092,7 +17097,7 @@ const CRMPortal = () => {
                 </thead>
                 <tbody>
                   {(() => {
-                    const sorted = sortData(pipelineStages, stagesPagination.sortColumn, stagesPagination.sortDirection);
+                    const sorted = sortData(pipelineStages, stagesPagination.sortBy, stagesPagination.sortOrder);
                     const paginated = paginateData(sorted, stagesPagination.currentPage, stagesPagination.rowsPerPage);
                     return paginated.map((stage) => (
                       <tr key={stage.id}>
@@ -22400,24 +22405,33 @@ const CRMPortal = () => {
               </div>
             </Modal.Body>
 
-            <Modal.Footer style={{ borderTop: '1px solid #e5e7eb', padding: '20px 30px' }}>
-              <Button 
-                variant="outline-primary" 
-                onClick={() => {
-                  setShowProductViewModal(false);
-                  handleOpenProductModal(viewingProduct);
-                }}
-                className="d-flex align-items-center gap-2"
+            <Modal.Footer
+              className="border-0"
+              style={{ borderTop: '1px solid #e5e7eb', padding: '20px 30px' }}
+            >
+              <div
+                className="w-100 d-flex justify-content-end"
+                style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                <Edit size={16} />
-                Edit Product
-              </Button>
-              <Button 
-                variant="secondary" 
-                onClick={() => setShowProductViewModal(false)}
-              >
-                Close
-              </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setShowProductViewModal(false);
+                    handleOpenProductModal(viewingProduct);
+                  }}
+                  style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                >
+                  <Edit size={16} aria-hidden />
+                  Edit Product
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => setShowProductViewModal(false)}
+                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                >
+                  Close
+                </Button>
+              </div>
             </Modal.Footer>
           </Modal>
         )}
@@ -22651,7 +22665,7 @@ const CRMPortal = () => {
                 </thead>
                 <tbody>
                   {(() => {
-                    const sorted = sortData(filteredProducts, productsPagination.sortColumn, productsPagination.sortDirection);
+                    const sorted = sortData(filteredProducts, productsPagination.sortBy, productsPagination.sortOrder);
                     const paginated = paginateData(sorted, productsPagination.currentPage, productsPagination.rowsPerPage);
                     
                     if (filteredProducts.length === 0) {

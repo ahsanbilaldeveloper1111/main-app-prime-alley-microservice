@@ -53,25 +53,6 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 /** Row from `getProducts` / list-products — not CRM `getCrmData`. */
 type BillingProductRow = ProductData & Record<string, unknown>;
 
-let customFieldIdSeq = 0;
-function createCustomFieldId(fieldName: string): string {
-  const w = (globalThis as unknown as { window?: Window }).window;
-  const cryptoObj = w?.crypto;
-
-  if (cryptoObj?.randomUUID) {
-    return `${cryptoObj.randomUUID()}-${fieldName}`;
-  }
-
-  if (cryptoObj?.getRandomValues) {
-    const bytes = new Uint8Array(16);
-    cryptoObj.getRandomValues(bytes);
-    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-    return `${hex}-${fieldName}`;
-  }
-
-  customFieldIdSeq += 1;
-  return `${Date.now()}-${customFieldIdSeq}-${fieldName}`;
-}
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 
@@ -266,11 +247,40 @@ const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
   gap: "8px",
 };
 
+function BillingProductsToolbarButton({
+  onClick,
+  children,
+}: Readonly<{
+  onClick: () => void;
+  children: React.ReactNode;
+}>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={ACTION_BUTTON_BASE_STYLE}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#1a1a1a";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "#000000";
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 const BillingManagement = () => {
   const { data: session } = useSession();
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
+  /** Sidebar search + status; applied to `currentFilters` only when user clicks Apply. */
+  const [filterSidebarDraft, setFilterSidebarDraft] = useState<{
+    search: string;
+    is_active: boolean | undefined;
+  }>({ search: "", is_active: undefined });
   const requestIdRef = useRef(0);
 
 
@@ -443,8 +453,8 @@ const BillingManagement = () => {
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [dataList, setDataList] = useState<BillingProductRow[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -488,9 +498,9 @@ const BillingManagement = () => {
         params.created_at_to = memoizedFilters.created_at_to;
       }
 
-      if (pagination.sortColumn) {
-        params.sort_column = pagination.sortColumn;
-        params.sort_direction = pagination.sortDirection;
+      if (pagination.sortBy) {
+        params.sort_by = pagination.sortBy;
+        params.sort_order = pagination.sortOrder;
       }
 
       return params;
@@ -502,8 +512,8 @@ const BillingManagement = () => {
       memoizedFilters.created_at_to,
       pagination.currentPage,
       pagination.rowsPerPage,
-      pagination.sortColumn,
-      pagination.sortDirection,
+      pagination.sortBy,
+      pagination.sortOrder,
     ],
   );
 
@@ -799,8 +809,15 @@ const BillingManagement = () => {
   }, []);
 
   const handleOpenFiltersSidebar = useCallback(() => {
+    setFilterSidebarDraft({
+      search: String(currentFilters.search ?? ""),
+      is_active:
+        typeof currentFilters.is_active === "boolean"
+          ? currentFilters.is_active
+          : undefined,
+    });
     setShowFiltersSidebar(true);
-  }, []);
+  }, [currentFilters.search, currentFilters.is_active]);
 
   const handleCloseFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(false);
@@ -974,34 +991,18 @@ const BillingManagement = () => {
       }}
       ref={addContactsRef}
     >
-     
-
-<button
-          onClick={() => router.push("/billing/products/manage-categories")}
-          style={ACTION_BUTTON_BASE_STYLE}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
-        >
-          <Plus size={16} />
-          Manage Categories
-        </button>
-        <button
-          onClick={() => setShowCreateProductModal(true)}
-          style={ACTION_BUTTON_BASE_STYLE}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = "#1a1a1a";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "#000000";
-          }}
-        >
-          <Plus size={16} />
-          Add Product
-        </button>
+      <BillingProductsToolbarButton
+        onClick={() => router.push("/billing/products/manage-categories")}
+      >
+        <Plus size={16} />
+        Manage Categories
+      </BillingProductsToolbarButton>
+      <BillingProductsToolbarButton
+        onClick={() => setShowCreateProductModal(true)}
+      >
+        <Plus size={16} />
+        Add Product
+      </BillingProductsToolbarButton>
     
     </div>
   );
@@ -1013,8 +1014,7 @@ const BillingManagement = () => {
     const isFormValid =
       contactForm.email?.trim() &&
       contactForm.phoneNumber?.trim() &&
-      (contactForm.firstName?.trim() || contactForm.lastName?.trim()) &&
-      contactForm.campaign_id != null;
+      (contactForm.firstName?.trim() || contactForm.lastName?.trim());
   
     return (
       <ProspectEditSidebar
@@ -1098,7 +1098,6 @@ const BillingManagement = () => {
     // Handle create product
     const handleCreateProduct = useCallback(() => {
         
-        toast.success("Product created successfully!");
         setShowCreateProductModal(false);
         fetchCrmData();
       }, [fetchCrmData]);
@@ -1106,7 +1105,6 @@ const BillingManagement = () => {
       // Handle create product and add another
       const handleCreateProductAndAddAnother = useCallback(() => {
         
-        toast.success("Product created successfully!");
         setCreateProductModalKey((k) => k + 1);
         fetchCrmData();
         // Don't close modal, just reset form
@@ -1118,9 +1116,9 @@ const BillingManagement = () => {
         id: "search",
         label: "Search",
         type: "text",
-        value: currentFilters.search ?? "",
+        value: filterSidebarDraft.search,
         onChange: (value) =>
-          setCurrentFilters((prev) => ({ ...prev, search: value || undefined })),
+          setFilterSidebarDraft((prev) => ({ ...prev, search: value ?? "" })),
         placeholder: "Search products...",
       },
       {
@@ -1128,10 +1126,10 @@ const BillingManagement = () => {
         label: "Status",
         type: "dropdown",
         value: billingProductActiveFilterToDropdownValue(
-          currentFilters.is_active,
+          filterSidebarDraft.is_active,
         ),
         onChange: (value) =>
-          setCurrentFilters((prev) => ({
+          setFilterSidebarDraft((prev) => ({
             ...prev,
             is_active: billingProductDropdownValueToActiveFilter(value ?? ""),
           })),
@@ -1142,7 +1140,7 @@ const BillingManagement = () => {
         ],
       },
     ],
-    [currentFilters.search, currentFilters.is_active],
+    [filterSidebarDraft.search, filterSidebarDraft.is_active],
   );
 
   if (!session?.user?.permissions?.includes("list-crm-data-management")) {
@@ -1305,13 +1303,13 @@ const BillingManagement = () => {
                 }}
                 // Sorting
                 sortable={true}
-                defaultSortColumn={pagination.sortColumn}
-                defaultSortDirection={pagination.sortDirection}
+                defaultSortBy={pagination.sortBy}
+                defaultSortOrder={pagination.sortOrder}
                 onSort={(column, direction) => {
                   setPagination((prev) => ({
                     ...prev,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                     currentPage: 1,
                   }));
                 }}
@@ -1541,12 +1539,28 @@ const BillingManagement = () => {
           width="400px"
           filters={productFilterFields}
           onApply={() => {
-            setProspectsSearch(currentFilters.search ?? "");
+            const trimmedSearch = filterSidebarDraft.search.trim();
+            setCurrentFilters((prev) => {
+              const next = { ...prev };
+              if (trimmedSearch) {
+                next.search = trimmedSearch;
+              } else {
+                delete next.search;
+              }
+              if (typeof filterSidebarDraft.is_active === "boolean") {
+                next.is_active = filterSidebarDraft.is_active;
+              } else {
+                delete next.is_active;
+              }
+              return next;
+            });
+            setProspectsSearch(trimmedSearch);
             setPagination((prev) => ({ ...prev, currentPage: 1 }));
             setRefreshKey((k) => k + 1);
             setShowFiltersSidebar(false);
           }}
           onReset={() => {
+            setFilterSidebarDraft({ search: "", is_active: undefined });
             setCurrentFilters({});
             setProspectsSearch("");
             setPagination((prev) => ({ ...prev, currentPage: 1 }));
@@ -1593,8 +1607,7 @@ const BillingManagement = () => {
       {/* Create Contact Sidebar */}
       {renderCreateContactSidebar()}
       {/* Create Product Modal */}
-       {/* Create Product Modal */}
-       {showCreateProductModal && (
+      {showCreateProductModal && (
         <CreateProductModal
           key={createProductModalKey}
           productId={editingProductId ?? undefined}

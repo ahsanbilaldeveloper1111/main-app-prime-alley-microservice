@@ -137,8 +137,8 @@ const HistoryPage = () => {
     last_page: 1,
     per_page: 15,
     total: 0,
-    sort_column: "",
-    sort_direction: "asc" as "asc" | "desc",
+    sort_by: "",
+    sort_order: "asc" as "asc" | "desc",
   });
   const [historyChain, setHistoryChain] = useState<HistoryChainRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -184,23 +184,23 @@ const HistoryPage = () => {
     async (
       page: number = 1,
       perPage?: number,
-      sortColumn?: string,
-      sortDirection?: "asc" | "desc",
+      sortBy?: string,
+      sortOrder?: "asc" | "desc",
     ) => {
       try {
         setLoading(true);
         const currentPerPage = perPage ?? pagination.per_page;
-        const effectiveSortColumn = sortColumn ?? pagination.sort_column;
-        const effectiveSortDirection = sortDirection ?? pagination.sort_direction;
+        const effectiveSortBy = sortBy ?? pagination.sort_by;
+        const effectiveSortOrder = sortOrder ?? pagination.sort_order;
         const params: any = {
           page,
           per_page: currentPerPage,
         };
 
         // Add sorting if available
-        if (effectiveSortColumn) {
-          params.sort_column = effectiveSortColumn;
-          params.sort_direction = effectiveSortDirection;
+        if (effectiveSortBy) {
+          params.sort_by = effectiveSortBy;
+          params.sort_order = effectiveSortOrder;
         }
 
         // Add search if available
@@ -302,8 +302,8 @@ const HistoryPage = () => {
           last_page: paginationInfo.last_page || 1,
           per_page: paginationInfo.per_page || currentPerPage,
           total: paginationInfo.total || 0,
-          sort_column: effectiveSortColumn || "",
-          sort_direction: effectiveSortDirection || "asc",
+          sort_by: effectiveSortBy || "",
+          sort_order: effectiveSortOrder || "asc",
         });
       } catch (error) {
         console.error("Failed to fetch history data:", error);
@@ -320,8 +320,8 @@ const HistoryPage = () => {
       activityFilters.dateRange,
       activityFilters.agents,
       pagination.per_page,
-      pagination.sort_column,
-      pagination.sort_direction,
+      pagination.sort_by,
+      pagination.sort_order,
       extensions,
       activityTypeFilter,
     ],
@@ -752,13 +752,13 @@ const HistoryPage = () => {
             fetchHistoryData(page, rowsPerPage);
           }}
           sortable={true}
-          defaultSortColumn={pagination.sort_column}
-          defaultSortDirection={pagination.sort_direction}
+          defaultSortBy={pagination.sort_by}
+          defaultSortOrder={pagination.sort_order}
           onSort={(column, direction) => {
             setPagination((prev) => ({
               ...prev,
-              sort_column: column,
-              sort_direction: direction,
+              sort_by: column,
+              sort_order: direction,
               current_page: 1,
             }));
             fetchHistoryData(1, pagination.per_page, column, direction);

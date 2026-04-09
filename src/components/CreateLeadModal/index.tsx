@@ -11,18 +11,21 @@ import {
   Modal,
 } from "react-bootstrap";
 import Select from "react-select";
-import PhoneInput from "react-phone-number-input";
-import { parsePhoneNumber } from "react-phone-number-input";
+import {
+  PhoneInput,
+  parsePhoneNumber,
+  Country,
+  State,
+  City,
+} from "@crm/leads/leadFormPhoneGeo";
 import { useSession } from "next-auth/react";
-import "react-phone-number-input/style.css";
-import { Country, State, City } from "country-state-city";
 import {
   FiSave,
   FiArrowLeft,
   FiDatabase,
   FiTarget,
   FiPlus,
-} from "react-icons/fi";
+} from "@crm/leads/leadFormFiIcons";
 import {
   CheckCircle,
   ChevronLeft,
@@ -31,7 +34,7 @@ import {
   X,
   Edit,
   Plus,
-} from "lucide-react";
+} from "@crm/leads/leadFormLucideCommon";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 
@@ -41,6 +44,7 @@ import {
   updateLead,
   getStages,
   StageData,
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
   getCampaigns,
   getCampaignById,
   CampaignData,
@@ -773,7 +777,10 @@ const CreateLeadModal: React.FC<CreateLeadModalProps> = ({
 
   const fetchCampaigns = async () => {
     try {
-      const campaignsData = await getCampaigns({ per_page: 100 });
+      const campaignsData = await getCampaigns({
+        per_page: 100,
+        filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+      });
       setCampaigns(campaignsData?.data || []);
     } catch (error) {
       console.error("Failed to fetch campaigns:", error);

@@ -1,5 +1,4 @@
-import "@assets/scss/datatable-style.scss";
-import parsePhoneNumber from "libphonenumber-js";
+import "@crm/orders/orderListPageOrderScss";
 import { useRouter } from "next/router";
 import React, {
   ReactElement,
@@ -8,13 +7,17 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebar";
-import GenericFilterSidebar from "@components/GenericFilterSidebar";
-import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
-import OrderEditModal from "@components/OrderEditModal";
+import {
+  Layout,
+  BreadcrumbItem,
+  GenericTable,
+  GenericSidebar,
+  GenericFilterSidebar,
+  StatsCards,
+  OrderEditModal,
+  type TableColumn,
+  type TableAction,
+} from "@crm/orders/orderListOrderPageFrame";
 import {
   FiUpload,
   FiDatabase,
@@ -33,7 +36,7 @@ import {
   FiCalendar,
   FiTarget,
   FiMoreVertical,
-} from "react-icons/fi";
+} from "@crm/orders/orderListFiIcons";
 import {
   getOrders,
   getOrder,
@@ -49,7 +52,7 @@ import {
   getLead,
   getDealAttachments,
   downloadDealAttachment,
-} from "@utils/crm";
+} from "@crm/orders/orderListCrmApi";
 import { GetHierarchyData } from "@utils/users";
 import {
   Button,
@@ -62,9 +65,15 @@ import {
   Table,
   InputGroup,
   Modal,
-  Spinner
-} from "react-bootstrap";
-import Select from "@components/AppSelect";
+  Spinner,
+} from "@crm/orders/orderListBootstrap";
+import Select, { type SingleValue } from "@components/AppSelect";
+
+type OrdersDeliverySelectOption = { value: string | number; label: string };
+const toOptionalSelectString = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined) return null;
+  return String(value);
+};
 import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,
@@ -109,12 +118,12 @@ import {
   User,
   Paperclip,
   Upload,
-  Download as DownloadIcon,
+  DownloadIcon,
   RotateCcw,
   AlertCircle,
   Handshake,
   Info,
-} from "lucide-react";
+} from "@crm/orders/orderListLucideHeavy";
 import {
   PieChart,
   Pie,
@@ -126,313 +135,25 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-} from "recharts";
+} from "@crm/orders/orderListRecharts";
 import Link from "next/link";
 import { toast } from "react-toastify";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import FormModal from "@pages/partial/FormModal";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import {
+  SuccessfulModal,
+  FormModal,
+  DeleteConfirmationModal,
+  PhoneDisplay,
+  KPICard,
+  FilterBar,
+  getInitials,
+  getRandomColor,
+  customSelectStyles,
+} from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 
-// Phone Container Component (with Badge for tables)
 const ignoredKeys = ["order_stage_id"];
-const PhoneContainer = ({ phone }: { phone: string }) => {
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
-  const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-  return (
-    <Badge bg="info" className="bg-opacity-10 text-dark">
-      <div className="d-flex align-items-center gap-2">
-        {phoneNumber?.countryCode && (
-          <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-        )}
-        {phoneNumber.phone}
-      </div>
-    </Badge>
-  );
-};
-
-// Phone Display Component (without Badge for view dialogs)
-const PhoneDisplay = ({ phone }: { phone: string }) => {
-  const parsePhone = useCallback((phone: string) => {
-    if (!phone)
-      return {
-        phone: "N/A",
-        countryCode: "",
-      };
-    try {
-      const parsedPhone = parsePhoneNumber(phone);
-      return {
-        phone: parsedPhone?.formatInternational() || phone,
-        countryCode: parsedPhone?.country || "",
-      };
-    } catch (e) {
-      console.error(e);
-      return {
-        phone: phone,
-        countryCode: "",
-      };
-    }
-  }, []);
-  const getFlagImgSrc = useCallback((countryCode: string) => {
-    return `https://flagcdn.com/w20/${countryCode.toLowerCase()}.png`;
-  }, []);
-  const phoneNumber = useMemo(() => {
-    return phone
-      ? parsePhone(phone)
-      : {
-          phone: "N/A",
-          countryCode: "",
-        };
-  }, [phone, parsePhone]);
-
-  const flagImgSrc = getFlagImgSrc(phoneNumber.countryCode);
-  return (
-    <div className="d-flex align-items-center gap-2">
-      {phoneNumber?.countryCode && (
-        <img src={flagImgSrc} alt={phoneNumber.countryCode} />
-      )}
-      {phoneNumber.phone}
-    </div>
-  );
-};
-
-// Helper function to get initials from name (first two words, first two letters, only a-z)
-const getInitials = (name: string): string => {
-  if (!name) return "NA";
-
-  // Split by spaces and take up to first two words
-  const words = name.trim().split(/\s+/).slice(0, 2);
-
-  // Check if we have two words and the second word has at least one letter
-  const hasSecondWord = words.length >= 2;
-  const secondWordHasLetter = hasSecondWord && /[a-z]/i.test(words[1]);
-
-  if (hasSecondWord && secondWordHasLetter) {
-    // First letter of first two words
-    const firstLetter1 = words[0].match(/[a-z]/i)?.[0];
-    const firstLetter2 = words[1].match(/[a-z]/i)?.[0];
-
-    if (firstLetter1 && firstLetter2) {
-      return (firstLetter1 + firstLetter2).toUpperCase();
-    }
-  }
-
-  // If no second word or second word is only numbers, use first two letters of first word
-  if (words[0]) {
-    const letters = words[0].match(/[a-z]/gi) || [];
-    if (letters.length >= 2) {
-      return (letters[0] + letters[1]).toUpperCase();
-    } else if (letters.length === 1) {
-      return letters[0].toUpperCase();
-    }
-  }
-
-  return "NA";
-};
-
-// Helper function to generate a random background color based on name
-const getRandomColor = (name: string): string => {
-  if (!name) return "#6c757d";
-
-  // Generate a consistent color based on the name
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (name?.codePointAt(i) || 0) + ((hash << 5) - hash);
-  }
-
-  // Generate a color with good contrast (avoid too light colors)
-  const hue = Math.abs(hash) % 360;
-  const saturation = 50 + (Math.abs(hash) % 30); // 50-80%
-  const lightness = 40 + (Math.abs(hash) % 20); // 40-60%
-
-  return `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`;
-};
-
-// KPI Card Component
-interface KPICardData {
-  title: string;
-  value: string;
-  change?: string;
-  isPositive?: boolean;
-  icon: React.ReactNode;
-  color: string;
-  onClick?: () => void;
-}
-
-const KPICard: React.FC<KPICardData> = ({
-  title,
-  value,
-  change,
-  isPositive,
-  icon,
-  color,
-  onClick,
-}) => {
-  return (
-    <Card
-      className={onClick ? "h-100" : ""}
-      style={{
-        cursor: onClick ? "pointer" : "default",
-        transition: "all 0.2s ease",
-        border: "1px solid #e9ecef",
-      }}
-      onClick={onClick}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(-4px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }
-      }}
-    >
-      <Card.Body>
-        <div className="d-flex justify-content-between align-items-start mb-3">
-          <div className={`bg-${color} bg-opacity-10 rounded p-3`}>
-            <div className={`text-${color}`}>{icon}</div>
-          </div>
-          {change && (
-            <Badge
-              bg={isPositive ? "success" : "danger"}
-              className="bg-opacity-10"
-            >
-              {isPositive ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
-              {change}
-            </Badge>
-          )}
-        </div>
-        <h3 className="mb-1">{value}</h3>
-        <p className="text-muted mb-0 small">{title}</p>
-      </Card.Body>
-    </Card>
-  );
-};
-
-// Filter Bar Component
-interface FilterBarProps {
-  quickFilters: {
-    id: string;
-    label: string;
-    count: number;
-    variant?: string;
-    color?: string;
-    icon?: React.ReactNode;
-  }[];
-  activeFilter?: string;
-  onFilterChange?: (filterId: string) => void;
-  searchValue?: string;
-  onSearchChange?: (value: string) => void;
-  onSearch?: () => void;
-  searchPlaceholder?: string;
-  showAdvancedFilters?: boolean;
-  onToggleAdvancedFilters?: () => void;
-  advancedFilterCount?: number;
-}
-
-const FilterBar: React.FC<FilterBarProps> = ({
-  quickFilters,
-  activeFilter,
-  onFilterChange,
-  searchValue,
-  onSearchChange,
-  onSearch,
-  searchPlaceholder = "Search...",
-  showAdvancedFilters,
-  onToggleAdvancedFilters,
-  advancedFilterCount = 0,
-}) => {
-  return (
-    <Card className="border-0 shadow-sm mb-3">
-      <Card.Body className="p-3">
-        <div className="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3">
-          <div className="d-flex gap-2 flex-wrap align-items-center flex-grow-1">
-            {quickFilters.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              const hasCustomColor = filter.color;
-              const buttonStyle: React.CSSProperties = {};
-              if (hasCustomColor) {
-                if (isActive) {
-                  const bgColor = filter.color;
-                  buttonStyle.background = bgColor;
-                  buttonStyle.borderColor = bgColor;
-                  buttonStyle.color = "#fff";
-                } else {
-                  buttonStyle.background = "#fff";
-                  buttonStyle.borderColor = filter.color;
-                  buttonStyle.color = filter.color;
-                }
-              }
-
-              return (
-                <Button
-                  key={filter.id}
-                  variant={
-                    hasCustomColor
-                      ? undefined
-                      : isActive
-                      ? filter.variant || "primary"
-                      : "outline-secondary"
-                  }
-                  onClick={() => onFilterChange && onFilterChange(filter.id)}
-                  className="d-flex align-items-center gap-2"
-                  style={hasCustomColor ? buttonStyle : undefined}
-                >
-                  {filter.icon && (
-                    <span className="d-flex align-items-center">
-                      {filter.icon}
-                    </span>
-                  )}
-                  {filter.label}
-                </Button>
-              );
-            })}
-          </div>
-
-         
-        </div>
-      </Card.Body>
-    </Card>
-  );
-};
 
 const CrmOrders = () => {
   const { data: session } = useSession();
@@ -526,8 +247,8 @@ const CrmOrders = () => {
   const [ordersPagination, setOrdersPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [ordersFilters, setOrdersFilters] = useState({
     assignedTo: null as string | null,
@@ -1175,28 +896,28 @@ const CrmOrders = () => {
     setPaginationState: (state: any) => void
   ) => {
     const newDirection =
-      paginationState.sortColumn === column &&
-      paginationState.sortDirection === "asc"
+      paginationState.sortBy === column &&
+      paginationState.sortOrder === "asc"
         ? "desc"
         : "asc";
     setPaginationState({
       ...paginationState,
-      sortColumn: column,
-      sortDirection: newDirection,
+      sortBy: column,
+      sortOrder: newDirection,
       currentPage: 1,
     });
   };
 
   const sortData = <T extends Record<string, any>>(
     data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc"
+    sortBy: string,
+    sortOrder: "asc" | "desc"
   ): T[] => {
-    if (!sortColumn) return data;
+    if (!sortBy) return data;
 
     return [...data].sort((a, b) => {
-      let aVal = a[sortColumn];
-      let bVal = b[sortColumn];
+      let aVal = a[sortBy];
+      let bVal = b[sortBy];
 
       if (aVal === undefined) aVal = "";
       if (bVal === undefined) bVal = "";
@@ -1204,8 +925,8 @@ const CrmOrders = () => {
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
 
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
+      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
   };
@@ -1357,10 +1078,10 @@ const CrmOrders = () => {
   };
 
   const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortColumn !== column) {
+    if (paginationState.sortBy !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return paginationState.sortDirection === "asc" ? (
+    return paginationState.sortOrder === "asc" ? (
       <ArrowUp size={14} className="ms-1" />
     ) : (
       <ArrowDown size={14} className="ms-1" />
@@ -1508,45 +1229,6 @@ const CrmOrders = () => {
 
     return counts;
   }, [ordersData, extensions, stages, summaryTiles, totalOrders]);
-
-  // Custom select styles
-  const customSelectStyles = {
-    control: (provided: any, state: any) => ({
-      ...provided,
-      minHeight: "45px",
-      fontSize: "0.875rem",
-      borderColor: state.isFocused ? "#86b7fe" : "#dee2e6",
-      boxShadow: state.isFocused
-        ? "0 0 0 0.2rem rgba(13, 110, 253, 0.25)"
-        : "none",
-      "&:hover": {
-        borderColor: "#86b7fe",
-      },
-    }),
-    multiValue: (provided: any) => ({
-      ...provided,
-      backgroundColor: "#0d6efd",
-      color: "white",
-      fontSize: "0.813rem",
-    }),
-    multiValueLabel: (provided: any) => ({
-      ...provided,
-      color: "white",
-      padding: "2px 6px",
-    }),
-    multiValueRemove: (provided: any) => ({
-      ...provided,
-      color: "white",
-      "&:hover": {
-        backgroundColor: "#0b5ed7",
-        color: "white",
-      },
-    }),
-    menu: (provided: any) => ({
-      ...provided,
-      fontSize: "0.875rem",
-    }),
-  };
 
   // Define columns for GenericTable
   const ordersColumns: TableColumn<any>[] = useMemo(
@@ -2160,7 +1842,9 @@ const CrmOrders = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const assignedToValue = selected ? selected.value : null;
+                      const opt =
+                        selected as SingleValue<OrdersDeliverySelectOption>;
+                      const assignedToValue = toOptionalSelectString(opt?.value);
                       setOrdersFilters((prev) => ({
                         ...prev,
                         assignedTo: assignedToValue,
@@ -2196,7 +1880,9 @@ const CrmOrders = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const stageValue = selected ? selected.value : null;
+                      const opt =
+                        selected as SingleValue<OrdersDeliverySelectOption>;
+                      const stageValue = toOptionalSelectString(opt?.value);
                       setOrdersFilters((prev) => ({
                         ...prev,
                         stage: stageValue,
@@ -3023,7 +2709,9 @@ const CrmOrders = () => {
                 })()
               : null,
             onChange: (selected) => {
-              const assignedToValue = selected ? selected.value : null;
+              const opt =
+                selected as SingleValue<OrdersDeliverySelectOption>;
+              const assignedToValue = toOptionalSelectString(opt?.value);
               setOrdersFilters(prev => ({
                 ...prev,
                 assignedTo: assignedToValue
@@ -3050,7 +2738,9 @@ const CrmOrders = () => {
                 })()
               : null,
             onChange: (selected) => {
-              const stageValue = selected ? selected.value : null;
+              const opt =
+                selected as SingleValue<OrdersDeliverySelectOption>;
+              const stageValue = toOptionalSelectString(opt?.value);
               setOrdersFilters(prev => ({
                 ...prev,
                 stage: stageValue

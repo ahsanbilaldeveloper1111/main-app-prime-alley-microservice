@@ -1,11 +1,11 @@
-import "@assets/scss/datatable-style.scss";
+import "@crm/leads/leadFullPageStyles";
 import React, { ReactElement, useState, useEffect, useRef } from "react";
-import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
+import { Layout, BreadcrumbItem } from "@crm/leads/leadFullPageFrame";
 import {
   createLead,
   getStages,
   StageData,
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
   getCampaigns,
   getCampaignById,
   CampaignData,
@@ -25,18 +25,21 @@ import {
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Form, Card, Alert, Badge, Table, Modal } from "react-bootstrap";
 import Select from "react-select";
-import PhoneInput from "react-phone-number-input";
-import { parsePhoneNumber } from "react-phone-number-input";
+import {
+  PhoneInput,
+  parsePhoneNumber,
+  Country,
+  State,
+  City,
+} from "@crm/leads/leadFormPhoneGeo";
 import { useSession } from "next-auth/react";
-import "react-phone-number-input/style.css";
-import { Country, State, City } from "country-state-city";
 import {
   FiSave,
   FiArrowLeft,
   FiDatabase,
   FiTarget,
   FiPlus,
-} from "react-icons/fi";
+} from "@crm/leads/leadFormFiIcons";
 import {
   CheckCircle,
   ChevronLeft,
@@ -44,13 +47,11 @@ import {
   AlertCircle,
   X,
   Edit,
-} from "lucide-react";
+} from "@crm/leads/leadFormLucideCommon";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
 import FormModal from "../../../partial/FormModal";
 import ConfirmModal from "@pages/partial/ConfirmModal";
@@ -636,7 +637,10 @@ const CreateLead = () => {
 
   const fetchCampaigns = async () => {
     try {
-      const campaignsData = await getCampaigns({ per_page: 100 });
+      const campaignsData = await getCampaigns({
+        per_page: 100,
+        filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+      });
       setCampaigns(campaignsData?.data || []);
     } catch (error) {
       console.error("Failed to fetch campaigns:", error);

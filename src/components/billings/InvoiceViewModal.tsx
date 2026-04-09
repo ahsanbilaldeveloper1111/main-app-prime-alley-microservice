@@ -1,10 +1,79 @@
 import React from "react";
-import PrimeAlleyLogo from "@assets/images/Prime3.png";
 import { Alert, Button, Col, Modal, Row } from "react-bootstrap";
 import moment from "moment";
-import { formatNumber, GlobalDateFormat, getCompanyByCrmId } from "@utils/Helper";
+import { formatNumber, getCompanyByCrmId, GlobalDateFormat } from "@utils/Helper";
+import { useSession } from "next-auth/react";
+
+/** Issuing party on the invoice (API: `company.vendor` for tenant invoices). */
+export type InvoiceIssuingPartyBankAccount = {
+  id?: string | number;
+  vendor_id?: string | number;
+  bank_name?: string;
+  account_holder_name?: string;
+  account_number?: string;
+  currency?: string;
+  routing_number?: string;
+  swift_code?: string;
+  iban?: string;
+  account_type?: string;
+  is_default?: boolean;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type InvoiceIssuingPartyProfile = {
+  tax_id?: string | number | null;
+  address?: string;
+  city?: unknown;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+  logo_url?: string;
+  /** Relative storage path when `logo_url` is empty */
+  logo?: string;
+  payment_terms?: string | number | null;
+  vendor_id?: string;
+};
+
+export type InvoiceIssuingParty = {
+  id?: string | number;
+  name?: string;
+  email?: string;
+  phone?: string;
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+  profile?: InvoiceIssuingPartyProfile;
+  bank_accounts?: InvoiceIssuingPartyBankAccount[];
+};
+
+/** Billed party (API `invoice.customer`). */
+export type InvoiceViewCustomer = {
+  id?: string | number;
+  crm_company_id?: string | number | null;
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  profile?: {
+    address?: string;
+    city?: unknown;
+    country?: string;
+    postal_code?: string | null;
+    vat_rate?: string | number | null;
+    tax_id?: string | number | null;
+    logo?: string | null;
+    currency?: string;
+  };
+};
 
 export type InvoiceViewData = {
+  /**
+   * When true: issuing party + banks from `company.vendor`; Bill To prefers `customer`, else session.
+   * When false: issuing party + banks from `company` (incl. `company.bank_accounts`); Bill To prefers `customer`, else CRM/company.
+   */
+  is_tenant_invoice?: boolean;
+  crm_company_id?: string | number;
   id?: string | number;
   invoice_number?: string;
   invoice_date?: string;
@@ -26,35 +95,84 @@ export type InvoiceViewData = {
     tax_amount?: string | number;
     line_total?: string | number;
   }>;
+  customer?: InvoiceViewCustomer;
   company?: {
+    name?: string | null;
+    email?: string;
+    phone?: string;
     crm_company_id?: string | number;
     country?: string;
-    profile?: { address?: string; tax_id?: string | number };
-    reseller?: {
-      name?: string;
-      email?: string;
-      phone?: string;
-      profile?: {
-        tax_id?: string | number;
-        address?: string;
-        city?: any;
-        country?: string;
-        logo_url?: string;
-        payment_terms?: any;
-      };
-      bank_accounts?: Array<{
-        id?: string | number;
-        bank_name?: string;
-        account_holder_name?: string;
-        account_number?: string;
-        currency?: string;
-        routing_number?: string;
-        swift_code?: string;
-        iban?: string;
-      }>;
+    profile?: {
+      address?: string;
+      tax_id?: string | number;
+      vat_rate?: string | number | null;
+      city?: unknown;
+      logo_url?: string;
+      logo?: string;
+      payment_terms?: string | number | null;
     };
+    /** Seller/org bank details (non-tenant and some tenant payloads). */
+    bank_accounts?: InvoiceIssuingPartyBankAccount[];
+    vendor?: InvoiceIssuingParty;
   };
 };
+
+/** Non-tenant: issuer row is built from `company` (name, contact, profile). */
+function issuingPartyFromCompany(company: InvoiceViewData["company"]): InvoiceIssuingParty | undefined {
+  if (!company) return undefined;
+  const name = typeof company.name === "string" ? company.name.trim() : "";
+  const hasContact = Boolean(
+    name || company.email || company.phone || company.profile?.address || company.country,
+  );
+  if (!hasContact) return undefined;
+  return {
+    name: name || "",
+    email: company.email ?? undefined,
+    phone: company.phone ?? undefined,
+    profile: company.profile as InvoiceIssuingPartyProfile | undefined,
+  };
+}
+
+function getInvoiceIssuingParty(
+  company: InvoiceViewData["company"],
+  isTenantInvoice: boolean,
+): InvoiceIssuingParty | undefined {
+  if (isTenantInvoice) {
+    return company?.vendor;
+  }
+  return issuingPartyFromCompany(company);
+}
+
+/** Tenant: `company.vendor.bank_accounts`. Non-tenant: `company.bank_accounts`. */
+function getIssuingPartyBankAccounts(
+  company: InvoiceViewData["company"],
+  isTenantInvoice: boolean,
+): InvoiceIssuingPartyBankAccount[] | undefined {
+  if (isTenantInvoice) {
+    const fromVendor = company?.vendor?.bank_accounts;
+    if (Array.isArray(fromVendor) && fromVendor.length > 0) return fromVendor;
+    return undefined;
+  }
+  const fromCompany = company?.bank_accounts;
+  if (Array.isArray(fromCompany) && fromCompany.length > 0) return fromCompany;
+  return undefined;
+}
+
+function resolveIsTenantInvoice(
+  prop: boolean | undefined,
+  invoice: InvoiceViewData | null | undefined,
+): boolean {
+  if (prop !== undefined) return prop;
+  return Boolean(invoice?.is_tenant_invoice);
+}
+
+function issuingPartyLogoSrc(profile: InvoiceIssuingPartyProfile | undefined): string {
+  const fromUrl = typeof profile?.logo_url === "string" ? profile.logo_url.trim() : "";
+  if (fromUrl) return fromUrl;
+  const fromPath = typeof profile?.logo === "string" ? profile.logo.trim() : "";
+  if (fromPath) return fromPath;
+  return "";
+}
 
 export type InvoiceViewModalProps = Readonly<{
   show: boolean;
@@ -63,9 +181,16 @@ export type InvoiceViewModalProps = Readonly<{
   loading?: boolean;
   companyName: string;
   companyOptions?: { id: string | number; name?: string }[];
+  /**
+   * When true: issuer from `company.vendor`, banks from vendor, Bill To from `customer` or session.
+   * When false: issuer from `company`, banks from `company.bank_accounts`, Bill To from `customer` or CRM.
+   * If omitted, uses `invoice.is_tenant_invoice`.
+   */
+  isTenantInvoice?: boolean;
 }>;
 
 const DEFAULT_CURRENCY = "AED";
+
 
 function isPositiveNumberLike(value: unknown): boolean {
   const n = Number(value);
@@ -98,53 +223,77 @@ type InvoiceDetailsProps = Readonly<{
   invoice: InvoiceViewData;
   companyName: string;
   companyOptions: { id: string | number; name?: string }[];
+  isTenantInvoice: boolean;
 }>;
 
-function ResellerHeader({ invoice, companyName }: Readonly<{ invoice: InvoiceViewData; companyName: string }>) {
-  const reseller = invoice.company?.reseller;
-  const profile = reseller?.profile;
+function VendorHeader({
+  invoice,
+  companyName,
+  isTenantInvoice,
+}: Readonly<{
+  invoice: InvoiceViewData;
+  companyName: string;
+  isTenantInvoice: boolean;
+}>) {
+  const company = invoice.company;
+  const vendor = getInvoiceIssuingParty(company, isTenantInvoice);
+  const issuingProfile = isTenantInvoice ? vendor?.profile : company?.profile;
+  const headerTitle = isTenantInvoice
+    ? vendor?.name || ""
+    : String(company?.name ?? "").trim() || companyName || "";
+  const headerPhone = isTenantInvoice ? vendor?.phone : company?.phone;
+  const headerEmail = isTenantInvoice ? vendor?.email : company?.email;
 
-  const showTaxInvoice = isPositiveNumberLike(profile?.tax_id);
-  const cityValue = profile?.city;
-  const showCityLine = typeof cityValue === "string" ? Boolean(cityValue.trim()) : isPositiveNumberLike(cityValue);
+  const taxIdForBanner = isTenantInvoice
+    ? (vendor?.profile?.tax_id ?? company?.profile?.tax_id)
+    : company?.profile?.tax_id;
+  const showTaxInvoice = isPositiveNumberLike(taxIdForBanner);
+  const cityValue = issuingProfile?.city;
+  const showCityCountryLineTenant =
+    typeof cityValue === "string" ? Boolean(cityValue.trim()) : isPositiveNumberLike(cityValue);
+  const showCountryLineNonTenant =
+    !isTenantInvoice && typeof company?.country === "string" && Boolean(company.country.trim());
   const showDueAmount = parseMoney(invoice.amount_due) > 0;
 
   return (
     <Row>
       <Col md={6}>
-        <h3 className="mb-2">{companyName || ""}</h3>
+        <h3 className="mb-2">{headerTitle}</h3>
 
         {showTaxInvoice && (
           <h5 className="mb-3 fw-bold" style={{ color: "#14509e" }}>
-            TAX INVOICE {String(profile?.tax_id ?? "")}
+            TAX INVOICE 
           </h5>
         )}
 
-        <p className="mb-2">{profile?.address || ""}</p>
-        {showCityLine && (
+        <p className="mb-2">{issuingProfile?.address || ""}</p>
+        {isTenantInvoice && showCityCountryLineTenant && (
           <p className="mb-2">
             {String(cityValue ?? "")},{" "}
-            {profile?.country || ""}
+            {vendor?.profile?.country || ""}
           </p>
         )}
+        {showCountryLineNonTenant && <p className="mb-2">{company?.country}</p>}
 
         <p className="mb-2">
           <b>Phone:</b>
-          {reseller?.phone || ""}
+          {headerPhone || ""}
         </p>
         <p className="mb-3">
-          <b>Email:</b> {reseller?.email || ""}
+          <b>Email:</b> {headerEmail || ""}
         </p>
       </Col>
 
       <Col md={6}>
         <div>
-          <img
-            src={profile?.logo_url || PrimeAlleyLogo.src}
-            alt="Logo"
-            className="img-fluid"
-            style={{ maxWidth: "60%", float: "right" }}
-          />
+          {issuingPartyLogoSrc(issuingProfile) && (
+            <img
+              src={issuingPartyLogoSrc(issuingProfile)}
+              alt="Logo"
+              className="img-fluid"
+              style={{ maxWidth: "60%", float: "right" }}
+            />
+          )}
         </div>
 
         {showDueAmount && (
@@ -163,9 +312,47 @@ function ResellerHeader({ invoice, companyName }: Readonly<{ invoice: InvoiceVie
   );
 }
 
-function BillTo({ invoice, companyOptions }: Readonly<{ invoice: InvoiceViewData; companyOptions: { id: string | number; name?: string }[] }>) {
+function BillTo({
+  invoice,
+  companyOptions,
+  isTenantInvoice,
+}: Readonly<{
+  invoice: InvoiceViewData;
+  companyOptions: { id: string | number; name?: string }[];
+  isTenantInvoice: boolean;
+}>) {
+  const { data: session } = useSession();
   const company = invoice.company;
-  const showTrn = isPositiveNumberLike(company?.profile?.tax_id);
+  const customer = invoice.customer;
+  const sessionCompanyName =
+    (session?.user as { company_name?: string } | undefined)?.company_name ?? "";
+
+  const billToCrmId = customer?.crm_company_id ?? company?.crm_company_id ?? invoice.crm_company_id;
+
+  let billToName: string;
+  let billToAddress: string;
+  let billToCountry: string;
+  let trnId: string | number | undefined;
+
+  if (customer) {
+    billToName = String(customer.name ?? "").trim();
+    billToAddress = customer.profile?.address ?? "";
+    billToCountry = customer.profile?.country ?? "";
+    trnId = customer.profile?.tax_id ?? undefined;
+  } else if (isTenantInvoice) {
+    billToName = sessionCompanyName;
+    billToAddress = company?.profile?.address ?? "";
+    billToCountry = company?.country ?? "";
+    trnId = company?.profile?.tax_id ?? undefined;
+  } else {
+    billToName =
+      getCompanyByCrmId(billToCrmId, companyOptions) || String(company?.name ?? "").trim();
+    billToAddress = company?.profile?.address ?? "";
+    billToCountry = company?.country ?? "";
+    trnId = company?.profile?.tax_id ?? undefined;
+  }
+
+  const showTrn = isPositiveNumberLike(trnId);
 
   return (
     <Col md={6}>
@@ -174,14 +361,14 @@ function BillTo({ invoice, companyOptions }: Readonly<{ invoice: InvoiceViewData
       </h5>
       <div className="border p-3 rounded bg-light mb-3">
         <p className="mb-2 fw-bold">
-          {getCompanyByCrmId(company?.crm_company_id, companyOptions) ?? ""}
+          {billToName}
         </p>
-        <p className="mb-2">{company?.profile?.address || ""}</p>
-        <p className="mb-3">{company?.country || ""}</p>
+        <p className="mb-2">{billToAddress}</p>
+        <p className="mb-3">{billToCountry}</p>
 
         {showTrn && (
           <p className="mb-0 fw-bold">
-            <b>TRN No.:</b> {company?.profile?.tax_id || ""}
+            <b>TRN No.:</b> {String(trnId ?? "")}
           </p>
         )}
       </div>
@@ -189,8 +376,14 @@ function BillTo({ invoice, companyOptions }: Readonly<{ invoice: InvoiceViewData
   );
 }
 
-function InvoiceMeta({ invoice }: Readonly<{ invoice: InvoiceViewData }>) {
-  const termsDays = invoice?.company?.reseller?.profile?.payment_terms;
+function InvoiceMeta({
+  invoice,
+  isTenantInvoice,
+}: Readonly<{ invoice: InvoiceViewData; isTenantInvoice: boolean }>) {
+  const issuing = getInvoiceIssuingParty(invoice.company, isTenantInvoice);
+  const termsDays = isTenantInvoice
+    ? issuing?.profile?.payment_terms
+    : invoice.company?.profile?.payment_terms ?? issuing?.profile?.payment_terms;
   const terms = termsDays ? `${termsDays} days` : "";
   const dueDate = invoice?.due_date ? moment(invoice?.due_date).format(GlobalDateFormat) : "";
 
@@ -218,7 +411,20 @@ function InvoiceMeta({ invoice }: Readonly<{ invoice: InvoiceViewData }>) {
   );
 }
 
-function InvoiceItemsAndTotals({ invoice }: Readonly<{ invoice: InvoiceViewData }>) {
+function vatPercentLabel(invoice: InvoiceViewData, isTenantInvoice: boolean): string {
+  const fromCustomer = invoice.customer?.profile?.vat_rate;
+  const fromCompany = invoice.company?.profile?.vat_rate;
+  if (isTenantInvoice) {
+    return `${Number(fromCompany ?? 0).toFixed(2)}%`;
+  }
+  return `${Number(fromCustomer ?? 0).toFixed(2)}%`;
+}
+
+function InvoiceItemsAndTotals({
+  invoice,
+  isTenantInvoice,
+  companyName,
+}: Readonly<{ invoice: InvoiceViewData; isTenantInvoice: boolean; companyName: string }>) {
   const currency = invoice.currency_code || DEFAULT_CURRENCY;
   const items = invoice.items ?? [];
   const hasItems = items.length > 0;
@@ -230,7 +436,16 @@ function InvoiceItemsAndTotals({ invoice }: Readonly<{ invoice: InvoiceViewData 
   }
 
   return (
-    <div className="">
+    <>
+      <div className="table-responsive">
+        <style>
+          {`
+            .table-responsive .table th:last-child, .table-responsive .table td:last-child {
+                min-width: 150px !important;
+                white-space: nowrap;
+            }
+          `}
+        </style>
       <table className="table table-bordered table-sm">
         <thead
           className="table-dark"
@@ -266,6 +481,8 @@ function InvoiceItemsAndTotals({ invoice }: Readonly<{ invoice: InvoiceViewData 
           ))}
         </tbody>
       </table>
+      </div>
+      <div className="mt-4">
       <Row>
         <Col md={6}>
           <h5 className="mb-2 fw-bold" style={{ color: "#14509e" }}>
@@ -280,7 +497,11 @@ function InvoiceItemsAndTotals({ invoice }: Readonly<{ invoice: InvoiceViewData 
             <li>
               <p className="mb-1 text-muted">
                 Cheque can be issued in favor of{" "}
-                {invoice?.company?.reseller?.name || "N/A"}.
+                <b>
+                  {getInvoiceIssuingParty(invoice.company, isTenantInvoice)?.name?.trim() ||
+                    companyName ||
+                    ""}
+                </b>.
               </p>
             </li>
             <li>
@@ -291,7 +512,9 @@ function InvoiceItemsAndTotals({ invoice }: Readonly<{ invoice: InvoiceViewData 
             </li>
             <li>
               <p className="mb-1 text-muted">
-                Value Added Tax (VAT) 5% will be applicable to this invoice.
+                Value Added Tax (VAT){" "}
+                <b>{vatPercentLabel(invoice, isTenantInvoice)}</b>{" "}
+                will be applicable to this invoice.
               </p>
             </li>
           </ol>
@@ -342,11 +565,18 @@ function InvoiceItemsAndTotals({ invoice }: Readonly<{ invoice: InvoiceViewData 
         </Col>
       </Row>
     </div>
+    </>
   );
 }
 
-function BankAccounts({ invoice }: Readonly<{ invoice: InvoiceViewData }>) {
-  const accounts = invoice?.company?.reseller?.bank_accounts;
+function BankAccounts({
+  invoice,
+  isTenantInvoice,
+  companyName,
+}: Readonly<{ invoice: InvoiceViewData; isTenantInvoice: boolean; companyName: string }>) {
+  const accounts = getIssuingPartyBankAccounts(invoice.company, isTenantInvoice);
+  const issuingParty = getInvoiceIssuingParty(invoice.company, isTenantInvoice);
+  const accountTitle = issuingParty?.name?.trim() || companyName;
   const hasAccounts = Array.isArray(accounts) && accounts.length > 0;
   if (!hasAccounts) return null;
 
@@ -354,8 +584,14 @@ function BankAccounts({ invoice }: Readonly<{ invoice: InvoiceViewData }>) {
     <div className="mb-3 alert alert-info">
       <h6>Bank Accounts</h6>
       <Row>
-        {accounts.map((bankAccount: any, idx: number) => (
-          <Col md={4} key={bankAccount?.id ?? bankAccount?.iban ?? `${bankAccount?.account_number ?? "bank"}-${idx}`}>
+        {accounts.map((bankAccount, idx) => (
+          <Col
+            md={6}
+            key={bankAccount.id ?? bankAccount.iban ?? `${bankAccount.account_number ?? "bank"}-${idx}`}
+          >
+            <p className="mb-1">
+              <b>Account Title:</b> {accountTitle}
+            </p>
             <p className="mb-1">
               <b>Bank Name:</b> {bankAccount.bank_name}
             </p>
@@ -368,6 +604,11 @@ function BankAccounts({ invoice }: Readonly<{ invoice: InvoiceViewData }>) {
             <p className="mb-1">
               <b>Currency:</b> {bankAccount.currency}
             </p>
+            {bankAccount.account_type ? (
+              <p className="mb-1">
+                <b>Account Type:</b> {bankAccount.account_type}
+              </p>
+            ) : null}
             <p className="mb-1">
               <b>Routing Number:</b> {bankAccount.routing_number}
             </p>
@@ -377,6 +618,11 @@ function BankAccounts({ invoice }: Readonly<{ invoice: InvoiceViewData }>) {
             <p className="mb-1">
               <b>IBAN:</b> {bankAccount.iban}
             </p>
+            {bankAccount.notes ? (
+              <p className="mb-1">
+                <b>Notes:</b> {bankAccount.notes}
+              </p>
+            ) : null}
           </Col>
         ))}
       </Row>
@@ -384,24 +630,33 @@ function BankAccounts({ invoice }: Readonly<{ invoice: InvoiceViewData }>) {
   );
 }
 
-function InvoiceDetails({ invoice, companyName, companyOptions }: InvoiceDetailsProps) {
+function InvoiceDetails({
+  invoice,
+  companyName,
+  companyOptions,
+  isTenantInvoice,
+}: InvoiceDetailsProps) {
   return (
     <>
-      <ResellerHeader invoice={invoice} companyName={companyName} />
+      <VendorHeader invoice={invoice} companyName={companyName} isTenantInvoice={isTenantInvoice} />
 
       <Row>
-        <BillTo invoice={invoice} companyOptions={companyOptions} />
-        <InvoiceMeta invoice={invoice} />
+        <BillTo invoice={invoice} companyOptions={companyOptions} isTenantInvoice={isTenantInvoice} />
+        <InvoiceMeta invoice={invoice} isTenantInvoice={isTenantInvoice} />
       </Row>
 
       <div>
         {/* Invoice Items */}
         <div className="mb-4">
-          <InvoiceItemsAndTotals invoice={invoice} />
+          <InvoiceItemsAndTotals
+            invoice={invoice}
+            isTenantInvoice={isTenantInvoice}
+            companyName={companyName}
+          />
         </div>
 
         {/* Notes */}
-        <BankAccounts invoice={invoice} />
+        <BankAccounts invoice={invoice} isTenantInvoice={isTenantInvoice} companyName={companyName} />
       </div>
     </>
   );
@@ -414,13 +669,24 @@ export default function InvoiceViewModal({
   loading = false,
   companyName,
   companyOptions = [],
+  isTenantInvoice: isTenantInvoiceProp,
 }: InvoiceViewModalProps) {
   if (!show) return null;
 
+  const isTenantInvoice = resolveIsTenantInvoice(isTenantInvoiceProp, invoice);
+
   let body: React.ReactNode;
   if (loading && !invoice) body = <div className="text-muted">Loading…</div>;
-  else if (invoice) body = <InvoiceDetails invoice={invoice} companyName={companyName} companyOptions={companyOptions} />;
-  else body = <Alert variant="warning">No invoice data available</Alert>;
+  else if (invoice) {
+    body = (
+      <InvoiceDetails
+        invoice={invoice}
+        companyName={companyName}
+        companyOptions={companyOptions}
+        isTenantInvoice={isTenantInvoice}
+      />
+    );
+  } else body = <Alert variant="warning">No invoice data available</Alert>;
 
   return (
     <Modal show={show} onHide={onHide} size="xl" centered>

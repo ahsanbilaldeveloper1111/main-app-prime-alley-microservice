@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  MoreVertical, 
   Phone,
   Search,
   X,
@@ -29,37 +30,21 @@ import {
   Sparkles,
   Plus,
   MonitorCheck,
-} from "lucide-react";
-import { Button } from "react-bootstrap";
-import { useCti } from "@hooks/useCti";
-import {
-  useIncomingCall,
-  type IncomingCallData,
-} from "../contexts/IncomingCallContext";
-import { usePermissions } from "../utils/permissionUtils";
-import {
-  getSearchableRoutes,
-  canAccessRoute,
-  getRequiredPermissions,
-} from "../config/permissions";
+    } from 'lucide-react';
+import { useCti } from '@hooks/useCti';
+import { useIncomingCall, type IncomingCallData } from '../contexts/IncomingCallContext';
+import { usePermissions } from '../utils/permissionUtils';
+import { getSearchableRoutes, canAccessRoute, getRequiredPermissions } from '../config/permissions';
 import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
-import DeviceSelectionModal from "../components/DeviceSelectionModal";
-import GlobalFloatingCallBar from "../components/GlobalFloatingCallBar";
-import CreateLeadModal from "@components/CreateLeadModal";
-import {
-  CreateCompanySidebar,
-  CompanyFormPayload,
-} from "@components/renderCreateCompany";
-import { createCompany } from "@utils/crm";
+import DeviceSelectionModal from '../components/DeviceSelectionModal';
+import GlobalFloatingCallBar from '../components/GlobalFloatingCallBar';
+import CreateLeadModal from '@components/CreateLeadModal';
+import { CreateCompanySidebar } from '@components/renderCreateCompany';
+import { CreateTicketSidebar } from '@components/renderCreateTicketForm';
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
-import {
-  hasReliableCtiCallId,
-  isSameCtiCallForActiveLookup,
-  resolveCallIdForAttendApi,
-  shouldDismissIncomingModalForAnsweredElsewhere,
-} from "@utils/incomingCallMatching";
+import CreateTaskModal from '@components/CreatePlannerTaskSidebar';
 
 interface LayoutProps {
   children: ReactNode;
@@ -97,10 +82,15 @@ interface CtiDialerDevice {
   details: string;
 }
 
-type DnsMapLike =
-  | Record<string, { devices?: Record<string, CtiDnsDevice> }>
-  | null
-  | undefined;
+interface SearchableRouteItem {
+  path: string;
+  label: string;
+}
+
+type DnsMapLike = Record<
+	string,
+	{ devices?: Record<string, CtiDnsDevice> }
+> | null | undefined;
 
 function findMatchingActiveCall(
   activeCalls: Map<string, CtiActiveCallEntry>,
@@ -108,6 +98,30 @@ function findMatchingActiveCall(
 ): CtiActiveCallEntry | undefined {
   const calls = Array.from(activeCalls.values());
   return calls.find((call) => isSameCtiCallForActiveLookup(call, incomingCall));
+}
+
+function findAnsweredIncomingCall(
+  activeCalls: Map<string, CtiActiveCallEntry>,
+  incomingCall: IncomingCallData
+): CtiActiveCallEntry | undefined {
+  const calls = Array.from(activeCalls.values()) as CtiActiveCallEntry[];
+  return calls.find((call) => {
+    const sameCall =
+      call.callId === incomingCall.callId ||
+      (call.callingAddress === incomingCall.callingAddress &&
+        call.calledAddress === incomingCall.calledAddress);
+    const notRinging = call.status && call.status !== 'ringing';
+    return Boolean(sameCall && notRinging);
+  });
+}
+
+function getNotificationsOverflowLabel(totalUnreadCount: number): string {
+  if (totalUnreadCount <= 0) {
+    return 'Notifications';
+  }
+
+  const countLabel = totalUnreadCount > 99 ? '99+' : String(totalUnreadCount);
+  return `Notifications (${countLabel})`;
 }
 
 function getUserDevicesFromDnsMap(
@@ -141,67 +155,65 @@ const Layout = ({ children }: LayoutProps) => {
   const router = useRouter();
   const { data: session, status } = useSession();
   const { logout } = useAuth();
-  const { unreadCount } = useNotifications();
-  const { isOpen: isDialerOpen, openDialer, closeDialer } = useDialerModal();
-  const {
-    isInitialized,
-    userAddress,
-    dnsMap,
-    callStateMap,
-    attendCall,
-    endCall,
-    getUserDataExtensions,
-    activeCalls,
-    makeCall,
-    dialNumber,
-    getAllUserDevices,
-  } = useCti();
-  const {
-    incomingCall,
-    showIncomingCallModal,
-    setIncomingCall,
-    setShowIncomingCallModal,
-  } = useIncomingCall();
-  const { hasPermission } = usePermissions();
-  const [isDialing, setIsDialing] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-  const [showNotificationsSidebar, setShowNotificationsSidebar] =
-    useState(false);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [showCreateDropdown, setShowCreateDropdown] = useState(false);
+	const { unreadCount } = useNotifications();
+	const { isOpen: isDialerOpen, openDialer, closeDialer } = useDialerModal();
+  const { 
+		isInitialized, 
+		userAddress, 
+		dnsMap, 
+		attendCall, 
+		endCall,
+		getUserDataExtensions,
+		activeCalls,
+		makeCall,
+		dialNumber,
+		getAllUserDevices
+	} = useCti();
+  
+  import {
+  hasReliableCtiCallId,
+  isSameCtiCallForActiveLookup,
+  resolveCallIdForAttendApi,
+  shouldDismissIncomingModalForAnsweredElsewhere,
+} from "@utils/incomingCallMatching";
+  
+	const { incomingCall, showIncomingCallModal, setIncomingCall, setShowIncomingCallModal } = useIncomingCall();
+	const { hasPermission } = usePermissions();
+	const [isDialing, setIsDialing] = useState(false);
+	const [sidebarOpen, setSidebarOpen] = useState(true);
+	const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [showNotificationsSidebar, setShowNotificationsSidebar] = useState(false);
+	const [showUserDropdown, setShowUserDropdown] = useState(false);
+	const [showCreateDropdown, setShowCreateDropdown] = useState(false);
+  const [showIconsDropdown, setShowIconsDropdown] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
-  const dialerButtonRef = useRef<HTMLButtonElement>(null);
-  const [dialerPosition, setDialerPosition] = useState({ top: 0, right: 0 });
-  const [dialedNumber, setDialedNumber] = useState("");
-  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
-    useState(false);
-  const [availableDevices, setAvailableDevices] = useState<CtiDialerDevice[]>(
-    [],
-  );
-  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
-  const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
-  const headerLogoUrlRef = useRef<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
-  const searchWrapperRef = useRef<HTMLDivElement>(null);
-  const searchableRoutes = useMemo(() => getSearchableRoutes(), []);
-  const searchSuggestions = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
-    const userPerms = session?.user?.permissions;
-    return searchableRoutes
-      .filter(
-        (r) =>
-          (r.path.toLowerCase().includes(q) ||
-            r.label.toLowerCase().includes(q)) &&
-          canAccessRoute(userPerms, r.path),
-      )
-      .slice(0, 10);
-  }, [searchQuery, searchableRoutes, session?.user?.permissions]);
-  const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
-  const [showCreateCompanySidebar, setShowCreateCompanySidebar] =
-    useState(false);
+  const iconsDropdownRef = useRef<HTMLDivElement>(null);
+	const dialerButtonRef = useRef<HTMLButtonElement>(null);
+	const [dialerPosition, setDialerPosition] = useState({ top: 0, right: 0 });
+	const [dialedNumber, setDialedNumber] = useState('');
+	const [showDeviceSelectionModal, setShowDeviceSelectionModal] = useState(false);
+	const [availableDevices, setAvailableDevices] = useState<CtiDialerDevice[]>([]);
+	const [pendingDialedNumber, setPendingDialedNumber] = useState('');
+	const [headerLogoUrl, setHeaderLogoUrl] = useState<string | null>(null);
+	const headerLogoUrlRef = useRef<string | null>(null);
+	const [searchQuery, setSearchQuery] = useState('');
+	const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+	const searchWrapperRef = useRef<HTMLDivElement>(null);
+  const searchableRoutes = useMemo<SearchableRouteItem[]>(() => getSearchableRoutes() as SearchableRouteItem[], []);
+	const searchSuggestions = useMemo(() => {
+		const q = searchQuery.trim().toLowerCase();
+		if (!q) return [];
+		const userPerms = session?.user?.permissions;
+		return searchableRoutes.filter(
+      (r: SearchableRouteItem) =>
+				(r.path.toLowerCase().includes(q) || r.label.toLowerCase().includes(q)) &&
+				canAccessRoute(userPerms, r.path)
+		).slice(0, 10);
+	}, [searchQuery, searchableRoutes, session?.user?.permissions]);
+	const [showCreateLeadModal, setShowCreateLeadModal] = useState(false);
+	const [showCreateCompanySidebar, setShowCreateCompanySidebar] = useState(false);
+  const [showCreateTicketSidebar, setShowCreateTicketSidebar] = useState(false);
+  const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
   const [showBreezeAssistant, setShowBreezeAssistant] = useState(false);
   const [breezeMaximized, setBreezeMaximized] = useState(false);
 
@@ -670,6 +682,9 @@ const Layout = ({ children }: LayoutProps) => {
         .main-content-wrapper {
           transition: margin-left 0.3s ease-in-out;
         }
+          .app-content-area {
+          margin-left:65px;
+          }
         
         /* CRM Prime-style top bar */
         .app-topbar-merged {
@@ -684,6 +699,8 @@ const Layout = ({ children }: LayoutProps) => {
           position: relative;
           width: 100%;
           max-width: 525px;
+          min-width: 220px;
+          flex: 0 1 525px;
         }
         
         .crm-prime-search-input {
@@ -696,6 +713,63 @@ const Layout = ({ children }: LayoutProps) => {
           color: #fff;
           font-size: 14px;
           transition: background 0.2s, border-color 0.2s;
+        }
+
+        .topbar-actions-group {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .topbar-actions-inline {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .topbar-actions-overflow {
+          display: none;
+          position: relative;
+        }
+
+        .topbar-overflow-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          right: 0;
+          min-width: 190px;
+          background: #ffffff;
+          border: 1px solid #dfe3e8;
+          border-radius: 6px;
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.14);
+          z-index: 1050;
+          padding: 6px 0;
+        }
+
+        .topbar-overflow-item {
+          width: 100%;
+          border: none;
+          background: transparent;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          font-size: 14px;
+          color: #1f2937;
+          text-align: left;
+        }
+
+        .topbar-overflow-item:hover {
+          background: #f5f8fa;
+        }
+
+        .topbar-overflow-item:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .crm-prime-assistant-label {
+          font-size: 13px;
+          font-weight: 100;
         }
         
         .crm-prime-search-input::placeholder {
@@ -1111,26 +1185,62 @@ font-weight:600;
 			text-decoration: none;
 			border-bottom: 1px solid #006162;
 			cursor: pointer;
+      border: none !important;
+      border-bottom: 1px solid #006162 !important;
+      background: transparent !important;
         }
         
         .user-dropdown-footer-link:hover {
           color: #007a8f;
           border-bottom-color: #007a8f;
         }
+          @media (max-width: 1400px) {
+          
+          
+          .crm-prime-search-wrapper {
+            max-width: 320px;
+          }
+          
+        }
+
+        @media (max-width: 1200px) {
+          .topbar-actions-inline {
+            display: none;
+          }
+
+          .topbar-actions-overflow {
+            display: block;
+          }
+
+          .crm-prime-assistant-label {
+            display: none;
+          }
+        }
         
         @media (max-width: 991px) {
+        .crm-prime-create-btn {
+          display: none;
+        }
           .app-topbar-merged { 
-            left: 0 !important; 
-            width: 100% !important; 
+            /*left: 0 !important; 
+            width: 100% !important; */
           }
-          .app-content-area { 
+          /*.app-content-area { 
             margin-left: 0 !important; 
-          }
-          .crm-prime-search-wrapper {
-            max-width: 220px;
-          }
+          }*/
+          
           .crm-prime-user-info {
             display: none;
+          }
+
+          .crm-prime-search-wrapper {
+            width: 200px;
+            min-width: 200px;
+            max-width: 200px;
+          }
+
+          .topbar-actions-group {
+            gap: 6px;
           }
         }
 
@@ -1151,32 +1261,9 @@ font-weight:600;
         }
       `}</style>
 
-      <div
-        className="min-vh-100 d-flex flex-column"
-        style={{ backgroundColor: "#f0f0f0" }}
-      >
-        {/* Sidebar Toggle Button (mobile) */}
-        <Button
-          variant="primary"
-          className="position-fixed d-lg-none"
-          style={{
-            top: "80px",
-            left: sidebarOpen ? "270px" : "10px",
-            zIndex: 1100,
-            width: "40px",
-            height: "40px",
-            padding: "0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: "50%",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-            transition: "left 0.3s ease-in-out",
-          }}
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-        >
-          {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-        </Button>
+<div className="min-vh-100 d-flex flex-column" style={{ backgroundColor: '#f0f0f0' }}>
+
+
 
         {/* Top bar */}
         <nav
@@ -1214,16 +1301,45 @@ font-weight:600;
                     setSearchQuery(e.target.value);
                     setShowSearchSuggestions(true);
                   }}
-                  onFocus={() =>
-                    searchQuery.trim() && setShowSearchSuggestions(true)
-                  }
-                  style={{ paddingRight: "68px" }}
-                />
-                {showSearchSuggestions &&
-                  searchQuery.trim() &&
-                  searchSuggestions.length > 0 && (
-                    <div
-                      className="create-dropdown-menu"
+                >
+                  {searchSuggestions.map((r: SearchableRouteItem) => (
+                    <button
+                      key={r.path}
+                      type="button"
+                      className="create-dropdown-item"
+                      onClick={() => {
+                        if (canAccessRoute(session?.user?.permissions, r.path)) {
+                          router.push(r.path);
+                          setSearchQuery('');
+                          setShowSearchSuggestions(false);
+                        }
+                      }}
+                    >
+                      <span>{r.label}</span>
+                      <span className="text-muted small ms-1">{r.path}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {/* Create Button */}
+                <div >
+                
+                <button
+                  type="button"
+                  className="crm-prime-create-btn"
+                  onClick={() => setShowCreateDropdown(!showCreateDropdown)}
+                  title="Create new"
+                >
+                  <Plus size={14} />
+                    </button>
+                
+                
+                {/* Create Dropdown */}
+                {showCreateDropdown && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Close create menu"
                       style={{
                         position: "absolute",
                         top: "100%",
@@ -1333,34 +1449,21 @@ font-weight:600;
                           </button>
                         )}
 
-                        {session?.user?.permissions?.includes(
-                          PERMISSIONS.MANAGE_HELP_CENTER,
-                        ) && (
-                          <button
-                            className="create-dropdown-item"
-                            onClick={() => {
-                              setShowCreateDropdown(false);
-                              router.push("/help-center/my-tickets/new");
-                            }}
-                          >
-                            Ticket
+                        {session?.user?.permissions?.includes(PERMISSIONS.MANAGE_HELP_CENTER) && (
+                        <button className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          setShowCreateTicketSidebar(true);
+                        }}>
+                        Ticket
                           </button>
                         )}
 
-                        {session?.user?.permissions?.includes(
-                          PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER,
-                        ) && (
-                          <button
-                            type="button"
-                            className="create-dropdown-item"
-                            onClick={() => {
-                              setShowCreateDropdown(
-                                false,
-                              ); /* Add Task handler */
-                              router.push("/planner/tasks");
-                            }}
-                          >
-                            Task
+                        {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
+                        <button type="button" className="create-dropdown-item" onClick={() => {
+                          setShowCreateDropdown(false);
+                          setShowCreateTaskSidebar(true);
+                        }}>
+                        Task
                           </button>
                         )}
                       </div>
@@ -1369,119 +1472,187 @@ font-weight:600;
                 </div>
               </div>
 
-              {/* Icons and user menu */}
-              <div
-                className="ms-auto d-flex align-items-center"
-                style={{ gap: "10px" }}
-              >
-                <GlobalFloatingCallBar />
+            {/* Icons and user menu */}
+            <div className="ms-auto d-flex align-items-center" style={{ gap: '10px' }}>
+              <GlobalFloatingCallBar />
 
-                {/* Dialer Button */}
-                {session?.user?.permissions?.includes(
-                  PERMISSIONS.DIAL_CALL_CTI,
-                ) && (
-                  <button
-                    type="button"
-                    ref={dialerButtonRef}
-                    className="crm-prime-topbar-icon"
-                    disabled={!isInitialized}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (isInitialized) {
-                        openDialer();
-                      }
-                    }}
-                    title="Open Dialer"
-                  >
-                    <Phone size={14} />
-                  </button>
-                )}
+              <div className="topbar-actions-group">
+                <div className="topbar-actions-inline">
+                  {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
+                    <button
+                      type="button"
+                      ref={dialerButtonRef}
+                      className="crm-prime-topbar-icon"
+                      disabled={!isInitialized}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (isInitialized) {
+                          openDialer();
+                        }
+                      }}
+                      title="Open Dialer"
+                    >
+                      <Phone size={14} />
+                    </button>
+                  )}
 
-                {/* Dialer Button */}
-                {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
-                  <button
-                    type="button"
-                    className="crm-prime-topbar-icon"
-                    onClick={() => {
-                      router.push("/communications/wallboards-live");
-                    }}
-                    title="Wallboards (Live)"
-                  >
-                    <MonitorCheck size={14} />
-                  </button>
-                )}
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
+                    <button
+                      type="button"
+                      className="crm-prime-topbar-icon"
+                      onClick={() => {
+                        router.push('/communications/wallboards-live');
+                      }}
+                      title="Wallboards (Live)"
+                    >
+                      <MonitorCheck size={14} />
+                    </button>
+                  )}
 
-                {/* Notifications - opens sidebar */}
-                {session?.user?.permissions?.includes(
-                  PERMISSIONS.VIEW_USER_NOTIFICATIONS,
-                ) && (
-                  <button
-                    type="button"
-                    className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? "has-badge" : ""}`}
-                    data-badge={
-                      totalUnreadCount > 99 ? "99+" : totalUnreadCount
-                    }
-                    onClick={() => setShowNotificationsSidebar(true)}
-                    title="Notifications"
-                  >
-                    <Bell size={14} />
-                  </button>
-                )}
-                {/* Help Icon */}
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
+                    <button
+                      type="button"
+                      className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
+                      data-badge={totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                      onClick={() => setShowNotificationsSidebar(true)}
+                      title="Notifications"
+                    >
+                      <Bell size={14} />
+                    </button>
+                  )}
 
-                {session?.user?.permissions?.includes(
-                  PERMISSIONS.VIEW_HELP_CENTER,
-                ) && (
-                  <button
-                    type="button"
-                    className="crm-prime-topbar-icon"
-                    title="Help"
-                    onClick={() => router.push("/help-center")}
-                  >
-                    <HelpCircle size={18} />
-                  </button>
-                )}
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
+                    <button
+                      type="button"
+                      className="crm-prime-topbar-icon"
+                      title="Help"
+                      onClick={() => router.push('/help-center')}
+                    >
+                      <HelpCircle size={18} />
+                    </button>
+                  )}
 
-                {/* Settings Icon */}
-                {session?.user?.permissions?.includes(
-                  PERMISSIONS.VIEW_SETTINGS,
-                ) && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
+                    <button
+                      type="button"
+                      className="crm-prime-topbar-icon"
+                      title="Settings"
+                      onClick={() => router.push('/main-settings')}
+                    >
+                      <Settings size={18} />
+                    </button>
+                  )}
+                </div>
+
+                <div ref={iconsDropdownRef} className="topbar-actions-overflow">
                   <button
                     type="button"
                     className="crm-prime-topbar-icon"
-                    title="Settings"
-                    onClick={() => router.push("/main-settings")}
+                    onClick={() => setShowIconsDropdown((prev) => !prev)}
+                    title="More actions"
                   >
-                    <Settings size={18} />
+                    <MoreVertical size={16} />
                   </button>
-                )}
-                {/* Divider */}
-                <div
-                  style={{
-                    width: "1px",
-                    height: "28px",
-                    background: "rgba(255, 255, 255, 0.2)",
-                    margin: "0 4px",
-                  }}
-                />
 
-                {/* Assistant Icon */}
+                  {showIconsDropdown && (
+                    <div className="topbar-overflow-menu">
+                      {session?.user?.permissions?.includes(PERMISSIONS.DIAL_CALL_CTI) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          disabled={!isInitialized}
+                          onClick={() => {
+                            if (!isInitialized) return;
+                            setShowIconsDropdown(false);
+                            openDialer();
+                          }}
+                        >
+                          <Phone size={16} />
+                          <span>Dialer</span>
+                        </button>
+                      )}
+
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          onClick={() => {
+                            setShowIconsDropdown(false);
+                            router.push('/communications/wallboards-live');
+                          }}
+                        >
+                          <MonitorCheck size={16} />
+                          <span>Wallboards</span>
+                        </button>
+                      )}
+
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          onClick={() => {
+                            setShowIconsDropdown(false);
+                            setShowNotificationsSidebar(true);
+                          }}
+                        >
+                          <Bell size={16} />
+                          <span>{getNotificationsOverflowLabel(totalUnreadCount)}</span>
+                        </button>
+                      )}
+
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          onClick={() => {
+                            setShowIconsDropdown(false);
+                            router.push('/help-center');
+                          }}
+                        >
+                          <HelpCircle size={16} />
+                          <span>Help</span>
+                        </button>
+                      )}
+
+                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
+                        <button
+                          type="button"
+                          className="topbar-overflow-item"
+                          onClick={() => {
+                            setShowIconsDropdown(false);
+                            router.push('/main-settings');
+                          }}
+                        >
+                          <Settings size={16} />
+                          <span>Settings</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div style={{ 
+                width: '1px', 
+                height: '28px', 
+                background: 'rgba(255, 255, 255, 0.2)',
+                margin: '0 4px'
+              }} />
+
+              {/* Assistant Icon */}
                 {/* <button className="crm-prime-topbar-icon" title="AI Assistant" style={{ width: 'auto', padding: '0 12px', gap: '6px' }}> */}
-                {session?.user?.permissions?.includes(
-                  PERMISSIONS.LIVE_CHAT_USERS,
-                ) && (
-                  <button
-                    type="button"
-                    className="crm-prime-topbar-icon"
-                    title="AI Assistant"
-                    style={{ width: "auto", padding: "0 12px", gap: "6px" }}
-                    onClick={() => setShowBreezeAssistant(!showBreezeAssistant)}
-                  >
-                    <Sparkles size={18} />
-                    <span style={{ fontSize: "13px", fontWeight: 100 }}>
-                      AI Assistant
-                    </span>
+                {session?.user?.permissions?.includes(PERMISSIONS.LIVE_CHAT_USERS) && (
+              <button 
+                type="button"
+                className="crm-prime-topbar-icon" 
+                title="AI Assistant" 
+                style={{ width: 'auto', padding: '0 12px', gap: '6px' }}
+                onClick={() => setShowBreezeAssistant(!showBreezeAssistant)}
+              >
+                <Sparkles size={18} />
+                <span className="crm-prime-assistant-label">AI Assistant</span>
                   </button>
                 )}
 
@@ -1611,19 +1782,34 @@ font-weight:600;
 
                       {/* Links */}
                       <div className="user-dropdown-section">
-                        {session?.user?.permissions?.includes(
-                          "tickets-tickets",
-                        ) && (
-                          <button
-                            type="button"
-                            className="user-dropdown-item"
-                            onClick={() => router.push("/crm/tickets")}
-                          >
-                            {/* <Ticket className="user-dropdown-item-icon" size={14} /> */}
-                            <span className="user-dropdown-item-text">
-                              Raise a ticket
-                            </span>
-                          </button>
+                        
+                          {session?.user?.permissions?.includes('tickets-tickets') && (
+                            <button
+                              type="button"
+                              className="user-dropdown-item"
+                              onClick={() => {
+                                setShowUserDropdown(false);
+                                router.push('/crm/tickets');
+                              }}
+                            >
+                              {/* <Ticket className="user-dropdown-item-icon" size={14} /> */}
+                              <span className="user-dropdown-item-text">Raise a ticket</span>
+                            </button>
+                          )}
+                          
+                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_PRICING_FEATURES) && (
+                        <button type="button" className="user-dropdown-item" onClick={() => router.push('/pricing')}>
+                          {/* <CreditCard className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Pricing & Features</span>
+                          <ExternalLink size={10} style={{ marginLeft: 'auto', color: '#666666' }} />
+                            </button>
+                          )}
+                          
+                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING) && (
+                        <button type="button" className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>
+                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                          <span className="user-dropdown-item-text">Account & Billing</span>
+                        </button>
                         )}
 
                         {session?.user?.permissions?.includes(
@@ -1696,9 +1882,15 @@ font-weight:600;
                             CRM Prime Credits
                           </span>
 
-                          <div className="user-dropdown-credits-count">
-                            1500 of 1500 credits available
+                          
+                        <button type="button" className="user-dropdown-item user-dropdown-credits-head">
+                          <div className="d-flex align-items-center justify-content-between w-100 gap-2">
+                            <span className="user-dropdown-item-text">Prime Credits</span>
+                            <span className="user-dropdown-item-badge">New</span>
                           </div>
+                            
+                          
+                          <div className="user-dropdown-credits-count">0 of 0 credits available</div>
                         </button>
                         <button type="button" className="user-dropdown-item">
                           {/* <Briefcase className="user-dropdown-item-icon" size={14} /> */}
@@ -1734,9 +1926,7 @@ font-weight:600;
                         <button
                           type="button"
                           className="user-dropdown-footer-link"
-                          onClick={() =>
-                            router.push("/main-settings/privacy-consent")
-                          }
+                          onClick={() => router.push('/privacy-policy')}
                         >
                           Privacy policy
                         </button>
@@ -2010,43 +2200,70 @@ font-weight:600;
           )}
         </div>
 
-        <Footer />
-      </div>
+<div
+  className="flex-grow-1 p-3 main-content-wrapper"
+  style={{
+    overflowY: 'auto',
+    width: mainContentWidth,
+    overflow: breezeMaximized ? 'hidden' : 'auto',
+    transition: 'width 0.3s ease-in-out'
+  }}
+>
+  <div className="pc-content">
+    {children}
+  </div>
+</div>
+      
 
-      {/* Notifications Sidebar */}
-      <NotificationsSidebar
-        isOpen={showNotificationsSidebar}
-        onClose={() => setShowNotificationsSidebar(false)}
+			{/* Breeze AI Assistant Sidebar */}
+			{showBreezeAssistant && (
+<BreezeAssistantSidebar
+       isOpen={showBreezeAssistant}
+       onClose={() => { setShowBreezeAssistant(false); setBreezeMaximized(false); }}
+       isMaximized={breezeMaximized}
+       onMaximizeChange={(v) => setBreezeMaximized(v)}
+       width={breezeMaximized ? '100%' : '400px'}
+    />
+			)}
+		</div>
+
+		<Footer />
+		</div>
+
+    	{/* Notifications Sidebar */}
+		<NotificationsSidebar
+			isOpen={showNotificationsSidebar}
+			onClose={() => setShowNotificationsSidebar(false)}
+		/>
+
+		{/* Create Lead Sidebar (from header Create dropdown) */}
+		<CreateLeadModal
+			show={showCreateLeadModal}
+			onHide={() => setShowCreateLeadModal(false)}
+			onSuccess={() => setShowCreateLeadModal(false)}
+		/>
+
+		{/* Create Company Sidebar (from header Create dropdown) */}
+		{showCreateCompanySidebar && (
+			<CreateCompanySidebar
+				onClose={() => setShowCreateCompanySidebar(false)}
+			/>
+		)}
+
+    {showCreateTicketSidebar && (
+      <CreateTicketSidebar
+        onClose={() => setShowCreateTicketSidebar(false)}
+        onSuccess={() => setShowCreateTicketSidebar(false)}
       />
+    )}
 
-      {/* Create Lead Sidebar (from header Create dropdown) */}
-      <CreateLeadModal
-        show={showCreateLeadModal}
-        onHide={() => setShowCreateLeadModal(false)}
-        onSuccess={() => setShowCreateLeadModal(false)}
-      />
-
-      {/* Create Company Sidebar (from header Create dropdown) */}
-      {showCreateCompanySidebar && (
-        <CreateCompanySidebar
-          onClose={() => setShowCreateCompanySidebar(false)}
-          onSave={async (data: CompanyFormPayload) => {
-            try {
-              await createCompany(data);
-              setShowCreateCompanySidebar(false);
-            } catch (error) {
-              toast.error(
-                `Failed to create company: ${getErrorMessage(error)}`,
-                {
-                  toastId: "layout_create_company_failed",
-                },
-              );
-            }
-          }}
-        />
-      )}
-    </>
-  );
+    <CreateTaskModal
+      isOpen={showCreateTaskSidebar}
+      onClose={() => setShowCreateTaskSidebar(false)}
+      onCreate={() => setShowCreateTaskSidebar(false)}
+    />
+		</>
+	);
 };
 
 export default Layout;

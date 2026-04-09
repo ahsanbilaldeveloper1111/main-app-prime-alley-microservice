@@ -6,12 +6,53 @@ import type { Session } from "next-auth";
 
 import moment from "moment-timezone";
 
+type dateType = string | Date | null | undefined;
+
 // Cache for session data to avoid multiple fetches
 let sessionCache: { session: Session | null; timestamp: number } | null = null;
 const SESSION_CACHE_TTL = 5000; // 5 seconds cache TTL
 
+function getWebCrypto(): Crypto {
+  const c = globalThis.crypto;
+  if (c?.getRandomValues == null) {
+    throw new Error("Web Crypto API (getRandomValues) is not available");
+  }
+  return c;
+}
+
+/** Uniform integer in [0, max) for password / ID generation (S2245: avoid Math.random). */
+function randomIntBelow(max: number): number {
+  if (max <= 0) {
+    return 0;
+  }
+  const buf = new Uint32Array(1);
+  const cryptoApi = getWebCrypto();
+  const uint32Space = 2 ** 32;
+  const upperBound = Math.floor(uint32Space / max) * max;
+  let x: number;
+  do {
+    cryptoApi.getRandomValues(buf);
+    x = buf[0]!;
+  } while (x >= upperBound);
+  return x % max;
+}
+
+function secureShuffleString(value: string): string {
+  const chars = value.split("");
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = randomIntBelow(i + 1);
+    const atI = chars[i];
+    const atJ = chars[j];
+    if (atI !== undefined && atJ !== undefined) {
+      chars[i] = atJ;
+      chars[j] = atI;
+    }
+  }
+  return chars.join("");
+}
+
 export const generateCustomId = (prefix = "", length = 12) => {
-  const id = uuidv4().replace(/-/g, ""); // Remove dashes to make it shorter
+  const id = uuidv4().replaceAll("-", "");
   return prefix + id.substring(0, length);
 };
 
@@ -21,27 +62,19 @@ export const generateComplexId = (length = 8) => {
   const digits = "0123456789";
   const special = "!@";
 
-  // Ensure at least one of each type
   let result = "";
-  result += upper.charAt(Math.floor(Math.random() * upper.length));
-  result += lower.charAt(Math.floor(Math.random() * lower.length));
-  result += digits.charAt(Math.floor(Math.random() * digits.length));
-  result += special.charAt(Math.floor(Math.random() * special.length));
+  result += upper.charAt(randomIntBelow(upper.length));
+  result += lower.charAt(randomIntBelow(lower.length));
+  result += digits.charAt(randomIntBelow(digits.length));
+  result += special.charAt(randomIntBelow(special.length));
 
-  // Fill remaining length with random chars from all types
   const allChars = upper + lower + digits + special;
   const remainingLength = length - result.length;
-  for (let i = 0; i < remainingLength; i++) {
-    result += allChars.charAt(Math.floor(Math.random() * allChars.length));
+  for (let i = 0; i < remainingLength; i += 1) {
+    result += allChars.charAt(randomIntBelow(allChars.length));
   }
 
-  // Shuffle the result
-  result = result
-    .split("")
-    .sort(() => Math.random() - 0.5)
-    .join("");
-
-  return result;
+  return secureShuffleString(result);
 };
 
 /**
@@ -84,6 +117,24 @@ export interface TimezoneConversionOptions {
  * @param options - Configuration options for formatting
  * @returns Formatted datetime string in user's timezone
  */
+function parseUtcMomentInput(
+  utcDateTime: string | Date,
+  inputFormat: string,
+): moment.Moment {
+  if (utcDateTime instanceof Date) {
+    return moment.utc(utcDateTime);
+  }
+  let parsed = moment.utc(utcDateTime, inputFormat);
+  if (!parsed.isValid()) {
+    parsed = moment.utc(utcDateTime);
+  }
+  return parsed;
+}
+
+function formatUtcNowWithOptionalZone(outputFormat: string, showTimezone: boolean): string {
+  return moment.utc().format(outputFormat) + (showTimezone ? " UTC" : "");
+}
+
 export const convertUTCToUserTimezone = (
   utcDateTime: string | Date,
   options: TimezoneConversionOptions = {},
@@ -96,49 +147,31 @@ export const convertUTCToUserTimezone = (
   } = options;
 
   try {
-    // Parse the UTC datetime
-    let momentObj: moment.Moment;
+    const momentObj = parseUtcMomentInput(utcDateTime, inputFormat);
 
-    if (utcDateTime instanceof Date) {
-      momentObj = moment.utc(utcDateTime);
-    } else {
-      // Try to parse with the input format first
-      momentObj = moment.utc(utcDateTime, inputFormat);
-
-      // If parsing fails, try common formats
-      if (!momentObj.isValid()) {
-        momentObj = moment.utc(utcDateTime);
-      }
-    }
-
-    // If still invalid and fallback is enabled, return UTC
     if (!momentObj.isValid()) {
       if (fallbackToUTC) {
         console.warn(
           "Invalid datetime provided, falling back to UTC:",
           utcDateTime,
         );
-        return moment.utc().format(outputFormat) + (showTimezone ? " UTC" : "");
+        return formatUtcNowWithOptionalZone(outputFormat, showTimezone);
       }
       throw new Error("Invalid datetime format");
     }
 
-    // Convert to user's timezone
     const userTimezone = momentObj.local();
-
-    // Format the result
     let formatted = userTimezone.format(outputFormat);
 
     if (showTimezone) {
-      const timezoneAbbr = userTimezone.format("z");
-      formatted += ` ${timezoneAbbr}`;
+      formatted += ` ${userTimezone.format("z")}`;
     }
 
     return formatted;
   } catch (error) {
     console.error("Error converting timezone:", error);
     if (fallbackToUTC) {
-      return moment.utc().format(outputFormat) + (showTimezone ? " UTC" : "");
+      return formatUtcNowWithOptionalZone(outputFormat, showTimezone);
     }
     return "Invalid Date";
   }
@@ -354,6 +387,40 @@ export const formatDuration = (seconds: number): string => {
  * formatDateTimeToLocal('2024-01-15 14:30:00', 'YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss')
  * formatDateTimeToLocal('2025-12-24 13:04:08 +04:00', 'YYYY-MM-DD hh:mm:ss A', undefined, 'Asia/Karachi')
  */
+function parseMomentFromDatetimeStringWithoutInputFormat(datetime: string): moment.Moment {
+  const hasTimezone = /[+-]\d{2}:\d{2}$|Z$/.test(datetime);
+
+  if (!hasTimezone) {
+    let m = moment.utc(datetime, "YYYY-MM-DD HH:mm:ss");
+    if (!m.isValid()) {
+      m = moment.utc(datetime);
+    }
+    return m;
+  }
+
+  let momentObj = moment.parseZone(datetime, "YYYY-MM-DD HH:mm:ss ZZ");
+  if (!momentObj.isValid()) {
+    momentObj = moment.parseZone(datetime, "YYYY-MM-DD HH:mm:ss Z");
+  }
+  if (!momentObj.isValid()) {
+    momentObj = moment.parseZone(datetime);
+  }
+  return momentObj.utc();
+}
+
+function buildMomentForFormatDateTimeToLocal(
+  datetime: string | Date,
+  inputFormat?: string,
+): moment.Moment {
+  if (datetime instanceof Date) {
+    return moment.utc(datetime);
+  }
+  if (inputFormat) {
+    return moment.utc(datetime, inputFormat);
+  }
+  return parseMomentFromDatetimeStringWithoutInputFormat(datetime);
+}
+
 export const formatDateTimeToLocal = (
   datetime: string | Date,
   format: string = "YYYY-MM-DD hh:mm:ss A",
@@ -361,63 +428,15 @@ export const formatDateTimeToLocal = (
   targetTimezone?: string,
 ): string => {
   try {
-    // Auto-detect timezone if not provided
     const timezone = targetTimezone || getAutoTimezone();
-
-    let momentObj: moment.Moment;
-
-    if (datetime instanceof Date) {
-      momentObj = moment.utc(datetime);
-    } else if (inputFormat) {
-      // Parse with specific input format as UTC
-      momentObj = moment.utc(datetime, inputFormat);
-    } else {
-      // Check if datetime string contains timezone offset (e.g., +04:00, -05:00, Z)
-      const hasTimezone = /[+-]\d{2}:\d{2}$|Z$/.test(datetime);
-
-      if (hasTimezone) {
-        // Parse with timezone offset - ZZ format handles +04:00 (with colon)
-        // Try ZZ first (handles +04:00), then Z (handles +0400), then auto-detect
-        momentObj = moment.parseZone(datetime, "YYYY-MM-DD HH:mm:ss ZZ");
-
-        if (!momentObj.isValid()) {
-          momentObj = moment.parseZone(datetime, "YYYY-MM-DD HH:mm:ss Z");
-        }
-
-        // If format parsing fails, try without format (for ISO formats)
-        if (!momentObj.isValid()) {
-          momentObj = moment.parseZone(datetime);
-        }
-
-        // parseZone preserves the timezone offset
-        // Convert to UTC first, then we'll convert to target timezone
-        // This ensures proper timezone conversion
-        momentObj = momentObj.utc();
-      } else {
-        // Parse as UTC (server sends UTC times without offset)
-        // Try common UTC formats first
-        momentObj = moment.utc(datetime, "YYYY-MM-DD HH:mm:ss");
-
-        // If that fails, try auto-detect but still assume UTC
-        if (!momentObj.isValid()) {
-          momentObj = moment.utc(datetime);
-        }
-      }
-    }
+    const momentObj = buildMomentForFormatDateTimeToLocal(datetime, inputFormat);
 
     if (!momentObj.isValid()) {
       console.warn("Invalid datetime format:", datetime);
       return "Invalid Date";
     }
 
-    // Convert to target timezone and format
-    // If momentObj is in parseZone mode (has timezone), convert to target timezone
-    // Otherwise, it's already in UTC mode, so convert to target timezone
-    if (momentObj.isValid()) {
-      return momentObj.tz(timezone).format(format);
-    }
-
-    return "Invalid Date";
+    return momentObj.tz(timezone).format(format);
   } catch (error) {
     console.error("Error formatting datetime:", error);
     return "Invalid Date";
@@ -507,66 +526,94 @@ export const debugTimezoneConversion = (date: string, time: string) => {
   };
 };
 
-export const GlobalDateFormat = "DD MMM YYYY";
+/** Moment format: full month and comma before year (e.g. "30 March, 2026"). */
+export const GlobalDateFormat = "D MMMM, YYYY";
 export const GlobalTimeFormat = "hh:mm:ss A";
-export const GlobalDateTimeFormat = "DD MMM YYYY hh:mm:ss A";
+export const GlobalDateTimeFormat = "D MMMM, YYYY hh:mm:ss A";
+
+/** Calendar date for UI using {@link GlobalDateFormat} (e.g. `"02 Apr 2026"`). */
+export const formatDateGlobal = (
+  date: string | number | Date | null | undefined,
+): string => {
+  if (date == null || date === "") return "";
+  const m = moment(date);
+  return m.isValid() ? m.format(GlobalDateFormat) : "";
+};
+
+/** Date and time for UI using {@link GlobalDateTimeFormat}. */
+export const formatDateTimeGlobal = (
+  date: string | number | Date | null | undefined,
+): string => {
+  if (date == null || date === "") return "";
+  const m = moment(date);
+  return m.isValid() ? m.format(GlobalDateTimeFormat) : "";
+};
 
 /**
- * Format date for table display (e.g., "13 Dec, 2025")
- * @param date - The date string or Date object
- * @returns Formatted date string (e.g., "13 Dec, 2025")
+ * CRM tables and preview: full month name and comma before year (e.g. "30 March, 2026").
  */
-export const formatDateForTable = (
-  date: string | Date | null | undefined,
+export const formatCrmPreviewDate = (
+  date: dateType,
 ): string => {
   if (!date) return "";
-
   try {
     const dateObj = typeof date === "string" ? new Date(date) : date;
-    if (isNaN(dateObj.getTime())) return "";
+    if (Number.isNaN(dateObj.getTime())) return "";
 
     const day = dateObj.getDate();
     const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
+      "January",
+      "February",
+      "March",
+      "April",
       "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ];
     const month = monthNames[dateObj.getMonth()];
     const year = dateObj.getFullYear();
 
-    return `${day} ${month} ${year}`;
+    return `${day} ${month}, ${year}`;
   } catch (error) {
-    console.error("Error formatting date:", error);
+    console.error("Error formatting CRM preview date:", error);
     return "";
   }
 };
 
 /**
- * Format seconds into minutes and seconds (e.g., "1m 20s")
- * @param seconds - Duration in seconds
- * @returns Formatted duration string (e.g., "1m 20s", "20s")
+ * Format date for table display (same as {@link formatCrmPreviewDate}: e.g. "30 March, 2026").
  */
-export const formatMinutesAndSeconds = (seconds: number): string => {
-  if (!seconds || seconds < 0) return "00:00:00";
-
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-
-  // if (minutes === 0) return `${secs}s`;
-  // return `${minutes}m ${secs}s`;
+export const formatDateForTable = (
+  date: string | Date | null | undefined,
+): string => {
+  return formatCrmPreviewDate(date);
 };
+
+/**
+ * CRM preview panels with time: e.g. "30 March, 2025 at 03:45 PM"
+ */
+export const formatCrmPreviewDateTime = (
+  date: dateType,
+): string => {
+  if (!date) return "";
+  try {
+    const m = moment(date);
+    if (!m.isValid()) return "";
+    return m.format("D MMMM, YYYY [at] hh:mm A");
+  } catch (error) {
+    console.error("Error formatting CRM preview datetime:", error);
+    return "";
+  }
+};
+
+/** Alias of {@link formatDuration} (zero-padded `HH:MM:SS`). */
+export const formatMinutesAndSeconds = (seconds: number): string =>
+  formatDuration(seconds);
 
 export const convertSecondsToHHMMSS = (seconds: number): string => {
   if (!seconds || seconds < 0) return "0s";
@@ -631,7 +678,7 @@ export const ModuleSlug = {
 };
 
 export const formatCurrency = (amount: number | null): string => {
-  if (amount === null || amount === 0 || amount === 0.0 || amount === 0.0) {
+  if (amount === null || amount === 0) {
     return "0.00";
   }
   return new Intl.NumberFormat("en-US", {
@@ -669,6 +716,18 @@ export const formatNumber = (
     minimumFractionDigits: withoutDecimals ? 0 : 2,
     maximumFractionDigits: withoutDecimals ? 0 : 2,
   }).format(numAmount);
+};
+
+/** Human-readable file size for CRM attachment lists (shared by deals, approvals, orders). */
+export const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const idx = Math.min(Math.max(i, 0), sizes.length - 1);
+  return (
+    Math.round((bytes / Math.pow(k, idx)) * 100) / 100 + " " + sizes[idx]
+  );
 };
 
 /**
@@ -762,9 +821,14 @@ const getSecretKey = (): string => {
  */
 const xorCipher = (text: string, key: string): string => {
   let result = "";
-  for (let i = 0; i < text.length; i++) {
+  for (let i = 0; i < text.length; ) {
+    const cp = text.codePointAt(i);
+    if (cp === undefined) break;
+    const charLen = cp > 0xffff ? 2 : 1;
     const keyChar = key[i % key.length];
-    result += String.fromCharCode(text.charCodeAt(i) ^ keyChar.charCodeAt(0));
+    const keyCp = keyChar.codePointAt(0) ?? 0;
+    result += String.fromCodePoint(cp ^ keyCp);
+    i += charLen;
   }
   return result;
 };
@@ -781,14 +845,13 @@ const rotateChars = (
   return text
     .split("")
     .map((char) => {
-      const code = char.charCodeAt(0);
+      const code = char.codePointAt(0) ?? 0;
       if (code >= 32 && code <= 126) {
-        // Printable ASCII range
         const range = 126 - 32 + 1;
         const newCode = forward
           ? ((code - 32 + shift) % range) + 32
           : ((code - 32 - shift + range) % range) + 32;
-        return String.fromCharCode(newCode);
+        return String.fromCodePoint(newCode);
       }
       return char;
     })
@@ -979,6 +1042,55 @@ type validationRule<
       type?: ValidationType;
       required?: boolean;
     };
+
+type ValidationFieldEntry = Readonly<{
+  value: unknown;
+  name: string;
+  isRequired: boolean;
+  validationType?: ValidationType;
+}>;
+
+type ObjectValidationRule<T extends { [key: string]: unknown }> = {
+  field: keyof T;
+  name: string;
+  type?: ValidationType;
+  required?: boolean;
+};
+
+function isObjectValidationRule<T extends { [key: string]: unknown }>(
+  field: validationRule<T>,
+): field is ObjectValidationRule<T> {
+  return typeof field === "object" && field !== null && "field" in field;
+}
+
+function resolveValidationFieldEntry<T extends { [key: string]: unknown }>(
+  object: T,
+  field: validationRule<T>,
+): ValidationFieldEntry {
+  if (isObjectValidationRule(field)) {
+    return {
+      value: object[field.field],
+      name: field.name,
+      isRequired: field.required ?? true,
+      validationType: field.type,
+    };
+  }
+  return {
+    value: object[field],
+    name: String(field),
+    isRequired: true,
+  };
+}
+
+function pushTypedValidationError(
+  displayName: string,
+  type: ValidationType,
+  errorMessages: string[],
+): void {
+  const method = customErrorMessages[type];
+  errorMessages.push(method ? method(displayName) : `Please fix ${displayName}`);
+}
+
 export function checkRequiredFields<
   T extends {
     [key: string]: unknown;
@@ -987,35 +1099,23 @@ export function checkRequiredFields<
   let isValid = true;
   const missingFields: string[] = [];
   const errorMessages: string[] = [];
+
   for (const field of requiredFields) {
-    let value: unknown = "";
-    let name: string = "";
-    const isRequired =
-      typeof field === "object" ? (field?.required ?? true) : true;
-    if (typeof field === "string") {
-      value = object[field];
-      name = field;
-    } else if (typeof field === "object") {
-      value = object[field.field];
-      name = field.name;
-      if (field?.type && value) {
-        const isFieldValid = checkFieldValidation(value, field.type);
-        if (!isFieldValid) {
-          isValid = false;
-          const method = customErrorMessages?.[field.type];
-          let errMessage = `Please fix ${field.name}`;
-          if (method) {
-            errMessage = method(field.name);
-          }
-          errorMessages.push(errMessage);
-        }
+    const entry = resolveValidationFieldEntry(object, field);
+
+    if (entry.validationType && entry.value) {
+      if (!checkFieldValidation(entry.value, entry.validationType)) {
+        isValid = false;
+        pushTypedValidationError(entry.name, entry.validationType, errorMessages);
       }
     }
-    if (isRequired && !value) {
+
+    if (entry.isRequired && !entry.value) {
       isValid = false;
-      missingFields.push(name);
+      missingFields.push(entry.name);
     }
   }
+
   if (!isValid && missingFields.length > 0) {
     toast.error(
       `The following fields are required: ${missingFields.join(", ")}`,
@@ -1043,11 +1143,44 @@ function checkFieldValidation(value: unknown, type: ValidationType): boolean {
   return isValid;
 }
 
-function isValidEmail(value: unknown): boolean {
-  if (typeof value === "string") {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const MAX_EMAIL_LENGTH = 254;
+const MAX_EMAIL_LOCAL_PART_LENGTH = 64;
+
+function emailSegmentContainsAtOrWhitespace(segment: string): boolean {
+  for (const ch of segment) {
+    if (ch === "@" || /\s/.test(ch)) {
+      return true;
+    }
   }
   return false;
+}
+
+export function isValidEmail(value: unknown): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const s = value.trim();
+  if (s.length === 0 || s.length > MAX_EMAIL_LENGTH) {
+    return false;
+  }
+  const at = s.indexOf("@");
+  if (at <= 0 || at !== s.lastIndexOf("@")) {
+    return false;
+  }
+  const local = s.slice(0, at);
+  const domain = s.slice(at + 1);
+  if (
+    local.length > MAX_EMAIL_LOCAL_PART_LENGTH ||
+    emailSegmentContainsAtOrWhitespace(local) ||
+    emailSegmentContainsAtOrWhitespace(domain)
+  ) {
+    return false;
+  }
+  const labels = domain.split(".");
+  if (labels.length < 2 || labels.some((label) => label.length === 0)) {
+    return false;
+  }
+  return true;
 }
 
 function isValide164PhoneNumber(value: unknown): boolean {
@@ -1056,6 +1189,26 @@ function isValide164PhoneNumber(value: unknown): boolean {
     return phoneNumber?.isValid() ?? false;
   }
   return false;
+}
+
+/** Toolbar/search text: strip invisible chars, collapse whitespace, trim. */
+export function normalizeSearchQuery(value: string | null | undefined): string {
+  if (value == null) return "";
+  return String(value)
+    .replaceAll(/[\u200B-\u200D\uFEFF\u2060]/g, "")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Search field while typing: strip zero-width / invisible chars only.
+ * Do not trim or collapse whitespace here — trimming on each keystroke removes
+ * trailing spaces and breaks typing multi-word queries (e.g. "John Doe").
+ * Use {@link normalizeSearchQuery} when committing search (Enter / API).
+ */
+export function sanitizeSearchInputLive(value: string | null | undefined): string {
+  if (value == null) return "";
+  return String(value).replaceAll(/[\u200B-\u200D\uFEFF\u2060]/g, "");
 }
 
 export const getGlobalExcludedPaths = () => ["/auth/signin"];
@@ -1070,8 +1223,8 @@ export enum RECORD_TYPES {
 
 
 export const FORMAT_CLOCK = (clock: string) => {
-  const num = parseInt(clock, 10);
-  if (isNaN(num)) return clock;
+  const num = Number.parseInt(clock, 10);
+  if (Number.isNaN(num)) return clock;
 
   const d = new Date(num * 1000);
 
@@ -1102,7 +1255,6 @@ export function getCompanyByCrmId(
   id: string | number | null | undefined,
   companiesObject: { id?: string | number; name?: string }[] | null | undefined
 ): string | undefined {
-  console.log('id', id);
   if (id == null || id === '' || !Array.isArray(companiesObject) || companiesObject.length === 0) {
     return undefined;
   }

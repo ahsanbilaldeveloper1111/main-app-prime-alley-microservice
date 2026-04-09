@@ -55,6 +55,37 @@ export function readListTasksEnvelope(res: unknown): {
   };
 }
 
+/**
+ * Stringify extension/id-like values for Set keys and filters.
+ * Avoids `String(object)` → `[object Object]` by only accepting primitives.
+ */
+export function extensionOrIdToTrimmedString(value: unknown): string {
+  if (value == null || value === '') {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value).trim();
+  }
+  if (typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value).trim();
+  }
+  return '';
+}
+
+/** First non-empty string from candidates (same coercion as {@link extensionOrIdToTrimmedString}). */
+export function firstExtensionOrIdString(...candidates: unknown[]): string {
+  for (const c of candidates) {
+    const s = extensionOrIdToTrimmedString(c);
+    if (s) {
+      return s;
+    }
+  }
+  return '';
+}
+
 export function applyListTabFiltersToParams(
   params: ListTasksParams,
   filters: ListTabFiltersState,
@@ -349,12 +380,22 @@ export function sortStringsLocale(a: string, b: string): number {
   return a.localeCompare(b, undefined, { sensitivity: 'base' });
 }
 
+/** Shown in board priority filter in addition to any `task.priority` values on the board. */
+export const BOARD_FILTER_STANDARD_PRIORITIES: readonly string[] = [
+  'Low',
+  'Medium',
+  'High',
+  'Urgent',
+];
+
 export type BoardTabColumnFilters = {
   searchTerm: string;
   showCompletedTasks: boolean;
   selectedAssignee: string;
   selectedPriority: string;
   selectedLabel: string;
+  /** `'All Statuses'` or a project status id as string (matches `task.status_id` / `task.status.id`). */
+  selectedStatus: string;
 };
 
 /** True when this workflow column represents completed/done work (API flag or name). */
@@ -387,6 +428,66 @@ function taskStatusIdForColumnMatch(task: any): string | null {
   return String(raw);
 }
 
+function boardSearchExcludesTask(task: any, termLower: string): boolean {
+  return Boolean(termLower && !task.title?.toLowerCase().includes(termLower));
+}
+
+function boardHideCompletedExcludesTask(
+  task: any,
+  showCompletedTasks: boolean,
+  doneColumnStatusIds: Set<string>,
+): boolean {
+  if (showCompletedTasks || !task.is_completed) {
+    return false;
+  }
+  const sid = taskStatusIdForColumnMatch(task);
+  return sid == null || !doneColumnStatusIds.has(sid);
+}
+
+function taskAssigneeMatchesSelection(task: any, selected: string): boolean {
+  return Boolean(
+    task.assignees?.some((a: any) => {
+      const ext = String(a.extension_number ?? a.extension ?? a.id ?? '').trim();
+      if (ext && ext === selected) {
+        return true;
+      }
+      const assigneeName = String(a.user?.name || '').trim();
+      return assigneeName.length > 0 && assigneeName === selected;
+    }),
+  );
+}
+
+function boardAssigneeFilterExcludesTask(task: any, selectedAssignee: string): boolean {
+  if (selectedAssignee === 'All Assignees') {
+    return false;
+  }
+  const selected = String(selectedAssignee).trim();
+  return !taskAssigneeMatchesSelection(task, selected);
+}
+
+function boardPriorityFilterExcludesTask(task: any, selectedPriority: string): boolean {
+  if (selectedPriority === 'All Priorities') {
+    return false;
+  }
+  return task.priority?.toLowerCase() !== selectedPriority.toLowerCase();
+}
+
+function boardLabelFilterExcludesTask(task: any, selectedLabel: string): boolean {
+  if (selectedLabel === 'All Labels') {
+    return false;
+  }
+  const hasLabel = task.labels?.some((l: any) => l.name === selectedLabel);
+  return !hasLabel;
+}
+
+function boardStatusFilterExcludesTask(task: any, selectedStatus: string): boolean {
+  if (selectedStatus === 'All Statuses') {
+    return false;
+  }
+  const sid = taskStatusIdForColumnMatch(task);
+  return sid !== String(selectedStatus);
+}
+
 export function filterBoardTasksForColumns(
   tasks: any[],
   filters: BoardTabColumnFilters,
@@ -395,34 +496,23 @@ export function filterBoardTasksForColumns(
   const term = filters.searchTerm.toLowerCase();
   const doneColumnStatusIds = buildCompletedColumnStatusIdSet(projectStatuses);
   return tasks.filter((task: any) => {
-    if (term && !task.title?.toLowerCase().includes(term)) {
+    if (boardSearchExcludesTask(task, term)) {
       return false;
     }
-    if (!filters.showCompletedTasks && task.is_completed) {
-      const sid = taskStatusIdForColumnMatch(task);
-      if (sid == null || !doneColumnStatusIds.has(sid)) {
-        return false;
-      }
+    if (boardHideCompletedExcludesTask(task, filters.showCompletedTasks, doneColumnStatusIds)) {
+      return false;
     }
-    if (filters.selectedAssignee !== 'All Assignees') {
-      const hasAssignee = task.assignees?.some((a: any) => {
-        const assigneeName = a.user?.name || a.extension_number || '';
-        return assigneeName === filters.selectedAssignee;
-      });
-      if (!hasAssignee) {
-        return false;
-      }
+    if (boardAssigneeFilterExcludesTask(task, filters.selectedAssignee)) {
+      return false;
     }
-    if (filters.selectedPriority !== 'All Priorities') {
-      if (task.priority?.toLowerCase() !== filters.selectedPriority.toLowerCase()) {
-        return false;
-      }
+    if (boardPriorityFilterExcludesTask(task, filters.selectedPriority)) {
+      return false;
     }
-    if (filters.selectedLabel !== 'All Labels') {
-      const hasLabel = task.labels?.some((l: any) => l.name === filters.selectedLabel);
-      if (!hasLabel) {
-        return false;
-      }
+    if (boardLabelFilterExcludesTask(task, filters.selectedLabel)) {
+      return false;
+    }
+    if (boardStatusFilterExcludesTask(task, filters.selectedStatus)) {
+      return false;
     }
     return true;
   });

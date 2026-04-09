@@ -5,10 +5,20 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
+import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
+import CrmColorCell from "@components/crm/crmColorCell";
+import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from "@components/crm/crmDialogActionButtonStyles";
 import {
   getStages,
   createStage,
@@ -51,8 +61,52 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
+import { formatCrmPreviewDate, normalizeSearchQuery } from "@utils/Helper";
 
 type StageType = "lead" | "deal" | "order" | "lost_reason";
+
+const STAGES_PREVIEW_LOCAL_STORAGE_KEY = "stages_last_preview_id";
+
+function readStagesPreviewIdFromStorage(): string | null {
+  if (globalThis.window === undefined) return null;
+  try {
+    return globalThis.localStorage.getItem(STAGES_PREVIEW_LOCAL_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStagesPreviewIdToStorage(id: string): void {
+  if (globalThis.window === undefined) return;
+  try {
+    globalThis.localStorage.setItem(STAGES_PREVIEW_LOCAL_STORAGE_KEY, id);
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function clearStagesPreviewIdFromStorage(): void {
+  if (globalThis.window === undefined) return;
+  try {
+    globalThis.localStorage.removeItem(STAGES_PREVIEW_LOCAL_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function findStageByStoredId(
+  list: StageData[],
+  savedId: string,
+): StageData | undefined {
+  const trimmed = savedId.trim();
+  if (!trimmed) return undefined;
+  const asNum = Number(trimmed);
+  const hasNum = !Number.isNaN(asNum);
+  return list.find((s) => {
+    if (hasNum && Number(s.id) === asNum) return true;
+    return String(s.id) === trimmed;
+  });
+}
 
 const PERMISSION_LIST_STAGES = "list-crm-stages";
 const PERMISSION_ADD_STAGES = "add-crm-stages";
@@ -270,14 +324,10 @@ const StagesManagement = () => {
     const normalized = (cols ?? [])
       .map((c) => map[c])
       .filter((c): c is string => Boolean(c));
-
-    const withActions = [...normalized, "actions"].reduce<string[]>((acc, value) => {
+    return normalized.reduce<string[]>((acc, value) => {
       if (!acc.includes(value)) acc.push(value);
       return acc;
     }, []);
-    return withActions.length > 1
-      ? withActions
-      : ["sequence", "name", "type", "description", "color", "actions"];
   };
 
   const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
@@ -287,8 +337,8 @@ const StagesManagement = () => {
   const [stagesPagination, setStagesPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [stagesData, setStagesData] = useState<StageData[]>([]);
   const [allStagesData, setAllStagesData] = useState<StageData[]>([]);
@@ -296,6 +346,27 @@ const StagesManagement = () => {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [stageToRestore, setStageToRestore] = useState<Stage | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [showStageSidebar, setShowStageSidebar] = useState(false);
+  const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
+  const [previewPortalReady, setPreviewPortalReady] = useState(false);
+  const hasAutoOpenedPreview = useRef(false);
+
+  useEffect(() => {
+    setPreviewPortalReady(true);
+  }, []);
+
+  const handlePreviewClick = useCallback((stage: Stage) => {
+    setSelectedStage(stage);
+    setShowStageSidebar(true);
+    writeStagesPreviewIdToStorage(String(stage.id));
+  }, []);
+
+  const handleCloseStageSidebar = useCallback(() => {
+    setShowStageSidebar(false);
+    setSelectedStage(null);
+    clearStagesPreviewIdFromStorage();
+    hasAutoOpenedPreview.current = false;
+  }, []);
 
   const handleCloseSuccessfulModal = () => {
     setShowSuccessfulModal(false);
@@ -344,6 +415,101 @@ const StagesManagement = () => {
   useEffect(() => {
     fetchAllStagesForCounts();
   }, [fetchAllStagesForCounts, refreshKey]);
+
+  useEffect(() => {
+    if (loadingStages) return;
+    if (stagesData.length === 0 && allStagesData.length === 0) return;
+    const rawSaved = readStagesPreviewIdFromStorage();
+    if (!rawSaved) return;
+    const savedId = rawSaved.trim();
+    if (!savedId) return;
+    if (hasAutoOpenedPreview.current) return;
+
+    const n = Number(savedId);
+    if (Number.isNaN(n)) {
+      clearStagesPreviewIdFromStorage();
+      return;
+    }
+
+    const stage =
+      findStageByStoredId(stagesData, savedId) ??
+      findStageByStoredId(allStagesData, savedId);
+    if (!stage) return;
+
+    hasAutoOpenedPreview.current = true;
+    setSelectedStage(stage as unknown as Stage);
+    setShowStageSidebar(true);
+  }, [stagesData, allStagesData, loadingStages]);
+
+  const stagePreviewSections = useMemo((): SidebarSection[] => {
+    if (!selectedStage) return [];
+    const s = selectedStage;
+    const resolveStatusLabel = (row: Stage): string => {
+      if (row.is_won) return "Won";
+      if (row.fold) return "Fold";
+      if (row.is_default) return "Default";
+      return "Active";
+    };
+    const resolveStatusVariant = (row: Stage): string => {
+      if (row.is_won) return "success";
+      if (row.fold) return "danger";
+      if (row.is_default) return "primary";
+      return "success";
+    };
+    const descriptionSection: SidebarSection = {
+      id: "description",
+      title: "Description",
+      icon: FileText,
+      collapsible: true,
+      defaultExpanded: true,
+    };
+    if (s.description) {
+      descriptionSection.fields = [{ label: "Description", value: s.description }];
+    } else {
+      descriptionSection.emptyState = {
+        icon: FileText,
+        message: "No description available.",
+      };
+    }
+    return [
+      {
+        id: "about-stage",
+        title: "About this stage",
+        icon: Target,
+        collapsible: true,
+        defaultExpanded: true,
+        fields: [
+          { label: "Stage Name", value: s.name, copyable: true },
+          { label: "Sequence", value: String(s.sequence) },
+          {
+            label: "Type",
+            value: getTypeDisplayName(s.type),
+            type: "badge" as const,
+            badgeVariant: getTypeBadgeColor(s.type),
+          },
+          { label: "Color", value: s.color },
+          { label: "Probability", value: `${s.probability}%` },
+          {
+            label: "Status",
+            value: resolveStatusLabel(s),
+            type: "badge" as const,
+            badgeVariant: resolveStatusVariant(s),
+          },
+          {
+            label: "Created",
+            value: formatCrmPreviewDate(s.created_at),
+            type: "date" as const,
+          },
+          {
+            label: "Updated",
+            value: formatCrmPreviewDate(s.updated_at),
+            type: "date" as const,
+          },
+        ],
+      },
+      descriptionSection,
+    ];
+  }, [selectedStage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -540,8 +706,12 @@ const StagesManagement = () => {
         label: "Description",
         sortable: false,
         type: "custom",
+        width: "260px",
         render: (stage: Stage) => (
-          <span className="small text-muted">{stage.description || "No description"}</span>
+          <CrmTruncatedDescriptionCell
+            text={stage.description}
+            emptyDisplay="No description"
+          />
         ),
       });
     }
@@ -552,9 +722,7 @@ const StagesManagement = () => {
         label: "Color",
         sortable: false,
         type: "custom",
-        render: (stage: Stage) => (
-          <Badge style={{ backgroundColor: stage.color }}>{stage.color}</Badge>
-        ),
+        render: (stage: Stage) => <CrmColorCell color={stage.color} />,
       });
     }
 
@@ -643,17 +811,17 @@ const StagesManagement = () => {
 
   const sortData = <T,>(
     data: T[],
-    sortColumn: string,
-    sortDirection: "asc" | "desc",
+    sortBy: string,
+    sortOrder: "asc" | "desc",
   ): T[] => {
-    if (!sortColumn) return data;
+    if (!sortBy) return data;
 
     const cell = (row: T, key: string): unknown =>
       (row as Record<string, unknown>)[key];
 
     return [...data].sort((a, b) => {
-      let aVal = cell(a, sortColumn);
-      let bVal = cell(b, sortColumn);
+      let aVal = cell(a, sortBy);
+      let bVal = cell(b, sortBy);
 
       if (aVal === undefined) aVal = "";
       if (bVal === undefined) bVal = "";
@@ -661,8 +829,8 @@ const StagesManagement = () => {
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
 
-      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
+      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
   };
@@ -679,24 +847,23 @@ const StagesManagement = () => {
 
   // Filter and transform stages data (only search filter, type is filtered by API)
   const filteredStages = useMemo(() => {
-    const searchTerm = currentFilters.search || "";
+    const searchTerm = normalizeSearchQuery(currentFilters.search);
+    const query = searchTerm.toLowerCase();
 
     return stagesData.filter((stage) => {
-      // Search filter
-      if (searchTerm) {
-        const matchesSearch =
-          stage.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          stage.description?.toLowerCase().includes(searchTerm.toLowerCase());
-        if (!matchesSearch) return false;
-      }
+      if (!searchTerm) return true;
 
-      return true;
+      const nameNorm = normalizeSearchQuery(stage.name).toLowerCase();
+      const descNorm = normalizeSearchQuery(stage.description).toLowerCase();
+      const matchesSearch =
+        nameNorm.includes(query) || descNorm.includes(query);
+      return matchesSearch;
     });
   }, [stagesData, currentFilters]);
 
   const sortedStages = useMemo(
-    () => sortData(filteredStages, stagesPagination.sortColumn, stagesPagination.sortDirection),
-    [filteredStages, stagesPagination.sortColumn, stagesPagination.sortDirection],
+    () => sortData(filteredStages, stagesPagination.sortBy, stagesPagination.sortOrder),
+    [filteredStages, stagesPagination.sortBy, stagesPagination.sortOrder],
   );
 
   const paginatedStages = useMemo(
@@ -713,8 +880,8 @@ const StagesManagement = () => {
     (column: string, direction: "asc" | "desc") => {
       setStagesPagination((prev) => ({
         ...prev,
-        sortColumn: column,
-        sortDirection: direction,
+        sortBy: column,
+        sortOrder: direction,
         currentPage: 1,
       }));
     },
@@ -767,13 +934,16 @@ const StagesManagement = () => {
   }, [allStagesData]);
 
   const handleToolbarSearchChange = useCallback((value: string) => {
-    setStagesSearch(value);
-    setCurrentFilters((prev) => ({ ...prev, search: value }));
+    const normalized = normalizeSearchQuery(value);
+    setStagesSearch(normalized);
+    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
     setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, []);
 
   const handleToolbarSearchSubmit = useCallback(() => {
-    setCurrentFilters((prev) => ({ ...prev, search: stagesSearch }));
+    const normalized = normalizeSearchQuery(stagesSearch);
+    setStagesSearch(normalized);
+    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
     setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
   }, [stagesSearch]);
 
@@ -1001,8 +1171,8 @@ const StagesManagement = () => {
             actions={[]}
             showActions={false}
             sortable
-            defaultSortColumn={stagesPagination.sortColumn}
-            defaultSortDirection={stagesPagination.sortDirection}
+            defaultSortBy={stagesPagination.sortBy}
+            defaultSortOrder={stagesPagination.sortOrder}
             onSort={handleStagesSort}
             loading={loadingStages}
             emptyMessage="No stages found matching your criteria"
@@ -1036,6 +1206,7 @@ const StagesManagement = () => {
             toolbar={toolbarConfig}
             showToolbarActions={false}
             uniqueKey="id"
+            onPreviewClick={(stage) => handlePreviewClick(stage)}
           />
         </div>
       </div>
@@ -1051,7 +1222,9 @@ const StagesManagement = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Stage Name *</Form.Label>
+                    <Form.Label>
+                      Stage Name <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Control
                       type="text"
                       value={formData.name}
@@ -1065,7 +1238,9 @@ const StagesManagement = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Sequence *</Form.Label>
+                    <Form.Label>
+                      Sequence <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Control
                       type="number"
                       value={formData.sequence}
@@ -1085,7 +1260,9 @@ const StagesManagement = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Type *</Form.Label>
+                    <Form.Label>
+                      Type <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Select
                       value={formData.type}
                       onChange={(e) =>
@@ -1188,6 +1365,7 @@ const StagesManagement = () => {
         onCancel={() => setShowCreateModal(false)}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        useCrmDialogFooterStyle
       />
 
       {/* Update Stage Modal */}
@@ -1202,7 +1380,9 @@ const StagesManagement = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Stage Name *</Form.Label>
+                    <Form.Label>
+                      Stage Name <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Control
                       type="text"
                       value={formData.name}
@@ -1216,7 +1396,9 @@ const StagesManagement = () => {
                 </Col>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Sequence *</Form.Label>
+                    <Form.Label>
+                      Sequence <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Control
                       type="number"
                       value={formData.sequence}
@@ -1236,7 +1418,9 @@ const StagesManagement = () => {
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-3">
-                    <Form.Label>Type *</Form.Label>
+                    <Form.Label>
+                      Type <span className="text-danger">*</span>
+                    </Form.Label>
                     <Form.Select
                       value={formData.type}
                       onChange={(e) =>
@@ -1314,6 +1498,7 @@ const StagesManagement = () => {
         onCancel={handleCloseUpdateModal}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        useCrmDialogFooterStyle
       />
 
       {/* Delete Confirmation Modal */}
@@ -1347,28 +1532,35 @@ const StagesManagement = () => {
             </p>
           )}
         </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowRestoreModal(false);
-              setStageToRestore(null);
-            }}
-            disabled={restoring}
+        <Modal.Footer className="border-0 pt-0">
+          <div
+            className="w-100 d-flex justify-content-end"
+            style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
           >
-            Cancel
-          </Button>
-          <Button
-            variant="success"
-            onClick={() => {
-              handleConfirmRestore().catch((error: unknown) => {
-                consumeHandledApiError(error, "StagesManagement.restoreStageSubmit");
-              });
-            }}
-            disabled={restoring}
-          >
-            {restoring ? "Restoring…" : "Restore"}
-          </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                handleConfirmRestore().catch((error: unknown) => {
+                  consumeHandledApiError(error, "StagesManagement.restoreStageSubmit");
+                });
+              }}
+              disabled={restoring}
+              style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+            >
+              {restoring ? "Restoring…" : "Restore"}
+            </Button>
+            <Button
+              variant="outline-secondary"
+              onClick={() => {
+                setShowRestoreModal(false);
+                setStageToRestore(null);
+              }}
+              disabled={restoring}
+              style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+            >
+              Cancel
+            </Button>
+          </div>
         </Modal.Footer>
       </Modal>
 
@@ -1648,52 +1840,39 @@ const StagesManagement = () => {
                     fontWeight: 500,
                   }}
                 >
-                  {new Date(viewingStage.created_at).toLocaleDateString()}
+                  {formatCrmPreviewDate(viewingStage.created_at)}
                 </div>
               </div>
             </div>
 
             {/* Description */}
-            {viewingStage.description && (
-              <>
-                <div
-                  style={{
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    color: "#1f2937",
-                    marginBottom: "20px",
-                    paddingBottom: "10px",
-                    borderBottom: "2px solid #f8f9fa",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                  }}
-                >
-                  <FileText size={18} style={{ color: "#4680ff" }} />
-                  Description
-                </div>
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    marginBottom: "30px",
-                    fontSize: "14px",
-                    color: "#1f2937",
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {viewingStage.description}
-                </div>
-              </>
-            )}
+            <div
+              style={{
+                fontSize: "16px",
+                fontWeight: 600,
+                color: "#1f2937",
+                marginBottom: "20px",
+                paddingBottom: "10px",
+                borderBottom: "2px solid #f8f9fa",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
+            >
+              <FileText size={18} style={{ color: "#4680ff" }} />
+              Description
+            </div>
+            <CrmDescriptionDetailsBlock
+              text={viewingStage.description}
+              emptyDisplay="No description"
+            />
 
             {/* Action Buttons */}
             <div
               style={{
-                display: "flex",
-                gap: "12px",
-                flexWrap: "wrap",
+                ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                width: "100%",
+                justifyContent: "flex-end",
                 paddingTop: "20px",
                 borderTop: "1px solid #e5e7eb",
               }}
@@ -1701,17 +1880,7 @@ const StagesManagement = () => {
               {session?.user?.permissions?.includes(PERMISSION_EDIT_STAGES) && (
                 <Button
                   variant="primary"
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    fontWeight: 500,
-                    fontSize: "14px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    background: "#4680ff",
-                    border: "none",
-                  }}
+                  style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
                   onClick={() => {
                     setShowViewModal(false);
                     openStageEdit(viewingStage);
@@ -1723,18 +1892,7 @@ const StagesManagement = () => {
               )}
               <Button
                 variant="outline-secondary"
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  fontWeight: 500,
-                  fontSize: "14px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  background: "white",
-                  color: "#6b7280",
-                  border: "2px solid #e5e7eb",
-                }}
+                style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
                 onClick={() => setShowViewModal(false)}
               >
                 Close
@@ -1743,6 +1901,56 @@ const StagesManagement = () => {
           </Modal.Body>
         </Modal>
       )}
+
+      {previewPortalReady &&
+        globalThis.document !== undefined &&
+        showStageSidebar &&
+        selectedStage &&
+        createPortal(
+          <div
+            className="stages-preview-sidebar-portal"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 1050,
+              pointerEvents: "none",
+            }}
+          >
+            <div
+              style={{
+                pointerEvents: "auto",
+                position: "absolute",
+                top: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                height: "100%",
+              }}
+            >
+              <GenericSidebar
+                isOpen={showStageSidebar}
+                onClose={handleCloseStageSidebar}
+                title={selectedStage.name || "Stage Details"}
+                subtitle={getTypeDisplayName(selectedStage.type)}
+                quickActions={[]}
+                avatar={{
+                  initials: (selectedStage.name || "S").slice(0, 2).toUpperCase(),
+                  name: selectedStage.name || "Stage",
+                  gradient: `linear-gradient(135deg, ${selectedStage.color || "#6c757d"} 0%, #4f46e5 100%)`,
+                }}
+                recordLink={{
+                  label: "View full details",
+                  onClick: () => {
+                    handleCloseStageSidebar();
+                    openStageView(selectedStage);
+                  },
+                }}
+                sections={stagePreviewSections}
+              />
+            </div>
+          </div>,
+          globalThis.document.body,
+        )}
 
       <SuccessfulModal
         show={showSuccessfulModal}

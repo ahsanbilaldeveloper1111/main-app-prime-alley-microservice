@@ -16,11 +16,17 @@ import {
   UpdateIndustryPayload,
   CrmProduct,
 } from "@utils/crm";
-import { formatDateTimeToLocal, GlobalDateFormat } from "@utils/Helper";
+import { formatDateTimeToLocal, GlobalDateFormat, formatDateForTable } from "@utils/Helper";
 import GenericTable, {
   TableColumn,
   ToolbarConfig,
 } from "@components/GenericTable";
+import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
+import {
+  CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+  CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+  CRM_DIALOG_SECONDARY_BUTTON_STYLE,
+} from "@components/crm/crmDialogActionButtonStyles";
 import {
   Button,
   Form,
@@ -32,6 +38,7 @@ import {
   Table,
 } from "react-bootstrap";
 import {
+  AlertCircle,
   PlusCircle,
   Eye,
   Edit,
@@ -42,6 +49,7 @@ import {
   FileText,
   Calendar,
   Building2,
+  Check,
 } from "lucide-react";
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -311,7 +319,8 @@ const IndustriesPage = () => {
         label: "Description",
         sortable: false,
         type: "custom",
-        render: (ind) => <div className="text-muted small">{ind.description || "—"}</div>,
+        width: "260px",
+        render: (ind) => <CrmTruncatedDescriptionCell text={ind.description} />,
       },
       {
         key: "created_at",
@@ -420,7 +429,12 @@ const IndustriesPage = () => {
         />
 
         {/* Create/Edit Modal */}
-        <Modal show={showModal} onHide={() => setShowModal(false)} centered>
+        <Modal
+          show={showModal}
+          onHide={() => setShowModal(false)}
+          size="lg"
+          centered
+        >
           <Modal.Header closeButton>
             <Modal.Title>
               {editingIndustry ? "Edit Product Group" : "Add New Product Group"}
@@ -455,24 +469,53 @@ const IndustriesPage = () => {
                 />
               </Form.Group>
             </Modal.Body>
-            <Modal.Footer>
-              <Button
-                variant="secondary"
-                onClick={() => setShowModal(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button variant="primary" type="submit" disabled={submitting}>
-                {submitting ? (
-                  <>
-                    <Spinner size="sm" className="me-2" />
-                    {editingIndustry ? "Updating..." : "Creating..."}
-                  </>
-                ) : (
-                  editingIndustry ? "Update" : "Create"
-                )}
-              </Button>
+            <Modal.Footer className="border-0 pt-2">
+              <div className="d-flex justify-content-between align-items-center w-100 gap-3 flex-nowrap">
+                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 min-w-0 flex-shrink-1 pe-2">
+                  <AlertCircle size={14} className="flex-shrink-0" />
+                  <span style={{ fontSize: "0.813rem" }}>
+                    Fields marked with <span className="text-danger fw-bold">*</span> are required
+                  </span>
+                </Form.Text>
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                    flexWrap: "nowrap",
+                  }}
+                >
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={submitting}
+                    className="d-inline-flex align-items-center justify-content-center gap-2"
+                    style={{
+                      ...CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+                      minWidth: "148px",
+                    }}
+                  >
+                    {submitting ? (
+                      <>
+                        <Spinner size="sm" />
+                        {editingIndustry ? "Updating..." : "Creating..."}
+                      </>
+                    ) : (
+                      <>
+                        <Check size={16} aria-hidden />
+                        {editingIndustry ? "Update" : "Create"}
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => setShowModal(false)}
+                    disabled={submitting}
+                    style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             </Modal.Footer>
           </Form>
         </Modal>
@@ -505,11 +548,10 @@ const IndustriesPage = () => {
               </div>
               <div className="mb-3">
                 <Form.Label className="text-muted small">Description</Form.Label>
-                <div>
-                  {viewingIndustry.description || (
-                    <span className="text-muted fst-italic">No description</span>
-                  )}
-                </div>
+                <CrmDescriptionDetailsBlock
+                  text={viewingIndustry.description}
+                  emptyDisplay="No description"
+                />
               </div>
 
               {/* Products Section */}
@@ -636,19 +678,32 @@ const IndustriesPage = () => {
               </div>
               
             </Modal.Body>
-            <Modal.Footer>
-              <Button variant="secondary" onClick={() => setShowViewModal(false)}>
-                Close
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setShowViewModal(false);
-                  handleOpenModal(viewingIndustry);
-                }}
+            <Modal.Footer className="border-0 pt-0">
+              <div
+                className="w-100 d-flex justify-content-end"
+                style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                Edit
-              </Button>
+                {session?.user?.permissions?.includes("edit-crm-industry") && (
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setShowViewModal(false);
+                      handleOpenModal(viewingIndustry);
+                    }}
+                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                  >
+                    <Edit size={16} aria-hidden />
+                    Edit Product Group
+                  </Button>
+                )}
+                <Button
+                  variant="outline-secondary"
+                  onClick={() => setShowViewModal(false)}
+                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                >
+                  Close
+                </Button>
+              </div>
             </Modal.Footer>
           </Modal>
         )}
@@ -793,27 +848,54 @@ const IndustriesPage = () => {
                 />
               </Form.Group>
 
-              <div className="d-flex justify-content-end gap-2 mt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setShowProductModal(false);
-                    setEditingProduct(null);
+              <div className="d-flex justify-content-between align-items-center gap-3 flex-nowrap mt-4 w-100">
+                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 align-self-center min-w-0 flex-shrink-1 pe-2">
+                  <AlertCircle size={14} className="flex-shrink-0" />
+                  <span style={{ fontSize: "0.813rem" }}>
+                    Fields marked with <span className="text-danger fw-bold">*</span> are required
+                  </span>
+                </Form.Text>
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    ...CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE,
+                    flexWrap: "nowrap",
                   }}
-                  disabled={productSubmitting}
                 >
-                  Cancel
-                </Button>
-                <Button variant="primary" type="submit" disabled={productSubmitting}>
-                  {productSubmitting ? (
-                    <>
-                      <Spinner size="sm" className="me-2" />
-                      {editingProduct ? "Updating..." : "Creating..."}
-                    </>
-                  ) : (
-                    editingProduct ? "Update Product" : "Add Product"
-                  )}
-                </Button>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={productSubmitting}
+                    className="d-inline-flex align-items-center justify-content-center gap-2"
+                    style={{
+                      ...CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+                      minWidth: "170px",
+                    }}
+                  >
+                    {productSubmitting ? (
+                      <>
+                        <Spinner size="sm" />
+                        {editingProduct ? "Updating..." : "Creating..."}
+                      </>
+                    ) : (
+                      <>
+                        <Check size={16} aria-hidden />
+                        {editingProduct ? "Update Product" : "Add Product"}
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline-secondary"
+                    onClick={() => {
+                      setShowProductModal(false);
+                      setEditingProduct(null);
+                    }}
+                    disabled={productSubmitting}
+                    style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             </Form>
           </Modal.Body>
@@ -1160,7 +1242,7 @@ const IndustriesPage = () => {
                   </div>
                   <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
                     <Calendar size={14} style={{ color: "#4680ff", marginRight: "6px" }} />
-                    {new Date(viewingProduct.created_at).toLocaleDateString()}
+                    {formatDateForTable(viewingProduct.created_at)}
                   </div>
                 </div>
               </div>
@@ -1280,37 +1362,41 @@ const IndustriesPage = () => {
                 <FileText size={18} style={{ color: "#4680ff" }} />
                 Description
               </div>
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "20px",
-                  borderRadius: "10px",
-                  marginBottom: "30px",
-                }}
-              >
-                <p style={{ margin: 0, fontSize: "15px", color: "#4b5563", lineHeight: "1.6" }}>
-                  {viewingProduct.description || "No description available"}
-                </p>
-              </div>
+              <CrmDescriptionDetailsBlock
+                text={viewingProduct.description}
+                emptyDisplay="No description available"
+              />
             </Modal.Body>
 
-            <Modal.Footer style={{ borderTop: "1px solid #e5e7eb", padding: "20px 30px" }}>
-              {session?.user?.permissions?.includes('edit-crm-products') && (
+            <Modal.Footer
+              className="border-0"
+              style={{ borderTop: "1px solid #e5e7eb", padding: "20px 30px" }}
+            >
+              <div
+                className="w-100 d-flex justify-content-end"
+                style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
+              >
+                {session?.user?.permissions?.includes("edit-crm-products") && (
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      setShowProductViewModal(false);
+                      handleOpenProductModal(viewingProduct);
+                    }}
+                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                  >
+                    <Edit size={16} aria-hidden />
+                    Edit Product
+                  </Button>
+                )}
                 <Button
-                  variant="outline-primary"
-                  onClick={() => {
-                    setShowProductViewModal(false);
-                    handleOpenProductModal(viewingProduct);
-                  }}
-                  className="d-flex align-items-center gap-2"
+                  variant="outline-secondary"
+                  onClick={() => setShowProductViewModal(false)}
+                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
                 >
-                  <Edit size={16} />
-                  Edit Product
+                  Close
                 </Button>
-              )}
-              <Button variant="secondary" onClick={() => setShowProductViewModal(false)}>
-                Close
-              </Button>
+              </div>
             </Modal.Footer>
           </Modal>
         )}

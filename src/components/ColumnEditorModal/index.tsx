@@ -47,7 +47,7 @@ export const ColumnEditorModal: React.FC<ColumnEditorModalProps> = ({
       </Modal.Header>
       <Modal.Body>
         <p className="text-muted mb-3">
-          Select which columns to display in the table
+          Select which columns to display in the table.
         </p>
         <Row>
           {columns.map((col) => {

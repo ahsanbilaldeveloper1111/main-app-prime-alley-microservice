@@ -1,4 +1,4 @@
-function stringifyApiScalar(value: unknown, fallback = ""): string {
+export function stringifyApiScalar(value: unknown, fallback = ""): string {
   if (value == null) return fallback;
   if (typeof value === "string") return value;
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
@@ -13,7 +13,7 @@ export type ProjectMemberRoleRow = {
   role?: string | null;
 };
 
-function resolveMembersFromProject(project: unknown): ProjectMemberRoleRow[] | undefined {
+export function resolveMembersFromProject(project: unknown): ProjectMemberRoleRow[] | undefined {
   if (project == null || typeof project !== "object") return undefined;
   const p = project as Record<string, unknown>;
   const apiData = p.apiData as { members?: ProjectMemberRoleRow[] } | null | undefined;
@@ -111,4 +111,36 @@ export function canManageProjectFromMembers(
   }
   const role = getProjectMemberRoleForSessionUser(members, sessionUserPhoneOrExtension);
   return allowsTaskContributionFromResolvedRole(role);
+}
+
+function nonEmptyTrimmedScalar(value: unknown): string {
+  return stringifyApiScalar(value).trim();
+}
+
+function firstExtensionFromScalarArray(arr: unknown): string {
+  if (!Array.isArray(arr) || arr.length === 0) return "";
+  return nonEmptyTrimmedScalar(arr[0]);
+}
+
+function firstAssigneeExtensionFromList(assignees: unknown): string {
+  if (!Array.isArray(assignees) || assignees.length === 0) return "";
+  const row = assignees[0];
+  if (row == null || typeof row !== "object") return "";
+  return nonEmptyTrimmedScalar((row as Record<string, unknown>).extension_number);
+}
+
+/**
+ * Resolves a single extension string to treat as the task "owner" for permissions (API may send
+ * `extension_number`, `owner_extension_number`, `created_by_extension_number`, `extension_numbers[0]`, or first assignee).
+ */
+export function resolveTaskExtensionNumberForTaskPermission(task: unknown): string {
+  if (task == null || typeof task !== "object") return "";
+  const t = task as Record<string, unknown>;
+  return (
+    nonEmptyTrimmedScalar(t.extension_number) ||
+    nonEmptyTrimmedScalar(t.owner_extension_number) ||
+    nonEmptyTrimmedScalar(t.created_by_extension_number) ||
+    firstExtensionFromScalarArray(t.extension_numbers) ||
+    firstAssigneeExtensionFromList(t.assignees)
+  );
 }

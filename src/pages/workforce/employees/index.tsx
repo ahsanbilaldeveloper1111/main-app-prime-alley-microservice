@@ -17,7 +17,7 @@ import {
   type UserProfile,
   type UserProfileAddress,
 } from "@utils/staffManagement";
-import { useMainAppLookups } from "@hooks/useMainAppLookups";
+import { useMainAppLookups, type MainAppUserLookup } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Button, Form, Modal } from "react-bootstrap";
 import GenericTable, { TableAction, TableColumn } from "@components/GenericTable";
@@ -28,6 +28,7 @@ import "@assets/scss/tabs.scss";
 import { Search, ChevronDown, Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
+import { formatPhoneForDisplay } from "@utils/phoneDisplay";
 import Select from "react-select";
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
@@ -79,6 +80,13 @@ interface MainAppUser {
   [key: string]: unknown;
 }
 
+/** Value sent as `user_ids` in getUserProfiles — matches profile `user_id` (phone / extension). */
+function userIdForProfilePayload(u: { phone?: string | null }): string {
+  const raw = u.phone;
+  if (raw == null) return "";
+  return String(raw).trim();
+}
+
 /** Address form row with country-state-city cascade fields */
 type AddressFormItem = UserProfileAddress & { state?: string; countryCode?: string; stateCode?: string };
 
@@ -86,7 +94,73 @@ function displayProfileName(p: UserProfile): string {
   return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
 }
 
+/** Label for department headcount chart: resolve id via main-app departments, else legacy name or placeholder */
+function departmentHeadcountDisplayName(
+  departmentId: number | null,
+  departments: MainAppDepartment[],
+  legacyName?: string | null
+): string {
+  if (departmentId != null) {
+    const match = departments.find((d) => Number(d.id) === Number(departmentId));
+    if (match?.name != null && String(match.name).trim() !== "") {
+      return String(match.name).trim();
+    }
+    return `Department ${departmentId}`;
+  }
+  if (legacyName != null && legacyName.trim() !== "") {
+    return legacyName.trim();
+  }
+  return "—";
+}
+
+function parseDepartmentIdFromApi(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function legacyDisplayNameFromApi(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return null;
+}
+
+interface DepartmentHeadcountRawRow {
+  departmentId: number | null;
+  count: number;
+  legacyName: string | null;
+}
+
+interface DepartmentHeadcountChartRow {
+  name: string;
+  count: number;
+  color: string;
+  rowKey: string;
+}
+
 const ITEMS_PER_PAGE = 15;
+
+const DEPARTMENT_CHART_COLORS = [
+  "#6366f1",
+  "#10b981",
+  "#f59e0b",
+  "#ec4899",
+  "#8b5cf6",
+  "#06b6d4",
+  "#84cc16",
+  "#f97316",
+];
 
 const E164_MAX_DIGITS = 15;
 
@@ -174,6 +248,28 @@ function hierarchyLabel(item: unknown): string {
   return "—";
 }
 
+/** Local calendar date as YYYY-MM-DD for `<input type="date" min>` and comparisons */
+function localDateIsoToday(): string {
+  return moment().format("YYYY-MM-DD");
+}
+
+/**
+ * Earliest allowed journey start: not before the employee record's `created_at` (local calendar day)
+ * and not before today.
+ */
+function journeyStartDateMinIso(profile: UserProfile | null | undefined): string {
+  const today = localDateIsoToday();
+  if (profile == null) return today;
+  const raw = profile["created_at"];
+  if (typeof raw !== "string" || raw.trim() === "") return today;
+  const createdDay = moment(raw);
+  if (!createdDay.isValid()) return today;
+  const createdIso = createdDay.format("YYYY-MM-DD");
+  const todayM = moment(today, "YYYY-MM-DD");
+  const createdM = moment(createdIso, "YYYY-MM-DD");
+  return moment.max(todayM, createdM).format("YYYY-MM-DD");
+}
+
 const Employees = () => {
   const router = useRouter();
   const { data: session } = useSession();
@@ -197,6 +293,7 @@ const Employees = () => {
   const [appliedContract, setAppliedContract] = useState("");
   const [appliedManagerIds, setAppliedManagerIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
   const [managerSearchTerm, setManagerSearchTerm] = useState("");
@@ -218,52 +315,60 @@ const Employees = () => {
   const [journeyForm, setJourneyForm] = useState<{ startDate: string; status: string }>({ startDate: "", status: "in_progress" });
   const [journeySubmitting, setJourneySubmitting] = useState(false);
 
-  const DEPARTMENT_CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4", "#84cc16", "#f97316"];
-
-  useEffect(() => {
-    const fetchDepartmentHeadcount = async () => {
-      try {
-        const data = await getEmployeeDashboardGraphDepartmentHeadcount();
-        let raw: unknown[] = [];
-        if (Array.isArray(data)) raw = data;
-        else if (data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data)) raw = (data as { data: unknown[] }).data;
-        const list = (raw as { name?: string; count?: number }[]).map((item, i) => ({
-          name: String(item.name ?? "—"),
-          count: Number(item.count ?? 0),
-          color: DEPARTMENT_CHART_COLORS[i % DEPARTMENT_CHART_COLORS.length],
-        }));
-        setDepartmentHeadcountData(list);
-      } catch (e) {
-        console.error("[Employees] getEmployeeDashboardGraphDepartmentHeadcount error", e);
-        setDepartmentHeadcountData([]);
-      }
-    };
-    fetchDepartmentHeadcount();
-  }, []);
-
-  useEffect(() => {
-    const fetchCounters = async () => {
-      try {
-        const data = await getEmployeeDashboardCounters();
-        setDashboardCounters((data as EmployeeDashboardCountersData) ?? null);
-      } catch (e) {
-        console.error("[Employees] getEmployeeDashboardCounters error", e);
-        setDashboardCounters(null);
-      }
-    };
-    fetchCounters();
-  }, []);
-
-  const [departmentHeadcountData, setDepartmentHeadcountData] = useState<{ name: string; count: number; color: string }[]>([]);
+  const [departmentHeadcountRaw, setDepartmentHeadcountRaw] = useState<DepartmentHeadcountRawRow[]>([]);
   const [dashboardCounters, setDashboardCounters] = useState<EmployeeDashboardCountersData | null>(null);
 
+  const fetchDepartmentHeadcount = useCallback(async () => {
+    try {
+      const data = await getEmployeeDashboardGraphDepartmentHeadcount();
+      let raw: unknown[] = [];
+      if (Array.isArray(data)) raw = data;
+      else if (data && typeof data === "object" && Array.isArray((data as { data?: unknown[] }).data)) raw = (data as { data: unknown[] }).data;
+      const list: DepartmentHeadcountRawRow[] = (raw as Record<string, unknown>[]).map((item) => {
+        const departmentId = parseDepartmentIdFromApi(item.department_id);
+        const count = Number(item.count ?? 0);
+        const legacyName = legacyDisplayNameFromApi(item.name);
+        return { departmentId, count, legacyName };
+      });
+      setDepartmentHeadcountRaw(list);
+    } catch (e) {
+      console.error("[Employees] getEmployeeDashboardGraphDepartmentHeadcount error", e);
+      setDepartmentHeadcountRaw([]);
+    }
+  }, []);
+
+  const departmentHeadcountData: DepartmentHeadcountChartRow[] = useMemo(() => {
+    const departments = mainAppDepartments ?? [];
+    return departmentHeadcountRaw.map((row, i) => {
+      const name = departmentHeadcountDisplayName(row.departmentId, departments, row.legacyName);
+      const color = DEPARTMENT_CHART_COLORS[i % DEPARTMENT_CHART_COLORS.length];
+      const rowKey =
+        row.departmentId == null ? `row-${i}-${row.legacyName ?? "x"}` : `dept-${row.departmentId}`;
+      return { name, count: row.count, color, rowKey };
+    });
+  }, [departmentHeadcountRaw, mainAppDepartments]);
+
+  const fetchDashboardCounters = useCallback(async () => {
+    try {
+      const data = await getEmployeeDashboardCounters();
+      setDashboardCounters((data as EmployeeDashboardCountersData) ?? null);
+    } catch (e) {
+      console.error("[Employees] getEmployeeDashboardCounters error", e);
+      setDashboardCounters(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDepartmentHeadcount();
+    fetchDashboardCounters();
+  }, [fetchDepartmentHeadcount, fetchDashboardCounters]);
 
   const loadProfiles = useCallback(async (page = 1) => {
     setLoading(true);
     try {
       const params: { page: number; limit: number; employment_type?: string; contract_type?: string; status?: string; location_id?: number; department_id?: number; search?: string; user_ids?: string[] } = {
         page,
-        limit: ITEMS_PER_PAGE,
+        limit: rowsPerPage,
       };
       if (appliedEmploymentType?.trim()) params.employment_type = appliedEmploymentType.trim();
       if (appliedContract?.trim()) params.contract_type = appliedContract.trim();
@@ -283,11 +388,28 @@ const Employees = () => {
     } finally {
       setLoading(false);
     }
-  }, [appliedEmploymentType, appliedContract, appliedStatus, appliedLocationId, appliedDepartment, appliedSearch, appliedManagerIds]);
+  }, [appliedEmploymentType, appliedContract, appliedStatus, appliedLocationId, appliedDepartment, appliedSearch, appliedManagerIds, rowsPerPage]);
 
   useEffect(() => {
     loadProfiles(currentPage);
-  }, [currentPage, loadProfiles]);
+  }, [currentPage, rowsPerPage, loadProfiles]);
+
+  const handlePaginationChange = useCallback((page: number, limit: number) => {
+    setRowsPerPage((prevLimit) => {
+      if (prevLimit !== limit) {
+        setCurrentPage(1);
+        return limit;
+      }
+      setCurrentPage(page);
+      return prevLimit;
+    });
+  }, []);
+
+  const refreshAfterProfileSave = useCallback(() => {
+    loadProfiles(currentPage);
+    fetchDepartmentHeadcount();
+    fetchDashboardCounters();
+  }, [currentPage, loadProfiles, fetchDepartmentHeadcount, fetchDashboardCounters]);
 
   // Open sidebar when navigating from notification with ?openId= (target_id)
   useEffect(() => {
@@ -360,7 +482,7 @@ const Employees = () => {
     e?.stopPropagation();
     setJourneyModalProfile(profile);
     setJourneyForm({
-      startDate: moment().format("YYYY-MM-DD"),
+      startDate: journeyStartDateMinIso(profile),
       status: "in_progress",
     });
     setShowJourneyModal(true);
@@ -377,6 +499,11 @@ const Employees = () => {
     const startDate = journeyForm.startDate.trim();
     if (startDate === "") {
       toast.warn("Please select a start date.");
+      return;
+    }
+    const minStart = journeyStartDateMinIso(journeyModalProfile);
+    if (startDate < minStart) {
+      toast.warn("Start date cannot be before the employee was created or before today.");
       return;
     }
     const departmentId = journeyModalProfile.department_id;
@@ -398,6 +525,7 @@ const Employees = () => {
     try {
       await createJourney(payload);
       toast.success("Journey created successfully.");
+      refreshAfterProfileSave();
       closeJourneyModal();
     } catch (err) {
       console.error("[Employees] createJourney error", err);
@@ -411,7 +539,9 @@ const Employees = () => {
   const getDisplayName = useCallback((p: UserProfile): string => {
     const userId = p.user_id ?? (p as UserProfile & { extension_number?: string }).extension_number ?? p.employee_code;
     if (userId != null && mainAppUsers.length > 0) {
-      const mainUser = mainAppUsers.find((u: any) => String(u.id) === String(userId));
+      const uid = String(userId);
+      const mainUser =
+        mainAppUsers.find((u) => String(u.phone) === uid) ?? mainAppUsers.find((u) => String(u.id) === uid);
       if (mainUser?.name) return mainUser.name;
     }
     return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
@@ -547,6 +677,7 @@ const Employees = () => {
                     alignItems: "center",
                     gap: "4px",
                     marginTop: "2px",
+                    textTransform: "capitalize",
                   }}
                 >
                   <span
@@ -566,6 +697,12 @@ const Employees = () => {
         },
       },
       {
+        key: "user_id",
+        label: "Extension",
+        type: "text",
+        sortable: false,
+      },
+      {
         key: "identification_number",
         label: "CNIC/ID",
         type: "text",
@@ -574,6 +711,18 @@ const Employees = () => {
       {
         key: "designation",
         label: "Designation",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "employment_type",
+        label: "Employment Type",
+        type: "text",
+        sortable: false,
+      },
+      {
+        key: "contract_type",
+        label: "Contract Type",
         type: "text",
         sortable: false,
       },
@@ -593,8 +742,11 @@ const Employees = () => {
       {
         key: "phone",
         label: "Phone",
-        type: "text",
+        type: "custom",
         sortable: false,
+        render: (profile: UserProfile) => (
+          <span style={{ fontSize: "14px", color: "#1f2937" }}>{formatPhoneForDisplay(profile.phone)}</span>
+        ),
       },
       {
         key: "status",
@@ -952,7 +1104,7 @@ const Employees = () => {
             )}
           </div>
 
-          {/* Manager Filter (multi-select); API receives user_ids: ["id1", "id2"] */}
+          {/* Manager Filter (multi-select); API receives user_ids: [phone, …] (same as profile user_id) */}
           <div style={{ position: 'relative' }}>
             <button
               type="button"
@@ -1029,20 +1181,21 @@ const Employees = () => {
                     All users
                   </button>
                   {managers
-                    .filter((mgr: any) => {
+                    .filter((mgr: MainAppUserLookup) => {
+                      if (userIdForProfilePayload(mgr) === "") return false;
                       const label = hierarchyLabel(mgr);
                       return !managerSearchTerm.trim() || label.toLowerCase().includes(managerSearchTerm.trim().toLowerCase());
                     })
-                    .map((mgr: any, idx: number) => {
+                    .map((mgr: MainAppUserLookup) => {
                       const label = hierarchyLabel(mgr);
-                      const idStr = String((mgr as { id?: number }).id ?? idx);
-                      const isSelected = selectedManagerIds.includes(idStr);
+                      const userIdStr = userIdForProfilePayload(mgr);
+                      const isSelected = selectedManagerIds.includes(userIdStr);
                       return (
                         <button
                           type="button"
-                          key={idStr}
+                          key={String(mgr.id)}
                           onClick={() => {
-                            toggleSelectedManagerId(idStr, isSelected);
+                            toggleSelectedManagerId(userIdStr, isSelected);
                           }}
                           style={{
                             width: "100%",
@@ -1360,7 +1513,9 @@ const Employees = () => {
             )}
             {appliedManagerIds.length > 0 && (
               <span
-                title={appliedManagerIds.map((id) => mainAppUsers.find((u: any) => String(u.id) === id)?.name ?? id).join(", ")}
+                title={appliedManagerIds
+                  .map((uid) => mainAppUsers.find((u) => userIdForProfilePayload(u) === uid)?.name ?? uid)
+                  .join(", ")}
                 style={{
                   padding: '4px 12px',
                   backgroundColor: '#e0e7ff',
@@ -1371,7 +1526,10 @@ const Employees = () => {
                   gap: '6px'
                 }}
               >
-                Managers: {appliedManagerIds.map((id) => mainAppUsers.find((u: any) => String(u.id) === id)?.name ?? id).join(", ")}
+                Managers:{" "}
+                {appliedManagerIds
+                  .map((uid) => mainAppUsers.find((u) => userIdForProfilePayload(u) === uid)?.name ?? uid)
+                  .join(", ")}
                 <button
                   onClick={() => { setSelectedManagerIds([]); setAppliedManagerIds([]); setCurrentPage(1); loadProfilesRef.current(1); }}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
@@ -1410,11 +1568,11 @@ const Employees = () => {
           uniqueKey="id"
           pagination={{
             currentPage,
-            rowsPerPage: ITEMS_PER_PAGE,
+            rowsPerPage,
             totalRows: pagination?.total ?? 0,
-            pageSizeOptions: [15],
+            pageSizeOptions: [15, 25, 50, 100],
           }}
-          onPaginationChange={(page) => setCurrentPage(page)}
+          onPaginationChange={handlePaginationChange}
           onRowClick={(profile: UserProfile) => handleProfileClick(profile)}
           showToolbar={false}
         />
@@ -1469,7 +1627,7 @@ const Employees = () => {
               flexWrap: 'wrap'
             }}>
               {departmentHeadcountData.map(dept => (
-                <div key={dept.name} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div key={dept.rowKey} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{
                     width: '12px',
                     height: '12px',
@@ -1507,7 +1665,7 @@ const Employees = () => {
                   radius={[8, 8, 0, 0]}
                 >
                   {departmentHeadcountData.map((entry) => (
-                    <Cell key={`${entry.name}-${entry.color}`} fill={entry.color} />
+                    <Cell key={entry.rowKey} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>
@@ -1649,7 +1807,7 @@ const Employees = () => {
       <AddEmployeeModal
         show={showCreateModal}
         onHide={() => setShowCreateModal(false)}
-        onSuccess={() => loadProfiles(currentPage)}
+        onSuccess={refreshAfterProfileSave}
         tenantId={companyIdentifier ?? undefined}
       />
 
@@ -1664,22 +1822,25 @@ const Employees = () => {
               <Form.Group className="mb-3">
                 {/* <Form.Label className="text-muted small">Employee</Form.Label> */}
                 <div style={{ fontWeight: 600, color: "#1f2937", marginBottom: "2px" }}>
-                  {getDisplayName(journeyModalProfile)}
+                  Create journey for: {getDisplayName(journeyModalProfile)}
                 </div>
-                <div className="text-muted small">
-                  Phone: {journeyModalProfile.extension_number ?? journeyModalProfile.phone ?? "—"}
-                </div>
-                <div className="text-muted small">
-                  Department: {mainAppDepartments.find((d: MainAppDepartment) => Number(d.id) === Number(journeyModalProfile.department_id))?.name ?? "—"}
-                </div>
+               
               </Form.Group>
               <Form.Group className="mb-3">
                 <Form.Label>Start Date</Form.Label>
                 <Form.Control
                   type="date"
+                  min={journeyStartDateMinIso(journeyModalProfile)}
                   value={journeyForm.startDate}
-                  onChange={(e) => setJourneyForm((f) => ({ ...f, startDate: e.target.value }))}
-                  
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    const minStart = journeyStartDateMinIso(journeyModalProfile);
+                    if (next !== "" && next < minStart) {
+                      toast.warn("Start date cannot be before the employee was created or before today.");
+                      return;
+                    }
+                    setJourneyForm((f) => ({ ...f, startDate: next }));
+                  }}
                 />
               </Form.Group>
               <Form.Group className="mb-3">
@@ -1713,8 +1874,8 @@ const Employees = () => {
         onHide={() => { setShowEditModal(false); setEditingProfile(null); }}
         profile={editingProfile}
         onSuccess={(id: number) => {
-          loadProfiles(currentPage);
-          if (id != null && selectedProfile?.id === id) setSelectedProfile(null);
+          refreshAfterProfileSave();
+          if (selectedProfile?.id === id) setSelectedProfile(null);
         }}
       />
 

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, FileText, Landmark, FileMinus, ChevronDown } from "lucide-react";
+import { Form } from "react-bootstrap";
 import {
   downloadInvoicePdf,
   getInvoice,
@@ -13,6 +14,9 @@ import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/Inv
 import { BILLING_FONT, BILLING_LINK } from "@components/billings/shared/styles";
 import { LinkButton } from "@components/shared/LinkButton";
 import { useInvoicePaymentModal } from "@components/billings/InvoicePaymentModal";
+import { getMinifiedCompanies } from "@utils/crm";
+import { toast } from "react-toastify";
+import { getErrorMessage } from "@utils/errors";
 
 const font = BILLING_FONT;
 
@@ -32,6 +36,20 @@ const toggleStringSelection = (list: readonly string[], value: string): string[]
   }
   return next;
 };
+
+/** Human-readable labels for filter options; API/filter state keeps snake_case values. */
+function formatBillingHistoryFilterLabel(option: string): string {
+  if (option === "All Statuses" || option === "All Payments") return option;
+  if (option.includes("_")) {
+    return option
+      .split("_")
+      .map((part) =>
+        part.length === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+      )
+      .join(" ");
+  }
+  return option.charAt(0).toUpperCase() + option.slice(1).toLowerCase();
+}
 
 function CardActions({
   onView,
@@ -133,8 +151,36 @@ const s: Record<string, React.CSSProperties> = {
   },
   content: {
     padding: "8px 24px",
-    maxWidth: "calc(1376px)",
+    maxWidth: "100%",
     margin: "0 auto",
+  },
+  emptyState: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "56px 24px",
+    textAlign: "center" as const,
+    backgroundColor: "#fff",
+    border: "1px solid rgb(204, 204, 204)",
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  emptyStateTitle: {
+    fontFamily: font,
+    fontSize: 18,
+    fontWeight: 600,
+    color: "#141414",
+    margin: "0 0 8px 0",
+  },
+  emptyStateHint: {
+    fontFamily: font,
+    fontSize: 14,
+    fontWeight: 400,
+    color: "#666",
+    margin: 0,
+    maxWidth: 420,
+    lineHeight: 1.5,
   },
   dateLabel: {
     fontSize: 14,
@@ -672,7 +718,6 @@ function StatusDropdown({
                     alignItems: "center",
                     gap: 10,
                     borderRadius: 6,
-                    textTransform: "capitalize",
                     backgroundColor: isSelected ? "#f0fafa" : "transparent",
                     color: isSelected ? "rgb(0,97,98)" : "#141414",
                   }}
@@ -690,7 +735,7 @@ function StatusDropdown({
                       flexShrink: 0,
                     }}
                   />
-                  {opt}
+                  {formatBillingHistoryFilterLabel(opt)}
                 </button>
               );
             })}
@@ -866,8 +911,18 @@ function OrderCard({
   );
 }
 
+export type BillingHistoryPageProps = Readonly<{
+  /**
+   * Customer-facing route: show company dropdown and call invoices with
+   * `crm_company_not_null: true` and `crm_company_id` when a company is selected.
+   */
+  customerCompanyPicker?: boolean;
+}>;
+
 // ── Main page ──────────────────────────────────────────────────────────────────
-export default function BillingHistoryPage() {
+export default function BillingHistoryPage({
+  customerCompanyPicker = false,
+}: BillingHistoryPageProps) {
   const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
   const [dateRangeOption, setDateRangeOption] = useState<string>("");
@@ -877,11 +932,42 @@ export default function BillingHistoryPage() {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState<string>("All Payments");
 
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  /** Start true so the first paint shows loading, not an empty state, before `useEffect` fetches. */
+  const [loadingInvoices, setLoadingInvoices] = useState(true);
   const requestIdRef = useRef(0);
   const [showViewInvoiceModal, setShowViewInvoiceModal] = useState(false);
   const [selectedInvoiceForView, setSelectedInvoiceForView] = useState<InvoiceViewData | null>(null);
   const [isInvoiceLoading, setIsInvoiceLoading] = useState(false);
+  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>(
+    [],
+  );
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
+
+  const selectedCompanyLabel = useMemo(() => {
+    if (!selectedCompanyId) return "";
+    const found = companyOptions.find((c) => String(c.id) === String(selectedCompanyId));
+    return found?.name?.trim() || String(selectedCompanyId);
+  }, [companyOptions, selectedCompanyId]);
+
+  useEffect(() => {
+    if (!customerCompanyPicker) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getMinifiedCompanies({ send_all: "true" });
+        if (!cancelled) setCompanyOptions(result ?? []);
+      } catch (e) {
+        if (!cancelled) {
+          toast.error(`Failed to load companies: ${getErrorMessage(e)}`, {
+            toastId: "billing_history_load_companies_failed",
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [customerCompanyPicker]);
 
   const closeViewInvoiceModal = useCallback(() => {
     setShowViewInvoiceModal(false);
@@ -918,17 +1004,29 @@ export default function BillingHistoryPage() {
 
     setLoadingInvoices(true);
     try {
-      const res = (await getInvoices({
+      const baseParams = {
         page: 1,
         per_page: 50,
         limit: 50,
         search: search || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
-        crm_company_id: "null",
         status: statusFilter === "All Statuses" ? "" : statusFilter,
         payment_status: paymentStatusFilter === "All Payments" ? "" : paymentStatusFilter,
-      })) as any;
+      };
+      const companyIdTrimmed = String(selectedCompanyId).trim();
+      const params = customerCompanyPicker
+        ? {
+            ...baseParams,
+            crm_company_not_null: true,
+            ...(companyIdTrimmed ? { crm_company_id: selectedCompanyId } : {}),
+          }
+        : {
+            ...baseParams,
+            crm_company_id: "null",
+          };
+
+      const res = (await getInvoices(params)) as { data?: unknown[] };
 
       if (requestId !== requestIdRef.current) return;
 
@@ -942,7 +1040,14 @@ export default function BillingHistoryPage() {
         setLoadingInvoices(false);
       }
     }
-  }, [dateFrom, dateTo, statusFilter, paymentStatusFilter]);
+  }, [
+    customerCompanyPicker,
+    selectedCompanyId,
+    dateFrom,
+    dateTo,
+    statusFilter,
+    paymentStatusFilter,
+  ]);
 
   const { openInvoicePayment: openInvoicePaymentModal, invoicePaymentModal } = useInvoicePaymentModal({
     onPaymentSuccess: () => {
@@ -966,14 +1071,22 @@ export default function BillingHistoryPage() {
     fetchInvoices(searchQuery).catch((err) => {
       console.error("BillingHistoryPage fetchInvoices effect error:", err);
     });
-  }, [fetchInvoices, searchQuery, dateFrom, dateTo, statusFilter, paymentStatusFilter]);
+  }, [
+    fetchInvoices,
+    searchQuery,
+    dateFrom,
+    dateTo,
+    statusFilter,
+    paymentStatusFilter,
+    selectedCompanyId,
+  ]);
 
   const filters = [
     { label: "Date range", options: ["Last 30 days", "Last 3 months", "Last 6 months", "Last 12 months", "Custom range"] },
-    { label: "Status", options: ["All Statuses", "draft", "sent", "paid", "pending", "overdue", "cancelled"] },
+    { label: "Status", options: ["All Statuses", "paid", "partially_paid", "pending", "overdue"] },
     { label: "Orders", options: ["Order issued", "Order amended", "Order cancelled"] },
     { label: "Invoices", options: ["Invoice issued", "Invoice credited", "Invoice voided"] },
-    { label: "Payments", options: ["All Payments", "pending", "completed", "failed"] },
+    // { label: "Payments", options: ["All Payments", "pending", "completed", "failed"] },
     { label: "Credits", options: ["Credit applied", "Credit issued", "Credit expired"] },
     { label: "Refunds", options: ["Refund issued", "Refund pending"] },
     { label: "Usage & Limits", options: ["Credits used", "Credits added", "Limit changed"] },
@@ -981,6 +1094,40 @@ export default function BillingHistoryPage() {
 
   return (
     <div style={s.page}>
+      {customerCompanyPicker ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            padding: "16px 24px 0 24px",
+            flexShrink: 0,
+          }}
+        >
+          <Form.Select
+            size="sm"
+            style={{
+              width: 220,
+              height: 40,
+              fontFamily: font,
+              border: "1px solid rgb(138, 138, 138)",
+              borderRadius: 4,
+            }}
+            value={String(selectedCompanyId)}
+            onChange={(e) =>
+              setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
+            }
+            aria-label="Select company"
+          >
+            <option value="">Select company</option>
+            {companyOptions.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name ?? c.id}
+              </option>
+            ))}
+          </Form.Select>
+        </div>
+      ) : null}
+
       {/* Top bar: search + filters */}
       <div style={s.topBar}>
         {/* Search */}
@@ -1082,9 +1229,21 @@ export default function BillingHistoryPage() {
       {/* Content */}
       <div style={s.content}>
 
-        {loadingInvoices ? (
+        {loadingInvoices && (
           <div style={{ padding: "24px 0", color: "#666" }}>Loading...</div>
-        ) : (
+        )}
+        {!loadingInvoices && invoices.length === 0 && (
+          <div style={s.emptyState} role="status" aria-live="polite">
+            <FileText size={48} color="#ccc" style={{ marginBottom: 16 }} aria-hidden />
+            <p style={s.emptyStateTitle}>No history found</p>
+            <p style={s.emptyStateHint}>
+              There is no billing history for the current filters. Choose a company above to narrow results,
+              or adjust your search, date range, or status filters.
+            </p>
+          </div>
+        )}
+        {!loadingInvoices &&
+          invoices.length > 0 &&
           invoices.map((invoice: any) => (
             <div key={invoice.id}>
               <div style={s.dateLabel}>
@@ -1130,14 +1289,18 @@ export default function BillingHistoryPage() {
                 amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
               /> */}
             </div>
-          ))
-        )}
+          ))}
         <InvoiceViewModal
           show={showViewInvoiceModal}
           onHide={closeViewInvoiceModal}
           invoice={selectedInvoiceForView}
           loading={isInvoiceLoading}
-          companyName={session?.user?.company_name || ""}
+          companyName={
+            customerCompanyPicker
+              ? selectedCompanyLabel || session?.user?.company_name || ""
+              : session?.user?.company_name || ""
+          }
+          isTenantInvoice={!customerCompanyPicker}
         />
         {invoicePaymentModal}
       </div>
