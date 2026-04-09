@@ -3,8 +3,10 @@
 import React from "react";
 import { Button, Modal, Form } from "react-bootstrap";
 import UserDummyImage from "@assets/images/user-dummy.jpg";
-import type { FloatingBarCtiCall } from "./globalFloatingCallBarHelpers";
-import type { FloatingBarDnsMap } from "./globalFloatingCallBarHelpers";
+import type {
+  FloatingBarCtiCall,
+  FloatingBarDnsMap,
+} from "./globalFloatingCallBarHelpers";
 
 const BUSY_CALL_STATUSES = new Set(["connected", "ringing", "dialing"]);
 
@@ -13,7 +15,9 @@ type UserDataExtensionsGetter = () => Record<
   { name?: string; user_name?: string }
 >;
 
-function devicesRecordHasRegistered(devices: Record<string, unknown> | undefined): boolean {
+function devicesRecordHasRegistered(
+  devices: Record<string, unknown> | undefined,
+): boolean {
   if (!devices) {
     return false;
   }
@@ -25,7 +29,10 @@ function devicesRecordHasRegistered(devices: Record<string, unknown> | undefined
   );
 }
 
-function extensionHasRegisteredDevice(ext: string, dnsMap: FloatingBarDnsMap | undefined): boolean {
+function extensionHasRegisteredDevice(
+  ext: string,
+  dnsMap: FloatingBarDnsMap | undefined,
+): boolean {
   const entry = dnsMap?.[ext];
   if (!entry || typeof entry !== "object" || !("devices" in entry)) {
     return false;
@@ -73,7 +80,9 @@ function resolveExtensionDisplayName(
   const dnString = String(ext);
   const dnNumber = Number(ext);
   const userData =
-    userDataExtensions[ext] || userDataExtensions[dnString] || userDataExtensions[dnNumber];
+    userDataExtensions[ext] ||
+    userDataExtensions[dnString] ||
+    userDataExtensions[dnNumber];
   const name = userData?.name || userData?.user_name;
   return name ? `${name} (${ext})` : ext;
 }
@@ -92,11 +101,13 @@ function TransferExtensionRow({
   dnsMap,
   getUserDataExtensions,
   onPick,
-}: TransferExtensionRowProps) {
+}: Readonly<TransferExtensionRowProps>) {
   const entry = dnsMap?.[ext];
   const deviceList =
     entry && typeof entry === "object" && "devices" in entry
-      ? Object.values((entry as { devices?: Record<string, unknown> }).devices || {})
+      ? Object.values(
+          (entry as { devices?: Record<string, unknown> }).devices || {},
+        )
       : [];
   const isOnline = deviceList.some(
     (d) =>
@@ -150,19 +161,26 @@ export function FloatingBarTransferModal({
   getUserDataExtensions,
   onTransfer,
   isTransferring,
-}: FloatingBarTransferModalProps) {
-  const filtered = filterTransferCandidateExtensions(transferCandidates, extensionSearch, dnsMap);
+}: Readonly<FloatingBarTransferModalProps>) {
+  const filtered = filterTransferCandidateExtensions(
+    transferCandidates,
+    extensionSearch,
+    dnsMap,
+  );
 
   return (
     <Modal show={show} onHide={onHide} centered size="sm">
       <Modal.Header closeButton>
         <Modal.Title>
-          <i className="material-icons-two-tone me-2">call_made</i> Transfer Call
+          <i className="material-icons-two-tone me-2">call_made</i> Transfer
+          Call
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
         <Form.Group className="mb-3">
-          <Form.Label className="fw-semibold">Select Target Extension</Form.Label>
+          <Form.Label className="fw-semibold">
+            Select Target Extension
+          </Form.Label>
           <Form.Control
             type="text"
             placeholder="Search extensions..."
@@ -194,7 +212,11 @@ export function FloatingBarTransferModal({
         <Button variant="default" onClick={onHide}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={onTransfer} disabled={!transferTarget || isTransferring}>
+        <Button
+          variant="primary"
+          onClick={onTransfer}
+          disabled={!transferTarget || isTransferring}
+        >
           {isTransferring ? (
             <>
               <span
@@ -255,144 +277,118 @@ export function FloatingBarActiveCallSection({
   onResumeCall,
   onEndCall,
   onOpenTransferModal,
-}: FloatingBarActiveCallSectionProps) {
+}: Readonly<FloatingBarActiveCallSectionProps>) {
   const showCustomAvatar =
-    Boolean(activeCallUserImageUrl) && activeCallUserImageUrl !== UserDummyImage.src;
+    Boolean(activeCallUserImageUrl) &&
+    activeCallUserImageUrl !== UserDummyImage.src;
 
   return (
-    <>
-      <section aria-label="Active call">
-        <div
-          ref={barRef}
-          className={`global-floating-call-bar ${isDragging ? "dragging" : ""}`}
-          style={sectionStyle}
+    <section aria-label="Active call">
+      <div
+        ref={barRef}
+        className={`global-floating-call-bar ${isDragging ? "dragging" : ""}`}
+        style={sectionStyle}
+      >
+        <button
+          type="button"
+          className="call-bar-drag-handle btn btn-link p-0 me-1 border-0 d-flex align-items-center justify-content-center"
+          aria-label="Drag to move call bar"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            onDragStart(e);
+          }}
+          style={{
+            minWidth: "1.5rem",
+            minHeight: "2.5rem",
+            color: "#64748b",
+          }}
         >
-          <button
-            type="button"
-            className="call-bar-drag-handle btn btn-link p-0 me-1 border-0 d-flex align-items-center justify-content-center"
-            aria-label="Drag to move call bar"
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              onDragStart(e);
-            }}
-            style={{ minWidth: "1.5rem", minHeight: "2.5rem", color: "#64748b" }}
+          <i
+            className="material-icons-two-tone"
+            style={{ fontSize: "1.25rem" }}
           >
-            <i className="material-icons-two-tone" style={{ fontSize: "1.25rem" }}>
-              drag_indicator
-            </i>
-          </button>
+            drag_indicator
+          </i>
+        </button>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            flex: 1,
+            flexDirection: "row",
+            minWidth: 0,
+            top: "0",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
           <div
+            className="position-relative"
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              flex: 1,
-              flexDirection: "row",
-              minWidth: 0,
-              top: "0",
-              position: "relative",
-              zIndex: 1,
+              width: "3rem",
+              height: "3rem",
+              minWidth: "3rem",
+              flexShrink: 0,
             }}
           >
-            <div
-              className="position-relative"
+            {showCustomAvatar ? (
+              <img
+                src={activeCallUserImageUrl}
+                alt={activeCallUserName}
+                className="rounded-circle"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  border: "2px solid #e5e7eb",
+                }}
+                onError={(e) => {
+                  e.currentTarget.src = UserDummyImage.src;
+                }}
+              />
+            ) : (
+              <img
+                src={UserDummyImage.src}
+                alt={activeCallUserName}
+                className="rounded-circle"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  border: "2px solid #e5e7eb",
+                }}
+              />
+            )}
+          </div>
+          <div style={{ flex: 1 }}>
+            <h3
               style={{
-                width: "3rem",
-                height: "3rem",
-                minWidth: "3rem",
-                flexShrink: 0,
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: "#334155",
+                marginBottom: "0.25rem",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
-              {showCustomAvatar ? (
-                <img
-                  src={activeCallUserImageUrl}
-                  alt={activeCallUserName}
-                  className="rounded-circle"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    border: "2px solid #e5e7eb",
-                  }}
-                  onError={(e) => {
-                    e.currentTarget.src = UserDummyImage.src;
-                  }}
-                />
-              ) : (
-                <img
-                  src={UserDummyImage.src}
-                  alt={activeCallUserName}
-                  className="rounded-circle"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    border: "2px solid #e5e7eb",
-                  }}
-                />
-              )}
+              {activeCallUserName}
+            </h3>
+            <div
+              style={{
+                fontSize: "0.7rem",
+                color: "#94a3b8",
+                marginBottom: "0.25rem",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {otherPartyNumber}
             </div>
-            <div style={{ flex: 1 }}>
-              <h3
-                style={{
-                  fontSize: "1rem",
-                  fontWeight: 600,
-                  color: "#334155",
-                  marginBottom: "0.25rem",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {activeCallUserName}
-              </h3>
+            {activeCall.status === "connected" && (
               <div
-                style={{
-                  fontSize: "0.7rem",
-                  color: "#94a3b8",
-                  marginBottom: "0.25rem",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {otherPartyNumber}
-              </div>
-              {activeCall.status === "connected" && (
-                <div
-                  style={{
-                    fontSize: "0.75rem",
-                    color: "#334155",
-                    fontWeight: 500,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    flexDirection: "row",
-                  }}
-                >
-                  <span className="text-success" style={{ fontWeight: "500" }}>
-                    Connected
-                  </span>
-                  <span style={{ color: "#94a3b8" }}>{connectedElapsedDisplay}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flex: 1,
-              flexDirection: "row",
-              gap: "10px",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-            {activeCall.status === "ringing" && (
-              <div
-                className="call-status-ringing"
                 style={{
                   fontSize: "0.75rem",
                   color: "#334155",
@@ -404,148 +400,100 @@ export function FloatingBarActiveCallSection({
                 }}
               >
                 <span className="text-success" style={{ fontWeight: "500" }}>
-                  Outgoing call
+                  Connected
                 </span>
-                <span
-                  className="bg-success rounded-circle"
-                  style={{ width: "0.375rem", height: "0.375rem" }}
-                />
-                <span style={{ color: "#94a3b8" }}>Ringing...</span>
-              </div>
-            )}
-            {activeCall.status === "dialing" && (
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#334155",
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  flexDirection: "row",
-                }}
-              >
-                <span style={{ color: "#94a3b8" }}>Dialing...</span>
+                <span style={{ color: "#94a3b8" }}>
+                  {connectedElapsedDisplay}
+                </span>
               </div>
             )}
           </div>
-          <div
-            style={{
-              display: "flex",
-              gap: "0.5rem",
-              alignItems: "center",
-              flexDirection: "row",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-            {activeCall.status === "onHold" && (
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#F4C22B",
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  flexDirection: "row",
-                }}
-              >
-                <span>On Hold</span>
-              </div>
-            )}
-            {activeCall.status === "connected" && (
-              <>
-                <button
-                  type="button"
-                  tabIndex={0}
-                  disabled={isHoldingCall}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onHoldCall();
-                  }}
-                  className="btn rounded-circle d-flex align-items-center justify-content-center"
-                  style={{
-                    width: "3rem",
-                    height: "3rem",
-                    backgroundColor: "#f1f5f9",
-                    border: "none",
-                    color: "#475569",
-                    cursor: isHoldingCall ? "not-allowed" : "pointer",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isHoldingCall) e.currentTarget.style.backgroundColor = "#e2e8f0";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f1f5f9";
-                  }}
-                  title="Hold Call"
-                >
-                  {isHoldingCall ? (
-                    <span
-                      className="spinner-border spinner-border-sm"
-                      aria-hidden="true"
-                      style={{
-                        width: "1.25rem",
-                        height: "1.25rem",
-                        borderWidth: "2px",
-                        color: "#475569",
-                      }}
-                    />
-                  ) : (
-                    <i
-                      className="material-icons-two-tone"
-                      style={{ fontSize: "1.25rem", color: "#475569" }}
-                    >
-                      pause
-                    </i>
-                  )}
-                </button>
-                {canTransferCall && (
-                  <button
-                    type="button"
-                    tabIndex={0}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenTransferModal();
-                    }}
-                    className="btn rounded-circle d-flex align-items-center justify-content-center"
-                    style={{
-                      width: "3rem",
-                      height: "3rem",
-                      backgroundColor: "#f1f5f9",
-                      border: "none",
-                      color: "#475569",
-                      cursor: "pointer",
-                      transition: "background-color 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = "#e2e8f0";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "#f1f5f9";
-                    }}
-                    title="Transfer Call"
-                  >
-                    <i
-                      className="material-icons-two-tone"
-                      style={{ fontSize: "1.25rem", color: "#475569" }}
-                    >
-                      call_made
-                    </i>
-                  </button>
-                )}
-              </>
-            )}
-            {activeCall.status === "onHold" && canCurrentUserResumeCall && (
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flex: 1,
+            flexDirection: "row",
+            gap: "10px",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          {activeCall.status === "ringing" && (
+            <div
+              className="call-status-ringing"
+              style={{
+                fontSize: "0.75rem",
+                color: "#334155",
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                flexDirection: "row",
+              }}
+            >
+              <span className="text-success" style={{ fontWeight: "500" }}>
+                Outgoing call
+              </span>
+              <span
+                className="bg-success rounded-circle"
+                style={{ width: "0.375rem", height: "0.375rem" }}
+              />
+              <span style={{ color: "#94a3b8" }}>Ringing...</span>
+            </div>
+          )}
+          {activeCall.status === "dialing" && (
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "#334155",
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                flexDirection: "row",
+              }}
+            >
+              <span style={{ color: "#94a3b8" }}>Dialing...</span>
+            </div>
+          )}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            alignItems: "center",
+            flexDirection: "row",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
+          {activeCall.status === "onHold" && (
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "#F4C22B",
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                flexDirection: "row",
+              }}
+            >
+              <span>On Hold</span>
+            </div>
+          )}
+          {activeCall.status === "connected" && (
+            <>
               <button
                 type="button"
                 tabIndex={0}
-                disabled={isResumingCall}
+                disabled={isHoldingCall}
                 onClick={(e) => {
                   e.stopPropagation();
-                  onResumeCall();
+                  onHoldCall();
                 }}
                 className="btn rounded-circle d-flex align-items-center justify-content-center"
                 style={{
@@ -554,18 +502,19 @@ export function FloatingBarActiveCallSection({
                   backgroundColor: "#f1f5f9",
                   border: "none",
                   color: "#475569",
-                  cursor: isResumingCall ? "not-allowed" : "pointer",
+                  cursor: isHoldingCall ? "not-allowed" : "pointer",
                   transition: "background-color 0.2s",
                 }}
                 onMouseEnter={(e) => {
-                  if (!isResumingCall) e.currentTarget.style.backgroundColor = "#e2e8f0";
+                  if (!isHoldingCall)
+                    e.currentTarget.style.backgroundColor = "#e2e8f0";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = "#f1f5f9";
                 }}
-                title="Resume Call"
+                title="Hold Call"
               >
-                {isResumingCall ? (
+                {isHoldingCall ? (
                   <span
                     className="spinner-border spinner-border-sm"
                     aria-hidden="true"
@@ -581,57 +530,154 @@ export function FloatingBarActiveCallSection({
                     className="material-icons-two-tone"
                     style={{ fontSize: "1.25rem", color: "#475569" }}
                   >
-                    play_arrow
+                    pause
                   </i>
                 )}
               </button>
-            )}
+              {canTransferCall && (
+                <button
+                  type="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenTransferModal();
+                  }}
+                  className="btn rounded-circle d-flex align-items-center justify-content-center"
+                  style={{
+                    width: "3rem",
+                    height: "3rem",
+                    backgroundColor: "#f1f5f9",
+                    border: "none",
+                    color: "#475569",
+                    cursor: "pointer",
+                    transition: "background-color 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#e2e8f0";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f1f5f9";
+                  }}
+                  title="Transfer Call"
+                >
+                  <i
+                    className="material-icons-two-tone"
+                    style={{ fontSize: "1.25rem", color: "#475569" }}
+                  >
+                    call_made
+                  </i>
+                </button>
+              )}
+            </>
+          )}
+          {activeCall.status === "onHold" && canCurrentUserResumeCall && (
             <button
               type="button"
               tabIndex={0}
-              disabled={isEndingCall}
+              disabled={isResumingCall}
               onClick={(e) => {
                 e.stopPropagation();
-                onEndCall();
+                onResumeCall();
               }}
-              className="btn btn-danger btn-sm rounded-1 d-flex align-items-center gap-1"
+              className="btn rounded-circle d-flex align-items-center justify-content-center"
+              style={{
+                width: "3rem",
+                height: "3rem",
+                backgroundColor: "#f1f5f9",
+                border: "none",
+                color: "#475569",
+                cursor: isResumingCall ? "not-allowed" : "pointer",
+                transition: "background-color 0.2s",
+              }}
               onMouseEnter={(e) => {
-                if (!isEndingCall) e.currentTarget.style.boxShadow = "0 6px 8px -1px rgba(239,68,68,0.4)";
+                if (!isResumingCall)
+                  e.currentTarget.style.backgroundColor = "#e2e8f0";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(239,68,68,0.3)";
+                e.currentTarget.style.backgroundColor = "#f1f5f9";
               }}
-              title="End Call"
+              title="Resume Call"
             >
-              {isEndingCall ? (
-                <>
-                  <span
-                    className="spinner-border spinner-border-sm"
-                    aria-hidden="true"
-                    style={{ width: "1rem", height: "1rem", borderWidth: "2px" }}
-                  />{" "}
-                  Ending...
-                </>
+              {isResumingCall ? (
+                <span
+                  className="spinner-border spinner-border-sm"
+                  aria-hidden="true"
+                  style={{
+                    width: "1.25rem",
+                    height: "1.25rem",
+                    borderWidth: "2px",
+                    color: "#475569",
+                  }}
+                />
               ) : (
-                <>
-                  <i
-                    className="material-icons-two-tone"
-                    style={{ fontSize: "1rem", color: "#fff", backgroundColor: "#fff" }}
-                  >
-                    call_end
-                  </i>{" "}
-                  End Call
-                </>
+                <i
+                  className="material-icons-two-tone"
+                  style={{ fontSize: "1.25rem", color: "#475569" }}
+                >
+                  play_arrow
+                </i>
               )}
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            tabIndex={0}
+            disabled={isEndingCall}
+            onClick={(e) => {
+              e.stopPropagation();
+              onEndCall();
+            }}
+            className="btn btn-danger btn-sm rounded-1 d-flex align-items-center gap-1"
+            onMouseEnter={(e) => {
+              if (!isEndingCall)
+                e.currentTarget.style.boxShadow =
+                  "0 6px 8px -1px rgba(239,68,68,0.4)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow =
+                "0 4px 6px -1px rgba(239,68,68,0.3)";
+            }}
+            title="End Call"
+          >
+            {isEndingCall ? (
+              <>
+                <span
+                  className="spinner-border spinner-border-sm"
+                  aria-hidden="true"
+                  style={{
+                    width: "1rem",
+                    height: "1rem",
+                    borderWidth: "2px",
+                  }}
+                />{" "}
+                Ending...
+              </>
+            ) : (
+              <>
+                <i
+                  className="material-icons-two-tone"
+                  style={{
+                    fontSize: "1rem",
+                    color: "#fff",
+                    backgroundColor: "#fff",
+                  }}
+                >
+                  call_end
+                </i>{" "}
+                End Call
+              </>
+            )}
+          </button>
         </div>
-      </section>
-    </>
+      </div>
+    </section>
   );
 }
 
-export function isExtensionBusyOnCalls(ext: string, activeCalls: Map<string, FloatingBarCtiCall>): boolean {
+export function isExtensionBusyOnCalls(
+  ext: string,
+  activeCalls: Map<string, FloatingBarCtiCall>,
+): boolean {
   return Array.from(activeCalls.values()).some(
     (call) => call.number === ext && BUSY_CALL_STATUSES.has(call.status),
   );

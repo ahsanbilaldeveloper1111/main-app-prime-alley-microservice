@@ -1,25 +1,115 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Button, Modal, Form } from "react-bootstrap";
+import type { CSSProperties } from "react";
 import { useCti } from "../contexts/CtiContext";
 import { getRemotePartyDnForTransfer } from "../utils/dialer";
 import { usePermissions } from "../utils/permissionUtils";
 import { useIncomingCall } from "../contexts/IncomingCallContext";
-import UserDummyImage from "@assets/images/user-dummy.jpg";
-import { getStorageImageUrl } from "@utils/imageUtils";
-import { parseCallAnswerStartTimeUtc } from "@components/live-calls/utils/helpers";
 import {
-  canUserResumeHoldOnFloatingBar,
-  pickFloatingBarCall,
-  type FloatingBarCallStateEntry,
+  getFloatingBarControllerDeviceInfo,
+  type FloatingBarControllerDevice,
   type FloatingBarCtiCall,
-  type FloatingBarEventLogEntry,
 } from "./globalFloatingCallBarHelpers";
+import {
+  useGlobalFloatingCallBarDerived,
+  type UseGlobalFloatingCallBarDerivedParams,
+} from "../hooks/useGlobalFloatingCallBarDerived";
+import {
+  FloatingBarActiveCallSection,
+  FloatingBarTransferModal,
+  type FloatingBarTransferModalProps,
+  isExtensionBusyOnCalls,
+} from "./GlobalFloatingCallBarPanels";
 import {
   clearFloatingBarIncomingTimer,
   useGlobalFloatingBarIncomingCall,
 } from "../hooks/useGlobalFloatingBarIncomingCall";
+
+type FloatingBarCtiResult = { success: boolean; error?: unknown };
+
+function buildFloatingBarPositionStyles(
+  barPosition: { x: number; y: number } | null,
+  isDragging: boolean,
+  dragPosition: { x: number; y: number } | null,
+): CSSProperties {
+  const baseStyles: CSSProperties = {
+    position: "fixed",
+    zIndex: 9999,
+    backgroundColor: "#fff",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    transition: isDragging ? "none" : "all 0.3s ease",
+    cursor: isDragging ? "grabbing" : "grab",
+    border: "none",
+    visibility: "visible",
+    opacity: 1,
+    borderRadius: "1.5rem",
+    padding: "0.5rem 1rem",
+    gap: "1rem",
+    minWidth: "320px",
+    maxWidth: "625px",
+    width: "auto",
+  };
+
+  const anchored: CSSProperties = {
+    ...baseStyles,
+    right: "auto",
+    bottom: "auto",
+    transform: "none",
+  };
+
+  if (isDragging && dragPosition) {
+    return { ...anchored, left: `${dragPosition.x}px`, top: `${dragPosition.y}px` };
+  }
+  if (barPosition) {
+    return { ...anchored, left: `${barPosition.x}px`, top: `${barPosition.y}px` };
+  }
+  return {
+    ...baseStyles,
+    top: "15px",
+    right: "15rem",
+    left: "auto",
+    bottom: "auto",
+    transform: "none",
+  };
+}
+
+async function runFloatingBarCtiOperation(
+  setBusy: (v: boolean) => void,
+  operation: () => Promise<FloatingBarCtiResult>,
+  logLabel: string,
+): Promise<void> {
+  setBusy(true);
+  try {
+    const result = await operation();
+    if (!result.success) {
+      console.error(`[GlobalFloatingCallBar] ${logLabel} failed:`, result.error);
+    }
+  } catch (error) {
+    console.error(`[GlobalFloatingCallBar] ${logLabel} error:`, error);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function buildFloatingBarSignedCallPayload(
+  activeCall: FloatingBarCtiCall,
+  controller: FloatingBarControllerDevice,
+) {
+  return {
+    callId: activeCall.callId!,
+    callingAddress: activeCall.callingAddress!,
+    calledAddress: activeCall.calledAddress || activeCall.number,
+    callingDeviceType: activeCall.callingDeviceType || "SOFT_HARD",
+    callingDeviceName: activeCall.callingDeviceName || "WebCTI",
+    controllerAddress: controller.controllerAddress,
+    controllerDeviceName: controller.controllerDeviceName,
+    controllerDeviceType: controller.controllerDeviceType,
+  };
+}
 
 
 // Add styles for the floating call bar
@@ -28,7 +118,7 @@ const floatingBarStyles = `
     animation: slideUp 0.3s ease-out;
     user-select: none;
     list-style: none;
-    /* Position is controlled by inline styles from getPositionStyles() so drag-snap is respected */
+    /* Position is controlled by inline styles from sectionStyle so drag-snap is respected */
     box-shadow:0px 2px 5px #c7c0c0 !important;
   }
   .global-floating-call-bar * {
@@ -248,229 +338,36 @@ const GlobalFloatingCallBar: React.FC = () => {
     };
   }, [isDragging, dragStart, handleDragEnd]);
 
-  // Get position styles – free (x,y) when set or dragging, else default top-right
-  const getPositionStyles = useCallback((): React.CSSProperties => {
-    const baseStyles: React.CSSProperties = {
-      position: "fixed",
-      zIndex: 9999,
-      backgroundColor: "#fff",
-      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-      display: "flex",
-      flexDirection: "row",
-      alignItems: "center",
-      transition: isDragging ? "none" : "all 0.3s ease",
-      cursor: isDragging ? "grabbing" : "grab",
-      border: "none",
-      visibility: "visible",
-      opacity: 1,
-      borderRadius: "1.5rem",
-      padding: "0.5rem 1rem",
-      gap: "1rem",
-      minWidth: "320px",
-      maxWidth: "625px",
-      width: "auto",
-    };
-
+  const sectionStyle = useMemo((): CSSProperties => {
+    const base = buildFloatingBarPositionStyles(barPosition, isDragging, dragPosition);
     if (isDragging && dragPosition) {
-      baseStyles.left = `${dragPosition.x}px`;
-      baseStyles.top = `${dragPosition.y}px`;
-      baseStyles.right = "auto";
-      baseStyles.bottom = "auto";
-      baseStyles.transform = "none";
-      return baseStyles;
+      return {
+        ...base,
+        "--bar-drag-left": `${dragPosition.x}px`,
+        "--bar-drag-top": `${dragPosition.y}px`,
+        "--bar-drag-right": "auto",
+      } as CSSProperties;
     }
-
-    if (barPosition) {
-      baseStyles.left = `${barPosition.x}px`;
-      baseStyles.top = `${barPosition.y}px`;
-      baseStyles.right = "auto";
-      baseStyles.bottom = "auto";
-      baseStyles.transform = "none";
-      return baseStyles;
-    }
-
-    // Default: top-right (no saved position)
-    baseStyles.top = "15px";
-    baseStyles.right = "15rem";
-    baseStyles.left = "auto";
-    baseStyles.bottom = "auto";
-    baseStyles.transform = "none";
-    return baseStyles;
+    return base;
   }, [barPosition, isDragging, dragPosition]);
 
-  const getControllerDeviceInfo = useCallback((call: FloatingBarCtiCall | null | undefined) => {
-    if (!call || !userAddress || !dnsMap) {
-      return null;
-    }
+  const {
+    activeCall,
+    canCurrentUserResumeCall,
+    connectedElapsedDisplay,
+    otherPartyNumber,
+    activeCallUserName,
+    activeCallUserImageUrl,
+  } = useGlobalFloatingCallBarDerived({
+    activeCalls: activeCalls as Map<string, FloatingBarCtiCall>,
+    userAddress,
+    callStateMap: callStateMap as UseGlobalFloatingCallBarDerivedParams["callStateMap"],
+    eventLog: eventLog as UseGlobalFloatingCallBarDerivedParams["eventLog"],
+    dnsMap,
+    formatDuration,
+    getUserDataExtensions,
+  });
 
-    const isCaller = call.callingAddress === userAddress;
-    const isCalled = call.calledAddress === userAddress;
-
-    if (!isCaller && !isCalled) {
-      return null;
-    }
-
-    const devices = dnsMap[userAddress]?.devices;
-    if (!devices) {
-      return null;
-    }
-
-    const userDevices = Object.values(devices);
-    if (userDevices.length === 0) {
-      return null;
-    }
-
-    let activeDevice =
-      isCaller && call.callingDeviceName
-        ? userDevices.find((device) => device.deviceName === call.callingDeviceName)
-        : undefined;
-
-    if (!activeDevice) {
-      activeDevice =
-        userDevices.find((device) => device.terminalState === "REGISTERED") || userDevices[0];
-    }
-
-    return {
-      controllerAddress: userAddress,
-      controllerDeviceName: activeDevice.deviceName || "WebCTI",
-      controllerDeviceType: activeDevice.deviceType || "SOFT_HARD",
-    };
-  }, [userAddress, dnsMap]);
-
-  const activeCall = useMemo(
-    () =>
-      pickFloatingBarCall(
-        activeCalls as Map<string, FloatingBarCtiCall>,
-        userAddress,
-        callStateMap as Record<string, FloatingBarCallStateEntry> | undefined,
-        eventLog as FloatingBarEventLogEntry[] | undefined
-      ),
-    [activeCalls, userAddress, callStateMap, eventLog]
-  );
-
-  const canCurrentUserResumeCall = React.useMemo(() => {
-    if (!activeCall?.callId || activeCall.status !== "onHold" || !userAddress) {
-      return false;
-    }
-    const callState = callStateMap?.[activeCall.callId];
-    return canUserResumeHoldOnFloatingBar(userAddress, callState, dnsMap);
-  }, [activeCall, userAddress, callStateMap, dnsMap]);
-
-  // Real-time duration update for active calls
-  const [currentDuration, setCurrentDuration] = React.useState<number | null>(null);
-  
-  React.useEffect(() => {
-    if (activeCall?.status !== "connected") {
-      setCurrentDuration(null);
-      return;
-    }
-
-    // Calculate initial duration
-    const calculateDuration = () => {
-      const callId = activeCall.callId;
-      if (!callId || !callStateMap?.[callId]) {
-        return activeCall.duration || 0;
-      }
-
-      const callState = callStateMap[callId];
-      const startTime = parseCallAnswerStartTimeUtc(callState, activeCall.startTime);
-      if (startTime) {
-        const now = new Date();
-        return Math.max(0, Math.round((now.getTime() - startTime.getTime()) / 1000));
-      }
-      
-      return activeCall.duration || 0;
-    };
-
-    // Set initial duration
-    setCurrentDuration(calculateDuration());
-
-    // Update every second
-    const interval = setInterval(() => {
-      setCurrentDuration(calculateDuration());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeCall, callStateMap]);
-
-  const connectedElapsedDisplay = useMemo(() => {
-    if (activeCall?.status !== "connected") {
-      return "";
-    }
-    if (currentDuration !== null) {
-      return formatDuration(currentDuration);
-    }
-    if (activeCall.duration != null) {
-      return formatDuration(activeCall.duration);
-    }
-    return formatDuration(0);
-  }, [activeCall, currentDuration, formatDuration]);
-
-  // Determine the other party's number (the person we're talking to, not ourselves)
-  const otherPartyNumber = React.useMemo(() => {
-    if (!activeCall || !userAddress) {
-      return activeCall?.number || null;
-    }
-    
-    // If user is the calling party, show the called party's number
-    if (activeCall.callingAddress === userAddress && activeCall.calledAddress) {
-      return activeCall.calledAddress;
-    }
-    
-    // If user is the called party, show the calling party's number
-    if (activeCall.calledAddress === userAddress && activeCall.callingAddress) {
-      return activeCall.callingAddress;
-    }
-    
-    // Fallback to number field
-    return activeCall.number || null;
-  }, [activeCall, userAddress]);
-
-  // Get user extension data for the other party's number
-  const activeCallUserData = React.useMemo(() => {
-    if (!activeCall || !otherPartyNumber || !getUserDataExtensions) {
-      return null;
-    }
-    
-    try {
-      const userDataExtensions = getUserDataExtensions() || {};
-      const callNumber = otherPartyNumber;
-      const dnString = String(callNumber);
-      const dnNumber = Number(callNumber);
-      
-      // Try different DN formats to match the key
-      const data = userDataExtensions[callNumber] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null;
-      
-      return data;
-    } catch (error) {
-      console.error(`[GlobalFloatingCallBar] Error getting extension data for ${otherPartyNumber}:`, error);
-      return null;
-    }
-  }, [activeCall, otherPartyNumber, getUserDataExtensions]);
-
-  // Get user name from extension data
-  const activeCallUserName = React.useMemo(() => {
-    if (!activeCallUserData) {
-      return otherPartyNumber || "Unknown";
-    }
-    return activeCallUserData.name || activeCallUserData.user_name || otherPartyNumber || "Unknown";
-  }, [activeCallUserData, otherPartyNumber]);
-
-  // Get user image URL
-  const activeCallUserImageUrl = React.useMemo(() => {
-    if (!activeCallUserData) {
-      return UserDummyImage.src;
-    }
-    
-    const imagePath = activeCallUserData?.image_path;
-    if (imagePath) {
-      const url = getStorageImageUrl(imagePath);
-      return url || UserDummyImage.src;
-    }
-    return UserDummyImage.src;
-  }, [activeCallUserData]);
-
-  // Get incoming call user extension data
   const shouldShowFloatingBar =
     isInitialized && hasPermission("dial-call-cti");
 
@@ -480,122 +377,78 @@ const GlobalFloatingCallBar: React.FC = () => {
     !showIncomingCallModalFromContext &&
     !incomingCallFromContext;
 
+  const closeTransferModal = useCallback(() => {
+    setShowTransferModal(false);
+    setTransferTarget("");
+    setExtensionSearch("");
+  }, []);
+
+  const transferCandidates = useMemo(
+    () =>
+      getAvailableExtensions().filter(
+        (ext) =>
+          !isExtensionBusyOnCalls(ext, activeCalls as Map<string, FloatingBarCtiCall>),
+      ),
+    [getAvailableExtensions, activeCalls],
+  );
+
   const handleEndCall = async () => {
     if (!activeCall?.callId) {
       return;
     }
-
-    const controllerDevice = getControllerDeviceInfo(activeCall);
+    const controllerDevice = getFloatingBarControllerDeviceInfo(activeCall, userAddress, dnsMap);
     if (!controllerDevice) {
       return;
     }
-
-    setIsEndingCall(true);
-    try {
-      const result = await endCall({
-        callId: activeCall.callId,
-        callingAddress: activeCall.callingAddress!,
-        calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: activeCall.callingDeviceType || "SOFT_HARD",
-        callingDeviceName: activeCall.callingDeviceName || "WebCTI",
-        controllerAddress: controllerDevice.controllerAddress,
-        controllerDeviceName: controllerDevice.controllerDeviceName,
-        controllerDeviceType: controllerDevice.controllerDeviceType,
-      } as Parameters<typeof endCall>[0]);
-
-      if (!result.success) {
-        console.error("[GlobalFloatingCallBar] endCall failed:", result.error);
-      }
-    } catch (error) {
-      console.error("[GlobalFloatingCallBar] endCall error:", error);
-    } finally {
-      setIsEndingCall(false);
-    }
+    const payload = buildFloatingBarSignedCallPayload(activeCall, controllerDevice);
+    await runFloatingBarCtiOperation(
+      setIsEndingCall,
+      () => endCall(payload as Parameters<typeof endCall>[0]),
+      "endCall",
+    );
   };
 
   const handleHoldCall = async () => {
     if (!activeCall?.callId) {
       return;
     }
-
-    const controllerDevice = getControllerDeviceInfo(activeCall);
+    const controllerDevice = getFloatingBarControllerDeviceInfo(activeCall, userAddress, dnsMap);
     if (!controllerDevice) {
       return;
     }
-
-    setIsHoldingCall(true);
-    try {
-      const result = await holdCall({
-        callId: activeCall.callId,
-        callingAddress: activeCall.callingAddress!,
-        calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: activeCall.callingDeviceType || "SOFT_HARD",
-        callingDeviceName: activeCall.callingDeviceName || "WebCTI",
-        controllerAddress: controllerDevice.controllerAddress,
-        controllerDeviceName: controllerDevice.controllerDeviceName,
-        controllerDeviceType: controllerDevice.controllerDeviceType,
-      } as Parameters<typeof holdCall>[0]);
-
-      if (!result.success) {
-        console.error("[GlobalFloatingCallBar] holdCall failed:", result.error);
-      }
-    } catch (error) {
-      console.error("[GlobalFloatingCallBar] holdCall error:", error);
-    } finally {
-      setIsHoldingCall(false);
-    }
+    const payload = buildFloatingBarSignedCallPayload(activeCall, controllerDevice);
+    await runFloatingBarCtiOperation(
+      setIsHoldingCall,
+      () => holdCall(payload as Parameters<typeof holdCall>[0]),
+      "holdCall",
+    );
   };
 
   const handleResumeCall = async () => {
     if (!activeCall?.callId) {
       return;
     }
-
-    const controllerDevice = getControllerDeviceInfo(activeCall);
+    const controllerDevice = getFloatingBarControllerDeviceInfo(activeCall, userAddress, dnsMap);
     if (!controllerDevice) {
       return;
     }
-
-    setIsResumingCall(true);
-    try {
-      const result = await resumeCall({
-        callId: activeCall.callId,
-        callingAddress: activeCall.callingAddress!,
-        calledAddress: activeCall.calledAddress || activeCall.number,
-        callingDeviceType: activeCall.callingDeviceType || "SOFT_HARD",
-        callingDeviceName: activeCall.callingDeviceName || "WebCTI",
-        controllerAddress: controllerDevice.controllerAddress,
-        controllerDeviceName: controllerDevice.controllerDeviceName,
-        controllerDeviceType: controllerDevice.controllerDeviceType,
-      } as Parameters<typeof resumeCall>[0]);
-
-      if (!result.success) {
-        console.error("[GlobalFloatingCallBar] resumeCall failed:", result.error);
-      }
-    } catch (error) {
-      console.error("[GlobalFloatingCallBar] resumeCall error:", error);
-    } finally {
-      setIsResumingCall(false);
-    }
+    const payload = buildFloatingBarSignedCallPayload(activeCall, controllerDevice);
+    await runFloatingBarCtiOperation(
+      setIsResumingCall,
+      () => resumeCall(payload as Parameters<typeof resumeCall>[0]),
+      "resumeCall",
+    );
   };
 
   const handleTransferCall = async () => {
     if (!activeCall?.callId || !transferTarget.trim()) {
       return;
     }
-
-    const controllerDevice = getControllerDeviceInfo(activeCall);
+    const controllerDevice = getFloatingBarControllerDeviceInfo(activeCall, userAddress, dnsMap);
     if (!controllerDevice) {
       return;
     }
-
-    const targetCall = Array.from(activeCalls.values()).find(
-      (c) =>
-        c.number === transferTarget &&
-        ["connected", "ringing", "dialing"].includes(c.status)
-    );
-
-    if (targetCall) {
+    if (isExtensionBusyOnCalls(transferTarget, activeCalls as Map<string, FloatingBarCtiCall>)) {
       return;
     }
 
@@ -604,7 +457,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       const transferAddress =
         getRemotePartyDnForTransfer(userAddress, activeCall.callingAddress, activeCall.calledAddress) ||
         activeCall.calledAddress ||
-        activeCall.number
+        activeCall.number;
       const result = await transferCall({
         callId: activeCall.callId,
         transferAddress,
@@ -616,9 +469,7 @@ const GlobalFloatingCallBar: React.FC = () => {
       });
 
       if (result.success) {
-        setShowTransferModal(false);
-        setTransferTarget("");
-        setExtensionSearch("");
+        closeTransferModal();
       } else {
         console.error("[GlobalFloatingCallBar] transferCall failed:", result.error);
       }
@@ -627,18 +478,6 @@ const GlobalFloatingCallBar: React.FC = () => {
     } finally {
       setIsTransferringCall(false);
     }
-  };
-
-  const getAvailableExtensionsForTransfer = () => {
-    return getAvailableExtensions().filter((ext) => {
-      // Filter out extensions that are currently in calls
-      const isInCall = Array.from(activeCalls.values()).some(
-        (call) =>
-          call.number === ext &&
-          ["connected", "ringing", "dialing"].includes(call.status)
-      );
-      return !isInCall;
-    });
   };
 
   // Don't render anything if CTI is not initialized or user doesn't have permission
@@ -653,498 +492,42 @@ const GlobalFloatingCallBar: React.FC = () => {
           session exists or their leg is an inbound offer (see isInboundAwaitingUserAnswerForFloatingBar). */}
       {floatingBarVisible && activeCall ? (
         <>
-        <section aria-label="Active call">
-        <div
-          ref={barRef}
-          className={`global-floating-call-bar ${isDragging ? "dragging" : ""}`}
-          style={{
-            ...getPositionStyles(),
-            ...(isDragging && dragPosition
-              ? {
-                  "--bar-drag-left": `${dragPosition.x}px`,
-                  "--bar-drag-top": `${dragPosition.y}px`,
-                  "--bar-drag-right": "auto",
-                }
-              : {}),
-          }}
-        >
-          <button
-            type="button"
-            className="call-bar-drag-handle btn btn-link p-0 me-1 border-0 d-flex align-items-center justify-content-center"
-            aria-label="Drag to move call bar"
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              handleDragStart(e);
-            }}
-            style={{ minWidth: "1.5rem", minHeight: "2.5rem", color: "#64748b" }}
-          >
-            <i className="material-icons-two-tone" style={{ fontSize: "1.25rem" }}>
-              drag_indicator
-            </i>
-          </button>
-          {/* Contact Info Section */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              flex: 1,
-              flexDirection: "row",
-              minWidth: 0,
-              top:"0",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-            {/* Avatar */}
-            <div
-              className="position-relative"
-              style={{
-                width: "3rem",
-                height: "3rem",
-                minWidth: "3rem",
-                flexShrink: 0,
-              }}
-            >
-              {activeCallUserImageUrl && activeCallUserImageUrl !== UserDummyImage.src ? (
-                <img
-                  src={activeCallUserImageUrl}
-                  alt={activeCallUserName}
-                  className="rounded-circle"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    border: "2px solid #e5e7eb",
-                  }}
-                  onError={(e) => {
-                    e.currentTarget.src = UserDummyImage.src;
-                  }}
-                />
-              ) : (
-                <img
-                  src={UserDummyImage.src}
-                  alt={activeCallUserName}
-                  className="rounded-circle"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    border: "2px solid #e5e7eb",
-                  }}
-                />
-              )}
-            </div>
-
-            {/* Contact Details */}
-              <div style={{ flex: 1 }}>
-                <h3
-                  style={{
-                    fontSize: "1rem",
-                    fontWeight: 600,
-                    color: "#334155",
-                    marginBottom: "0.25rem",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {activeCallUserName}
-                </h3>
-                <div
-                  style={{
-                    fontSize: "0.7rem",
-                    color: "#94a3b8",
-                    marginBottom: "0.25rem",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {otherPartyNumber}
-                </div>
-                {/* Optional: Add contact label/group here if available */}
-
-                {/* Status Text */}
-            {activeCall.status === "connected" && (
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#334155",
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  flexDirection: "row",
-                }}
-              >
-                <span className="text-success" style={{ fontWeight: "500" }}>Connected</span>
-                <span style={{ color: "#94a3b8" }}>{connectedElapsedDisplay}</span>
-              </div>
-            )}
-
-              </div>
-          </div>
-
-          {/* Call Status Section */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flex: 1,
-              flexDirection: "row",
-              gap: "10px",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-            {activeCall.status === "ringing" && (
-              <div
-                className="call-status-ringing"
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#334155",
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  flexDirection: "row",
-                }}
-              >
-                <span className="text-success" style={{ fontWeight: "500" }}>Outgoing call</span>
-                <span className="bg-success rounded-circle" style={{ width: "0.375rem", height: "0.375rem" }}></span>
-                <span style={{ color: "#94a3b8" }}>Ringing...</span>
-              </div>
-            )}
-            {activeCall.status === "dialing" && (
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#334155",
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  flexDirection: "row",
-                }}
-              >
-                <span style={{ color: "#94a3b8" }}>Dialing...</span>
-              </div>
-            )}
-          </div>
-
-          {/* Call Control Buttons */}
-          <div
-            style={{
-              display: "flex",
-              gap: "0.5rem",
-              alignItems: "center",
-              flexDirection: "row",
-              position: "relative",
-              zIndex: 1,
-            }}
-          >
-{activeCall.status === "onHold" && (
-              <div
-                style={{
-                  fontSize: "0.75rem",
-                  color: "#F4C22B",
-                  fontWeight: 500,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  flexDirection: "row",
-                }}
-              >
-                <span>On Hold</span>
-              </div>
-            )}
-
-            {/* Additional Controls for Connected Calls */}
-            {activeCall.status === "connected" && (
-              <>
-
-              
-                <button
-                  type="button"
-                  tabIndex={0}
-                  disabled={isHoldingCall}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleHoldCall();
-                  }}
-                  className="btn rounded-circle d-flex align-items-center justify-content-center"
-                  style={{
-                    width: "3rem",
-                    height: "3rem",
-                    backgroundColor: "#f1f5f9",
-                    border: "none",
-                    color: "#475569",
-                    cursor: isHoldingCall ? "not-allowed" : "pointer",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isHoldingCall) e.currentTarget.style.backgroundColor = "#e2e8f0";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f1f5f9";
-                  }}
-                  title="Hold Call"
-                >
-                  {isHoldingCall ? (
-                    <span className="spinner-border spinner-border-sm" aria-hidden="true" style={{ width: "1.25rem", height: "1.25rem", borderWidth: "2px", color: "#475569" }} />
-                  ) : (
-                    <i
-                      className="material-icons-two-tone"
-                      style={{ fontSize: "1.25rem", color: "#475569" }}
-                    >
-                      pause
-                    </i>
-                  )}
-                </button>
-                {hasPermission("transfer-call-cti") && (
-                <button
-                  type="button"
-                  tabIndex={0}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowTransferModal(true);
-                  }}
-                  className="btn rounded-circle d-flex align-items-center justify-content-center"
-                  style={{
-                    width: "3rem",
-                    height: "3rem",
-                    backgroundColor: "#f1f5f9",
-                    border: "none",
-                    color: "#475569",
-                    cursor: "pointer",
-                    transition: "background-color 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#e2e8f0";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "#f1f5f9";
-                  }}
-                  title="Transfer Call"
-                >
-                  <i
-                    className="material-icons-two-tone"
-                    style={{ fontSize: "1.25rem", color: "#475569" }}
-                  >
-                    call_made
-                  </i>
-                </button>
-                )}
-              </>
-            )}
-
-            {activeCall.status === "onHold" && canCurrentUserResumeCall && (
-              <button
-                type="button"
-                tabIndex={0}
-                disabled={isResumingCall}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleResumeCall();
-                }}
-                className="btn rounded-circle d-flex align-items-center justify-content-center"
-                style={{
-                  width: "3rem",
-                  height: "3rem",
-                  backgroundColor: "#f1f5f9",
-                  border: "none",
-                  color: "#475569",
-                  cursor: isResumingCall ? "not-allowed" : "pointer",
-                  transition: "background-color 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isResumingCall) e.currentTarget.style.backgroundColor = "#e2e8f0";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#f1f5f9";
-                }}
-                title="Resume Call"
-              >
-                {isResumingCall ? (
-                  <span className="spinner-border spinner-border-sm" aria-hidden="true" style={{ width: "1.25rem", height: "1.25rem", borderWidth: "2px", color: "#475569" }} />
-                ) : (
-                  <i
-                    className="material-icons-two-tone"
-                    style={{ fontSize: "1.25rem", color: "#475569" }}
-                  >
-                    play_arrow
-                  </i>
-                )}
-              </button>
-            )}
-
-            {/* End Call Button */}
-            <button
-              type="button"
-              tabIndex={0}
-              disabled={isEndingCall}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleEndCall();
-              }}
-              className="btn btn-danger btn-sm rounded-1 d-flex align-items-center gap-1"
-              onMouseEnter={(e) => {
-                if (!isEndingCall) e.currentTarget.style.boxShadow = "0 6px 8px -1px rgba(239,68,68,0.4)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "0 4px 6px -1px rgba(239,68,68,0.3)";
-              }}
-              title="End Call"
-            >
-              {isEndingCall ? (
-                <>
-                  <span className="spinner-border spinner-border-sm" aria-hidden="true" style={{ width: "1rem", height: "1rem", borderWidth: "2px" }} />
-                  {" "}
-                  Ending...
-                </>
-              ) : (
-                <>
-                  <i
-                    className="material-icons-two-tone"
-                    style={{ fontSize: "1rem", color: "#fff", backgroundColor: "#fff" }}
-                  >
-                    call_end
-                  </i>{" "}
-                  End Call
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-        </section>
-
-        {/* Transfer Call Modal - shown with call bar */}
-        <Modal
-          show={showTransferModal}
-          onHide={() => {
-            setShowTransferModal(false);
-            setTransferTarget("");
-            setExtensionSearch("");
-          }}
-          centered
-          size="sm"
-        >
-          <Modal.Header closeButton>
-            <Modal.Title>
-              <i className="material-icons-two-tone me-2">call_made</i>{" "}
-              Transfer Call
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form.Group className="mb-3">
-              <Form.Label className="fw-semibold">
-                Select Target Extension
-              </Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Search extensions..."
-                value={extensionSearch}
-                onChange={(e) => setExtensionSearch(e.target.value)}
-                className="mb-2"
-              />
-              <div style={{ maxHeight: "300px", overflowY: "auto" }}>
-                {getAvailableExtensionsForTransfer()
-                  .filter(
-                    (ext) =>
-                      extensionSearch === "" ||
-                      ext.toLowerCase().includes(extensionSearch.toLowerCase())
-                  )
-                  .filter((ext) =>
-                    Object.values(dnsMap?.[ext]?.devices || {}).some(
-                      (d: any) => d.terminalState === "REGISTERED"
-                    )
-                  )
-                  .sort((extA, extB) => {
-                    const isOnline = (e: string) =>
-                      Object.values(dnsMap?.[e]?.devices || {}).some(
-                        (d: any) => d.terminalState === "REGISTERED"
-                      );
-                    const aOnline = isOnline(extA);
-                    const bOnline = isOnline(extB);
-                    if (aOnline && !bOnline) return -1;
-                    if (!aOnline && bOnline) return 1;
-                    return 0;
-                  })
-                  .map((ext) => {
-                    const extensionData = dnsMap?.[ext];
-                    const deviceList = extensionData
-                      ? Object.values(extensionData.devices || {})
-                      : [];
-                    const isOnline = deviceList.some(
-                      (d: any) => d.terminalState === "REGISTERED"
-                    );
-                    const userDataExtensions = getUserDataExtensions?.() || {};
-                    const dnString = String(ext);
-                    const dnNumber = Number(ext);
-                    const userData = userDataExtensions[ext] || userDataExtensions[dnString] || userDataExtensions[dnNumber];
-                    const name = userData?.name || userData?.user_name;
-                    const displayName = name ? `${name} (${ext})` : ext;
-
-                    return (
-                      <Button
-                        key={ext}
-                        variant={
-                          transferTarget === ext ? "primary" : "outline-primary"
-                        }
-                        size="sm"
-                        className="w-100 mb-2"
-                        onClick={() => setTransferTarget(ext)}
-                      >
-                        <div className="d-flex justify-content-between align-items-center">
-                          <span className="fw-bold">{displayName}</span>
-                          <small
-                            className={isOnline ? "text-success" : "text-muted"}
-                          >
-                            {isOnline ? "ONLINE" : "OFFLINE"}
-                          </small>
-                        </div>
-                      </Button>
-                    );
-                  })}
-              </div>
-              {getAvailableExtensionsForTransfer().length === 0 && (
-                <div className="alert alert-warning py-2">
-                  <i className="material-icons-two-tone me-2">warning</i>
-                  <small>No available extensions for transfer</small>
-                </div>
-              )}
-            </Form.Group>
-          </Modal.Body>
-          <Modal.Footer>
-            <Button
-              variant="default"
-              onClick={() => {
-                setShowTransferModal(false);
-                setTransferTarget("");
-                setExtensionSearch("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleTransferCall}
-              disabled={!transferTarget || isTransferringCall}
-            >
-              {isTransferringCall ? (
-                <>
-                  <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" style={{ width: "1rem", height: "1rem", borderWidth: "2px" }} />
-                  {" "}
-                  Transferring...
-                </>
-              ) : (
-                "Transfer"
-              )}
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          <FloatingBarActiveCallSection
+            barRef={barRef}
+            isDragging={isDragging}
+            dragPosition={dragPosition}
+            sectionStyle={sectionStyle}
+            onDragStart={handleDragStart}
+            activeCall={activeCall}
+            activeCallUserImageUrl={activeCallUserImageUrl}
+            activeCallUserName={activeCallUserName}
+            otherPartyNumber={otherPartyNumber}
+            connectedElapsedDisplay={connectedElapsedDisplay}
+            canCurrentUserResumeCall={canCurrentUserResumeCall}
+            canTransferCall={hasPermission("transfer-call-cti")}
+            isHoldingCall={isHoldingCall}
+            isResumingCall={isResumingCall}
+            isEndingCall={isEndingCall}
+            onHoldCall={handleHoldCall}
+            onResumeCall={handleResumeCall}
+            onEndCall={handleEndCall}
+            onOpenTransferModal={() => setShowTransferModal(true)}
+          />
+          <FloatingBarTransferModal
+            show={showTransferModal}
+            onHide={closeTransferModal}
+            extensionSearch={extensionSearch}
+            onExtensionSearchChange={setExtensionSearch}
+            transferTarget={transferTarget}
+            onTransferTargetChange={setTransferTarget}
+            transferCandidates={transferCandidates}
+            dnsMap={dnsMap}
+            getUserDataExtensions={
+              getUserDataExtensions as FloatingBarTransferModalProps["getUserDataExtensions"]
+            }
+            onTransfer={handleTransferCall}
+            isTransferring={isTransferringCall}
+          />
         </>
       ) : null}
     </>

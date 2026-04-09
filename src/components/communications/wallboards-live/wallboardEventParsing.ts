@@ -390,7 +390,7 @@ function normalizeMonitoringTypeForWallboardCompare(
   if (t == null || t === "") {
     return "";
   }
-  return String(t).trim().toUpperCase().replaceAll(/-/g, "_");
+  return String(t).trim().toUpperCase().replaceAll("-", "_");
 }
 
 /**

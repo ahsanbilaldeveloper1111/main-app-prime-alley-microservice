@@ -504,11 +504,9 @@ export function getFloatingBarControllerDeviceInfo(
         )
       : undefined;
 
-  if (!activeDevice) {
-    activeDevice =
-      userDevices.find((device) => device.terminalState === "REGISTERED") ||
-      userDevices[0];
-  }
+  activeDevice ??=
+    userDevices.find((device) => device.terminalState === "REGISTERED") ||
+    userDevices[0];
 
   return {
     controllerAddress: userAddress,

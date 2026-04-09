@@ -16,8 +16,6 @@ import { useAuth } from "../hooks/useAuth";
 
 import {
   Bell,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
   MoreVertical, 
   Phone,
@@ -45,6 +43,12 @@ import { CreateTicketSidebar } from '@components/renderCreateTicketForm';
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
 import CreateTaskModal from '@components/CreatePlannerTaskSidebar';
+import {
+  hasReliableCtiCallId,
+  isSameCtiCallForActiveLookup,
+  resolveCallIdForAttendApi,
+  shouldDismissIncomingModalForAnsweredElsewhere,
+} from "../utils/incomingCallMatching";
 
 interface LayoutProps {
   children: ReactNode;
@@ -157,26 +161,20 @@ const Layout = ({ children }: LayoutProps) => {
   const { logout } = useAuth();
 	const { unreadCount } = useNotifications();
 	const { isOpen: isDialerOpen, openDialer, closeDialer } = useDialerModal();
-  const { 
-		isInitialized, 
-		userAddress, 
-		dnsMap, 
-		attendCall, 
+  const {
+		isInitialized,
+		userAddress,
+		dnsMap,
+		attendCall,
 		endCall,
 		getUserDataExtensions,
 		activeCalls,
+		callStateMap,
 		makeCall,
 		dialNumber,
 		getAllUserDevices
 	} = useCti();
-  
-  import {
-  hasReliableCtiCallId,
-  isSameCtiCallForActiveLookup,
-  resolveCallIdForAttendApi,
-  shouldDismissIncomingModalForAnsweredElsewhere,
-} from "@utils/incomingCallMatching";
-  
+
 	const { incomingCall, showIncomingCallModal, setIncomingCall, setShowIncomingCallModal } = useIncomingCall();
 	const { hasPermission } = usePermissions();
 	const [isDialing, setIsDialing] = useState(false);
@@ -1306,80 +1304,43 @@ font-weight:600;
                     setSearchQuery(e.target.value);
                     setShowSearchSuggestions(true);
                   }}
-                >
-                  {searchSuggestions.map((r: SearchableRouteItem) => (
-                    <button
-                      key={r.path}
-                      type="button"
-                      className="create-dropdown-item"
-                      onClick={() => {
-                        if (canAccessRoute(session?.user?.permissions, r.path)) {
-                          router.push(r.path);
-                          setSearchQuery('');
-                          setShowSearchSuggestions(false);
-                        }
-                      }}
-                    >
-                      <span>{r.label}</span>
-                      <span className="text-muted small ms-1">{r.path}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                />
+                {showSearchSuggestions && searchSuggestions.length > 0 && (
+                  <div
+                    className="create-dropdown-menu"
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      marginTop: 4,
+                      maxHeight: 320,
+                      overflowY: "auto",
+                      zIndex: 1050,
+                    }}
+                  >
+                    {searchSuggestions.map((r: SearchableRouteItem) => (
+                      <button
+                        key={r.path}
+                        type="button"
+                        className="create-dropdown-item"
+                        onClick={() => {
+                          if (canAccessRoute(session?.user?.permissions, r.path)) {
+                            router.push(r.path);
+                            setSearchQuery("");
+                            setShowSearchSuggestions(false);
+                          }
+                        }}
+                      >
+                        <span>{r.label}</span>
+                        <span className="text-muted small ms-1">{r.path}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               {/* Create Button */}
-                <div >
-                
-                <button
-                  type="button"
-                  className="crm-prime-create-btn"
-                  onClick={() => setShowCreateDropdown(!showCreateDropdown)}
-                  title="Create new"
-                >
-                  <Plus size={14} />
-                    </button>
-                
-                
-                {/* Create Dropdown */}
-                {showCreateDropdown && (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Close create menu"
-                      style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: 0,
-                        right: 0,
-                        marginTop: 4,
-                        maxHeight: 320,
-                        overflowY: "auto",
-                      }}
-                    >
-                      {searchSuggestions.map((r) => (
-                        <button
-                          key={r.path}
-                          type="button"
-                          className="create-dropdown-item"
-                          onClick={() => {
-                            if (
-                              canAccessRoute(session?.user?.permissions, r.path)
-                            ) {
-                              router.push(r.path);
-                              setSearchQuery("");
-                              setShowSearchSuggestions(false);
-                            }
-                          }}
-                        >
-                          <span>{r.label}</span>
-                          <span className="text-muted small ms-1">
-                            {r.path}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                {/* Create Button */}
-                <div>
+              <div>
                   <button
                     type="button"
                     className="crm-prime-create-btn"
@@ -1475,7 +1436,6 @@ font-weight:600;
                     </>
                   )}
                 </div>
-              </div>
 
             {/* Icons and user menu */}
             <div className="ms-auto d-flex align-items-center" style={{ gap: '10px' }}>
@@ -1883,18 +1843,10 @@ font-weight:600;
                           type="button"
                           className="user-dropdown-item user-dropdown-credits-head"
                         >
-                          <span className="user-dropdown-item-text">
-                            CRM Prime Credits
-                          </span>
-
-                          
-                        <button type="button" className="user-dropdown-item user-dropdown-credits-head">
                           <div className="d-flex align-items-center justify-content-between w-100 gap-2">
                             <span className="user-dropdown-item-text">Prime Credits</span>
                             <span className="user-dropdown-item-badge">New</span>
                           </div>
-                            
-                          
                           <div className="user-dropdown-credits-count">0 of 0 credits available</div>
                         </button>
                         <button type="button" className="user-dropdown-item">
@@ -1984,7 +1936,7 @@ font-weight:600;
                   {incomingCallUserName}
                 </h6>
                 <div style={{ fontSize: "13px", color: "#6c757d" }}>
-                  {formatPhoneNumber(incomingCall.callingAddress)}
+                  {formatPhoneNumber(incomingCall?.callingAddress ?? "")}
                 </div>
                 <div
                   style={{
@@ -2205,35 +2157,8 @@ font-weight:600;
           )}
         </div>
 
-<div
-  className="flex-grow-1 p-3 main-content-wrapper"
-  style={{
-    overflowY: 'auto',
-    width: mainContentWidth,
-    overflow: breezeMaximized ? 'hidden' : 'auto',
-    transition: 'width 0.3s ease-in-out'
-  }}
->
-  <div className="pc-content">
-    {children}
-  </div>
-</div>
-      
-
-			{/* Breeze AI Assistant Sidebar */}
-			{showBreezeAssistant && (
-<BreezeAssistantSidebar
-       isOpen={showBreezeAssistant}
-       onClose={() => { setShowBreezeAssistant(false); setBreezeMaximized(false); }}
-       isMaximized={breezeMaximized}
-       onMaximizeChange={(v) => setBreezeMaximized(v)}
-       width={breezeMaximized ? '100%' : '400px'}
-    />
-			)}
-		</div>
-
-		<Footer />
-		</div>
+        <Footer />
+      </div>
 
     	{/* Notifications Sidebar */}
 		<NotificationsSidebar
