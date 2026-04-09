@@ -15,12 +15,118 @@ export type FloatingBarCtiCall = {
   duration?: number;
 };
 
+export type FloatingBarCallStateParty = {
+  callStatus?: string;
+  callingAddress?: string;
+  calledAddress?: string;
+};
+
 export type FloatingBarCallStateEntry = {
   isMonitoring?: boolean;
   monitoring?: { monitorDn?: string };
   heldByAddress?: string;
-  parties?: Array<{ callStatus?: string; callingAddress?: string; calledAddress?: string }>;
+  parties?: Array<FloatingBarCallStateParty>;
 };
+
+/** Matches CTI `dnsMap` keys = registered extension DNs (external PSTN is usually absent). */
+export type FloatingBarDnsMap = Record<string, unknown>;
+
+function normalizeAddressForComparison(address?: string): string {
+  if (!address) return "";
+  const digitsOnly = address.replace(/\D/g, "");
+  if (!digitsOnly) return "";
+  return digitsOnly.length > 10 ? digitsOnly.slice(-10) : digitsOnly;
+}
+
+function addressesEquivalent(a: string | undefined, b: string | undefined): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const na = normalizeAddressForComparison(a);
+  const nb = normalizeAddressForComparison(b);
+  return na !== "" && na === nb;
+}
+
+function isDnRegisteredOnFloatingBar(
+  dnsMap: FloatingBarDnsMap | undefined,
+  address: string | undefined,
+): boolean {
+  if (!address || !dnsMap) return false;
+  if (Object.prototype.hasOwnProperty.call(dnsMap, address)) return true;
+  const norm = normalizeAddressForComparison(address);
+  if (!norm) return false;
+  return Object.keys(dnsMap).some((k) => normalizeAddressForComparison(k) === norm);
+}
+
+/**
+ * Whether the signed-in user should see Resume on the floating bar for a held call.
+ * Uses `heldByAddress` when it still matches an active party; otherwise infers from the user's leg
+ * and which endpoint is an internal DN (fixes callee/transfer-recipient hold and stale heldBy after transfer).
+ */
+function inferResumeAllowedFromDnsForParty(
+  userAddress: string,
+  ourParty: FloatingBarCallStateParty,
+  dnsMap: FloatingBarDnsMap | undefined,
+): boolean {
+  const callerKnown = isDnRegisteredOnFloatingBar(dnsMap, ourParty.callingAddress);
+  const calleeKnown = isDnRegisteredOnFloatingBar(dnsMap, ourParty.calledAddress);
+  if (callerKnown !== calleeKnown) {
+    return callerKnown
+      ? addressesEquivalent(userAddress, ourParty.callingAddress)
+      : addressesEquivalent(userAddress, ourParty.calledAddress);
+  }
+  return (
+    addressesEquivalent(userAddress, ourParty.callingAddress) ||
+    addressesEquivalent(userAddress, ourParty.calledAddress)
+  );
+}
+
+export function canUserResumeHoldOnFloatingBar(
+  userAddress: string | undefined,
+  callState: FloatingBarCallStateEntry | undefined,
+  dnsMap: FloatingBarDnsMap | undefined,
+): boolean {
+  if (!userAddress || !callState) {
+    return false;
+  }
+
+  const parties = callState.parties ?? [];
+  const ourParty = parties.find(
+    (p) =>
+      addressesEquivalent(p.callingAddress, userAddress) ||
+      addressesEquivalent(p.calledAddress, userAddress),
+  );
+  if (!ourParty) {
+    return false;
+  }
+
+  const heldByAddress = callState.heldByAddress;
+  const heldByNonEmpty = typeof heldByAddress === "string" && heldByAddress.length > 0;
+  const heldByOnCall =
+    heldByNonEmpty &&
+    parties.some(
+      (p) =>
+        addressesEquivalent(p.callingAddress, heldByAddress) ||
+        addressesEquivalent(p.calledAddress, heldByAddress),
+    );
+
+  if (heldByNonEmpty && heldByOnCall) {
+    if (addressesEquivalent(userAddress, heldByAddress)) {
+      return true;
+    }
+    const status = (ourParty.callStatus ?? "").toUpperCase();
+    if (status === "ON_HOLD" || status === "HELD") {
+      return inferResumeAllowedFromDnsForParty(userAddress, ourParty, dnsMap);
+    }
+    return false;
+  }
+
+  const status = (ourParty.callStatus ?? "").toUpperCase();
+  if (status === "ON_HOLD" || status === "HELD") {
+    return inferResumeAllowedFromDnsForParty(userAddress, ourParty, dnsMap);
+  }
+
+  return true;
+}
 
 export type FloatingBarEventLogEntry = {
   isMonitoring?: boolean;
@@ -120,12 +226,52 @@ function eventLogImpliesMonitoringCall(
   return false;
 }
 
+function isPartyStatusRingingForCallee(party: FloatingBarCallStateParty, userAddress: string): boolean {
+  if (party.calledAddress !== userAddress) {
+    return false;
+  }
+  const raw = party.callStatus ?? "";
+  const s = raw.toUpperCase();
+  return s === "RINGING" || s === "ALERTING" || s === "PROCEEDING";
+}
+
+/**
+ * Transfer UX (two roles):
+ * - **Transfer initiator** (still on the consult / connecting leg as caller): keep seeing the
+ *   floating bar — `isInboundAwaitingUserAnswerForFloatingBar` is false for them because they are
+ *   not `calledAddress` on the inbound offer to the transfer target.
+ * - **Transfer recipient** (`calledAddress` = this user, party still RINGING/ALERTING/PROCEEDING):
+ *   must use attend/reject only — exclude this call from the floating bar so it does not replace
+ *   the incoming dialog.
+ *
+ * Uses per-party state when available so consult/transfer aggregate "connected" state does not
+ * show the bar to the recipient before they answer.
+ */
+export function isInboundAwaitingUserAnswerForFloatingBar(
+  call: FloatingBarCtiCall,
+  userAddress: string | null | undefined,
+  callStateMap: Record<string, FloatingBarCallStateEntry> | undefined
+): boolean {
+  if (!userAddress || call.calledAddress !== userAddress) {
+    return false;
+  }
+  const parties = call.callId ? callStateMap?.[call.callId]?.parties : undefined;
+  if (parties?.length) {
+    return parties.some((p) => isPartyStatusRingingForCallee(p, userAddress));
+  }
+  return call.status === "ringing" || call.status === "dialing";
+}
+
+/** Eligible calls for the floating bar for this signed-in extension (monitoring calls excluded). */
 export function shouldIncludeCallOnFloatingBar(
   call: FloatingBarCtiCall,
   userAddress: string | null | undefined,
   callStateMap: Record<string, FloatingBarCallStateEntry> | undefined,
   eventLog: FloatingBarEventLogEntry[] | undefined
 ): boolean {
+  if (isInboundAwaitingUserAnswerForFloatingBar(call, userAddress, callStateMap)) {
+    return false;
+  }
   const involvesUser = !!(
     userAddress &&
     (call.callingAddress === userAddress || call.calledAddress === userAddress)
@@ -151,20 +297,39 @@ function applyFallbackConnectedDuration(call: FloatingBarCtiCall): void {
   call.duration = Math.max(0, Math.round((now.getTime() - startTime.getTime()) / 1000));
 }
 
+function hasEquivalentConnectedParty(
+  ringingParties: NonNullable<FloatingBarCallStateEntry["parties"]>,
+  connectedParties: NonNullable<FloatingBarCallStateEntry["parties"]>
+): boolean {
+  return ringingParties.some((ringingParty) => {
+    const ringingCaller = normalizeAddressForComparison(ringingParty.callingAddress);
+    const ringingCallee = normalizeAddressForComparison(ringingParty.calledAddress);
+    return connectedParties.some((connectedParty) => {
+      const connectedCaller = normalizeAddressForComparison(connectedParty.callingAddress);
+      const connectedCallee = normalizeAddressForComparison(connectedParty.calledAddress);
+      return ringingCaller === connectedCaller && ringingCallee === connectedCallee;
+    });
+  });
+}
+
 function applyPartyStatusesToCall(
   call: FloatingBarCtiCall,
   userAddress: string | null | undefined,
   parties: NonNullable<FloatingBarCallStateEntry["parties"]>
 ): void {
-  const hasConnectedParty = parties.some(
+  const connectedParties = parties.filter(
     (p) =>
       p.callStatus === "CONNECTED" ||
       p.callStatus === "ANSWERED" ||
       p.callStatus === "RETRIEVED"
   );
-  const hasRingingParty = parties.some((p) => p.callStatus === "RINGING");
+  const ringingParties = parties.filter((p) => p.callStatus === "RINGING");
+  const hasConnectedParty = connectedParties.length > 0;
+  const hasRingingParty = ringingParties.length > 0;
+  const hasEquivalentConnectedAndRinging =
+    hasConnectedParty && hasRingingParty && hasEquivalentConnectedParty(ringingParties, connectedParties);
 
-  if (hasConnectedParty && !hasRingingParty) {
+  if (hasConnectedParty && (!hasRingingParty || hasEquivalentConnectedAndRinging)) {
     call.status = "connected";
   } else if (hasRingingParty && call.calledAddress === userAddress) {
     call.status = "ringing";
@@ -205,7 +370,8 @@ export function pickFloatingBarCall(
   callStateMap: Record<string, FloatingBarCallStateEntry> | undefined,
   eventLog: FloatingBarEventLogEntry[] | undefined
 ): FloatingBarCtiCall | undefined {
-  const list = Array.from(activeCalls.values())
+  const all = Array.from(activeCalls.values());
+  const list = all
     .filter((c) => shouldIncludeCallOnFloatingBar(c, userAddress, callStateMap, eventLog))
     .sort(compareFloatingBarCalls);
   const call = list[0];

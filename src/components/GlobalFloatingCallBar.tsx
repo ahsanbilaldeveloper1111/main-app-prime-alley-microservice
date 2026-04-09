@@ -10,6 +10,7 @@ import UserDummyImage from "@assets/images/user-dummy.jpg";
 import { getStorageImageUrl } from "@utils/imageUtils";
 import { parseCallAnswerStartTimeUtc } from "@components/live-calls/utils/helpers";
 import {
+  canUserResumeHoldOnFloatingBar,
   pickFloatingBarCall,
   type FloatingBarCallStateEntry,
   type FloatingBarCtiCall,
@@ -107,6 +108,7 @@ const GlobalFloatingCallBar: React.FC = () => {
   const { hasPermission } = usePermissions();
   const {
     showIncomingCallModal: showIncomingCallModalFromContext,
+    incomingCall: incomingCallFromContext,
     setIncomingCall: setIncomingCallContext,
     setShowIncomingCallModal: setShowIncomingCallModalContext,
   } = useIncomingCall();
@@ -346,30 +348,13 @@ const GlobalFloatingCallBar: React.FC = () => {
     [activeCalls, userAddress, callStateMap, eventLog]
   );
 
-  // Only the party who put the call on hold can resume (not the held party). If our party is ON_HOLD we were held by the other side -> hide Resume. Caller who put on hold can resume.
   const canCurrentUserResumeCall = React.useMemo(() => {
     if (!activeCall?.callId || activeCall.status !== "onHold" || !userAddress) {
       return false;
     }
-    const callId = activeCall.callId;
-    const callState = callStateMap?.[callId];
-    if (!callState) return false;
-    const heldByAddress = callState.heldByAddress;
-    if (heldByAddress !== undefined) {
-      return userAddress === heldByAddress;
-    }
-    const parties: NonNullable<FloatingBarCallStateEntry["parties"]> = callState.parties ?? [];
-    const ourParty = parties.find(
-      (p) => p.callingAddress === userAddress || p.calledAddress === userAddress
-    );
-    if (ourParty) {
-      if (ourParty.callStatus === "ON_HOLD") {
-        return ourParty.callingAddress === userAddress;
-      }
-      return true;
-    }
-    return false;
-  }, [activeCall, userAddress, callStateMap]);
+    const callState = callStateMap?.[activeCall.callId];
+    return canUserResumeHoldOnFloatingBar(userAddress, callState, dnsMap);
+  }, [activeCall, userAddress, callStateMap, dnsMap]);
 
   // Real-time duration update for active calls
   const [currentDuration, setCurrentDuration] = React.useState<number | null>(null);
@@ -488,6 +473,12 @@ const GlobalFloatingCallBar: React.FC = () => {
   // Get incoming call user extension data
   const shouldShowFloatingBar =
     isInitialized && hasPermission("dial-call-cti");
+
+  const floatingBarVisible =
+    shouldShowFloatingBar &&
+    Boolean(activeCall) &&
+    !showIncomingCallModalFromContext &&
+    !incomingCallFromContext;
 
   const handleEndCall = async () => {
     if (!activeCall?.callId) {
@@ -658,8 +649,9 @@ const GlobalFloatingCallBar: React.FC = () => {
   return (
     <>
       <style>{floatingBarStyles}</style>
-      {/* Floating Call Bar - Hide when incoming call modal is open */}
-      {shouldShowFloatingBar && activeCall && !showIncomingCallModalFromContext && (
+      {/* Bar: transfer initiator / connected party. Hidden for transfer recipient while attend/reject
+          session exists or their leg is an inbound offer (see isInboundAwaitingUserAnswerForFloatingBar). */}
+      {floatingBarVisible && activeCall ? (
         <>
         <section aria-label="Active call">
         <div
@@ -1154,7 +1146,7 @@ const GlobalFloatingCallBar: React.FC = () => {
           </Modal.Footer>
         </Modal>
         </>
-      )}
+      ) : null}
     </>
   );
 };

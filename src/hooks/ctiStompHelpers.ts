@@ -346,14 +346,28 @@ function computeEffectiveCurrentState(
   return evt.eventType;
 }
 
+function isDnKeyInDnsMap(
+  dnsMap: Record<string, { dn: string; devices: Record<string, { deviceName: string; deviceType: string }> }>,
+  address: string | undefined,
+): boolean {
+  return Boolean(address && Object.prototype.hasOwnProperty.call(dnsMap, address));
+}
+
+/** Prefer a party that is actually on hold for inference (order is not stable after transfer). */
+function pickPartyForHeldInference(activePartiesOnly: any[]): any {
+  const onHold = activePartiesOnly.find((p: any) => p.callStatus === "ON_HOLD");
+  return onHold ?? activePartiesOnly[0];
+}
+
 function computeHeldByAddress(
   evt: any,
   effectiveCurrentState: string,
   base: any,
   activePartiesOnly: any[],
+  dnsMap: Record<string, { dn: string; devices: Record<string, { deviceName: string; deviceType: string }> }>,
 ): string | undefined {
   if (evt.eventType === "HELD" && activePartiesOnly.length >= 1) {
-    const p = activePartiesOnly[0];
+    const p = pickPartyForHeldInference(activePartiesOnly);
     const calling = p.callingAddress;
     const called = p.calledAddress;
     const details = String((evt as { details?: string }).details || "");
@@ -362,6 +376,14 @@ function computeHeldByAddress(
     if (globalCallingMatch) {
       const globalCalling = globalCallingMatch[1].trim();
       return calling === globalCalling ? called : calling;
+    }
+    const knownCalling = isDnKeyInDnsMap(dnsMap, calling);
+    const knownCalled = isDnKeyInDnsMap(dnsMap, called);
+    if (knownCalling && !knownCalled) {
+      return calling;
+    }
+    if (knownCalled && !knownCalling) {
+      return called;
     }
     return calling;
   }
@@ -446,6 +468,7 @@ export function applyCallEventToCallStateMap(
     effectiveCurrentState,
     base,
     activePartiesOnly,
+    dnsMap,
   );
 
   updated[callId] = {
@@ -642,10 +665,6 @@ export function mergeOngoingCallsIntoCallStateMap(
       hasActiveParticipants: callData.hasActiveParticipants !== false,
       isTerminating: callData.isTerminating === true,
       eventTime: callData.eventTime ?? existingCall?.eventTime ?? "",
-      ...(currentState === "HELD" &&
-        existingCall?.heldByAddress != null && {
-          heldByAddress: existingCall.heldByAddress,
-        }),
     };
   });
 

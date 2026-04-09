@@ -350,6 +350,18 @@ export function computeNextIdleSinceMap(input: IdleSinceReconcileInput): Record<
   return next
 }
 
+function normalizeMonitoringTypeForWallboardCompare(t: string | null | undefined): string {
+  if (t == null || t === '') {
+    return ''
+  }
+  return String(t).trim().toUpperCase().replace(/-/g, '_')
+}
+
+/**
+ * True when `active` should be updated to match `payload`.
+ * When local monitoring was cleared (dn/type empty), returns false so stale callStateMap / eventLog
+ * does not immediately re-apply the session the user just stopped (avoids setState + rerender loops).
+ */
 export function monitoringPayloadDiffersFromActive(
   active: {
     dn: string | null
@@ -359,12 +371,23 @@ export function monitoringPayloadDiffersFromActive(
   },
   payload: MonitoringPayload
 ): boolean {
+  if (!payload?.monitoredDn || !payload?.monitorDn) {
+    return false
+  }
+
+  if (!active.dn || !active.type) {
+    return false
+  }
+
+  const typeMatches =
+    normalizeMonitoringTypeForWallboardCompare(active.type) ===
+    normalizeMonitoringTypeForWallboardCompare(payload.monitoringType)
+
   return (
-    !active.dn ||
     active.dn !== payload.monitoredDn ||
     (!!payload.monitoredDeviceName && active.deviceName !== payload.monitoredDeviceName) ||
-    active.monitor !== payload.monitorDn ||
-    active.type !== payload.monitoringType
+    (active.monitor ?? undefined) !== (payload.monitorDn ?? undefined) ||
+    !typeMatches
   )
 }
 
