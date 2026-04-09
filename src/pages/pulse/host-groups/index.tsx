@@ -1,8 +1,8 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback } from 'react';
+import React, { ReactElement, useEffect, useState, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
+import GenericTable, { TableAction, TableColumn, ToolbarConfig, TabConfig } from '@components/GenericTable';
 import {
   addCustomerHostGroups,
   addHostGroup,
@@ -11,7 +11,7 @@ import {
   updateHostGroup,
   ZabbixHostGroup,
 } from '@utils/zabbix';
-import { Button, Row, Col, Modal, Form, Spinner } from 'react-bootstrap';
+import { Button, Modal, Form, Spinner } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
@@ -25,9 +25,9 @@ const HostGroups = () => {
   const [search, setSearch] = useState('');
   const [pagination, setPagination] = useState({
     offset: 0,
-    limit: 10,
+    limit: 20,
     total: 0,
-    pageSizeOptions: [10, 15, 25, 50, 100] as number[],
+    pageSizeOptions: [10, 20, 25, 50, 100] as number[],
   });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createName, setCreateName] = useState('');
@@ -76,26 +76,12 @@ const HostGroups = () => {
   }, []);
 
   useEffect(() => {
-    fetchHostGroups(0, 10);
+    fetchHostGroups(0, 20);
   }, [fetchHostGroups]);
-
-  const handlePrevPage = () => {
-    const { offset, limit } = pagination;
-    fetchHostGroups(Math.max(0, offset - limit), limit, search);
-  };
-
-  const handleNextPage = () => {
-    const { offset, limit, total } = pagination;
-    if (offset + limit < total) {
-      fetchHostGroups(offset + limit, limit, search);
-    }
-  };
 
   const handleSearch = () => fetchHostGroups(0, pagination.limit, search);
 
   const handleRefresh = () => fetchHostGroups(0, pagination.limit, search);
-
-  const hasNextPage = pagination.offset + pagination.limit < pagination.total;
 
   const openCreateModal = () => {
     setCreateName('');
@@ -205,70 +191,102 @@ const HostGroups = () => {
     { label: 'Delete', icon: <Trash2 size={16} />, onClick: (row) => openDeleteConfirm(row) },
   ];
 
+  const hostGroupTabs: TabConfig[] = useMemo(
+    () => [
+      {
+        id: 'host-groups',
+        label: 'Host Groups',
+        count: pagination.total,
+        removable: false,
+      },
+    ],
+    [pagination.total]
+  );
+
+  const hostGroupsToolbarConfig: ToolbarConfig = useMemo(
+    () => ({
+      showSearch: true,
+      searchValue: search,
+      searchPlaceholder: 'Search host groups...',
+      onSearchChange: setSearch,
+      onSearch: handleSearch,
+      showTabs: true,
+      tabs: hostGroupTabs,
+      activeTab: 'host-groups',
+      onTabChange: () => {},
+      showTableViewDropdown: false,
+      customActions: (
+        <div className="d-flex align-items-center gap-2 flex-wrap hg-toolbar-buttons">
+          <button className="hg-btn" onClick={handleSearch} disabled={loading}>
+            <Search size={14} /> Search
+          </button>
+          <button className="hg-btn" onClick={openCreateModal} disabled={loading}>
+            <Plus size={14} /> New Host Group
+          </button>
+          <button className="hg-btn" onClick={openCustomerModal} disabled={loading}>
+            <Plus size={14} /> Add Customer Group
+          </button>
+          <button className="hg-btn" onClick={handleRefresh} disabled={loading}>
+            <FiRefreshCw size={14} /> Refresh
+          </button>
+        </div>
+      ),
+    }),
+    [
+      handleRefresh,
+      handleSearch,
+      hostGroupTabs,
+      loading,
+      openCreateModal,
+      openCustomerModal,
+    ]
+  );
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Hosts" />
       <BreadcrumbItem mainTitle="Hosts" mainLink="/pulse/hosts" subTitle="Host Groups" />
 
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2 d-flex justify-content-end align-items-center gap-2 flex-wrap">
-           
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Search host groups..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              style={{ maxWidth: '240px' }}
-            />
-            <Button variant="primary" onClick={handleSearch} disabled={loading}>
-              <Search size={14} />
-              Search
-            </Button>
-            <Button variant="success" onClick={openCreateModal} disabled={loading}>
-              <Plus  size={14} />
-              New Host Group
-            </Button>
-            <Button variant="warning" onClick={openCustomerModal} disabled={loading}>
-              <Plus size={14} />
-              Add Customer Group
-            </Button>
-
-            
-            <Button variant="info" onClick={handleRefresh} disabled={loading}>
-              <FiRefreshCw size={14} /> Refresh
-            </Button>
-          </div>
-        </Col>
-      </Row>
-
-      
-
-      <GenericTable<ZabbixHostGroup>
-        data={groups}
-        columns={tableColumns}
-        actions={tableActions}
-        showActions
-        actionsLabel="Actions"
-        loading={loading}
-        emptyMessage="No host groups found."
-        loadingMessage="Loading host groups..."
-        pagination={{
-          currentPage: pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
-          rowsPerPage: pagination.limit,
-          totalRows: pagination.total,
-          pageSizeOptions: pagination.pageSizeOptions,
+      <div
+        className="pulse-hostgroups-page"
+        style={{
+          display: 'flex',
+          gap: '0',
+          height: 'calc(100vh)',
+          overflow: 'hidden',
         }}
-        onPaginationChange={(page, rowsPerPage) => {
-          fetchHostGroups((page - 1) * rowsPerPage, rowsPerPage, search);
-        }}
-        sortable
-        hover
-        striped={false}
-        uniqueKey="groupid"
-      />
+      >
+        <div className="hg-table-pane" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <GenericTable<ZabbixHostGroup>
+            data={groups}
+            columns={tableColumns}
+            actions={tableActions}
+            showActions
+            actionsLabel="Actions"
+            showToolbarActions={false}
+            loading={loading}
+            emptyMessage="No host groups found."
+            loadingMessage="Loading host groups..."
+            pagination={{
+              currentPage: pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
+              rowsPerPage: pagination.limit,
+              totalRows: pagination.total,
+              pageSizeOptions: pagination.pageSizeOptions,
+            }}
+            onPaginationChange={(page, rowsPerPage) => {
+              fetchHostGroups((page - 1) * rowsPerPage, rowsPerPage, search);
+            }}
+            sortable
+            hover
+            striped={false}
+            uniqueKey="groupid"
+            showToolbar={true}
+            toolbar={hostGroupsToolbarConfig}
+            fixedHeight={true}
+            maxHeight="calc(100vh - 295px)"
+          />
+        </div>
+      </div>
 
       <Modal show={showCreateModal} onHide={() => setShowCreateModal(false)} centered>
         <Modal.Header closeButton>
@@ -394,6 +412,64 @@ const HostGroups = () => {
         itemType="host group"
         loading={deleteLoading}
       />
+
+      <style jsx global>{`
+        .pulse-hostgroups-page .hg-btn {
+          padding: 9px 13px;
+          background-color: rgb(0, 0, 0);
+          color: rgb(255, 255, 255);
+          border: none;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 40px;
+          line-height: 1;
+        }
+
+        .pulse-hostgroups-page .hg-btn:hover,
+        .pulse-hostgroups-page .hg-btn:focus {
+          background-color: rgb(0, 0, 0);
+          color: rgb(255, 255, 255);
+          opacity: 0.92;
+        }
+
+        .pulse-hostgroups-page .hg-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .pulse-hostgroups-page .gt-toolbar-search input,
+        .pulse-hostgroups-page .gt-toolbar-search .form-control {
+          min-height: 40px;
+          height: 40px;
+          font-size: 12px;
+        }
+
+        .pulse-hostgroups-page .gt-toolbar-search button,
+        .pulse-hostgroups-page .gt-toolbar-search .btn {
+          min-height: 40px;
+          height: 40px;
+          padding: 9px 13px;
+          font-size: 12px;
+          font-weight: 500;
+          border-radius: 4px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .pulse-hostgroups-page .hg-table-pane {
+          min-height: 0;
+        }
+
+        .pulse-hostgroups-page .hg-table-pane .generic-table-responsive.fixed-height-table {
+          min-height: 0;
+        }
+      `}</style>
     </React.Fragment>
   );
 };
