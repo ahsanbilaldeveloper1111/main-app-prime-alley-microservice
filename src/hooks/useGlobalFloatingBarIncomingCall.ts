@@ -1,4 +1,8 @@
 import { useEffect, useRef, type MutableRefObject, type Dispatch, type SetStateAction } from "react";
+import {
+  isDuplicateRingingEventForOpenModal,
+  shouldCloseIncomingModalOnCallEndEvent,
+} from "@utils/incomingCallMatching";
 
 /** Ref object for incoming-call auto-dismiss timer (avoid React's MutableRefObject import for Sonar/deprecation). */
 export type FloatingBarIncomingTimerRef = {
@@ -81,14 +85,12 @@ function closeIncomingSession(
   setIncomingCallContext(null);
 }
 
-const CALL_END_EVENT_TYPES = new Set(["DISCONNECTED", "DROPPED", "ENDED"]);
-
-function isSameCallAsState(eventData: EventParty, cur: FloatingBarIncomingCallState): boolean {
-  return (
-    eventData.callId === cur.callId ||
-    (eventData.callingAddress === cur.callingAddress && eventData.calledAddress === cur.calledAddress)
-  );
-}
+/**
+ * Incoming UI must not auto-close on DISCONNECTED/DROPPED: CTI often emits those for a ringing
+ * transfer leg while the callee should still answer. Rely on reject, 30s timeout,
+ * Layout answered-elsewhere, or true ENDED.
+ */
+const INCOMING_SESSION_AUTO_CLOSE_EVENT_TYPES = new Set(["ENDED"]);
 
 function isRingingDuplicateForOpenModal(
   eventData: EventParty,
@@ -98,7 +100,7 @@ function isRingingDuplicateForOpenModal(
   if (!cur || !showIncomingCallModal) {
     return false;
   }
-  return isSameCallAsState(eventData, cur);
+  return isDuplicateRingingEventForOpenModal(eventData, cur);
 }
 
 function getRegisteredDeviceForUser(
@@ -221,10 +223,10 @@ function handleCallEndEventBranch(args: {
   if (!eventData || !cur) {
     return;
   }
-  if (!CALL_END_EVENT_TYPES.has(latestEvent.eventType ?? "")) {
+  if (!INCOMING_SESSION_AUTO_CLOSE_EVENT_TYPES.has(latestEvent.eventType ?? "")) {
     return;
   }
-  if (!isSameCallAsState(eventData, cur)) {
+  if (!shouldCloseIncomingModalOnCallEndEvent(eventData, cur)) {
     return;
   }
   closeIncomingSession(

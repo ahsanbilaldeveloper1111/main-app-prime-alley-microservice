@@ -10,7 +10,11 @@ const LOAD_PERSIST_ACTIVE_STATUSES = new Set([
   "ANSWERED",
 ]);
 
-const SAVE_PERSIST_ACTIVE_STATUSES = new Set(["CONNECTED", "RETRIEVED", "ON_HOLD"]);
+const SAVE_PERSIST_ACTIVE_STATUSES = new Set([
+  "CONNECTED",
+  "RETRIEVED",
+  "ON_HOLD",
+]);
 const SAVE_ESTABLISHED_STATUSES = new Set(["CONNECTED", "RETRIEVED"]);
 
 export function partyLegHasStartTime(startTime: unknown): boolean {
@@ -59,7 +63,9 @@ export function readCtiCallerInfoFromStorage(): Record<string, unknown> | null {
   }
 }
 
-export function inferCallingDeviceTypeFromDeviceName(deviceName: string): string {
+export function inferCallingDeviceTypeFromDeviceName(
+  deviceName: string,
+): string {
   const n = deviceName.toLowerCase();
   if (n.includes("android") || n.includes("mobile")) {
     return "MOBILE";
@@ -68,7 +74,10 @@ export function inferCallingDeviceTypeFromDeviceName(deviceName: string): string
 }
 
 function findDeviceTypeInDnsMap(
-  dnsMap: Record<string, { devices: Record<string, { deviceName: string; deviceType: string }> }>,
+  dnsMap: Record<
+    string,
+    { devices: Record<string, { deviceName: string; deviceType: string }> }
+  >,
   callingAddress: string,
   callingDeviceName: string,
 ): string | undefined {
@@ -84,7 +93,13 @@ function findDeviceTypeInDnsMap(
 
 export function enrichPartyCallingDeviceType(
   party: any,
-  dnsMap: Record<string, { dn: string; devices: Record<string, { deviceName: string; deviceType: string }> }>,
+  dnsMap: Record<
+    string,
+    {
+      dn: string;
+      devices: Record<string, { deviceName: string; deviceType: string }>;
+    }
+  >,
 ): void {
   const stored = readCtiCallerInfoFromStorage();
   if (
@@ -95,14 +110,24 @@ export function enrichPartyCallingDeviceType(
     party.callingDeviceType = stored.callingDeviceType;
     return;
   }
-  if (!party.callingDeviceType && party.callingAddress && party.callingDeviceName) {
-    const fromMap = findDeviceTypeInDnsMap(dnsMap, party.callingAddress, party.callingDeviceName);
+  if (
+    !party.callingDeviceType &&
+    party.callingAddress &&
+    party.callingDeviceName
+  ) {
+    const fromMap = findDeviceTypeInDnsMap(
+      dnsMap,
+      party.callingAddress,
+      party.callingDeviceName,
+    );
     if (fromMap) {
       party.callingDeviceType = fromMap;
     }
   }
   if (!party.callingDeviceType && party.callingDeviceName) {
-    party.callingDeviceType = inferCallingDeviceTypeFromDeviceName(party.callingDeviceName);
+    party.callingDeviceType = inferCallingDeviceTypeFromDeviceName(
+      party.callingDeviceName,
+    );
   }
 }
 
@@ -124,65 +149,75 @@ function normalizeStateFromActivePartiesForDropped(
 export function reduceLoadPersistedCallStates(
   parsed: Record<string, unknown>,
 ): Record<string, unknown> {
-  return Object.entries(parsed).reduce((acc, [callId, raw]) => {
-    const event = raw as Record<string, any>;
-    if (event.isTerminating || !event.parties?.length) {
+  return Object.entries(parsed).reduce(
+    (acc, [callId, raw]) => {
+      const event = raw as Record<string, any>;
+      if (event.isTerminating || !event.parties?.length) {
+        return acc;
+      }
+      const activeParties = event.parties.filter(
+        (p: any) =>
+          p.callStatus &&
+          p.callStatus !== "DROPPED" &&
+          p.callStatus !== "DISCONNECTED" &&
+          LOAD_PERSIST_ACTIVE_STATUSES.has(p.callStatus),
+      );
+      if (activeParties.length === 0) {
+        return acc;
+      }
+      let normalizedState = event.currentState;
+      if (event.currentState === "DROPPED") {
+        normalizedState =
+          normalizeStateFromActivePartiesForDropped(activeParties);
+      }
+      acc[callId] = {
+        ...event,
+        currentState: normalizedState,
+        parties: activeParties,
+        hasActiveParticipants: activeParties.length > 0,
+      };
       return acc;
-    }
-    const activeParties = event.parties.filter(
-      (p: any) =>
-        p.callStatus &&
-        p.callStatus !== "DROPPED" &&
-        p.callStatus !== "DISCONNECTED" &&
-        LOAD_PERSIST_ACTIVE_STATUSES.has(p.callStatus),
-    );
-    if (activeParties.length === 0) {
-      return acc;
-    }
-    let normalizedState = event.currentState;
-    if (event.currentState === "DROPPED") {
-      normalizedState = normalizeStateFromActivePartiesForDropped(activeParties);
-    }
-    acc[callId] = {
-      ...event,
-      currentState: normalizedState,
-      parties: activeParties,
-      hasActiveParticipants: activeParties.length > 0,
-    };
-    return acc;
-  }, {} as Record<string, unknown>);
+    },
+    {} as Record<string, unknown>,
+  );
 }
 
-export function reduceSaveCallStates(callStates: Record<string, unknown>): Record<string, unknown> {
-  return Object.entries(callStates).reduce((acc, [callId, raw]) => {
-    const callEvent = raw as Record<string, any>;
-    if (callEvent.isTerminating || !callEvent.parties?.length) {
+export function reduceSaveCallStates(
+  callStates: Record<string, unknown>,
+): Record<string, unknown> {
+  return Object.entries(callStates).reduce(
+    (acc, [callId, raw]) => {
+      const callEvent = raw as Record<string, any>;
+      if (callEvent.isTerminating || !callEvent.parties?.length) {
+        return acc;
+      }
+      const activeParties = callEvent.parties.filter(
+        (p: any) =>
+          p.callStatus &&
+          p.callStatus !== "DROPPED" &&
+          p.callStatus !== "DISCONNECTED" &&
+          SAVE_PERSIST_ACTIVE_STATUSES.has(p.callStatus),
+      );
+      const isConnectedOrRetrieved = activeParties.some(
+        (p: any) => p.callStatus && SAVE_ESTABLISHED_STATUSES.has(p.callStatus),
+      );
+      if (!isConnectedOrRetrieved || activeParties.length === 0) {
+        return acc;
+      }
+      let normalizedState = callEvent.currentState;
+      if (callEvent.currentState === "DROPPED") {
+        normalizedState =
+          normalizeStateFromActivePartiesForDropped(activeParties);
+      }
+      acc[callId] = {
+        ...callEvent,
+        currentState: normalizedState,
+        hasActiveParticipants: true,
+      };
       return acc;
-    }
-    const activeParties = callEvent.parties.filter(
-      (p: any) =>
-        p.callStatus &&
-        p.callStatus !== "DROPPED" &&
-        p.callStatus !== "DISCONNECTED" &&
-        SAVE_PERSIST_ACTIVE_STATUSES.has(p.callStatus),
-    );
-    const isConnectedOrRetrieved = activeParties.some(
-      (p: any) => p.callStatus && SAVE_ESTABLISHED_STATUSES.has(p.callStatus),
-    );
-    if (!isConnectedOrRetrieved || activeParties.length === 0) {
-      return acc;
-    }
-    let normalizedState = callEvent.currentState;
-    if (callEvent.currentState === "DROPPED") {
-      normalizedState = normalizeStateFromActivePartiesForDropped(activeParties);
-    }
-    acc[callId] = {
-      ...callEvent,
-      currentState: normalizedState,
-      hasActiveParticipants: true,
-    };
-    return acc;
-  }, {} as Record<string, unknown>);
+    },
+    {} as Record<string, unknown>,
+  );
 }
 
 function partyPairMatchesDropped(
@@ -190,8 +225,10 @@ function partyPairMatchesDropped(
   droppedPair: { calling: any; called: any },
 ): boolean {
   return (
-    (p.callingAddress === droppedPair.calling && p.calledAddress === droppedPair.called) ||
-    (p.callingAddress === droppedPair.called && p.calledAddress === droppedPair.calling)
+    (p.callingAddress === droppedPair.calling &&
+      p.calledAddress === droppedPair.called) ||
+    (p.callingAddress === droppedPair.called &&
+      p.calledAddress === droppedPair.calling)
   );
 }
 
@@ -224,7 +261,9 @@ function applyDroppedPairToOtherCalls(
       continue;
     }
     const updatedParties = otherCall.parties.map((p: any) =>
-      partyPairMatchesDropped(p, droppedPair) ? { ...p, callStatus: "DROPPED" } : p,
+      partyPairMatchesDropped(p, droppedPair)
+        ? { ...p, callStatus: "DROPPED" }
+        : p,
     );
     const nextActive = updatedParties.filter(
       (p: any) => p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED",
@@ -249,7 +288,9 @@ export function applyStaleDroppedPartyCleanup(
   }
 
   const droppedPartyPairs = processedParties
-    .filter((p: any) => p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED")
+    .filter(
+      (p: any) => p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED",
+    )
     .map((p: any) => ({
       calling: p.callingAddress,
       called: p.calledAddress,
@@ -258,7 +299,12 @@ export function applyStaleDroppedPartyCleanup(
   const currentEventTime = new Date(evt.eventTime).getTime();
 
   for (const droppedPair of droppedPartyPairs) {
-    applyDroppedPairToOtherCalls(updated, callId, droppedPair, currentEventTime);
+    applyDroppedPairToOtherCalls(
+      updated,
+      callId,
+      droppedPair,
+      currentEventTime,
+    );
   }
 }
 
@@ -277,7 +323,8 @@ function tryRemoveCallOnEarlyExit(
     const allPartiesDroppedEarly =
       evt.parties.length > 0 &&
       evt.parties.every(
-        (p: any) => p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED",
+        (p: any) =>
+          p.callStatus === "DROPPED" || p.callStatus === "DISCONNECTED",
       );
     if (allPartiesDroppedEarly || evt.hasActiveParticipants === false) {
       const { [callId]: _, ...rest } = updated;
@@ -288,8 +335,14 @@ function tryRemoveCallOnEarlyExit(
   return null;
 }
 
-function shouldIgnoreStaleEvent(evt: any, base: any, eventTimeMs: number): boolean {
-  const existingEventTimeMs = base.eventTime ? new Date(base.eventTime).getTime() : 0;
+function shouldIgnoreStaleEvent(
+  evt: any,
+  base: any,
+  eventTimeMs: number,
+): boolean {
+  const existingEventTimeMs = base.eventTime
+    ? new Date(base.eventTime).getTime()
+    : 0;
   if (eventTimeMs < existingEventTimeMs) {
     return true;
   }
@@ -313,7 +366,9 @@ function computeShouldTerminate(
     (evt.hasActiveParticipants === false &&
       processedParties.length > 0 &&
       evt.eventType !== "RINGING") ||
-    (!hasActiveParties && processedParties.length > 0 && evt.eventType !== "RINGING") ||
+    (!hasActiveParties &&
+      processedParties.length > 0 &&
+      evt.eventType !== "RINGING") ||
     (evt.eventType === "DISCONNECTED" && !hasActiveParties)
   );
 }
@@ -346,14 +401,40 @@ function computeEffectiveCurrentState(
   return evt.eventType;
 }
 
+function isDnKeyInDnsMap(
+  dnsMap: Record<
+    string,
+    {
+      dn: string;
+      devices: Record<string, { deviceName: string; deviceType: string }>;
+    }
+  >,
+  address: string | undefined,
+): boolean {
+  return Boolean(address && Object.hasOwn(dnsMap, address));
+}
+
+/** Prefer a party that is actually on hold for inference (order is not stable after transfer). */
+function pickPartyForHeldInference(activePartiesOnly: any[]): any {
+  const onHold = activePartiesOnly.find((p: any) => p.callStatus === "ON_HOLD");
+  return onHold ?? activePartiesOnly[0];
+}
+
 function computeHeldByAddress(
   evt: any,
   effectiveCurrentState: string,
   base: any,
   activePartiesOnly: any[],
+  dnsMap: Record<
+    string,
+    {
+      dn: string;
+      devices: Record<string, { deviceName: string; deviceType: string }>;
+    }
+  >,
 ): string | undefined {
   if (evt.eventType === "HELD" && activePartiesOnly.length >= 1) {
-    const p = activePartiesOnly[0];
+    const p = pickPartyForHeldInference(activePartiesOnly);
     const calling = p.callingAddress;
     const called = p.calledAddress;
     const details = String((evt as { details?: string }).details || "");
@@ -362,6 +443,14 @@ function computeHeldByAddress(
     if (globalCallingMatch) {
       const globalCalling = globalCallingMatch[1].trim();
       return calling === globalCalling ? called : calling;
+    }
+    const knownCalling = isDnKeyInDnsMap(dnsMap, calling);
+    const knownCalled = isDnKeyInDnsMap(dnsMap, called);
+    if (knownCalling && !knownCalled) {
+      return calling;
+    }
+    if (knownCalled && !knownCalling) {
+      return called;
     }
     return calling;
   }
@@ -388,7 +477,13 @@ export function applyCallEventToCallStateMap(
   prev: Record<string, any>,
   callId: string,
   evt: any,
-  dnsMap: Record<string, { dn: string; devices: Record<string, { deviceName: string; deviceType: string }> }>,
+  dnsMap: Record<
+    string,
+    {
+      dn: string;
+      devices: Record<string, { deviceName: string; deviceType: string }>;
+    }
+  >,
   saveCallStatesToStorage: (m: Record<string, any>) => void,
 ): Record<string, any> {
   const updated = { ...prev };
@@ -396,7 +491,12 @@ export function applyCallEventToCallStateMap(
 
   const eventTimeMs = evt.eventTime ? new Date(evt.eventTime).getTime() : 0;
 
-  const early = tryRemoveCallOnEarlyExit(updated, callId, evt, saveCallStatesToStorage);
+  const early = tryRemoveCallOnEarlyExit(
+    updated,
+    callId,
+    evt,
+    saveCallStatesToStorage,
+  );
   if (early) {
     return early;
   }
@@ -446,6 +546,7 @@ export function applyCallEventToCallStateMap(
     effectiveCurrentState,
     base,
     activePartiesOnly,
+    dnsMap,
   );
 
   updated[callId] = {
@@ -458,7 +559,10 @@ export function applyCallEventToCallStateMap(
     isOneToOne: evt.isOneToOne ?? base.isOneToOne,
     parties: activePartiesOnly,
     isTerminating: shouldTerminate,
-    hasActiveParticipants: resolveHasActiveParticipantsForEvent(evt, hasActiveParties),
+    hasActiveParticipants: resolveHasActiveParticipantsForEvent(
+      evt,
+      hasActiveParties,
+    ),
     eventName: evt.eventName || base.eventName,
     heldByAddress,
     // Supervision metadata must follow each event; otherwise refresh/ongoing merge loses monitoring on the next event.
@@ -472,7 +576,13 @@ export function applyCallEventToCallStateMap(
     return rest;
   }
 
-  applyStaleDroppedPartyCleanup(updated, callId, evt, processedParties, activePartiesOnly);
+  applyStaleDroppedPartyCleanup(
+    updated,
+    callId,
+    evt,
+    processedParties,
+    activePartiesOnly,
+  );
   saveCallStatesToStorage(updated);
   return updated;
 }
@@ -543,7 +653,7 @@ export function extractCallsByDnFromOngoingCallsPayload(
 ): Record<string, unknown> | null {
   if (!isRecord(data)) return null;
 
-  const o = data ;
+  const o = data;
 
   const direct = getCallsByDn(o, "callsByDn") ?? getCallsByDn(o, "calls_by_dn");
   if (direct) return direct;
@@ -620,7 +730,8 @@ export function mergeOngoingCallsIntoCallStateMap(
     const existingCall = updated[callId];
     const activeParties = preservePartyStartTimesFromBase(
       (callData.parties || []).filter(
-        (p: any) => p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED",
+        (p: any) =>
+          p.callStatus !== "DROPPED" && p.callStatus !== "DISCONNECTED",
       ),
       existingCall?.parties,
     );
@@ -632,7 +743,10 @@ export function mergeOngoingCallsIntoCallStateMap(
       return;
     }
 
-    const currentState = resolveOngoingCallCurrentState(callData, activeParties);
+    const currentState = resolveOngoingCallCurrentState(
+      callData,
+      activeParties,
+    );
 
     updated[callId] = {
       ...callData,
@@ -642,28 +756,38 @@ export function mergeOngoingCallsIntoCallStateMap(
       hasActiveParticipants: callData.hasActiveParticipants !== false,
       isTerminating: callData.isTerminating === true,
       eventTime: callData.eventTime ?? existingCall?.eventTime ?? "",
-      ...(currentState === "HELD" &&
-        existingCall?.heldByAddress != null && {
-          heldByAddress: existingCall.heldByAddress,
-        }),
     };
   });
 
   return updated;
 }
 
-export function pickMostRecentCall<T extends { eventTime?: string }>(calls: T[]): T {
-  return calls.slice(1).reduce((a, b) => (new Date(b.eventTime || 0) > new Date(a.eventTime || 0) ? b : a), calls[0]);
+export function pickMostRecentCall<T extends { eventTime?: string }>(
+  calls: T[],
+): T {
+  return calls
+    .slice(1)
+    .reduce(
+      (a, b) =>
+        new Date(b.eventTime || 0) > new Date(a.eventTime || 0) ? b : a,
+      calls[0],
+    );
 }
 
-export function mergeRemoteEventLogWithPrevious(prev: any[], masterLog: any[]): any[] {
+export function mergeRemoteEventLogWithPrevious(
+  prev: any[],
+  masterLog: any[],
+): any[] {
   const prevEventIds = new Set(
     prev
-      .map((e: any) => (e.callId && e.eventTime ? `${e.callId}-${e.eventTime}` : null))
+      .map((e: any) =>
+        e.callId && e.eventTime ? `${e.callId}-${e.eventTime}` : null,
+      )
       .filter(Boolean),
   );
   const newEvents = masterLog.filter((e: any) => {
-    const eventId = e.callId && e.eventTime ? `${e.callId}-${e.eventTime}` : null;
+    const eventId =
+      e.callId && e.eventTime ? `${e.callId}-${e.eventTime}` : null;
     return Boolean(eventId && !prevEventIds.has(eventId));
   });
   if (masterLog.length > prev.length + 10) {
