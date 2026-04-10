@@ -1,33 +1,22 @@
 import "@assets/scss/datatable-style.scss";
-import React, {
-  ReactElement,
-} from "react";
+import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericListPage from "@components/GenericListPage";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
 
-import  { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { getSystemMetrics, getAlerts, SystemMetric, SystemMetricsResponse, Alert } from "@utils/netops";
 import { 
-  Search, 
   Server, 
   Globe, 
-  Layout as LayoutIcon, 
-  Database, 
-  Star,
   ChevronRight,
   AlertCircle,
   CheckCircle,
   AlertTriangle,
   XCircle,
   ChevronDown,
-  LayoutGrid,
-  List,
   Cpu,
   HardDrive,
   Activity,
@@ -35,10 +24,71 @@ import {
 } from 'lucide-react';
 import { Form } from 'react-bootstrap';
 
+type SeverityBadgeColor = 'danger' | 'warning' | 'info' | 'secondary';
+
+type NetworkLike = {
+  interface: string;
+  is_up: boolean;
+  ip?: string;
+};
+
+type AlertResponseLike = {
+  alerts?: Alert[];
+};
+
+const getSeverityColor = (severity: string): SeverityBadgeColor => {
+  switch (severity) {
+    case 'CRITICAL':
+    case 'HIGH':
+      return 'danger';
+    case 'MEDIUM':
+      return 'warning';
+    case 'LOW':
+      return 'info';
+    default:
+      return 'secondary';
+  }
+};
+
+const getSeverityIcon = (severity: string) => {
+  if (severity === 'CRITICAL' || severity === 'HIGH') {
+    return <XCircle size={14} color="#dc3545" />;
+  }
+  if (severity === 'MEDIUM') {
+    return <AlertTriangle size={14} color="#ffc107" />;
+  }
+  return <AlertCircle size={14} color="#17a2b8" />;
+};
+
+const getAlertDisplayName = (alert: Alert): string =>
+  alert.hostname || alert.customer_name || `Device ${alert.device_id}`;
+
+const getAlertDisplayInfo = (alert: Alert): string =>
+  alert.service_name || alert.message || alert.alert_type;
+
+const getServerStatusColorHex = (statusColor: string): string => {
+  if (statusColor === 'danger') {
+    return '#dc3545';
+  }
+  if (statusColor === 'warning') {
+    return '#ffc107';
+  }
+  return '#28a745';
+};
+
+const getUsageBarColor = (usedPercent: number, healthyColor: string): string => {
+  if (usedPercent > 80) {
+    return '#dc3545';
+  }
+  if (usedPercent > 60) {
+    return '#ffc107';
+  }
+  return healthyColor;
+};
+
 const SelectServer = () => {
       const router = useRouter();
-      const [viewMode, setViewMode] = useState('cards');
-      const [selectedGroup, setSelectedGroup] = useState('all');
+      const selectedGroup = 'all';
       const [selectedEnvironment, setSelectedEnvironment] = useState('All Environments');
       const [selectedRegion, setSelectedRegion] = useState('All Regions');
       const [showEnvDropdown, setShowEnvDropdown] = useState(false);
@@ -74,7 +124,7 @@ const SelectServer = () => {
       
       // Helper function to get IP address from network interfaces
       const getServerIp = (metric: SystemMetric): string => {
-        const mainInterface = metric.network.find(n => n.interface !== 'lo' && n.is_up);
+        const mainInterface = metric.network.find((n: NetworkLike) => n.interface !== 'lo' && n.is_up);
         return mainInterface?.ip || 'N/A';
       };
     
@@ -92,18 +142,6 @@ const SelectServer = () => {
         }
       };
     
-      const getEnvironmentColor = (env: string) => {
-        const colors = {
-          'Production': '#28a745',
-          'Warning': '#ffc107',
-          'Critical': '#dc3545',
-          'Development': '#17a2b8',
-          'Staging': '#ffc107',
-          'Healthy': '#28a745'
-        };
-        return colors[env as keyof typeof colors] || '#6c757d';
-      };
-
       // Fetch server metrics on component mount
       const fetchServerMetrics = useCallback(async () => {
         try {
@@ -111,7 +149,7 @@ const SelectServer = () => {
           console.log("=== Fetching System Metrics ===");
           const response: SystemMetricsResponse = await getSystemMetrics("all");
           setServerMetrics(response.metrics);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("=== Failed to fetch system metrics ===", error);
         } finally {
           setLoading(false);
@@ -127,8 +165,8 @@ const SelectServer = () => {
             is_resolved: false,  // Only get unresolved alerts
             limit: 5  // Limit to 5 most recent alerts
           });
-          setAlerts((alertsData as any)?.alerts ?? []);
-        } catch (error: any) {
+          setAlerts(((alertsData as AlertResponseLike)?.alerts ?? []));
+        } catch (error: unknown) {
           console.error("=== Failed to fetch alerts ===", error);
         } finally {
           setLoadingAlerts(false);
@@ -147,19 +185,19 @@ const SelectServer = () => {
             setServerMetrics(prevMetrics => {
               const updatedMetrics = [...prevMetrics];
               const serverIndex = updatedMetrics.findIndex(m => m.hostname === hostname);
-              
-              if (serverIndex !== -1) {
-                // Replace the existing server's metrics
-                updatedMetrics[serverIndex] = response.metrics[0];
-              } else {
-                // If server not found, add it to the list
+
+              if (serverIndex === -1) {
+                // If server not found, add it to the list.
                 updatedMetrics.push(response.metrics[0]);
+                return updatedMetrics;
               }
-              
+
+              // Replace the existing server's metrics.
+              updatedMetrics[serverIndex] = response.metrics[0];
               return updatedMetrics;
             });
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error(`=== Failed to refresh metrics for server ${hostname} ===`, error);
         } finally {
           setRefreshingServer(null);
@@ -180,6 +218,338 @@ const SelectServer = () => {
           return () => clearInterval(interval);
         }
       }, [autoRefresh, fetchServerMetrics, fetchAlerts]);
+
+      const filteredServerMetrics = useMemo(
+        () =>
+          serverMetrics.filter((metric) => {
+            if (selectedGroup === 'all') {
+              return true;
+            }
+            const status = getServerStatus(metric);
+            return status.status === selectedGroup;
+          }),
+        [serverMetrics, selectedGroup]
+      );
+
+      const serverCounts = useMemo(() => {
+        const totalServers = filteredServerMetrics.length;
+        const healthyCount = filteredServerMetrics.filter((metric) => getServerStatus(metric).status === 'Healthy').length;
+        const warningCount = filteredServerMetrics.filter((metric) => getServerStatus(metric).status === 'Warning').length;
+        const criticalCount = filteredServerMetrics.filter((metric) => getServerStatus(metric).status === 'Critical').length;
+        return {
+          totalServers,
+          healthyCount,
+          warningCount,
+          criticalCount,
+          offlineCount: 0,
+        };
+      }, [filteredServerMetrics]);
+
+      const serverMetricsContent = (() => {
+        if (loading) {
+          return (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ fontSize: '16px', color: '#6c757d' }}>Loading server metrics...</div>
+            </div>
+          );
+        }
+
+        if (serverMetrics.length === 0) {
+          return (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ fontSize: '16px', color: '#6c757d' }}>No server metrics available</div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="grid-3">
+            {filteredServerMetrics.map((metric) => {
+              const status = getServerStatus(metric);
+              const serverIp = getServerIp(metric);
+              const statusColor = getServerStatusColorHex(status.statusColor);
+
+              return (
+                <div key={metric.hostname} className="card">
+                  <div style={{ padding: '16px', position: 'relative' }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        refreshServerMetrics(metric.hostname);
+                      }}
+                      disabled={refreshingServer === metric.hostname}
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: refreshingServer === metric.hostname ? 'not-allowed' : 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '4px',
+                        transition: 'background-color 0.2s',
+                        opacity: refreshingServer === metric.hostname ? 0.6 : 1,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (refreshingServer !== metric.hostname) {
+                          e.currentTarget.style.backgroundColor = '#f0f0f0';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                      title="Refresh server metrics"
+                    >
+                      <RefreshCw
+                        size={16}
+                        className={refreshingServer === metric.hostname ? 'spinning' : ''}
+                        color="#6c757d"
+                      />
+                    </button>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <h6
+                        style={{
+                          fontSize: '15px',
+                          fontWeight: '600',
+                          marginBottom: '4px',
+                          color: '#1a1a1a',
+                        }}
+                      >
+                        {metric.hostname}
+                      </h6>
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          color: '#6c757d',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <Server size={12} />
+                        {serverIp}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color: '#6c757d',
+                          marginTop: '4px',
+                        }}
+                      >
+                        OS: {metric.host.os.split('-')[0]}
+                      </div>
+                    </div>
+
+                    <span className={`badge badge-${status.statusColor}`} style={{ marginBottom: '16px' }}>
+                      {status.status}
+                    </span>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <div className="metric-item">
+                        <div className="metric-label">
+                          <Cpu size={14} />
+                          <span>CPU Usage</span>
+                        </div>
+                        <div className="metric-value">
+                          <span>{metric.cpu.used_percent.toFixed(1)}%</span>
+                          <span style={{ fontSize: '11px', color: '#6c757d' }}>({metric.cpu.cores} cores)</span>
+                        </div>
+                        <div className="progress-container">
+                          <div
+                            className="progress-bar"
+                            style={{
+                              width: `${metric.cpu.used_percent}%`,
+                              background: getUsageBarColor(metric.cpu.used_percent, '#4da6ff'),
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="metric-item">
+                        <div className="metric-label">
+                          <Activity size={14} />
+                          <span>Memory</span>
+                        </div>
+                        <div className="metric-value">
+                          <span>{metric.memory.used_gb.toFixed(2)} GB</span>
+                          <span style={{ fontSize: '11px', color: '#6c757d' }}>
+                            of {metric.memory.total_gb.toFixed(2)} GB
+                          </span>
+                        </div>
+                        <div className="progress-container">
+                          <div
+                            className="progress-bar"
+                            style={{
+                              width: `${metric.memory.used_percent}%`,
+                              background: getUsageBarColor(metric.memory.used_percent, '#28a745'),
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="metric-item">
+                        <div className="metric-label">
+                          <HardDrive size={14} />
+                          <span>Disk Usage</span>
+                        </div>
+                        <div className="metric-value">
+                          <span>{metric.disk.used_percent.toFixed(1)}%</span>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              color: metric.disk.used_percent < 20 ? '#28a745' : '#6c757d',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '2px',
+                            }}
+                          >
+                            {metric.disk.free_gb.toFixed(1)} GB free
+                          </span>
+                        </div>
+                        <div className="progress-container">
+                          <div
+                            className="progress-bar"
+                            style={{
+                              width: `${metric.disk.used_percent}%`,
+                              background: getUsageBarColor(metric.disk.used_percent, '#17a2b8'),
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingTop: '12px',
+                        borderTop: '1px solid #e9ecef',
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontSize: '13px',
+                          color: statusColor,
+                        }}
+                      >
+                        {getStatusIcon(status.status)}
+                        {status.status}
+                      </div>
+                      <button
+                        className="btn btn-link"
+                        onClick={() =>
+                          router.push(`/pulse/application-monitoring?server=${encodeURIComponent(metric.hostname)}`)
+                        }
+                        style={{ fontSize: '12px' }}
+                      >
+                        Open Monitoring
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })();
+
+      const alertsContent = (() => {
+        if (loadingAlerts) {
+          return (
+            <div
+              style={{
+                padding: '20px',
+                textAlign: 'center',
+                color: '#6c757d',
+                fontSize: '14px',
+              }}
+            >
+              Loading alerts...
+            </div>
+          );
+        }
+
+        if (alerts.length === 0) {
+          return (
+            <div
+              style={{
+                padding: '20px',
+                textAlign: 'center',
+                color: '#6c757d',
+                fontSize: '14px',
+              }}
+            >
+              No alerts at this time
+            </div>
+          );
+        }
+
+        return alerts.map((alert: Alert, idx: number) => {
+          const severityColor = getSeverityColor(alert.severity);
+          const displayName = getAlertDisplayName(alert);
+          const displayInfo = getAlertDisplayInfo(alert);
+
+          return (
+            <div
+              key={alert.id}
+              style={{
+                padding: '12px 0',
+                borderBottom: idx < alerts.length - 1 ? '1px solid #e9ecef' : 'none',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {getSeverityIcon(alert.severity)}
+                    <span
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#1a1a1a',
+                      }}
+                    >
+                      {displayName}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      color: '#6c757d',
+                      paddingLeft: '20px',
+                    }}
+                  >
+                    {displayInfo}
+                  </div>
+                </div>
+                <span className={`badge badge-${severityColor}`} style={{ fontSize: '11px' }}>
+                  {alert.severity}
+                </span>
+              </div>
+            </div>
+          );
+        });
+      })();
     
 
   return (
@@ -412,7 +782,43 @@ const SelectServer = () => {
           min-width: 200px;
         }
 
-        .dropdown-toggle {
+        .layout-row {
+          display: flex;
+          gap: 20px;
+          align-items: flex-start;
+        }
+
+        .main-content-pane {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .right-sidebar {
+          width: 280px;
+          flex-shrink: 0;
+        }
+
+        .header-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 24px;
+          flex-wrap: wrap;
+          gap: 12px;
+        }
+
+        .filters-row {
+          display: flex;
+          gap: 12px;
+          margin-bottom: 20px;
+          flex-wrap: wrap;
+        }
+
+        .filters-row .dropdown {
+          min-width: 220px;
+        }
+
+        .server-filter-toggle {
           width: 100%;
           text-align: left;
           display: flex;
@@ -425,9 +831,10 @@ const SelectServer = () => {
           border-radius: 8px;
           cursor: pointer;
           transition: all 0.2s;
+          color: inherit;
         }
 
-        .dropdown-toggle:hover {
+        .server-filter-toggle:hover {
           background: #e2e8f0;
         }
 
@@ -478,9 +885,59 @@ const SelectServer = () => {
           font-weight: 500;
         }
 
+        .grid-3 {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 16px;
+        }
+
+        .grid-3 .card {
+          min-width: 0;
+        }
+
+        @media (max-width: 1400px) {
+          .grid-3 {
+            grid-template-columns: repeat(2, minmax(280px, 1fr));
+          }
+        }
+
         @media (max-width: 1200px) {
           .grid-3 {
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(2, minmax(260px, 1fr));
+          }
+
+          .right-sidebar {
+            width: 240px;
+          }
+        }
+
+        @media (max-width: 1100px) {
+          .grid-3 {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @media (max-width: 992px) {
+          .layout-row {
+            flex-direction: column;
+          }
+
+          .main-content-pane {
+            width: 100%;
+          }
+
+          .grid-3 {
+            width: 100%;
+          }
+
+          .right-sidebar {
+            width: 100%;
+          }
+
+          .header-actions {
+            width: 100%;
+            justify-content: space-between;
+            flex-wrap: wrap;
           }
         }
 
@@ -502,34 +959,43 @@ const SelectServer = () => {
             grid-template-columns: 1fr;
           }
           
-          .layout-row {
-            flex-direction: column;
+          .filters-row .dropdown {
+            min-width: 100%;
           }
-          
-         
+
+          .header-row h2 {
+            font-size: 22px !important;
+          }
+
+        }
+
+        @media (max-width: 576px) {
+          .metric-value {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+          }
+
+          .btn {
+            width: 100%;
+            justify-content: center;
+          }
         }
       `}</style>
 
       
         {/* Header */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '24px',
-          flexWrap: 'wrap',
-         
-        }}>
-          <h2 style={{
-            fontSize: '28px',
+        <div className="header-row">
+          <h4 style={{
+            
             fontWeight: '600',
             color: '#1a1a1a',
             margin: 0
           }}>
             Select a Server
-          </h2>
+          </h4>
 
-          <div className="d-flex gap-2 align-items-center">
+          <div className="d-flex gap-2 align-items-center header-actions">
             <button 
               className="btn btn-sm btn-outline-primary d-flex align-items-center gap-2"
               onClick={async () => {
@@ -551,39 +1017,21 @@ const SelectServer = () => {
               />
             </div>
           </div>
-
-          {/* <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-            <button 
-              className={`btn ${viewMode === 'cards' ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setViewMode('cards')}
-            >
-              <LayoutGrid size={18} /> Cards
-            </button>
-            <button 
-              className={`btn ${viewMode === 'list' ? 'btn-primary' : 'btn-outline'}`}
-              onClick={() => setViewMode('list')}
-            >
-              <List size={18} /> List
-            </button>
-            <label className="switch">
-              <input type="checkbox" />
-              <span className="slider"></span>
-            </label>
-          </div> */}
         </div>
 
-        <div className="layout-row" style={{ display: 'flex', gap: '20px' }}>
+        <div className="layout-row">
           
 
           {/* Main Content */}
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="main-content-pane">
             
             {/* Filter Dropdowns */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+            <div className="filters-row">
               {/* Environment Dropdown */}
-              <div className={`dropdown ${showEnvDropdown ? 'show' : ''}`} style={{ minWidth: '220px' }}>
-                <div 
-                  className="dropdown-toggle"
+              <div className={`dropdown ${showEnvDropdown ? 'show' : ''}`}>
+                <button
+                  type="button"
+                  className="server-filter-toggle"
                   onClick={() => {
                     setShowEnvDropdown(!showEnvDropdown);
                     setShowRegionDropdown(false);
@@ -594,11 +1042,12 @@ const SelectServer = () => {
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>{selectedEnvironment}</span>
                   </div>
                   <ChevronDown size={16} style={{ color: '#6c757d' }} />
-                </div>
+                </button>
                 <div className="dropdown-menu">
-                  {environments.map((env, index) => (
-                    <div
-                      key={index}
+                  {environments.map((env) => (
+                    <button
+                      type="button"
+                      key={env}
                       className={`dropdown-item ${selectedEnvironment === env ? 'active' : ''}`}
                       onClick={() => {
                         setSelectedEnvironment(env);
@@ -606,18 +1055,18 @@ const SelectServer = () => {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {/* <Server size={14} /> */}
                         <span>{env}</span>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
 
               {/* Region Dropdown */}
-              <div className={`dropdown ${showRegionDropdown ? 'show' : ''}`} style={{ minWidth: '200px' }}>
-                <div 
-                  className="dropdown-toggle"
+              <div className={`dropdown ${showRegionDropdown ? 'show' : ''}`}>
+                <button
+                  type="button"
+                  className="server-filter-toggle"
                   onClick={() => {
                     setShowRegionDropdown(!showRegionDropdown);
                     setShowEnvDropdown(false);
@@ -628,11 +1077,12 @@ const SelectServer = () => {
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>{selectedRegion}</span>
                   </div>
                   <ChevronDown size={16} style={{ color: '#6c757d' }} />
-                </div>
+                </button>
                 <div className="dropdown-menu">
-                  {regions.map((region, index) => (
-                    <div
-                      key={index}
+                  {regions.map((region) => (
+                    <button
+                      type="button"
+                      key={region}
                       className={`dropdown-item ${selectedRegion === region ? 'active' : ''}`}
                       onClick={() => {
                         setSelectedRegion(region);
@@ -640,235 +1090,19 @@ const SelectServer = () => {
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {/* <Globe size={14} /> */}
                         <span>{region}</span>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
             </div>
 
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <div style={{ fontSize: '16px', color: '#6c757d' }}>Loading server metrics...</div>
-              </div>
-            ) : serverMetrics.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <div style={{ fontSize: '16px', color: '#6c757d' }}>No server metrics available</div>
-              </div>
-            ) : (
-              <div className="grid-3" style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '16px'
-              }}>
-                {serverMetrics
-                  .filter(metric => {
-                    if (selectedGroup === 'all') return true;
-                    const status = getServerStatus(metric);
-                    return status.status === selectedGroup;
-                  })
-                  .map((metric, idx) => {
-                    const status = getServerStatus(metric);
-                    const serverIp = getServerIp(metric);
-                    return (
-                      <div 
-                        key={idx} 
-                        className="card" 
-                       
-                        >
-                        <div style={{ padding: '16px', position: 'relative' }}>
-                          {/* Refresh Button - Top Right Corner */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              refreshServerMetrics(metric.hostname);
-                            }}
-                            disabled={refreshingServer === metric.hostname}
-                            style={{
-                              position: 'absolute',
-                              top: '12px',
-                              right: '12px',
-                              background: 'transparent',
-                              border: 'none',
-                              cursor: refreshingServer === metric.hostname ? 'not-allowed' : 'pointer',
-                              padding: '4px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: '4px',
-                              transition: 'background-color 0.2s',
-                              opacity: refreshingServer === metric.hostname ? 0.6 : 1
-                            }}
-                            onMouseEnter={(e) => {
-                              if (refreshingServer !== metric.hostname) {
-                                e.currentTarget.style.backgroundColor = '#f0f0f0';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                            title="Refresh server metrics"
-                          >
-                            <RefreshCw 
-                              size={16} 
-                              className={refreshingServer === metric.hostname ? 'spinning' : ''}
-                              color="#6c757d"
-                            />
-                          </button>
-
-                          <div style={{ marginBottom: '12px' }}>
-                            <h6 style={{
-                              fontSize: '15px',
-                              fontWeight: '600',
-                              marginBottom: '4px',
-                              color: '#1a1a1a'
-                            }}>
-                              {metric.hostname}
-                            </h6>
-                            <div style={{
-                              fontSize: '12px',
-                              color: '#6c757d',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}>
-                              <Server size={12} />
-                              {serverIp}
-                            </div>
-                            <div style={{
-                              fontSize: '11px',
-                              color: '#6c757d',
-                              marginTop: '4px'
-                            }}>
-                              OS: {metric.host.os.split('-')[0]}
-                            </div>
-                          </div>
-
-                          <span 
-                            className={`badge badge-${status.statusColor}`}
-                            style={{ marginBottom: '16px' }}
-                          >
-                            {status.status}
-                          </span>
-
-                          {/* Resource Usage Progress Bars */}
-                          <div style={{ marginBottom: '16px' }}>
-                            {/* CPU Usage */}
-                            <div className="metric-item">
-                              <div className="metric-label">
-                                <Cpu size={14} />
-                                <span>CPU Usage</span>
-                              </div>
-                              <div className="metric-value">
-                                <span>{metric.cpu.used_percent.toFixed(1)}%</span>
-                                <span style={{ fontSize: '11px', color: '#6c757d' }}>
-                                  ({metric.cpu.cores} cores)
-                                </span>
-                              </div>
-                              <div className="progress-container">
-                                <div 
-                                  className="progress-bar" 
-                                  style={{
-                                    width: `${metric.cpu.used_percent}%`,
-                                    background: metric.cpu.used_percent > 80 ? '#dc3545' : 
-                                               metric.cpu.used_percent > 60 ? '#ffc107' : '#4da6ff'
-                                  }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Memory Usage */}
-                            <div className="metric-item">
-                              <div className="metric-label">
-                                <Activity size={14} />
-                                <span>Memory</span>
-                              </div>
-                              <div className="metric-value">
-                                <span>{metric.memory.used_gb.toFixed(2)} GB</span>
-                                <span style={{ fontSize: '11px', color: '#6c757d' }}>
-                                  of {metric.memory.total_gb.toFixed(2)} GB
-                                </span>
-                              </div>
-                              <div className="progress-container">
-                                <div 
-                                  className="progress-bar" 
-                                  style={{
-                                    width: `${metric.memory.used_percent}%`,
-                                    background: metric.memory.used_percent > 80 ? '#dc3545' : 
-                                               metric.memory.used_percent > 60 ? '#ffc107' : '#28a745'
-                                  }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Disk Usage */}
-                            <div className="metric-item">
-                              <div className="metric-label">
-                                <HardDrive size={14} />
-                                <span>Disk Usage</span>
-                              </div>
-                              <div className="metric-value">
-                                <span>{metric.disk.used_percent.toFixed(1)}%</span>
-                                <span style={{ 
-                                  fontSize: '11px', 
-                                  color: metric.disk.used_percent < 20 ? '#28a745' : '#6c757d',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '2px'
-                                }}>
-                                  {metric.disk.free_gb.toFixed(1)} GB free
-                                </span>
-                              </div>
-                              <div className="progress-container">
-                                <div 
-                                  className="progress-bar" 
-                                  style={{
-                                    width: `${metric.disk.used_percent}%`,
-                                    background: metric.disk.used_percent > 80 ? '#dc3545' : 
-                                               metric.disk.used_percent > 60 ? '#ffc107' : '#17a2b8'
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            paddingTop: '12px',
-                            borderTop: '1px solid #e9ecef'
-                          }}>
-                            <div style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              fontSize: '13px',
-                              color: status.statusColor === 'danger' ? '#dc3545' :
-                                     status.statusColor === 'warning' ? '#ffc107' : '#28a745'
-                            }}>
-                              {getStatusIcon(status.status)}
-                              {status.status}
-                            </div>
-                            <button className="btn btn-link"
-                            onClick={() => router.push(`/pulse/application-monitoring?server=${encodeURIComponent(metric.hostname)}`)}
-                      
-                             style={{ fontSize: '12px' }}>
-                              Open Monitoring
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
+            {serverMetricsContent}
           </div>
 
           {/* Right Sidebar */}
-          <div style={{ width: '280px', flexShrink: 0 }}>
+          <div className="right-sidebar">
             <div className="card" style={{ marginBottom: '20px' }}>
               <div style={{ padding: '20px' }}>
                 <h5 style={{
@@ -880,30 +1114,8 @@ const SelectServer = () => {
                   Server Summary
                 </h5>
 
-                {(() => {
-                  const filteredMetrics = serverMetrics.filter(metric => {
-                    if (selectedGroup === 'all') return true;
-                    const status = getServerStatus(metric);
-                    return status.status === selectedGroup;
-                  });
-                  
-                  const totalServers = filteredMetrics.length;
-                  const healthyCount = filteredMetrics.filter(m => {
-                    const status = getServerStatus(m);
-                    return status.status === 'Healthy';
-                  }).length;
-                  const warningCount = filteredMetrics.filter(m => {
-                    const status = getServerStatus(m);
-                    return status.status === 'Warning';
-                  }).length;
-                  const criticalCount = filteredMetrics.filter(m => {
-                    const status = getServerStatus(m);
-                    return status.status === 'Critical';
-                  }).length;
-                  const offlineCount = 0; // No offline servers in current data
-                  
-                  return (
-                    <>
+                {
+                  <>
                       <div style={{ marginBottom: '16px' }}>
                         <div style={{
                           display: 'flex',
@@ -921,12 +1133,12 @@ const SelectServer = () => {
                             Healthy Servers
                           </span>
                           <div>
-                            <strong style={{ fontSize: '18px' }}>{healthyCount}</strong>
+                            <strong style={{ fontSize: '18px' }}>{serverCounts.healthyCount}</strong>
                             {/* <span style={{
                               fontSize: '13px',
                               color: '#6c757d',
                               marginLeft: '4px'
-                            }}>{totalServers > 0 ? Math.round((healthyCount / totalServers) * 100) : 0}%</span> */}
+                            }}>{serverCounts.totalServers > 0 ? Math.round((serverCounts.healthyCount / serverCounts.totalServers) * 100) : 0}%</span> */}
                           </div>
                         </div>
                       </div>
@@ -948,12 +1160,12 @@ const SelectServer = () => {
                             Warning Servers
                           </span>
                           <div>
-                            <strong style={{ fontSize: '18px' }}>{warningCount}</strong>
+                            <strong style={{ fontSize: '18px' }}>{serverCounts.warningCount}</strong>
                             {/* <span style={{
                               fontSize: '13px',
                               color: '#6c757d',
                               marginLeft: '4px'
-                            }}>{totalServers > 0 ? Math.round((warningCount / totalServers) * 100) : 0}%</span> */}
+                            }}>{serverCounts.totalServers > 0 ? Math.round((serverCounts.warningCount / serverCounts.totalServers) * 100) : 0}%</span> */}
                           </div>
                         </div>
                       </div>
@@ -975,12 +1187,12 @@ const SelectServer = () => {
                             Critical Servers
                           </span>
                           <div>
-                            <strong style={{ fontSize: '18px' }}>{criticalCount}</strong>
+                            <strong style={{ fontSize: '18px' }}>{serverCounts.criticalCount}</strong>
                             {/* <span style={{
                               fontSize: '13px',
                               color: '#6c757d',
                               marginLeft: '4px'
-                            }}>{totalServers > 0 ? Math.round((criticalCount / totalServers) * 100) : 0}%</span> */}
+                            }}>{serverCounts.totalServers > 0 ? Math.round((serverCounts.criticalCount / serverCounts.totalServers) * 100) : 0}%</span> */}
                           </div>
                         </div>
                       </div>
@@ -1002,18 +1214,17 @@ const SelectServer = () => {
                             Offline Servers
                           </span>
                           <div>
-                            <strong style={{ fontSize: '18px' }}>{offlineCount}</strong>
+                            <strong style={{ fontSize: '18px' }}>{serverCounts.offlineCount}</strong>
                             {/* <span style={{
                               fontSize: '13px',
                               color: '#6c757d',
                               marginLeft: '4px'
-                            }}>{totalServers > 0 ? Math.round((offlineCount / totalServers) * 100) : 0}%</span> */}
+                            }}>{serverCounts.totalServers > 0 ? Math.round((serverCounts.offlineCount / serverCounts.totalServers) * 100) : 0}%</span> */}
                           </div>
                         </div>
                       </div>
-                    </>
-                  );
-                })()}
+                  </>
+                }
               </div>
             </div>
 
@@ -1028,118 +1239,20 @@ const SelectServer = () => {
                   Recent Alerts
                 </h5>
 
-                <div>
-                  {loadingAlerts ? (
-                    <div style={{ 
-                      padding: '20px', 
-                      textAlign: 'center', 
-                      color: '#6c757d',
-                      fontSize: '14px'
-                    }}>
-                      Loading alerts...
-                    </div>
-                  ) : alerts.length === 0 ? (
-                    <div style={{ 
-                      padding: '20px', 
-                      textAlign: 'center', 
-                      color: '#6c757d',
-                      fontSize: '14px'
-                    }}>
-                      No alerts at this time
-                    </div>
-                  ) : (
-                    alerts.map((alert: Alert, idx: number) => {
-                      // Map severity to color
-                      const getSeverityColor = (severity: string): string => {
-                        switch (severity) {
-                          case 'CRITICAL':
-                            return 'danger';
-                          case 'HIGH':
-                            return 'danger';
-                          case 'MEDIUM':
-                            return 'warning';
-                          case 'LOW':
-                            return 'info';
-                          default:
-                            return 'secondary';
-                        }
-                      };
-
-                      // Map severity to icon
-                      const getSeverityIcon = (severity: string) => {
-                        if (severity === 'CRITICAL' || severity === 'HIGH') {
-                          return <XCircle size={14} color="#dc3545" />;
-                        } else if (severity === 'MEDIUM') {
-                          return <AlertTriangle size={14} color="#ffc107" />;
-                        } else {
-                          return <AlertCircle size={14} color="#17a2b8" />;
-                        }
-                      };
-
-                      const severityColor = getSeverityColor(alert.severity);
-                      const displayName = alert.hostname || alert.customer_name || `Device ${alert.device_id}`;
-                      const displayInfo = alert.service_name || alert.message || alert.alert_type;
-
-                      return (
-                        <div 
-                          key={alert.id}
-                          style={{
-                            padding: '12px 0',
-                            borderBottom: idx < alerts.length - 1 ? '1px solid #e9ecef' : 'none'
-                          }}
-                        >
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start'
-                          }}>
-                            <div style={{ flex: 1 }}>
-                              <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                marginBottom: '4px'
-                              }}>
-                                {getSeverityIcon(alert.severity)}
-                                <span style={{
-                                  fontSize: '14px',
-                                  fontWeight: '500',
-                                  color: '#1a1a1a'
-                                }}>
-                                  {displayName}
-                                </span>
-                              </div>
-                              <div style={{
-                                fontSize: '12px',
-                                color: '#6c757d',
-                                paddingLeft: '20px'
-                              }}>
-                                {displayInfo}
-                              </div>
-                            </div>
-                            <span 
-                              className={`badge badge-${severityColor}`}
-                              style={{ fontSize: '11px' }}
-                            >
-                              {alert.severity}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                <div>{alertsContent}</div>
               </div>
             </div>
 
             <button 
-              className="btn btn-primary"
+              className="btn"
               style={{
                 width: '100%',
                 padding: '12px',
                 fontWeight: '600',
                 justifyContent: 'center',
-                fontSize: '15px'
+                fontSize: '15px',
+                background: '#141414',
+                color: '#ffffff',
               }}
               onClick={() => router.push(`/pulse/application-monitoring`)}
             >
