@@ -2,7 +2,8 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useEffect, useState, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
+import GenericTable, { TableColumn, TableAction, ToolbarConfig, TabConfig } from '@components/GenericTable';
+import GenericSidebar, { SidebarSection } from '@components/GenericSidebarNew';
 import {
   createHost,
   deleteHost,
@@ -20,7 +21,7 @@ import { toast } from 'react-toastify';
 import '@assets/scss/common.scss';
 import { FiRefreshCw } from 'react-icons/fi';
 import '@assets/scss/tabs.scss';
-import { Eye, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, Trash2, Server, Globe, FolderTree, Layers, Phone, MessageCircle, MessageSquare, Calendar, Mail, MoreHorizontal, Search } from 'lucide-react';
 import AppSelect from '@components/AppSelect';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import router from 'next/router';
@@ -28,6 +29,51 @@ import router from 'next/router';
 type HostGroupOption = { value: string; label: string };
 type TemplateOption = { value: string; label: string };
 type SnmpVersionOption = { value: number; label: string };
+type HostGroupLike = { groupid: string; name?: string };
+type TemplateLike = { templateid: string; name?: string };
+
+function validateHostBasics(
+  hostname: string,
+  groupCount: number,
+  templateCount: number
+): string | null {
+  if (!hostname) return 'Hostname is required';
+  if (groupCount === 0) return 'Please select at least one group';
+  if (templateCount === 0) return 'Please select at least one template';
+  return null;
+}
+
+function validateAgentConnection(
+  useIp: boolean,
+  ip: string,
+  dns: string,
+  port: string,
+  isValidIpv4: (v: string) => boolean,
+  isValidPort: (v: string) => boolean
+): string | null {
+  if (useIp && !ip.trim()) return 'IP is required when "Use IP" is enabled';
+  if (useIp && !isValidIpv4(ip)) return 'IP address is invalid';
+  if (!useIp && !dns.trim()) return 'DNS is required when "Use IP" is disabled';
+  if (!isValidPort(port)) return 'Port must be a number between 1 and 65535';
+  return null;
+}
+
+function validateSnmpWhenEnabled(
+  enabled: boolean,
+  useIp: boolean,
+  ip: string,
+  dns: string,
+  port: string,
+  isValidIpv4: (v: string) => boolean,
+  isValidPort: (v: string) => boolean
+): string | null {
+  if (!enabled) return null;
+  if (useIp && !ip.trim()) return 'SNMP IP is required when "SNMP Use IP" is enabled';
+  if (useIp && !isValidIpv4(ip)) return 'SNMP IP address is invalid';
+  if (!useIp && !dns.trim()) return 'SNMP DNS is required when "SNMP Use IP" is disabled';
+  if (!isValidPort(port)) return 'SNMP port must be a number between 1 and 65535';
+  return null;
+}
 
 const Hosts = () => {
   const [hosts, setHosts] = useState<ZabbixHost[]>([]);
@@ -40,9 +86,9 @@ const Hosts = () => {
   const [templateOptions, setTemplateOptions] = useState<TemplateOption[]>([]);
   const [pagination, setPagination] = useState({
     offset: 0,
-    limit: 10,
+    limit: 20,
     total: 0,
-    pageSizeOptions: [5, 10, 15, 20, 25, 50, 100] as number[],
+    pageSizeOptions: [10, 20, 25, 50, 100] as number[],
   });
 
   // New host modal
@@ -74,6 +120,8 @@ const Hosts = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ZabbixHost | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showHostSidebar, setShowHostSidebar] = useState(false);
+  const [selectedHost, setSelectedHost] = useState<ZabbixHost | null>(null);
 
   const fetchHosts = useCallback(async (offset: number, limit: number, search?: string, groupid?: string) => {
     setLoading(true);
@@ -109,7 +157,7 @@ const Hosts = () => {
   }, []);
 
   useEffect(() => {
-    fetchHosts(0, 10);
+    fetchHosts(0, 20);
   }, [fetchHosts]);
 
   useEffect(() => {
@@ -202,18 +250,6 @@ const Hosts = () => {
     [fetchHosts, pagination.offset, pagination.limit, search, selectedHostGroup?.value]
   );
 
-  const handlePrevPage = () => {
-    const { offset, limit } = pagination;
-    fetchHosts(Math.max(0, offset - limit), limit, search, selectedHostGroup?.value);
-  };
-
-  const handleNextPage = () => {
-    const { offset, limit, total } = pagination;
-    if (offset + limit < total) {
-      fetchHosts(offset + limit, limit, search, selectedHostGroup?.value);
-    }
-  };
-
   const handleSearch = () => fetchHosts(0, pagination.limit, search, selectedHostGroup?.value);
 
   const handleRefresh = () => fetchHosts(0, pagination.limit, search, selectedHostGroup?.value);
@@ -231,8 +267,6 @@ const Hosts = () => {
       setRefreshCacheLoading(false);
     }
   };
-
-  const hasNextPage = pagination.offset + pagination.limit < pagination.total;
 
   const openCreateModal = () => {
     setEditingHostId(null);
@@ -271,12 +305,18 @@ const Hosts = () => {
     setCreatePort((iface?.port as string) ?? '10050');
     setCreateUseIp(Boolean((iface?.ip as string) ?? ''));
 
-    const groups: HostGroupOption[] =
-      host.groups?.map((g) => ({ value: g.groupid, label: g.name ?? g.groupid })) ?? [];
+    const hostGroups = (host.groups ?? []) as HostGroupLike[];
+    const groups: HostGroupOption[] = hostGroups.map((group) => ({
+      value: group.groupid,
+      label: group.name ?? group.groupid,
+    }));
     setCreateGroups(groups);
 
-    const templates: TemplateOption[] =
-      host.parentTemplates?.map((t) => ({ value: t.templateid, label: t.name ?? t.templateid })) ?? [];
+    const hostTemplates = (host.parentTemplates ?? []) as TemplateLike[];
+    const templates: TemplateOption[] = hostTemplates.map((template) => ({
+      value: template.templateid,
+      label: template.name ?? template.templateid,
+    }));
     setCreateTemplates(templates);
 
     setShowCreateModal(true);
@@ -286,6 +326,16 @@ const Hosts = () => {
     setDeleteTarget(host);
     setShowDeleteModal(true);
   };
+
+  const openHostSidebar = useCallback((host: ZabbixHost) => {
+    setSelectedHost(host);
+    setShowHostSidebar(true);
+  }, []);
+
+  const closeHostSidebar = useCallback(() => {
+    setShowHostSidebar(false);
+    setSelectedHost(null);
+  }, []);
 
   const handleDeleteHost = async () => {
     if (!deleteTarget?.hostid) return;
@@ -325,30 +375,42 @@ const Hosts = () => {
     return true;
   }, []);
 
+  const validateCreateHostForm = useCallback((): string | null => {
+    return (
+      validateHostBasics(createHostname.trim(), createGroups.length, createTemplates.length) ??
+      validateAgentConnection(createUseIp, createIp, createDns, createPort, isValidIpv4, isValidPort) ??
+      validateSnmpWhenEnabled(snmpEnabled, snmpUseIp, snmpIp, snmpDns, snmpPort, isValidIpv4, isValidPort)
+    );
+  }, [
+    createDns,
+    createGroups.length,
+    createHostname,
+    createIp,
+    createPort,
+    createTemplates.length,
+    createUseIp,
+    isValidIpv4,
+    isValidPort,
+    snmpDns,
+    snmpEnabled,
+    snmpIp,
+    snmpPort,
+    snmpUseIp,
+  ]);
+
+  const getCreateHostErrorMessage = useCallback((error: unknown): string => {
+    if (error instanceof Error) return error.message;
+    return editingHostId ? 'Failed to update host' : 'Failed to create host';
+  }, [editingHostId]);
+
   const submitCreateHost = async () => {
+    const validationError = validateCreateHostForm();
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
     const hostname = createHostname.trim();
-    if (!hostname) return toast.error('Hostname is required');
-    if (createGroups.length === 0) return toast.error('Please select at least one group');
-    if (createTemplates.length === 0) return toast.error('Please select at least one template');
-
-    if (createUseIp) {
-      if (!createIp.trim()) return toast.error('IP is required when "Use IP" is enabled');
-      if (!isValidIpv4(createIp)) return toast.error('IP address is invalid');
-    } else {
-      if (!createDns.trim()) return toast.error('DNS is required when "Use IP" is disabled');
-    }
-
-    if (!isValidPort(createPort)) return toast.error('Port must be a number between 1 and 65535');
-
-    if (snmpEnabled) {
-      if (snmpUseIp) {
-        if (!snmpIp.trim()) return toast.error('SNMP IP is required when "SNMP Use IP" is enabled');
-        if (!isValidIpv4(snmpIp)) return toast.error('SNMP IP address is invalid');
-      } else {
-        if (!snmpDns.trim()) return toast.error('SNMP DNS is required when "SNMP Use IP" is disabled');
-      }
-      if (!isValidPort(snmpPort)) return toast.error('SNMP port must be a number between 1 and 65535');
-    }
 
     setCreateSaving(true);
     try {
@@ -385,7 +447,7 @@ const Hosts = () => {
       refreshList(0);
     } catch (error) {
       console.error('Error creating host:', error);
-      toast.error(error instanceof Error ? error.message : editingHostId ? 'Failed to update host' : 'Failed to create host');
+      toast.error(getCreateHostErrorMessage(error));
     } finally {
       setCreateSaving(false);
     }
@@ -404,7 +466,10 @@ const Hosts = () => {
       key: 'groups',
       label: 'Groups',
       sortable: true,
-      render: (row) => <span>{row.groups?.map((g) => g.name).join(', ') ?? '-'}</span>,
+      render: (row) => {
+        const rowGroups = (row.groups ?? []) as HostGroupLike[];
+        return <span>{rowGroups.map((group) => group.name).filter(Boolean).join(', ') || '-'}</span>;
+      },
     },
     {
       key: 'status',
@@ -424,6 +489,237 @@ const Hosts = () => {
     { label: 'Edit', icon: <Pencil size={16} />, onClick: (row) => openEditModal(row) },
     { label: 'Delete', icon: <Trash2 size={16} />, onClick: (row) => openDeleteConfirm(row) },
   ];
+
+  const handleHostGroupFilterChange = useCallback(
+    (opt: HostGroupOption | null) => {
+      setSelectedHostGroup(opt);
+      fetchHosts(0, pagination.limit, search, opt?.value);
+    },
+    [fetchHosts, pagination.limit, search]
+  );
+
+  const handleCreateGroupsChange = useCallback((opt: readonly HostGroupOption[] | null) => {
+    setCreateGroups(opt ? [...opt] : []);
+  }, []);
+
+  const handleCreateTemplatesChange = useCallback((opt: readonly TemplateOption[] | null) => {
+    setCreateTemplates(opt ? [...opt] : []);
+  }, []);
+
+  const handleSnmpVersionChange = useCallback((opt: SnmpVersionOption | null) => {
+    setSnmpVersion(opt?.value ?? 2);
+  }, []);
+
+  const handleHostGroupFilterChangeRaw = useCallback((opt: any) => {
+    handleHostGroupFilterChange((opt as HostGroupOption | null) ?? null);
+  }, [handleHostGroupFilterChange]);
+
+  const handleCreateGroupsChangeRaw = useCallback((opt: any) => {
+    handleCreateGroupsChange((opt as readonly HostGroupOption[] | null) ?? null);
+  }, [handleCreateGroupsChange]);
+
+  const handleCreateTemplatesChangeRaw = useCallback((opt: any) => {
+    handleCreateTemplatesChange((opt as readonly TemplateOption[] | null) ?? null);
+  }, [handleCreateTemplatesChange]);
+
+  const handleSnmpVersionChangeRaw = useCallback((opt: any) => {
+    handleSnmpVersionChange((opt as SnmpVersionOption | null) ?? null);
+  }, [handleSnmpVersionChange]);
+
+  const hostSidebarQuickActions = useMemo(() => {
+    // Hosts do not currently provide phone/email fields, keep these actions visible but disabled.
+    const hasPhone = false;
+    const hasEmail = false;
+
+    return [
+      {
+        id: 'qa-call',
+        label: 'Call',
+        icon: Phone,
+        onClick: () => {},
+        disabled: !hasPhone,
+      },
+      {
+        id: 'qa-whatsapp',
+        label: 'WhatsApp',
+        icon: MessageCircle,
+        onClick: () => {},
+        disabled: !hasPhone,
+      },
+      {
+        id: 'qa-sms',
+        label: 'SMS',
+        icon: MessageSquare,
+        onClick: () => {},
+        disabled: !hasPhone,
+      },
+      {
+        id: 'qa-meeting',
+        label: 'Meeting',
+        icon: Calendar,
+        onClick: () => {},
+      },
+      {
+        id: 'qa-email',
+        label: 'Email',
+        icon: Mail,
+        onClick: () => {},
+        disabled: !hasEmail,
+      },
+      {
+        id: 'more',
+        label: 'More',
+        icon: MoreHorizontal,
+        onClick: () => {
+          // Let GenericSidebar's built-in "More" submenu open.
+        },
+      },
+    ];
+  }, []);
+
+  const hostTabs: TabConfig[] = useMemo(
+    () => [
+      {
+        id: 'hosts',
+        label: 'Hosts',
+        count: pagination.total,
+        removable: false,
+      },
+    ],
+    [pagination.total]
+  );
+
+  const hostSidebarSections: SidebarSection[] = useMemo(() => {
+    if (!selectedHost) return [];
+
+    const hostInterface = selectedHost.interfaces?.[0];
+    const selectedHostGroups = (selectedHost.groups ?? []) as HostGroupLike[];
+    const selectedHostTemplates = (selectedHost.parentTemplates ?? []) as TemplateLike[];
+    const groupNames = selectedHostGroups.map((group) => group.name).filter(Boolean);
+    const templateNames = selectedHostTemplates.map((template) => template.name).filter(Boolean);
+
+    return [
+      {
+        id: 'about-host',
+        title: 'About this host',
+        icon: Server,
+        collapsible: true,
+        defaultExpanded: true,
+        fields: [
+          { label: 'Host ID', value: selectedHost.hostid || 'N/A', copyable: true },
+          { label: 'Host Name', value: selectedHost.host || 'N/A', copyable: true },
+          { label: 'Visible Name', value: selectedHost.name || 'N/A', copyable: true },
+          {
+            label: 'Status',
+            value: Number(selectedHost.status) === 1 ? 'Monitored' : 'Not monitored',
+            type: 'badge',
+            badgeVariant: Number(selectedHost.status) === 1 ? 'success' : 'danger',
+          },
+          { label: 'Description', value: selectedHost.description || 'N/A' },
+        ],
+      },
+      {
+        id: 'network',
+        title: 'Network',
+        icon: Globe,
+        collapsible: true,
+        defaultExpanded: true,
+        fields: [
+          { label: 'IP Address', value: hostInterface?.ip || 'N/A', copyable: true },
+          { label: 'DNS', value: hostInterface?.dns || 'N/A', copyable: true },
+          { label: 'Port', value: hostInterface?.port || 'N/A', copyable: true },
+        ],
+      },
+      {
+        id: 'groups',
+        title: 'Groups',
+        icon: FolderTree,
+        collapsible: true,
+        defaultExpanded: true,
+        fields: [
+          {
+            label: 'Assigned Groups',
+            value: groupNames.length > 0 ? groupNames : ['No groups'],
+            type: 'tags',
+          },
+        ],
+      },
+      {
+        id: 'templates',
+        title: 'Templates',
+        icon: Layers,
+        collapsible: true,
+        defaultExpanded: false,
+        fields: [
+          {
+            label: 'Linked Templates',
+            value: templateNames.length > 0 ? templateNames : ['No templates'],
+            type: 'tags',
+          },
+        ],
+      },
+    ];
+  }, [selectedHost]);
+
+  const hostsToolbarConfig: ToolbarConfig = useMemo(
+    () => ({
+      showSearch: true,
+      searchValue: search,
+      searchPlaceholder: 'Search hosts...',
+      onSearchChange: setSearch,
+      onSearch: handleSearch,
+      showTabs: true,
+      tabs: hostTabs,
+      activeTab: 'hosts',
+      onTabChange: () => {},
+      showTableViewDropdown: false,
+      customActions: (
+        <div className="d-flex align-items-center gap-2 flex-wrap hosts-toolbar-buttons">
+          <button className="hosts-btn" onClick={handleSearch} disabled={loading}>
+            <Search size={14} /> Search
+          </button>
+          <button className="hosts-btn" onClick={openCreateModal} disabled={loading}>
+            <Plus size={14} /> New Host
+          </button>
+          <button className="hosts-btn" onClick={handleRefreshCache} disabled={loading || refreshCacheLoading}>
+            <FiRefreshCw size={14} /> Refresh Hosts Cache
+          </button>
+          <button className="hosts-btn" onClick={handleRefresh} disabled={loading}>
+            <FiRefreshCw size={14} /> Refresh
+          </button>
+        </div>
+      ),
+      rightActions: (
+        <div className="hosts-filter-select" style={{ minWidth: '260px', width: '100%', maxWidth: '320px' }}>
+          <AppSelect
+            instanceId="pulse-hosts-hostgroup"
+            classNamePrefix="hosts-select"
+            placeholder="All host groups"
+            isClearable
+            isLoading={hostGroupsLoading}
+            options={hostGroupOptions}
+            value={selectedHostGroup}
+            onChange={handleHostGroupFilterChangeRaw}
+          />
+        </div>
+      ),
+    }),
+    [
+      fetchHosts,
+      handleRefresh,
+      handleRefreshCache,
+      handleSearch,
+      hostGroupOptions,
+      hostGroupsLoading,
+      hostTabs,
+      handleHostGroupFilterChange,
+      handleHostGroupFilterChangeRaw,
+      loading,
+      openCreateModal,
+      refreshCacheLoading,
+      selectedHostGroup,
+    ]
+  );
 
   const snmpVersionOptions: SnmpVersionOption[] = [
     { value: 1, label: 'SNMPv1' },
@@ -461,84 +757,91 @@ const Hosts = () => {
     snmpUseIp,
   ]);
 
+  const submitButtonLabel = editingHostId ? 'Update Host' : 'Create Host';
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="Pulse" mainLink="/pulse/dashboard" subTitle="Hosts" />
-
-      <Row className="mb-3">
-        <Col md={12}>
-          
-          <div className="page-header-title style-2 d-flex justify-content-end align-items-center gap-2 flex-wrap">
-
-            
-            <div style={{ minWidth: '260px', maxWidth: '320px' }}>
-              <AppSelect
-                instanceId="pulse-hosts-hostgroup"
-                placeholder="All host groups"
-                isClearable
-                isLoading={hostGroupsLoading}
-                options={hostGroupOptions}
-                value={selectedHostGroup}
-                onChange={(opt) => {
-                  const next = (opt ?? null) as HostGroupOption | null;
-                  setSelectedHostGroup(next);
-                  fetchHosts(0, pagination.limit, search, next?.value);
-                }}
-              />
-            </div>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Search hosts..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              style={{ maxWidth: '240px' }}
-            />
-            <Button variant="primary" onClick={handleSearch} disabled={loading}>
-            <Search size={14} /> Search
-            </Button>
-            <Button variant="success" onClick={openCreateModal} disabled={loading}>
-              <Plus size={14} /> New Host
-            </Button>
-
-            <Button variant="warning" onClick={handleRefreshCache} disabled={loading || refreshCacheLoading}>
-              <FiRefreshCw size={14} /> Refresh Hosts Cache
-            </Button>
-
-            
-            <Button variant="info" onClick={handleRefresh} disabled={loading}>
-              <FiRefreshCw size={14} /> Refresh
-            </Button>
-          </div>
-        </Col>
-      </Row>
-
-   
-
-      <GenericTable<ZabbixHost>
-        data={hosts}
-        columns={tableColumns}
-        actions={tableActions}
-        showActions
-        actionsLabel="Actions"
-        loading={loading}
-        emptyMessage="No hosts found."
-        loadingMessage="Loading hosts..."
-        pagination={{
-          currentPage: pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
-          rowsPerPage: pagination.limit,
-          totalRows: pagination.total,
-          pageSizeOptions: pagination.pageSizeOptions,
+      <div
+        className="pulse-hosts-page"
+        style={{
+          display: 'flex',
+          gap: '0',
+          height: 'calc(100vh)',
+          overflow: 'hidden',
         }}
-        onPaginationChange={(page, rowsPerPage) => {
-          fetchHosts((page - 1) * rowsPerPage, rowsPerPage, search, selectedHostGroup?.value);
-        }}
-        sortable
-        hover
-        striped={false}
-        uniqueKey="hostid"
-      />
+      >
+        <div className="hosts-table-pane" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <GenericTable<ZabbixHost>
+            data={hosts}
+            columns={tableColumns}
+            actions={tableActions}
+            showActions
+            actionsLabel="Actions"
+            showToolbarActions={false}
+            loading={loading}
+            emptyMessage="No hosts found."
+            loadingMessage="Loading hosts..."
+            pagination={{
+              currentPage: pagination.limit > 0 ? Math.floor(pagination.offset / pagination.limit) + 1 : 1,
+              rowsPerPage: pagination.limit,
+              totalRows: pagination.total,
+              pageSizeOptions: pagination.pageSizeOptions,
+            }}
+            onPaginationChange={(page, rowsPerPage) => {
+              fetchHosts((page - 1) * rowsPerPage, rowsPerPage, search, selectedHostGroup?.value);
+            }}
+            sortable
+            hover
+            striped={false}
+            uniqueKey="hostid"
+            onPreviewClick={(row) => openHostSidebar(row)}
+            showToolbar={true}
+            toolbar={hostsToolbarConfig}
+            fixedHeight={true}
+            maxHeight="calc(100vh - 295px)"
+          />
+        </div>
+
+        {showHostSidebar && selectedHost && (
+          <GenericSidebar
+            isOpen={showHostSidebar}
+            onClose={closeHostSidebar}
+            title={selectedHost.name || selectedHost.host || 'Host Details'}
+            subtitle={selectedHost.interfaces?.[0]?.ip || ''}
+            avatar={{
+              initials: (selectedHost.host || selectedHost.name || 'H').slice(0, 2).toUpperCase(),
+              name: selectedHost.host || selectedHost.name || 'Host',
+              gradient: '#0091ae',
+            }}
+            recordLink={{
+              label: 'Open host details page',
+              onClick: () => router.push(`/pulse/hosts/${selectedHost.hostid}`),
+            }}
+            actionsDropdown={{
+              label: 'Actions',
+              items: [
+                {
+                  label: 'Edit Host',
+                  onClick: () => {
+                    closeHostSidebar();
+                    openEditModal(selectedHost);
+                  },
+                },
+                {
+                  label: 'Delete Host',
+                  onClick: () => {
+                    closeHostSidebar();
+                    openDeleteConfirm(selectedHost);
+                  },
+                },
+              ],
+            }}
+            sections={hostSidebarSections}
+            quickActions={hostSidebarQuickActions}
+          />
+        )}
+      </div>
 
       <Modal
         show={showCreateModal}
@@ -628,11 +931,12 @@ const Hosts = () => {
                 <Form.Label>Groups</Form.Label>
                 <AppSelect<HostGroupOption, true>
                   instanceId="create-host-groups"
+                  classNamePrefix="hosts-select"
                   isMulti
                   isLoading={hostGroupsLoading}
                   options={hostGroupOptions}
                   value={createGroups}
-                  onChange={(opt) => setCreateGroups(((opt ?? []) as HostGroupOption[]) ?? [])}
+                  onChange={handleCreateGroupsChangeRaw}
                   placeholder="Select groups..."
                 />
               </Form.Group>
@@ -642,11 +946,12 @@ const Hosts = () => {
                 <Form.Label>Templates</Form.Label>
                 <AppSelect<TemplateOption, true>
                   instanceId="create-host-templates"
+                  classNamePrefix="hosts-select"
                   isMulti
                   isLoading={templatesLoading}
                   options={templateOptions}
                   value={createTemplates}
-                  onChange={(opt) => setCreateTemplates(((opt ?? []) as TemplateOption[]) ?? [])}
+                  onChange={handleCreateTemplatesChangeRaw}
                   placeholder="Select templates..."
                 />
               </Form.Group>
@@ -705,9 +1010,10 @@ const Hosts = () => {
                     <Form.Label>SNMP Version</Form.Label>
                     <AppSelect<SnmpVersionOption>
                       instanceId="hc-snmp-version"
+                      classNamePrefix="hosts-select"
                       options={snmpVersionOptions}
                       value={selectedSnmpVersion}
-                      onChange={(opt) => setSnmpVersion(((opt as SnmpVersionOption | null)?.value ?? 2) as number)}
+                      onChange={handleSnmpVersionChangeRaw}
                       isSearchable={false}
                       placeholder="Select SNMP version"
                     />
@@ -759,7 +1065,7 @@ const Hosts = () => {
                 <Spinner size="sm" animation="border" /> Saving...
               </span>
             ) : (
-              editingHostId ? 'Update Host' : 'Create Host'
+              submitButtonLabel
             )}
           </Button>
         </Modal.Footer>
@@ -776,6 +1082,84 @@ const Hosts = () => {
         itemType="host"
         loading={deleteLoading}
       />
+
+      <style jsx global>{`
+        .pulse-hosts-page .hosts-btn {
+          padding: 9px 13px;
+          background-color: rgb(0, 0, 0);
+          color: rgb(255, 255, 255);
+          border: none;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 40px;
+          line-height: 1;
+        }
+
+        .pulse-hosts-page .hosts-btn:hover,
+        .pulse-hosts-page .hosts-btn:focus {
+          background-color: rgb(0, 0, 0);
+          color: rgb(255, 255, 255);
+          opacity: 0.92;
+        }
+
+        .pulse-hosts-page .hosts-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .pulse-hosts-page .gt-toolbar-search input,
+        .pulse-hosts-page .gt-toolbar-search .form-control {
+          min-height: 40px;
+          height: 40px;
+          font-size: 12px;
+        }
+
+        .pulse-hosts-page .gt-toolbar-search button,
+        .pulse-hosts-page .gt-toolbar-search .btn {
+          min-height: 40px;
+          height: 40px;
+          padding: 9px 13px;
+          font-size: 12px;
+          font-weight: 500;
+          border-radius: 4px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .pulse-hosts-page .hosts-filter-select {
+          min-height: 40px;
+        }
+
+        .pulse-hosts-page .hosts-select__control {
+          min-height: 40px;
+          height: 40px;
+          border-radius: 4px;
+        }
+
+        .pulse-hosts-page .hosts-select__value-container {
+          min-height: 40px;
+          padding: 0 10px;
+          font-size: 12px;
+        }
+
+        .pulse-hosts-page .hosts-select__indicators {
+          min-height: 40px;
+        }
+
+        .pulse-hosts-page .hosts-table-pane {
+          min-height: 0;
+        }
+
+        .pulse-hosts-page .hosts-table-pane .generic-table-responsive.fixed-height-table {
+          min-height: 0;
+        }
+      `}</style>
     
     </React.Fragment>
   );

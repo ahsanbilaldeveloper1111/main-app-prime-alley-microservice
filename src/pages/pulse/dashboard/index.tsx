@@ -1,15 +1,11 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useRef } from 'react';
+import React, { ReactElement, useEffect, useState } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Button, Modal, Row, Tab, Tabs } from 'react-bootstrap';
-import { Col } from 'react-bootstrap';
+import { Modal, Row, Col } from 'react-bootstrap';
 import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
 import { useSession } from 'next-auth/react';
-import AnimatedNumber from '@components/AnimatedNumber';
 import EmptyState from '@components/EmptyState';
-import { formatDateTimeToLocal, GlobalDateTimeFormat } from '@utils/Helper';
 import '@assets/scss/common.scss';
 import '@assets/scss/report-style.scss';
 import '@assets/scss/tabs.scss';
@@ -17,8 +13,8 @@ import moment from 'moment';
 import Link from 'next/link';
 import NProgress from "nprogress";
 import "nprogress/nprogress.css";
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
-import { motion } from 'framer-motion';
+
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 
 // NetOps API imports
 import { 
@@ -26,15 +22,10 @@ import {
   getMonitoringDashboard, 
   getDevices, 
   getServices, 
-  getAlerts,
   ComprehensiveMonitoringResponse,
   MonitoringDashboardResponse,
   Device,
   Service,
-  Alert,
-  DeviceStatus,
-  MonitoringSummary,
-  AlertsSummary
 } from '@utils/netops';
 
 import dynamic from 'next/dynamic';
@@ -51,7 +42,7 @@ interface NetOpsDashboardState {
 }
 
 const NetOpsDashboard = () => {
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
   const [state, setState] = useState<NetOpsDashboardState>({
     comprehensiveData: null,
     dashboardData: null,
@@ -64,87 +55,46 @@ const NetOpsDashboard = () => {
   const [showServiceModal, setShowServiceModal] = useState(false);
 
   // Create summary cards for PageSummaryGrid
-  const summaryCards: SummaryCard[] = [
+  const summaryCards: StatsCardData[] = [
     {
-      id: 'total-devices',
       title: 'Total Devices',
       value: state.dashboardData?.total_devices || 0,
-      description: 'Total devices in the system',
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
+      subtitle: 'Total devices in the system'
     },
     {
-      id: 'devices-up',
       title: 'Devices Online',
       value: state.dashboardData?.devices_up || 0,
-      description: 'Devices currently online',
-      delay: 0.3,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
+      subtitle: 'Devices currently online'
     },
     {
-      id: 'devices-down',
       title: 'Devices Offline',
       value: state.dashboardData?.devices_down || 0,
-      description: 'Devices currently offline',
-      delay: 0.5,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
+      subtitle: 'Devices currently offline'
     },
     {
-      id: 'total-services',
       title: 'Total Services',
       value: state.comprehensiveData?.summary?.total_services || 0,
-      description: 'Total services monitored',
-      delay: 0.7,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
+      subtitle: 'Total services monitored'
     },
     {
-      id: 'services-up',
       title: 'Services Up',
       value: state.comprehensiveData?.summary?.services_up || 0,
-      description: 'Services currently running',
-      delay: 0.9,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
+      subtitle: 'Services currently running'
     },
     {
-      id: 'services-down',
       title: 'Services Down',
       value: state.comprehensiveData?.summary?.services_down || 0,
-      description: 'Services currently down',
-      delay: 1.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
+      subtitle: 'Services currently down'
     },
     {
-      id: 'active-alerts',
       title: 'Active Alerts',
       value: state.dashboardData?.active_alerts || 0,
-      description: 'Currently active alerts',
-      delay: 1.3,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2'
+      subtitle: 'Currently active alerts'
     },
     {
-      id: 'avg-uptime',
       title: 'Avg Uptime',
-      value: state.comprehensiveData?.summary?.average_uptime || 0,
-      description: 'Average system uptime',
-      delay: 1.5,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2',
-      suffix: '%'
+      value: `${(state.comprehensiveData?.summary?.average_uptime || 0).toFixed(1)}%`,
+      subtitle: 'Average system uptime'
     }
   ];
 
@@ -228,12 +178,12 @@ const NetOpsDashboard = () => {
   const updateCharts = (comprehensiveData: ComprehensiveMonitoringResponse, dashboardData: MonitoringDashboardResponse) => {
     
     // Safety checks
-    if (!comprehensiveData || !comprehensiveData.summary) {
+    if (!comprehensiveData?.summary) {
       console.warn("Invalid comprehensive data received");
       return;
     }
 
-    if (!dashboardData || !dashboardData.devices_up) {
+    if (!dashboardData?.devices_up) {
       console.warn("Invalid dashboard data received");
       return;
     }
@@ -284,19 +234,21 @@ const NetOpsDashboard = () => {
       <Row className="mb-3">
         <Col md={12}>
           <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={8}>
-                <h2 className="mb-0">Network Operations Dashboard</h2>
+            <Row className="d-flex justify-content-between align-items-center header-row-responsive">
+              <Col xs={12} md={8}>
+                <h4 className="mb-0">Network Operations Dashboard</h4>
               </Col>
-              <Col md={4} className="d-flex justify-content-end">
+              <Col xs={12} md={4} className="d-flex justify-content-end header-actions-col">
                 <div className="action-buttons">
                   <div className="d-flex align-items-center gap-2">
                     {state.lastUpdated && (
                       <>
-                        <p className="mb-0">
+                        <p className="mb-0 last-updated-text">
                           Last Updated: <span className="status-badge primary">{state.lastUpdated}</span>
                         </p>
-                        <i className="material-icons-two-tone" style={{cursor: 'pointer'}} onClick={() => refreshData()}>refresh</i>
+                        <button type="button" className="btn btn-link p-0 border-0" onClick={() => refreshData()} aria-label="Refresh data">
+                      <i className="material-icons-two-tone">refresh</i>
+                    </button>
                       </>
                     )}
                   </div>
@@ -308,19 +260,19 @@ const NetOpsDashboard = () => {
       </Row>
 
       {/* Summary Cards */}
-      <PageSummaryGrid cards={summaryCards} />
+      <StatsCards data={summaryCards} />
 
       {/* Charts Row */}
       <Row>
-        <Col md={3}>
+        <Col xs={12} sm={6} lg={3}>
           <div className="card">
             <div className="card-body">
               <h5 className="mb-0 app-title-heading">Device Status</h5>
               {state.loading ? (
                 <div className="d-flex justify-content-center align-items-center" style={{ height: '200px' }}>
-                  <div className="spinner-border text-primary" role="status">
+                  <output className="spinner-border text-primary" aria-live="polite">
                     <span className="visually-hidden">Loading...</span>
-                  </div>
+                  </output>
                 </div>
               ) : (
                 <ReactApexChart 
@@ -328,22 +280,22 @@ const NetOpsDashboard = () => {
                   options={deviceStatusChart.options as ApexOptions} 
                   series={deviceStatusChart.series} 
                   type="donut" 
-                  height={200} 
+                  height={180} 
                 />
               )}
             </div>
           </div>
         </Col>
 
-        <Col md={3}>
+        <Col xs={12} sm={6} lg={3}>
           <div className="card">
             <div className="card-body">
               <h5 className="mb-0 app-title-heading">Service Status</h5>
               {state.loading ? (
                 <div className="d-flex justify-content-center align-items-center" style={{ height: '200px' }}>
-                  <div className="spinner-border text-primary" role="status">
+                  <output className="spinner-border text-primary" aria-live="polite">
                     <span className="visually-hidden">Loading...</span>
-                  </div>
+                  </output>
                 </div>
               ) : (
                 <ReactApexChart 
@@ -351,22 +303,22 @@ const NetOpsDashboard = () => {
                   options={serviceStatusChart.options as ApexOptions} 
                   series={serviceStatusChart.series} 
                   type="donut" 
-                  height={200} 
+                  height={180} 
                 />
               )}
             </div>
           </div>
         </Col>
 
-        <Col md={6}>
+        <Col xs={12} lg={6}>
           <div className="card">
             <div className="card-body">
               <h5 className="mb-0 app-title-heading">Alert Summary</h5>
               {state.loading ? (
                 <div className="d-flex justify-content-center align-items-center" style={{ height: '200px' }}>
-                  <div className="spinner-border text-primary" role="status">
+                  <output className="spinner-border text-primary" aria-live="polite">
                     <span className="visually-hidden">Loading...</span>
-                  </div>
+                  </output>
                 </div>
               ) : (
                 <div className="table-responsive">
@@ -412,7 +364,7 @@ const NetOpsDashboard = () => {
 
       {/* Data Tables */}
       <Row className="mt-3">
-        <Col md={6}>
+        <Col xs={12} xl={6}>
           <div className="card">
             <div className="card-body">
               <h5 className="mb-0 app-title-heading mb-3">Recent Alerts</h5>
@@ -424,7 +376,7 @@ const NetOpsDashboard = () => {
                 
                 // Sort by creation date (newest first) and take first 5
                 const recentAlerts = allAlerts
-                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                  .toSorted((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                   .slice(0, 5);
 
                 return recentAlerts.length === 0 ? (
@@ -447,8 +399,8 @@ const NetOpsDashboard = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {recentAlerts.map((alert, index) => (
-                          <tr key={index}>
+                        {recentAlerts.map((alert) => (
+                          <tr key={`${alert.hostname}-${alert.alert_type}-${alert.created_at}`}>
                             <td>
                               <span className={`badge bg-${getSeverityColor(alert.severity)}`}>
                                 {alert.severity}
@@ -456,7 +408,7 @@ const NetOpsDashboard = () => {
                             </td>
                             <td>{alert.alert_type}</td>
                             <td>{alert.hostname}</td>
-                            <td className="text-truncate" style={{ maxWidth: '200px' }} title={alert.message}>
+                            <td className="alert-message-cell" title={alert.message}>
                               {alert.message}
                             </td>
                             <td>{moment(alert.created_at).format('MM/DD HH:mm')}</td>
@@ -481,7 +433,7 @@ const NetOpsDashboard = () => {
           </div>
         </Col>
 
-        <Col md={6}>
+        <Col xs={12} xl={6}>
           <div className="card">
             <div className="card-body">
               <h5 className="mb-0 app-title-heading mb-3">Device Status Overview</h5>
@@ -504,8 +456,8 @@ const NetOpsDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {state.comprehensiveData?.devices.slice(0, 5).map((device, index) => (
-                        <tr key={index}>
+                      {state.comprehensiveData?.devices.slice(0, 5).map((device) => (
+                        <tr key={device.hostname}>
                           <td>{device.hostname}</td>
                           <td>{device.ip_address}</td>
                           <td>
@@ -550,24 +502,77 @@ const NetOpsDashboard = () => {
           <Modal.Title>Service Status</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <div className="chart-container" style={{ minHeight: '500px' }}>
+          <div className="chart-container" style={{ minHeight: '300px' }}>
             <ReactApexChart 
               key={`modal-service-status-${serviceStatusChart.series.join('-')}`}
               options={{
                 ...serviceStatusChart.options as ApexOptions,
                 chart: {
                   ...serviceStatusChart.options.chart,
-                  height: 500,
+                  height: 420,
                   toolbar: { show: true }
                 }
               }} 
               series={serviceStatusChart.series} 
               type="donut" 
-              height={500} 
+              height={420} 
             />
           </div>
         </Modal.Body>
       </Modal>
+
+      <style jsx>{`
+        .header-row-responsive {
+          row-gap: 0.75rem;
+        }
+
+        .last-updated-text {
+          white-space: nowrap;
+          font-size: 0.9rem;
+        }
+
+        .alert-message-cell {
+          max-width: 220px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        @media (max-width: 767.98px) {
+          .header-actions-col {
+            justify-content: flex-start !important;
+          }
+
+          .header-actions-col .action-buttons,
+          .header-actions-col .action-buttons > div {
+            width: 100%;
+          }
+
+          .header-actions-col .action-buttons > div {
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.5rem;
+          }
+
+          .last-updated-text {
+            font-size: 0.8rem;
+            white-space: normal;
+            margin-right: 0.5rem;
+          }
+
+          .app-title-heading {
+            font-size: 1rem;
+          }
+
+          .table {
+            font-size: 0.85rem;
+          }
+
+          .alert-message-cell {
+            max-width: 140px;
+          }
+        }
+      `}</style>
     </React.Fragment>
   );
 };
