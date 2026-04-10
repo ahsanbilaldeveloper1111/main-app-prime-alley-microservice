@@ -86,11 +86,16 @@ function closeIncomingSession(
 }
 
 /**
- * Incoming UI must not auto-close on DISCONNECTED/DROPPED: CTI often emits those for a ringing
- * transfer leg while the callee should still answer. Rely on reject, 30s timeout,
- * Layout answered-elsewhere, or true ENDED.
+ * Remote hang-up before answer usually arrives as DISCONNECTED/DROPPED; ENDED is also possible.
+ * `shouldCloseIncomingModalOnCallEndEvent` requires a matching call id and, for DISCONNECTED/DROPPED,
+ * that the party’s `calledAddress` is our incoming callee DN so consult legs on other DNs do not
+ * dismiss the modal.
  */
-const INCOMING_SESSION_AUTO_CLOSE_EVENT_TYPES = new Set(["ENDED"]);
+const INCOMING_SESSION_AUTO_CLOSE_EVENT_TYPES = new Set([
+  "ENDED",
+  "DISCONNECTED",
+  "DROPPED",
+]);
 
 function isRingingDuplicateForOpenModal(
   eventData: EventParty,
@@ -210,7 +215,6 @@ function handleRingingEventBranch(args: {
 
 function handleCallEndEventBranch(args: {
   latestEvent: LogEvent;
-  eventData: EventParty | undefined;
   incomingCallRef: MutableRefObject<FloatingBarIncomingCallState | null>;
   incomingTimerRef: FloatingBarIncomingTimerRef;
   setIncomingCall: Dispatch<SetStateAction<FloatingBarIncomingCallState | null>>;
@@ -218,15 +222,19 @@ function handleCallEndEventBranch(args: {
   setShowIncomingCallModal: Dispatch<SetStateAction<boolean>>;
   setShowIncomingCallModalContext: (v: boolean) => void;
 }): void {
-  const { latestEvent, eventData, incomingCallRef, incomingTimerRef } = args;
+  const { latestEvent, incomingCallRef, incomingTimerRef } = args;
   const cur = incomingCallRef.current;
-  if (!eventData || !cur) {
+  if (!cur || !latestEvent.parties?.length) {
     return;
   }
   if (!INCOMING_SESSION_AUTO_CLOSE_EVENT_TYPES.has(latestEvent.eventType ?? "")) {
     return;
   }
-  if (!shouldCloseIncomingModalOnCallEndEvent(eventData, cur)) {
+  const eventType = latestEvent.eventType;
+  const matchedParty = latestEvent.parties.find((p) =>
+    shouldCloseIncomingModalOnCallEndEvent(p, cur, eventType),
+  );
+  if (!matchedParty) {
     return;
   }
   closeIncomingSession(
@@ -313,7 +321,6 @@ export function useGlobalFloatingBarIncomingCall({
     }
     handleCallEndEventBranch({
       latestEvent,
-      eventData,
       incomingCallRef,
       incomingTimerRef,
       setIncomingCall,

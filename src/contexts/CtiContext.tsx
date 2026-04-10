@@ -14,6 +14,9 @@ import {
   getRemotePartyDnForTransfer,
   getAllUserDevices,
   GetCallLegs,
+  extractCallIdFromDialApiData,
+  extractDialApiLineStatus,
+  mapDialApiStatusToActiveCallStatus,
   type HoldCallParams,
 } from '../utils/dialer';
 import { getCrossTabCtiManager } from '../utils/crossTabCtiManager';
@@ -177,6 +180,61 @@ function buildActiveCallsMapFromCallStateMap(
     mergeCallStateIntoMap(newMap, callState as any);
   });
   return newMap;
+}
+
+function mergePendingOutboundIntoActiveCallsMap(
+  fromState: Map<string, ActiveCallMapValue>,
+  pending: Map<string, ActiveCallMapValue>,
+): Map<string, ActiveCallMapValue> {
+  const merged = new Map(fromState);
+  pending.forEach((call, callId) => {
+    const alreadyInState = Array.from(merged.values()).some(
+      (c) => c.callId === callId,
+    );
+    if (!alreadyInState) {
+      merged.set(callId, call);
+    }
+  });
+  return merged;
+}
+
+function registerPendingOutboundAfterDialSuccess(
+  setPending: React.Dispatch<
+    React.SetStateAction<Map<string, ActiveCallMapValue>>
+  >,
+  dialResultData: unknown,
+  leg: {
+    callingAddress: string;
+    calledAddress: string;
+    callingDeviceName: string;
+    callingDeviceType: string;
+  },
+): void {
+  const callId = extractCallIdFromDialApiData(dialResultData);
+  if (!callId) {
+    return;
+  }
+  const apiStatus = extractDialApiLineStatus(dialResultData);
+  const localStatus = mapDialApiStatusToActiveCallStatus(apiStatus);
+  if (localStatus === "ended") {
+    return;
+  }
+  setPending((prev) => {
+    const next = new Map(prev);
+    next.set(callId, {
+      id: callId,
+      number: leg.calledAddress,
+      status: localStatus,
+      startTime: new Date(),
+      callId,
+      callingAddress: leg.callingAddress,
+      calledAddress: leg.calledAddress,
+      callingDeviceName: leg.callingDeviceName,
+      callingDeviceType: leg.callingDeviceType,
+      duration: 0,
+    });
+    return next;
+  });
 }
 
 function isCallLegParticipantActive(item: Record<string, unknown>): boolean {
@@ -484,15 +542,56 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
   const activeCallsRef = useRef(activeCalls);
   activeCallsRef.current = activeCalls;
 
-  // activeCalls is derived from callStateMap (updated by CTI events in useCtiStomp) — single source of truth.
+  /** Outbound legs returned by dialCall before STOMP populates `callStateMap.parties` (floating bar + cancel). */
+  const [pendingOutboundByCallId, setPendingOutboundByCallId] = useState<
+    Map<string, ActiveCallMapValue>
+  >(new Map());
+
+  // Drop optimistic outbound rows once the websocket snapshot includes the same call id.
   useEffect(() => {
     if (!ctiStomp.isInitialized || !ctiStomp.callStateMap) {
       return;
     }
-    setActiveCalls(
-      buildActiveCallsMapFromCallStateMap(ctiStomp.callStateMap as Record<string, unknown>),
+    const fromState = buildActiveCallsMapFromCallStateMap(
+      ctiStomp.callStateMap as Record<string, unknown>,
     );
+    const idsInState = new Set(
+      Array.from(fromState.values())
+        .map((c) => c.callId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    setPendingOutboundByCallId((prev) => {
+      if (prev.size === 0) {
+        return prev;
+      }
+      let changed = false;
+      const next = new Map(prev);
+      for (const id of Array.from(next.keys())) {
+        if (idsInState.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
   }, [ctiStomp.isInitialized, ctiStomp.callStateMap]);
+
+  // activeCalls from callStateMap plus short-lived outbound rows from dial API (until events arrive).
+  useEffect(() => {
+    const fromState =
+      ctiStomp.isInitialized && ctiStomp.callStateMap
+        ? buildActiveCallsMapFromCallStateMap(
+            ctiStomp.callStateMap as Record<string, unknown>,
+          )
+        : new Map<string, ActiveCallMapValue>();
+    setActiveCalls(
+      mergePendingOutboundIntoActiveCallsMap(fromState, pendingOutboundByCallId),
+    );
+  }, [
+    ctiStomp.isInitialized,
+    ctiStomp.callStateMap,
+    pendingOutboundByCallId,
+  ]);
 
   // Timer effect for call duration
   useEffect(() => {
@@ -590,12 +689,25 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
       };
     }
     const calledAddress = params.calledAddress?.replaceAll(' ', '');
-    return await makeCallAPI({
+    const result = await makeCallAPI({
       callingAddress,
       calledAddress,
       callingDeviceType,
       callingDeviceName,
     });
+    if (result.success && result.data) {
+      registerPendingOutboundAfterDialSuccess(
+        setPendingOutboundByCallId,
+        result.data,
+        {
+          callingAddress,
+          calledAddress,
+          callingDeviceName,
+          callingDeviceType,
+        },
+      );
+    }
+    return result;
   }, [ctiStomp.userAddress, ctiStomp.dnsMap]);
   
   const endCall = useCallback(async (params: {
@@ -664,6 +776,14 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
 
     if (result.success && params.callId) {
       ctiStomp.removeCallIdsFromCallStateMap([params.callId]);
+      setPendingOutboundByCallId((prev) => {
+        if (!prev.has(params.callId)) {
+          return prev;
+        }
+        const next = new Map(prev);
+        next.delete(params.callId);
+        return next;
+      });
     }
 
     return result;
@@ -1031,24 +1151,50 @@ export const CtiProvider: React.FC<CtiProviderProps> = ({ children }) => {
     
     // Check if user has multiple devices
     const userDevices = getAllUserDevices(ctiStomp.userAddress, ctiStomp.dnsMap);
+    let result: Awaited<ReturnType<typeof makeCallAPI>>;
     if (userDevices && userDevices.length > 1) {
-      // For multiple devices, use the first registered device or first available
-      const registeredDevice = userDevices.find((d: any) => d.terminalState === 'REGISTERED') || userDevices[0];
-      return await makeCallAPI({
+      const registeredDevice =
+        userDevices.find((d: { terminalState?: string }) => d.terminalState === 'REGISTERED') ||
+        userDevices[0];
+      result = await makeCallAPI({
         callingAddress: ctiStomp.userAddress,
         calledAddress: cleanedNumber,
         callingDeviceType: registeredDevice.deviceType,
-        callingDeviceName: registeredDevice.deviceName
+        callingDeviceName: registeredDevice.deviceName,
       });
+      if (result.success && result.data) {
+        registerPendingOutboundAfterDialSuccess(
+          setPendingOutboundByCallId,
+          result.data,
+          {
+            callingAddress: ctiStomp.userAddress,
+            calledAddress: cleanedNumber,
+            callingDeviceName: registeredDevice.deviceName,
+            callingDeviceType: registeredDevice.deviceType,
+          },
+        );
+      }
+    } else {
+      result = await makeCallAPI({
+        callingAddress: deviceInfo.callingAddress,
+        calledAddress: cleanedNumber,
+        callingDeviceType: deviceInfo.callingDeviceType,
+        callingDeviceName: deviceInfo.callingDeviceName,
+      });
+      if (result.success && result.data) {
+        registerPendingOutboundAfterDialSuccess(
+          setPendingOutboundByCallId,
+          result.data,
+          {
+            callingAddress: deviceInfo.callingAddress,
+            calledAddress: cleanedNumber,
+            callingDeviceName: deviceInfo.callingDeviceName,
+            callingDeviceType: deviceInfo.callingDeviceType,
+          },
+        );
+      }
     }
-    
-    // Use the device info we got
-    return await makeCallAPI({
-      callingAddress: deviceInfo.callingAddress,
-      calledAddress: cleanedNumber,
-      callingDeviceType: deviceInfo.callingDeviceType,
-      callingDeviceName: deviceInfo.callingDeviceName
-    });
+    return result;
   }, [ctiStomp.userAddress, ctiStomp.dnsMap, canDialNumber]);
 
   // Simplified dial function - just takes phone number

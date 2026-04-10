@@ -53,10 +53,17 @@ export function shouldDismissIncomingModalForAnsweredElsewhere(
   return active.callId === incoming.callId;
 }
 
-/** Dismiss incoming UI on DISCONNECTED/DROPPED/ENDED only when call ids clearly match (avoids transfer leg mixups). */
+/**
+ * Dismiss incoming UI on terminal events when the event clearly refers to this session.
+ * - **ENDED**: same reliable `callId` is enough.
+ * - **DISCONNECTED / DROPPED**: same `callId` and the party’s **calledAddress** must match our
+ *   incoming callee DN (digit-tailed), so a consult/transfer leg dropping on another DN does not
+ *   close a still-ringing primary offer.
+ */
 export function shouldCloseIncomingModalOnCallEndEvent(
   eventData: CtiCallPartyLike,
   incoming: IncomingCallMatchable,
+  eventType?: string,
 ): boolean {
   if (
     !hasReliableCtiCallId(eventData.callId) ||
@@ -64,7 +71,17 @@ export function shouldCloseIncomingModalOnCallEndEvent(
   ) {
     return false;
   }
-  return eventData.callId === incoming.callId;
+  if (eventData.callId !== incoming.callId) {
+    return false;
+  }
+  const et = (eventType ?? "").toUpperCase();
+  if (et === "DISCONNECTED" || et === "DROPPED") {
+    return addressesMatchForAttend(
+      eventData.calledAddress,
+      incoming.calledAddress,
+    );
+  }
+  return true;
 }
 
 /** Rows from CTI `activeCalls` include normalized `status` (see CtiContext `mapCtiCallStatusToLocalStatus`). */
