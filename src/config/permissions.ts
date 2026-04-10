@@ -42,11 +42,11 @@ export const routePermissions: RoutePermission[] = [
     {path:'/faqs/types',permissions: [PERMISSIONS.MANAGE_HELP_CENTER]},
     {
         path: '/main-settings',
-        permissions: [PERMISSIONS.VIEW_SETTINGS],
+        permissions: [PERMISSIONS.GENERAL_SERVICES],
         children: [
-            { path: '/general-prefs', permissions: [PERMISSIONS.VIEW_SETTINGS] },
+            { path: '/general-prefs', permissions: [PERMISSIONS.GENERAL_SERVICES] },
             { path: '/notifications', permissions: [PERMISSIONS.VIEW_USER_NOTIFICATIONS] },
-            { path: '/account-defaults', permissions: [PERMISSIONS.VIEW_SETTINGS] },
+            { path: '/account-defaults', permissions: [PERMISSIONS.GENERAL_SERVICES] },
             { path: '/users-teams', permissions: [PERMISSIONS.CONTROL_HUB_SERVICES] },
             { path: '/smart-crm', permissions: [PERMISSIONS.CRM_SERVICES] },
             { path: '/communications', permissions: [PERMISSIONS.COMMUNICATIONS_SERVICES] },
