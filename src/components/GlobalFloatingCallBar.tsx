@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import type { CSSProperties } from "react";
 import { useCti } from "../contexts/CtiContext";
 import { getRemotePartyDnForTransfer } from "../utils/dialer";
@@ -28,6 +28,28 @@ import {
 
 type FloatingBarCtiResult = { success: boolean; error?: unknown };
 
+const FLOATING_BAR_VIEWPORT_GUTTER_PX = 12;
+
+function clampFloatingBarPositionToViewport(
+  pos: { x: number; y: number },
+  barWidth: number,
+  barHeight: number,
+  margin = 8,
+): { x: number; y: number } {
+  const win = globalThis.window;
+  if (win === undefined || barWidth <= 0 || barHeight <= 0) {
+    return pos;
+  }
+  const vw = win.innerWidth;
+  const vh = win.innerHeight;
+  const maxX = Math.max(margin, vw - barWidth - margin);
+  const maxY = Math.max(margin, vh - barHeight - margin);
+  return {
+    x: Math.min(Math.max(margin, pos.x), maxX),
+    y: Math.min(Math.max(margin, pos.y), maxY),
+  };
+}
+
 function buildFloatingBarPositionStyles(
   barPosition: { x: number; y: number } | null,
   isDragging: boolean,
@@ -48,9 +70,10 @@ function buildFloatingBarPositionStyles(
     opacity: 1,
     borderRadius: "1.5rem",
     padding: "0.5rem 1rem",
-    gap: "1rem",
-    minWidth: "320px",
-    maxWidth: "625px",
+    gap: "clamp(0.5rem, 2vw, 1rem)",
+    boxSizing: "border-box",
+    minWidth: `min(320px, calc(100vw - ${FLOATING_BAR_VIEWPORT_GUTTER_PX * 2}px))`,
+    maxWidth: `min(625px, calc(100vw - ${FLOATING_BAR_VIEWPORT_GUTTER_PX * 2}px))`,
     width: "auto",
   };
 
@@ -67,12 +90,9 @@ function buildFloatingBarPositionStyles(
   if (barPosition) {
     return { ...anchored, left: `${barPosition.x}px`, top: `${barPosition.y}px` };
   }
+  /* Default anchor: position comes from `.global-floating-call-bar-default-anchor` for responsiveness */
   return {
     ...baseStyles,
-    top: "15px",
-    right: "15rem",
-    left: "auto",
-    bottom: "auto",
     transform: "none",
   };
 }
@@ -120,6 +140,32 @@ const floatingBarStyles = `
     list-style: none;
     /* Position is controlled by inline styles from sectionStyle so drag-snap is respected */
     box-shadow:0px 2px 5px #c7c0c0 !important;
+  }
+
+  /* Responsive default placement (no custom drag position) */
+  .global-floating-call-bar.global-floating-call-bar-default-anchor {
+    top: max(12px, env(safe-area-inset-top, 0px));
+    right: clamp(12px, 4vw, 15rem);
+    left: auto;
+    bottom: auto;
+  }
+
+  @media (max-width: 768px) {
+    .global-floating-call-bar.global-floating-call-bar-default-anchor {
+      right: max(12px, env(safe-area-inset-right, 0px));
+      left: max(12px, env(safe-area-inset-left, 0px));
+      width: calc(100vw - 24px);
+      max-width: min(625px, calc(100vw - 24px));
+      min-width: 0;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .global-floating-call-bar.global-floating-call-bar-default-anchor {
+      padding: 0.4rem 0.65rem;
+      gap: 0.5rem;
+      border-radius: 1rem;
+    }
   }
   .global-floating-call-bar * {
     list-style: none;
@@ -252,6 +298,20 @@ const GlobalFloatingCallBar: React.FC = () => {
   const barRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
   const lastDragPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const prevFloatingBarActiveCallIdRef = useRef<string | undefined>(undefined);
+
+  const resetFloatingBarAnchorToDefault = useCallback(() => {
+    setBarPosition(null);
+    setDragPosition(null);
+    setIsDragging(false);
+    isDraggingRef.current = false;
+    lastDragPositionRef.current = null;
+    try {
+      localStorage.removeItem("callBarPosition");
+    } catch {
+      // ignore storage failures (private mode, quota)
+    }
+  }, []);
 
   // Load saved position from localStorage (free x,y or legacy edge key)
   useEffect(() => {
@@ -267,10 +327,16 @@ const GlobalFloatingCallBar: React.FC = () => {
     }
   }, []);
 
-  // Save position to localStorage
+  // Persist custom drag position; clear storage when using default anchor
   useEffect(() => {
-    if (barPosition) {
-      localStorage.setItem("callBarPosition", JSON.stringify(barPosition));
+    try {
+      if (barPosition) {
+        localStorage.setItem("callBarPosition", JSON.stringify(barPosition));
+      } else {
+        localStorage.removeItem("callBarPosition");
+      }
+    } catch {
+      // ignore storage failures
     }
   }, [barPosition]);
 
@@ -306,8 +372,9 @@ const GlobalFloatingCallBar: React.FC = () => {
     const barRect = barRef.current.getBoundingClientRect();
     setDragPosition(null);
     setIsDragging(false);
-    const saved = lastDragPositionRef.current ?? { x: barRect.left, y: barRect.top };
+    const raw = lastDragPositionRef.current ?? { x: barRect.left, y: barRect.top };
     lastDragPositionRef.current = null;
+    const saved = clampFloatingBarPositionToViewport(raw, barRect.width, barRect.height);
     setBarPosition(saved);
   }, []);
 
@@ -318,7 +385,11 @@ const GlobalFloatingCallBar: React.FC = () => {
     const handleMouseMove = (e: MouseEvent) => {
       const newLeft = e.clientX - dragStart.x;
       const newTop = e.clientY - dragStart.y;
-      const pos = { x: newLeft, y: newTop };
+      let pos = { x: newLeft, y: newTop };
+      if (barRef.current) {
+        const { width, height } = barRef.current.getBoundingClientRect();
+        pos = clampFloatingBarPositionToViewport(pos, width, height);
+      }
       lastDragPositionRef.current = pos;
       setDragPosition(pos);
     };
@@ -376,6 +447,79 @@ const GlobalFloatingCallBar: React.FC = () => {
     Boolean(activeCall) &&
     !showIncomingCallModalFromContext &&
     !incomingCallFromContext;
+
+  const incomingSessionCallId =
+    incomingCallFromContext?.callId ?? incomingCall?.callId ?? undefined;
+
+  /** Last floating-bar visibility while not in an incoming session (to avoid clearing drag position mid-call). */
+  const barVisibleBeforeIncomingRef = useRef(false);
+  useEffect(() => {
+    if (!incomingSessionCallId) {
+      barVisibleBeforeIncomingRef.current = floatingBarVisible;
+    }
+  }, [floatingBarVisible, incomingSessionCallId]);
+
+  // New inbound session while idle: default anchor when the incoming modal opens (calledAddress === userAddress).
+  // Supervisors/queues often get events where calledAddress !== userAddress, so this alone misses them — see
+  // activeCall lifecycle reset below.
+  useEffect(() => {
+    if (!incomingSessionCallId) {
+      return;
+    }
+    if (barVisibleBeforeIncomingRef.current) {
+      return;
+    }
+    resetFloatingBarAnchorToDefault();
+  }, [incomingSessionCallId, resetFloatingBarAnchorToDefault]);
+
+  // When the call shown on the floating bar ends, clear custom position so the next call uses the default
+  // anchor (covers supervisor/queue legs that never open IncomingCallContext).
+  useEffect(() => {
+    const id = activeCall?.callId;
+    const prev = prevFloatingBarActiveCallIdRef.current;
+    prevFloatingBarActiveCallIdRef.current = id;
+    if (!prev || id) {
+      return;
+    }
+    resetFloatingBarAnchorToDefault();
+  }, [activeCall?.callId, resetFloatingBarAnchorToDefault]);
+
+  const useDefaultFloatingBarAnchor =
+    !barPosition && !isDragging && !dragPosition;
+
+  // Keep a saved drag position on-screen after resize or when the bar becomes visible
+  useLayoutEffect(() => {
+    if (!floatingBarVisible || !barPosition || !barRef.current) {
+      return;
+    }
+    const { width, height } = barRef.current.getBoundingClientRect();
+    const next = clampFloatingBarPositionToViewport(barPosition, width, height);
+    if (next.x !== barPosition.x || next.y !== barPosition.y) {
+      setBarPosition(next);
+    }
+  }, [floatingBarVisible, barPosition, activeCall?.callId]);
+
+  useEffect(() => {
+    const onResize = () => {
+      setBarPosition((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const el = barRef.current;
+        if (!el) {
+          return prev;
+        }
+        const { width, height } = el.getBoundingClientRect();
+        const next = clampFloatingBarPositionToViewport(prev, width, height);
+        if (next.x === prev.x && next.y === prev.y) {
+          return prev;
+        }
+        return next;
+      });
+    };
+    globalThis.window.addEventListener("resize", onResize);
+    return () => globalThis.window.removeEventListener("resize", onResize);
+  }, []);
 
   const closeTransferModal = useCallback(() => {
     setShowTransferModal(false);
@@ -496,6 +640,7 @@ const GlobalFloatingCallBar: React.FC = () => {
             barRef={barRef}
             isDragging={isDragging}
             dragPosition={dragPosition}
+            defaultAnchored={useDefaultFloatingBarAnchor}
             sectionStyle={sectionStyle}
             onDragStart={handleDragStart}
             activeCall={activeCall}
