@@ -12,15 +12,16 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import axiosInstance from "@utils/axios";
 import GenericTable, {
   FilterPill,
+  TabConfig,
   TableColumn,
   ToolbarConfig,
 } from "@components/GenericTable";
+import { StatsCardData } from "@components/GenericStatsCards";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import { Row, Col, Card, Form, Button, Badge, Popover, OverlayTrigger } from 'react-bootstrap';
-import { TrendingUp, Shield, RefreshCw, XCircle, Clock, Phone } from 'lucide-react';
-import { LineChart, Line, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+import { Form, Button, Badge, Popover, OverlayTrigger } from 'react-bootstrap';
+import { Phone } from 'lucide-react';
 
 
 // API Response Types
@@ -143,7 +144,7 @@ function buildCdrQueryParams(
   const params: Record<string, string | number | boolean> = {
     page: currentPage,
     per_page: recordsPerPage,
-    include_statistics: false,
+    include_statistics: true,
   };
 
   if (filters.search) params.search = filters.search;
@@ -288,45 +289,6 @@ const PhoneContainer = ({ phone, onClick }: { phone: string; onClick?: () => voi
   );
 };
 
-// Component definitions moved outside
-const StatCard: React.FC<{ icon: React.ReactNode; title: string; value: string | number; subtitle?: string; chart?: React.ReactNode; bgClass?: string }> = ({ icon, title, value, subtitle, chart, bgClass = '' }) => (
-  <Card className={`border stat-card-responsive ${bgClass}`} style={{ backgroundColor: '#ffffff', borderRadius: '12px', borderColor: '#dee2e6' }}>
-    <Card.Body className="p-3 d-flex flex-column">
-      <div className="d-flex align-items-center mb-2">
-        <div style={{ color: '#10b981' }} className="me-2">{icon}</div>
-        <div style={{ color: '#6c757d', fontSize: '0.875rem' }}>{title}</div>
-      </div>
-      <div className="mb-2">
-        <div style={{ fontSize: '2rem', fontWeight: '600', color: '#212529' }}>{value}</div>
-        {subtitle && <div style={{ color: '#6c757d', fontSize: '0.75rem' }}>{subtitle}</div>}
-      </div>
-      {chart && <div className="mt-auto" style={{ width: '100%', height: '55px', marginTop: '12px' }}>{chart}</div>}
-    </Card.Body>
-  </Card>
-);
-
-const MetricCard: React.FC<{ icon: React.ReactNode; title: string; items: Array<{ label: string; value: string | number; color?: string }>; chart?: React.ReactNode; bgGradient?: string }> = ({ icon, title, items, chart, bgGradient = '' }) => (
-  <Card className="stat-card-responsive border" style={{ backgroundColor: '#ffffff', borderRadius: '12px', background: bgGradient || '#ffffff', borderColor: '#dee2e6' }}>
-    <Card.Body className="p-3">
-      <div className="d-flex align-items-center mb-3">
-        <div style={{ color: '#f59e0b' }} className="me-2">{icon}</div>
-        <div style={{ color: '#6c757d', fontSize: '0.875rem' }}>{title}</div>
-      </div>
-      <div className="d-flex justify-content-between align-items-center">
-        <div>
-          {items.map((item, idx) => (
-            <div key={`item-${item.label}-${idx}`} className="mb-2">
-              <div style={{ color: '#6c757d', fontSize: '0.75rem' }}>{item.label}</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: item.color || '#212529' }}>{item.value}</div>
-            </div>
-          ))}
-        </div>
-        {chart && <div style={{ width: '120px', height: '120px' }}>{chart}</div>}
-      </div>
-    </Card.Body>
-  </Card>
-);
-
 const CDRRecords = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [recordsPerPage, setRecordsPerPage] = useState(25);
@@ -461,28 +423,9 @@ const CDRRecords = () => {
 
   // Calculate stats from API data
   const calculateStats = () => {
-    if (!apiData || apiData.length === 0) {
-      return {
-        totalRecords: 0,
-        localDNDNotChecked: 0,
-        localDNDAllowed: 0,
-        repetitionAllowed: 0,
-        repetitionNotAllowed: 0,
-        dncrApiFalse: 0,
-        dncrApiTrue: 0,
-        allowLocalDNCLTrue: 0,
-        allowLocalDNCLFalse: 0,
-        allowApiDNCLTrue: 0,
-        allowApiDNCLFalse: 0,
-        allowRepetitionTrue: 0,
-        allowRepetitionFalse: 0,
-        avgTime: 0
-      };
-    }
-
-    // Use statistics.this_month data if available, otherwise fallback to calculated stats
+    // Use statistics.this_month data if available (preferred)
     const thisMonthStats = statistics?.this_month;
-    
+
     if (thisMonthStats) {
       return {
         totalRecords: thisMonthStats.total_calls || 0,
@@ -503,7 +446,30 @@ const CDRRecords = () => {
         totalTime: 0,
         avgTime: thisMonthStats.performance?.avg_time_ms || 0,
         minTime: thisMonthStats.performance?.min_time_ms || 0,
-        maxTime: thisMonthStats.performance?.max_time_ms || 0
+        maxTime: thisMonthStats.performance?.max_time_ms || 0,
+      };
+    }
+
+    if (!apiData || apiData.length === 0) {
+      return {
+        totalRecords: metadata?.total_records || 0,
+        localDNDNotChecked: 0,
+        localDNDAllowed: 0,
+        localDNDBlocked: 0,
+        repetitionAllowed: 0,
+        repetitionNotAllowed: 0,
+        repetitionNotChecked: 0,
+        dncrApiFalse: 0,
+        dncrApiTrue: 0,
+        dncrApiNotChecked: 0,
+        dncrApiInvalid: 0,
+        dncrApiNone: 0,
+        dncrApiError: 0,
+        allowLocalDNCLTrue: 0,
+        allowLocalDNCLFalse: 0,
+        avgTime: 0,
+        minTime: 0,
+        maxTime: 0,
       };
     }
 
@@ -574,21 +540,43 @@ const CDRRecords = () => {
 
   const stats = calculateStats();
 
-  // Generate chart data (simplified - using current data)
-  const trendData = Array.from({ length: 11 }, () => ({ value: stats.totalRecords }));
-  const dncApiTrendData = Array.from({ length: 11 }, () => ({ value: stats.dncrApiFalse }));
-  const avgTimeTrendData = Array.from({ length: 11 }, () => ({ value: Math.round(stats.avgTime) }));
-
-  const repetitionData = [
-    { name: 'Blocked', value: stats.repetitionNotAllowed || 0, color: '#ef4444' },
-    { name: 'Allowed', value: stats.repetitionAllowed || 0, color: '#10b981' },
-    { name: 'Not Checked', value: stats.repetitionNotChecked || 0, color: '#6c757d' }
-  ];
-
   // Map API data to UI format
   const mappedData: MappedCDRRecord[] = apiData.map(mapRecordToUI);
 
   const totalRecords = metadata?.total_records || 0;
+
+  const statsCards: StatsCardData[] = [
+    {
+      title: "Total Records",
+      value: stats.totalRecords.toLocaleString(),
+      subtitle: "This month",
+    },
+    {
+      title: "Local DND — Allowed",
+      value: stats.localDNDAllowed || 0,
+      subtitle: `Blocked: ${stats.localDNDBlocked || 0} · Not Checked: ${stats.localDNDNotChecked || 0}`,
+    },
+    {
+      title: "Repetition — Allowed",
+      value: stats.repetitionAllowed || 0,
+      subtitle: `Blocked: ${stats.repetitionNotAllowed || 0} · Not Checked: ${stats.repetitionNotChecked || 0}`,
+    },
+    {
+      title: "DNCR API — Allowed",
+      value: stats.dncrApiFalse || 0,
+      subtitle: `Blocked: ${stats.dncrApiTrue || 0} · Not Checked: ${stats.dncrApiNotChecked || 0}`,
+    },
+    {
+      title: "Avg Response Time",
+      value: `${(stats.avgTime || 0).toFixed(1)}ms`,
+      subtitle: `Min ${(stats.minTime || 0).toFixed(1)}ms / Max ${(stats.maxTime || 0).toFixed(1)}ms`,
+    },
+  ];
+
+  const cdrTabs = useMemo<TabConfig[]>(
+    () => [{ id: "cdr-records", label: "CDR Records", count: totalRecords, removable: false }],
+    [totalRecords],
+  );
 
   // Apply filters handler
   const handleApplyFilters = () => {
@@ -862,44 +850,25 @@ const CDRRecords = () => {
       searchPlaceholder: 'Search (across all fields)',
       onSearchChange: setSearchQuery,
       onSearch: handleApplyFilters,
+      showTabs: true,
+      tabs: cdrTabs,
+      activeTab: 'cdr-records',
+      onTabChange: () => {},
       showFilterPills: true,
       filterPills,
       showMoreFiltersButton: false,
       customActions: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Button
-            variant="light"
-            onClick={handleResetFilters}
-            style={{
-              backgroundColor: '#ffffff',
-              border: '1px solid #dee2e6',
-              borderRadius: '8px',
-              color: '#212529',
-              height: '33px',
-              fontSize: '0.875rem',
-              padding: '0 12px',
-            }}
-          >
+        <div className="d-flex align-items-center gap-2 flex-wrap cdr-toolbar-buttons">
+          <button type="button" className="cdr-btn cdr-btn-outline" onClick={handleResetFilters}>
             Reset
-          </Button>
-          <Button
-            onClick={handleApplyFilters}
-            style={{
-              backgroundColor: '#4f46e5',
-              border: 'none',
-              borderRadius: '8px',
-              color: '#ffffff',
-              height: '33px',
-              fontSize: '0.875rem',
-              padding: '0 12px',
-            }}
-          >
+          </button>
+          <button type="button" className="cdr-btn" onClick={handleApplyFilters}>
             Apply Filters
-          </Button>
+          </button>
         </div>
       ),
     }),
-    [searchQuery, filterPills],
+    [searchQuery, filterPills, cdrTabs],
   );
 
   const cdrColumns = useMemo<TableColumn<MappedCDRRecord>[]>(
@@ -997,276 +966,72 @@ const CDRRecords = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="CDR Records" />
 
-      
-        {/* Header */}
-        <div className="mb-4">
-          <h4 style={{ color: '#212529', fontWeight: '600' }}>
-            CDR Records <span style={{ color: '#6c757d' }}>— Compliance Checks</span>
-          </h4>
-        </div>
+      <GenericTable<MappedCDRRecord>
+        data={mappedData}
+        columns={cdrColumns}
+        loading={loading}
+        loadingMessage="Loading CDR records..."
+        emptyMessage={error ? <span style={{ color: '#dc3545' }}>{error}</span> : 'No records found matching your filters'}
+        uniqueKey="id"
+        pagination={{
+          currentPage,
+          rowsPerPage: recordsPerPage,
+          totalRows: totalRecords,
+          pageSizeOptions: [25, 50, 100],
+        }}
+        onPaginationChange={(page, rowsPerPageValue) => {
+          if (rowsPerPageValue !== recordsPerPage) {
+            handleRecordsPerPageChange(rowsPerPageValue);
+            return;
+          }
+          setCurrentPage(page);
+        }}
+        showToolbar={true}
+        toolbar={toolbarConfig}
+        showToolbarActions={false}
+        showActions={false}
+        statsCards={statsCards}
+        metricsGridMinWidth="200px"
+      />
 
-        {/* Stats Cards Row */}
-        <Row className="g-3 mb-4">
-          <Col >
-          <style>{`
-      .stat-card-responsive {
-        min-height: auto;
-      }
-
-      /* Desktop and up */
-@media (min-width: 992px) { /* lg breakpoint */
-  .stat-card-responsive {
-    min-height: 195px; /* adjust as needed */
-  }
-}
+      <style jsx global>{`
+        .cdr-btn {
+          padding: 9px 13px;
+          background-color: rgb(0, 0, 0);
+          color: rgb(255, 255, 255);
+          border: none;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-height: 32px;
+          line-height: 1;
+        }
+        .cdr-btn:hover,
+        .cdr-btn:focus {
+          background-color: rgb(0, 0, 0);
+          color: rgb(255, 255, 255);
+          opacity: 0.92;
+        }
+        .cdr-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+        .cdr-btn-outline {
+          background-color: rgb(255, 255, 255);
+          color: rgb(0, 0, 0);
+          border: 1px solid rgb(0, 0, 0);
+        }
+        .cdr-btn-outline:hover,
+        .cdr-btn-outline:focus {
+          background-color: rgb(255, 255, 255);
+          color: rgb(0, 0, 0);
+          opacity: 0.85;
+        }
       `}</style>
-            <StatCard
-              icon={<TrendingUp size={20} />}
-              title="Total Records"
-              value={stats.totalRecords.toLocaleString()}
-              chart={
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData}>
-                    <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              }
-            />
-          </Col>
-          <Col >
-            <MetricCard
-              icon={<Shield size={20} />}
-              title="Local DND"
-              items={[
-                { 
-                  label: 'Not Checked', 
-                  value: stats.localDNDNotChecked || 0,
-                  color: '#212529' 
-                },
-                { 
-                  label: 'Allowed', 
-                  value: stats.localDNDAllowed || 0,
-                  color: '#10b981' 
-                },
-                { 
-                  label: 'Blocked', 
-                  value: stats.localDNDBlocked || 0,
-                  color: '#ef4444' 
-                }
-              ]}
-              bgGradient="linear-gradient(135deg, #ffffff 0%, #fff5f0 100%)"
-            />
-          </Col>
-          <Col >
-            <MetricCard
-              icon={<RefreshCw size={20} />}
-              title="Repetition"
-              items={[
-                { 
-                  label: 'Allowed', 
-                  value: stats.repetitionAllowed || 0,
-                  color: '#10b981' 
-                },
-                { 
-                  label: 'Blocked', 
-                  value: stats.repetitionNotAllowed || 0,
-                  color: '#ef4444' 
-                },
-                { 
-                  label: 'Not Checked', 
-                  value: stats.repetitionNotChecked || 0,
-                  color: '#6c757d' 
-                }
-              ]}
-              chart={
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={repetitionData} dataKey="value" cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={2}>
-                      {repetitionData.map((entry) => (
-                        <Cell key={`cell-${entry.name}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              }
-            />
-          </Col>
-          <Col >
-            <MetricCard
-              icon={<XCircle size={20} />}
-              title="DNCR API"
-              items={[
-                { 
-                  label: 'Allowed', 
-                  value: stats.dncrApiFalse || 0,
-                  color: '#10b981' 
-                },
-                { 
-                  label: 'Blocked', 
-                  value: stats.dncrApiTrue || 0,
-                  color: '#ef4444' 
-                },
-                { 
-                  label: 'Not Checked', 
-                  value: stats.dncrApiNotChecked || 0,
-                  color: '#6c757d' 
-                },
-              ]}
-              chart={
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={dncApiTrendData}>
-                    <Line type="monotone" dataKey="value" stroke="#ef4444" strokeWidth={3} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              }
-              bgGradient="linear-gradient(135deg, #ffffff 0%, #fef2f2 100%)"
-            />
-          </Col>
-          {/* <Col xs={12} sm={6} lg={2}>
-            <MetricCard
-              icon={<X size={20} />}
-              title="Allow Local DNCL"
-              items={[
-                { 
-                  label: 'TRUE', 
-                  value: stats.totalRecords > 0 
-                    ? `${Math.round((stats.allowLocalDNCLTrue / stats.totalRecords) * 100)}%` 
-                    : '0%', 
-                  color: '#212529' 
-                }
-              ]}
-              chart={
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={allowLocalDNCLData} dataKey="value" cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={2}>
-                      {allowLocalDNCLData.map((entry) => (
-                        <Cell key={`cell-${entry.name}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              }
-              bgGradient="linear-gradient(135deg, #ffffff 0%, #f5f0ff 100%)"
-            />
-          </Col> */}
-          <Col >
-            <MetricCard
-              icon={<Clock size={20} />}
-              title="Performance"
-              items={[
-                { 
-                  label: 'Avg Time', 
-                  value: `${(stats.avgTime || 0).toFixed(1)}ms`,
-                  color: '#8b5cf6' 
-                },
-                { 
-                  label: 'Min Time', 
-                  value: `${(stats.minTime || 0).toFixed(1)}ms`,
-                  color: '#10b981' 
-                },
-                { 
-                  label: 'Max Time', 
-                  value: `${(stats.maxTime || 0).toFixed(1)}ms`,
-                  color: '#ef4444' 
-                }
-              ]}
-              chart={
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={avgTimeTrendData}>
-                    <Line type="monotone" dataKey="value" stroke="#8b5cf6" strokeWidth={3} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              }
-              bgGradient="linear-gradient(135deg, #ffffff 0%, #f5f3ff 100%)"
-            />
-          </Col>
-        </Row>
-
-        <div className="mb-3" />
-
-        {/* Active Filters Display */}
-        {(appliedFilters.search || appliedFilters.calling_number || appliedFilters.called_number || 
-          appliedFilters.user_id || appliedFilters.call_repetition_status || 
-          appliedFilters.local_dnd_status || appliedFilters.dncr_api_status ||
-          appliedFilters.date_from || appliedFilters.date_to) && (
-          <div className="mb-3 px-2">
-            <div className="d-flex gap-2 align-items-center flex-wrap">
-              <span style={{ color: '#6c757d', fontSize: '0.875rem' }}>Active Filters:</span>
-              {appliedFilters.search && (
-                <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  Search: {appliedFilters.search}
-                </span>
-              )}
-              {appliedFilters.calling_number && (
-                <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  Calling: {appliedFilters.calling_number}
-                </span>
-              )}
-              {appliedFilters.called_number && (
-                <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  Called: {appliedFilters.called_number}
-                </span>
-              )}
-              {appliedFilters.user_id && (
-                <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  User: {appliedFilters.user_id}
-                </span>
-              )}
-              {appliedFilters.call_repetition_status && (
-                <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  Repetition: {appliedFilters.call_repetition_status}
-                </span>
-              )}
-              {appliedFilters.local_dnd_status && (
-                <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  Local DND: {appliedFilters.local_dnd_status}
-                </span>
-              )}
-              {appliedFilters.dncr_api_status && (
-                <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  DNCR API: {dncrApiStatusLabels[appliedFilters.dncr_api_status] || appliedFilters.dncr_api_status}
-                </span>
-              )}
-              {appliedFilters.date_from && (
-                <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  From: {appliedFilters.date_from}
-                </span>
-              )}
-              {appliedFilters.date_to && (
-                <span style={{ backgroundColor: '#e0e7ff', color: '#4f46e5', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem' }}>
-                  To: {appliedFilters.date_to}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-
-        <GenericTable<MappedCDRRecord>
-          data={mappedData}
-          columns={cdrColumns}
-          loading={loading}
-          loadingMessage="Loading CDR records..."
-          emptyMessage={error ? <span style={{ color: '#dc3545' }}>{error}</span> : 'No records found matching your filters'}
-          uniqueKey="id"
-          pagination={{
-            currentPage,
-            rowsPerPage: recordsPerPage,
-            totalRows: totalRecords,
-            pageSizeOptions: [25, 50, 100],
-          }}
-          onPaginationChange={(page, rowsPerPageValue) => {
-            if (rowsPerPageValue !== recordsPerPage) {
-              handleRecordsPerPageChange(rowsPerPageValue);
-              return;
-            }
-            setCurrentPage(page);
-          }}
-          showToolbar={true}
-          toolbar={toolbarConfig}
-          showToolbarActions={false}
-          showActions={false}
-        />
-
     </React.Fragment>
   );
 };

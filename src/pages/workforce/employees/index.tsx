@@ -1,12 +1,13 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import EmployeeDetailSidebar from "@components/employee-sidebar";
+import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import AddEmployeeModal from "@pages/workforce/AddEmployeeModal";
 import EditEmployeeModal from "@pages/workforce/EditEmployeeModal";
+
 import {
   getUserProfiles,
   getUserProfile,
@@ -20,19 +21,19 @@ import {
 import { useMainAppLookups, type MainAppUserLookup } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Button, Form, Modal } from "react-bootstrap";
-import GenericTable, { TableAction, TableColumn } from "@components/GenericTable";
+import GenericTable, { FilterPill, TabConfig, TableAction, TableColumn, ToolbarConfig } from "@components/GenericTable";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import { Search, ChevronDown, Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
+import { Plus, Pencil, Trash2, User, Calendar } from "lucide-react";
 import moment from "moment";
 import { GlobalDateTimeFormat } from "@utils/Helper";
 import { formatPhoneForDisplay } from "@utils/phoneDisplay";
-import Select from "react-select";
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
+const EMPLOYEE_STATUS_OPTIONS = ["Active", "Inactive"];
 
 /** Dashboard counters API response shape */
 interface EmployeeDashboardCountersData {
@@ -270,12 +271,96 @@ function journeyStartDateMinIso(profile: UserProfile | null | undefined): string
   return moment.max(todayM, createdM).format("YYYY-MM-DD");
 }
 
+function ManagerFilterPillContent({
+  managers,
+  selectedManagerIds,
+  onToggle,
+  closeMenu,
+}: Readonly<{
+  managers: MainAppUserLookup[];
+  selectedManagerIds: string[];
+  onToggle: (idStr: string, isSelected: boolean) => void;
+  closeMenu: () => void;
+}>) {
+  const [query, setQuery] = useState("");
+
+  const filteredManagers = useMemo(
+    () =>
+      managers.filter((mgr: MainAppUserLookup) => {
+        if (userIdForProfilePayload(mgr) === "") return false;
+        const label = hierarchyLabel(mgr);
+        return !query.trim() || label.toLowerCase().includes(query.trim().toLowerCase());
+      }),
+    [managers, query],
+  );
+
+  return (
+    <div style={{ minWidth: "260px", maxHeight: "320px", overflow: "hidden" }}>
+      <div className="p-2 border-bottom">
+        <input
+          type="text"
+          className="form-control form-control-sm"
+          placeholder="Search user..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          autoFocus
+        />
+      </div>
+      <div style={{ maxHeight: "220px", overflowY: "auto" }}>
+        <button
+          type="button"
+          className="dropdown-item"
+          onClick={() => closeMenu()}
+        >
+          Done
+        </button>
+        {filteredManagers.map((mgr: MainAppUserLookup) => {
+          const label = hierarchyLabel(mgr);
+          const userIdStr = userIdForProfilePayload(mgr);
+          const isSelected = selectedManagerIds.includes(userIdStr);
+          return (
+            <button
+              type="button"
+              key={String(mgr.id)}
+              className="dropdown-item d-flex align-items-center gap-2"
+              onClick={() => onToggle(userIdStr, isSelected)}
+              style={{ backgroundColor: isSelected ? "#eef2ff" : undefined }}
+            >
+              <span style={{ width: "16px" }}>{isSelected ? "✓" : ""}</span>
+              <span>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function UsersPillDropdownContent({
+  closeMenu,
+  managers,
+  selectedManagerIds,
+  onToggle,
+}: Readonly<{
+  closeMenu: () => void;
+  managers: MainAppUserLookup[];
+  selectedManagerIds: string[];
+  onToggle: (idStr: string, isSelected: boolean) => void;
+}>) {
+  return (
+    <ManagerFilterPillContent
+      managers={managers}
+      selectedManagerIds={selectedManagerIds}
+      onToggle={onToggle}
+      closeMenu={closeMenu}
+    />
+  );
+}
+
 const Employees = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const { mainAppDepartments, mainAppUsers, companyIdentifier } = useMainAppLookups();
-
-  const filtersRef = useRef<HTMLDivElement>(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDepartment, setSelectedDepartment] = useState("");
@@ -294,9 +379,6 @@ const Employees = () => {
   const [appliedManagerIds, setAppliedManagerIds] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [departmentSearchTerm, setDepartmentSearchTerm] = useState("");
-  const [managerSearchTerm, setManagerSearchTerm] = useState("");
   const [selectedProfile, setSelectedProfile] = useState<UserProfile | null>(null);
 
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -436,29 +518,6 @@ const Employees = () => {
     return () => { cancelled = true; };
   }, [router.isReady, router.query.openId]);
 
-  const loadProfilesRef = useRef(loadProfiles);
-  loadProfilesRef.current = loadProfiles;
-
-  const toggleDropdown = useCallback((dropdown: string) => {
-    setOpenDropdown((current) => (current === dropdown ? null : dropdown));
-  }, []);
-
-  useEffect(() => {
-    if (openDropdown == null) return;
-    const handler = (e: MouseEvent) => {
-      const root = filtersRef.current;
-      if (!root) {
-        setOpenDropdown(null);
-        return;
-      }
-      const target = e.target as Node | null;
-      if (target && root.contains(target)) return;
-      setOpenDropdown(null);
-    };
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
-  }, [openDropdown]);
-
   const handleProfileClick = useCallback(async (profile: UserProfile) => {
     try {
       const fullProfile = await getUserProfile(profile.id);
@@ -541,7 +600,8 @@ const Employees = () => {
     if (userId != null && mainAppUsers.length > 0) {
       const uid = String(userId);
       const mainUser =
-        mainAppUsers.find((u) => String(u.phone) === uid) ?? mainAppUsers.find((u) => String(u.id) === uid);
+        mainAppUsers.find((u: MainAppUserLookup) => String(u.phone) === uid) ??
+        mainAppUsers.find((u: MainAppUserLookup) => String(u.id) === uid);
       if (mainUser?.name) return mainUser.name;
     }
     return String((p as UserProfile & { name?: string }).name ?? p.user_id ?? p.employee_code ?? p.id ?? "—");
@@ -580,23 +640,6 @@ const Employees = () => {
   const filteredProfiles = profiles;
 
   const departments = mainAppDepartments ?? [];
-  const statuses = ["Active", "Inactive"];
-  
-  /** Resolve department id to display label (for dropdown button and filter chip) */
-  const selectedDepartmentLabel = useMemo(() => {
-    if (selectedDepartment === "") return "";
-    const d = departments.find((d: MainAppDepartment) => String((d as { id?: number }).id) === selectedDepartment);
-    if (d == null) return selectedDepartment;
-    return hierarchyLabel(d);
-  }, [selectedDepartment, departments]);
-
-  const appliedDepartmentLabel = useMemo(() => {
-    if (appliedDepartment === "") return "";
-    const d = departments.find((d: MainAppDepartment) => String((d as { id?: number }).id) === appliedDepartment);
-    if (d == null) return appliedDepartment;
-    return hierarchyLabel(d);
-  }, [appliedDepartment, departments]);
-
   const managers = mainAppUsers ?? [];
 
   
@@ -608,7 +651,7 @@ const Employees = () => {
   }, []);
 
 
-    const handleApply = () => {
+  const handleApply = useCallback(() => {
       setAppliedSearch(searchTerm);
       setAppliedDepartment(selectedDepartment);
       setAppliedLocationId(selectedLocationId);
@@ -617,12 +660,17 @@ const Employees = () => {
       setAppliedContract(selectedContract);
       setAppliedManagerIds(selectedManagerIds);
       setCurrentPage(1);
-      // Don't call loadProfilesRef.current(1) here: the useEffect([currentPage, loadProfiles])
-      // will run once after state updates, using the new applied filters. Calling it here would
-      // use the old filters and cause a duplicate API call.
-    };
+    }, [
+      searchTerm,
+      selectedDepartment,
+      selectedLocationId,
+      selectedStatus,
+      selectedEmploymentType,
+      selectedContract,
+      selectedManagerIds,
+    ]);
 
-    const resetFilters = () => {
+  const resetFilters = useCallback(() => {
       setSelectedDepartment("");
       setSelectedLocationId(null);
       setSelectedStatus("");
@@ -638,7 +686,241 @@ const Employees = () => {
       setAppliedContract("");
       setAppliedManagerIds([]);
       setCurrentPage(1);
-    };
+    }, []);
+
+  const employeeTabs = useMemo<TabConfig[]>(
+    () => [{ id: "employees", label: "Employees", count: pagination?.total ?? 0, removable: false }],
+    [pagination?.total],
+  );
+
+  const managerNames = useMemo(() => {
+    return appliedManagerIds
+      .map((uid) => mainAppUsers.find((u: MainAppUserLookup) => userIdForProfilePayload(u) === uid)?.name ?? uid)
+      .join(", ");
+  }, [appliedManagerIds, mainAppUsers]);
+
+  const renderUsersDropdown = useCallback(
+    ({ closeMenu }: Readonly<{ closeMenu: () => void }>) => (
+      <UsersPillDropdownContent
+        closeMenu={closeMenu}
+        managers={managers}
+        selectedManagerIds={selectedManagerIds}
+        onToggle={toggleSelectedManagerId}
+      />
+    ),
+    [managers, selectedManagerIds, toggleSelectedManagerId],
+  );
+
+  const employeeFilterPills = useMemo<FilterPill[]>(() => {
+    const deptFilterKey = selectedDepartment || appliedDepartment;
+    const matchedDepartment = deptFilterKey
+      ? departments.find((d: MainAppDepartment) => String((d as { id?: number }).id) === deptFilterKey)
+      : undefined;
+    let departmentActiveLabel = "";
+    if (deptFilterKey) {
+      if (matchedDepartment) {
+        departmentActiveLabel = hierarchyLabel(matchedDepartment);
+      } else {
+        departmentActiveLabel = deptFilterKey;
+      }
+    }
+
+    const departmentOptions = departments.map((dept: MainAppDepartment, idx: number) => {
+      const label = hierarchyLabel(dept);
+      const deptId = typeof dept === "object" && dept !== null && "id" in (dept as object) ? String((dept as { id?: number }).id ?? "") : "";
+      return {
+        label,
+        value: deptId || `dept-${idx}`,
+        onClick: () => setSelectedDepartment(deptId),
+      };
+    });
+
+    return [
+      {
+        id: "department",
+        label: "Department",
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(deptFilterKey),
+        activeLabel: departmentActiveLabel,
+        onClear: () => {
+          setSelectedDepartment("");
+          setAppliedDepartment("");
+          setCurrentPage(1);
+        },
+        dropdownOptions: [
+          {
+            label: "All departments",
+            value: "",
+            onClick: () => setSelectedDepartment(""),
+          },
+          ...departmentOptions,
+        ],
+      },
+      {
+        id: "status",
+        label: "Status",
+        showDropdown: true,
+        active: Boolean(selectedStatus || appliedStatus),
+        activeLabel: selectedStatus || appliedStatus,
+        onClear: () => {
+          setSelectedStatus("");
+          setAppliedStatus("");
+          setCurrentPage(1);
+        },
+        dropdownOptions: [
+          { label: "All Statuses", value: "", onClick: () => setSelectedStatus("") },
+          ...EMPLOYEE_STATUS_OPTIONS.map((status) => ({
+            label: status,
+            value: status,
+            onClick: () => setSelectedStatus(status),
+          })),
+        ],
+      },
+      {
+        id: "users",
+        label: "Users",
+        showDropdown: true,
+        active: selectedManagerIds.length > 0 || appliedManagerIds.length > 0,
+        activeLabel: selectedManagerIds.length > 0 
+          ? selectedManagerIds
+              .map((uid) => mainAppUsers.find((u: MainAppUserLookup) => userIdForProfilePayload(u) === uid)?.name ?? uid)
+              .join(", ")
+          : managerNames,
+        onClear: () => {
+          setSelectedManagerIds([]);
+          setAppliedManagerIds([]);
+          setCurrentPage(1);
+        },
+        dropdownContent: renderUsersDropdown,
+      },
+      {
+        id: "employment",
+        label: "Employment",
+        showDropdown: true,
+        active: Boolean(selectedEmploymentType || appliedEmploymentType),
+        activeLabel: selectedEmploymentType || appliedEmploymentType,
+        onClear: () => {
+          setSelectedEmploymentType("");
+          setAppliedEmploymentType("");
+          setCurrentPage(1);
+        },
+        dropdownOptions: [
+          { label: "All employment types", value: "", onClick: () => setSelectedEmploymentType("") },
+          ...EMPLOYMENT_TYPES.map((type) => ({
+            label: type,
+            value: type,
+            onClick: () => setSelectedEmploymentType(type),
+          })),
+        ],
+      },
+      {
+        id: "contract",
+        label: "Contract",
+        showDropdown: true,
+        active: Boolean(selectedContract || appliedContract),
+        activeLabel: selectedContract || appliedContract,
+        onClear: () => {
+          setSelectedContract("");
+          setAppliedContract("");
+          setCurrentPage(1);
+        },
+        dropdownOptions: [
+          { label: "All contract types", value: "", onClick: () => setSelectedContract("") },
+          ...CONTRACT_TYPES.map((type) => ({
+            label: type,
+            value: type,
+            onClick: () => setSelectedContract(type),
+          })),
+        ],
+      },
+    ];
+  }, [
+    appliedContract,
+    appliedDepartment,
+    appliedEmploymentType,
+    appliedManagerIds,
+    appliedStatus,
+    selectedDepartment,
+    selectedStatus,
+    selectedEmploymentType,
+    selectedContract,
+    selectedManagerIds,
+    departments,
+    managerNames,
+    managers,
+    renderUsersDropdown,
+    toggleSelectedManagerId,
+    mainAppUsers,
+  ]);
+
+  const employeeToolbarConfig = useMemo<ToolbarConfig>(
+    () => ({
+      showSearch: true,
+      searchValue: searchTerm,
+      searchPlaceholder: "Search by identification number,phone, extension, or designation",
+      onSearchChange: setSearchTerm,
+      onSearch: handleApply,
+      showTabs: true,
+      tabs: employeeTabs,
+      activeTab: "employees",
+      onTabChange: () => {},
+      showFiltersButton: true,
+      showFilterPills: false,
+      filterPills: employeeFilterPills,
+      showMoreFiltersButton: false,
+      customActions: (
+        <div className="d-flex align-items-center gap-2 flex-wrap">
+          <button type="button" className="btn btn-outline-dark btn-sm" onClick={resetFilters}>
+            Reset
+          </button>
+          <button type="button" className="btn btn-dark btn-sm" onClick={handleApply}>
+            Apply
+          </button>
+          {session?.user?.permissions?.includes("add-employee-staff-management") && (
+            <button type="button" className="btn btn-dark btn-sm d-flex align-items-center gap-1" onClick={openCreateModal}>
+              <Plus size={14} />
+              Add Employee
+            </button>
+          )}
+        </div>
+      ),
+    }),
+    [employeeFilterPills, employeeTabs, handleApply, openCreateModal, resetFilters, searchTerm, session?.user?.permissions],
+  );
+
+  const employeeSidebarSections = useMemo<SidebarSection[]>(() => {
+    if (!selectedProfile) return [];
+    const departmentName = selectedProfile.department_id == null
+      ? "—"
+      : mainAppDepartments.find((d: MainAppDepartment) => Number(d.id) === Number(selectedProfile.department_id))?.name ?? String(selectedProfile.department_id);
+
+    return [
+      {
+        id: "employee-overview",
+        title: "Employee Overview",
+        defaultExpanded: true,
+        fields: [
+          { label: "Name", value: getDisplayName(selectedProfile) },
+          { label: "Extension", value: selectedProfile.user_id ?? "—" },
+          { label: "Phone", value: formatPhoneForDisplay(selectedProfile.phone ?? "") || "—", type: "phone" },
+          { label: "Status", value: selectedProfile.status ?? "—", type: "badge", badgeVariant: String(selectedProfile.status ?? "").toLowerCase() === "active" ? "success" : "danger" },
+        ],
+      },
+      {
+        id: "employee-job",
+        title: "Employment Details",
+        defaultExpanded: true,
+        fields: [
+          { label: "Department", value: departmentName },
+          { label: "Designation", value: selectedProfile.designation ?? "—" },
+          { label: "Employment Type", value: selectedProfile.employment_type ?? "—" },
+          { label: "Contract Type", value: selectedProfile.contract_type ?? "—" },
+          { label: "Last Updated", value: (selectedProfile as UserProfile & { updated_at?: string }).updated_at ? moment((selectedProfile as UserProfile & { updated_at?: string }).updated_at).format(GlobalDateTimeFormat) : "—" },
+        ],
+      },
+    ];
+  }, [getDisplayName, mainAppDepartments, selectedProfile]);
 
   const employeeColumns = useMemo<TableColumn<UserProfile>[]>(
     () => [
@@ -834,748 +1116,51 @@ const Employees = () => {
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees" />
       <div>
-        <div>
-        {/* Header */}
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "24px",
-          flexWrap: "wrap",
-          gap: "16px",
-        }}>
-          <h1 style={{ fontSize: "28px", fontWeight: "600", color: "#111827", margin: 0 }}>
-            Employees
-          </h1>
+        <div style={{ display: "flex", gap: "0", alignItems: "stretch" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Employee Table - Using GenericTable Component */}
+            <GenericTable<UserProfile>
+              data={filteredProfiles}
+              columns={employeeColumns}
+              actions={employeeActions}
+              showActions={true}
+              actionsLabel="Actions"
+              loading={loading}
+              loadingMessage="Loading employees..."
+              emptyMessage="No employees found"
+              hover={true}
+              uniqueKey="id"
+              pagination={{
+                currentPage,
+                rowsPerPage,
+                totalRows: pagination?.total ?? 0,
+                pageSizeOptions: [15, 25, 50, 100],
+              }}
+              onPaginationChange={handlePaginationChange}
+              onPreviewClick={(profile: UserProfile) => {
+                handleProfileClick(profile).catch((err) => console.error(err));
+              }}
+              showToolbar={true}
+              showToolbarActions={false}
+              toolbar={employeeToolbarConfig}
+            />
+          </div>
 
-          {session?.user?.permissions?.includes('add-employee-staff-management') && (
-          <button
-            type="button"
-            onClick={openCreateModal}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              padding: "10px 20px",
-              backgroundColor: "#6366f1",
-              color: "white",
-              border: "none",
-              borderRadius: "8px",
-              fontSize: "14px",
-              fontWeight: "600",
-              cursor: "pointer",
-            }}
-          >
-            <Plus size={18} />
-            Add Employee
-          </button>
+          {selectedProfile && (
+            <GenericSidebar
+              isOpen={Boolean(selectedProfile)}
+              onClose={closeSidebar}
+              title={getDisplayName(selectedProfile)}
+              subtitle={selectedProfile.designation ?? ""}
+              avatar={{
+                initials: getDisplayName(selectedProfile).slice(0, 2).toUpperCase(),
+                name: getDisplayName(selectedProfile),
+                gradient: "#6366f1",
+              }}
+              sections={employeeSidebarSections}
+            />
           )}
         </div>
-
-        {/* Search Bar & Filters */}
-        <div
-          ref={filtersRef}
-          style={{ 
-          display: 'flex', 
-          flexWrap: 'wrap', 
-          gap: '12px', 
-          marginBottom: '24px',
-          alignItems: 'center'
-        }}>
-          {/* Search Bar */}
-          <div style={{ position: 'relative', flex: '1 1 300px', minWidth: '250px' }}>
-            <Search 
-              size={20} 
-              style={{ 
-                position: 'absolute', 
-                left: '16px', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                color: '#9ca3af'
-              }} 
-            />
-            <input
-              type="text"
-              placeholder="Search by identification number,phone, extension, or designation "
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '10px 16px 10px 48px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '14px',
-                outline: 'none',
-                backgroundColor: 'white',
-              }}
-            />
-          </div>
-
-          {/* Department Filter */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleDropdown('department');
-              }}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              <span>📋</span>
-              <span>{selectedDepartmentLabel || 'Department'}</span>
-              <ChevronDown size={16} />
-            </button>
-            {openDropdown === 'department' && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '200px',
-                maxHeight: '280px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-              }}>
-                <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
-                  <input
-                    type="text"
-                    placeholder="Search department..."
-                    value={departmentSearchTerm}
-                    onChange={(e) => setDepartmentSearchTerm(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedDepartment('');
-                      setOpenDropdown(null);
-                      setDepartmentSearchTerm('');
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      border: "none",
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      backgroundColor: selectedDepartment === "" ? '#f3f4f6' : 'white',
-                      borderBottom: '1px solid #e5e7eb',
-                    }}
-                  >
-                    All departments
-                  </button>
-                  {departments
-                    .filter((dept: MainAppDepartment) => {
-                      const label = hierarchyLabel(dept);
-                      return !departmentSearchTerm.trim() || label.toLowerCase().includes(departmentSearchTerm.trim().toLowerCase());
-                    })
-                    .map((dept: MainAppDepartment, idx: number) => {
-                      const label = hierarchyLabel(dept);
-                      const deptId = typeof dept === "object" && dept !== null && "id" in (dept as object) ? String((dept as { id?: number }).id ?? "") : "";
-                      return (
-                        <button
-                          type="button"
-                          key={deptId || String(idx)}
-                          onClick={() => {
-                            setSelectedDepartment(deptId);
-                            setOpenDropdown(null);
-                            setDepartmentSearchTerm('');
-                          }}
-                          style={{
-                            width: "100%",
-                            textAlign: "left",
-                            border: "none",
-                            padding: '10px 16px',
-                            cursor: 'pointer',
-                            backgroundColor: selectedDepartment === deptId ? '#f3f4f6' : 'white'
-                          }}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          
-
-          {/* Status Filter */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleDropdown('status');
-              }}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              <span>{selectedStatus || 'Status'}</span>
-              <ChevronDown size={16} />
-            </button>
-            {openDropdown === 'status' && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '150px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedStatus('');
-                    setOpenDropdown(null);
-                  }}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    border: "none",
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    backgroundColor: selectedStatus === "" ? '#f3f4f6' : 'white',
-                    borderBottom: '1px solid #e5e7eb',
-                  }}
-                >
-                  All Statuses
-                </button>
-                {statuses.map(status => (
-                  <button
-                    type="button"
-                    key={status}
-                    onClick={() => {
-                      setSelectedStatus(status);
-                      setOpenDropdown(null);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      border: "none",
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      backgroundColor: selectedStatus === status ? '#f3f4f6' : 'white'
-                    }}
-                  >
-                    {status}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Manager Filter (multi-select); API receives user_ids: [phone, …] (same as profile user_id) */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleDropdown('manager');
-              }}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              <span>{selectedManagerIds.length > 0 ? `Users (${selectedManagerIds.length})` : 'Users'}</span>
-              <ChevronDown size={16} />
-            </button>
-            {openDropdown === 'manager' && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '200px',
-                maxHeight: '280px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-              }}>
-                <div style={{ padding: '8px', borderBottom: '1px solid #e5e7eb' }}>
-                  <input
-                    type="text"
-                    placeholder="Search user..."
-                    value={managerSearchTerm}
-                    onChange={(e) => setManagerSearchTerm(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: '6px',
-                      fontSize: '14px',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-                <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedManagerIds([]);
-                      setOpenDropdown(null);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      border: "none",
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      backgroundColor: selectedManagerIds.length === 0 ? '#f3f4f6' : 'white',
-                      borderBottom: '1px solid #e5e7eb',
-                    }}
-                  >
-                    All users
-                  </button>
-                  {managers
-                    .filter((mgr: MainAppUserLookup) => {
-                      if (userIdForProfilePayload(mgr) === "") return false;
-                      const label = hierarchyLabel(mgr);
-                      return !managerSearchTerm.trim() || label.toLowerCase().includes(managerSearchTerm.trim().toLowerCase());
-                    })
-                    .map((mgr: MainAppUserLookup) => {
-                      const label = hierarchyLabel(mgr);
-                      const userIdStr = userIdForProfilePayload(mgr);
-                      const isSelected = selectedManagerIds.includes(userIdStr);
-                      return (
-                        <button
-                          type="button"
-                          key={String(mgr.id)}
-                          onClick={() => {
-                            toggleSelectedManagerId(userIdStr, isSelected);
-                          }}
-                          style={{
-                            width: "100%",
-                            textAlign: "left",
-                            border: "none",
-                            padding: '10px 16px',
-                            cursor: 'pointer',
-                            backgroundColor: isSelected ? '#e0e7ff' : 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                          }}
-                        >
-                          {isSelected && <span style={{ color: '#6366f1', fontWeight: 600 }}>✓</span>}
-                          {label}
-                        </button>
-                      );
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Employment Type Filter */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleDropdown('employment');
-              }}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              <span>{selectedEmploymentType || 'Employment'}</span>
-              <ChevronDown size={16} />
-            </button>
-            {openDropdown === 'employment' && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '150px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedEmploymentType("");
-                    setOpenDropdown(null);
-                  }}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    border: "none",
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    backgroundColor: selectedEmploymentType === "" ? '#f3f4f6' : 'white',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}
-                >
-                  All employment types
-                </button>
-                {EMPLOYMENT_TYPES.map(type => (
-                  <button
-                    type="button"
-                    key={type}
-                    onClick={() => {
-                      setSelectedEmploymentType(type);
-                      setOpenDropdown(null);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      border: "none",
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      backgroundColor: selectedEmploymentType === type ? '#f3f4f6' : 'white'
-                    }}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Contract Type Filter */}
-          <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleDropdown('contract');
-              }}
-              style={{
-                padding: '10px 16px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              <span>{selectedContract || 'Contract'}</span>
-              <ChevronDown size={16} />
-            </button>
-            {openDropdown === 'contract' && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: '4px',
-                backgroundColor: 'white',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-                zIndex: 10,
-                minWidth: '150px'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedContract("");
-                    setOpenDropdown(null);
-                  }}
-                  style={{
-                    width: "100%",
-                    textAlign: "left",
-                    border: "none",
-                    padding: '10px 16px',
-                    cursor: 'pointer',
-                    backgroundColor: selectedContract === "" ? '#f3f4f6' : 'white',
-                    borderBottom: '1px solid #e5e7eb'
-                  }}
-                >
-                  All contract types
-                </button>
-                {CONTRACT_TYPES.map(type => (
-                  <button
-                    type="button"
-                    key={type}
-                    onClick={() => {
-                      setSelectedContract(type);
-                      setOpenDropdown(null);
-                    }}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      border: "none",
-                      padding: '10px 16px',
-                      cursor: 'pointer',
-                      backgroundColor: selectedContract === type ? '#f3f4f6' : 'white'
-                    }}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '12px' }}>
-            {/* <button
-              onClick={handleExport}
-              style={{
-                padding: '10px 20px',
-                border: '1px solid #e5e7eb',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              <Download size={16} />
-              <span>Export</span>
-            </button> */}
-            <button
-              onClick={handleApply}
-              style={{
-                padding: '10px 32px',
-                border: 'none',
-                borderRadius: '8px',
-                backgroundColor: '#6366f1',
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
-              }}
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-
-        {/* Active Filters - show when any applied filter is set */}
-        {(appliedSearch.trim() || appliedDepartment || appliedLocationId != null || appliedStatus || appliedEmploymentType || appliedContract || appliedManagerIds.length > 0) && (
-          <div style={{ marginBottom: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <span style={{ fontSize: '14px', color: '#6b7280' }}>Active filters:</span>
-            {appliedSearch.trim() && (
-              <span style={{
-                padding: '4px 12px',
-                backgroundColor: '#e0e7ff',
-                borderRadius: '16px',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                Search: {appliedSearch}
-                <button
-                  onClick={() => { setSearchTerm(''); setAppliedSearch(''); setCurrentPage(1); loadProfilesRef.current(1); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {appliedDepartment && (
-              <span style={{
-                padding: '4px 12px',
-                backgroundColor: '#e0e7ff',
-                borderRadius: '16px',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                {appliedDepartmentLabel}
-                <button
-                  onClick={() => { setSelectedDepartment(''); setAppliedDepartment(''); setCurrentPage(1); loadProfilesRef.current(1); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            
-            {appliedStatus && (
-              <span style={{
-                padding: '4px 12px',
-                backgroundColor: '#e0e7ff',
-                borderRadius: '16px',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                {appliedStatus}
-                <button
-                  onClick={() => { setSelectedStatus(''); setAppliedStatus(''); setCurrentPage(1); loadProfilesRef.current(1); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {appliedEmploymentType && (
-              <span style={{
-                padding: '4px 12px',
-                backgroundColor: '#e0e7ff',
-                borderRadius: '16px',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                {appliedEmploymentType}
-                <button
-                  onClick={() => { setSelectedEmploymentType(''); setAppliedEmploymentType(''); setCurrentPage(1); loadProfilesRef.current(1); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {appliedContract && (
-              <span style={{
-                padding: '4px 12px',
-                backgroundColor: '#e0e7ff',
-                borderRadius: '16px',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}>
-                {appliedContract}
-                <button
-                  onClick={() => { setSelectedContract(''); setAppliedContract(''); setCurrentPage(1); loadProfilesRef.current(1); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            {appliedManagerIds.length > 0 && (
-              <span
-                title={appliedManagerIds
-                  .map((uid) => mainAppUsers.find((u) => userIdForProfilePayload(u) === uid)?.name ?? uid)
-                  .join(", ")}
-                style={{
-                  padding: '4px 12px',
-                  backgroundColor: '#e0e7ff',
-                  borderRadius: '16px',
-                  fontSize: '13px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                Managers:{" "}
-                {appliedManagerIds
-                  .map((uid) => mainAppUsers.find((u) => userIdForProfilePayload(u) === uid)?.name ?? uid)
-                  .join(", ")}
-                <button
-                  onClick={() => { setSelectedManagerIds([]); setAppliedManagerIds([]); setCurrentPage(1); loadProfilesRef.current(1); }}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '16px' }}
-                >
-                  ×
-                </button>
-              </span>
-            )}
-            <button
-              onClick={resetFilters}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#6366f1',
-                cursor: 'pointer',
-                fontSize: '13px',
-                textDecoration: 'underline'
-              }}
-            >
-              Clear all
-            </button>
-          </div>
-        )}
-
-        {/* Employee Table - Using GenericTable Component */}
-        <GenericTable<UserProfile>
-          data={filteredProfiles}
-          columns={employeeColumns}
-          actions={employeeActions}
-          showActions={true}
-          actionsLabel="Actions"
-          loading={loading}
-          loadingMessage="Loading employees..."
-          emptyMessage="No employees found"
-          hover={true}
-          uniqueKey="id"
-          pagination={{
-            currentPage,
-            rowsPerPage,
-            totalRows: pagination?.total ?? 0,
-            pageSizeOptions: [15, 25, 50, 100],
-          }}
-          onPaginationChange={handlePaginationChange}
-          onRowClick={(profile: UserProfile) => handleProfileClick(profile)}
-          showToolbar={false}
-        />
 
         {/* Two Column Layout for Charts and Documents */}
         <div style={{ 
@@ -1888,47 +1473,6 @@ const Employees = () => {
         itemType="employee"
         loading={deleting}
       />
-
-      {/* Employee Detail Sidebar */}
-      {selectedProfile && (
-        <div
-          style={{
-            position: "fixed",
-            top: "80px",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            zIndex: 1000,
-            display: "flex",
-            justifyContent: "flex-end",
-          }}
-        >
-          <button
-            type="button"
-            aria-label="Close employee sidebar"
-            onClick={closeSidebar}
-            style={{
-              position: "absolute",
-              inset: 0,
-              border: "none",
-              padding: 0,
-              margin: 0,
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              cursor: "pointer",
-            }}
-          />
-          <div style={{ position: "relative", zIndex: 1 }}>
-            <EmployeeDetailSidebar
-              profile={selectedProfile}
-              departments={mainAppDepartments}
-              users={mainAppUsers}
-              onClose={closeSidebar}
-            />
-          </div>
-        </div>
-      )}
-      </div>
     </React.Fragment>
   );
 };

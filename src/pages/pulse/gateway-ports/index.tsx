@@ -2,19 +2,17 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import GenericTable, { TableColumn } from "@components/GenericTable";
+import GenericTable, { FilterPill, TabConfig, TableColumn, ToolbarConfig } from "@components/GenericTable";
+import { StatsCardData } from "@components/GenericStatsCards";
 import { ListPorts } from "@utils/ports";
-import { UpdatePortMobileNumber } from "@utils/GsmManagement";
+import { getGsmData, UpdatePortMobileNumber } from "@utils/GsmManagement";
 
-import { Row, Col } from "react-bootstrap";
+
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 
 import "@assets/scss/common.scss";
 
-import GsmPortFilter from "@components/filters/GsmPortFilter";
-
-import PageSummaryGrid, { SummaryCard } from "@components/PageSummaryGrid";
 import { FiEdit } from "react-icons/fi";
 
 interface PortCompany {
@@ -78,6 +76,211 @@ function mapPortRecordToTableRow(item: PortRecord, idx: number): PortTableRow {
 
 const MOBILE_NUMBER_REGEX = /^\+?[1-9]\d{0,15}$/;
 
+interface FilterOption {
+  label: string;
+  value: string;
+}
+
+const PORT_POWER_OPTIONS: FilterOption[] = [
+  { label: "Power On", value: "power_on" },
+  { label: "Power Off", value: "power_off" },
+];
+
+const OPERATOR_OPTIONS: FilterOption[] = [
+  { label: "Etisalat by e&", value: "Etisalat" },
+  { label: "DU", value: "du" },
+];
+
+const SIM_STATUS_OPTIONS: FilterOption[] = [
+  { label: "Registered", value: "REGISTER_OK" },
+  { label: "Unregistered", value: "UNREGISTER_OK" },
+  { label: "No SIM", value: "NO_SIM" },
+  { label: "Power Off", value: "POWER_OFF" },
+];
+
+const PORT_STATUS_OPTIONS: FilterOption[] = [
+  { label: "Active", value: "up" },
+  { label: "Not Active", value: "down" },
+];
+
+const SIM_STATUS_LABELS: Record<string, string> = {
+  REGISTER_OK: "Registered",
+  UNREGISTER_OK: "Unregistered",
+  NO_SIM: "No SIM",
+  POWER_OFF: "Power Off",
+};
+
+const PORT_STATUS_LABELS: Record<string, string> = {
+  up: "Active",
+  down: "Not Active",
+};
+
+const PORT_POWER_LABELS: Record<string, string> = {
+  power_on: "Power On",
+  power_off: "Power Off",
+};
+
+const OPERATOR_LABELS: Record<string, string> = {
+  Etisalat: "Etisalat by e&",
+  du: "DU",
+};
+
+interface GsmHierarchyItem {
+  id: string;
+  name: string;
+  identifier?: string;
+}
+
+function TextFilterPill({
+  placeholder,
+  initialValue,
+  onApply,
+}: Readonly<{
+  placeholder: string;
+  initialValue: string;
+  onApply: (value: string) => void;
+}>) {
+  const [localValue, setLocalValue] = useState(initialValue);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      onApply(localValue.trim());
+    }
+  };
+
+  return (
+    <div style={{ minWidth: "220px", padding: "4px 2px" }}>
+      <input
+        type="text"
+        className="form-control form-control-sm mb-2"
+        placeholder={placeholder}
+        value={localValue}
+        onChange={(e) => setLocalValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        autoFocus
+      />
+      <button
+        type="button"
+        className="btn btn-primary btn-sm w-100"
+        onClick={() => onApply(localValue.trim())}
+      >
+        Apply
+      </button>
+    </div>
+  );
+}
+
+interface PillDropdownContentProps {
+  readonly placeholder: string;
+  readonly initialValue: string;
+  readonly filterKey: string;
+  readonly closeMenu: () => void;
+  readonly onSetFilter: (key: string, value: string) => void;
+  readonly onClearFilter: (key: string) => void;
+}
+
+function PillDropdownContent({
+  placeholder,
+  initialValue,
+  filterKey,
+  closeMenu,
+  onSetFilter,
+  onClearFilter,
+}: PillDropdownContentProps) {
+  const handleApply = (val: string) => {
+    if (val) {
+      onSetFilter(filterKey, val);
+    } else {
+      onClearFilter(filterKey);
+    }
+    closeMenu();
+  };
+  return <TextFilterPill placeholder={placeholder} initialValue={initialValue} onApply={handleApply} />;
+}
+
+interface TextPillDropdownRendererProps {
+  readonly closeMenu: () => void;
+  readonly initialValue: string;
+  readonly onSetFilter: (key: string, value: string) => void;
+  readonly onClearFilter: (key: string) => void;
+}
+
+function MobileNumberPillDropdown({
+  closeMenu,
+  initialValue,
+  onSetFilter,
+  onClearFilter,
+}: TextPillDropdownRendererProps) {
+  return (
+    <PillDropdownContent
+      placeholder="Enter Mobile Number"
+      initialValue={initialValue}
+      filterKey="mobile_number"
+      closeMenu={closeMenu}
+      onSetFilter={onSetFilter}
+      onClearFilter={onClearFilter}
+    />
+  );
+}
+
+function ImeiPillDropdown({
+  closeMenu,
+  initialValue,
+  onSetFilter,
+  onClearFilter,
+}: TextPillDropdownRendererProps) {
+  return (
+    <PillDropdownContent
+      placeholder="Enter IMEI"
+      initialValue={initialValue}
+      filterKey="imei"
+      closeMenu={closeMenu}
+      onSetFilter={onSetFilter}
+      onClearFilter={onClearFilter}
+    />
+  );
+}
+
+function ImsiPillDropdown({
+  closeMenu,
+  initialValue,
+  onSetFilter,
+  onClearFilter,
+}: TextPillDropdownRendererProps) {
+  return (
+    <PillDropdownContent
+      placeholder="Enter IMSI"
+      initialValue={initialValue}
+      filterKey="imsi"
+      closeMenu={closeMenu}
+      onSetFilter={onSetFilter}
+      onClearFilter={onClearFilter}
+    />
+  );
+}
+
+function IccidPillDropdown({
+  closeMenu,
+  initialValue,
+  onSetFilter,
+  onClearFilter,
+}: TextPillDropdownRendererProps) {
+  return (
+    <PillDropdownContent
+      placeholder="Enter ICCID"
+      initialValue={initialValue}
+      filterKey="iccid"
+      closeMenu={closeMenu}
+      onSetFilter={onSetFilter}
+      onClearFilter={onClearFilter}
+    />
+  );
+}
+
+interface DropdownContext {
+  closeMenu: () => void;
+}
+
 const GsmPorts = () => {
   const { data: session } = useSession();
 
@@ -100,48 +303,46 @@ const GsmPorts = () => {
     active_port: 0,
   });
 
-  const summaryCards: SummaryCard[] = [
-    {
-      id: "total-gsms-count",
-      title: "Total",
-      value: portSummary.total_port,
-      description: "Total Carrier Ports in the system",
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "assigned-gsms-count",
-      title: "Registered",
-      value: portSummary.online_port,
-      description: "Registered Carrier Ports in the system",
-      delay: 0.3,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "unassigned-gsms-count",
-      title: "Unregistered",
-      value: portSummary.offline_port,
-      description: "Unregistered Carrier Ports in the system",
-      delay: 0.5,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-    {
-      id: "total-ports-count",
-      title: "Active",
-      value: portSummary.active_port,
-      description: "Active Carrier Ports in the system",
-      delay: 0.7,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: "style-2",
-    },
-  ];
+  const [gsmFilterOptions, setGsmFilterOptions] = useState<FilterOption[]>([]);
+  const [companyFilterOptions, setCompanyFilterOptions] = useState<FilterOption[]>([]);
+
+  useEffect(() => {
+    const hasFilterPerm = session?.user?.permissions?.includes("filters-gsm-assignment");
+    if (!hasFilterPerm) return;
+
+    getGsmData()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((data: any) => {
+        if (!data) return;
+
+        const gsmList: GsmHierarchyItem[] = Array.isArray(data.gsm) ? data.gsm : [];
+        setGsmFilterOptions(
+          gsmList.map((g) => ({
+            label: g.name || g.id,
+            value: String(g.id),
+          })),
+        );
+
+        const companyList: GsmHierarchyItem[] = Array.isArray(data.company) ? data.company : [];
+        setCompanyFilterOptions(
+          companyList.map((c) => ({
+            label: c.name || c.id,
+            value: String(c.identifier || c.id),
+          })),
+        );
+      })
+      .catch(() => {});
+  }, [session?.user?.permissions]);
+
+  const statsCards = useMemo<StatsCardData[]>(
+    () => [
+      { title: "Total", value: portSummary.total_port, subtitle: "Total Carrier Ports" },
+      { title: "Registered", value: portSummary.online_port, subtitle: "Registered Carrier Ports" },
+      { title: "Unregistered", value: portSummary.offline_port, subtitle: "Unregistered Carrier Ports" },
+      { title: "Active", value: portSummary.active_port, subtitle: "Active Carrier Ports" },
+    ],
+    [portSummary],
+  );
 
   const portColumns = useMemo<TableColumn<PortTableRow>[]>(() => {
     const isAdmin = session?.user?.is_admin === "1";
@@ -331,10 +532,6 @@ const GsmPorts = () => {
     }
   }, [currentFilters]);
 
-  const handleFiltersChange = (filters: Record<string, unknown>) => {
-    setCurrentFilters(filters);
-  };
-
   useEffect(() => {
     const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(prevFiltersRef.current);
 
@@ -417,6 +614,237 @@ const GsmPorts = () => {
     }
   };
 
+  const setFilter = useCallback((key: string, value: unknown) => {
+    setCurrentFilters((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const clearFilter = useCallback((key: string) => {
+    setCurrentFilters((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }, []);
+
+  const renderMobileNumberDropdown = useCallback(
+    (ctx: DropdownContext) => (
+      <MobileNumberPillDropdown
+        closeMenu={ctx.closeMenu}
+        initialValue={String(currentFilters.mobile_number ?? "")}
+        onSetFilter={setFilter}
+        onClearFilter={clearFilter}
+      />
+    ),
+    [currentFilters.mobile_number, setFilter, clearFilter],
+  );
+
+  const renderImeiDropdown = useCallback(
+    (ctx: DropdownContext) => (
+      <ImeiPillDropdown
+        closeMenu={ctx.closeMenu}
+        initialValue={String(currentFilters.imei ?? "")}
+        onSetFilter={setFilter}
+        onClearFilter={clearFilter}
+      />
+    ),
+    [currentFilters.imei, setFilter, clearFilter],
+  );
+
+  const renderImsiDropdown = useCallback(
+    (ctx: DropdownContext) => (
+      <ImsiPillDropdown
+        closeMenu={ctx.closeMenu}
+        initialValue={String(currentFilters.imsi ?? "")}
+        onSetFilter={setFilter}
+        onClearFilter={clearFilter}
+      />
+    ),
+    [currentFilters.imsi, setFilter, clearFilter],
+  );
+
+  const renderIccidDropdown = useCallback(
+    (ctx: DropdownContext) => (
+      <IccidPillDropdown
+        closeMenu={ctx.closeMenu}
+        initialValue={String(currentFilters.iccid ?? "")}
+        onSetFilter={setFilter}
+        onClearFilter={clearFilter}
+      />
+    ),
+    [currentFilters.iccid, setFilter, clearFilter],
+  );
+
+  const portFilterPills = useMemo<FilterPill[]>(() => {
+    const hasFilterPerm = session?.user?.permissions?.includes("filters-gsm-assignment");
+
+    if (!hasFilterPerm) return [];
+
+    return [
+      // GSM Device (from hierarchy)
+      {
+        id: "gsm-device",
+        label: "GSM Device",
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(currentFilters.gsm),
+        activeLabel: gsmFilterOptions.find((g) => g.value === String(currentFilters.gsm))?.label,
+        onClear: () => clearFilter("gsm"),
+        dropdownOptions: gsmFilterOptions.map((g) => ({
+          label: g.label,
+          value: g.value,
+          onClick: () => setFilter("gsm", g.value),
+        })),
+      },
+      // Port (power status)
+      {
+        id: "port-power",
+        label: "Port",
+        showDropdown: true,
+        active: Boolean(currentFilters.port),
+        activeLabel: PORT_POWER_LABELS[String(currentFilters.port)],
+        onClear: () => clearFilter("port"),
+        dropdownOptions: PORT_POWER_OPTIONS.map((opt) => ({
+          label: opt.label,
+          value: opt.value,
+          onClick: () => setFilter("port", opt.value),
+        })),
+      },
+      // Company (from hierarchy)
+      {
+        id: "company",
+        label: "Company",
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(currentFilters.company),
+        activeLabel: companyFilterOptions.find((c) => c.value === String(currentFilters.company))?.label,
+        onClear: () => clearFilter("company"),
+        dropdownOptions: companyFilterOptions.map((c) => ({
+          label: c.label,
+          value: c.value,
+          onClick: () => setFilter("company", c.value),
+        })),
+      },
+      // SIM Status
+      {
+        id: "sim-status",
+        label: "SIM Status",
+        showDropdown: true,
+        active: Boolean(currentFilters.sim_status),
+        activeLabel: SIM_STATUS_LABELS[String(currentFilters.sim_status)],
+        onClear: () => clearFilter("sim_status"),
+        dropdownOptions: SIM_STATUS_OPTIONS.map((opt) => ({
+          label: opt.label,
+          value: opt.value,
+          onClick: () => setFilter("sim_status", opt.value),
+        })),
+      },
+      // Sim Operator
+      {
+        id: "operator",
+        label: "Operator",
+        showDropdown: true,
+        active: Boolean(currentFilters.operator),
+        activeLabel: OPERATOR_LABELS[String(currentFilters.operator)],
+        onClear: () => clearFilter("operator"),
+        dropdownOptions: OPERATOR_OPTIONS.map((opt) => ({
+          label: opt.label,
+          value: opt.value,
+          onClick: () => setFilter("operator", opt.value),
+        })),
+      },
+      // Mobile Number (text input)
+      {
+        id: "mobile-number",
+        label: "Mobile Number",
+        showDropdown: true,
+        active: Boolean(currentFilters.mobile_number),
+        activeLabel: String(currentFilters.mobile_number ?? ""),
+        activeLabelOnly: true,
+        onClear: () => clearFilter("mobile_number"),
+        dropdownContent: renderMobileNumberDropdown,
+      },
+      // IMEI (text input)
+      {
+        id: "imei",
+        label: "IMEI",
+        showDropdown: true,
+        active: Boolean(currentFilters.imei),
+        activeLabel: String(currentFilters.imei ?? ""),
+        activeLabelOnly: true,
+        onClear: () => clearFilter("imei"),
+        dropdownContent: renderImeiDropdown,
+      },
+      // IMSI (text input)
+      {
+        id: "imsi",
+        label: "IMSI",
+        showDropdown: true,
+        active: Boolean(currentFilters.imsi),
+        activeLabel: String(currentFilters.imsi ?? ""),
+        activeLabelOnly: true,
+        onClear: () => clearFilter("imsi"),
+        dropdownContent: renderImsiDropdown,
+      },
+      // ICCID (text input)
+      {
+        id: "iccid",
+        label: "ICCID",
+        showDropdown: true,
+        active: Boolean(currentFilters.iccid),
+        activeLabel: String(currentFilters.iccid ?? ""),
+        activeLabelOnly: true,
+        onClear: () => clearFilter("iccid"),
+        dropdownContent: renderIccidDropdown,
+      },
+      // Port Status
+      {
+        id: "port-status",
+        label: "Port Status",
+        showDropdown: true,
+        active: Boolean(currentFilters.port_status),
+        activeLabel: PORT_STATUS_LABELS[String(currentFilters.port_status)],
+        onClear: () => clearFilter("port_status"),
+        dropdownOptions: PORT_STATUS_OPTIONS.map((opt) => ({
+          label: opt.label,
+          value: opt.value,
+          onClick: () => setFilter("port_status", opt.value),
+        })),
+      },
+    ];
+  }, [
+    session?.user?.permissions,
+    currentFilters,
+    gsmFilterOptions,
+    companyFilterOptions,
+    setFilter,
+    clearFilter,
+    renderMobileNumberDropdown,
+    renderImeiDropdown,
+    renderImsiDropdown,
+    renderIccidDropdown,
+  ]);
+
+  const portTabs = useMemo<TabConfig[]>(
+    () => [
+      { id: "carrier-ports", label: "Carrier Ports", count: totalRecords, removable: false },
+    ],
+    [totalRecords],
+  );
+
+  const portToolbarConfig = useMemo<ToolbarConfig>(
+    () => ({
+      showTabs: true,
+      tabs: portTabs,
+      activeTab: "carrier-ports",
+      onTabChange: () => {},
+      showFiltersButton: true,
+      showFilterPills: false,
+      filterPills: portFilterPills,
+      showMoreFiltersButton: false,
+    }),
+    [portTabs, portFilterPills],
+  );
+
   const canUpdateMobile =
     session?.user?.is_admin === "1" &&
     session?.user?.permissions?.includes("update-mobile-number-gsm-ports");
@@ -424,24 +852,6 @@ const GsmPorts = () => {
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Carrier Ports" />
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="align-items-center">
-              <Col md={3}>
-                <h2 className="mb-0 d-flex align-items-center">Carrier Ports</h2>
-              </Col>
-              <Col md={9} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  <GsmPortFilter onFiltersChange={handleFiltersChange} showExport={false} />
-                </div>
-              </Col>
-            </Row>
-          </div>
-        </Col>
-      </Row>
-
-      <PageSummaryGrid cards={summaryCards} />
 
       {session?.user?.permissions?.includes("list-gsm-ports") && (
         <GenericTable<PortTableRow>
@@ -451,8 +861,11 @@ const GsmPorts = () => {
           loading={loading}
           loadingMessage="Loading GSM ports..."
           emptyMessage="No GSM ports found."
-          showToolbar={false}
+          showToolbar={true}
+          toolbar={portToolbarConfig}
           showToolbarActions={false}
+          statsCards={statsCards}
+          metricsGridMinWidth="200px"
           showActions={canUpdateMobile}
           actionsLabel="Actions"
           customizableColumns={false}
