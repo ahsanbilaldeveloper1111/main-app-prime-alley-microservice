@@ -12,11 +12,22 @@ import GenericTable, {
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-import { getJourneys } from "@utils/staffManagement";
+import {
+  createJourneyStep,
+  deleteJourney,
+  deleteJourneyStep,
+  getJourney,
+  getJourneys,
+  updateJourney,
+  updateJourneyStep,
+} from "@utils/staffManagement";
 import { useMainAppLookups, type MainAppDepartmentLookup } from "@hooks/useMainAppLookups";
-import { ChevronRight } from "lucide-react";
-import OnboardingDetailSidebar from "./sidebar";
+import { Briefcase, Check, ChevronRight, Pencil, Plus, Target, Trash2, User } from "lucide-react";
+import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import { JOURNEY_STATUS_OPTIONS } from "@utils/workforce/journeyStatusOptions";
+import { toast } from "react-toastify";
+import { Form, Modal } from "react-bootstrap";
+import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
 interface OnboardingEmployee {
   id: string;
@@ -73,6 +84,19 @@ interface JourneyRecord {
   [key: string]: unknown;
 }
 
+interface JourneyStepRecord {
+  id?: number;
+  journey_id?: string | number;
+  stage?: string;
+  title?: string;
+  description?: string;
+  status?: string;
+  sort_order?: string | number;
+  due_date?: string | null;
+  completed_at?: string | null;
+  [key: string]: unknown;
+}
+
 /** API pagination shape */
 interface JourneysPagination {
   total?: number;
@@ -88,6 +112,65 @@ const STATUS_DISPLAY: Record<string, "In Progress" | "On Track" | "Completed"> =
   on_track: "On Track",
   completed: "Completed",
 };
+
+function statusDisplayToApiValue(display: string): string {
+  const map: Record<string, string> = {
+    "In Progress": "in_progress",
+    "On Track": "on_track",
+    Completed: "completed",
+  };
+  return map[display] ?? "in_progress";
+}
+
+function isEmployeeJourneyDisplayCompleted(status: string): boolean {
+  return status.trim().toLowerCase() === "completed";
+}
+
+function formatJourneyStepStatusForDisplay(status: string): string {
+  return status
+    .split("_")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function journeyStartDateToInputMin(iso: string | null | undefined): string | undefined {
+  if (iso == null || String(iso).trim() === "") return undefined;
+  const trimmed = String(iso).trim();
+  if (Number.isNaN(Date.parse(trimmed))) return undefined;
+  const parsed = new Date(trimmed);
+  const y = parsed.getUTCFullYear();
+  const m = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function readJourneyStartDateFromPayload(data: unknown): string | null {
+  if (data == null || typeof data !== "object") return null;
+  const startDate = (data as { start_date?: unknown }).start_date;
+  return typeof startDate === "string" && startDate.trim() !== "" ? startDate.trim() : null;
+}
+
+function clampDueDateToJourneyMin(due: string, min: string | undefined): string {
+  if (min == null || min === "") return due;
+  return due < min ? min : due;
+}
+
+function toInputDate(value: string | null | undefined): string {
+  if (value == null || value.trim() === "") return new Date().toISOString().slice(0, 10);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDueDateForDisplay(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+}
 
 const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "Freelance", "Temporary"];
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
@@ -145,48 +228,232 @@ const getStatusColor = (status: OnboardingEmployee["status"]) => {
   }
 };
 
-const EmployeesOnboarding = () => {
-  const { mainAppUsers, mainAppDepartments, companyIdentifier } = useMainAppLookups();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [appliedDepartment, setAppliedDepartment] = useState("");
-  const [selectedEmploymentType, setSelectedEmploymentType] = useState("");
-  const [selectedContract, setSelectedContract] = useState("");
-  const [appliedEmploymentType, setAppliedEmploymentType] = useState("");
-  const [appliedContract, setAppliedContract] = useState("");
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [appliedUserIds, setAppliedUserIds] = useState<string[]>([]);
-  const [selectedStatus, setSelectedStatus] = useState("");
-  const [appliedStatus, setAppliedStatus] = useState("");
-  const [userSearchTerm, setUserSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
-  const [selectedEmployee, setSelectedEmployee] = useState<OnboardingEmployee | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+function mapJourneyRecordsToEmployees(data: JourneyRecord[], users: LookupUser[]): OnboardingEmployee[] {
+  return data.map((j) => {
+    const rawUserId = j.user_id ?? j.user_profile?.user_id;
+    const userId = rawUserId == null ? "" : String(rawUserId).trim();
+    const name =
+      users.find((u) => String(u.phone ?? "").trim() === userId || String(u.id) === userId)?.name ??
+      (userId || "—");
+    const statusKey = (j.status ?? "in_progress").toLowerCase().replaceAll(/\s/g, "_");
+    const status: OnboardingEmployee["status"] = STATUS_DISPLAY[statusKey] ?? "In Progress";
+    const totalSteps = Math.max(1, Number(j.total_steps_count ?? 0));
+    const completedSteps = Number(j.completed_steps_count ?? 0);
+    const progress = Math.min(100, Math.round((completedSteps / totalSteps) * 100));
+    const steps = Array.isArray(j.steps) ? j.steps : [];
+    const stepNames = steps.length
+      ? steps.map((s) => (s.name ?? "document").toLowerCase())
+      : ["document", "profile"];
+    const startDateFormatted = j.start_date
+      ? new Date(j.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      : "—";
+    const profile = j.user_profile;
+    const contractRaw = profile?.contract_type;
+    const employmentRaw = profile?.employment_type;
+    const designationRaw = profile?.designation;
+    const designation =
+      designationRaw != null && String(designationRaw).trim() !== ""
+        ? String(designationRaw).trim()
+        : undefined;
+    return {
+      id: String(j.id ?? j.user_profile_id ?? (userId || "unknown")),
+      name,
+      avatar: "",
+      startDate: startDateFormatted,
+      stages: stepNames,
+      progress,
+      status,
+      role: j.job_title ?? profile?.job_title ?? undefined,
+      department: j.department_name ?? undefined,
+      user_id: userId || undefined,
+      department_name: j.department_name ?? undefined,
+      designation,
+      total_steps_count: j.total_steps_count,
+      completed_steps_count: j.completed_steps_count,
+      contract_type:
+        contractRaw != null && String(contractRaw).trim() !== "" ? String(contractRaw).trim() : undefined,
+      employment_type:
+        employmentRaw != null && String(employmentRaw).trim() !== "" ? String(employmentRaw).trim() : undefined,
+    };
+  });
+}
 
-  const users = useMemo(() => (mainAppUsers ?? []) as LookupUser[], [mainAppUsers]);
-  const managers = users;
+type JourneyStepsSidebarSectionProps = {
+  steps: JourneyStepRecord[];
+  loading: boolean;
+  isCompleted: boolean;
+  canUpdate: boolean;
+  deletingStepId: number | null;
+  onAddStep: () => void;
+  onEditStep: (step: JourneyStepRecord) => void;
+  onDeleteStep: (step: JourneyStepRecord) => void;
+};
+
+function JourneyStepsSidebarSection({
+  steps,
+  loading,
+  isCompleted,
+  canUpdate,
+  deletingStepId,
+  onAddStep,
+  onEditStep,
+  onDeleteStep,
+}: Readonly<JourneyStepsSidebarSectionProps>) {
+  return (
+    <div style={{ padding: "0 4px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+        <span style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>Journey Steps</span>
+        {!isCompleted && canUpdate && (
+          <button
+            type="button"
+            onClick={onAddStep}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 12px",
+              backgroundColor: "#6366f1",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              fontSize: "13px",
+              fontWeight: "600",
+              cursor: "pointer",
+            }}
+          >
+            <Plus size={16} />
+            Add step
+          </button>
+        )}
+      </div>
+
+      {loading && <div style={{ fontSize: "13px", color: "#6b7280" }}>Loading steps...</div>}
+      {!loading && steps.length === 0 && (
+        <div style={{ fontSize: "13px", color: "#6b7280" }}>No steps yet.</div>
+      )}
+      {!loading && steps.length > 0 && (
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {steps.map((step) => {
+            const fallbackKey = `${step.title ?? "untitled"}-${step.stage ?? "nostage"}-${step.due_date ?? "nodue"}`;
+            return (
+              <li
+                key={step.id == null ? fallbackKey : `journey-step-${step.id}`}
+                style={{
+                  padding: "12px",
+                  marginBottom: "8px",
+                  backgroundColor: "#f9fafb",
+                  borderRadius: "8px",
+                  border: "1px solid #e5e7eb",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "14px", fontWeight: "600", color: "#1f2937", marginBottom: "4px" }}>
+                      {step.title || "—"}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}>
+                      {step.stage ? <span style={{ marginRight: "8px" }}>{step.stage}</span> : null}
+                      {step.status ? (
+                        <span style={{ padding: "2px 6px", backgroundColor: "#e5e7eb", borderRadius: "4px" }}>
+                          {formatJourneyStepStatusForDisplay(step.status)}
+                        </span>
+                      ) : null}
+                    </div>
+                    {step.description && <div style={{ fontSize: "13px", color: "#4b5563" }}>{step.description}</div>}
+                    {step.due_date && (
+                      <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+                        Due: {formatDueDateForDisplay(step.due_date)}
+                      </div>
+                    )}
+                  </div>
+                  {!isCompleted && (
+                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditStep(step);
+                        }}
+                        title="Edit"
+                        style={{
+                          padding: "6px",
+                          border: "none",
+                          borderRadius: "6px",
+                          backgroundColor: "#e0e7ff",
+                          color: "#4338ca",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteStep(step);
+                        }}
+                        disabled={deletingStepId === step.id}
+                        title="Delete"
+                        style={{
+                          padding: "6px",
+                          border: "none",
+                          borderRadius: "6px",
+                          backgroundColor: "#fee2e2",
+                          color: "#b91c1c",
+                          cursor: deletingStepId === step.id ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Hook: useWorkforceJourneysList
+// ---------------------------------------------------------------------------
+type JourneysListParams = {
+  companyIdentifier: string | null | undefined;
+  currentPage: number;
+  rowsPerPage: number;
+  refreshKey: number;
+  appliedSearch: string;
+  appliedDepartment: string;
+  appliedEmploymentType: string;
+  appliedContract: string;
+  appliedUserIds: string[];
+  appliedStatus: string;
+};
+
+function useWorkforceJourneysList({
+  companyIdentifier,
+  currentPage,
+  rowsPerPage,
+  refreshKey,
+  appliedSearch,
+  appliedDepartment,
+  appliedEmploymentType,
+  appliedContract,
+  appliedUserIds,
+  appliedStatus,
+}: Readonly<JourneysListParams>) {
   const [journeysData, setJourneysData] = useState<JourneyRecord[]>([]);
   const [journeysPagination, setJourneysPagination] = useState<JourneysPagination | null>(null);
   const [loadingJourneys, setLoadingJourneys] = useState(true);
-  const [refreshJourneysKey, setRefreshJourneysKey] = useState(0);
-
-  const toggleSelectedUserId = useCallback((idStr: string, isSelected: boolean) => {
-    setSelectedUserIds((prev) => {
-      if (isSelected) return prev.filter((id) => id !== idStr);
-      return [...prev, idStr];
-    });
-  }, []);
-
-  const filteredManagers = useMemo(() => {
-    const needle = userSearchTerm.trim().toLowerCase();
-    if (!needle) return managers;
-    return managers.filter((mgr) => hierarchyLabel(mgr).toLowerCase().includes(needle));
-  }, [managers, userSearchTerm]);
 
   useEffect(() => {
-    if (!companyIdentifier) return;
+    if (!companyIdentifier) {
+      setLoadingJourneys(false);
+      return;
+    }
     const fetchJourneys = async () => {
       setLoadingJourneys(true);
       try {
@@ -199,10 +466,7 @@ const EmployeesOnboarding = () => {
           user_ids?: string[];
           department_id?: number;
           status?: string;
-        } = {
-          page: currentPage,
-          limit: rowsPerPage,
-        };
+        } = { page: currentPage, limit: rowsPerPage };
         if (appliedSearch?.trim()) params.search = appliedSearch.trim();
         if (appliedDepartment?.trim()) {
           const deptId = Number(appliedDepartment.trim());
@@ -229,7 +493,7 @@ const EmployeesOnboarding = () => {
     companyIdentifier,
     currentPage,
     rowsPerPage,
-    refreshJourneysKey,
+    refreshKey,
     appliedSearch,
     appliedDepartment,
     appliedEmploymentType,
@@ -238,61 +502,561 @@ const EmployeesOnboarding = () => {
     appliedStatus,
   ]);
 
-  useEffect(() => {
-    if (companyIdentifier) return;
-    setLoadingJourneys(false);
-  }, [companyIdentifier]);
+  return { journeysData, journeysPagination, loadingJourneys };
+}
 
-  const employees: OnboardingEmployee[] = useMemo(() => {
-    return journeysData.map((j) => {
-      const rawUserId = j.user_id ?? j.user_profile?.user_id;
-      const userId = rawUserId == null ? "" : String(rawUserId).trim();
-      const name =
-        users.find((u) => String(u.phone ?? "").trim() === userId || String(u.id) === userId)?.name ??
-        (userId || "—");
-      const statusKey = (j.status ?? "in_progress").toLowerCase().replaceAll(/\s/g, "_");
-      const status: OnboardingEmployee["status"] =
-        STATUS_DISPLAY[statusKey] ?? "In Progress";
-      const totalSteps = Math.max(1, Number(j.total_steps_count ?? 0));
-      const completedSteps = Number(j.completed_steps_count ?? 0);
-      const progress = Math.min(100, Math.round((completedSteps / totalSteps) * 100));
-      const steps = Array.isArray(j.steps) ? j.steps : [];
-      const stepNames = steps.length
-        ? steps.map((s) => (s.name ?? "document").toLowerCase())
-        : ["document", "profile"];
-      const startDateFormatted = j.start_date
-        ? new Date(j.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-        : "—";
-      const profile = j.user_profile;
-      const contractRaw = profile?.contract_type;
-      const employmentRaw = profile?.employment_type;
-      const designationRaw = profile?.designation;
-      const designation =
-        designationRaw != null && String(designationRaw).trim() !== ""
-          ? String(designationRaw).trim()
-          : undefined;
-      return {
-        id: String(j.id ?? j.user_profile_id ?? (userId || "unknown")),
-        name,
-        avatar: "",
-        startDate: startDateFormatted,
-        stages: stepNames,
-        progress,
-        status,
-        role: j.job_title ?? profile?.job_title ?? undefined,
-        department: j.department_name ?? undefined,
-        user_id: userId || undefined,
-        department_name: j.department_name ?? undefined,
-        designation,
-        total_steps_count: j.total_steps_count,
-        completed_steps_count: j.completed_steps_count,
-        contract_type:
-          contractRaw != null && String(contractRaw).trim() !== "" ? String(contractRaw).trim() : undefined,
-        employment_type:
-          employmentRaw != null && String(employmentRaw).trim() !== "" ? String(employmentRaw).trim() : undefined,
-      };
+// ---------------------------------------------------------------------------
+// Hook: useSelectedJourneyDetail
+// ---------------------------------------------------------------------------
+function useSelectedJourneyDetail(journeyId: number, canUpdate: boolean) {
+  const [journeySteps, setJourneySteps] = useState<JourneyStepRecord[]>([]);
+  const [stepsLoading, setStepsLoading] = useState(false);
+  const [journeyStartDateIso, setJourneyStartDateIso] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!canUpdate) {
+      setJourneySteps([]);
+      setJourneyStartDateIso(null);
+      return;
+    }
+    let cancelled = false;
+    setStepsLoading(true);
+    setJourneyStartDateIso(null);
+    getJourney(journeyId)
+      .then((data: unknown) => {
+        if (cancelled) return;
+        const raw = data as { steps?: JourneyStepRecord[]; start_date?: string };
+        setJourneySteps(Array.isArray(raw?.steps) ? raw.steps : []);
+        setJourneyStartDateIso(readJourneyStartDateFromPayload(raw));
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error("[WorkforceJourney] getJourney failed", error);
+        setJourneySteps([]);
+        setJourneyStartDateIso(null);
+      })
+      .finally(() => {
+        if (!cancelled) setStepsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [journeyId, canUpdate]);
+
+  const refreshSteps = useCallback(async () => {
+    const data = (await getJourney(journeyId)) as { steps?: JourneyStepRecord[]; start_date?: string };
+    setJourneySteps(Array.isArray(data?.steps) ? data.steps : []);
+    setJourneyStartDateIso(readJourneyStartDateFromPayload(data));
+  }, [journeyId]);
+
+  return { journeySteps, stepsLoading, journeyStartDateIso, refreshSteps };
+}
+
+// ---------------------------------------------------------------------------
+// Component: AddJourneyStepModal
+// ---------------------------------------------------------------------------
+type AddJourneyStepModalProps = {
+  show: boolean;
+  journeyId: number;
+  journeyDueDateMin: string | undefined;
+  stepCount: number;
+  onHide: () => void;
+  onStepAdded: () => void;
+  onRefreshJourneys: () => void;
+};
+
+function AddJourneyStepModal({
+  show,
+  journeyId,
+  journeyDueDateMin,
+  stepCount,
+  onHide,
+  onStepAdded,
+  onRefreshJourneys,
+}: Readonly<AddJourneyStepModalProps>) {
+  const [form, setForm] = useState({
+    stage: "",
+    title: "",
+    description: "",
+    due_date: new Date().toISOString().slice(0, 10),
+    status: "pending",
+    sort_order: 0,
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!show || journeyDueDateMin == null) return;
+    setForm((prev) => (prev.due_date < journeyDueDateMin ? { ...prev, due_date: journeyDueDateMin } : prev));
+  }, [show, journeyDueDateMin]);
+
+  useEffect(() => {
+    if (show) {
+      setForm((prev) => ({
+        ...prev,
+        sort_order: stepCount,
+        due_date: clampDueDateToJourneyMin(prev.due_date, journeyDueDateMin),
+      }));
+    }
+  }, [show, stepCount, journeyDueDateMin]);
+
+  const handleSubmit = async () => {
+    if (form.title.trim() === "") {
+      toast.error("Task is required");
+      return;
+    }
+    if (journeyDueDateMin != null && form.due_date !== "" && form.due_date < journeyDueDateMin) {
+      toast.error("Due date cannot be before the journey start date.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await createJourneyStep(journeyId, {
+        stage: form.stage,
+        title: form.title,
+        description: form.description,
+        due_date: form.due_date,
+        status: form.status,
+        sort_order: form.sort_order,
+      });
+      toast.success("Step added.");
+      onHide();
+      setForm({
+        stage: "",
+        title: "",
+        description: "",
+        due_date: clampDueDateToJourneyMin(new Date().toISOString().slice(0, 10), journeyDueDateMin),
+        status: "pending",
+        sort_order: stepCount,
+      });
+      onStepAdded();
+      onRefreshJourneys();
+    } catch (error: unknown) {
+      console.error("[WorkforceJourney] createJourneyStep failed", error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal show={show} onHide={onHide} centered style={{ zIndex: 99999 }}>
+      <Modal.Header closeButton>
+        <Modal.Title>New step</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          <Form.Group className="mb-3">
+            <Form.Label>Stage</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Type the stage"
+              value={form.stage}
+              onChange={(e) => setForm((prev) => ({ ...prev, stage: e.target.value }))}
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>
+              Task <span className="text-danger">*</span>
+            </Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Type the task"
+              value={form.title}
+              onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Description</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={2}
+              placeholder="Description"
+              value={form.description}
+              onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Due Date</Form.Label>
+            <Form.Control
+              type="date"
+              min={journeyDueDateMin}
+              value={form.due_date}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  due_date: clampDueDateToJourneyMin(e.target.value, journeyDueDateMin),
+                }))
+              }
+            />
+          </Form.Group>
+        </div>
+      </Modal.Body>
+      <Modal.Footer>
+        <button
+          type="button"
+          onClick={onHide}
+          disabled={submitting}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "white",
+            color: "#6b7280",
+            border: "1px solid #e5e7eb",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: "600",
+            cursor: submitting ? "not-allowed" : "pointer",
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting || form.title.trim() === ""}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#6366f1",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: "600",
+            cursor: submitting || form.title.trim() === "" ? "not-allowed" : "pointer",
+          }}
+        >
+          {submitting ? "Adding..." : "Add step"}
+        </button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Component: EditJourneyStepModal
+// ---------------------------------------------------------------------------
+type EditJourneyStepModalProps = {
+  step: JourneyStepRecord | null;
+  journeyId: number;
+  journeyDueDateMin: string | undefined;
+  onHide: () => void;
+  onStepUpdated: () => void;
+  onRefreshJourneys: () => void;
+};
+
+function EditJourneyStepModal({
+  step,
+  journeyId,
+  journeyDueDateMin,
+  onHide,
+  onStepUpdated,
+  onRefreshJourneys,
+}: Readonly<EditJourneyStepModalProps>) {
+  const [form, setForm] = useState({
+    stage: "",
+    title: "",
+    description: "",
+    due_date: "",
+    status: "pending",
+    sort_order: 0,
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (step == null) return;
+    const dueRaw = step.due_date ? toInputDate(step.due_date) : new Date().toISOString().slice(0, 10);
+    setForm({
+      stage: step.stage ?? "",
+      title: step.title ?? "",
+      description: step.description ?? "",
+      due_date: clampDueDateToJourneyMin(dueRaw, journeyDueDateMin),
+      status: step.status ?? "pending",
+      sort_order: Number(step.sort_order ?? 0),
     });
-  }, [journeysData, users]);
+  }, [step, journeyDueDateMin]);
+
+  const handleSubmit = async () => {
+    if (step?.id == null) return;
+    if (journeyDueDateMin != null && form.due_date !== "" && form.due_date < journeyDueDateMin) {
+      toast.error("Due date cannot be before the journey start date.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await updateJourneyStep(journeyId, step.id, {
+        stage: form.stage,
+        title: form.title,
+        description: form.description,
+        due_date: form.due_date,
+        status: form.status,
+        sort_order: form.sort_order,
+      });
+      toast.success("Step updated.");
+      onHide();
+      onStepUpdated();
+      onRefreshJourneys();
+    } catch (error: unknown) {
+      console.error("[WorkforceJourney] updateJourneyStep failed", error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal show={step != null} onHide={onHide} centered style={{ zIndex: 99999 }}>
+      <Modal.Header closeButton>
+        <Modal.Title>Edit step</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <Form.Group className="mb-3">
+          <Form.Label>Stage</Form.Label>
+          <Form.Control
+            type="text"
+            placeholder="Stage"
+            value={form.stage}
+            onChange={(e) => setForm((prev) => ({ ...prev, stage: e.target.value }))}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Title</Form.Label>
+          <Form.Control
+            type="text"
+            placeholder="Title"
+            value={form.title}
+            onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Description</Form.Label>
+          <Form.Control
+            as="textarea"
+            rows={2}
+            placeholder="Description"
+            value={form.description}
+            onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Due Date</Form.Label>
+          <Form.Control
+            type="date"
+            min={journeyDueDateMin}
+            value={form.due_date}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                due_date: clampDueDateToJourneyMin(e.target.value, journeyDueDateMin),
+              }))
+            }
+          />
+        </Form.Group>
+        <Form.Group className="mb-3">
+          <Form.Label>Status</Form.Label>
+          <Form.Control
+            as="select"
+            value={form.status}
+            onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
+          >
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+          </Form.Control>
+        </Form.Group>
+      </Modal.Body>
+      <Modal.Footer>
+        <button
+          type="button"
+          onClick={onHide}
+          disabled={submitting}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "white",
+            color: "#6b7280",
+            border: "1px solid #e5e7eb",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: "600",
+            cursor: submitting ? "not-allowed" : "pointer",
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#6366f1",
+            color: "white",
+            border: "none",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: "600",
+            cursor: submitting ? "not-allowed" : "pointer",
+          }}
+        >
+          {submitting ? "Saving..." : "Save"}
+        </button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main page component
+// ---------------------------------------------------------------------------
+const EmployeesOnboarding = () => {
+  const { mainAppUsers, mainAppDepartments, companyIdentifier } = useMainAppLookups();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [appliedDepartment, setAppliedDepartment] = useState("");
+  const [selectedEmploymentType, setSelectedEmploymentType] = useState("");
+  const [selectedContract, setSelectedContract] = useState("");
+  const [appliedEmploymentType, setAppliedEmploymentType] = useState("");
+  const [appliedContract, setAppliedContract] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [appliedUserIds, setAppliedUserIds] = useState<string[]>([]);
+  const [selectedStatus, setSelectedStatus] = useState("");
+  const [appliedStatus, setAppliedStatus] = useState("");
+  const [userSearchTerm, setUserSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
+  const [selectedEmployee, setSelectedEmployee] = useState<OnboardingEmployee | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [statusValue, setStatusValue] = useState<string>("in_progress");
+  const [statusUpdating, setStatusUpdating] = useState(false);
+  const [showAddStepForm, setShowAddStepForm] = useState(false);
+  const [editingStep, setEditingStep] = useState<JourneyStepRecord | null>(null);
+  const [deletingStepId, setDeletingStepId] = useState<number | null>(null);
+  const [deletingJourney, setDeletingJourney] = useState(false);
+  const [showDeleteJourneyModal, setShowDeleteJourneyModal] = useState(false);
+  const [showDeleteStepModal, setShowDeleteStepModal] = useState(false);
+  const [stepPendingDelete, setStepPendingDelete] = useState<JourneyStepRecord | null>(null);
+  const [refreshJourneysKey, setRefreshJourneysKey] = useState(0);
+
+  const users = useMemo(() => (mainAppUsers ?? []) as LookupUser[], [mainAppUsers]);
+  const managers = users;
+
+  const journeyId = Number(selectedEmployee?.id);
+  const canUpdateJourney = Number.isInteger(journeyId) && journeyId > 0;
+  const isJourneyCompleted = useMemo(
+    () => statusValue === "completed" || isEmployeeJourneyDisplayCompleted(selectedEmployee?.status ?? ""),
+    [statusValue, selectedEmployee?.status],
+  );
+
+  const { journeysData, journeysPagination, loadingJourneys } = useWorkforceJourneysList({
+    companyIdentifier,
+    currentPage,
+    rowsPerPage,
+    refreshKey: refreshJourneysKey,
+    appliedSearch,
+    appliedDepartment,
+    appliedEmploymentType,
+    appliedContract,
+    appliedUserIds,
+    appliedStatus,
+  });
+
+  const { journeySteps, stepsLoading, journeyStartDateIso, refreshSteps } = useSelectedJourneyDetail(
+    journeyId,
+    canUpdateJourney,
+  );
+
+  const journeyDueDateMin = useMemo(
+    () => journeyStartDateToInputMin(journeyStartDateIso),
+    [journeyStartDateIso],
+  );
+
+  useEffect(() => {
+    setStatusValue(statusDisplayToApiValue(selectedEmployee?.status ?? "In Progress"));
+  }, [selectedEmployee?.id, selectedEmployee?.status]);
+
+  const toggleSelectedUserId = useCallback((idStr: string, isSelected: boolean) => {
+    setSelectedUserIds((prev) => {
+      if (isSelected) return prev.filter((id) => id !== idStr);
+      return [...prev, idStr];
+    });
+  }, []);
+
+  const filteredManagers = useMemo(() => {
+    const needle = userSearchTerm.trim().toLowerCase();
+    if (!needle) return managers;
+    return managers.filter((mgr) => hierarchyLabel(mgr).toLowerCase().includes(needle));
+  }, [managers, userSearchTerm]);
+
+  const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newStatus = e.target.value;
+    if (!canUpdateJourney || isJourneyCompleted) return;
+    setStatusUpdating(true);
+    try {
+      await updateJourney(journeyId, { status: newStatus });
+      setStatusValue(newStatus);
+      setSelectedEmployee((prev) => {
+        if (!prev) return prev;
+        const displayStatus = STATUS_DISPLAY[newStatus] ?? prev.status;
+        return { ...prev, status: displayStatus };
+      });
+      toast.success("Status updated.");
+      setRefreshJourneysKey((k) => k + 1);
+    } catch (error: unknown) {
+      console.error("[WorkforceJourney] updateJourney failed", error);
+    } finally {
+      setStatusUpdating(false);
+    }
+  };
+
+  const openDeleteStepModal = (step: JourneyStepRecord) => {
+    if (step.id == null) return;
+    setStepPendingDelete(step);
+    setShowDeleteStepModal(true);
+  };
+
+  const closeDeleteStepModal = () => {
+    setShowDeleteStepModal(false);
+    setStepPendingDelete(null);
+  };
+
+  const confirmDeleteStep = useCallback(async () => {
+    const step = stepPendingDelete;
+    if (!canUpdateJourney || step?.id == null) {
+      closeDeleteStepModal();
+      return;
+    }
+    setDeletingStepId(step.id);
+    try {
+      await deleteJourneyStep(journeyId, step.id);
+      toast.success("Step deleted.");
+      await refreshSteps();
+      closeDeleteStepModal();
+      setRefreshJourneysKey((k) => k + 1);
+    } catch (error: unknown) {
+      console.error("[WorkforceJourney] deleteJourneyStep failed", error);
+    } finally {
+      setDeletingStepId(null);
+    }
+  }, [canUpdateJourney, journeyId, stepPendingDelete, refreshSteps]);
+
+  const handleDeleteJourney = async () => {
+    if (!canUpdateJourney) return;
+    setDeletingJourney(true);
+    try {
+      await deleteJourney(journeyId);
+      toast.success("Journey deleted.");
+      setShowDeleteJourneyModal(false);
+      setIsSidebarOpen(false);
+      setSelectedEmployee(null);
+      setRefreshJourneysKey((k) => k + 1);
+    } catch (error: unknown) {
+      console.error("[WorkforceJourney] deleteJourney failed", error);
+    } finally {
+      setDeletingJourney(false);
+    }
+  };
+
+  const employees = useMemo<OnboardingEmployee[]>(
+    () => mapJourneyRecordsToEmployees(journeysData, users),
+    [journeysData, users],
+  );
 
   const handleApply = () => {
     setAppliedSearch(searchTerm);
@@ -374,13 +1138,13 @@ const EmployeesOnboarding = () => {
 
   const selectedStatusLabel = useMemo(() => {
     if (selectedStatus === "") return "";
-    const opt = JOURNEY_STATUS_OPTIONS.find((o) => o.value === selectedStatus);
+    const opt = JOURNEY_STATUS_OPTIONS.find((o: { value: string; label: string }) => o.value === selectedStatus);
     return opt?.label ?? selectedStatus;
   }, [selectedStatus]);
 
   const appliedStatusLabel = useMemo(() => {
     if (appliedStatus === "") return "";
-    const opt = JOURNEY_STATUS_OPTIONS.find((o) => o.value === appliedStatus);
+    const opt = JOURNEY_STATUS_OPTIONS.find((o: { value: string; label: string }) => o.value === appliedStatus);
     return opt?.label ?? appliedStatus;
   }, [appliedStatus]);
 
@@ -545,6 +1309,183 @@ const EmployeesOnboarding = () => {
     [],
   );
 
+  const journeySidebarSections = useMemo<SidebarSection[]>(() => {
+    if (!selectedEmployee) return [];
+    const totalSteps = Number(selectedEmployee.total_steps_count ?? 0);
+    const completedSteps = Number(selectedEmployee.completed_steps_count ?? 0);
+    const statusColors = getStatusColor(selectedEmployee.status);
+
+    return [
+      {
+        id: "journey-employee-details",
+        title: "Employee Details",
+        icon: User,
+        collapsible: true,
+        defaultExpanded: true,
+        fields: [
+          { label: "Extension", value: selectedEmployee.user_id || "—" },
+          { label: "Department", value: selectedEmployee.department_name || "—" },
+          { label: "Designation", value: selectedEmployee.designation || "—" },
+          { label: "Start Date", value: selectedEmployee.startDate || "—" },
+          { label: "Role", value: selectedEmployee.role || "—" },
+        ],
+      },
+      {
+        id: "journey-employment-info",
+        title: "Employment Info",
+        icon: Briefcase,
+        collapsible: true,
+        defaultExpanded: true,
+        fields: [
+          { label: "Contract Type", value: selectedEmployee.contract_type || "—" },
+          { label: "Employment Type", value: selectedEmployee.employment_type || "—" },
+        ],
+      },
+      {
+        id: "journey-onboarding-progress",
+        title: "Onboarding Progress",
+        icon: Target,
+        collapsible: true,
+        defaultExpanded: true,
+        customContent: (
+          <div style={{ padding: "0 4px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: "8px",
+              }}
+            >
+              <span style={{ fontSize: "13px", color: "#6b7280" }}>
+                {completedSteps} of {totalSteps} steps completed
+              </span>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#1f2937" }}>
+                {selectedEmployee.progress}%
+              </span>
+            </div>
+            <div
+              style={{
+                width: "100%",
+                height: "8px",
+                backgroundColor: "#e9d5ff",
+                borderRadius: "4px",
+                overflow: "hidden",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                style={{
+                  width: `${selectedEmployee.progress}%`,
+                  height: "100%",
+                  backgroundColor: "#8b5cf6",
+                  borderRadius: "4px",
+                  transition: "width 0.3s ease",
+                }}
+              />
+            </div>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "4px 12px",
+                backgroundColor: statusColors.bg,
+                borderRadius: "16px",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  backgroundColor: statusColors.dot,
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ fontSize: "13px", fontWeight: "500", color: statusColors.color }}>
+                {selectedEmployee.status}
+              </span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: "journey-status",
+        title: "Status",
+        icon: Target,
+        collapsible: true,
+        defaultExpanded: true,
+        customContent: (
+          <div style={{ padding: "0 4px" }}>
+            <label
+              htmlFor="journey-sidebar-status"
+              style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}
+            >
+              Journey Status
+            </label>
+            <select
+              id="journey-sidebar-status"
+              className="form-select"
+              value={statusValue}
+              onChange={handleStatusChange}
+              disabled={statusUpdating || isJourneyCompleted || !canUpdateJourney}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                fontSize: "14px",
+                border: "1px solid #e5e7eb",
+                borderRadius: "8px",
+                backgroundColor: isJourneyCompleted ? "#f9fafb" : "white",
+                color: "#1f2937",
+                cursor: statusUpdating || isJourneyCompleted ? "not-allowed" : "pointer",
+              }}
+            >
+              {JOURNEY_STATUS_OPTIONS.map((opt: { value: string; label: string }) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            {statusUpdating && (
+              <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>Updating...</div>
+            )}
+          </div>
+        ),
+      },
+      {
+        id: "journey-steps",
+        title: "Steps",
+        icon: Check,
+        collapsible: true,
+        defaultExpanded: true,
+        customContent: (
+          <JourneyStepsSidebarSection
+            steps={journeySteps}
+            loading={stepsLoading}
+            isCompleted={isJourneyCompleted}
+            canUpdate={canUpdateJourney}
+            deletingStepId={deletingStepId}
+            onAddStep={() => setShowAddStepForm(true)}
+            onEditStep={(step) => setEditingStep(step)}
+            onDeleteStep={openDeleteStepModal}
+          />
+        ),
+      },
+    ];
+  }, [
+    selectedEmployee,
+    statusValue,
+    statusUpdating,
+    isJourneyCompleted,
+    canUpdateJourney,
+    stepsLoading,
+    journeySteps,
+    deletingStepId,
+    journeyDueDateMin,
+  ]);
+
   const employmentFilterOptions = useMemo(
     () => [
       {
@@ -603,7 +1544,7 @@ const EmployeesOnboarding = () => {
         value: "__all__",
         onClick: () => setSelectedStatus(""),
       },
-      ...JOURNEY_STATUS_OPTIONS.map((opt) => ({
+      ...JOURNEY_STATUS_OPTIONS.map((opt: { value: string; label: string }) => ({
         label: opt.label,
         value: opt.value,
         onClick: () => setSelectedStatus(opt.value),
@@ -818,12 +1759,22 @@ const EmployeesOnboarding = () => {
 
   const onboardingToolbar = useMemo<ToolbarConfig>(
     () => ({
+      showTabs: true,
+      tabs: [
+        {
+          id: "employees-journey",
+          label: "Employees Journey",
+          count: journeysPagination?.total,
+        },
+      ],
+      activeTab: "employees-journey",
       showSearch: true,
       searchValue: searchTerm,
       searchPlaceholder: "Search by extension or designation",
       onSearchChange: setSearchTerm,
       onSearch: handleApply,
-      showFilterPills: true,
+      showFiltersButton: true,
+      showFilterPills: false,
       filterPills,
       showMoreFiltersButton: false,
       customActions: (
@@ -861,30 +1812,20 @@ const EmployeesOnboarding = () => {
         </div>
       ),
     }),
-    [searchTerm, filterPills],
+    [searchTerm, filterPills, journeysPagination?.total],
   );
 
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees Journey" />
-      <div>
-        <div>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '24px',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}>
-            <h1 style={{
-              fontSize: "28px",
-              fontWeight: "600",
-              color: "#111827",
-              margin: 0
-            }}>Employees Journey</h1>
-          </div>
-
+      <div
+        className="journey-page-shell"
+        style={{ display: "flex", gap: 0, height: "calc(100vh)", overflow: "hidden" }}
+      >
+        <div
+          className="journey-table-pane"
+          style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}
+        >
           <GenericTable<OnboardingEmployee>
             data={employees}
             columns={onboardingColumns}
@@ -911,9 +1852,15 @@ const EmployeesOnboarding = () => {
               setSelectedEmployee(row);
               setIsSidebarOpen(true);
             }}
+            onPreviewClick={(row) => {
+              setSelectedEmployee(row);
+              setIsSidebarOpen(true);
+            }}
             showToolbar={true}
             toolbar={onboardingToolbar}
             showToolbarActions={false}
+            fixedHeight={true}
+            maxHeight="calc(100vh - 295px)"
           />
 
           {(appliedSearch.trim() ||
@@ -922,7 +1869,7 @@ const EmployeesOnboarding = () => {
             appliedContract ||
             appliedStatus ||
             appliedUserIds.length > 0) && (
-            <div style={{ marginTop: "10px", fontSize: "12px", color: "#6b7280" }}>
+            <div style={{ marginTop: "10px", fontSize: "12px", color: "#6b7280", padding: "0 4px" }}>
               {appliedSearch.trim() ? `Search: ${appliedSearch} | ` : ""}
               {appliedDepartment ? `Department: ${appliedDepartmentLabel} | ` : ""}
               {appliedEmploymentType ? `Employment: ${appliedEmploymentType} | ` : ""}
@@ -932,57 +1879,75 @@ const EmployeesOnboarding = () => {
             </div>
           )}
         </div>
-  
-        {/* Sidebar Overlay */}
+
         {isSidebarOpen && selectedEmployee && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 9999,
-              display: 'flex',
-              justifyContent: 'flex-end'
+          <GenericSidebar
+            isOpen={isSidebarOpen}
+            onClose={() => {
+              setIsSidebarOpen(false);
+              setSelectedEmployee(null);
             }}
-          >
-            <button
-              type="button"
-              aria-label="Close onboarding sidebar"
-              onClick={() => {
-                setIsSidebarOpen(false);
-                setSelectedEmployee(null);
-              }}
-              style={{
-                position: "absolute",
-                inset: 0,
-                border: "none",
-                padding: 0,
-                margin: 0,
-                backgroundColor: "rgba(0, 0, 0, 0.4)",
-                cursor: "pointer",
-              }}
-            />
-            <div
-              style={{
-                position: 'relative',
-                zIndex: 1000,
-              }}
-            >
-              <OnboardingDetailSidebar
-                employee={selectedEmployee}
-                onClose={() => {
-                  setIsSidebarOpen(false);
-                  setSelectedEmployee(null);
-                }}
-                onRefreshJourneys={() => setRefreshJourneysKey((k) => k + 1)}
-              />
-            </div>
-          </div>
+            title={selectedEmployee.name}
+            subtitle={selectedEmployee.role ?? selectedEmployee.designation ?? ""}
+            company={selectedEmployee.department_name}
+            avatar={{
+              initials: getInitials(selectedEmployee.name),
+              name: selectedEmployee.name,
+              gradient: getAvatarColor(selectedEmployee.name),
+            }}
+            quickActions={
+              canUpdateJourney
+                ? [
+                    {
+                      id: "delete-journey",
+                      label: "Delete",
+                      icon: Trash2,
+                      onClick: () => setShowDeleteJourneyModal(true),
+                      disabled: deletingJourney,
+                    },
+                  ]
+                : undefined
+            }
+            sections={journeySidebarSections}
+          />
         )}
+
+        <AddJourneyStepModal
+          show={showAddStepForm}
+          journeyId={journeyId}
+          journeyDueDateMin={journeyDueDateMin}
+          stepCount={journeySteps.length}
+          onHide={() => setShowAddStepForm(false)}
+          onStepAdded={refreshSteps}
+          onRefreshJourneys={() => setRefreshJourneysKey((k) => k + 1)}
+        />
+
+        <EditJourneyStepModal
+          step={editingStep}
+          journeyId={journeyId}
+          journeyDueDateMin={journeyDueDateMin}
+          onHide={() => setEditingStep(null)}
+          onStepUpdated={refreshSteps}
+          onRefreshJourneys={() => setRefreshJourneysKey((k) => k + 1)}
+        />
+
+        <DeleteConfirmationModal
+          show={showDeleteStepModal}
+          onHide={closeDeleteStepModal}
+          onConfirm={confirmDeleteStep}
+          itemName={stepPendingDelete?.title?.trim() ? `step "${stepPendingDelete.title.trim()}"` : "this journey step"}
+          itemType="step"
+          loading={deletingStepId != null}
+        />
+        <DeleteConfirmationModal
+          show={showDeleteJourneyModal}
+          onHide={() => setShowDeleteJourneyModal(false)}
+          onConfirm={handleDeleteJourney}
+          itemName={selectedEmployee ? `onboarding journey for ${selectedEmployee.name}` : "this journey"}
+          itemType="journey"
+          loading={deletingJourney}
+        />
       </div>
-     
     </React.Fragment>
   );
 };
