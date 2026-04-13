@@ -11,9 +11,9 @@ export function handleCrmListUploadResponse(
   entityName: string,
   callbacks: CrmUploadSuccessCallbacks,
 ): boolean {
-  const responseData = response?.data || {};
-  const processedCount: number = responseData.processed_count || 0;
-  const validationFailures: number = responseData.validation_failures || 0;
+  const responseData = response?.data ?? response ?? {};
+  const processedCount: number = responseData.processed_count ?? 0;
+  const validationFailures: number = responseData.validation_failures ?? 0;
 
   if (processedCount > 0) {
     let msg = `Successfully processed ${processedCount} record${

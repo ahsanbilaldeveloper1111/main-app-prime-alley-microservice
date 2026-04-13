@@ -80,6 +80,8 @@ import {
   CRM_DIALOG_PRIMARY_BUTTON_STYLE,
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
 } from "@components/crm/crmDialogActionButtonStyles";
+import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
+import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import moment from "moment";
 
 function consumeHandledApiError(error: unknown, source: string): void {
@@ -298,13 +300,16 @@ function buildCrmDataAssignmentPayload(args: {
   }
 
   payload.custom_extensions = extensionArray;
-  payload.distribution_mode = distributionMode === "custom" ? "custom" : distributionMode;
+  payload.user_distribution_mode = distributionMode === "custom" ? "custom" : "equal";
 
   if (distributionMode === "custom") {
-    const dist: Record<number, number> = {};
-    Object.entries(customDistribution).forEach(([v, count]) => {
-      const id = Number.parseInt(v, 10);
-      if (id > 0 && count > 0) dist[id] = count;
+    const allowed = new Set(extensionArray.map(String));
+    const dist: Record<string, number> = {};
+    Object.entries(customDistribution).forEach(([key, count]) => {
+      const k = String(key);
+      if (!allowed.has(k)) return;
+      if (typeof count !== "number" || !Number.isFinite(count) || count < 0) return;
+      dist[k] = count;
     });
     payload.extension_distribution = dist;
   }
@@ -612,7 +617,8 @@ const CRM_CAMPAIGNS_SELECT_STYLES = {
 
 type ToolbarFactoryArgs = {
   campaignsSearch: string;
-  setCampaignsSearch: (v: string) => void;
+  onCampaignsSearchChange: (v: string) => void;
+  submitCampaignsSearch: () => void;
   handleFiltersChange: (filters: Record<string, any>) => void;
   setCampaignsPagination: React.Dispatch<React.SetStateAction<{ currentPage: number; rowsPerPage: number; sortBy: string; sortOrder: "asc" | "desc" }>>;
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
@@ -649,13 +655,10 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
     showSearch: true,
     searchValue: a.campaignsSearch,
     searchPlaceholder: "Search campaigns by name, description...",
-    onSearchChange: (value) => {
-      a.setCampaignsSearch(value);
-    },
+    onSearchChange: a.onCampaignsSearchChange,
     onSearch: () => {
-      a.handleFiltersChange({ search: a.campaignsSearch });
+      a.submitCampaignsSearch();
       a.setCampaignsPagination((prev) => ({ ...prev, currentPage: 1 }));
-      a.setRefreshKey((prev) => prev + 1);
     },
     showTabs: true,
     tabs: [
@@ -1182,7 +1185,7 @@ type CrmCampaignListQueryParams = {
     tags: string[] | null;
   };
   activeFilter: string;
-  campaignsSearch: string;
+  campaignsSearchQuery: string;
 };
 
 type CrmCampaignListSetters = {
@@ -1197,7 +1200,7 @@ function useCrmCampaignListQueryEffect(
   query: CrmCampaignListQueryParams,
   setters: CrmCampaignListSetters,
 ) {
-  const { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch } = query;
+  const { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearchQuery } = query;
   const { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns } = setters;
   useEffect(() => {
     const loadCampaigns = async () => {
@@ -1207,7 +1210,7 @@ function useCrmCampaignListQueryEffect(
         const response = await getCampaigns({
           page: campaignsPagination.currentPage,
           per_page: campaignsPagination.rowsPerPage,
-          search: memoizedFilters.search || campaignsSearch || undefined,
+          search: campaignsSearchQuery || undefined,
           filters,
           module_slug: ModuleSlug.CRM_CAMPAIGNS,
         });
@@ -1235,7 +1238,7 @@ function useCrmCampaignListQueryEffect(
     memoizedFilters,
     campaignFilters,
     activeFilter,
-    campaignsSearch,
+    campaignsSearchQuery,
   ]);
 }
 
@@ -1284,21 +1287,6 @@ const DEFAULT_CAMPAIGN_SELECTED_COLUMNS: string[] = [
   "actions",
 ];
 
-function parseSavedCampaignTableColumns(raw: string | null): string[] | null {
-  if (!raw) return null;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    const allowed = new Set<string>(CAMPAIGN_SELECTABLE_COLUMN_KEYS);
-    const next = parsed.filter(
-      (k): k is string => typeof k === "string" && allowed.has(k),
-    );
-    return next.length > 0 ? next : null;
-  } catch {
-    return null;
-  }
-}
-
 const CrmCampaigns = () => { // NOSONAR
   const { data: session } = useSession();
 
@@ -1314,23 +1302,25 @@ const CrmCampaigns = () => { // NOSONAR
   // UI State
   const [showCampaignsAnalytics, setShowCampaignsAnalytics] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
-  const [campaignsSearch, setCampaignsSearch] = useState("");
-  const [campaignsPagination, setCampaignsPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 10,
-    sortBy: "",
-    sortOrder: "asc" as "asc" | "desc",
+  const {
+    inputValue: campaignsSearch,
+    queryValue: campaignsSearchQuery,
+    handleInputChange: handleCampaignsSearchChange,
+    submitQuery: submitCampaignsSearch,
+  } = useDebouncedSearchInput();
+  const {
+    pagination: campaignsPagination,
+    setPagination: setCampaignsPagination,
+    selectedColumns: selectedCampaignTableColumns,
+    setSelectedColumns: setSelectedCampaignTableColumns,
+    handlePaginationChange: handleCampaignsPaginationChange,
+    handleSort: handleCampaignsSort,
+  } = useCrmSettingsTableState({
+    defaultSelectedColumns: DEFAULT_CAMPAIGN_SELECTED_COLUMNS,
+    selectableColumnKeys: CAMPAIGN_SELECTABLE_COLUMN_KEYS,
+    columnStorageKey: CAMPAIGN_TABLE_COLUMN_STORAGE_KEY,
+    initialPagination: { rowsPerPage: 10 },
   });
-  const [selectedCampaignTableColumns, setSelectedCampaignTableColumns] =
-    useState<string[]>(() => {
-      if (globalThis.window === undefined) {
-        return [...DEFAULT_CAMPAIGN_SELECTED_COLUMNS];
-      }
-      const saved = parseSavedCampaignTableColumns(
-        globalThis.localStorage.getItem(CAMPAIGN_TABLE_COLUMN_STORAGE_KEY),
-      );
-      return saved ?? [...DEFAULT_CAMPAIGN_SELECTED_COLUMNS];
-    });
   const [campaignFilters, setCampaignFilters] = useState({
     status: [] as string[],
     dateFrom: null as string | null,
@@ -1474,9 +1464,16 @@ const CrmCampaigns = () => { // NOSONAR
   }, []);
 
   const listCampaignsPermission = Boolean(session?.user?.permissions?.includes("list-crm-campaigns"));
+
+  useEffect(() => {
+    setCampaignsPagination((prev) =>
+      prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 },
+    );
+  }, [campaignsSearchQuery, setCampaignsPagination]);
+
   useCrmCampaignListQueryEffect(
     listCampaignsPermission,
-    { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch },
+    { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearchQuery },
     { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns },
   );
 
@@ -1697,7 +1694,9 @@ const CrmCampaigns = () => { // NOSONAR
       );
 
       const processedCount = response.processed_count ?? 0;
-      const validationFailureCount = Array.isArray(response.errors) ? response.errors.length : 0;
+      const validationFailureCount =
+        (typeof response.validation_failures === "number" ? response.validation_failures : null) ??
+        (Array.isArray(response.errors) ? response.errors.length : 0);
       toastCrmCsvUploadOutcome(processedCount, validationFailureCount);
 
       setSelectedFile(null);
@@ -1986,7 +1985,8 @@ const CrmCampaigns = () => { // NOSONAR
     () =>
       createCrmCampaignsToolbarConfig({
         campaignsSearch,
-        setCampaignsSearch,
+        onCampaignsSearchChange: handleCampaignsSearchChange,
+        submitCampaignsSearch,
         handleFiltersChange,
         setCampaignsPagination,
         setRefreshKey,
@@ -2005,6 +2005,7 @@ const CrmCampaigns = () => { // NOSONAR
       }),
     [
       campaignsSearch,
+      handleCampaignsSearchChange,
       activeFilter,
       filterCounts,
       showCampaignsAnalytics,
@@ -2014,20 +2015,9 @@ const CrmCampaigns = () => { // NOSONAR
       handleDataAssignment,
       handleCreateCampaign,
       handleFiltersChange,
+      submitCampaignsSearch,
     ],
   );
-
-  const handleCampaignsPaginationChange = useCallback((page: number, rowsPerPage: number) => {
-    setCampaignsPagination((prev) => ({
-      ...prev,
-      currentPage: rowsPerPage === prev.rowsPerPage ? page : 1,
-      rowsPerPage,
-    }));
-  }, []);
-
-  const handleCampaignsSort = useCallback((column: string, direction: "asc" | "desc") => {
-    setCampaignsPagination((prev) => ({ ...prev, sortBy: column, sortOrder: direction, currentPage: 1 }));
-  }, []);
 
   const closeCreateEditModal = () => {
     setShowCreateModal(false);
@@ -2085,15 +2075,7 @@ const CrmCampaigns = () => { // NOSONAR
           customizableColumns
           selectedColumns={selectedCampaignTableColumns}
           defaultSelectedColumns={DEFAULT_CAMPAIGN_SELECTED_COLUMNS}
-          onColumnChange={(cols) => {
-            const allowed = new Set<string>(CAMPAIGN_SELECTABLE_COLUMN_KEYS);
-            const filtered = cols.filter((c) => allowed.has(c));
-            setSelectedCampaignTableColumns(filtered);
-            globalThis.localStorage.setItem(
-              CAMPAIGN_TABLE_COLUMN_STORAGE_KEY,
-              JSON.stringify(filtered),
-            );
-          }}
+          onColumnChange={setSelectedCampaignTableColumns}
           columnStorageKey={CAMPAIGN_TABLE_COLUMN_STORAGE_KEY}
           showToolbar
           toolbar={toolbarConfig}
@@ -2103,8 +2085,16 @@ const CrmCampaigns = () => { // NOSONAR
       )}
 
       {/* Create/Edit Campaign Modal */}
-      <Modal show={showCreateModal || showEditModal} onHide={closeCreateEditModal} size="xl" centered>
-        <Modal.Header closeButton>
+      <Modal
+        show={showCreateModal || showEditModal}
+        onHide={() => {
+          if (loading) return;
+          closeCreateEditModal();
+        }}
+        size="xl"
+        centered
+      >
+        <Modal.Header closeButton={!loading}>
           <Modal.Title>
             {showEditModal ? `Edit Campaign: ${selectedCampaign?.name}` : "Add New Campaign"}
           </Modal.Title>

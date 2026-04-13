@@ -62,10 +62,29 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import { formatCrmPreviewDate, normalizeSearchQuery } from "@utils/Helper";
+import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
+import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 
 type StageType = "lead" | "deal" | "order" | "lost_reason";
 
 const STAGES_PREVIEW_LOCAL_STORAGE_KEY = "stages_last_preview_id";
+const STAGES_TABLE_COLUMN_STORAGE_KEY = "stagesSelectedColumns";
+const STAGES_TABLE_SELECTABLE_KEYS = [
+  "sequence",
+  "name",
+  "type",
+  "description",
+  "color",
+  "actions",
+] as const;
+const DEFAULT_STAGES_SELECTED_COLUMNS = [
+  "sequence",
+  "name",
+  "type",
+  "description",
+  "color",
+  "actions",
+];
 
 function readStagesPreviewIdFromStorage(): string | null {
   if (globalThis.window === undefined) return null;
@@ -137,20 +156,6 @@ function getTypeBadgeColor(type: string): string {
 
 function consumeHandledApiError(error: unknown, source: string): void {
   reportApiErrorFromCatch(error, source, { scope: "StagesManagement" });
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((x) => typeof x === "string");
-}
-
-function parseSavedStageColumns(raw: string | null): string[] | undefined {
-  if (!raw) return undefined;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return isStringArray(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 type StageFormState = {
@@ -288,6 +293,8 @@ const StagesManagement = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [submittingStageForm, setSubmittingStageForm] = useState(false);
+  const [deletingStage, setDeletingStage] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
   const [stageToDelete, setStageToDelete] = useState<Stage | null>(null);
@@ -302,13 +309,18 @@ const StagesManagement = () => {
     search: "",
     type: "",
   });
-  const [stagesSearch, setStagesSearch] = useState("");
+  const {
+    inputValue: stagesSearch,
+    queryValue: stagesSearchQuery,
+    handleInputChange: handleToolbarSearchChange,
+    submitQuery: handleToolbarSearchSubmit,
+  } = useDebouncedSearchInput({
+    normalize: normalizeSearchQuery,
+  });
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [showStagesAnalytics, setShowStagesAnalytics] = useState(false);
 
-  const normalizeSelectedStageColumns = (
-    cols: string[] | null | undefined,
-  ): string[] => {
+  const normalizeSelectedStageColumns = (cols: string[]): string[] => {
     const map: Record<string, string> = {
       order: "sequence",
       stageName: "name",
@@ -330,15 +342,19 @@ const StagesManagement = () => {
     }, []);
   };
 
-  const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem("stagesSelectedColumns");
-    return normalizeSelectedStageColumns(parseSavedStageColumns(saved));
-  });
-  const [stagesPagination, setStagesPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortBy: "",
-    sortOrder: "asc" as "asc" | "desc",
+  const {
+    selectedColumns: selectedStagesColumns,
+    setSelectedColumns: setSelectedStagesColumns,
+    pagination: stagesPagination,
+    setPagination,
+    handlePaginationChange: handleStagesPaginationChange,
+    handleSort: handleStagesSort,
+  } = useCrmSettingsTableState({
+    defaultSelectedColumns: DEFAULT_STAGES_SELECTED_COLUMNS,
+    selectableColumnKeys: STAGES_TABLE_SELECTABLE_KEYS,
+    columnStorageKey: STAGES_TABLE_COLUMN_STORAGE_KEY,
+    initialPagination: { rowsPerPage: 15 },
+    normalizeSelectedColumns: normalizeSelectedStageColumns,
   });
   const [stagesData, setStagesData] = useState<StageData[]>([]);
   const [allStagesData, setAllStagesData] = useState<StageData[]>([]);
@@ -415,6 +431,17 @@ const StagesManagement = () => {
   useEffect(() => {
     fetchAllStagesForCounts();
   }, [fetchAllStagesForCounts, refreshKey]);
+
+  useEffect(() => {
+    setCurrentFilters((prev) =>
+      prev.search === stagesSearchQuery
+        ? prev
+        : { ...prev, search: stagesSearchQuery }
+    );
+    setPagination((prev) =>
+      prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 }
+    );
+  }, [setPagination, stagesSearchQuery]);
 
   useEffect(() => {
     if (loadingStages) return;
@@ -515,6 +542,7 @@ const StagesManagement = () => {
     e.preventDefault();
 
     try {
+      setSubmittingStageForm(true);
       await createStage(formData);
       toast.success("Stage created successfully!");
       setShowCreateModal(false);
@@ -526,6 +554,8 @@ const StagesManagement = () => {
     } catch (error: unknown) {
       consumeHandledApiError(error, "StagesManagement.handleSubmit");
       toast.error("Failed to create stage");
+    } finally {
+      setSubmittingStageForm(false);
     }
   };
 
@@ -540,6 +570,7 @@ const StagesManagement = () => {
     if (!stageToUpdate) return;
 
     try {
+      setSubmittingStageForm(true);
       await updateStage(stageToUpdate.id, formData);
       toast.success("Stage updated successfully!");
       setShowUpdateModal(false);
@@ -552,6 +583,8 @@ const StagesManagement = () => {
     } catch (error: unknown) {
       consumeHandledApiError(error, "StagesManagement.handleUpdateStage");
       toast.error("Failed to update stage");
+    } finally {
+      setSubmittingStageForm(false);
     }
   };
 
@@ -559,6 +592,7 @@ const StagesManagement = () => {
     if (!stageToDelete) return;
 
     try {
+      setDeletingStage(true);
       await deleteStage(stageToDelete.id);
       toast.success("Stage deleted successfully!");
       setShowDeleteModal(false);
@@ -570,6 +604,8 @@ const StagesManagement = () => {
     } catch (error: unknown) {
       consumeHandledApiError(error, "StagesManagement.handleDeleteStage");
       toast.error("Failed to delete stage");
+    } finally {
+      setDeletingStage(false);
     }
   };
 
@@ -876,29 +912,6 @@ const StagesManagement = () => {
     [sortedStages, stagesPagination.currentPage, stagesPagination.rowsPerPage],
   );
 
-  const handleStagesSort = useCallback(
-    (column: string, direction: "asc" | "desc") => {
-      setStagesPagination((prev) => ({
-        ...prev,
-        sortBy: column,
-        sortOrder: direction,
-        currentPage: 1,
-      }));
-    },
-    [],
-  );
-
-  const handleStagesPaginationChange = useCallback(
-    (page: number, rowsPerPage: number) => {
-      setStagesPagination((prev) => ({
-        ...prev,
-        currentPage: rowsPerPage === prev.rowsPerPage ? page : 1,
-        rowsPerPage,
-      }));
-    },
-    [],
-  );
-
   // Calculate analytics data
   const analyticsData = useMemo(() => {
     const total = filteredStages.length;
@@ -933,24 +946,10 @@ const StagesManagement = () => {
     return counts;
   }, [allStagesData]);
 
-  const handleToolbarSearchChange = useCallback((value: string) => {
-    const normalized = normalizeSearchQuery(value);
-    setStagesSearch(normalized);
-    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
-    setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, []);
-
-  const handleToolbarSearchSubmit = useCallback(() => {
-    const normalized = normalizeSearchQuery(stagesSearch);
-    setStagesSearch(normalized);
-    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
-    setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, [stagesSearch]);
-
   const handleToolbarTabChange = useCallback((tabId: string) => {
     setActiveFilter(tabId);
-    setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, []);
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, [setPagination]);
 
   const toggleStagesAnalytics = useCallback(() => {
     setShowStagesAnalytics((open) => !open);
@@ -1185,23 +1184,9 @@ const StagesManagement = () => {
             onPaginationChange={handleStagesPaginationChange}
             customizableColumns
             selectedColumns={selectedStagesColumns}
-            defaultSelectedColumns={[
-              "sequence",
-              "name",
-              "type",
-              "description",
-              "color",
-              "actions",
-            ]}
-            onColumnChange={(cols) => {
-              const normalized = normalizeSelectedStageColumns(cols);
-              setSelectedStagesColumns(normalized);
-              localStorage.setItem(
-                "stagesSelectedColumns",
-                JSON.stringify(normalized),
-              );
-            }}
-            columnStorageKey="stagesSelectedColumns"
+            defaultSelectedColumns={DEFAULT_STAGES_SELECTED_COLUMNS}
+            onColumnChange={setSelectedStagesColumns}
+            columnStorageKey={STAGES_TABLE_COLUMN_STORAGE_KEY}
             showToolbar={true}
             toolbar={toolbarConfig}
             showToolbarActions={false}
@@ -1355,7 +1340,7 @@ const StagesManagement = () => {
               </Form.Group>
             </Form>
         }
-        submitButtonText="Create Stage"
+        submitButtonText={submittingStageForm ? "Creating Stage..." : "Create Stage"}
         cancelButtonText="Cancel"
         onSubmit={() => {
           handleSubmit(scaffoldFormEvent()).catch((error: unknown) => {
@@ -1365,6 +1350,8 @@ const StagesManagement = () => {
         onCancel={() => setShowCreateModal(false)}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        isSubmitting={submittingStageForm}
+        isSubmitDisabled={submittingStageForm}
         useCrmDialogFooterStyle
       />
 
@@ -1488,7 +1475,7 @@ const StagesManagement = () => {
               </Form.Group>
             </Form>
         }
-        submitButtonText="Update Stage"
+        submitButtonText={submittingStageForm ? "Updating Stage..." : "Update Stage"}
         cancelButtonText="Cancel"
         onSubmit={() => {
           handleUpdateStage(scaffoldFormEvent()).catch((error: unknown) => {
@@ -1498,6 +1485,8 @@ const StagesManagement = () => {
         onCancel={handleCloseUpdateModal}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        isSubmitting={submittingStageForm}
+        isSubmitDisabled={submittingStageForm}
         useCrmDialogFooterStyle
       />
 
@@ -1511,6 +1500,7 @@ const StagesManagement = () => {
         onConfirm={handleDeleteStage}
         itemName={stageToDelete?.name}
         itemType="stage"
+        loading={deletingStage}
       />
 
       <Modal
