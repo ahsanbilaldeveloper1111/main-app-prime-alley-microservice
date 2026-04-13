@@ -14,7 +14,7 @@ const NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID =
 const DEFAULT_TEAM_ID = Number(NEXT_PUBLIC_FINESSED_DEFAULT_TEAM_ID);
 
 export const getStoredTeamId = (): number => {
-  if (typeof globalThis.window === "undefined") return DEFAULT_TEAM_ID;
+  if (globalThis.window === undefined) return DEFAULT_TEAM_ID;
   try {
     const raw = globalThis.sessionStorage.getItem(FINESSE_SELECTED_TEAM_ID_KEY);
     if (raw == null || raw === "") return DEFAULT_TEAM_ID;
@@ -26,7 +26,7 @@ export const getStoredTeamId = (): number => {
 };
 
 export const setStoredTeamId = (teamId: number): void => {
-  if (typeof globalThis.window === "undefined") return;
+  if (globalThis.window === undefined) return;
   try {
     globalThis.sessionStorage.setItem(
       FINESSE_SELECTED_TEAM_ID_KEY,
@@ -60,7 +60,7 @@ export interface FinesseUserData {
 }
 
 export const setFinesseUserData = (data: FinesseUserData): void => {
-  if (typeof globalThis.window === "undefined") return;
+  if (globalThis.window === undefined) return;
   try {
     globalThis.sessionStorage.setItem(
       FINESSE_USER_DATA_KEY,
@@ -72,7 +72,7 @@ export const setFinesseUserData = (data: FinesseUserData): void => {
 };
 
 export const getFinesseUserData = (): FinesseUserData | null => {
-  if (typeof globalThis.window === "undefined") return null;
+  if (globalThis.window === undefined) return null;
   try {
     const raw = globalThis.sessionStorage.getItem(FINESSE_USER_DATA_KEY);
     return raw ? (JSON.parse(raw) as FinesseUserData) : null;
@@ -82,7 +82,7 @@ export const getFinesseUserData = (): FinesseUserData | null => {
 };
 
 export const setFinesseToken = (token: string): void => {
-  if (typeof globalThis.window === "undefined") return;
+  if (globalThis.window === undefined) return;
   try {
     globalThis.sessionStorage.setItem(FINESSE_TOKEN_KEY, token);
   } catch {
@@ -91,7 +91,7 @@ export const setFinesseToken = (token: string): void => {
 };
 
 export const getFinesseToken = (): string | null => {
-  if (typeof globalThis.window === "undefined") return null;
+  if (globalThis.window === undefined) return null;
   try {
     return globalThis.sessionStorage.getItem(FINESSE_TOKEN_KEY);
   } catch {
@@ -105,7 +105,7 @@ export const getFinesseToken = (): string | null => {
  * Finesse token is thus cleared here and replaced when user authenticates again (setFinesseToken(response.token)).
  */
 export const clearFinesseUserData = (): void => {
-  if (typeof globalThis.window === "undefined") return;
+  if (globalThis.window === undefined) return;
   try {
     globalThis.sessionStorage.removeItem(FINESSE_USER_DATA_KEY);
     globalThis.sessionStorage.removeItem(FINESSE_TOKEN_KEY);
@@ -199,22 +199,32 @@ function truncateToastText(s: string): string {
     : t;
 }
 
+function appendValidationErrorPart(parts: string[], item: unknown): void {
+  if (typeof item === "string") {
+    const t = item.trim();
+    if (t) parts.push(t);
+    return;
+  }
+  if (typeof item === "number" || typeof item === "boolean") {
+    parts.push(String(item));
+  }
+}
+
+function collectValidationPartsForValue(parts: string[], v: unknown): void {
+  if (Array.isArray(v)) {
+    for (const item of v) {
+      appendValidationErrorPart(parts, item);
+    }
+    return;
+  }
+  appendValidationErrorPart(parts, v);
+}
+
 function flattenValidationErrors(errors: unknown): string | undefined {
   if (!isPlainRecord(errors)) return undefined;
   const parts: string[] = [];
   for (const v of Object.values(errors)) {
-    if (Array.isArray(v)) {
-      for (const item of v) {
-        if (typeof item === "string" && item.trim()) parts.push(item.trim());
-        else if (typeof item === "number" || typeof item === "boolean") {
-          parts.push(String(item));
-        }
-      }
-    } else if (typeof v === "string" && v.trim()) {
-      parts.push(v.trim());
-    } else if (typeof v === "number" || typeof v === "boolean") {
-      parts.push(String(v));
-    }
+    collectValidationPartsForValue(parts, v);
   }
   if (parts.length === 0) return undefined;
   return truncateToastText(parts.join(". "));
@@ -353,6 +363,11 @@ export async function assertFinesseTeamSwitchable(
       await getFinesseUser(normalizedId, username);
       return { ok: true };
     } catch (err: unknown) {
+      console.error(
+        "[assertFinesseTeamSwitchable] getFinesseUser failed",
+        { teamId: normalizedId, username },
+        err,
+      );
       return {
         ok: false,
         message: "This team is not available.",
@@ -457,6 +472,44 @@ export interface FinesseDialogActionPayload {
   wrapUpReasonNotAllowedForUpdateCallData?: boolean;
 }
 
+type FinesseCallVariableRow = { name: string; value: string };
+
+const UPDATE_CALL_DATA_FLAG_KEYS = [
+  "actionParamCombinationValid",
+  "wrapUpItemsValidIfProvided",
+  "callVariableNamesUnique",
+  "updateCallDataRequiresItemsOrCallVars",
+  "updateCallDataFieldsOnlyForUpdateCallData",
+  "wrapUpReasonNotAllowedForUpdateCallData",
+] as const satisfies ReadonlyArray<keyof FinesseDialogActionPayload>;
+
+function normalizeCallVariablesForDialogAction(
+  callVariables: FinesseDialogActionPayload["callVariables"],
+): FinesseCallVariableRow[] | undefined {
+  if (callVariables == null) return undefined;
+  if (Array.isArray(callVariables)) {
+    return callVariables.length > 0 ? callVariables : undefined;
+  }
+  const arr = Object.entries(callVariables)
+    .filter(([, value]) => value != null && String(value).trim() !== "")
+    .map(([name, value]) => ({ name, value: String(value) }));
+  return arr.length > 0 ? arr : undefined;
+}
+
+function applyUpdateCallDataPayloadToBody(
+  body: Record<string, unknown>,
+  payload: FinesseDialogActionPayload,
+): void {
+  if (payload.wrapUpReason != null) body.wrapUpReason = payload.wrapUpReason;
+  if (payload.wrapUpItems != null) body.wrapUpItems = payload.wrapUpItems;
+  const callVars = normalizeCallVariablesForDialogAction(payload.callVariables);
+  if (callVars != undefined) body.callVariables = callVars;
+  for (const key of UPDATE_CALL_DATA_FLAG_KEYS) {
+    const v = payload[key];
+    if (v !== undefined) body[key] = v;
+  }
+}
+
 /**
  * POST finesse/teams/{teamId}/user/{finesseUserId}/dialog/{dialogId}/action - Send dialog action (ACCEPT, REJECT, CLOSE, DROP, UPDATE_CALL_DATA, RECLASSIFY)
  */
@@ -472,31 +525,7 @@ export const sendFinesseDialogAction = async (
   };
   if (payload.actionParam != null) body.actionParam = payload.actionParam;
   if (payload.action === "UPDATE_CALL_DATA") {
-    if (payload.wrapUpReason != null) body.wrapUpReason = payload.wrapUpReason;
-    if (payload.wrapUpItems != null) body.wrapUpItems = payload.wrapUpItems;
-    if (payload.callVariables != null) {
-      const arr = Array.isArray(payload.callVariables)
-        ? payload.callVariables
-        : Object.entries(payload.callVariables)
-            .filter(([, value]) => value != null && String(value).trim() !== "")
-            .map(([name, value]) => ({ name, value: String(value) }));
-      if (arr.length > 0) body.callVariables = arr;
-    }
-    if (payload.actionParamCombinationValid !== undefined)
-      body.actionParamCombinationValid = payload.actionParamCombinationValid;
-    if (payload.wrapUpItemsValidIfProvided !== undefined)
-      body.wrapUpItemsValidIfProvided = payload.wrapUpItemsValidIfProvided;
-    if (payload.callVariableNamesUnique !== undefined)
-      body.callVariableNamesUnique = payload.callVariableNamesUnique;
-    if (payload.updateCallDataRequiresItemsOrCallVars !== undefined)
-      body.updateCallDataRequiresItemsOrCallVars =
-        payload.updateCallDataRequiresItemsOrCallVars;
-    if (payload.updateCallDataFieldsOnlyForUpdateCallData !== undefined)
-      body.updateCallDataFieldsOnlyForUpdateCallData =
-        payload.updateCallDataFieldsOnlyForUpdateCallData;
-    if (payload.wrapUpReasonNotAllowedForUpdateCallData !== undefined)
-      body.wrapUpReasonNotAllowedForUpdateCallData =
-        payload.wrapUpReasonNotAllowedForUpdateCallData;
+    applyUpdateCallDataPayloadToBody(body, payload);
   }
   const response = await axiosInstance.post(
     `${prefix}/teams/${teamId}/user/${encodeURIComponent(finesseUserId)}/dialog/${encodeURIComponent(dialogId)}/action`,
