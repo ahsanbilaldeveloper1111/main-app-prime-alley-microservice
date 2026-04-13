@@ -979,7 +979,16 @@ export interface CrmDataUploadResponse {
   success: boolean;
   message: string;
   processed_count: number;
-  errors: string[];
+  chunks_processed?: number;
+  chunk_size?: string | number;
+  /**
+   * Backend may return validation failures separately from `errors`.
+   * Keep both to support older/newer response shapes.
+   */
+  validation_failures?: number;
+  errors: unknown[];
+  user_assignments?: unknown[];
+  filters?: Record<string, unknown>;
 }
 
 export const createCrmData = async (payload: {
@@ -1110,11 +1119,17 @@ export const uploadCrmDataCsv = async (
       },
     );
 
-    if (response.data.success) {
-      toast.success(response.data.message);
+    // API commonly wraps payload as `{ code, message, data: { ... } }`
+    // but some endpoints may still return `{ success, ... }` directly.
+    const raw: unknown = response.data;
+    if (raw && typeof raw === "object" && "data" in raw) {
+      const wrapped = raw as { data?: unknown };
+      if (wrapped.data && typeof wrapped.data === "object") {
+        return wrapped.data as CrmDataUploadResponse;
+      }
     }
 
-    return response.data;
+    return raw as CrmDataUploadResponse;
   } catch (error: any) {
     toast.error(error?.response?.data?.message || "Failed to upload CSV file");
     throw error;

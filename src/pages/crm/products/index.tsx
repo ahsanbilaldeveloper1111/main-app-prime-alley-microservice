@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, {
@@ -52,6 +52,8 @@ import {
 } from "@components/crm/crmDialogActionButtonStyles";
 import { useSession } from "next-auth/react";
 import { formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
+import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
+import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 
 // Product interface matching UI expectations
 interface ProductDisplayData {
@@ -68,6 +70,17 @@ interface ProductDisplayData {
   industry?: IndustryData | null;
   industry_id?: number | null;
 }
+
+const PRODUCTS_TABLE_COLUMN_STORAGE_KEY = "productsSelectedColumns";
+const DEFAULT_PRODUCT_TABLE_COLUMNS = [
+  "productName",
+  "sku",
+  "price",
+  "category",
+  "brand",
+  "status",
+  "actions",
+];
 
 const ProductsPage = () => {
   const { data: session } = useSession();
@@ -115,11 +128,14 @@ const ProductsPage = () => {
   const [products, setProducts] = useState<CrmProduct[]>([]);
   const [totalProducts, setTotalProducts] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [productsPagination, setProductsPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 10,
+  const {
+    inputValue: productsSearch,
+    queryValue: productsSearchQuery,
+    handleInputChange: handleProductsSearchChange,
+    submitQuery: handleProductsSearchSubmit,
+  } = useDebouncedSearchInput({
+    normalize: normalizeSearchQuery,
   });
-  const [productsSearch, setProductsSearch] = useState("");
   const [productsFilters, setProductsFilters] = useState({
     industry_id: null as number | null,
     category: null as string | null,
@@ -131,6 +147,7 @@ const ProductsPage = () => {
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] =
     useState<ProductDisplayData | null>(null);
+  const [submittingProduct, setSubmittingProduct] = useState(false);
 
   const productTableSelectableKeys = [
     "productName",
@@ -145,34 +162,17 @@ const ProductsPage = () => {
     "actions",
   ] as const;
 
-  const defaultProductTableColumns = [
-    "productName",
-    "sku",
-    "price",
-    "category",
-    "brand",
-    "status",
-    "actions",
-  ];
-
-  const [selectedProductsColumns, setSelectedProductsColumns] = useState<
-    string[]
-  >(() => {
-    if (globalThis.window === undefined)
-      return [...defaultProductTableColumns];
-    try {
-      const raw = globalThis.localStorage.getItem("productsSelectedColumns");
-      if (!raw) return [...defaultProductTableColumns];
-      const parsed: unknown = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [...defaultProductTableColumns];
-      const allowed = new Set<string>(productTableSelectableKeys);
-      const next = parsed.filter(
-        (k): k is string => typeof k === "string" && allowed.has(k),
-      );
-      return next.length > 0 ? next : [...defaultProductTableColumns];
-    } catch {
-      return [...defaultProductTableColumns];
-    }
+  const {
+    pagination: productsPagination,
+    setPagination: setProductsPagination,
+    selectedColumns: selectedProductsColumns,
+    setSelectedColumns: setSelectedProductsColumns,
+    handlePaginationChange: handleProductsPaginationChange,
+  } = useCrmSettingsTableState({
+    defaultSelectedColumns: DEFAULT_PRODUCT_TABLE_COLUMNS,
+    selectableColumnKeys: productTableSelectableKeys,
+    columnStorageKey: PRODUCTS_TABLE_COLUMN_STORAGE_KEY,
+    initialPagination: { rowsPerPage: 10 },
   });
   const [productFormData, setProductFormData] = useState({
     productName: "",
@@ -190,6 +190,7 @@ const ProductsPage = () => {
   const [deletingProduct, setDeletingProduct] =
     useState<ProductDisplayData | null>(null);
   const [showProductDeleteModal, setShowProductDeleteModal] = useState(false);
+  const [deletingProductPending, setDeletingProductPending] = useState(false);
   const [showProductViewModal, setShowProductViewModal] = useState(false);
   const [viewingProduct, setViewingProduct] =
     useState<ProductDisplayData | null>(null);
@@ -346,20 +347,16 @@ const ProductsPage = () => {
     productsFilters,
   ]);
 
-  const handleProductsSearchChange = useCallback((value: string) => {
-    const normalized = normalizeSearchQuery(value);
-    setProductsSearch(normalized);
-    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
-    setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, []);
-
-  const handleProductsSearchSubmit = useCallback(() => {
-    setCurrentFilters((prev) => ({
-      ...prev,
-      search: normalizeSearchQuery(productsSearch),
-    }));
-    setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, [productsSearch]);
+  useEffect(() => {
+    setCurrentFilters((prev) =>
+      prev.search === productsSearchQuery
+        ? prev
+        : { ...prev, search: productsSearchQuery }
+    );
+    setProductsPagination((prev) =>
+      prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 }
+    );
+  }, [productsSearchQuery, setProductsPagination]);
 
   // Convert products to display data (no filtering - done by API)
   const displayProducts = useMemo(() => {
@@ -556,20 +553,6 @@ const ProductsPage = () => {
       statusFilterDropdownContent,
     ],
   );
-
-  // Available columns
-  const availableColumns = [
-    { key: "productName", label: "Product Name" },
-    { key: "sku", label: "SKU" },
-    { key: "price", label: "Price" },
-    { key: "currency", label: "Currency" },
-    { key: "category", label: "Category" },
-    { key: "brand", label: "Brand" },
-    { key: "status", label: "Status" },
-    { key: "description", label: "Description" },
-    { key: "created", label: "Created Date" },
-    { key: "actions", label: "Actions" },
-  ];
 
   const productsTableColumns = useMemo<TableColumn<ProductDisplayData>[]>(() => {
     const cols: TableColumn<ProductDisplayData>[] = [];
@@ -850,6 +833,7 @@ const ProductsPage = () => {
     }
 
     try {
+      setSubmittingProduct(true);
       if (editingProduct) {
         // Update existing product
         const updatePayload: any = {
@@ -885,12 +869,15 @@ const ProductsPage = () => {
       await fetchProducts();
     } catch (error: any) {
       toast.error(getErrorMessageFromUnknown(error, "Failed to save product"));
+    } finally {
+      setSubmittingProduct(false);
     }
   };
 
   const handleDeleteProduct = async () => {
     if (!deletingProduct) return;
     try {
+      setDeletingProductPending(true);
       await deleteProduct(deletingProduct.id);
       setShowProductDeleteModal(false);
       setDeletingProduct(null);
@@ -898,8 +885,19 @@ const ProductsPage = () => {
       await fetchProducts();
     } catch (error: any) {
       toast.error(getErrorMessageFromUnknown(error, "Failed to delete product"));
+    } finally {
+      setDeletingProductPending(false);
     }
   };
+
+  let productSubmitButtonLabel = "Add Product";
+  if (submittingProduct) {
+    productSubmitButtonLabel = editingProduct
+      ? "Updating Product..."
+      : "Adding Product...";
+  } else if (editingProduct) {
+    productSubmitButtonLabel = "Update Product";
+  }
 
   if (!session?.user?.permissions?.includes("list-crm-products")) {
     return null;
@@ -950,11 +948,14 @@ const ProductsPage = () => {
         {/* Product Form Modal */}
         <Modal
           show={showProductModal}
-          onHide={() => setShowProductModal(false)}
+          onHide={() => {
+            if (submittingProduct) return;
+            setShowProductModal(false);
+          }}
           size="lg"
           centered
         >
-          <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Header closeButton={!submittingProduct} className="border-0 pb-0">
             <Modal.Title className="fw-bold">
               {editingProduct ? "Edit Product" : "Add New Product"}
             </Modal.Title>
@@ -1000,7 +1001,7 @@ const ProductsPage = () => {
                       }
                       placeholder="Enter SKU"
                       required
-                      disabled={!!editingProduct}
+                      disabled={!!editingProduct || submittingProduct}
                     />
                     <Form.Text className="text-muted">
                       Unique product identifier (e.g., PROD-001)
@@ -1100,7 +1101,7 @@ const ProductsPage = () => {
                       placeholder="Select product group..."
                       styles={customSelectStyles}
                       isLoading={loadingIndustries}
-                      isDisabled={loadingIndustries}
+                      isDisabled={loadingIndustries || submittingProduct}
                       isClearable
                       required
                     />
@@ -1133,6 +1134,7 @@ const ProductsPage = () => {
                       }
                       placeholder="Select or create category..."
                       styles={customSelectStyles}
+                      isDisabled={submittingProduct}
                       isClearable
                     />
                     <Form.Text className="text-muted">
@@ -1211,14 +1213,19 @@ const ProductsPage = () => {
                   <Button
                     variant="primary"
                     type="submit"
+                    disabled={submittingProduct}
                     style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
                   >
                     <Check size={16} aria-hidden />
-                    {editingProduct ? "Update Product" : "Add Product"}
+                    {productSubmitButtonLabel}
                   </Button>
                   <Button
                     variant="outline-secondary"
-                    onClick={() => setShowProductModal(false)}
+                    onClick={() => {
+                      if (submittingProduct) return;
+                      setShowProductModal(false);
+                    }}
+                    disabled={submittingProduct}
                     style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
                   >
                     Cancel
@@ -1239,6 +1246,7 @@ const ProductsPage = () => {
           onConfirm={handleDeleteProduct}
           itemName={deletingProduct?.productName}
           itemType="product"
+          loading={deletingProductPending}
         />
 
         {/* Product View Modal */}
@@ -1774,32 +1782,13 @@ const ProductsPage = () => {
               totalRows: totalProducts,
               pageSizeOptions: [10, 25, 50, 100],
             }}
-            onPaginationChange={(page, rowsPerPage) => {
-              setProductsPagination((prev) => ({
-                ...prev,
-                currentPage: page,
-                rowsPerPage,
-              }));
-            }}
+            onPaginationChange={handleProductsPaginationChange}
             sortable
             customizableColumns
             selectedColumns={selectedProductsColumns}
-            defaultSelectedColumns={[
-              "productName",
-              "sku",
-              "price",
-              "category",
-              "brand",
-              "status",
-              "actions",
-            ]}
-            onColumnChange={(cols) => {
-              const allowed = new Set(availableColumns.map((c) => c.key));
-              const filtered = cols.filter((c) => allowed.has(c));
-              setSelectedProductsColumns(filtered);
-              localStorage.setItem("productsSelectedColumns", JSON.stringify(filtered));
-            }}
-            columnStorageKey="productsSelectedColumns"
+            defaultSelectedColumns={DEFAULT_PRODUCT_TABLE_COLUMNS}
+            onColumnChange={setSelectedProductsColumns}
+            columnStorageKey={PRODUCTS_TABLE_COLUMN_STORAGE_KEY}
             showToolbar
             toolbar={productsToolbarConfig}
             showToolbarActions={false}

@@ -60,6 +60,9 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
   };
 
   const handleClose = () => {
+    if (loading || isSubmitting) {
+      return;
+    }
     setConfirmText("");
     setIsSubmitting(false);
     confirmLockRef.current = false;
@@ -96,7 +99,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
       centered
       style={{ zIndex: 999999 }}
     >
-      <Modal.Header closeButton className="border-bottom">
+      <Modal.Header closeButton={!loading && !isSubmitting} className="border-bottom">
         <Modal.Title>Confirm Deletion</Modal.Title>
       </Modal.Header>
       <Modal.Body className="p-4">
