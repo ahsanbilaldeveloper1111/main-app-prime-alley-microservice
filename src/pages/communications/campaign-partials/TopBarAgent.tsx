@@ -1,14 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import {
-  Search,
-  ChevronDown,
-  CheckCircle,
-  XCircle,
-  User,
-  Settings,
-  LogOut,
-  Users,
-} from "lucide-react";
+import { Search, ChevronDown, CheckCircle } from "lucide-react";
 
 interface StatusOption {
   value: string;
@@ -198,6 +189,11 @@ const TopBar: React.FC<TopBarProps> = ({
           font-size: 14px;
           font-weight: 600;
           min-width: 160px;
+          font-family: inherit;
+          color: inherit;
+          text-align: left;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         .status-selector:hover {
@@ -205,7 +201,15 @@ const TopBar: React.FC<TopBarProps> = ({
           box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
         }
 
+        .status-selector:focus-visible {
+          outline: none;
+          border-color: #667eea;
+          box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
         .status-indicator {
+          display: inline-block;
+          flex-shrink: 0;
           width: 10px;
           height: 10px;
           border-radius: 50%;
@@ -320,7 +324,7 @@ const TopBar: React.FC<TopBarProps> = ({
             >
               {teamOptions.map((team) => (
                 <option key={team.id} value={team.name}>
-                  {team.name.replace(/-/g, " ")}
+                  {team.name.replaceAll("-", " ")}
                 </option>
               ))}
             </select>
@@ -329,8 +333,11 @@ const TopBar: React.FC<TopBarProps> = ({
 
         <div className="top-right-controls">
           <div className="status-dropdown-container" ref={statusDropdownRef}>
-            <div
+            <button
+              type="button"
               className="status-selector"
+              aria-expanded={showStatusDropdown}
+              aria-haspopup="menu"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -338,8 +345,9 @@ const TopBar: React.FC<TopBarProps> = ({
               }}
               style={{ cursor: "pointer", userSelect: "none" }}
             >
-              <div
+              <span
                 className="status-indicator"
+                aria-hidden
                 style={{ backgroundColor: currentStatus.color }}
               />
               <span>{currentStatus.label}</span>
@@ -353,7 +361,7 @@ const TopBar: React.FC<TopBarProps> = ({
                   transition: "transform 0.2s",
                 }}
               />
-            </div>
+            </button>
 
             {showStatusDropdown && (
               <div className="dropdown-menu" style={{ display: "block" }}>
