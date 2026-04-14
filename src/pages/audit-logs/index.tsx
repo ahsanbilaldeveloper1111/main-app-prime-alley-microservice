@@ -28,6 +28,10 @@ const PAGE_CSS = `
     display: flex;
     flex: 1 1 0;
     min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
   }
   .al-tab-btn {
     flex: 1 1 0;
@@ -96,6 +100,43 @@ const PAGE_CSS = `
     border-left: 1px solid #cccccc;
     flex-shrink: 0;
   }
+  .al-mobile-tabs-toggle {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid #c5cdd8;
+    border-radius: 3px;
+    background: #ffffff;
+    color: #33475b;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .al-mobile-tabs-menu {
+    display: none;
+  }
+  .al-mobile-tabs-item {
+    width: 100%;
+    text-align: left;
+    border: 1px solid #d9d9d9;
+    background: #ffffff;
+    color: #141414;
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .al-mobile-tabs-item.al-mobile-tabs-item-active {
+    background: #f0fafa;
+    border-color: #8a8a8a;
+  }
+  .al-tabs-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
   .al-tabs-icon-btn {
     display: flex;
     align-items: center;
@@ -127,6 +168,68 @@ const PAGE_CSS = `
     flex-shrink: 0;
   }
   .al-tabs-more-btn:hover { background: #f0f0f0; }
+
+  @media (max-width: 991px) {
+    .al-tab-btn {
+      flex: 0 0 auto;
+      min-width: 170px;
+      text-align: center;
+    }
+    .al-tabs-actions {
+      padding-left: 6px;
+      padding-right: 6px;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .al-tabs-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .al-tabs-group {
+      display: none;
+    }
+    .al-tab-btn {
+      min-width: 160px;
+      padding: 9px 12px;
+      font-size: 13px;
+    }
+    .al-tabs-actions {
+      border-left: 0;
+      padding: 0;
+      justify-content: space-between;
+      width: 100%;
+      flex-wrap: wrap;
+    }
+    .al-mobile-tabs-toggle {
+      display: inline-flex;
+    }
+    .al-mobile-tabs-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .al-tabs-more-btn {
+      margin-left: 0;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .al-tab-btn {
+      min-width: 140px;
+    }
+    .al-tabs-icon-btn {
+      width: 26px;
+      height: 26px;
+    }
+    .al-tabs-more-btn {
+      height: 26px;
+      padding: 0 8px;
+      font-size: 12px;
+    }
+  }
   .al-filter-row {
     display: flex;
     align-items: center;
@@ -561,6 +664,7 @@ const AuditLogsNewPage = () => { // NOSONAR
   const [serviceSearch, setServiceSearch] = useState("");
   const [actionSearch, setActionSearch] = useState("");
   const [userSearch, setUserSearch] = useState("");
+  const [mobileTabsOpen, setMobileTabsOpen] = useState(false);
 
   const selectedRowUser = toUserLike(selectedRow?.user);
   const sidebarFields: AuditSidebarField[] = selectedRow ? [
@@ -600,6 +704,7 @@ const AuditLogsNewPage = () => { // NOSONAR
     const node = visibleAuditModules.find((n: AuditFilterNode) => n.moduleName === moduleName) ?? null;
     setSelectedAuditModule(node); setSelectedAuditService(null);
     setSelectedAuditAction(""); setAuditStartDate(""); setAuditEndDate(""); setSelectedAuditUser(""); setAuditPage(1);
+    setMobileTabsOpen(false);
   }, [visibleAuditModules, selectedAuditModule?.moduleName]);
 
   const handleAuditServiceChange = useCallback((serviceName: string) => {
@@ -765,14 +870,40 @@ const AuditLogsNewPage = () => { // NOSONAR
 
                 {/* Right-side action icons */}
                 <div className="al-tabs-actions">
-                  <button type="button" className="al-tabs-icon-btn" title="Undo"><IconUndo /></button>
-                  <button type="button" className="al-tabs-icon-btn" title="Duplicate"><IconCopy /></button>
-                  <button type="button" className="al-tabs-icon-btn" title="Grid view"><IconGrid /></button>
-                  <button type="button" className="al-tabs-more-btn">
-                    More <CaretDown />
+                  <button
+                    type="button"
+                    className="al-mobile-tabs-toggle"
+                    onClick={() => setMobileTabsOpen((prev) => !prev)}
+                    aria-expanded={mobileTabsOpen}
+                    aria-label="Toggle modules"
+                  >
+                    {selectedAuditModule?.moduleName || "Modules"} <CaretDown />
                   </button>
+                  <div className="al-tabs-actions-right">
+                    <button type="button" className="al-tabs-icon-btn" title="Undo"><IconUndo /></button>
+                    <button type="button" className="al-tabs-icon-btn" title="Duplicate"><IconCopy /></button>
+                    <button type="button" className="al-tabs-icon-btn" title="Grid view"><IconGrid /></button>
+                    <button type="button" className="al-tabs-more-btn">
+                      More <CaretDown />
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              {mobileTabsOpen && (
+                <div className="al-mobile-tabs-menu">
+                  {visibleAuditModules.map((module: AuditFilterNode) => (
+                    <button
+                      type="button"
+                      key={`mobile-${module.moduleName}`}
+                      className={`al-mobile-tabs-item${selectedAuditModule?.moduleName === module.moduleName ? " al-mobile-tabs-item-active" : ""}`}
+                      onClick={() => handleAuditModuleChange(module.moduleName)}
+                    >
+                      {module.moduleName}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* ── Sub-filter row: shown as soon as a module is active (incl. auto-selected first) ── */}
               {/* ── Sub-filter row ── */}
