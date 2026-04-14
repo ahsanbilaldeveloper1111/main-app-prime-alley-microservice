@@ -63,6 +63,8 @@ import {
   clearFinesseUserData,
   finesseUnlink,
   finesseSetState,
+  assertFinesseTeamSwitchable,
+  getFinesseApiErrorMessage,
 } from '@utils/finesse';
 
 import "@assets/scss/common.scss";
@@ -130,6 +132,7 @@ const formatDuration = (stateChangeTime?: string): string => {
 };
 
 const LiveCallsAgentsManagement = () => {
+      const { data: session } = useSession();
       const [teams, setTeams] = useState<TeamOption[]>([]);
       const [selectedTeam, setSelectedTeam] = useState('');
       const [searchQuery, setSearchQuery] = useState('');
@@ -260,13 +263,29 @@ const LiveCallsAgentsManagement = () => {
 
       const handleTeamChange = async (newTeamName: string, newTeamId: number) => {
         if (Number(getStoredTeamId()) === newTeamId) return;
+        const previousTeamName = selectedTeam;
+        const stored = getFinesseUserData();
+        const usernameForCheck =
+          stored?.loginId ??
+          stored?.loginName ??
+          (session?.user as { username?: string } | undefined)?.username ??
+          '';
+        const switchCheck = await assertFinesseTeamSwitchable(newTeamId, usernameForCheck || undefined, [
+          teams,
+          stored?.teams,
+        ]);
+        if (!switchCheck.ok) {
+          toast.error(switchCheck.message);
+          setSelectedTeam(previousTeamName);
+          return;
+        }
         const { username, teamId } = getFinesseContext();
         if (username && teamId != null) {
           try {
             await finesseUnlink(username, teamId);
           } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Unlink failed';
-            toast.error(msg);
+            toast.error(getFinesseApiErrorMessage(err, 'Unlink failed'));
+            setSelectedTeam(previousTeamName);
             return;
           }
         }

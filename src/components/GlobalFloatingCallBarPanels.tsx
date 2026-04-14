@@ -239,6 +239,8 @@ export type FloatingBarActiveCallSectionProps = {
   barRef: React.RefObject<HTMLDivElement | null>;
   isDragging: boolean;
   dragPosition: { x: number; y: number } | null;
+  /** When true, bar uses CSS default anchor (responsive); false when using saved/drag coordinates */
+  defaultAnchored: boolean;
   sectionStyle: React.CSSProperties;
   onDragStart: (e: React.MouseEvent) => void;
   activeCall: FloatingBarCtiCall;
@@ -261,6 +263,7 @@ export function FloatingBarActiveCallSection({
   barRef,
   isDragging,
   dragPosition,
+  defaultAnchored,
   sectionStyle,
   onDragStart,
   activeCall,
@@ -286,7 +289,9 @@ export function FloatingBarActiveCallSection({
     <section aria-label="Active call">
       <div
         ref={barRef}
-        className={`global-floating-call-bar ${isDragging ? "dragging" : ""}`}
+        className={`global-floating-call-bar ${isDragging ? "dragging" : ""}${
+          defaultAnchored ? " global-floating-call-bar-default-anchor" : ""
+        }`}
         style={sectionStyle}
       >
         <button
