@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from "react";
 import {
   Search,
   ChevronDown,
@@ -7,8 +7,8 @@ import {
   User,
   Settings,
   LogOut,
-  Users
-} from 'lucide-react';
+  Users,
+} from "lucide-react";
 
 interface StatusOption {
   value: string;
@@ -60,28 +60,40 @@ const TopBar: React.FC<TopBarProps> = ({
   onStatusChange,
   onTeamChange,
 }) => {
-  const teamOptions: TeamOption[] = Array.isArray(teams) && teams.length > 0 && typeof teams[0] === 'object' && teams[0] != null && 'id' in (teams[0] as object)
-    ? (teams as TeamOption[])
-    : (teams as string[]).map((name, i) => ({ id: i, name }));
+  const teamOptions: TeamOption[] =
+    Array.isArray(teams) &&
+    teams.length > 0 &&
+    typeof teams[0] === "object" &&
+    teams[0] != null &&
+    "id" in (teams[0] as object)
+      ? (teams as TeamOption[])
+      : (teams as string[]).map((name, i) => ({ id: i, name }));
   const teamNames = teamOptions.map((t) => t.name);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+      if (
+        statusDropdownRef.current &&
+        !statusDropdownRef.current.contains(event.target as Node)
+      ) {
         setShowStatusDropdown(false);
       }
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(event.target as Node)
+      ) {
         setShowUserMenu(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [setShowStatusDropdown, setShowUserMenu]);
 
-  const currentStatus = statusOptions.find(s => s.value === agentStatus) || statusOptions[0];
+  const currentStatus =
+    statusOptions.find((s) => s.value === agentStatus) || statusOptions[0];
 
   const handleStatusChange = async (status: string) => {
     setShowStatusDropdown(false);
@@ -89,7 +101,7 @@ const TopBar: React.FC<TopBarProps> = ({
       await onStatusChange(status);
     } else {
       setAgentStatus(status);
-      const statusLabel = statusOptions.find(s => s.value === status)?.label;
+      const statusLabel = statusOptions.find((s) => s.value === status)?.label;
       if (statusLabel) {
         alert(`✅ Status changed to ${statusLabel}`);
       }
@@ -283,7 +295,9 @@ const TopBar: React.FC<TopBarProps> = ({
       `}</style>
 
       <div className="top-bar">
-        <div style={{ display: 'flex', gap: '12px', flex: 1, maxWidth: '450px' }}>
+        <div
+          style={{ display: "flex", gap: "12px", flex: 1, maxWidth: "450px" }}
+        >
           <div className="search-box">
             <Search className="search-icon" size={20} />
             <input
@@ -293,7 +307,7 @@ const TopBar: React.FC<TopBarProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          
+
           <div className="team-selector">
             <select
               value={selectedTeam}
@@ -306,48 +320,50 @@ const TopBar: React.FC<TopBarProps> = ({
             >
               {teamOptions.map((team) => (
                 <option key={team.id} value={team.name}>
-                  {team.name.replace(/-/g, ' ')}
+                  {team.name.replace(/-/g, " ")}
                 </option>
               ))}
             </select>
           </div>
         </div>
-        
+
         <div className="top-right-controls">
           <div className="status-dropdown-container" ref={statusDropdownRef}>
-            <div 
+            <div
               className="status-selector"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 setShowStatusDropdown(!showStatusDropdown);
               }}
-              style={{ cursor: 'pointer', userSelect: 'none' }}
+              style={{ cursor: "pointer", userSelect: "none" }}
             >
-              <div 
-                className="status-indicator" 
+              <div
+                className="status-indicator"
                 style={{ backgroundColor: currentStatus.color }}
               />
               <span>{currentStatus.label}</span>
-              <ChevronDown 
-                size={16} 
-                style={{ 
-                  marginLeft: 'auto',
-                  transform: showStatusDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s'
-                }} 
+              <ChevronDown
+                size={16}
+                style={{
+                  marginLeft: "auto",
+                  transform: showStatusDropdown
+                    ? "rotate(180deg)"
+                    : "rotate(0deg)",
+                  transition: "transform 0.2s",
+                }}
               />
             </div>
-            
+
             {showStatusDropdown && (
-              <div className="dropdown-menu" style={{ display: 'block' }}>
-                {statusOptions.map(option => {
+              <div className="dropdown-menu" style={{ display: "block" }}>
+                {statusOptions.map((option) => {
                   const IconComponent = option.icon;
                   return (
                     <button
                       key={option.value}
                       type="button"
-                      className={`dropdown-item ${agentStatus === option.value ? 'active' : ''}`}
+                      className={`dropdown-item ${agentStatus === option.value ? "active" : ""}`}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -357,7 +373,7 @@ const TopBar: React.FC<TopBarProps> = ({
                       <IconComponent size={18} color={option.color} />
                       <span>{option.label}</span>
                       {agentStatus === option.value && (
-                        <CheckCircle size={16} style={{ marginLeft: 'auto' }} />
+                        <CheckCircle size={16} style={{ marginLeft: "auto" }} />
                       )}
                     </button>
                   );
@@ -366,7 +382,7 @@ const TopBar: React.FC<TopBarProps> = ({
             )}
           </div>
 
-          <div className="status-dropdown-container" ref={userMenuRef}>
+          {/* <div className="status-dropdown-container" ref={userMenuRef}>
             <button 
               className="user-menu-button"
               onClick={(e) => {
@@ -409,7 +425,7 @@ const TopBar: React.FC<TopBarProps> = ({
                   <Settings size={18} />
                   <span>Settings</span>
                 </button> */}
-                <div style={{ 
+          {/* <div style={{ 
                   height: '1px', 
                   background: '#f1f5f9', 
                   margin: '8px 0' 
@@ -428,9 +444,9 @@ const TopBar: React.FC<TopBarProps> = ({
                   <LogOut size={18} />
                   <span>Logout</span>
                 </button>
-              </div>
-            )}
-          </div>
+              </div> */}
+          {/* )} */}
+          {/* </div> */}
         </div>
       </div>
     </>
