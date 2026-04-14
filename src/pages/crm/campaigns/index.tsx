@@ -328,11 +328,13 @@ function campaignFieldRowKey(
         : String(field.id as string | number | boolean | bigint);
     return `campaign-field-${idStr}`;
   }
-  return `campaign-field-new-${field.field_name ?? "unnamed"}-${field.field_type ?? "na"}-${field.sort_order ?? index}-${index}`;
+  // IMPORTANT: do not derive React keys from editable text; it causes remounts and input focus loss while typing.
+  return `campaign-field-idx-${index}`;
 }
 
-function campaignFieldOptionKey(fieldName: string, option: string, optionIndex: number): string {
-  return `opt-${fieldName}-${optionIndex}-${option.length}-${option.slice(0, 48)}`;
+function campaignFieldOptionKey(fieldKey: string, optionIndex: number): string {
+  // IMPORTANT: do not derive React keys from editable text; it causes remounts and input focus loss while typing.
+  return `opt-${fieldKey}-${optionIndex}`;
 }
 
 function viewModalDateRangeText(selected: { start_date?: string; end_date?: string }): string {
@@ -665,8 +667,8 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
       { id: "all", label: "All Campaigns", count: a.filterCounts.all, removable: false },
       { id: "active", label: "Active", count: a.filterCounts.active, removable: false },
       { id: "inactive", label: "Inactive", count: a.filterCounts.inactive, removable: false },
-      { id: "assigned", label: "Assigned Records", removable: false },
-      { id: "unassigned", label: "Unassigned Records", removable: false },
+      { id: "assigned", label: "With Assigned Records", removable: false },
+      { id: "unassigned", label: "With Unassigned Records", removable: false },
     ],
     activeTab: a.activeFilter,
     onTabChange: (tabId) => {
@@ -2069,7 +2071,7 @@ const CrmCampaigns = () => { // NOSONAR
             currentPage: campaignsPagination.currentPage,
             rowsPerPage: campaignsPagination.rowsPerPage,
             totalRows: totalCampaigns,
-            pageSizeOptions: [10, 25, 50, 100],
+            pageSizeOptions: [10, 15, 25, 50, 100],
           }}
           onPaginationChange={handleCampaignsPaginationChange}
           customizableColumns
@@ -2213,47 +2215,87 @@ const CrmCampaigns = () => { // NOSONAR
                   </Row>
                 </Card.Body>
               </Card>
-              {campaignFields.map((field, index) => (
-                <Card key={campaignFieldRowKey(field, index)} className="mb-2">
-                  <Card.Body>
-                    <Row className="align-items-center">
-                      <Col md={4}>
-                        <Form.Control type="text" value={field.field_name} onChange={(e) => { const u = [...campaignFields]; u[index].field_name = e.target.value; setCampaignFields(u); }} />
-                      </Col>
-                      <Col md={3}>
-                        <Form.Select value={field.field_type} onChange={(e) => handleFieldTypeChange(index, e.target.value)}>
-                          <option value="string">Text</option>
-                          <option value="integer">Number</option>
-                          <option value="date">Date</option>
-                          <option value="email">Email</option>
-                          <option value="dropdown">Dropdown</option>
-                        </Form.Select>
-                      </Col>
-                      <Col md={2}>
-                        <Form.Check type="checkbox" label="Required" checked={field.is_required || false} onChange={(e) => { const u = [...campaignFields]; u[index].is_required = e.target.checked; setCampaignFields(u); }} />
-                      </Col>
-                      <Col md={3}>
-                        <Button variant="danger" className="app-button" onClick={() => handleRemoveField(index)}><FiTrash2 /> Delete</Button>
-                      </Col>
-                      {field.field_type === "dropdown" && (
-                        <Col md={12} className="mt-3">
-                          {field.field_options?.map((option: string, optionIndex: number) => (
-                            <div key={campaignFieldOptionKey(field.field_name, option, optionIndex)} className="d-flex mb-3 row align-items-center justify-content-left">
-                              <Col md={5}>
-                                <Form.Control type="text" size="sm" value={option} onChange={(e) => handleFieldOptionChange(index, optionIndex, e.target.value)} placeholder="Option value" />
-                              </Col>
-                              <Col md={5}>
-                                <Button variant="danger" size="sm" className="app-button" onClick={() => handleRemoveFieldOption(index, optionIndex)}>Remove Option</Button>
-                              </Col>
-                            </div>
-                          ))}
-                          <Button variant="primary" className="app-button" size="sm" onClick={() => handleAddFieldOption(index)}>Add Option</Button>
+              {campaignFields.map((field, index) => {
+                const fieldKey = campaignFieldRowKey(field, index);
+                return (
+                  <Card key={fieldKey} className="mb-2">
+                    <Card.Body>
+                      <Row className="align-items-center">
+                        <Col md={4}>
+                          <Form.Control
+                            type="text"
+                            value={field.field_name}
+                            onChange={(e) => {
+                              const u = [...campaignFields];
+                              u[index].field_name = e.target.value;
+                              setCampaignFields(u);
+                            }}
+                          />
                         </Col>
-                      )}
-                    </Row>
-                  </Card.Body>
-                </Card>
-              ))}
+                        <Col md={3}>
+                          <Form.Select value={field.field_type} onChange={(e) => handleFieldTypeChange(index, e.target.value)}>
+                            <option value="string">Text</option>
+                            <option value="integer">Number</option>
+                            <option value="date">Date</option>
+                            <option value="email">Email</option>
+                            <option value="dropdown">Dropdown</option>
+                          </Form.Select>
+                        </Col>
+                        <Col md={2}>
+                          <Form.Check
+                            type="checkbox"
+                            label="Required"
+                            checked={field.is_required || false}
+                            onChange={(e) => {
+                              const u = [...campaignFields];
+                              u[index].is_required = e.target.checked;
+                              setCampaignFields(u);
+                            }}
+                          />
+                        </Col>
+                        <Col md={3}>
+                          <Button variant="danger" className="app-button" onClick={() => handleRemoveField(index)}>
+                            <FiTrash2 /> Delete
+                          </Button>
+                        </Col>
+                        {field.field_type === "dropdown" && (
+                          <Col md={12} className="mt-3">
+                            {field.field_options?.map((option: string, optionIndex: number) => (
+                              <div
+                                key={campaignFieldOptionKey(fieldKey, optionIndex)}
+                                className="d-flex mb-3 row align-items-center justify-content-left"
+                              >
+                                <Col md={5}>
+                                  <Form.Control
+                                    type="text"
+                                    size="sm"
+                                    value={option}
+                                    onChange={(e) => handleFieldOptionChange(index, optionIndex, e.target.value)}
+                                    placeholder="Option value"
+                                  />
+                                </Col>
+                                <Col md={5}>
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    className="app-button"
+                                    onClick={() => handleRemoveFieldOption(index, optionIndex)}
+                                  >
+                                    Remove Option
+                                  </Button>
+                                </Col>
+                              </div>
+                            ))}
+                            <Button variant="primary" className="app-button" size="sm" onClick={() => handleAddFieldOption(index)}>
+                              Add Option
+                            </Button>
+                          </Col>
+                        )}
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                );
+              })}
               {campaignFields.length === 0 && (
                 <Alert variant="info">No fields added yet. Click "Add Field" to create custom fields for this campaign.</Alert>
               )}
@@ -2390,20 +2432,23 @@ const CrmCampaigns = () => { // NOSONAR
                           <tr><th>Field Name</th><th>Type</th><th>Required</th><th>Options</th></tr>
                         </thead>
                         <tbody>
-                          {selectedCampaign.fields.map((field: any, index: number) => (
-                            <tr key={campaignFieldRowKey(field, index)}>
+                          {selectedCampaign.fields.map((field: any, index: number) => {
+                            const fieldKey = campaignFieldRowKey(field, index);
+                            return (
+                            <tr key={fieldKey}>
                               <td>{field.field_name}</td>
                               <td><Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge></td>
                               <td>{field.is_required ? <Badge bg="danger">Required</Badge> : <Badge bg="secondary">Optional</Badge>}</td>
                               <td>
                                 {field.field_type === "dropdown" && field.field_options
                                   ? field.field_options.map((opt: string, i: number) => (
-                                    <Badge key={campaignFieldOptionKey(field.field_name, opt, i)} bg="info" className="me-1">{opt}</Badge>
+                                    <Badge key={campaignFieldOptionKey(fieldKey, i)} bg="info" className="me-1">{opt}</Badge>
                                   ))
                                   : <span className="text-muted">N/A</span>}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

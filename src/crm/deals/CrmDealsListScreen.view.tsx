@@ -3147,6 +3147,7 @@ export function CrmDealsListScreenView({
         : "crm-deals-list-preview-record-id",
       listLoading: !isInitialized || loading,
       openPreviewByNumericId: openDealPreviewById,
+      enableRestore: false,
     });
 
   const handlePreviewClick = useCallback(

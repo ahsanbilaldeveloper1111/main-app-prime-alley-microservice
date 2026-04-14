@@ -401,7 +401,7 @@ const ProductsPage = () => {
             }));
             setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
           }}
-          placeholder="Select industry..."
+          placeholder="Select product group..."
           styles={customSelectStyles}
           isLoading={loadingIndustries}
           isDisabled={loadingIndustries}
@@ -494,7 +494,7 @@ const ProductsPage = () => {
     () => [
       {
         id: "products-industry",
-        label: "Industry",
+        label: "Product Group",
         showDropdown: true,
         active: Boolean(productsFilters.industry_id),
         activeLabel:
@@ -1780,7 +1780,7 @@ const ProductsPage = () => {
               currentPage: productsPagination.currentPage,
               rowsPerPage: productsPagination.rowsPerPage,
               totalRows: totalProducts,
-              pageSizeOptions: [10, 25, 50, 100],
+              pageSizeOptions: [15, 25, 50, 100],
             }}
             onPaginationChange={handleProductsPaginationChange}
             sortable

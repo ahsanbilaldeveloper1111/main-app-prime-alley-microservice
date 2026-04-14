@@ -993,6 +993,7 @@ const CrmOrders = () => { // NOSONAR
       localStorageKey: "crm-orders-list-preview-record-id",
       listLoading: !isInitialized || loading,
       openPreviewByNumericId: openOrderPreviewById,
+      enableRestore: false,
     });
 
   const handlePreviewClick = useCallback(

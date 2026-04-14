@@ -360,6 +360,7 @@ const IndustriesPage = () => {
         label: "Name",
         sortable: true,
         type: "custom",
+        width: "240px",
         render: (ind) => <div className="fw-semibold">{ind.name}</div>,
       },
       {
@@ -367,7 +368,7 @@ const IndustriesPage = () => {
         label: "Description",
         sortable: false,
         type: "custom",
-        width: "260px",
+        width: "420px",
         render: (ind) => <CrmTruncatedDescriptionCell text={ind.description} />,
       },
       {
@@ -375,6 +376,7 @@ const IndustriesPage = () => {
         label: "Created At",
         sortable: true,
         type: "custom",
+        width: "200px",
         render: (ind) => (
           <div className="text-muted small">
             {formatDateTimeToLocal(ind.created_at, GlobalDateFormat)}
@@ -387,6 +389,7 @@ const IndustriesPage = () => {
         sortable: false,
         align: "right",
         type: "custom",
+        width: "160px",
         render: (ind) => (
           <div className="d-flex justify-content-end gap-2">
             <Button
@@ -428,7 +431,7 @@ const IndustriesPage = () => {
     () => ({
       showSearch: true,
       searchValue: searchInput,
-      searchPlaceholder: "Search industries by name or description...",
+      searchPlaceholder: "Search product groups by name or description...",
       onSearchChange: handleSearchChange,
       onSearch: () => {
         submitSearch();
@@ -455,7 +458,11 @@ const IndustriesPage = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Industries" />
+      <BreadcrumbItem
+        mainTitle="CRM"
+        mainLink="/crm/dashboard"
+        subTitle="Product Groups"
+      />
       <div>
         <GenericTable<IndustryData>
           data={industries}
