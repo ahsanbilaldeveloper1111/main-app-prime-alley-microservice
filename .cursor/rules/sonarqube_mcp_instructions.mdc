@@ -42,3 +42,7 @@ These are some guidelines when using the SonarQube MCP server.
 - Ensure programming language is correctly specified
 - Remind users that snippet analysis doesn't replace full project scans
 - Provide full file content for better analysis results
+
+## Windows path normalization (IMPORTANT)
+- When calling `analyze_file_list` on Windows, pass file paths with a **lowercase drive letter** and forward slashes, e.g. `d:/work/...`.
+- Avoid `D:/...`, `D:\...`, and mixed-case paths, as SonarQube for IDE indexes files using `file:///d:/...` URIs and may treat mismatched casing as “out of scope”, causing 500 errors.

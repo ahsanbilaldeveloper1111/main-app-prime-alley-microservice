@@ -715,6 +715,7 @@ const StagesManagement = () => {
         sortable: true,
         align: "center",
         type: "custom",
+        width: "120px",
         render: (stage: Stage) => <span className="fw-bold">{stage.sequence}</span>,
       });
     }
@@ -742,7 +743,7 @@ const StagesManagement = () => {
         label: "Description",
         sortable: false,
         type: "custom",
-        width: "260px",
+        width: "360px",
         render: (stage: Stage) => (
           <CrmTruncatedDescriptionCell
             text={stage.description}
@@ -1179,7 +1180,7 @@ const StagesManagement = () => {
               currentPage: stagesPagination.currentPage,
               rowsPerPage: stagesPagination.rowsPerPage,
               totalRows: filteredStages.length,
-              pageSizeOptions: [10, 25, 50, 100],
+              pageSizeOptions: [10, 15, 25, 50, 100],
             }}
             onPaginationChange={handleStagesPaginationChange}
             customizableColumns

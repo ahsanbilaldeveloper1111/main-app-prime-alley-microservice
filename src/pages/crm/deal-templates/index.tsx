@@ -384,6 +384,7 @@ const DealTemplatesPage = () => {
         label: "Name",
         sortable: true,
         type: "custom",
+        width: "260px",
         render: (template) => (
           <div className="fw-semibold">{template.name}</div>
         ),
@@ -393,7 +394,7 @@ const DealTemplatesPage = () => {
         label: "Description",
         sortable: false,
         type: "custom",
-        width: "260px",
+        width: "420px",
         render: (template) => (
           <CrmTruncatedDescriptionCell
             text={template.description}
@@ -406,6 +407,7 @@ const DealTemplatesPage = () => {
         label: "Fields",
         sortable: false,
         type: "custom",
+        width: "140px",
         render: (template) => (
           <Badge bg="secondary">{template.fields?.length || 0} field(s)</Badge>
         ),
@@ -416,6 +418,7 @@ const DealTemplatesPage = () => {
         sortable: false,
         align: "right",
         type: "custom",
+        width: "170px",
         render: (template) => (
           <div className="d-flex justify-content-end gap-2">
             <Button

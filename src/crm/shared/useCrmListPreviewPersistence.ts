@@ -7,6 +7,11 @@ export type UseCrmListPreviewPersistenceParams = {
   listLoading: boolean;
   /** Re-open sidebar for this record id (should match preview click behavior / fetch full row). */
   openPreviewByNumericId: (id: number) => void | Promise<void>;
+  /**
+   * When false, we still write/clear ids but we do NOT auto-restore/open the preview on mount.
+   * Default true to keep backward compatibility.
+   */
+  enableRestore?: boolean;
 };
 
 /**
@@ -18,6 +23,7 @@ export function useCrmListPreviewPersistence({
   localStorageKey,
   listLoading,
   openPreviewByNumericId,
+  enableRestore = true,
 }: UseCrmListPreviewPersistenceParams) {
   const didInitialRestoreRef = useRef(false);
 
@@ -44,6 +50,7 @@ export function useCrmListPreviewPersistence({
   }, [localStorageKey]);
 
   useEffect(() => {
+    if (!enableRestore) return;
     if (listLoading) return;
     if (didInitialRestoreRef.current) return;
     didInitialRestoreRef.current = true;
@@ -66,7 +73,7 @@ export function useCrmListPreviewPersistence({
       return;
     }
     void openPreviewByNumericId(id);
-  }, [listLoading, localStorageKey, openPreviewByNumericId]);
+  }, [enableRestore, listLoading, localStorageKey, openPreviewByNumericId]);
 
   return { writePreviewIdToStorage, clearPreviewIdFromStorage };
 }

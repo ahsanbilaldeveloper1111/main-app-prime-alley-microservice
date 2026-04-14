@@ -222,6 +222,7 @@ const BusinessTypes = () => {
         label: "Name",
         sortable: true,
         type: "custom",
+        width: "260px",
         render: (bt) => <div className="fw-semibold">{bt.name}</div>,
       },
       {
@@ -229,7 +230,7 @@ const BusinessTypes = () => {
         label: "Description",
         sortable: false,
         type: "custom",
-        width: "260px",
+        width: "420px",
         render: (bt) => <CrmTruncatedDescriptionCell text={bt.description} />,
       },
       {
@@ -237,6 +238,7 @@ const BusinessTypes = () => {
         label: "Created At",
         sortable: true,
         type: "custom",
+        width: "200px",
         render: (bt) => (
           <div className="text-muted small">
             {bt.created_at
@@ -251,6 +253,7 @@ const BusinessTypes = () => {
         sortable: false,
         align: "right",
         type: "custom",
+        width: "160px",
         render: (bt) => (
           <div className="d-flex justify-content-end gap-2">
             {session?.user?.permissions?.includes(PERMISSION_EDIT) && (
