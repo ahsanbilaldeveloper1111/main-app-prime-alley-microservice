@@ -393,6 +393,8 @@ export interface FilterPill {
     value: string;
     onClick?: () => void;
   }>;
+  /** Override the default `Dropdown.Menu` inline styles (e.g. remove maxHeight/overflow for portalled selects). */
+  dropdownMenuStyle?: React.CSSProperties;
 }
 
 export interface ToolbarConfig {
@@ -1813,7 +1815,7 @@ const GenericTable = <T extends Record<string, any>>({
                         )}
                       </Dropdown.Toggle>
                       <Dropdown.Menu
-                        style={{ maxHeight: "280px", overflowY: "auto" }}
+                        style={pill.dropdownMenuStyle ?? { maxHeight: "280px", overflowY: "auto" }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         <GenericTableFilterPillMenuBody

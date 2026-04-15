@@ -5,13 +5,10 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
-  useRef,
 } from "react";
-import { createPortal } from "react-dom";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
-import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import CrmColorCell from "@components/crm/crmColorCell";
 import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import {
@@ -67,7 +64,6 @@ import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 
 type StageType = "lead" | "deal" | "order" | "lost_reason";
 
-const STAGES_PREVIEW_LOCAL_STORAGE_KEY = "stages_last_preview_id";
 const STAGES_TABLE_COLUMN_STORAGE_KEY = "stagesSelectedColumns";
 const STAGES_TABLE_SELECTABLE_KEYS = [
   "sequence",
@@ -85,47 +81,6 @@ const DEFAULT_STAGES_SELECTED_COLUMNS = [
   "color",
   "actions",
 ];
-
-function readStagesPreviewIdFromStorage(): string | null {
-  if (globalThis.window === undefined) return null;
-  try {
-    return globalThis.localStorage.getItem(STAGES_PREVIEW_LOCAL_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeStagesPreviewIdToStorage(id: string): void {
-  if (globalThis.window === undefined) return;
-  try {
-    globalThis.localStorage.setItem(STAGES_PREVIEW_LOCAL_STORAGE_KEY, id);
-  } catch {
-    /* quota / private mode */
-  }
-}
-
-function clearStagesPreviewIdFromStorage(): void {
-  if (globalThis.window === undefined) return;
-  try {
-    globalThis.localStorage.removeItem(STAGES_PREVIEW_LOCAL_STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-function findStageByStoredId(
-  list: StageData[],
-  savedId: string,
-): StageData | undefined {
-  const trimmed = savedId.trim();
-  if (!trimmed) return undefined;
-  const asNum = Number(trimmed);
-  const hasNum = !Number.isNaN(asNum);
-  return list.find((s) => {
-    if (hasNum && Number(s.id) === asNum) return true;
-    return String(s.id) === trimmed;
-  });
-}
 
 const PERMISSION_LIST_STAGES = "list-crm-stages";
 const PERMISSION_ADD_STAGES = "add-crm-stages";
@@ -362,28 +317,6 @@ const StagesManagement = () => {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [stageToRestore, setStageToRestore] = useState<Stage | null>(null);
   const [restoring, setRestoring] = useState(false);
-  const [showStageSidebar, setShowStageSidebar] = useState(false);
-  const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
-  const [previewPortalReady, setPreviewPortalReady] = useState(false);
-  const hasAutoOpenedPreview = useRef(false);
-
-  useEffect(() => {
-    setPreviewPortalReady(true);
-  }, []);
-
-  const handlePreviewClick = useCallback((stage: Stage) => {
-    setSelectedStage(stage);
-    setShowStageSidebar(true);
-    writeStagesPreviewIdToStorage(String(stage.id));
-  }, []);
-
-  const handleCloseStageSidebar = useCallback(() => {
-    setShowStageSidebar(false);
-    setSelectedStage(null);
-    clearStagesPreviewIdFromStorage();
-    hasAutoOpenedPreview.current = false;
-  }, []);
-
   const handleCloseSuccessfulModal = () => {
     setShowSuccessfulModal(false);
   };
@@ -442,101 +375,6 @@ const StagesManagement = () => {
       prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 }
     );
   }, [setPagination, stagesSearchQuery]);
-
-  useEffect(() => {
-    if (loadingStages) return;
-    if (stagesData.length === 0 && allStagesData.length === 0) return;
-    const rawSaved = readStagesPreviewIdFromStorage();
-    if (!rawSaved) return;
-    const savedId = rawSaved.trim();
-    if (!savedId) return;
-    if (hasAutoOpenedPreview.current) return;
-
-    const n = Number(savedId);
-    if (Number.isNaN(n)) {
-      clearStagesPreviewIdFromStorage();
-      return;
-    }
-
-    const stage =
-      findStageByStoredId(stagesData, savedId) ??
-      findStageByStoredId(allStagesData, savedId);
-    if (!stage) return;
-
-    hasAutoOpenedPreview.current = true;
-    setSelectedStage(stage as unknown as Stage);
-    setShowStageSidebar(true);
-  }, [stagesData, allStagesData, loadingStages]);
-
-  const stagePreviewSections = useMemo((): SidebarSection[] => {
-    if (!selectedStage) return [];
-    const s = selectedStage;
-    const resolveStatusLabel = (row: Stage): string => {
-      if (row.is_won) return "Won";
-      if (row.fold) return "Fold";
-      if (row.is_default) return "Default";
-      return "Active";
-    };
-    const resolveStatusVariant = (row: Stage): string => {
-      if (row.is_won) return "success";
-      if (row.fold) return "danger";
-      if (row.is_default) return "primary";
-      return "success";
-    };
-    const descriptionSection: SidebarSection = {
-      id: "description",
-      title: "Description",
-      icon: FileText,
-      collapsible: true,
-      defaultExpanded: true,
-    };
-    if (s.description) {
-      descriptionSection.fields = [{ label: "Description", value: s.description }];
-    } else {
-      descriptionSection.emptyState = {
-        icon: FileText,
-        message: "No description available.",
-      };
-    }
-    return [
-      {
-        id: "about-stage",
-        title: "About this stage",
-        icon: Target,
-        collapsible: true,
-        defaultExpanded: true,
-        fields: [
-          { label: "Stage Name", value: s.name, copyable: true },
-          { label: "Sequence", value: String(s.sequence) },
-          {
-            label: "Type",
-            value: getTypeDisplayName(s.type),
-            type: "badge" as const,
-            badgeVariant: getTypeBadgeColor(s.type),
-          },
-          { label: "Color", value: s.color },
-          { label: "Probability", value: `${s.probability}%` },
-          {
-            label: "Status",
-            value: resolveStatusLabel(s),
-            type: "badge" as const,
-            badgeVariant: resolveStatusVariant(s),
-          },
-          {
-            label: "Created",
-            value: formatCrmPreviewDate(s.created_at),
-            type: "date" as const,
-          },
-          {
-            label: "Updated",
-            value: formatCrmPreviewDate(s.updated_at),
-            type: "date" as const,
-          },
-        ],
-      },
-      descriptionSection,
-    ];
-  }, [selectedStage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -668,19 +506,6 @@ const StagesManagement = () => {
       }
       return { ...prev, [field]: value };
     });
-  };
-
-  const getStatusBadge = (stage: Stage) => {
-    if (stage.is_won) {
-      return <span className="status-badge success">Won</span>;
-    }
-    if (stage.fold) {
-      return <span className="status-badge danger">Fold</span>;
-    }
-    if (stage.is_default) {
-      return <span className="status-badge primary">Default</span>;
-    }
-    return <span className="status-badge success">Active</span>;
   };
 
   const stagesTableColumns = useMemo<TableColumn<Stage>[]>(() => {
@@ -1192,7 +1017,7 @@ const StagesManagement = () => {
             toolbar={toolbarConfig}
             showToolbarActions={false}
             uniqueKey="id"
-            onPreviewClick={(stage) => handlePreviewClick(stage)}
+            onPreviewClick={(stage) => openStageView(stage)}
           />
         </div>
       </div>
@@ -1766,6 +1591,8 @@ const StagesManagement = () => {
                   }}
                 >
                   <div
+                    aria-label={`Color ${viewingStage.color}`}
+                    title={viewingStage.color}
                     style={{
                       width: "20px",
                       height: "20px",
@@ -1773,36 +1600,6 @@ const StagesManagement = () => {
                       borderRadius: "4px",
                     }}
                   />
-                  {viewingStage.color}
-                </div>
-              </div>
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "16px",
-                  borderRadius: "10px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Status
-                </div>
-                <div
-                  style={{
-                    fontSize: "15px",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  {getStatusBadge(viewingStage)}
                 </div>
               </div>
               <div
@@ -1892,56 +1689,6 @@ const StagesManagement = () => {
           </Modal.Body>
         </Modal>
       )}
-
-      {previewPortalReady &&
-        globalThis.document !== undefined &&
-        showStageSidebar &&
-        selectedStage &&
-        createPortal(
-          <div
-            className="stages-preview-sidebar-portal"
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 1050,
-              pointerEvents: "none",
-            }}
-          >
-            <div
-              style={{
-                pointerEvents: "auto",
-                position: "absolute",
-                top: 0,
-                right: 0,
-                bottom: 0,
-                display: "flex",
-                height: "100%",
-              }}
-            >
-              <GenericSidebar
-                isOpen={showStageSidebar}
-                onClose={handleCloseStageSidebar}
-                title={selectedStage.name || "Stage Details"}
-                subtitle={getTypeDisplayName(selectedStage.type)}
-                quickActions={[]}
-                avatar={{
-                  initials: (selectedStage.name || "S").slice(0, 2).toUpperCase(),
-                  name: selectedStage.name || "Stage",
-                  gradient: `linear-gradient(135deg, ${selectedStage.color || "#6c757d"} 0%, #4f46e5 100%)`,
-                }}
-                recordLink={{
-                  label: "View full details",
-                  onClick: () => {
-                    handleCloseStageSidebar();
-                    openStageView(selectedStage);
-                  },
-                }}
-                sections={stagePreviewSections}
-              />
-            </div>
-          </div>,
-          globalThis.document.body,
-        )}
 
       <SuccessfulModal
         show={showSuccessfulModal}

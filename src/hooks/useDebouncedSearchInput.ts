@@ -40,12 +40,9 @@ export function useDebouncedSearchInput(
     };
   }, [delayMs, inputValue, normalizeValue]);
 
-  const handleInputChange = useCallback(
-    (value: string) => {
-      setInputValue(normalizeValue(value));
-    },
-    [normalizeValue],
-  );
+  const handleInputChange = useCallback((value: string) => {
+    setInputValue(value);
+  }, []);
 
   const submitQuery = useCallback(() => {
     const next = normalizeValue(inputValue);
