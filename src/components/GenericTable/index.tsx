@@ -397,6 +397,13 @@ export interface FilterPill {
   dropdownMenuStyle?: React.CSSProperties;
 }
 
+export interface ToolbarTabsDropdownItem {
+  label: string;
+  href?: string;
+  onClick?: () => void;
+  disabled?: boolean;
+}
+
 export interface ToolbarConfig {
   // Search
   showSearch?: boolean;
@@ -413,6 +420,7 @@ export interface ToolbarConfig {
   onTabAdd?: () => void;
   onTabRemove?: (tabId: string) => void;
   tabsDropdownLabel?: string;
+  tabsDropdownItems?: ToolbarTabsDropdownItem[];
 
   // View controls
   showViewSwitcher?: boolean;
@@ -1426,6 +1434,17 @@ const GenericTable = <T extends Record<string, any>>({
     </Dropdown>
   );
 
+  // Default CRM dropdown items (backward compatibility fallback)
+  const defaultCrmDropdownItems: ToolbarTabsDropdownItem[] = [
+    { label: "Prospects", href: "/crm/prospects" },
+    { label: "Leads", href: "/crm/leads" },
+    { label: "Deals", href: "/crm/deals" },
+    { label: "Orders", href: "/crm/orders" },
+    { label: "Company", href: "/crm/companies" },
+    { label: "Inbox", href: "/crm/inbox" },
+    { label: "Approvals", href: "/crm/approvals" },
+  ];
+
   // Render toolbar
   const renderToolbar = () => {
     if (!showToolbar || !toolbar) return null;
@@ -1442,7 +1461,7 @@ const GenericTable = <T extends Record<string, any>>({
         {toolbar.showTabs && toolbar.tabs && toolbar.tabs.length > 0 && (
           <div className="gt-toolbar-tabs-section">
             <div className="d-flex align-items-center gap-3">
-              {/* Dropdown (if provided) */}
+              {/* Dropdown: use provided items or fall back to default CRM items */}
               {toolbar.tabsDropdownLabel && (
                 <Dropdown>
                   <Dropdown.Toggle
@@ -1453,29 +1472,32 @@ const GenericTable = <T extends Record<string, any>>({
                     <span>{toolbar.tabsDropdownLabel}</span>
                   </Dropdown.Toggle>
                   <Dropdown.Menu style={{ zIndex: "99" }}>
-                    <Dropdown.Item
-                      onClick={() => router.push("/crm/prospects")}
-                    >
-                      Prospects
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => router.push("/crm/leads")}>
-                      Leads
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => router.push("/crm/deals")}>
-                      Deals
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => router.push("/crm/orders")}>
-                      Orders
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => router.push("/crm/companies")}>
-                      Company
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => router.push("/crm/inbox")}>
-                      Inbox
-                    </Dropdown.Item>
-                    <Dropdown.Item onClick={() => router.push("/crm/approvals")}>
-                      Approvals
-                    </Dropdown.Item>
+                    {(toolbar.tabsDropdownItems ?? defaultCrmDropdownItems).map(
+                      (item) => {
+                        const handleItemClick = () => {
+                          if (item.disabled) {
+                            return;
+                          }
+                          if (item.onClick) {
+                            item.onClick();
+                            return;
+                          }
+                          if (item.href) {
+                            router.push(item.href);
+                          }
+                        };
+
+                        return (
+                          <Dropdown.Item
+                            key={item.label}
+                            disabled={item.disabled}
+                            onClick={handleItemClick}
+                          >
+                            {item.label}
+                          </Dropdown.Item>
+                        );
+                      },
+                    )}
                   </Dropdown.Menu>
                 </Dropdown>
               )}
