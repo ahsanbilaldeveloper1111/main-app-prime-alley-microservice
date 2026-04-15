@@ -27,3 +27,20 @@ export function firstString(...values: unknown[]): string {
   }
   return "";
 }
+
+/**
+ * Resolve company UUID/string from bot API payloads (GET /bots/{id}/).
+ * Handles `company_id`, string `company`, or nested `company` object
+ * (nested: `id` first, then `company_id`).
+ */
+export function companyIdFromBotApi(data: Record<string, unknown>): string {
+  const direct = firstString(data.company_id);
+  if (direct) return direct;
+  const co = data.company;
+  if (typeof co === "string") return co;
+  if (co && typeof co === "object") {
+    const o = co as Record<string, unknown>;
+    return firstString(o.id, o.company_id);
+  }
+  return "";
+}

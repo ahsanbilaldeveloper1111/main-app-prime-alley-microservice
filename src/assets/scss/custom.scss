@@ -451,4 +451,19 @@ h2.react-datepicker__current-month, .react-datepicker-time__header{
 .theTable td:last-child {
     color: #28a745 !important; /* Example: green text */
   }
-  
+
+/* Reset password modal: must stack above Toastify (.Toastify z-index 9999999), floating bars, and high-z popovers */
+.reset-password-modal-root.modal.show {
+  z-index: 10000100 !important;
+  pointer-events: auto !important;
+}
+
+.reset-password-modal-root .modal-dialog,
+.reset-password-modal-root .modal-content {
+  pointer-events: auto !important;
+}
+
+.modal-backdrop.reset-password-modal-backdrop {
+  z-index: 10000099 !important;
+}
+

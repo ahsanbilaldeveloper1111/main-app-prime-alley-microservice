@@ -50,7 +50,7 @@ export function normalizeCompaniesResponse(
       item.identifier ?? item.company_identifier ?? item.company_id,
     );
     const company_id = normalizeCompanyId(
-      item.company_id ?? item.company_identifier ?? item.identifier ?? item.id,
+      item.id ?? item.company_identifier ?? item.identifier ?? item.company_id,
     );
     const fallbackId = normalizeCompanyId(item.id);
     const id =
@@ -69,4 +69,3 @@ export function normalizeCompaniesResponse(
 
   return out;
 }
-
