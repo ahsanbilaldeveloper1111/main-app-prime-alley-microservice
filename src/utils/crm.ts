@@ -1739,6 +1739,7 @@ export interface CampaignData {
 export interface CampaignMetrics {
   active_campaigns: number;
   inactive_campaigns: number;
+  users_count: number;
 }
 
 /**
@@ -2530,11 +2531,6 @@ export const createProduct = async (
     toast.success("Product created successfully");
     return extractData<CrmProduct>(response.data);
   } catch (error: any) {
-    toast.error(
-      error?.response?.data?.message ||
-        error?.message ||
-        "Failed to create product",
-    );
     throw error;
   }
 };

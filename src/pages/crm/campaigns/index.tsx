@@ -317,6 +317,32 @@ function buildCrmDataAssignmentPayload(args: {
   return { ok: true, payload };
 }
 
+function getZeroUserCampaignNamesFromAssignmentResult(
+  assignmentResult: any,
+  availableCampaignsForUpload: Array<{ label: string; id: number }>,
+  campaignsData: any[],
+): string[] {
+  const distribution = Array.isArray(assignmentResult?.distribution)
+    ? assignmentResult.distribution
+    : [];
+
+  const ids = distribution
+    .filter((row: any) => Number(row?.user_count) === 0)
+    .map((row: any) => Number(row?.campaign_id))
+    .filter((id: number) => Number.isFinite(id) && id > 0);
+
+  if (ids.length === 0) return [];
+
+  const uniqueIds = Array.from(new Set(ids));
+  return uniqueIds.map((id) => {
+    const opt = availableCampaignsForUpload.find((c) => c.id === id);
+    if (opt?.label) return opt.label;
+    const fromList = campaignsData.find((c: any) => Number(c?.id) === id);
+    if (fromList?.name) return fromList.name;
+    return `Campaign #${id}`;
+  });
+}
+
 function campaignFieldRowKey(
   field: { id?: unknown; field_name?: string; field_type?: string; sort_order?: number },
   index: number,
@@ -793,6 +819,7 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
           a.setCampaignFilters((prev) => ({ ...prev, userExtensions: null }));
           a.handleFiltersChange({ user_extensions: null });
         },
+        dropdownMenuStyle: { overflow: "visible" },
         dropdownContent: (
           <div style={{ minWidth: "260px" }}>
             <Form.Label className="small fw-bold mb-2">Campaign Users</Form.Label>
@@ -814,7 +841,11 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
                 a.handleFiltersChange({ user_extensions: vals || null });
               }}
               placeholder="Select users..."
-              styles={CRM_CAMPAIGNS_SELECT_STYLES}
+              menuPortalTarget={document?.body || undefined}
+              styles={{
+                ...CRM_CAMPAIGNS_SELECT_STYLES,
+                menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+              }}
             />
           </div>
         ),
@@ -1298,6 +1329,7 @@ const CrmCampaigns = () => { // NOSONAR
   const [metrics, setMetrics] = useState<CampaignMetrics>({
     active_campaigns: 0,
     inactive_campaigns: 0,
+    users_count: 0,
   });
   const [totalCampaigns, setTotalCampaigns] = useState(0);
 
@@ -1807,7 +1839,28 @@ const CrmCampaigns = () => { // NOSONAR
       }
 
       const response = await axiosInstance.post("/crm/crm_data/assign", built.payload);
-      if (response?.data?.data?.success) {
+      const assignmentResult = response?.data?.data;
+      if (assignmentResult?.success) {
+        if (assignmentTargetType === "campaigns") {
+          const campaignNames = getZeroUserCampaignNamesFromAssignmentResult(
+            assignmentResult,
+            availableCampaignsForUpload,
+            campaignsData,
+          );
+
+          if (campaignNames.length > 0) {
+            const assignedCount =
+              typeof assignmentResult.assigned_count === "number"
+                ? assignmentResult.assigned_count
+                : recordsToAssign;
+            toast.error(
+              `Assigned ${assignedCount} records, but these campaign(s) have 0 users: ${campaignNames.join(", ")}. Please add users to the campaign(s) and try again.`,
+            );
+            setRefreshKey((prev) => prev + 1);
+            return;
+          }
+        }
+
         toast.success(`Successfully assigned ${recordsToAssign} records!`);
         setShowDataAssignmentModal(false);
         resetAssignmentState();
@@ -1816,7 +1869,7 @@ const CrmCampaigns = () => { // NOSONAR
         setSuccessModalDescription(`Successfully assigned ${recordsToAssign} records!`);
         setRefreshKey((prev) => prev + 1);
       } else {
-        toast.error(response.data.message || "Failed to assign data");
+        toast.error(response?.data?.message || "Failed to assign data");
       }
     } catch (error: unknown) {
       consumeHandledApiError(error, "CrmCampaigns.handleDataAssignmentSubmit");
@@ -1824,7 +1877,7 @@ const CrmCampaigns = () => { // NOSONAR
     } finally {
       setAssigningData(false);
     }
-  }, [assignmentTargetType, recordsToAssign, distributionMode, assignToCampaigns, selectedUserExtensions, assignmentFilterCampaigns, assignmentFilterTags, availableTags, availableCampaignsForUpload, includeAssignedRecords, customDistribution]);
+  }, [assignmentTargetType, recordsToAssign, distributionMode, assignToCampaigns, selectedUserExtensions, assignmentFilterCampaigns, assignmentFilterTags, availableTags, availableCampaignsForUpload, campaignsData, includeAssignedRecords, customDistribution]);
 
   const handleAutoFillEqualDistribution = useCallback(() => {
     if (assignmentTargetType === "campaigns") {
@@ -2048,7 +2101,7 @@ const CrmCampaigns = () => { // NOSONAR
             <KPICard title="Inactive Campaigns" value={metrics.inactive_campaigns.toString()} icon={<AlertCircle size={24} />} color="warning" />
           </Col>
           <Col lg={3} md={6} className="mb-3">
-            <KPICard title="Total Users" value={extensions.length.toString()} icon={<Users size={24} />} color="info" />
+            <KPICard title="Total Users" value={metrics.users_count.toString()} icon={<Users size={24} />} color="info" />
           </Col>
         </Row>
       )}
@@ -2421,6 +2474,27 @@ const CrmCampaigns = () => { // NOSONAR
                       </div>
                     </>
                   )}
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Product Groups</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                        {selectedCampaign.industries?.length > 0
+                          ? selectedCampaign.industries.map((ind: any) => (
+                              <Badge key={ind.id} bg="info" className="me-1">{ind.name}</Badge>
+                            ))
+                          : <span className="text-muted">None</span>}
+                      </div>
+                    </div>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Deal Template</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                        {selectedCampaign.deal_template?.name
+                          ? <Badge bg="info">{selectedCampaign.deal_template.name}</Badge>
+                          : <span className="text-muted">None</span>}
+                      </div>
+                    </div>
+                  </div>
 
                   <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
                     <FileText size={18} style={{ color: "#4680ff" }} /> Campaign Fields ({selectedCampaign.fields?.length || 0})

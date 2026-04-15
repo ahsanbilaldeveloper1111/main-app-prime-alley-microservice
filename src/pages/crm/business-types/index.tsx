@@ -361,8 +361,8 @@ const BusinessTypes = () => {
           <Modal.Header closeButton={!submitting}>
             <Modal.Title>{modalTitle(editingBusinessType)}</Modal.Title>
           </Modal.Header>
-          <Form onSubmit={handleSubmit}>
-            <Modal.Body>
+          <Modal.Body>
+            <Form onSubmit={handleSubmit}>
               <Form.Group className="mb-3">
                 <Form.Label>
                   Name <span className="text-danger">*</span>
@@ -387,10 +387,9 @@ const BusinessTypes = () => {
                   placeholder="Enter business type description"
                 />
               </Form.Group>
-            </Modal.Body>
-            <Modal.Footer className="border-0 pt-2">
-              <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
-                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
+
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 w-100">
+                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 align-self-center">
                   <AlertCircle size={14} />
                   <span style={{ fontSize: "0.813rem" }}>
                     Fields marked with <span className="text-danger fw-bold">*</span> are required
@@ -425,8 +424,8 @@ const BusinessTypes = () => {
                   </Button>
                 </div>
               </div>
-            </Modal.Footer>
-          </Form>
+            </Form>
+          </Modal.Body>
         </Modal>
 
         {/* Delete Confirmation Modal */}

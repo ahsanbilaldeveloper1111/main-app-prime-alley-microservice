@@ -797,22 +797,8 @@ const DealTemplatesPage = () => {
             </Modal.Header>
             <Modal.Body style={{ maxHeight: "70vh", overflowY: "auto" }}>
               <div className="mb-3">
-                <Form.Label className="text-muted small">ID</Form.Label>
-                <div className="fw-semibold">#{viewingTemplate.id}</div>
-              </div>
-              <div className="mb-3">
                 <Form.Label className="text-muted small">Name</Form.Label>
                 <div className="fw-semibold">{viewingTemplate.name}</div>
-              </div>
-              <div className="mb-3">
-                <Form.Label className="text-muted small">Industry</Form.Label>
-                <div>
-                  {viewingTemplate.industry ? (
-                    <Badge bg="info">{viewingTemplate.industry.name}</Badge>
-                  ) : (
-                    <span className="text-muted">N/A</span>
-                  )}
-                </div>
               </div>
               <div className="mb-3">
                 <Form.Label className="text-muted small">
