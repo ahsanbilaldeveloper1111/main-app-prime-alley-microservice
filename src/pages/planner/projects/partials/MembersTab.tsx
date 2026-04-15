@@ -631,6 +631,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
           actions={actions}
           showActions={isAllow && actions.length > 0}
           actionsLabel="Actions"
+          showToolbarActions={false}
           
           // Selection
           selectable={isAllow}

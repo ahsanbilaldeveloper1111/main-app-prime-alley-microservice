@@ -199,6 +199,17 @@ const DEFAULT_PRODUCT_TABLE_COLUMN_KEYS: string[] = [
   "actions",
 ];
 
+const BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS = [
+  { label: "Account Overview", href: "/billing/account-overview" },
+  { label: "Products", href: "/billing/products" },
+  { label: "Quotes", href: "/billing/quotes" },
+  { label: "Order Invoicing", href: "/billing/order-invoicing" },
+  { label: "Subscriptions", href: "/billing/subscriptions" },
+  { label: "Invoices", href: "/billing/invoices" },
+  { label: "Payments", href: "/billing/payments" },
+  { label: "Transactions", href: "/billing/transactions" },
+];
+
 function parseStoredProductColumnKeys(raw: string | null): string[] | null {
   if (!raw) {
     return null;
@@ -1077,7 +1088,7 @@ const BillingManagement = () => {
       ...customTabs,
     ],
     onTabAdd: () => setShowTabModal(true),
-    onTabRemove: (tabId) => {
+    onTabRemove: (tabId: string) => {
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
       if (activeFilter === tabId) handleFilterChange("all");
     },
@@ -1338,6 +1349,7 @@ const BillingManagement = () => {
                 showToolbar={true}
                 toolbar={{
                   ...productsToolbarConfig,
+                  tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
                   showFilterPills: true,
                   filterPills: productsFilterPills,
                   showMoreFiltersButton: true,
@@ -1577,7 +1589,7 @@ const BillingManagement = () => {
         title="Customize Columns"
         columns={productsColumns.map((c) => ({ key: c.key, label: c.label }))}
         selectedColumnKeys={selectedColumns}
-        onApply={(keys) => {
+        onApply={(keys: string[]) => {
           setSelectedColumns(keys);
           const w = (globalThis as unknown as { window?: Window }).window;
           if (w) {
