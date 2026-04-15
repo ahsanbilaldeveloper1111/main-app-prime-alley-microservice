@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, { ReactElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
@@ -120,6 +120,11 @@ function companyLabelFromBotRow(row: BotRow): string {
   if (typeof co === "string" && co.trim() !== "") return co;
   return "";
 }
+const BOT_STATUS_TABS = [
+  { id: "draft", label: "Drafts" },
+  { id: "published", label: "Published" },
+  { id: "archived", label: "Archived" },
+] as const;
 
 const defaultConfig: BotConfiguration = {
   instructions: "",
@@ -157,6 +162,17 @@ function getCompanyOptions(list: unknown[]): CompanyOption[] {
     if (idStr !== "") option.company_id = idStr;
     return option;
   });
+}
+
+function removeIdFromList(prev: string[], idToRemove: string): string[] {
+  return prev.filter((id) => id !== idToRemove);
+}
+
+function toggleTabDraftSelection(prev: string[], tabId: string, isChecked: boolean): string[] {
+  if (isChecked) {
+    return prev.includes(tabId) ? prev : [...prev, tabId];
+  }
+  return prev.filter((id) => id !== tabId);
 }
 
 /** Renders version configuration_snapshot (API shape: instructions, knowledge_base, voice_settings, llm_settings, behavior_settings, sip_settings) */
@@ -708,6 +724,9 @@ const BotsPage = () => {
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [showTabSelectorModal, setShowTabSelectorModal] = useState(false);
+  const [visibleTabIds, setVisibleTabIds] = useState<string[]>(["all", "published"]);
+  const [tabSelectionDraft, setTabSelectionDraft] = useState<string[]>(["published"]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -731,6 +750,7 @@ const BotsPage = () => {
     status: "draft",
     configuration: { ...defaultConfig },
   });
+  const hasInitializedVisibleTabs = useRef(false);
 
   const fetchCompanies = useCallback(async () => {
     try {
@@ -780,6 +800,13 @@ const BotsPage = () => {
   useEffect(() => {
     fetchBots();
   }, [fetchBots]);
+
+  useEffect(() => {
+    if (hasInitializedVisibleTabs.current) return;
+    setVisibleTabIds(["all", "published"]);
+    setTabSelectionDraft(["published"]);
+    hasInitializedVisibleTabs.current = true;
+  }, []);
 
   useEffect(() => {
     if (showViewModal && viewBotId) {
@@ -861,6 +888,128 @@ const BotsPage = () => {
         .finally(() => setRollbackVersion(null));
     },
     [fetchBots],
+  );
+
+  const botTabCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: data.length,
+      draft: 0,
+      published: 0,
+      archived: 0,
+    };
+
+    data.forEach((row) => {
+      const status = String(row.status ?? "").toLowerCase();
+      if (status in counts) {
+        counts[status] += 1;
+      }
+    });
+
+    return counts;
+  }, [data]);
+
+  const handleTabRemove = useCallback(
+    (tabId: string) => {
+      if (tabId === "all") return;
+      setVisibleTabIds((prev) => removeIdFromList(prev, tabId));
+      if (statusFilter === tabId) {
+        setLoading(true);
+        setStatusFilter("");
+      }
+    },
+    [statusFilter],
+  );
+
+  const applyTabDraftChange = useCallback((tabId: string, isChecked: boolean) => {
+    setTabSelectionDraft((prev) => toggleTabDraftSelection(prev, tabId, isChecked));
+  }, []);
+
+  const addBotButtonStyle: React.CSSProperties = {
+    cursor: "pointer",
+    transition: "150ms ease-out",
+    display: "inline-flex",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    background: "#141414",
+    borderColor: "rgba(20, 20, 20, 0)",
+    color: "rgb(255, 255, 255)",
+    textDecoration: "none",
+    borderRadius: "4px",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    verticalAlign: "middle",
+    paddingBlock: "8px",
+    paddingInline: "16px",
+    maxWidth: "100%",
+    fontFamily: '"Lexend Deca", Helvetica, Arial, sans-serif',
+    fontSize: "12px",
+    fontWeight: 300,
+    letterSpacing: "0px",
+    lineHeight: "14px",
+    WebkitFontSmoothing: "antialiased",
+    textUnderlineOffset: "24%",
+    alignItems: "center",
+    gap: "0.5rem",
+  };
+
+  const toolbarRightActions = useMemo(
+    () => (
+      <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        {isAdmin && (
+          <Form.Select
+            style={{ width: "200px", padding: "7px", marginRight: "3px", borderRadius: "3px" }}
+            value={companyFilter}
+            onChange={(e) => setCompanyFilter(e.target.value)}
+          >
+            <option value="">All companies</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </Form.Select>
+        )}
+        <Button
+          onClick={() => {
+            router.push("/voicebot/inbound/bots/create");
+          }}
+          style={addBotButtonStyle}
+          className="bots-add-button"
+        >
+          <Plus size={16} />
+          <span>Add Bot</span>
+        </Button>
+      </div>
+    ),
+    [isAdmin, companyFilter, companies, router],
+  );
+
+  const tableToolbar = useMemo(
+    () => ({
+      showTabs: true,
+      tabs: [
+        { id: "all", label: "All Bots", count: botTabCounts.all, removable: false },
+        ...BOT_STATUS_TABS
+          .filter((tab) => visibleTabIds.includes(tab.id))
+          .map((tab) => ({
+            id: tab.id,
+            label: tab.label,
+            count: botTabCounts[tab.id] || 0,
+            removable: true,
+          })),
+      ],
+      activeTab: statusFilter || "all",
+      onTabChange: (tabId: string) => {
+        setLoading(true);
+        setStatusFilter(tabId === "all" ? "" : tabId);
+      },
+      onTabAdd: () => {
+        setTabSelectionDraft(visibleTabIds.filter((tabId) => tabId !== "all"));
+        setShowTabSelectorModal(true);
+      },
+      onTabRemove: handleTabRemove,
+      rightActions: toolbarRightActions,
+    }),
+    [botTabCounts, visibleTabIds, statusFilter, toolbarRightActions, handleTabRemove],
   );
 
   const columns: TableColumn<BotRow>[] = [
@@ -1008,15 +1157,7 @@ const BotsPage = () => {
           as="textarea"
           rows={2}
           value={form.configuration?.instructions ?? ""}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              configuration: {
-                ...f.configuration,
-                instructions: e.target.value,
-              },
-            }))
-          }
+          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, instructions: e.target.value } })}
           placeholder="Bot system instructions"
         />
       </Form.Group>
@@ -1024,15 +1165,7 @@ const BotsPage = () => {
         <Form.Label>Greeting message</Form.Label>
         <Form.Control
           value={form.configuration?.greeting_message ?? ""}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              configuration: {
-                ...f.configuration,
-                greeting_message: e.target.value,
-              },
-            }))
-          }
+          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, greeting_message: e.target.value } })}
           placeholder="Hello! How can I help?"
         />
       </Form.Group>
@@ -1040,12 +1173,7 @@ const BotsPage = () => {
         <Form.Label>Voice name</Form.Label>
         <Form.Control
           value={form.configuration?.voice_name ?? ""}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              configuration: { ...f.configuration, voice_name: e.target.value },
-            }))
-          }
+          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, voice_name: e.target.value } })}
           placeholder="onyx"
         />
       </Form.Group>
@@ -1053,12 +1181,7 @@ const BotsPage = () => {
         <Form.Label>LLM model</Form.Label>
         <Form.Control
           value={form.configuration?.llm_model ?? ""}
-          onChange={(e) =>
-            setForm((f) => ({
-              ...f,
-              configuration: { ...f.configuration, llm_model: e.target.value },
-            }))
-          }
+          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, llm_model: e.target.value } })}
           placeholder="gpt-4o-mini"
         />
       </Form.Group>
@@ -1114,25 +1237,27 @@ const BotsPage = () => {
               </Button>
             </div>
           </div>
-        </Col>
-      </Row>
-
-      <GenericTable<BotRow>
-        data={data}
-        columns={columns}
-        loading={loading}
-        emptyMessage="No bots found."
-        loadingMessage="Loading bots..."
-        pagination={{
-          currentPage: 1,
-          rowsPerPage: 10,
-          totalRows: data.length,
-          pageSizeOptions: [10, 25, 50],
-        }}
-        uniqueKey="id"
-        hover
-        striped={false}
-      />
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="outline-secondary" onClick={() => setShowTabSelectorModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              const nextVisible = ["all", ...tabSelectionDraft];
+              setVisibleTabIds(nextVisible);
+              if (statusFilter && !nextVisible.includes(statusFilter)) {
+                setLoading(true);
+                setStatusFilter("");
+              }
+              setShowTabSelectorModal(false);
+            }}
+          >
+            Apply
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <Modal
         show={showAddModal}

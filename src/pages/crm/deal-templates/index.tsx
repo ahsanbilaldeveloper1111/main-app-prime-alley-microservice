@@ -47,8 +47,24 @@ import {
   CRM_DIALOG_PRIMARY_BUTTON_STYLE,
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
 } from "@components/crm/crmDialogActionButtonStyles";
+import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
+import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 
 const PERMISSION_ADD_DEAL_TEMPLATES = "add-crm-deal-templates";
+const DEAL_TEMPLATES_TABLE_COLUMN_STORAGE_KEY =
+  "dealTemplatesSelectedColumns";
+const DEAL_TEMPLATES_TABLE_SELECTABLE_KEYS = [
+  "name",
+  "description",
+  "fields",
+  "actions",
+] as const;
+const DEFAULT_DEAL_TEMPLATES_TABLE_COLUMNS = [
+  "name",
+  "description",
+  "fields",
+  "actions",
+];
 
 type DealTemplateFieldForm = {
   id: string;
@@ -100,17 +116,30 @@ const DealTemplatesPage = () => {
   const [templates, setTemplates] = useState<DealTemplateData[]>([]);
   const [totalTemplates, setTotalTemplates] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    perPage: 15,
+  const {
+    pagination,
+    setPagination,
+    selectedColumns,
+    setSelectedColumns,
+    handlePaginationChange,
+  } = useCrmSettingsTableState({
+    defaultSelectedColumns: DEFAULT_DEAL_TEMPLATES_TABLE_COLUMNS,
+    selectableColumnKeys: DEAL_TEMPLATES_TABLE_SELECTABLE_KEYS,
+    columnStorageKey: DEAL_TEMPLATES_TABLE_COLUMN_STORAGE_KEY,
   });
-  const [search, setSearch] = useState("");
+  const {
+    inputValue: searchInput,
+    queryValue: search,
+    handleInputChange: handleSearchChange,
+    submitQuery: submitSearch,
+  } = useDebouncedSearchInput();
   const [showModal, setShowModal] = useState(false);
   const [editingTemplate, setEditingTemplate] =
     useState<DealTemplateData | null>(null);
   const [deletingTemplate, setDeletingTemplate] =
     useState<DealTemplateData | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingTemplatePending, setDeletingTemplatePending] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingTemplate, setViewingTemplate] =
     useState<DealTemplateData | null>(null);
@@ -128,7 +157,7 @@ const DealTemplatesPage = () => {
     try {
       const params: { page: number; per_page: number; search?: string } = {
         page: pagination.currentPage,
-        per_page: pagination.perPage,
+        per_page: pagination.rowsPerPage,
       };
       const trimmed = search.trim();
       if (trimmed) {
@@ -144,11 +173,17 @@ const DealTemplatesPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.currentPage, pagination.perPage, search]);
+  }, [pagination.currentPage, pagination.rowsPerPage, search]);
 
   useEffect(() => {
     fetchTemplates();
   }, [fetchTemplates]);
+
+  useEffect(() => {
+    setPagination((prev) =>
+      prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 },
+    );
+  }, [search, setPagination]);
 
   const handleOpenModal = useCallback((template?: DealTemplateData) => {
     if (template) {
@@ -320,12 +355,15 @@ const DealTemplatesPage = () => {
   const handleDelete = useCallback(async () => {
     if (!deletingTemplate) return;
     try {
+      setDeletingTemplatePending(true);
       await deleteDealTemplate(deletingTemplate.id);
       setShowDeleteModal(false);
       setDeletingTemplate(null);
       await fetchTemplates();
     } catch (error: unknown) {
       consumeHandledApiError(error, "DealTemplates.handleDelete");
+    } finally {
+      setDeletingTemplatePending(false);
     }
   }, [deletingTemplate, fetchTemplates]);
 
@@ -346,6 +384,7 @@ const DealTemplatesPage = () => {
         label: "Name",
         sortable: true,
         type: "custom",
+        width: "260px",
         render: (template) => (
           <div className="fw-semibold">{template.name}</div>
         ),
@@ -355,7 +394,7 @@ const DealTemplatesPage = () => {
         label: "Description",
         sortable: false,
         type: "custom",
-        width: "260px",
+        width: "420px",
         render: (template) => (
           <CrmTruncatedDescriptionCell
             text={template.description}
@@ -368,6 +407,7 @@ const DealTemplatesPage = () => {
         label: "Fields",
         sortable: false,
         type: "custom",
+        width: "140px",
         render: (template) => (
           <Badge bg="secondary">{template.fields?.length || 0} field(s)</Badge>
         ),
@@ -378,6 +418,7 @@ const DealTemplatesPage = () => {
         sortable: false,
         align: "right",
         type: "custom",
+        width: "170px",
         render: (template) => (
           <div className="d-flex justify-content-end gap-2">
             <Button
@@ -414,10 +455,11 @@ const DealTemplatesPage = () => {
   const templatesToolbarConfig = useMemo<ToolbarConfig>(
     () => ({
       showSearch: true,
-      searchValue: search,
+      searchValue: searchInput,
       searchPlaceholder: "Search templates by name or description...",
-      onSearchChange: setSearch,
+      onSearchChange: handleSearchChange,
       onSearch: () => {
+        submitSearch();
         setPagination((prev) => ({ ...prev, currentPage: 1 }));
       },
       rightActions: (
@@ -436,7 +478,13 @@ const DealTemplatesPage = () => {
         </div>
       ),
     }),
-    [search, session?.user?.permissions, handleOpenModal],
+    [
+      handleOpenModal,
+      handleSearchChange,
+      searchInput,
+      session?.user?.permissions,
+      submitSearch,
+    ],
   );
 
   return (
@@ -454,13 +502,16 @@ const DealTemplatesPage = () => {
           toolbar={templatesToolbarConfig}
           pagination={{
             currentPage: pagination.currentPage,
-            rowsPerPage: pagination.perPage,
+            rowsPerPage: pagination.rowsPerPage,
             totalRows: totalTemplates,
             pageSizeOptions: [10, 15, 25, 50],
           }}
-          onPaginationChange={(page, rowsPerPage) => {
-            setPagination({ currentPage: page, perPage: rowsPerPage });
-          }}
+          onPaginationChange={handlePaginationChange}
+          customizableColumns
+          selectedColumns={selectedColumns}
+          defaultSelectedColumns={DEFAULT_DEAL_TEMPLATES_TABLE_COLUMNS}
+          onColumnChange={setSelectedColumns}
+          columnStorageKey={DEAL_TEMPLATES_TABLE_COLUMN_STORAGE_KEY}
           loading={loading}
           emptyMessage={
             <div className="text-center p-5">
@@ -730,6 +781,7 @@ const DealTemplatesPage = () => {
           onConfirm={handleDelete}
           itemName={deletingTemplate?.name}
           itemType="deal template"
+          loading={deletingTemplatePending}
         />
 
         {/* View Modal */}
@@ -745,22 +797,8 @@ const DealTemplatesPage = () => {
             </Modal.Header>
             <Modal.Body style={{ maxHeight: "70vh", overflowY: "auto" }}>
               <div className="mb-3">
-                <Form.Label className="text-muted small">ID</Form.Label>
-                <div className="fw-semibold">#{viewingTemplate.id}</div>
-              </div>
-              <div className="mb-3">
                 <Form.Label className="text-muted small">Name</Form.Label>
                 <div className="fw-semibold">{viewingTemplate.name}</div>
-              </div>
-              <div className="mb-3">
-                <Form.Label className="text-muted small">Industry</Form.Label>
-                <div>
-                  {viewingTemplate.industry ? (
-                    <Badge bg="info">{viewingTemplate.industry.name}</Badge>
-                  ) : (
-                    <span className="text-muted">N/A</span>
-                  )}
-                </div>
               </div>
               <div className="mb-3">
                 <Form.Label className="text-muted small">

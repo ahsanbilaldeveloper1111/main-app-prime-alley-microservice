@@ -39,10 +39,26 @@ import {
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
 } from "@components/crm/crmDialogActionButtonStyles";
 import { useSession } from "next-auth/react";
+import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
+import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 
 const PERMISSION_ADD = "add-crm-business-types";
 const PERMISSION_EDIT = "edit-crm-business-types";
 const PERMISSION_DELETE = "delete-crm-business-types";
+const BUSINESS_TYPES_TABLE_COLUMN_STORAGE_KEY =
+  "businessTypesSelectedColumns";
+const BUSINESS_TYPES_TABLE_SELECTABLE_KEYS = [
+  "name",
+  "description",
+  "created_at",
+  "actions",
+] as const;
+const DEFAULT_BUSINESS_TYPES_TABLE_COLUMNS = [
+  "name",
+  "description",
+  "created_at",
+  "actions",
+];
 
 function consumeHandledApiError(error: unknown, source: string): void {
   reportApiErrorFromCatch(error, source, { scope: "BusinessTypes" });
@@ -73,15 +89,28 @@ const BusinessTypes = () => {
   const [businessTypes, setBusinessTypes] = useState<BusinessTypeData[]>([]);
   const [totalBusinessTypes, setTotalBusinessTypes] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    perPage: 15,
+  const {
+    pagination,
+    setPagination,
+    selectedColumns,
+    setSelectedColumns,
+    handlePaginationChange,
+  } = useCrmSettingsTableState({
+    defaultSelectedColumns: DEFAULT_BUSINESS_TYPES_TABLE_COLUMNS,
+    selectableColumnKeys: BUSINESS_TYPES_TABLE_SELECTABLE_KEYS,
+    columnStorageKey: BUSINESS_TYPES_TABLE_COLUMN_STORAGE_KEY,
   });
-  const [search, setSearch] = useState("");
+  const {
+    inputValue: searchInput,
+    queryValue: search,
+    handleInputChange: handleSearchChange,
+    submitQuery: submitSearch,
+  } = useDebouncedSearchInput();
   const [showModal, setShowModal] = useState(false);
   const [editingBusinessType, setEditingBusinessType] = useState<BusinessTypeData | null>(null);
   const [deletingBusinessType, setDeletingBusinessType] = useState<BusinessTypeData | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingBusinessTypePending, setDeletingBusinessTypePending] = useState(false);
   const [formData, setFormData] = useState<BusinessTypeFormState>({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
 
@@ -90,7 +119,7 @@ const BusinessTypes = () => {
     try {
       const params: { page: number; per_page: number; search?: string } = {
         page: pagination.currentPage,
-        per_page: pagination.perPage,
+        per_page: pagination.rowsPerPage,
       };
       const trimmed = search.trim();
       if (trimmed) {
@@ -106,13 +135,19 @@ const BusinessTypes = () => {
     } finally {
       setLoading(false);
     }
-  }, [pagination.currentPage, pagination.perPage, search]);
+  }, [pagination.currentPage, pagination.rowsPerPage, search]);
 
   useEffect(() => {
     fetchBusinessTypes().catch((error: unknown) => {
       consumeHandledApiError(error, "BusinessTypes.useEffect");
     });
   }, [fetchBusinessTypes]);
+
+  useEffect(() => {
+    setPagination((prev) =>
+      prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 },
+    );
+  }, [search, setPagination]);
   
 
   const handleOpenModal = useCallback((businessType?: BusinessTypeData) => {
@@ -168,12 +203,15 @@ const BusinessTypes = () => {
   const handleDelete = useCallback(async () => {
     if (!deletingBusinessType) return;
     try {
+      setDeletingBusinessTypePending(true);
       await deleteBusinessType(deletingBusinessType.id);
       setShowDeleteModal(false);
       setDeletingBusinessType(null);
       await fetchBusinessTypes();
     } catch (error: unknown) {
       consumeHandledApiError(error, "BusinessTypes.handleDelete");
+    } finally {
+      setDeletingBusinessTypePending(false);
     }
   }, [deletingBusinessType, fetchBusinessTypes]);
 
@@ -184,6 +222,7 @@ const BusinessTypes = () => {
         label: "Name",
         sortable: true,
         type: "custom",
+        width: "260px",
         render: (bt) => <div className="fw-semibold">{bt.name}</div>,
       },
       {
@@ -191,7 +230,7 @@ const BusinessTypes = () => {
         label: "Description",
         sortable: false,
         type: "custom",
-        width: "260px",
+        width: "420px",
         render: (bt) => <CrmTruncatedDescriptionCell text={bt.description} />,
       },
       {
@@ -199,6 +238,7 @@ const BusinessTypes = () => {
         label: "Created At",
         sortable: true,
         type: "custom",
+        width: "200px",
         render: (bt) => (
           <div className="text-muted small">
             {bt.created_at
@@ -213,6 +253,7 @@ const BusinessTypes = () => {
         sortable: false,
         align: "right",
         type: "custom",
+        width: "160px",
         render: (bt) => (
           <div className="d-flex justify-content-end gap-2">
             {session?.user?.permissions?.includes(PERMISSION_EDIT) && (
@@ -243,15 +284,16 @@ const BusinessTypes = () => {
   );
 
   const handleToolbarSearch = useCallback(() => {
+    submitSearch();
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, []);
+  }, [setPagination, submitSearch]);
 
   const businessToolbarConfig = useMemo<ToolbarConfig>(
     () => ({
       showSearch: true,
-      searchValue: search,
+      searchValue: searchInput,
       searchPlaceholder: "Search business types by name or description...",
-      onSearchChange: setSearch,
+      onSearchChange: handleSearchChange,
       onSearch: handleToolbarSearch,
       rightActions: (
         <div className="d-flex gap-2">
@@ -267,7 +309,13 @@ const BusinessTypes = () => {
         </div>
       ),
     }),
-    [search, session?.user?.permissions, handleOpenModal, handleToolbarSearch],
+    [
+      handleOpenModal,
+      handleSearchChange,
+      handleToolbarSearch,
+      searchInput,
+      session?.user?.permissions,
+    ],
   );
 
   return (
@@ -281,13 +329,16 @@ const BusinessTypes = () => {
           toolbar={businessToolbarConfig}
           pagination={{
             currentPage: pagination.currentPage,
-            rowsPerPage: pagination.perPage,
+            rowsPerPage: pagination.rowsPerPage,
             totalRows: totalBusinessTypes,
             pageSizeOptions: [10, 15, 25, 50],
           }}
-          onPaginationChange={(page, rowsPerPage) => {
-            setPagination({ currentPage: page, perPage: rowsPerPage });
-          }}
+          onPaginationChange={handlePaginationChange}
+          customizableColumns
+          selectedColumns={selectedColumns}
+          defaultSelectedColumns={DEFAULT_BUSINESS_TYPES_TABLE_COLUMNS}
+          onColumnChange={setSelectedColumns}
+          columnStorageKey={BUSINESS_TYPES_TABLE_COLUMN_STORAGE_KEY}
           loading={loading}
           emptyMessage={
             <div className="text-center p-5">
@@ -299,12 +350,19 @@ const BusinessTypes = () => {
         />
 
         {/* Create/Edit Modal */}
-        <Modal show={showModal} onHide={() => setShowModal(false)} centered>
-          <Modal.Header closeButton>
+        <Modal
+          show={showModal}
+          onHide={() => {
+            if (submitting) return;
+            setShowModal(false);
+          }}
+          centered
+        >
+          <Modal.Header closeButton={!submitting}>
             <Modal.Title>{modalTitle(editingBusinessType)}</Modal.Title>
           </Modal.Header>
-          <Form onSubmit={handleSubmit}>
-            <Modal.Body>
+          <Modal.Body>
+            <Form onSubmit={handleSubmit}>
               <Form.Group className="mb-3">
                 <Form.Label>
                   Name <span className="text-danger">*</span>
@@ -329,10 +387,9 @@ const BusinessTypes = () => {
                   placeholder="Enter business type description"
                 />
               </Form.Group>
-            </Modal.Body>
-            <Modal.Footer className="border-0 pt-2">
-              <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
-                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
+
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 w-100">
+                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 align-self-center">
                   <AlertCircle size={14} />
                   <span style={{ fontSize: "0.813rem" }}>
                     Fields marked with <span className="text-danger fw-bold">*</span> are required
@@ -367,8 +424,8 @@ const BusinessTypes = () => {
                   </Button>
                 </div>
               </div>
-            </Modal.Footer>
-          </Form>
+            </Form>
+          </Modal.Body>
         </Modal>
 
         {/* Delete Confirmation Modal */}
@@ -381,6 +438,7 @@ const BusinessTypes = () => {
           onConfirm={handleDelete}
           itemName={deletingBusinessType?.name}
           itemType="business type"
+          loading={deletingBusinessTypePending}
         />
       </div>
     </React.Fragment>

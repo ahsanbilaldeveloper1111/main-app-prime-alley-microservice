@@ -393,6 +393,8 @@ export interface FilterPill {
     value: string;
     onClick?: () => void;
   }>;
+  /** Override the default `Dropdown.Menu` inline styles (e.g. remove maxHeight/overflow for portalled selects). */
+  dropdownMenuStyle?: React.CSSProperties;
 }
 
 export interface ToolbarConfig {
@@ -902,6 +904,7 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
       style={{
         textAlign: col.align || "left",
         position: colIdx === 0 ? "relative" : undefined,
+        ...(col.width ? { width: col.width, maxWidth: col.width } : {}),
       }}
     >
       {firstColumnClickable ? (
@@ -1337,29 +1340,9 @@ const GenericTable = <T extends Record<string, any>>({
     }
   };
 
-  /** Always open downward, escape overflow parents, stay within the viewport. */
-  const getColumnSelectorPopperConfig = useMemo(
-    () =>
-      (defaultConfig: Record<string, any>) => ({
-        ...defaultConfig,
-        strategy: "fixed" as const,
-        placement: "bottom-end" as const,
-        modifiers: (defaultConfig.modifiers ?? []).map(
-          (mod: Record<string, any>) => {
-            if (mod.name === "flip") return { ...mod, enabled: false };
-            if (mod.name === "preventOverflow")
-              return {
-                ...mod,
-                options: {
-                  ...mod.options,
-                  boundary: "viewport" as const,
-                  padding: 8,
-                },
-              };
-            return mod;
-          },
-        ),
-      }),
+  /** Escape scroll/overflow parents so the menu is not clipped. */
+  const columnSelectorMenuPopperConfig = useMemo(
+    () => ({ strategy: "fixed" as const }),
     [],
   );
 
@@ -1383,7 +1366,7 @@ const GenericTable = <T extends Record<string, any>>({
         align="end"
         className="column-selector-menu"
         renderOnMount
-        popperConfig={getColumnSelectorPopperConfig}
+        popperConfig={columnSelectorMenuPopperConfig}
       >
         {columnCatalog.map((c) => (
           <Dropdown.Item key={c.key} as="div">
@@ -1832,7 +1815,7 @@ const GenericTable = <T extends Record<string, any>>({
                         )}
                       </Dropdown.Toggle>
                       <Dropdown.Menu
-                        style={{ maxHeight: "280px", overflowY: "auto" }}
+                        style={pill.dropdownMenuStyle ?? { maxHeight: "280px", overflowY: "auto" }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         <GenericTableFilterPillMenuBody
@@ -2092,7 +2075,6 @@ const GenericTable = <T extends Record<string, any>>({
             <td
               className="generic-table-td"
               style={{ width: "52px" }}
-              aria-hidden
             />
           )}
           {actionsColumnVisible && (

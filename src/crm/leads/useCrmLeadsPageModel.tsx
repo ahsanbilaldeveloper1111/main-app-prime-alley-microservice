@@ -1010,6 +1010,7 @@ export function useCrmLeadsPageModel() {
       localStorageKey: "crm-leads-list-preview-record-id",
       listLoading: !isInitialized || loading,
       openPreviewByNumericId: openLeadPreviewById,
+      enableRestore: false,
     });
 
   const handlePreviewClick = useCallback(

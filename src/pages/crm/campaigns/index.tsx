@@ -80,6 +80,8 @@ import {
   CRM_DIALOG_PRIMARY_BUTTON_STYLE,
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
 } from "@components/crm/crmDialogActionButtonStyles";
+import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
+import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import moment from "moment";
 
 function consumeHandledApiError(error: unknown, source: string): void {
@@ -298,18 +300,47 @@ function buildCrmDataAssignmentPayload(args: {
   }
 
   payload.custom_extensions = extensionArray;
-  payload.distribution_mode = distributionMode === "custom" ? "custom" : distributionMode;
+  payload.user_distribution_mode = distributionMode === "custom" ? "custom" : "equal";
 
   if (distributionMode === "custom") {
-    const dist: Record<number, number> = {};
-    Object.entries(customDistribution).forEach(([v, count]) => {
-      const id = Number.parseInt(v, 10);
-      if (id > 0 && count > 0) dist[id] = count;
+    const allowed = new Set(extensionArray.map(String));
+    const dist: Record<string, number> = {};
+    Object.entries(customDistribution).forEach(([key, count]) => {
+      const k = String(key);
+      if (!allowed.has(k)) return;
+      if (typeof count !== "number" || !Number.isFinite(count) || count < 0) return;
+      dist[k] = count;
     });
     payload.extension_distribution = dist;
   }
 
   return { ok: true, payload };
+}
+
+function getZeroUserCampaignNamesFromAssignmentResult(
+  assignmentResult: any,
+  availableCampaignsForUpload: Array<{ label: string; id: number }>,
+  campaignsData: any[],
+): string[] {
+  const distribution = Array.isArray(assignmentResult?.distribution)
+    ? assignmentResult.distribution
+    : [];
+
+  const ids = distribution
+    .filter((row: any) => Number(row?.user_count) === 0)
+    .map((row: any) => Number(row?.campaign_id))
+    .filter((id: number) => Number.isFinite(id) && id > 0);
+
+  if (ids.length === 0) return [];
+
+  const uniqueIds = Array.from(new Set(ids));
+  return uniqueIds.map((id) => {
+    const opt = availableCampaignsForUpload.find((c) => c.id === id);
+    if (opt?.label) return opt.label;
+    const fromList = campaignsData.find((c: any) => Number(c?.id) === id);
+    if (fromList?.name) return fromList.name;
+    return `Campaign #${id}`;
+  });
 }
 
 function campaignFieldRowKey(
@@ -323,11 +354,13 @@ function campaignFieldRowKey(
         : String(field.id as string | number | boolean | bigint);
     return `campaign-field-${idStr}`;
   }
-  return `campaign-field-new-${field.field_name ?? "unnamed"}-${field.field_type ?? "na"}-${field.sort_order ?? index}-${index}`;
+  // IMPORTANT: do not derive React keys from editable text; it causes remounts and input focus loss while typing.
+  return `campaign-field-idx-${index}`;
 }
 
-function campaignFieldOptionKey(fieldName: string, option: string, optionIndex: number): string {
-  return `opt-${fieldName}-${optionIndex}-${option.length}-${option.slice(0, 48)}`;
+function campaignFieldOptionKey(fieldKey: string, optionIndex: number): string {
+  // IMPORTANT: do not derive React keys from editable text; it causes remounts and input focus loss while typing.
+  return `opt-${fieldKey}-${optionIndex}`;
 }
 
 function viewModalDateRangeText(selected: { start_date?: string; end_date?: string }): string {
@@ -612,7 +645,8 @@ const CRM_CAMPAIGNS_SELECT_STYLES = {
 
 type ToolbarFactoryArgs = {
   campaignsSearch: string;
-  setCampaignsSearch: (v: string) => void;
+  onCampaignsSearchChange: (v: string) => void;
+  submitCampaignsSearch: () => void;
   handleFiltersChange: (filters: Record<string, any>) => void;
   setCampaignsPagination: React.Dispatch<React.SetStateAction<{ currentPage: number; rowsPerPage: number; sortBy: string; sortOrder: "asc" | "desc" }>>;
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
@@ -649,21 +683,18 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
     showSearch: true,
     searchValue: a.campaignsSearch,
     searchPlaceholder: "Search campaigns by name, description...",
-    onSearchChange: (value) => {
-      a.setCampaignsSearch(value);
-    },
+    onSearchChange: a.onCampaignsSearchChange,
     onSearch: () => {
-      a.handleFiltersChange({ search: a.campaignsSearch });
+      a.submitCampaignsSearch();
       a.setCampaignsPagination((prev) => ({ ...prev, currentPage: 1 }));
-      a.setRefreshKey((prev) => prev + 1);
     },
     showTabs: true,
     tabs: [
       { id: "all", label: "All Campaigns", count: a.filterCounts.all, removable: false },
       { id: "active", label: "Active", count: a.filterCounts.active, removable: false },
       { id: "inactive", label: "Inactive", count: a.filterCounts.inactive, removable: false },
-      { id: "assigned", label: "Assigned Records", removable: false },
-      { id: "unassigned", label: "Unassigned Records", removable: false },
+      { id: "assigned", label: "With Assigned Records", removable: false },
+      { id: "unassigned", label: "With Unassigned Records", removable: false },
     ],
     activeTab: a.activeFilter,
     onTabChange: (tabId) => {
@@ -788,6 +819,7 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
           a.setCampaignFilters((prev) => ({ ...prev, userExtensions: null }));
           a.handleFiltersChange({ user_extensions: null });
         },
+        dropdownMenuStyle: { overflow: "visible" },
         dropdownContent: (
           <div style={{ minWidth: "260px" }}>
             <Form.Label className="small fw-bold mb-2">Campaign Users</Form.Label>
@@ -809,7 +841,11 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
                 a.handleFiltersChange({ user_extensions: vals || null });
               }}
               placeholder="Select users..."
-              styles={CRM_CAMPAIGNS_SELECT_STYLES}
+              menuPortalTarget={document?.body || undefined}
+              styles={{
+                ...CRM_CAMPAIGNS_SELECT_STYLES,
+                menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
+              }}
             />
           </div>
         ),
@@ -1182,7 +1218,7 @@ type CrmCampaignListQueryParams = {
     tags: string[] | null;
   };
   activeFilter: string;
-  campaignsSearch: string;
+  campaignsSearchQuery: string;
 };
 
 type CrmCampaignListSetters = {
@@ -1197,7 +1233,7 @@ function useCrmCampaignListQueryEffect(
   query: CrmCampaignListQueryParams,
   setters: CrmCampaignListSetters,
 ) {
-  const { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch } = query;
+  const { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearchQuery } = query;
   const { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns } = setters;
   useEffect(() => {
     const loadCampaigns = async () => {
@@ -1207,7 +1243,7 @@ function useCrmCampaignListQueryEffect(
         const response = await getCampaigns({
           page: campaignsPagination.currentPage,
           per_page: campaignsPagination.rowsPerPage,
-          search: memoizedFilters.search || campaignsSearch || undefined,
+          search: campaignsSearchQuery || undefined,
           filters,
           module_slug: ModuleSlug.CRM_CAMPAIGNS,
         });
@@ -1235,7 +1271,7 @@ function useCrmCampaignListQueryEffect(
     memoizedFilters,
     campaignFilters,
     activeFilter,
-    campaignsSearch,
+    campaignsSearchQuery,
   ]);
 }
 
@@ -1284,21 +1320,6 @@ const DEFAULT_CAMPAIGN_SELECTED_COLUMNS: string[] = [
   "actions",
 ];
 
-function parseSavedCampaignTableColumns(raw: string | null): string[] | null {
-  if (!raw) return null;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    const allowed = new Set<string>(CAMPAIGN_SELECTABLE_COLUMN_KEYS);
-    const next = parsed.filter(
-      (k): k is string => typeof k === "string" && allowed.has(k),
-    );
-    return next.length > 0 ? next : null;
-  } catch {
-    return null;
-  }
-}
-
 const CrmCampaigns = () => { // NOSONAR
   const { data: session } = useSession();
 
@@ -1308,29 +1329,32 @@ const CrmCampaigns = () => { // NOSONAR
   const [metrics, setMetrics] = useState<CampaignMetrics>({
     active_campaigns: 0,
     inactive_campaigns: 0,
+    users_count: 0,
   });
   const [totalCampaigns, setTotalCampaigns] = useState(0);
 
   // UI State
   const [showCampaignsAnalytics, setShowCampaignsAnalytics] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
-  const [campaignsSearch, setCampaignsSearch] = useState("");
-  const [campaignsPagination, setCampaignsPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 10,
-    sortBy: "",
-    sortOrder: "asc" as "asc" | "desc",
+  const {
+    inputValue: campaignsSearch,
+    queryValue: campaignsSearchQuery,
+    handleInputChange: handleCampaignsSearchChange,
+    submitQuery: submitCampaignsSearch,
+  } = useDebouncedSearchInput();
+  const {
+    pagination: campaignsPagination,
+    setPagination: setCampaignsPagination,
+    selectedColumns: selectedCampaignTableColumns,
+    setSelectedColumns: setSelectedCampaignTableColumns,
+    handlePaginationChange: handleCampaignsPaginationChange,
+    handleSort: handleCampaignsSort,
+  } = useCrmSettingsTableState({
+    defaultSelectedColumns: DEFAULT_CAMPAIGN_SELECTED_COLUMNS,
+    selectableColumnKeys: CAMPAIGN_SELECTABLE_COLUMN_KEYS,
+    columnStorageKey: CAMPAIGN_TABLE_COLUMN_STORAGE_KEY,
+    initialPagination: { rowsPerPage: 10 },
   });
-  const [selectedCampaignTableColumns, setSelectedCampaignTableColumns] =
-    useState<string[]>(() => {
-      if (globalThis.window === undefined) {
-        return [...DEFAULT_CAMPAIGN_SELECTED_COLUMNS];
-      }
-      const saved = parseSavedCampaignTableColumns(
-        globalThis.localStorage.getItem(CAMPAIGN_TABLE_COLUMN_STORAGE_KEY),
-      );
-      return saved ?? [...DEFAULT_CAMPAIGN_SELECTED_COLUMNS];
-    });
   const [campaignFilters, setCampaignFilters] = useState({
     status: [] as string[],
     dateFrom: null as string | null,
@@ -1474,9 +1498,16 @@ const CrmCampaigns = () => { // NOSONAR
   }, []);
 
   const listCampaignsPermission = Boolean(session?.user?.permissions?.includes("list-crm-campaigns"));
+
+  useEffect(() => {
+    setCampaignsPagination((prev) =>
+      prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 },
+    );
+  }, [campaignsSearchQuery, setCampaignsPagination]);
+
   useCrmCampaignListQueryEffect(
     listCampaignsPermission,
-    { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearch },
+    { refreshKey, campaignsPagination, memoizedFilters, campaignFilters, activeFilter, campaignsSearchQuery },
     { setListLoading, setCampaignsData, setMetrics, setTotalCampaigns },
   );
 
@@ -1697,7 +1728,9 @@ const CrmCampaigns = () => { // NOSONAR
       );
 
       const processedCount = response.processed_count ?? 0;
-      const validationFailureCount = Array.isArray(response.errors) ? response.errors.length : 0;
+      const validationFailureCount =
+        (typeof response.validation_failures === "number" ? response.validation_failures : null) ??
+        (Array.isArray(response.errors) ? response.errors.length : 0);
       toastCrmCsvUploadOutcome(processedCount, validationFailureCount);
 
       setSelectedFile(null);
@@ -1806,7 +1839,28 @@ const CrmCampaigns = () => { // NOSONAR
       }
 
       const response = await axiosInstance.post("/crm/crm_data/assign", built.payload);
-      if (response?.data?.data?.success) {
+      const assignmentResult = response?.data?.data;
+      if (assignmentResult?.success) {
+        if (assignmentTargetType === "campaigns") {
+          const campaignNames = getZeroUserCampaignNamesFromAssignmentResult(
+            assignmentResult,
+            availableCampaignsForUpload,
+            campaignsData,
+          );
+
+          if (campaignNames.length > 0) {
+            const assignedCount =
+              typeof assignmentResult.assigned_count === "number"
+                ? assignmentResult.assigned_count
+                : recordsToAssign;
+            toast.error(
+              `Assigned ${assignedCount} records, but these campaign(s) have 0 users: ${campaignNames.join(", ")}. Please add users to the campaign(s) and try again.`,
+            );
+            setRefreshKey((prev) => prev + 1);
+            return;
+          }
+        }
+
         toast.success(`Successfully assigned ${recordsToAssign} records!`);
         setShowDataAssignmentModal(false);
         resetAssignmentState();
@@ -1815,7 +1869,7 @@ const CrmCampaigns = () => { // NOSONAR
         setSuccessModalDescription(`Successfully assigned ${recordsToAssign} records!`);
         setRefreshKey((prev) => prev + 1);
       } else {
-        toast.error(response.data.message || "Failed to assign data");
+        toast.error(response?.data?.message || "Failed to assign data");
       }
     } catch (error: unknown) {
       consumeHandledApiError(error, "CrmCampaigns.handleDataAssignmentSubmit");
@@ -1823,7 +1877,7 @@ const CrmCampaigns = () => { // NOSONAR
     } finally {
       setAssigningData(false);
     }
-  }, [assignmentTargetType, recordsToAssign, distributionMode, assignToCampaigns, selectedUserExtensions, assignmentFilterCampaigns, assignmentFilterTags, availableTags, availableCampaignsForUpload, includeAssignedRecords, customDistribution]);
+  }, [assignmentTargetType, recordsToAssign, distributionMode, assignToCampaigns, selectedUserExtensions, assignmentFilterCampaigns, assignmentFilterTags, availableTags, availableCampaignsForUpload, campaignsData, includeAssignedRecords, customDistribution]);
 
   const handleAutoFillEqualDistribution = useCallback(() => {
     if (assignmentTargetType === "campaigns") {
@@ -1986,7 +2040,8 @@ const CrmCampaigns = () => { // NOSONAR
     () =>
       createCrmCampaignsToolbarConfig({
         campaignsSearch,
-        setCampaignsSearch,
+        onCampaignsSearchChange: handleCampaignsSearchChange,
+        submitCampaignsSearch,
         handleFiltersChange,
         setCampaignsPagination,
         setRefreshKey,
@@ -2005,6 +2060,7 @@ const CrmCampaigns = () => { // NOSONAR
       }),
     [
       campaignsSearch,
+      handleCampaignsSearchChange,
       activeFilter,
       filterCounts,
       showCampaignsAnalytics,
@@ -2014,20 +2070,9 @@ const CrmCampaigns = () => { // NOSONAR
       handleDataAssignment,
       handleCreateCampaign,
       handleFiltersChange,
+      submitCampaignsSearch,
     ],
   );
-
-  const handleCampaignsPaginationChange = useCallback((page: number, rowsPerPage: number) => {
-    setCampaignsPagination((prev) => ({
-      ...prev,
-      currentPage: rowsPerPage === prev.rowsPerPage ? page : 1,
-      rowsPerPage,
-    }));
-  }, []);
-
-  const handleCampaignsSort = useCallback((column: string, direction: "asc" | "desc") => {
-    setCampaignsPagination((prev) => ({ ...prev, sortBy: column, sortOrder: direction, currentPage: 1 }));
-  }, []);
 
   const closeCreateEditModal = () => {
     setShowCreateModal(false);
@@ -2056,7 +2101,7 @@ const CrmCampaigns = () => { // NOSONAR
             <KPICard title="Inactive Campaigns" value={metrics.inactive_campaigns.toString()} icon={<AlertCircle size={24} />} color="warning" />
           </Col>
           <Col lg={3} md={6} className="mb-3">
-            <KPICard title="Total Users" value={extensions.length.toString()} icon={<Users size={24} />} color="info" />
+            <KPICard title="Total Users" value={metrics.users_count.toString()} icon={<Users size={24} />} color="info" />
           </Col>
         </Row>
       )}
@@ -2079,21 +2124,13 @@ const CrmCampaigns = () => { // NOSONAR
             currentPage: campaignsPagination.currentPage,
             rowsPerPage: campaignsPagination.rowsPerPage,
             totalRows: totalCampaigns,
-            pageSizeOptions: [10, 25, 50, 100],
+            pageSizeOptions: [10, 15, 25, 50, 100],
           }}
           onPaginationChange={handleCampaignsPaginationChange}
           customizableColumns
           selectedColumns={selectedCampaignTableColumns}
           defaultSelectedColumns={DEFAULT_CAMPAIGN_SELECTED_COLUMNS}
-          onColumnChange={(cols) => {
-            const allowed = new Set<string>(CAMPAIGN_SELECTABLE_COLUMN_KEYS);
-            const filtered = cols.filter((c) => allowed.has(c));
-            setSelectedCampaignTableColumns(filtered);
-            globalThis.localStorage.setItem(
-              CAMPAIGN_TABLE_COLUMN_STORAGE_KEY,
-              JSON.stringify(filtered),
-            );
-          }}
+          onColumnChange={setSelectedCampaignTableColumns}
           columnStorageKey={CAMPAIGN_TABLE_COLUMN_STORAGE_KEY}
           showToolbar
           toolbar={toolbarConfig}
@@ -2103,8 +2140,16 @@ const CrmCampaigns = () => { // NOSONAR
       )}
 
       {/* Create/Edit Campaign Modal */}
-      <Modal show={showCreateModal || showEditModal} onHide={closeCreateEditModal} size="xl" centered>
-        <Modal.Header closeButton>
+      <Modal
+        show={showCreateModal || showEditModal}
+        onHide={() => {
+          if (loading) return;
+          closeCreateEditModal();
+        }}
+        size="xl"
+        centered
+      >
+        <Modal.Header closeButton={!loading}>
           <Modal.Title>
             {showEditModal ? `Edit Campaign: ${selectedCampaign?.name}` : "Add New Campaign"}
           </Modal.Title>
@@ -2223,47 +2268,87 @@ const CrmCampaigns = () => { // NOSONAR
                   </Row>
                 </Card.Body>
               </Card>
-              {campaignFields.map((field, index) => (
-                <Card key={campaignFieldRowKey(field, index)} className="mb-2">
-                  <Card.Body>
-                    <Row className="align-items-center">
-                      <Col md={4}>
-                        <Form.Control type="text" value={field.field_name} onChange={(e) => { const u = [...campaignFields]; u[index].field_name = e.target.value; setCampaignFields(u); }} />
-                      </Col>
-                      <Col md={3}>
-                        <Form.Select value={field.field_type} onChange={(e) => handleFieldTypeChange(index, e.target.value)}>
-                          <option value="string">Text</option>
-                          <option value="integer">Number</option>
-                          <option value="date">Date</option>
-                          <option value="email">Email</option>
-                          <option value="dropdown">Dropdown</option>
-                        </Form.Select>
-                      </Col>
-                      <Col md={2}>
-                        <Form.Check type="checkbox" label="Required" checked={field.is_required || false} onChange={(e) => { const u = [...campaignFields]; u[index].is_required = e.target.checked; setCampaignFields(u); }} />
-                      </Col>
-                      <Col md={3}>
-                        <Button variant="danger" className="app-button" onClick={() => handleRemoveField(index)}><FiTrash2 /> Delete</Button>
-                      </Col>
-                      {field.field_type === "dropdown" && (
-                        <Col md={12} className="mt-3">
-                          {field.field_options?.map((option: string, optionIndex: number) => (
-                            <div key={campaignFieldOptionKey(field.field_name, option, optionIndex)} className="d-flex mb-3 row align-items-center justify-content-left">
-                              <Col md={5}>
-                                <Form.Control type="text" size="sm" value={option} onChange={(e) => handleFieldOptionChange(index, optionIndex, e.target.value)} placeholder="Option value" />
-                              </Col>
-                              <Col md={5}>
-                                <Button variant="danger" size="sm" className="app-button" onClick={() => handleRemoveFieldOption(index, optionIndex)}>Remove Option</Button>
-                              </Col>
-                            </div>
-                          ))}
-                          <Button variant="primary" className="app-button" size="sm" onClick={() => handleAddFieldOption(index)}>Add Option</Button>
+              {campaignFields.map((field, index) => {
+                const fieldKey = campaignFieldRowKey(field, index);
+                return (
+                  <Card key={fieldKey} className="mb-2">
+                    <Card.Body>
+                      <Row className="align-items-center">
+                        <Col md={4}>
+                          <Form.Control
+                            type="text"
+                            value={field.field_name}
+                            onChange={(e) => {
+                              const u = [...campaignFields];
+                              u[index].field_name = e.target.value;
+                              setCampaignFields(u);
+                            }}
+                          />
                         </Col>
-                      )}
-                    </Row>
-                  </Card.Body>
-                </Card>
-              ))}
+                        <Col md={3}>
+                          <Form.Select value={field.field_type} onChange={(e) => handleFieldTypeChange(index, e.target.value)}>
+                            <option value="string">Text</option>
+                            <option value="integer">Number</option>
+                            <option value="date">Date</option>
+                            <option value="email">Email</option>
+                            <option value="dropdown">Dropdown</option>
+                          </Form.Select>
+                        </Col>
+                        <Col md={2}>
+                          <Form.Check
+                            type="checkbox"
+                            label="Required"
+                            checked={field.is_required || false}
+                            onChange={(e) => {
+                              const u = [...campaignFields];
+                              u[index].is_required = e.target.checked;
+                              setCampaignFields(u);
+                            }}
+                          />
+                        </Col>
+                        <Col md={3}>
+                          <Button variant="danger" className="app-button" onClick={() => handleRemoveField(index)}>
+                            <FiTrash2 /> Delete
+                          </Button>
+                        </Col>
+                        {field.field_type === "dropdown" && (
+                          <Col md={12} className="mt-3">
+                            {field.field_options?.map((option: string, optionIndex: number) => (
+                              <div
+                                key={campaignFieldOptionKey(fieldKey, optionIndex)}
+                                className="d-flex mb-3 row align-items-center justify-content-left"
+                              >
+                                <Col md={5}>
+                                  <Form.Control
+                                    type="text"
+                                    size="sm"
+                                    value={option}
+                                    onChange={(e) => handleFieldOptionChange(index, optionIndex, e.target.value)}
+                                    placeholder="Option value"
+                                  />
+                                </Col>
+                                <Col md={5}>
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    className="app-button"
+                                    onClick={() => handleRemoveFieldOption(index, optionIndex)}
+                                  >
+                                    Remove Option
+                                  </Button>
+                                </Col>
+                              </div>
+                            ))}
+                            <Button variant="primary" className="app-button" size="sm" onClick={() => handleAddFieldOption(index)}>
+                              Add Option
+                            </Button>
+                          </Col>
+                        )}
+                      </Row>
+                    </Card.Body>
+                  </Card>
+                );
+              })}
               {campaignFields.length === 0 && (
                 <Alert variant="info">No fields added yet. Click "Add Field" to create custom fields for this campaign.</Alert>
               )}
@@ -2390,6 +2475,27 @@ const CrmCampaigns = () => { // NOSONAR
                     </>
                   )}
 
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Product Groups</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                        {selectedCampaign.industries?.length > 0
+                          ? selectedCampaign.industries.map((ind: any) => (
+                              <Badge key={ind.id} bg="info" className="me-1">{ind.name}</Badge>
+                            ))
+                          : <span className="text-muted">None</span>}
+                      </div>
+                    </div>
+                    <div style={{ background: "#f8f9fa", padding: "16px", borderRadius: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>Deal Template</div>
+                      <div style={{ fontSize: "15px", color: "#1f2937", fontWeight: 500 }}>
+                        {selectedCampaign.deal_template?.name
+                          ? <Badge bg="info">{selectedCampaign.deal_template.name}</Badge>
+                          : <span className="text-muted">None</span>}
+                      </div>
+                    </div>
+                  </div>
+
                   <div style={{ fontSize: "16px", fontWeight: 600, color: "#1f2937", marginBottom: "20px", paddingBottom: "10px", borderBottom: "2px solid #f8f9fa", display: "flex", alignItems: "center", gap: "10px" }}>
                     <FileText size={18} style={{ color: "#4680ff" }} /> Campaign Fields ({selectedCampaign.fields?.length || 0})
                   </div>
@@ -2400,20 +2506,23 @@ const CrmCampaigns = () => { // NOSONAR
                           <tr><th>Field Name</th><th>Type</th><th>Required</th><th>Options</th></tr>
                         </thead>
                         <tbody>
-                          {selectedCampaign.fields.map((field: any, index: number) => (
-                            <tr key={campaignFieldRowKey(field, index)}>
+                          {selectedCampaign.fields.map((field: any, index: number) => {
+                            const fieldKey = campaignFieldRowKey(field, index);
+                            return (
+                            <tr key={fieldKey}>
                               <td>{field.field_name}</td>
                               <td><Badge bg="primary" className="text-capitalize">{getFieldTypeText(field.field_type)}</Badge></td>
                               <td>{field.is_required ? <Badge bg="danger">Required</Badge> : <Badge bg="secondary">Optional</Badge>}</td>
                               <td>
                                 {field.field_type === "dropdown" && field.field_options
                                   ? field.field_options.map((opt: string, i: number) => (
-                                    <Badge key={campaignFieldOptionKey(field.field_name, opt, i)} bg="info" className="me-1">{opt}</Badge>
+                                    <Badge key={campaignFieldOptionKey(fieldKey, i)} bg="info" className="me-1">{opt}</Badge>
                                   ))
                                   : <span className="text-muted">N/A</span>}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

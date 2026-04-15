@@ -1100,7 +1100,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
     {
       id: 'settings',
       key: 'settings',
-      permission: PERMISSIONS.VIEW_SETTINGS,
+      permission: PERMISSIONS.GENERAL_SERVICES,
       icon: <Settings size={16} />,
       color: MENU_COLORS.REPORTS,
       title: 'Settings',

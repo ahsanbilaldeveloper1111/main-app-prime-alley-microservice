@@ -5,13 +5,10 @@ import React, {
   useCallback,
   useMemo,
   useEffect,
-  useRef,
 } from "react";
-import { createPortal } from "react-dom";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn, ToolbarConfig } from "@components/GenericTable";
-import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import CrmColorCell from "@components/crm/crmColorCell";
 import { CrmDescriptionDetailsBlock, CrmTruncatedDescriptionCell } from "@components/crm/crmTruncatedDescriptionCell";
 import {
@@ -62,51 +59,28 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import { formatCrmPreviewDate, normalizeSearchQuery } from "@utils/Helper";
+import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
+import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 
 type StageType = "lead" | "deal" | "order" | "lost_reason";
 
-const STAGES_PREVIEW_LOCAL_STORAGE_KEY = "stages_last_preview_id";
-
-function readStagesPreviewIdFromStorage(): string | null {
-  if (globalThis.window === undefined) return null;
-  try {
-    return globalThis.localStorage.getItem(STAGES_PREVIEW_LOCAL_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeStagesPreviewIdToStorage(id: string): void {
-  if (globalThis.window === undefined) return;
-  try {
-    globalThis.localStorage.setItem(STAGES_PREVIEW_LOCAL_STORAGE_KEY, id);
-  } catch {
-    /* quota / private mode */
-  }
-}
-
-function clearStagesPreviewIdFromStorage(): void {
-  if (globalThis.window === undefined) return;
-  try {
-    globalThis.localStorage.removeItem(STAGES_PREVIEW_LOCAL_STORAGE_KEY);
-  } catch {
-    /* ignore */
-  }
-}
-
-function findStageByStoredId(
-  list: StageData[],
-  savedId: string,
-): StageData | undefined {
-  const trimmed = savedId.trim();
-  if (!trimmed) return undefined;
-  const asNum = Number(trimmed);
-  const hasNum = !Number.isNaN(asNum);
-  return list.find((s) => {
-    if (hasNum && Number(s.id) === asNum) return true;
-    return String(s.id) === trimmed;
-  });
-}
+const STAGES_TABLE_COLUMN_STORAGE_KEY = "stagesSelectedColumns";
+const STAGES_TABLE_SELECTABLE_KEYS = [
+  "sequence",
+  "name",
+  "type",
+  "description",
+  "color",
+  "actions",
+] as const;
+const DEFAULT_STAGES_SELECTED_COLUMNS = [
+  "sequence",
+  "name",
+  "type",
+  "description",
+  "color",
+  "actions",
+];
 
 const PERMISSION_LIST_STAGES = "list-crm-stages";
 const PERMISSION_ADD_STAGES = "add-crm-stages";
@@ -137,20 +111,6 @@ function getTypeBadgeColor(type: string): string {
 
 function consumeHandledApiError(error: unknown, source: string): void {
   reportApiErrorFromCatch(error, source, { scope: "StagesManagement" });
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((x) => typeof x === "string");
-}
-
-function parseSavedStageColumns(raw: string | null): string[] | undefined {
-  if (!raw) return undefined;
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return isStringArray(parsed) ? parsed : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 type StageFormState = {
@@ -288,6 +248,8 @@ const StagesManagement = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
+  const [submittingStageForm, setSubmittingStageForm] = useState(false);
+  const [deletingStage, setDeletingStage] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
   const [stageToDelete, setStageToDelete] = useState<Stage | null>(null);
@@ -302,13 +264,18 @@ const StagesManagement = () => {
     search: "",
     type: "",
   });
-  const [stagesSearch, setStagesSearch] = useState("");
+  const {
+    inputValue: stagesSearch,
+    queryValue: stagesSearchQuery,
+    handleInputChange: handleToolbarSearchChange,
+    submitQuery: handleToolbarSearchSubmit,
+  } = useDebouncedSearchInput({
+    normalize: normalizeSearchQuery,
+  });
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [showStagesAnalytics, setShowStagesAnalytics] = useState(false);
 
-  const normalizeSelectedStageColumns = (
-    cols: string[] | null | undefined,
-  ): string[] => {
+  const normalizeSelectedStageColumns = (cols: string[]): string[] => {
     const map: Record<string, string> = {
       order: "sequence",
       stageName: "name",
@@ -330,15 +297,19 @@ const StagesManagement = () => {
     }, []);
   };
 
-  const [selectedStagesColumns, setSelectedStagesColumns] = useState<string[]>(() => {
-    const saved = localStorage.getItem("stagesSelectedColumns");
-    return normalizeSelectedStageColumns(parseSavedStageColumns(saved));
-  });
-  const [stagesPagination, setStagesPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortBy: "",
-    sortOrder: "asc" as "asc" | "desc",
+  const {
+    selectedColumns: selectedStagesColumns,
+    setSelectedColumns: setSelectedStagesColumns,
+    pagination: stagesPagination,
+    setPagination,
+    handlePaginationChange: handleStagesPaginationChange,
+    handleSort: handleStagesSort,
+  } = useCrmSettingsTableState({
+    defaultSelectedColumns: DEFAULT_STAGES_SELECTED_COLUMNS,
+    selectableColumnKeys: STAGES_TABLE_SELECTABLE_KEYS,
+    columnStorageKey: STAGES_TABLE_COLUMN_STORAGE_KEY,
+    initialPagination: { rowsPerPage: 15 },
+    normalizeSelectedColumns: normalizeSelectedStageColumns,
   });
   const [stagesData, setStagesData] = useState<StageData[]>([]);
   const [allStagesData, setAllStagesData] = useState<StageData[]>([]);
@@ -346,28 +317,6 @@ const StagesManagement = () => {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [stageToRestore, setStageToRestore] = useState<Stage | null>(null);
   const [restoring, setRestoring] = useState(false);
-  const [showStageSidebar, setShowStageSidebar] = useState(false);
-  const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
-  const [previewPortalReady, setPreviewPortalReady] = useState(false);
-  const hasAutoOpenedPreview = useRef(false);
-
-  useEffect(() => {
-    setPreviewPortalReady(true);
-  }, []);
-
-  const handlePreviewClick = useCallback((stage: Stage) => {
-    setSelectedStage(stage);
-    setShowStageSidebar(true);
-    writeStagesPreviewIdToStorage(String(stage.id));
-  }, []);
-
-  const handleCloseStageSidebar = useCallback(() => {
-    setShowStageSidebar(false);
-    setSelectedStage(null);
-    clearStagesPreviewIdFromStorage();
-    hasAutoOpenedPreview.current = false;
-  }, []);
-
   const handleCloseSuccessfulModal = () => {
     setShowSuccessfulModal(false);
   };
@@ -417,104 +366,21 @@ const StagesManagement = () => {
   }, [fetchAllStagesForCounts, refreshKey]);
 
   useEffect(() => {
-    if (loadingStages) return;
-    if (stagesData.length === 0 && allStagesData.length === 0) return;
-    const rawSaved = readStagesPreviewIdFromStorage();
-    if (!rawSaved) return;
-    const savedId = rawSaved.trim();
-    if (!savedId) return;
-    if (hasAutoOpenedPreview.current) return;
-
-    const n = Number(savedId);
-    if (Number.isNaN(n)) {
-      clearStagesPreviewIdFromStorage();
-      return;
-    }
-
-    const stage =
-      findStageByStoredId(stagesData, savedId) ??
-      findStageByStoredId(allStagesData, savedId);
-    if (!stage) return;
-
-    hasAutoOpenedPreview.current = true;
-    setSelectedStage(stage as unknown as Stage);
-    setShowStageSidebar(true);
-  }, [stagesData, allStagesData, loadingStages]);
-
-  const stagePreviewSections = useMemo((): SidebarSection[] => {
-    if (!selectedStage) return [];
-    const s = selectedStage;
-    const resolveStatusLabel = (row: Stage): string => {
-      if (row.is_won) return "Won";
-      if (row.fold) return "Fold";
-      if (row.is_default) return "Default";
-      return "Active";
-    };
-    const resolveStatusVariant = (row: Stage): string => {
-      if (row.is_won) return "success";
-      if (row.fold) return "danger";
-      if (row.is_default) return "primary";
-      return "success";
-    };
-    const descriptionSection: SidebarSection = {
-      id: "description",
-      title: "Description",
-      icon: FileText,
-      collapsible: true,
-      defaultExpanded: true,
-    };
-    if (s.description) {
-      descriptionSection.fields = [{ label: "Description", value: s.description }];
-    } else {
-      descriptionSection.emptyState = {
-        icon: FileText,
-        message: "No description available.",
-      };
-    }
-    return [
-      {
-        id: "about-stage",
-        title: "About this stage",
-        icon: Target,
-        collapsible: true,
-        defaultExpanded: true,
-        fields: [
-          { label: "Stage Name", value: s.name, copyable: true },
-          { label: "Sequence", value: String(s.sequence) },
-          {
-            label: "Type",
-            value: getTypeDisplayName(s.type),
-            type: "badge" as const,
-            badgeVariant: getTypeBadgeColor(s.type),
-          },
-          { label: "Color", value: s.color },
-          { label: "Probability", value: `${s.probability}%` },
-          {
-            label: "Status",
-            value: resolveStatusLabel(s),
-            type: "badge" as const,
-            badgeVariant: resolveStatusVariant(s),
-          },
-          {
-            label: "Created",
-            value: formatCrmPreviewDate(s.created_at),
-            type: "date" as const,
-          },
-          {
-            label: "Updated",
-            value: formatCrmPreviewDate(s.updated_at),
-            type: "date" as const,
-          },
-        ],
-      },
-      descriptionSection,
-    ];
-  }, [selectedStage]);
+    setCurrentFilters((prev) =>
+      prev.search === stagesSearchQuery
+        ? prev
+        : { ...prev, search: stagesSearchQuery }
+    );
+    setPagination((prev) =>
+      prev.currentPage === 1 ? prev : { ...prev, currentPage: 1 }
+    );
+  }, [setPagination, stagesSearchQuery]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     try {
+      setSubmittingStageForm(true);
       await createStage(formData);
       toast.success("Stage created successfully!");
       setShowCreateModal(false);
@@ -526,6 +392,8 @@ const StagesManagement = () => {
     } catch (error: unknown) {
       consumeHandledApiError(error, "StagesManagement.handleSubmit");
       toast.error("Failed to create stage");
+    } finally {
+      setSubmittingStageForm(false);
     }
   };
 
@@ -540,6 +408,7 @@ const StagesManagement = () => {
     if (!stageToUpdate) return;
 
     try {
+      setSubmittingStageForm(true);
       await updateStage(stageToUpdate.id, formData);
       toast.success("Stage updated successfully!");
       setShowUpdateModal(false);
@@ -552,6 +421,8 @@ const StagesManagement = () => {
     } catch (error: unknown) {
       consumeHandledApiError(error, "StagesManagement.handleUpdateStage");
       toast.error("Failed to update stage");
+    } finally {
+      setSubmittingStageForm(false);
     }
   };
 
@@ -559,6 +430,7 @@ const StagesManagement = () => {
     if (!stageToDelete) return;
 
     try {
+      setDeletingStage(true);
       await deleteStage(stageToDelete.id);
       toast.success("Stage deleted successfully!");
       setShowDeleteModal(false);
@@ -570,6 +442,8 @@ const StagesManagement = () => {
     } catch (error: unknown) {
       consumeHandledApiError(error, "StagesManagement.handleDeleteStage");
       toast.error("Failed to delete stage");
+    } finally {
+      setDeletingStage(false);
     }
   };
 
@@ -634,19 +508,6 @@ const StagesManagement = () => {
     });
   };
 
-  const getStatusBadge = (stage: Stage) => {
-    if (stage.is_won) {
-      return <span className="status-badge success">Won</span>;
-    }
-    if (stage.fold) {
-      return <span className="status-badge danger">Fold</span>;
-    }
-    if (stage.is_default) {
-      return <span className="status-badge primary">Default</span>;
-    }
-    return <span className="status-badge success">Active</span>;
-  };
-
   const stagesTableColumns = useMemo<TableColumn<Stage>[]>(() => {
     const cols: TableColumn<Stage>[] = [];
 
@@ -679,6 +540,7 @@ const StagesManagement = () => {
         sortable: true,
         align: "center",
         type: "custom",
+        width: "120px",
         render: (stage: Stage) => <span className="fw-bold">{stage.sequence}</span>,
       });
     }
@@ -706,7 +568,7 @@ const StagesManagement = () => {
         label: "Description",
         sortable: false,
         type: "custom",
-        width: "260px",
+        width: "360px",
         render: (stage: Stage) => (
           <CrmTruncatedDescriptionCell
             text={stage.description}
@@ -876,29 +738,6 @@ const StagesManagement = () => {
     [sortedStages, stagesPagination.currentPage, stagesPagination.rowsPerPage],
   );
 
-  const handleStagesSort = useCallback(
-    (column: string, direction: "asc" | "desc") => {
-      setStagesPagination((prev) => ({
-        ...prev,
-        sortBy: column,
-        sortOrder: direction,
-        currentPage: 1,
-      }));
-    },
-    [],
-  );
-
-  const handleStagesPaginationChange = useCallback(
-    (page: number, rowsPerPage: number) => {
-      setStagesPagination((prev) => ({
-        ...prev,
-        currentPage: rowsPerPage === prev.rowsPerPage ? page : 1,
-        rowsPerPage,
-      }));
-    },
-    [],
-  );
-
   // Calculate analytics data
   const analyticsData = useMemo(() => {
     const total = filteredStages.length;
@@ -933,24 +772,10 @@ const StagesManagement = () => {
     return counts;
   }, [allStagesData]);
 
-  const handleToolbarSearchChange = useCallback((value: string) => {
-    const normalized = normalizeSearchQuery(value);
-    setStagesSearch(normalized);
-    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
-    setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, []);
-
-  const handleToolbarSearchSubmit = useCallback(() => {
-    const normalized = normalizeSearchQuery(stagesSearch);
-    setStagesSearch(normalized);
-    setCurrentFilters((prev) => ({ ...prev, search: normalized }));
-    setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, [stagesSearch]);
-
   const handleToolbarTabChange = useCallback((tabId: string) => {
     setActiveFilter(tabId);
-    setStagesPagination((prev) => ({ ...prev, currentPage: 1 }));
-  }, []);
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, [setPagination]);
 
   const toggleStagesAnalytics = useCallback(() => {
     setShowStagesAnalytics((open) => !open);
@@ -1180,33 +1005,19 @@ const StagesManagement = () => {
               currentPage: stagesPagination.currentPage,
               rowsPerPage: stagesPagination.rowsPerPage,
               totalRows: filteredStages.length,
-              pageSizeOptions: [10, 25, 50, 100],
+              pageSizeOptions: [10, 15, 25, 50, 100],
             }}
             onPaginationChange={handleStagesPaginationChange}
             customizableColumns
             selectedColumns={selectedStagesColumns}
-            defaultSelectedColumns={[
-              "sequence",
-              "name",
-              "type",
-              "description",
-              "color",
-              "actions",
-            ]}
-            onColumnChange={(cols) => {
-              const normalized = normalizeSelectedStageColumns(cols);
-              setSelectedStagesColumns(normalized);
-              localStorage.setItem(
-                "stagesSelectedColumns",
-                JSON.stringify(normalized),
-              );
-            }}
-            columnStorageKey="stagesSelectedColumns"
+            defaultSelectedColumns={DEFAULT_STAGES_SELECTED_COLUMNS}
+            onColumnChange={setSelectedStagesColumns}
+            columnStorageKey={STAGES_TABLE_COLUMN_STORAGE_KEY}
             showToolbar={true}
             toolbar={toolbarConfig}
             showToolbarActions={false}
             uniqueKey="id"
-            onPreviewClick={(stage) => handlePreviewClick(stage)}
+            onPreviewClick={(stage) => openStageView(stage)}
           />
         </div>
       </div>
@@ -1355,7 +1166,7 @@ const StagesManagement = () => {
               </Form.Group>
             </Form>
         }
-        submitButtonText="Create Stage"
+        submitButtonText={submittingStageForm ? "Creating Stage..." : "Create Stage"}
         cancelButtonText="Cancel"
         onSubmit={() => {
           handleSubmit(scaffoldFormEvent()).catch((error: unknown) => {
@@ -1365,6 +1176,8 @@ const StagesManagement = () => {
         onCancel={() => setShowCreateModal(false)}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        isSubmitting={submittingStageForm}
+        isSubmitDisabled={submittingStageForm}
         useCrmDialogFooterStyle
       />
 
@@ -1488,7 +1301,7 @@ const StagesManagement = () => {
               </Form.Group>
             </Form>
         }
-        submitButtonText="Update Stage"
+        submitButtonText={submittingStageForm ? "Updating Stage..." : "Update Stage"}
         cancelButtonText="Cancel"
         onSubmit={() => {
           handleUpdateStage(scaffoldFormEvent()).catch((error: unknown) => {
@@ -1498,6 +1311,8 @@ const StagesManagement = () => {
         onCancel={handleCloseUpdateModal}
         submitButtonVariant="primary"
         cancelButtonVariant="secondary"
+        isSubmitting={submittingStageForm}
+        isSubmitDisabled={submittingStageForm}
         useCrmDialogFooterStyle
       />
 
@@ -1511,6 +1326,7 @@ const StagesManagement = () => {
         onConfirm={handleDeleteStage}
         itemName={stageToDelete?.name}
         itemType="stage"
+        loading={deletingStage}
       />
 
       <Modal
@@ -1775,6 +1591,8 @@ const StagesManagement = () => {
                   }}
                 >
                   <div
+                    aria-label={`Color ${viewingStage.color}`}
+                    title={viewingStage.color}
                     style={{
                       width: "20px",
                       height: "20px",
@@ -1782,36 +1600,6 @@ const StagesManagement = () => {
                       borderRadius: "4px",
                     }}
                   />
-                  {viewingStage.color}
-                </div>
-              </div>
-              <div
-                style={{
-                  background: "#f8f9fa",
-                  padding: "16px",
-                  borderRadius: "10px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                    marginBottom: "6px",
-                  }}
-                >
-                  Status
-                </div>
-                <div
-                  style={{
-                    fontSize: "15px",
-                    color: "#1f2937",
-                    fontWeight: 500,
-                  }}
-                >
-                  {getStatusBadge(viewingStage)}
                 </div>
               </div>
               <div
@@ -1901,56 +1689,6 @@ const StagesManagement = () => {
           </Modal.Body>
         </Modal>
       )}
-
-      {previewPortalReady &&
-        globalThis.document !== undefined &&
-        showStageSidebar &&
-        selectedStage &&
-        createPortal(
-          <div
-            className="stages-preview-sidebar-portal"
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 1050,
-              pointerEvents: "none",
-            }}
-          >
-            <div
-              style={{
-                pointerEvents: "auto",
-                position: "absolute",
-                top: 0,
-                right: 0,
-                bottom: 0,
-                display: "flex",
-                height: "100%",
-              }}
-            >
-              <GenericSidebar
-                isOpen={showStageSidebar}
-                onClose={handleCloseStageSidebar}
-                title={selectedStage.name || "Stage Details"}
-                subtitle={getTypeDisplayName(selectedStage.type)}
-                quickActions={[]}
-                avatar={{
-                  initials: (selectedStage.name || "S").slice(0, 2).toUpperCase(),
-                  name: selectedStage.name || "Stage",
-                  gradient: `linear-gradient(135deg, ${selectedStage.color || "#6c757d"} 0%, #4f46e5 100%)`,
-                }}
-                recordLink={{
-                  label: "View full details",
-                  onClick: () => {
-                    handleCloseStageSidebar();
-                    openStageView(selectedStage);
-                  },
-                }}
-                sections={stagePreviewSections}
-              />
-            </div>
-          </div>,
-          globalThis.document.body,
-        )}
 
       <SuccessfulModal
         show={showSuccessfulModal}

@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
@@ -16,10 +16,10 @@ import {
   type CompanyOption,
 } from "@utils/companyOptions";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
-import { Row, Col, Button, Form, Modal, Nav } from "react-bootstrap";
+import { Button, Form, Modal, Nav } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
-import { Filter, Eye } from "lucide-react";
+import { Activity, Bot, Clock3, DollarSign, Eye, PhoneCall } from "lucide-react";
 import "@assets/scss/common.scss";
 import moment from "moment";
 
@@ -100,6 +100,90 @@ interface CallDetail {
   [key: string]: unknown;
 }
 
+const CALL_STATUS_OPTIONS = [
+  { label: "Initiated", value: "initiated" },
+  { label: "Answered", value: "answered" },
+  { label: "Completed", value: "completed" },
+  { label: "Transferred", value: "transferred" },
+  { label: "Failed", value: "failed" },
+  { label: "Timeout", value: "timeout" },
+  { label: "Dropped", value: "dropped" },
+];
+
+interface ConversationDateFilterDropdownProps {
+  value: string;
+  onChange: (value: string) => void;
+  onClear: () => void;
+  closeMenu: () => void;
+  endOfDay?: boolean;
+}
+
+function toUtcDateTimeValue(localDateTime: string, endOfDay = false) {
+  if (!localDateTime) return "";
+  const utcMoment = moment(localDateTime).utc();
+  if (endOfDay) {
+    return `${utcMoment.endOf("day").format("YYYY-MM-DDTHH:mm:ss")}Z`;
+  }
+  return `${utcMoment.format("YYYY-MM-DDTHH:mm:ss")}Z`;
+}
+
+function ConversationDateFilterDropdown({
+  value,
+  onChange,
+  onClear,
+  closeMenu,
+  endOfDay = false,
+}: Readonly<ConversationDateFilterDropdownProps>) {
+  return (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+      <Form.Control
+        size="sm"
+        type="datetime-local"
+        value={value ? moment.utc(value).local().format("YYYY-MM-DDTHH:mm") : ""}
+        onChange={(e) => {
+          const localValue = e.target.value;
+          const nextValue = toUtcDateTimeValue(localValue, endOfDay);
+          onChange(nextValue);
+        }}
+      />
+      <div className="d-flex justify-content-between gap-2">
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          onClick={() => {
+            onClear();
+            closeMenu();
+          }}
+        >
+          Clear
+        </Button>
+        <Button size="sm" variant="primary" onClick={closeMenu}>
+          Done
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function createConversationDateDropdown(
+  value: string,
+  onChange: (value: string) => void,
+  onClear: () => void,
+  endOfDay = false,
+) {
+  return function ConversationDateDropdownRender({ closeMenu }: { closeMenu: () => void }) {
+    return (
+      <ConversationDateFilterDropdown
+        value={value}
+        onChange={onChange}
+        onClear={onClear}
+        closeMenu={closeMenu}
+        endOfDay={endOfDay}
+      />
+    );
+  };
+}
+
 const CallsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
@@ -126,6 +210,8 @@ const CallsPage = () => {
     end_date: "",
     limit: 50,
   });
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewCallId, setViewCallId] = useState<string | null>(null);
   const [viewCallData, setViewCallData] = useState<CallDetail | null>(null);
@@ -196,6 +282,7 @@ const CallsPage = () => {
       if (filters.status) params.status = filters.status;
       if (filters.start_date) params.start_date = filters.start_date;
       if (filters.end_date) params.end_date = filters.end_date;
+      if (appliedSearch.trim()) params.search = appliedSearch.trim();
       const res = await getCalls(params);
       const list = Array.isArray(res)
         ? res
@@ -415,10 +502,6 @@ const CallsPage = () => {
     },
   ];
 
-  const applyFilters = () => {
-    setShowFilters(false);
-  };
-
   const hasActiveFilters = !!(
     filters.company_id ||
     filters.bot_id ||
@@ -426,6 +509,42 @@ const CallsPage = () => {
     filters.start_date ||
     filters.end_date
   );
+
+  const renderMessageContent = (msg: CallMessage, messageIndex: number) => {
+    const lines = (msg.content ?? "").split("\n");
+    const messageKey = msg.id ?? `msg-${messageIndex}`;
+    return lines.map((line, lineIndex) => {
+      const lineKey = `${messageKey}-${String(line).slice(0, 40)}-${lineIndex}`;
+      const isLastLine = lineIndex === lines.length - 1;
+      return (
+        <span key={lineKey}>
+          {line}
+          {isLastLine ? null : <br />}
+        </span>
+      );
+    });
+  };
+
+  const renderTranscriptContent = (messages: CallMessage[]) => {
+    if (messages.length === 0) {
+      return <p className="text-muted mb-0">No messages.</p>;
+    }
+
+    return messages.map((msg, index) => (
+      <div key={msg.id ?? `msg-${index}`} className={`mb-3 ${msg.role === "user" ? "text-end" : ""}`}>
+        <span className="small text-muted d-block mb-1">
+          {msg.role === "assistant" ? "Bot" : "User"}
+          {msg.timestamp ? ` · ${moment(msg.timestamp).format("YYYY-MM-DD HH:mm:ss")}` : ""}
+        </span>
+        <div
+          className={`d-inline-block p-2 rounded text-start ${msg.role === "user" ? "bg-primary text-white" : "bg-white border"}`}
+          style={{ maxWidth: "85%" }}
+        >
+          {renderMessageContent(msg, index)}
+        </div>
+      </div>
+    ));
+  };
 
   const resetFilters = () => {
     setFilters({
@@ -438,6 +557,194 @@ const CallsPage = () => {
     });
     setShowFilters(false);
   };
+
+  const statsCards = useMemo(
+    () => [
+      {
+        title: "Total Calls",
+        value: stats?.total_calls ?? 0,
+        icon: PhoneCall,
+        iconColor: "#1D4ED8",
+        iconBgColor: "#DBEAFE",
+        subtitle: "Conversations captured",
+      },
+      {
+        title: "Published Bots",
+        value: botCounts.published,
+        icon: Bot,
+        iconColor: "#0F766E",
+        iconBgColor: "#CCFBF1",
+        subtitle: "Bots ready for production",
+      },
+      {
+        title: "Active Bots",
+        value: botCounts.active,
+        icon: Activity,
+        iconColor: "#7C3AED",
+        iconBgColor: "#EDE9FE",
+        subtitle: "Bots currently active",
+      },
+      {
+        title: "Avg Duration",
+        value: stats?.avg_duration_seconds == null ? "—" : formatDuration(stats.avg_duration_seconds),
+        icon: Clock3,
+        iconColor: "#B45309",
+        iconBgColor: "#FEF3C7",
+        subtitle: "Average conversation length",
+      },
+      {
+        title: "Total Cost",
+        value: stats?.total_cost == null ? "—" : `$${Number(stats.total_cost).toFixed(4)}`,
+        icon: DollarSign,
+        iconColor: "#047857",
+        iconBgColor: "#D1FAE5",
+        subtitle: "Aggregate call spend",
+      },
+    ],
+    [botCounts.active, botCounts.published, stats],
+  );
+
+  const tableToolbar = useMemo(
+    () => ({
+      showTabs: true,
+      tabs: [
+        {
+          id: "conversations",
+          label: "Conversations",
+          count: stats?.total_calls ?? data.length,
+          removable: false,
+        },
+      ],
+      activeTab: "conversations",
+      onTabChange: () => undefined,
+      showSearch: true,
+      searchValue: searchInput,
+      searchPlaceholder: "Search by caller, bot, status, room...",
+      onSearchChange: (value: string) => {
+        setSearchInput(value);
+        setAppliedSearch(value.trim());
+      },
+      onSearch: () => setAppliedSearch(searchInput.trim()),
+      showFiltersButton: false,
+      showFilterPills: showFilters,
+      showMoreFiltersButton: false,
+      customActions: (
+        <>
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            className="gt-toolbar-btn"
+            onClick={() => setShowFilters((prev) => !prev)}
+          >
+            Filters
+          </Button>
+          {hasActiveFilters ? (
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              className="gt-toolbar-btn"
+              onClick={resetFilters}
+            >
+              Reset Filters
+            </Button>
+          ) : null}
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            className="gt-toolbar-btn"
+            onClick={() => setAppliedSearch(searchInput.trim())}
+          >
+            Search
+          </Button>
+        </>
+      ),
+      filterPills: [
+        ...(isAdmin
+          ? [
+              {
+                id: "company_id",
+                label: "Company",
+                showDropdown: true,
+                searchable: true,
+                active: Boolean(filters.company_id),
+                activeLabel: selectedCompany?.name || undefined,
+                onClear: () => setFilters((prev) => ({ ...prev, company_id: "", bot_id: "" })),
+                dropdownOptions: companyDropdownOptions,
+              },
+            ]
+          : []),
+        {
+          id: "bot_id",
+          label: "Bot",
+          showDropdown: true,
+          searchable: true,
+          active: Boolean(filters.bot_id),
+          activeLabel: selectedBot?.name || undefined,
+          onClear: () => setFilters((prev) => ({ ...prev, bot_id: "" })),
+          dropdownOptions: botDropdownOptions,
+        },
+        {
+          id: "status",
+          label: "Status",
+          showDropdown: true,
+          active: Boolean(filters.status),
+          activeLabel: selectedStatus?.label || undefined,
+          onClear: () => setFilters((prev) => ({ ...prev, status: "" })),
+          dropdownOptions: statusDropdownOptions,
+        },
+        {
+          id: "start_date",
+          label: "Start Date",
+          showDropdown: true,
+          active: Boolean(filters.start_date),
+          activeLabel: filters.start_date ? moment(filters.start_date).format("MMM DD, YYYY HH:mm") : undefined,
+          activeLabelOnly: true,
+          onClear: () => setFilters((prev) => ({ ...prev, start_date: "" })),
+          dropdownContent: createConversationDateDropdown(
+            filters.start_date,
+            (value) => setFilters((prev) => ({ ...prev, start_date: value })),
+            () => setFilters((prev) => ({ ...prev, start_date: "" })),
+          ),
+        },
+        {
+          id: "end_date",
+          label: "End Date",
+          showDropdown: true,
+          active: Boolean(filters.end_date),
+          activeLabel: filters.end_date ? moment(filters.end_date).format("MMM DD, YYYY HH:mm") : undefined,
+          activeLabelOnly: true,
+          onClear: () => setFilters((prev) => ({ ...prev, end_date: "" })),
+          dropdownContent: createConversationDateDropdown(
+            filters.end_date,
+            (value) => setFilters((prev) => ({ ...prev, end_date: value })),
+            () => setFilters((prev) => ({ ...prev, end_date: "" })),
+            true,
+          ),
+        },
+      ],
+    }),
+    [
+      companies,
+      data.length,
+      filters.bot_id,
+      filters.company_id,
+      filters.end_date,
+      filters.start_date,
+      filters.status,
+      hasActiveFilters,
+      isAdmin,
+      bots,
+      selectedBot,
+      selectedCompany,
+      selectedStatus,
+      companyDropdownOptions,
+      botDropdownOptions,
+      statusDropdownOptions,
+      showFilters,
+      searchInput,
+      stats?.total_calls,
+    ],
+  );
 
   return (
     <React.Fragment>

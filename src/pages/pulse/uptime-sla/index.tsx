@@ -1,11 +1,11 @@
 import '@assets/scss/datatable-style.scss';
 import '@assets/scss/common.scss';
 import '@assets/scss/report-style.scss';
-import React, { ReactElement, useState } from 'react';
+import React, { ReactElement } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import { Row, Col } from 'react-bootstrap';
-import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
+import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
 import dynamic from 'next/dynamic';
 import { ApexOptions } from 'apexcharts';
 
@@ -18,64 +18,62 @@ interface Summary {
   sla_violations: number;
 }
 
+interface UptimeTrendPoint {
+  date: string;
+  deviceUptime: number;
+  serviceUptime: number;
+}
+
+interface UptimeRow {
+  name: string;
+  uptime: number;
+  target: number;
+  slaStatus: 'met' | 'miss';
+}
+
+interface AttentionItem {
+  name: string;
+  percentage: number;
+  status: string;
+  type: 'device' | 'service';
+  icon: string;
+}
+
 const UptimeSLAMonitoring = () => {
-  const [summary, setSummary] = useState<Summary>({
+  const summary: Summary = {
     overall_uptime: 97.61,
     total_monitored: 66,
     sla_compliant: 81,
     sla_violations: 19,
-  });
+  };
 
-  // Create cards data for PageSummaryGrid
-  const summaryCards: SummaryCard[] = [
+  // Create cards data for GenericStatsCards
+  const summaryCards: StatsCardData[] = [
     {
-      id: 'overall-uptime',
       title: 'Overall Uptime',
-      value: summary.overall_uptime,
-      description: 'System-wide uptime percentage',
-      delay: 0.1,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2',
-      suffix: '%',
+      value: `${summary.overall_uptime}%`,
+      subtitle: 'System-wide uptime percentage',
     },
     {
-      id: 'total-monitored',
       title: 'Total Monitored',
       value: summary.total_monitored,
-      description: 'Total devices and services monitored',
-      delay: 0.3,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2',
+      subtitle: 'Total devices and services monitored',
     },
     {
-      id: 'sla-compliant',
       title: 'SLA Compliant',
-      value: summary.sla_compliant,
-      description: 'Services meeting SLA requirements',
-      delay: 0.5,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2',
-      suffix: '%',
+      value: `${summary.sla_compliant}%`,
+      subtitle: 'Services meeting SLA requirements',
     },
     {
-      id: 'sla-violations',
       title: 'SLA Violations',
-      value: summary.sla_violations,
-      description: 'Services with SLA violations',
-      delay: 0.7,
-      showAnimatedNumber: true,
-      animationDuration: 1000,
-      fontStyle: 'style-2',
-      suffix: '%',
+      value: `${summary.sla_violations}%`,
+      subtitle: 'Services with SLA violations',
     },
   ];
 
   // Generate mock data for the last 30 days
-  const generateUptimeData = () => {
-    const data = [];
+  const generateUptimeData = (): UptimeTrendPoint[] => {
+    const data: UptimeTrendPoint[] = [];
     const today = new Date();
     
     for (let i = 29; i >= 0; i--) {
@@ -113,7 +111,7 @@ const UptimeSLAMonitoring = () => {
     },
     colors: ['#00B8D9', '#FF6B6B'],
     xaxis: {
-      categories: uptimeData.map(item => item.date),
+      categories: uptimeData.map((item) => item.date),
       labels: {
         rotate: -45,
         style: {
@@ -137,7 +135,7 @@ const UptimeSLAMonitoring = () => {
     },
     tooltip: {
       y: {
-        formatter: (value) => `${value}%`,
+        formatter: (value: number) => `${value}%`,
       },
     },
   };
@@ -145,11 +143,11 @@ const UptimeSLAMonitoring = () => {
   const lineChartSeries = [
     {
       name: 'Device Uptime',
-      data: uptimeData.map(item => item.deviceUptime),
+      data: uptimeData.map((item) => item.deviceUptime),
     },
     {
       name: 'Service Uptime',
-      data: uptimeData.map(item => item.serviceUptime),
+      data: uptimeData.map((item) => item.serviceUptime),
     },
   ];
 
@@ -173,11 +171,11 @@ const UptimeSLAMonitoring = () => {
     },
     dataLabels: {
       enabled: true,
-      formatter: (val) => `${val}%`,
+      formatter: (val: number) => `${val}%`,
     },
     tooltip: {
       y: {
-        formatter: (value) => `${value}%`,
+        formatter: (value: number) => `${value}%`,
       },
     },
   };
@@ -185,16 +183,16 @@ const UptimeSLAMonitoring = () => {
   const doughnutChartSeries = [summary.sla_compliant, summary.sla_violations];
 
   // Mock data for device and service uptime sections
-  const deviceUptimeData = [
+  const deviceUptimeData: UptimeRow[] = [
     { name: 'router-01', uptime: 99.8, target: 99.9, slaStatus: 'miss' },
     { name: 'switch-01', uptime: 99.5, target: 99.9, slaStatus: 'miss' },
     { name: 'server-01', uptime: 98.2, target: 99.9, slaStatus: 'miss' },
   ];
 
-  const serviceUptimeData = [
+  const serviceUptimeData: UptimeRow[] = [
     { name: 'Web API (server-01)', uptime: 99.9, target: 99.9, slaStatus: 'met' },
     { name: 'Database (server-02)', uptime: 97.5, target: 99.5, slaStatus: 'miss' },
-    { name: 'Monitoring (server-03)', uptime: 99.1, target: 99.0, slaStatus: 'met' },
+    { name: 'Monitoring (server-03)', uptime: 99.1, target: 99, slaStatus: 'met' },
   ];
 
   const getProgressBarColor = (uptime: number, target: number) => {
@@ -212,7 +210,7 @@ const UptimeSLAMonitoring = () => {
   };
 
   // Mock data for attention required section
-  const attentionRequiredData = [
+  const attentionRequiredData: AttentionItem[] = [
     { 
       name: 'server-01', 
       percentage: 95.2, 
@@ -242,17 +240,17 @@ const UptimeSLAMonitoring = () => {
           <div className="page-header-title style-2">
             <Row className="d-flex justify-content-between align-items-center">
               <Col md={12}>
-                <h2 className="mb-0">Uptime & SLA Monitoring</h2>
+                <h4 className="mb-0">Uptime & SLA Monitoring</h4>
               </Col>
             </Row>
           </div>
         </Col>
       </Row>
 
-      <PageSummaryGrid cards={summaryCards} />
+      <StatsCards data={summaryCards} />
 
       <Row className="mt-4">
-        <Col md={8}>
+        <Col lg={8} md={12}>
           <div className="card">
             <div className="card-header">
               <h5 className="card-title mb-0">Uptime Trends (Last 30 Days)</h5>
@@ -267,7 +265,7 @@ const UptimeSLAMonitoring = () => {
             </div>
           </div>
         </Col>
-        <Col md={4}>
+        <Col lg={4} md={12} className="mt-4 mt-lg-0">
           <div className="card">
             <div className="card-header">
               <h5 className="card-title mb-0">SLA Compliance</h5>
@@ -286,18 +284,19 @@ const UptimeSLAMonitoring = () => {
 
       {/* Device and Service Uptime Sections */}
       <Row className="mt-4">
-        <Col md={6}>
+        <Col xl={6} md={12}>
           <div className="card">
             <div className="card-header">
               <h5 className="card-title mb-0">
                 <i className="ph-duotone ph-server me-2"></i>
+                {' '}
                 Device Uptime
               </h5>
             </div>
-            <div className="card-body">
-              {deviceUptimeData.map((device, index) => (
-                <div key={index} className="mb-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
+            <div className="card-body uptime-list-body">
+              {deviceUptimeData.map((device) => (
+                <div key={device.name} className="mb-3">
+                  <div className="d-flex justify-content-between align-items-center mb-2 uptime-item-header">
                     <span className="fw-medium">{device.name}</span>
                     <div className="d-flex gap-2">
                       <span className={`badge bg-${getSlaStatusColor(device.slaStatus)}`}>
@@ -306,16 +305,12 @@ const UptimeSLAMonitoring = () => {
                       <i className="ph-duotone ph-chart-line text-muted"></i>
                     </div>
                   </div>
-                  <div className="progress mb-1" style={{ height: '8px' }}>
-                    <div
-                      className={`progress-bar bg-${getProgressBarColor(device.uptime, device.target)}`}
-                      role="progressbar"
-                      style={{ width: `${device.uptime}%` }}
-                      aria-valuenow={device.uptime}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    ></div>
-                  </div>
+                  <progress
+                    className={`w-100 mb-1 text-${getProgressBarColor(device.uptime, device.target)}`}
+                    value={device.uptime}
+                    max={100}
+                    style={{ height: '8px' }}
+                  />
                   <div className="d-flex justify-content-between">
                     <small className="text-muted">{device.uptime}%</small>
                     <small className="text-primary">Target: {device.target}%</small>
@@ -325,18 +320,19 @@ const UptimeSLAMonitoring = () => {
             </div>
           </div>
         </Col>
-        <Col md={6}>
+        <Col xl={6} md={12} className="mt-4 mt-xl-0">
           <div className="card">
             <div className="card-header">
               <h5 className="card-title mb-0">
                 <i className="ph-duotone ph-gear me-2"></i>
+                {' '}
                 Service Uptime
               </h5>
             </div>
-            <div className="card-body">
-              {serviceUptimeData.map((service, index) => (
-                <div key={index} className="mb-3">
-                  <div className="d-flex justify-content-between align-items-center mb-2">
+            <div className="card-body uptime-list-body">
+              {serviceUptimeData.map((service) => (
+                <div key={service.name} className="mb-3">
+                  <div className="d-flex justify-content-between align-items-center mb-2 uptime-item-header">
                     <span className="fw-medium">{service.name}</span>
                     <div className="d-flex gap-2">
                       <span className={`badge bg-${getSlaStatusColor(service.slaStatus)}`}>
@@ -345,16 +341,12 @@ const UptimeSLAMonitoring = () => {
                       <i className="ph-duotone ph-chart-line text-muted"></i>
                     </div>
                   </div>
-                  <div className="progress mb-1" style={{ height: '8px' }}>
-                    <div
-                      className={`progress-bar bg-${getProgressBarColor(service.uptime, service.target)}`}
-                      role="progressbar"
-                      style={{ width: `${service.uptime}%` }}
-                      aria-valuenow={service.uptime}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    ></div>
-                  </div>
+                  <progress
+                    className={`w-100 mb-1 text-${getProgressBarColor(service.uptime, service.target)}`}
+                    value={service.uptime}
+                    max={100}
+                    style={{ height: '8px' }}
+                  />
                   <div className="d-flex justify-content-between">
                     <small className="text-muted">{service.uptime}%</small>
                     <small className="text-primary">Target: {service.target}%</small>
@@ -373,18 +365,19 @@ const UptimeSLAMonitoring = () => {
             <div className="card-header">
               <h5 className="card-title mb-0">
                 <i className="ph-duotone ph-warning-circle me-2"></i>
+                {' '}
                 Attention Required
               </h5>
             </div>
             <div className="card-body">
-              {attentionRequiredData.map((item, index) => (
-                <div key={index} className="alert-item mb-3 p-3 border border-warning rounded bg-warning bg-opacity-10">
-                  <div className="d-flex justify-content-between align-items-center">
+              {attentionRequiredData.map((item) => (
+                <div key={`${item.type}-${item.name}`} className="alert-item mb-3 p-3 border border-warning rounded bg-warning bg-opacity-10">
+                  <div className="d-flex justify-content-between align-items-center alert-item-row">
                     <div className="d-flex align-items-center">
                       <i className={`${item.icon} me-3 text-warning`} style={{ fontSize: '1.2rem' }}></i>
                       <span className="text-dark fw-medium">{item.name}</span>
                     </div>
-                    <div className="d-flex align-items-center gap-3">
+                    <div className="d-flex align-items-center gap-3 alert-item-meta">
                       <span className="badge bg-warning text-dark px-3 py-2 rounded">
                         {item.percentage}%
                       </span>
@@ -397,6 +390,47 @@ const UptimeSLAMonitoring = () => {
           </div>
         </Col>
       </Row>
+
+      <style jsx global>{`
+        .uptime-list-body {
+          overflow-x: hidden;
+        }
+
+        @media (max-width: 991.98px) {
+          .uptime-item-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 8px;
+          }
+
+          .alert-item-row {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 10px;
+          }
+
+          .alert-item-meta {
+            width: 100%;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px !important;
+          }
+        }
+
+        @media (max-width: 767.98px) {
+          .uptime-list-body {
+            padding: 14px;
+          }
+
+          .alert-item {
+            padding: 12px !important;
+          }
+
+          .alert-item .badge {
+            padding: 6px 10px !important;
+          }
+        }
+      `}</style>
     </React.Fragment>
   );
 };

@@ -616,32 +616,12 @@ export function CrmProspectsContactsListPage({
     [handlePreviewClickCore, writePreviewIdToStorage],
   );
 
+  // Auto-restore of the preview sidebar from localStorage is intentionally disabled.
+  // We still persist the last preview id so future re-enablement is possible without data migration.
   useEffect(() => {
-    if (!isInitialized || loading) return;
     if (didInitialPreviewRestoreRef.current) return;
     didInitialPreviewRestoreRef.current = true;
-
-    let raw: string | null = null;
-    try {
-      raw = globalThis.localStorage.getItem(previewPersistenceKey);
-    } catch {
-      return;
-    }
-    const trimmed = raw?.trim() ?? "";
-    if (!trimmed) return;
-    const id = Number(trimmed);
-    if (!Number.isFinite(id) || id <= 0) {
-      clearPreviewIdFromStorage();
-      return;
-    }
-    openProspectSidebar({ id } as CrmDataItem);
-  }, [
-    isInitialized,
-    loading,
-    previewPersistenceKey,
-    openProspectSidebar,
-    clearPreviewIdFromStorage,
-  ]);
+  }, []);
 
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
