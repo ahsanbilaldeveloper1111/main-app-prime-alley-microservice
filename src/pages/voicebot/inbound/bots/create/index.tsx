@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect } from "react";
+import React, { ReactElement, useState, useEffect, useRef } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -11,13 +11,21 @@ import {
   type BotConfiguration,
   type UpdateBotPayload,
 } from "@utils/voicebot/inbound";
-import { toFormString } from "@utils/voicebot/formDisplay";
+import { companyIdFromBotApi, toFormString } from "@utils/voicebot/formDisplay";
 import { Form, Spinner, Tab } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
 import PageHeader from "@components/PageHeader";
-import { HelpCircle, FileText, Settings, Mic, Cpu, Shield, Phone } from "lucide-react";
+import {
+  HelpCircle,
+  FileText,
+  Settings,
+  Mic,
+  Cpu,
+  Shield,
+  Phone,
+} from "lucide-react";
 import OverlayTrigger from "react-bootstrap/OverlayTrigger";
 import Tooltip from "react-bootstrap/Tooltip";
 import { TabsNavigation } from "@components/voicebot/TabsNavigation";
@@ -26,14 +34,7 @@ import { ValidationChecklist } from "@components/voicebot/ValidationChecklist";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
-const VOICE_OPTIONS = [
-  "alloy",
-  "echo",
-  "fable",
-  "onyx",
-  "nova",
-  "shimmer",
-];
+const VOICE_OPTIONS = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"];
 
 const LLM_MODEL_OPTIONS = [
   "gpt-4o-mini",
@@ -43,7 +44,8 @@ const LLM_MODEL_OPTIONS = [
 ];
 
 const defaultConfig: BotConfiguration = {
-  instructions: "You are a helpful AI assistant. Answer questions clearly and concisely.",
+  instructions:
+    "You are a helpful AI assistant. Answer questions clearly and concisely.",
   knowledge_base: "",
   voice_name: "alloy",
   voice_model: "gpt-4o-mini-tts",
@@ -55,6 +57,7 @@ const defaultConfig: BotConfiguration = {
   max_tokens: 1000,
   transfer_enabled: true,
   transfer_number: "",
+  transfer_trunk_id: "",
   max_duration: 1800,
   idle_timeout: 300,
   allow_interruptions: true,
@@ -144,8 +147,13 @@ const BasicInfoPane = ({
     >
       Basic Information
     </h6>
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-      <Form.Group className="mb-3">
+    <div
+      style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}
+    >
+      <Form.Group
+        className="mb-3"
+        style={isAdmin ? undefined : { gridColumn: "1 / -1" }}
+      >
         <Form.Label style={labelStyle}>Bot Name *</Form.Label>
         <Form.Control
           value={form.name}
@@ -159,10 +167,12 @@ const BasicInfoPane = ({
         <Form.Group className="mb-3">
           <Form.Label style={labelStyle}>Company *</Form.Label>
           <Form.Select
-            value={form.company}
-            onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+            value={form.company_id}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, company_id: e.target.value }))
+            }
             required
-            disabled={loadingCompanies || isEditMode}
+            disabled={loadingCompanies}
             style={inputStyle}
           >
             <option value="">Select company</option>
@@ -175,13 +185,26 @@ const BasicInfoPane = ({
         </Form.Group>
       )}
     </div>
+    {!isAdmin && (
+      <Form.Group className="mb-3">
+        <Form.Label style={labelStyle}>Company</Form.Label>
+        <Form.Control
+          readOnly
+          disabled
+          value={userCompanyName || userCompanyIdentifier || ""}
+          style={inputStyle}
+        />
+      </Form.Group>
+    )}
     <Form.Group className="mb-3">
       <Form.Label style={labelStyle}>Description *</Form.Label>
       <Form.Control
         as="textarea"
         rows={3}
         value={form.description ?? ""}
-        onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+        onChange={(e) =>
+          setForm((f) => ({ ...f, description: e.target.value }))
+        }
         placeholder="Description"
         required
         style={{ ...inputStyle, resize: "vertical" as const }}
@@ -269,7 +292,8 @@ const BottomActionBar = ({
           onClick={onFinalSubmit}
           style={{
             padding: "10px 32px",
-            backgroundColor: submitting || !canSubmitFinal ? "#9ca3af" : "#667eea",
+            backgroundColor:
+              submitting || !canSubmitFinal ? "#9ca3af" : "#667eea",
             border: "none",
             color: "white",
             fontSize: "14px",
@@ -311,7 +335,7 @@ const BottomActionBar = ({
 // TabsNavigation/ValidationChecklist extracted to shared components
 
 function getFirstValidationError(form: CreateBotPayload): string | null {
-  if (!form.company) return "Please select a company";
+  if (!form.company_id) return "Please select a company";
   if (!form.name?.trim()) return "Bot Name is required";
   if (!form.description?.trim()) return "Description is required";
   const c = form.configuration;
@@ -336,8 +360,10 @@ function validateFormAndToast(form: CreateBotPayload): boolean {
 function buildUpdatePayload(form: CreateBotPayload): UpdateBotPayload {
   const c = form.configuration ?? defaultConfig;
   const num = (v: unknown, def: number, parse: (s: string) => number) =>
-    typeof v === "number" && !Number.isNaN(v) ? v : (parse(String(v)) || def);
+    typeof v === "number" && !Number.isNaN(v) ? v : parse(String(v)) || def;
+  const companyId = String(form.company_id ?? "").trim();
   return {
+    company_id: companyId,
     name: form.name?.trim() ?? "",
     description: form.description?.trim() ?? "",
     status: form.status ?? "draft",
@@ -354,12 +380,17 @@ function buildUpdatePayload(form: CreateBotPayload): UpdateBotPayload {
       greeting_message: c.greeting_message?.trim() ?? "",
       transfer_enabled: Boolean(c.transfer_enabled),
       transfer_number: c.transfer_number?.trim() ?? "",
+      transfer_trunk_id: c.transfer_trunk_id?.trim() ?? "",
       max_duration: num(c.max_duration, 1800, (s) => Number.parseInt(s, 10)),
       idle_timeout: num(c.idle_timeout, 300, (s) => Number.parseInt(s, 10)),
       sip_trunk_id: c.sip_trunk_id?.trim() ?? "",
       phone_number: c.phone_number?.trim() ?? "",
       allow_interruptions: Boolean(c.allow_interruptions),
-      min_endpointing_delay: num(c.min_endpointing_delay, 0.05, Number.parseFloat),
+      min_endpointing_delay: num(
+        c.min_endpointing_delay,
+        0.05,
+        Number.parseFloat,
+      ),
       noise_cancellation: Boolean(c.noise_cancellation),
     },
   };
@@ -368,7 +399,7 @@ function buildUpdatePayload(form: CreateBotPayload): UpdateBotPayload {
 function buildCreateBotPayload(form: CreateBotPayload): CreateBotPayload {
   const updatePayload = buildUpdatePayload(form);
   return {
-    company: form.company,
+    company_id: updatePayload.company_id ?? "",
     name: updatePayload.name ?? "",
     description: updatePayload.description ?? "",
     status: updatePayload.status ?? "draft",
@@ -378,50 +409,110 @@ function buildCreateBotPayload(form: CreateBotPayload): CreateBotPayload {
 
 async function loadCompanyOptions(): Promise<CompanyOption[]> {
   const res = await getCompanies({ show_inactive: false });
-  const list = Array.isArray(res) ? res : (res as { results?: unknown[] })?.results ?? (res as { data?: unknown[] })?.data ?? [];
+  const list = Array.isArray(res)
+    ? res
+    : ((res as { results?: unknown[] })?.results ??
+      (res as { data?: unknown[] })?.data ??
+      []);
   const arr = Array.isArray(list) ? list : [];
-  return arr.map((c: { company_id?: string; id?: string; name?: string }) => ({
-    id: c.company_id ?? c.id ?? "",
-    company_id: c.company_id ?? c.id,
-    name: c.name ?? "",
-  }));
+  return arr.map((c: { company_id?: string; id?: string; name?: string }) => {
+    const canonicalId = String(c.id ?? c.company_id ?? "").trim();
+    return {
+      id: canonicalId,
+      company_id: c.id ?? c.company_id,
+      name: c.name ?? "",
+    };
+  });
 }
 
-function validationItem(id: string, label: string, checked: boolean, okMsg: string, failMsg: string): ValidationItemType {
+function validationItem(
+  id: string,
+  label: string,
+  checked: boolean,
+  okMsg: string,
+  failMsg: string,
+): ValidationItemType {
   return { id, label, checked, message: checked ? okMsg : failMsg };
 }
 
 function getBasicValidationItem(form: CreateBotPayload): ValidationItemType {
-  const ok = !!(form.name?.trim() && form.company && form.description?.trim());
-  return validationItem("basic", "Basic Information", ok, `Bot "${form.name?.trim()}", company and description set`, "Provide bot name, company and description");
+  const ok = !!(
+    form.name?.trim() &&
+    form.company_id &&
+    form.description?.trim()
+  );
+  return validationItem(
+    "basic",
+    "Basic Information",
+    ok,
+    `Bot "${form.name?.trim()}", company and description set`,
+    "Provide bot name, company and description",
+  );
 }
 
 function getConfigValidationItem(cfg: BotConfiguration): ValidationItemType {
   const ok = !!(cfg.instructions?.trim() && cfg.knowledge_base?.trim());
-  return validationItem("config", "Configuration", ok, "Instructions and knowledge base configured", "Instructions and knowledge base are required");
+  return validationItem(
+    "config",
+    "Configuration",
+    ok,
+    "Instructions and knowledge base configured",
+    "Instructions and knowledge base are required",
+  );
 }
 
 function getVoiceValidationItem(cfg: BotConfiguration): ValidationItemType {
-  const ok = !!(cfg.voice_name && cfg.greeting_message?.trim() && cfg.voice_instructions?.trim());
-  return validationItem("voice", "Voice Settings", ok, "Voice, greeting and voice instructions set", "Set voice, greeting message and voice instructions");
+  const ok = !!(
+    cfg.voice_name &&
+    cfg.greeting_message?.trim() &&
+    cfg.voice_instructions?.trim()
+  );
+  return validationItem(
+    "voice",
+    "Voice Settings",
+    ok,
+    "Voice, greeting and voice instructions set",
+    "Set voice, greeting message and voice instructions",
+  );
 }
 
 function getLlmValidationItem(cfg: BotConfiguration): ValidationItemType {
   const ok = !!(cfg.llm_model && cfg.max_tokens);
-  return validationItem("llm", "LLM Settings", ok, `${cfg.llm_model}, max ${cfg.max_tokens} tokens`, "Select LLM model and max tokens");
+  return validationItem(
+    "llm",
+    "LLM Settings",
+    ok,
+    `${cfg.llm_model}, max ${cfg.max_tokens} tokens`,
+    "Select LLM model and max tokens",
+  );
 }
 
 function getBehaviorValidationItem(cfg: BotConfiguration): ValidationItemType {
   const ok = !!cfg.transfer_number?.trim();
-  return validationItem("behavior", "Behavior", ok, "Transfer number configured", "Transfer number is required");
+  return validationItem(
+    "behavior",
+    "Behavior",
+    ok,
+    "Transfer number configured",
+    "Transfer number is required",
+  );
 }
 
 function getSipValidationItem(cfg: BotConfiguration): ValidationItemType {
   const ok = !!(cfg.sip_trunk_id?.trim() && cfg.phone_number?.trim());
-  return validationItem("sip", "SIP Settings", ok, "SIP trunk ID and phone number set", "SIP Trunk ID and phone number are required");
+  return validationItem(
+    "sip",
+    "SIP Settings",
+    ok,
+    "SIP trunk ID and phone number set",
+    "SIP Trunk ID and phone number are required",
+  );
 }
 
-function buildValidationItemsList(form: CreateBotPayload, cfg: BotConfiguration): ValidationItemType[] {
+function buildValidationItemsList(
+  form: CreateBotPayload,
+  cfg: BotConfiguration,
+): ValidationItemType[] {
   return [
     getBasicValidationItem(form),
     getConfigValidationItem(cfg),
@@ -440,7 +531,7 @@ async function submitBotForm(
   form: CreateBotPayload,
   isEditMode: boolean,
   botId: string | undefined,
-  router: ReturnType<typeof useRouter>
+  router: ReturnType<typeof useRouter>,
 ): Promise<void> {
   try {
     if (isEditMode && botId) {
@@ -452,14 +543,25 @@ async function submitBotForm(
     }
     router.push("/voicebot/inbound/bots");
   } catch (err: unknown) {
-    const axErr = err as { response?: { data?: { detail?: string } }; message?: string };
-    toast.error(axErr?.response?.data?.detail ?? axErr?.message ?? (isEditMode ? "Failed to update bot" : "Failed to create bot"));
+    const axErr = err as {
+      response?: { data?: { detail?: string } };
+      message?: string;
+    };
+    toast.error(
+      axErr?.response?.data?.detail ??
+        axErr?.message ??
+        (isEditMode ? "Failed to update bot" : "Failed to create bot"),
+    );
   }
 }
 
 const LoadingBotPlaceholder = () => (
   <React.Fragment>
-    <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Inbound - Bots - Edit" />
+    <BreadcrumbItem
+      mainTitle=""
+      mainLink=""
+      subTitle="Voicebot Inbound - Bots - Edit"
+    />
     <PageHeader title="Edit Inbound Bot" showSearch={false} />
     <div className="d-flex justify-content-center align-items-center p-5">
       <Spinner animation="border" />
@@ -467,26 +569,51 @@ const LoadingBotPlaceholder = () => (
   </React.Fragment>
 );
 
-function useTabNavigation(activeTab: string, setActiveTab: (tab: string) => void) {
+function useTabNavigation(
+  activeTab: string,
+  setActiveTab: (tab: string) => void,
+) {
   const currentIndex = TAB_ORDER.indexOf(activeTab);
   const goPrev = () => {
     if (currentIndex > 0) setActiveTab(TAB_ORDER[currentIndex - 1]);
   };
   const goNext = () => {
-    if (currentIndex < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[currentIndex + 1]);
+    if (currentIndex < TAB_ORDER.length - 1)
+      setActiveTab(TAB_ORDER[currentIndex + 1]);
   };
-  return { isFirstTab: currentIndex <= 0, isLastTab: currentIndex >= TAB_ORDER.length - 1, goPrev, goNext };
+  return {
+    isFirstTab: currentIndex <= 0,
+    isLastTab: currentIndex >= TAB_ORDER.length - 1,
+    goPrev,
+    goNext,
+  };
 }
 
 function useSessionCompany() {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
-  const userCompanyIdentifier = (session?.user as { company_identifier?: string } | undefined)?.company_identifier ?? "";
-  const userCompanyName = (session?.user as { company_name?: string } | undefined)?.company_name ?? userCompanyIdentifier;
-  return { isAdmin, userCompanyIdentifier, userCompanyName };
+  const user = session?.user as
+    | {
+        company_id?: string | null;
+        company_identifier?: string | null;
+        company_name?: string | null;
+      }
+    | undefined;
+  const userCompanyId = String(user?.company_id ?? "").trim();
+  const userCompanyIdentifier = String(user?.company_identifier ?? "").trim();
+  const userCompanyName =
+    String(user?.company_name ?? "").trim() || userCompanyIdentifier;
+  return {
+    isAdmin,
+    userCompanyId,
+    userCompanyIdentifier,
+    userCompanyName,
+  };
 }
 
-function useCompanies(setForm: React.Dispatch<React.SetStateAction<CreateBotPayload>>) {
+function useCompanies(
+  setForm: React.Dispatch<React.SetStateAction<CreateBotPayload>>,
+) {
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   useEffect(() => {
@@ -494,7 +621,8 @@ function useCompanies(setForm: React.Dispatch<React.SetStateAction<CreateBotPayl
     loadCompanyOptions()
       .then((opts) => {
         setCompanies(opts);
-        if (opts.length > 0) setForm((f) => (f.company ? f : { ...f, company: opts[0].id }));
+        if (opts.length > 0)
+          setForm((f) => (f.company_id ? f : { ...f, company_id: opts[0].id }));
       })
       .catch(() => {
         toast.error("Failed to load companies");
@@ -509,18 +637,33 @@ function useBotLoader(
   botId: string | undefined,
   isEditMode: boolean,
   setForm: React.Dispatch<React.SetStateAction<CreateBotPayload>>,
-  router: ReturnType<typeof useRouter>
+  router: ReturnType<typeof useRouter>,
 ) {
   const [loadingBot, setLoadingBot] = useState(isEditMode);
+  const loadSeqRef = useRef(0);
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
   useEffect(() => {
-    if (isEditMode && botId) {
+    if (!isEditMode || !botId) {
+      setLoadingBot(false);
+      return;
+    }
+
+    const seq = ++loadSeqRef.current;
+    let cancelled = false;
+
     setLoadingBot(true);
     getBot(botId)
       .then((data: Record<string, unknown>) => {
-        const company = toFormString(data.company);
-        const configuration = { ...defaultConfig, ...(data.configuration as Record<string, unknown>) };
+        if (cancelled || seq !== loadSeqRef.current) return;
+        const companyId = companyIdFromBotApi(data);
+        const configuration = {
+          ...defaultConfig,
+          ...(data.configuration as Record<string, unknown>),
+        };
         setForm({
-          company,
+          company_id: companyId,
           name: toFormString(data.name),
           description: toFormString(data.description),
           status: toFormString(data.status) || "draft",
@@ -528,24 +671,35 @@ function useBotLoader(
         });
       })
       .catch(() => {
+        if (cancelled || seq !== loadSeqRef.current) return;
         toast.error("Failed to load bot");
-        router.push("/voicebot/inbound/bots");
+        routerRef.current.push("/voicebot/inbound/bots");
       })
-      .finally(() => setLoadingBot(false));
-    }
-  }, [isEditMode, botId, router, setForm]);
+      .finally(() => {
+        if (seq === loadSeqRef.current) {
+          setLoadingBot(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isEditMode, botId, setForm]);
+
   return loadingBot;
 }
 
 const VoicebotInboundBotsCreate = () => {
   const router = useRouter();
-  const botId = typeof router.query.id === "string" ? router.query.id : undefined;
+  const botId =
+    typeof router.query.id === "string" ? router.query.id : undefined;
   const isEditMode = Boolean(botId);
   const pageCopy = getPageCopy(isEditMode);
-  const { isAdmin, userCompanyIdentifier, userCompanyName } = useSessionCompany();
+  const { isAdmin, userCompanyId, userCompanyIdentifier, userCompanyName } =
+    useSessionCompany();
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [form, setForm] = useState<CreateBotPayload>({
-    company: "",
+    company_id: "",
     name: "",
     description: "",
     status: "draft",
@@ -554,11 +708,18 @@ const VoicebotInboundBotsCreate = () => {
   const { companies, loadingCompanies } = useCompanies(setForm);
   const loadingBot = useBotLoader(botId, isEditMode, setForm, router);
   const [submitting, setSubmitting] = useState(false);
-  const [expandedValidation, setExpandedValidation] = useState<string | null>(null);
+  const [expandedValidation, setExpandedValidation] = useState<string | null>(
+    null,
+  );
+
+  const formRef = useRef(form);
+  formRef.current = form;
 
   useEffect(() => {
-    if (!isAdmin && userCompanyIdentifier) setForm((f) => ({ ...f, company: userCompanyIdentifier }));
-  }, [isAdmin, userCompanyIdentifier]);
+    if (isAdmin) return;
+    const cid = userCompanyId || userCompanyIdentifier;
+    if (cid) setForm((f) => ({ ...f, company_id: cid }));
+  }, [isAdmin, userCompanyId, userCompanyIdentifier]);
 
   const updateConfig = (key: keyof BotConfiguration, value: unknown) => {
     setForm((f) => ({
@@ -568,9 +729,12 @@ const VoicebotInboundBotsCreate = () => {
   };
 
   const submit = () => {
-    if (!validateFormAndToast(form)) return Promise.resolve();
+    const current = formRef.current;
+    if (!validateFormAndToast(current)) return Promise.resolve();
     setSubmitting(true);
-    return submitBotForm(form, isEditMode, botId, router).finally(() => setSubmitting(false));
+    return submitBotForm(current, isEditMode, botId, router).finally(() =>
+      setSubmitting(false),
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -582,7 +746,10 @@ const VoicebotInboundBotsCreate = () => {
     router.push("/voicebot/inbound/bots");
   };
 
-  const { isFirstTab, isLastTab, goPrev, goNext } = useTabNavigation(activeTab, setActiveTab);
+  const { isFirstTab, isLastTab, goPrev, goNext } = useTabNavigation(
+    activeTab,
+    setActiveTab,
+  );
 
   const cfg = form.configuration ?? defaultConfig;
   const validationItems = getValidationItems(form);
@@ -607,11 +774,19 @@ const VoicebotInboundBotsCreate = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle={pageCopy.breadcrumbSubTitle} />
+      <BreadcrumbItem
+        mainTitle=""
+        mainLink=""
+        subTitle={pageCopy.breadcrumbSubTitle}
+      />
       <PageHeader title={pageCopy.title} showSearch={false} />
 
       {/* Tab navigation */}
-      <TabsNavigation tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
+      <TabsNavigation
+        tabs={TABS}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
       <Form
         onSubmit={handleSubmit}
@@ -622,10 +797,17 @@ const VoicebotInboundBotsCreate = () => {
           e.preventDefault();
         }}
       >
-        <div style={{ maxWidth: "1600px", margin: "0 auto", padding: "24px 0" }}>
+        <div
+          style={{ maxWidth: "1600px", margin: "0 auto", padding: "24px 0" }}
+        >
           <div
             className="content-grid inbound-bot-create-grid"
-            style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: "24px", alignItems: "start" }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 380px",
+              gap: "24px",
+              alignItems: "start",
+            }}
           >
             {/* Left column - form card */}
             <div>
@@ -637,12 +819,15 @@ const VoicebotInboundBotsCreate = () => {
                   boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
                 }}
               >
-                <Tab.Container activeKey={activeTab} onSelect={(k) => setActiveTab(k ?? TAB_KEYS.basic)}>
+                <Tab.Container
+                  activeKey={activeTab}
+                  onSelect={(k) => setActiveTab(k ?? TAB_KEYS.basic)}
+                >
                   <Tab.Content>
                     <BasicInfoPane
                       form={form}
                       setForm={setForm}
-                      isAdmin={isAdmin}
+                      isAdmin={!isAdmin}
                       companies={companies}
                       loadingCompanies={loadingCompanies}
                       isEditMode={isEditMode}
@@ -652,11 +837,21 @@ const VoicebotInboundBotsCreate = () => {
                       inputStyle={inputStyle}
                     />
                     <Tab.Pane eventKey={TAB_KEYS.configuration}>
-                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                      <h6
+                        style={{
+                          margin: "0 0 20px 0",
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                        }}
+                      >
                         Configuration
                       </h6>
                       <Form.Group className="mb-3">
-                        <Form.Label className="d-flex align-items-center gap-1" style={labelStyle}>
+                        <Form.Label
+                          className="d-flex align-items-center gap-1"
+                          style={labelStyle}
+                        >
                           Instructions *
                           <OverlayTrigger
                             placement="top"
@@ -666,7 +861,10 @@ const VoicebotInboundBotsCreate = () => {
                               </Tooltip>
                             }
                           >
-                            <span className="text-muted" style={{ cursor: "pointer" }}>
+                            <span
+                              className="text-muted"
+                              style={{ cursor: "pointer" }}
+                            >
                               <HelpCircle size={14} />
                             </span>
                           </OverlayTrigger>
@@ -675,24 +873,33 @@ const VoicebotInboundBotsCreate = () => {
                           as="textarea"
                           rows={3}
                           value={cfg.instructions ?? ""}
-                          onChange={(e) => updateConfig("instructions", e.target.value)}
+                          onChange={(e) =>
+                            updateConfig("instructions", e.target.value)
+                          }
                           required
                           placeholder="You are a helpful AI assistant..."
                           style={{ ...inputStyle, resize: "vertical" as const }}
                         />
                       </Form.Group>
                       <Form.Group className="mb-3">
-                        <Form.Label className="d-flex align-items-center gap-1" style={labelStyle}>
+                        <Form.Label
+                          className="d-flex align-items-center gap-1"
+                          style={labelStyle}
+                        >
                           Knowledge Base *
                           <OverlayTrigger
                             placement="top"
                             overlay={
                               <Tooltip id="kb-tooltip">
-                                Q&A or context the bot can use. e.g. Q1. Question? A1. Answer...
+                                Q&A or context the bot can use. e.g. Q1.
+                                Question? A1. Answer...
                               </Tooltip>
                             }
                           >
-                            <span className="text-muted" style={{ cursor: "pointer" }}>
+                            <span
+                              className="text-muted"
+                              style={{ cursor: "pointer" }}
+                            >
                               <HelpCircle size={14} />
                             </span>
                           </OverlayTrigger>
@@ -701,36 +908,61 @@ const VoicebotInboundBotsCreate = () => {
                           as="textarea"
                           rows={3}
                           value={cfg.knowledge_base ?? ""}
-                          onChange={(e) => updateConfig("knowledge_base", e.target.value)}
-                          placeholder={'Q1. What is this company?\nA1. We provide excellent services...'}
+                          onChange={(e) =>
+                            updateConfig("knowledge_base", e.target.value)
+                          }
+                          placeholder={
+                            "Q1. What is this company?\nA1. We provide excellent services..."
+                          }
                           required
                           style={{ ...inputStyle, resize: "vertical" as const }}
                         />
                       </Form.Group>
                     </Tab.Pane>
                     <Tab.Pane eventKey={TAB_KEYS.voice}>
-                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                      <h6
+                        style={{
+                          margin: "0 0 20px 0",
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                        }}
+                      >
                         Voice Settings
                       </h6>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: "16px",
+                        }}
+                      >
                         <div>
                           <Form.Group className="mb-3">
                             <Form.Label style={labelStyle}>Voice</Form.Label>
                             <Form.Select
                               value={cfg.voice_name ?? "alloy"}
-                              onChange={(e) => updateConfig("voice_name", e.target.value)}
+                              onChange={(e) =>
+                                updateConfig("voice_name", e.target.value)
+                              }
                               style={inputStyle}
                             >
                               {VOICE_OPTIONS.map((v) => (
-                                <option key={v} value={v}>{v}</option>
+                                <option key={v} value={v}>
+                                  {v}
+                                </option>
                               ))}
                             </Form.Select>
                           </Form.Group>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>Voice Model</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              Voice Model
+                            </Form.Label>
                             <Form.Control
                               value={cfg.voice_model ?? ""}
-                              onChange={(e) => updateConfig("voice_model", e.target.value)}
+                              onChange={(e) =>
+                                updateConfig("voice_model", e.target.value)
+                              }
                               placeholder="gpt-4o-mini-tts"
                               disabled
                               style={inputStyle}
@@ -739,24 +971,45 @@ const VoicebotInboundBotsCreate = () => {
                         </div>
                         <div>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>Voice Speed ({(cfg.voice_speed ?? 1).toFixed(2)})</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              Voice Speed ({(cfg.voice_speed ?? 1).toFixed(2)})
+                            </Form.Label>
                             <Form.Range
                               min={0.5}
                               max={2}
                               step={0.01}
                               value={cfg.voice_speed ?? 1}
-                              onChange={(e) => updateConfig("voice_speed", Number.parseFloat(e.target.value))}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "voice_speed",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
                             />
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                fontSize: "12px",
+                                color: "#6b7280",
+                              }}
+                            >
                               <span>0.50</span>
                               <span>2.00</span>
                             </div>
                           </Form.Group>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>Voice Instructions *</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              Voice Instructions *
+                            </Form.Label>
                             <Form.Control
                               value={cfg.voice_instructions ?? ""}
-                              onChange={(e) => updateConfig("voice_instructions", e.target.value)}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "voice_instructions",
+                                  e.target.value,
+                                )
+                              }
                               placeholder="Voice-specific instructions"
                               required
                               style={inputStyle}
@@ -765,46 +1018,84 @@ const VoicebotInboundBotsCreate = () => {
                         </div>
                       </div>
                       <Form.Group className="mb-3">
-                        <Form.Label style={labelStyle}>Greeting Message</Form.Label>
+                        <Form.Label style={labelStyle}>
+                          Greeting Message
+                        </Form.Label>
                         <Form.Control
                           value={cfg.greeting_message ?? ""}
-                          onChange={(e) => updateConfig("greeting_message", e.target.value)}
+                          onChange={(e) =>
+                            updateConfig("greeting_message", e.target.value)
+                          }
                           placeholder="Hello! I'm here to help you. How can I assist you today?"
                           style={inputStyle}
                         />
                       </Form.Group>
                     </Tab.Pane>
                     <Tab.Pane eventKey={TAB_KEYS.llm}>
-                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                      <h6
+                        style={{
+                          margin: "0 0 20px 0",
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                        }}
+                      >
                         LLM Settings
                       </h6>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr 1fr",
+                          gap: "16px",
+                        }}
+                      >
                         <div>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>LLM Model</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              LLM Model
+                            </Form.Label>
                             <Form.Select
                               value={cfg.llm_model ?? "gpt-4o-mini"}
-                              onChange={(e) => updateConfig("llm_model", e.target.value)}
+                              onChange={(e) =>
+                                updateConfig("llm_model", e.target.value)
+                              }
                               disabled
                               style={inputStyle}
                             >
                               {LLM_MODEL_OPTIONS.map((m) => (
-                                <option key={m} value={m}>{m}</option>
+                                <option key={m} value={m}>
+                                  {m}
+                                </option>
                               ))}
                             </Form.Select>
                           </Form.Group>
                         </div>
                         <div>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>Temperature ({(cfg.temperature ?? 0.7).toFixed(2)})</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              Temperature ({(cfg.temperature ?? 0.7).toFixed(2)}
+                              )
+                            </Form.Label>
                             <Form.Range
                               min={0}
                               max={1}
                               step={0.01}
                               value={cfg.temperature ?? 0.7}
-                              onChange={(e) => updateConfig("temperature", Number.parseFloat(e.target.value))}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "temperature",
+                                  Number.parseFloat(e.target.value),
+                                )
+                              }
                             />
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280" }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                fontSize: "12px",
+                                color: "#6b7280",
+                              }}
+                            >
                               <span>0.00</span>
                               <span>1.00</span>
                             </div>
@@ -812,14 +1103,21 @@ const VoicebotInboundBotsCreate = () => {
                         </div>
                         <div>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>Max Tokens</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              Max Tokens
+                            </Form.Label>
                             <Form.Control
                               type="number"
                               min={100}
                               max={4000}
                               step={100}
                               value={cfg.max_tokens ?? 1000}
-                              onChange={(e) => updateConfig("max_tokens", Number.parseInt(e.target.value, 10) || 1000)}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "max_tokens",
+                                  Number.parseInt(e.target.value, 10) || 1000,
+                                )
+                              }
                               style={inputStyle}
                             />
                           </Form.Group>
@@ -827,10 +1125,23 @@ const VoicebotInboundBotsCreate = () => {
                       </div>
                     </Tab.Pane>
                     <Tab.Pane eventKey={TAB_KEYS.behavior}>
-                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                      <h6
+                        style={{
+                          margin: "0 0 20px 0",
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                        }}
+                      >
                         Behavior Settings
                       </h6>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr 1fr",
+                          gap: "16px",
+                        }}
+                      >
                         <div>
                           <Form.Group className="mb-3">
                             <Form.Check
@@ -838,40 +1149,79 @@ const VoicebotInboundBotsCreate = () => {
                               id="transfer-enabled"
                               label="Enable Transfer"
                               checked={!!cfg.transfer_enabled}
-                              onChange={(e) => updateConfig("transfer_enabled", e.target.checked)}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "transfer_enabled",
+                                  e.target.checked,
+                                )
+                              }
                             />
                           </Form.Group>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>Transfer Number *</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              Transfer Number *
+                            </Form.Label>
                             <Form.Control
                               value={cfg.transfer_number ?? ""}
-                              onChange={(e) => updateConfig("transfer_number", e.target.value)}
+                              onChange={(e) =>
+                                updateConfig("transfer_number", e.target.value)
+                              }
                               placeholder="Transfer number"
                               required
+                              style={inputStyle}
+                            />
+                          </Form.Group>
+                          <Form.Group className="mb-3">
+                            <Form.Label style={labelStyle}>
+                              Transfer Trunk ID
+                            </Form.Label>
+                            <Form.Control
+                              value={cfg.transfer_trunk_id ?? ""}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "transfer_trunk_id",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="e.g. ST_4G65oNUBmDaG"
                               style={inputStyle}
                             />
                           </Form.Group>
                         </div>
                         <div>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>Max Duration (seconds)</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              Max Duration (seconds)
+                            </Form.Label>
                             <Form.Control
                               type="number"
                               min={60}
                               step={60}
                               value={cfg.max_duration ?? 1800}
-                              onChange={(e) => updateConfig("max_duration", Number.parseInt(e.target.value, 10) || 1800)}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "max_duration",
+                                  Number.parseInt(e.target.value, 10) || 1800,
+                                )
+                              }
                               style={inputStyle}
                             />
                           </Form.Group>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>Idle Timeout (seconds)</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              Idle Timeout (seconds)
+                            </Form.Label>
                             <Form.Control
                               type="number"
                               min={30}
                               step={30}
                               value={cfg.idle_timeout ?? 300}
-                              onChange={(e) => updateConfig("idle_timeout", Number.parseInt(e.target.value, 10) || 300)}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "idle_timeout",
+                                  Number.parseInt(e.target.value, 10) || 300,
+                                )
+                              }
                               style={inputStyle}
                             />
                           </Form.Group>
@@ -883,7 +1233,12 @@ const VoicebotInboundBotsCreate = () => {
                               id="allow-interruptions"
                               label="Allow Interruptions"
                               checked={!!cfg.allow_interruptions}
-                              onChange={(e) => updateConfig("allow_interruptions", e.target.checked)}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "allow_interruptions",
+                                  e.target.checked,
+                                )
+                              }
                             />
                           </Form.Group>
                           <Form.Group className="mb-3">
@@ -892,18 +1247,30 @@ const VoicebotInboundBotsCreate = () => {
                               id="noise-cancellation"
                               label="Noise Cancellation"
                               checked={!!cfg.noise_cancellation}
-                              onChange={(e) => updateConfig("noise_cancellation", e.target.checked)}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "noise_cancellation",
+                                  e.target.checked,
+                                )
+                              }
                             />
                           </Form.Group>
                           <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>Min Endpointing Delay</Form.Label>
+                            <Form.Label style={labelStyle}>
+                              Min Endpointing Delay
+                            </Form.Label>
                             <Form.Control
                               type="number"
                               min={0}
                               max={1}
                               step={0.01}
                               value={cfg.min_endpointing_delay ?? 0.05}
-                              onChange={(e) => updateConfig("min_endpointing_delay", Number.parseFloat(e.target.value) || 0.05)}
+                              onChange={(e) =>
+                                updateConfig(
+                                  "min_endpointing_delay",
+                                  Number.parseFloat(e.target.value) || 0.05,
+                                )
+                              }
                               style={inputStyle}
                             />
                           </Form.Group>
@@ -911,25 +1278,46 @@ const VoicebotInboundBotsCreate = () => {
                       </div>
                     </Tab.Pane>
                     <Tab.Pane eventKey={TAB_KEYS.sip}>
-                      <h6 style={{ margin: "0 0 20px 0", fontSize: "16px", fontWeight: 600, color: "#1f2937" }}>
+                      <h6
+                        style={{
+                          margin: "0 0 20px 0",
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          color: "#1f2937",
+                        }}
+                      >
                         SIP Settings
                       </h6>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: "16px",
+                        }}
+                      >
                         <Form.Group className="mb-3">
-                          <Form.Label style={labelStyle}>SIP Trunk ID *</Form.Label>
+                          <Form.Label style={labelStyle}>
+                            SIP Trunk ID *
+                          </Form.Label>
                           <Form.Control
                             value={cfg.sip_trunk_id ?? ""}
-                            onChange={(e) => updateConfig("sip_trunk_id", e.target.value)}
+                            onChange={(e) =>
+                              updateConfig("sip_trunk_id", e.target.value)
+                            }
                             placeholder="SIP trunk identifier"
                             required
                             style={inputStyle}
                           />
                         </Form.Group>
                         <Form.Group className="mb-3">
-                          <Form.Label style={labelStyle}>Phone Number *</Form.Label>
+                          <Form.Label style={labelStyle}>
+                            Phone Number *
+                          </Form.Label>
                           <Form.Control
                             value={cfg.phone_number ?? ""}
-                            onChange={(e) => updateConfig("phone_number", e.target.value)}
+                            onChange={(e) =>
+                              updateConfig("phone_number", e.target.value)
+                            }
                             placeholder="Phone number"
                             required
                             style={inputStyle}
@@ -973,7 +1361,7 @@ const VoicebotInboundBotsCreate = () => {
               submit();
             }}
             finalActionLabel={pageCopy.finalActionLabel}
-            canSubmitFinal={Boolean(form.company && form.name?.trim())}
+            canSubmitFinal={Boolean(form.company_id && form.name?.trim())}
           />
         </div>
       </Form>

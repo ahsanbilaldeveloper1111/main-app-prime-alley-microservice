@@ -37,7 +37,7 @@ export interface UpdateCompanyPayload {
 
 /** GET /companies/ - List companies. Set show_inactive=true to include inactive. */
 export const getCompanies = async (params?: ListCompaniesParams) => {
-  const response = await axiosInstance.get(`${PREFIX}/companies/`, { params });
+  const response = await axiosInstance.get(`${PREFIX}/companies`, { params });
   return response.data;
 };
 
@@ -54,38 +54,54 @@ export const getCompany = async (companyId: string) => {
 };
 
 /** PUT /companies/{companyId}/ - Update company */
-export const putCompany = async (companyId: string, payload: UpdateCompanyPayload) => {
-  const response = await axiosInstance.put(`${PREFIX}/companies/${companyId}/`, payload);
+export const putCompany = async (
+  companyId: string,
+  payload: UpdateCompanyPayload,
+) => {
+  const response = await axiosInstance.put(
+    `${PREFIX}/companies/${companyId}/`,
+    payload,
+  );
   return response.data;
 };
 
 /** DELETE /companies/{companyId}/ - Delete company */
 export const deleteCompany = async (companyId: string) => {
-  const response = await axiosInstance.delete(`${PREFIX}/companies/${companyId}/`);
+  const response = await axiosInstance.delete(
+    `${PREFIX}/companies/${companyId}/`,
+  );
   return response.data;
 };
 
 /** POST /companies/{companyId}/activate/ - Activate company */
 export const activateCompany = async (companyId: string) => {
-  const response = await axiosInstance.post(`${PREFIX}/companies/${companyId}/activate/`);
+  const response = await axiosInstance.post(
+    `${PREFIX}/companies/${companyId}/activate/`,
+  );
   return response.data;
 };
 
 /** POST /companies/{companyId}/deactivate/ - Deactivate company */
 export const deactivateCompany = async (companyId: string) => {
-  const response = await axiosInstance.post(`${PREFIX}/companies/${companyId}/deactivate/`);
+  const response = await axiosInstance.post(
+    `${PREFIX}/companies/${companyId}/deactivate/`,
+  );
   return response.data;
 };
 
 /** GET /companies/{companyId}/stats/ - Get company stats */
 export const getCompanyStats = async (companyId: string) => {
-  const response = await axiosInstance.get(`${PREFIX}/companies/${companyId}/stats/`);
+  const response = await axiosInstance.get(
+    `${PREFIX}/companies/${companyId}/stats/`,
+  );
   return response.data;
 };
 
 /** GET /companies/{companyId}/bots/ - Get company bots */
 export const getCompanyBots = async (companyId: string) => {
-  const response = await axiosInstance.get(`${PREFIX}/companies/${companyId}/bots/`);
+  const response = await axiosInstance.get(
+    `${PREFIX}/companies/${companyId}/bots/`,
+  );
   return response.data;
 };
 
@@ -112,6 +128,7 @@ export interface BotConfiguration {
   greeting_message?: string;
   transfer_enabled?: boolean;
   transfer_number?: string;
+  transfer_trunk_id?: string;
   max_duration?: number;
   idle_timeout?: number;
   sip_trunk_id?: string;
@@ -123,7 +140,7 @@ export interface BotConfiguration {
 }
 
 export interface CreateBotPayload {
-  company: string;
+  company_id: string;
   name: string;
   description?: string;
   status?: string;
@@ -131,14 +148,11 @@ export interface CreateBotPayload {
 }
 
 export interface UpdateBotPayload {
+  company_id?: string;
   name?: string;
   description?: string;
   status?: string;
   configuration?: Partial<BotConfiguration>;
-}
-
-export interface RollbackBotPayload {
-  version: number;
 }
 
 /** GET /bots/ - List bots, optionally by company_id and limit */
@@ -154,8 +168,13 @@ export const postBots = async (payload: CreateBotPayload) => {
 };
 
 /** GET /bots/lookup/ - Lookup bot by phone_number or sip_trunk_id */
-export const getBotsLookup = async (params: { phone_number?: string; sip_trunk_id?: string }) => {
-  const response = await axiosInstance.get(`${PREFIX}/bots/lookup/`, { params });
+export const getBotsLookup = async (params: {
+  phone_number?: string;
+  sip_trunk_id?: string;
+}) => {
+  const response = await axiosInstance.get(`${PREFIX}/bots/lookup/`, {
+    params,
+  });
   return response.data;
 };
 
@@ -185,7 +204,9 @@ export const publishBot = async (botId: string) => {
 
 /** POST /bots/{botId}/unpublish/ - Unpublish bot */
 export const unpublishBot = async (botId: string) => {
-  const response = await axiosInstance.post(`${PREFIX}/bots/${botId}/unpublish/`);
+  const response = await axiosInstance.post(
+    `${PREFIX}/bots/${botId}/unpublish/`,
+  );
   return response.data;
 };
 
@@ -206,14 +227,20 @@ export interface BotVersionItem {
 }
 
 /** GET /bots/{botId}/versions/ - Get bot version history */
-export const getBotVersions = async (botId: string): Promise<BotVersionItem[]> => {
-  const response = await axiosInstance.get<BotVersionItem[]>(`${PREFIX}/bots/${botId}/versions/`);
+export const getBotVersions = async (
+  botId: string,
+): Promise<BotVersionItem[]> => {
+  const response = await axiosInstance.get<BotVersionItem[]>(
+    `${PREFIX}/bots/${botId}/versions/`,
+  );
   return response.data;
 };
 
-/** POST /bots/{botId}/rollback/ - Rollback bot to a version */
-export const rollbackBot = async (botId: string, payload: RollbackBotPayload) => {
-  const response = await axiosInstance.post(`${PREFIX}/bots/${botId}/rollback/`, payload);
+/** POST /bots/{botId}/switch/{version}/ - Switch bot to a version (rollback) */
+export const switchBotVersion = async (botId: string, version: number) => {
+  const response = await axiosInstance.post(
+    `${PREFIX}/bots/${botId}/switch/${version}/`,
+  );
   return response.data;
 };
 
@@ -309,7 +336,9 @@ export const postCalls = async (payload: CreateCallPayload) => {
 
 /** GET /calls/stats/ - Get call statistics */
 export const getCallsStats = async (params?: GetCallsStatsParams) => {
-  const response = await axiosInstance.get(`${PREFIX}/calls/stats/`, { params });
+  const response = await axiosInstance.get(`${PREFIX}/calls/stats/`, {
+    params,
+  });
   return response.data;
 };
 
@@ -320,25 +349,45 @@ export const getCall = async (callId: string) => {
 };
 
 /** POST /calls/{callId}/add_message/ - Add messages to call */
-export const addCallMessage = async (callId: string, messages: CallMessageItem[]) => {
-  const response = await axiosInstance.post(`${PREFIX}/calls/${callId}/add_message/`, messages);
+export const addCallMessage = async (
+  callId: string,
+  messages: CallMessageItem[],
+) => {
+  const response = await axiosInstance.post(
+    `${PREFIX}/calls/${callId}/add_message/`,
+    messages,
+  );
   return response.data;
 };
 
 /** POST /calls/{callId}/update_stats/ - Update call stats and usage */
-export const updateCallStats = async (callId: string, payload: UpdateCallStatsPayload) => {
-  const response = await axiosInstance.post(`${PREFIX}/calls/${callId}/update_stats/`, payload);
+export const updateCallStats = async (
+  callId: string,
+  payload: UpdateCallStatsPayload,
+) => {
+  const response = await axiosInstance.post(
+    `${PREFIX}/calls/${callId}/update_stats/`,
+    payload,
+  );
   return response.data;
 };
 
 /** GET /calls/{callId}/transcript/ - Get call transcript */
 export const getCallTranscript = async (callId: string) => {
-  const response = await axiosInstance.get(`${PREFIX}/calls/${callId}/transcript/`);
+  const response = await axiosInstance.get(
+    `${PREFIX}/calls/${callId}/transcript/`,
+  );
   return response.data;
 };
 
 /** POST /calls/{callId}/add_recording/ - Add recording to call */
-export const addCallRecording = async (callId: string, payload: AddRecordingPayload) => {
-  const response = await axiosInstance.post(`${PREFIX}/calls/${callId}/add_recording/`, payload);
+export const addCallRecording = async (
+  callId: string,
+  payload: AddRecordingPayload,
+) => {
+  const response = await axiosInstance.post(
+    `${PREFIX}/calls/${callId}/add_recording/`,
+    payload,
+  );
   return response.data;
 };
