@@ -24,6 +24,8 @@ import '@assets/scss/common.scss';
 import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat, formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import GenericFilterSidebar, { FilterFieldType } from '@components/GenericFilterSidebar';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -384,7 +386,8 @@ const CallLogs = () => {
                     
 
                     <div className="action-buttons d-flex align-items-center gap-2">
-                        <button
+                        {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS_FILTERS) && (
+                            <button
                             type="button"
                             className="btn btn-outline-secondary"
                             onClick={() => setShowFiltersSidebar(true)}
@@ -392,6 +395,7 @@ const CallLogs = () => {
                             <Filter size={16} className="me-2" />
                             Filters
                         </button>
+                        )}
                         {session?.user?.permissions?.includes('export-call-logs') && (
                             <button
                                 type="button"

@@ -30,6 +30,9 @@ import CircularProgressCircle from '@components/CircularProgressCircle';
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
 // Interfaces
 interface Summary {
   numbers: number;
@@ -650,7 +653,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
       fetchCallLogsOriginal(1, paginationInfo.perPage, searchValue.trim());
     },
-    showFiltersButton: true,
+    showFiltersButton: session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_RECORDINGS_FILTERS),
     showExportButton: session?.user?.permissions?.includes('export-call-recordings'),
     onExportClick: () => handleExport('excel', appliedFilters),
     showFilterPills: true,

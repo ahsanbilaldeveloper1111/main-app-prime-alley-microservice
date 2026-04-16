@@ -16,6 +16,9 @@ import '@assets/scss/common.scss';
 import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat, formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { isExactPhoneMatch, normalizePhoneValue } from '@utils/phoneMatch';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -473,7 +476,7 @@ const CallLogs = () => {
             setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
             fetchCallLogs(1, tablePagination.rowsPerPage, searchValue.trim());
         },
-        showFiltersButton: true,
+        showFiltersButton: session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS_FILTERS),
         showExportButton: session?.user?.permissions?.includes('export-call-logs'),
         onExportClick: () => handleExport(),
         showFilterPills: true,
