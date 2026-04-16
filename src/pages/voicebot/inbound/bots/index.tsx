@@ -1189,7 +1189,7 @@ const BotsPage = () => {
   );
 
   return (
-    <React.Fragment>
+    <>
       <BreadcrumbItem
         mainTitle=""
         mainLink=""
@@ -1237,6 +1237,60 @@ const BotsPage = () => {
               </Button>
             </div>
           </div>
+        </Col>
+      </Row>
+
+      <GenericTable<BotRow>
+        data={data}
+        columns={columns}
+        loading={loading}
+        emptyMessage="No bots found."
+        loadingMessage="Loading bots..."
+        showToolbar
+        toolbar={tableToolbar}
+        showToolbarActions={false}
+        pagination={{
+          currentPage: 1,
+          rowsPerPage: 10,
+          totalRows: data.length,
+          pageSizeOptions: [10, 25, 50],
+        }}
+        uniqueKey="id"
+        hover
+        striped={false}
+      />
+
+      <Modal
+        show={showTabSelectorModal}
+        onHide={() => setShowTabSelectorModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Visible tabs</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted small mb-3">
+            Choose which status tabs appear in the table toolbar.
+          </p>
+          {BOT_STATUS_TABS.map((tab) => (
+            <Form.Check
+              key={tab.id}
+              type="checkbox"
+              id={`bots-tab-visible-${tab.id}`}
+              className="mb-2"
+              label={tab.label}
+              checked={tabSelectionDraft.includes(tab.id)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setTabSelectionDraft((prev) => {
+                  if (checked) {
+                    return prev.includes(tab.id) ? prev : [...prev, tab.id];
+                  }
+                  return prev.filter((id) => id !== tab.id);
+                });
+              }}
+            />
+          ))}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setShowTabSelectorModal(false)}>
@@ -1435,7 +1489,7 @@ const BotsPage = () => {
         itemType="bot"
         loading={deleteLoading}
       />
-    </React.Fragment>
+    </>
   );
 };
 
