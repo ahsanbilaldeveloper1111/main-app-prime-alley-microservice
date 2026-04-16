@@ -305,6 +305,7 @@ MENU_COLORS: {
     
     //OLD
     CONTROL_HUB_SERVICES: 'control-hub-services',
+    ACCOUNT_DEFAULTS_SERVICES: 'account-defaults-services',
     VIEW_USERS_CONTROLHUB: 'view-users',
     VIEW_RANKS_CONTROLHUB: 'view-ranks',
     VIEW_GROUPS_CONTROLHUB: 'view-groups',

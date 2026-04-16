@@ -1462,7 +1462,7 @@ font-weight:600;
                     </button>
                   )}
 
-                  {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.COMMUNICATIONS_SERVICES) && session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
                     <button
                       type="button"
                       className="crm-prime-topbar-icon"
@@ -1537,7 +1537,6 @@ font-weight:600;
                           <span>Dialer</span>
                         </button>
                       )}
-
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
                         <button
                           type="button"
