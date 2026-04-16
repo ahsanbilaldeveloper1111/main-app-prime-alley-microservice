@@ -175,6 +175,24 @@ function toggleTabDraftSelection(prev: string[], tabId: string, isChecked: boole
   return prev.filter((id) => id !== tabId);
 }
 
+function tabSelectionDraftFromVisible(visibleTabIds: string[]): string[] {
+  return visibleTabIds.filter((tabId) => tabId !== "all");
+}
+
+function mapVisibleStatusTabsForToolbar(
+  visibleTabIds: string[],
+  botTabCounts: Record<string, number>,
+): Array<{ id: string; label: string; count: number; removable: boolean }> {
+  return BOT_STATUS_TABS.filter((tab) => visibleTabIds.includes(tab.id)).map(
+    (tab) => ({
+      id: tab.id,
+      label: tab.label,
+      count: botTabCounts[tab.id] || 0,
+      removable: true,
+    }),
+  );
+}
+
 /** Renders version configuration_snapshot (API shape: instructions, knowledge_base, voice_settings, llm_settings, behavior_settings, sip_settings) */
 const VersionConfigSnapshot = ({
   config,
@@ -924,6 +942,16 @@ const BotsPage = () => {
     setTabSelectionDraft((prev) => toggleTabDraftSelection(prev, tabId, isChecked));
   }, []);
 
+  const handleApplyTabSelector = useCallback(() => {
+    const nextVisible = ["all", ...tabSelectionDraft];
+    setVisibleTabIds(nextVisible);
+    if (statusFilter && !nextVisible.includes(statusFilter)) {
+      setLoading(true);
+      setStatusFilter("");
+    }
+    setShowTabSelectorModal(false);
+  }, [tabSelectionDraft, statusFilter]);
+
   const addBotButtonStyle: React.CSSProperties = {
     cursor: "pointer",
     transition: "150ms ease-out",
@@ -988,14 +1016,7 @@ const BotsPage = () => {
       showTabs: true,
       tabs: [
         { id: "all", label: "All Bots", count: botTabCounts.all, removable: false },
-        ...BOT_STATUS_TABS
-          .filter((tab) => visibleTabIds.includes(tab.id))
-          .map((tab) => ({
-            id: tab.id,
-            label: tab.label,
-            count: botTabCounts[tab.id] || 0,
-            removable: true,
-          })),
+        ...mapVisibleStatusTabsForToolbar(visibleTabIds, botTabCounts),
       ],
       activeTab: statusFilter || "all",
       onTabChange: (tabId: string) => {
@@ -1003,7 +1024,7 @@ const BotsPage = () => {
         setStatusFilter(tabId === "all" ? "" : tabId);
       },
       onTabAdd: () => {
-        setTabSelectionDraft(visibleTabIds.filter((tabId) => tabId !== "all"));
+        setTabSelectionDraft(tabSelectionDraftFromVisible(visibleTabIds));
         setShowTabSelectorModal(true);
       },
       onTabRemove: handleTabRemove,
@@ -1189,7 +1210,7 @@ const BotsPage = () => {
   );
 
   return (
-    <React.Fragment>
+    <>
       <BreadcrumbItem
         mainTitle=""
         mainLink=""
@@ -1237,23 +1258,58 @@ const BotsPage = () => {
               </Button>
             </div>
           </div>
+        </Col>
+      </Row>
+
+      <GenericTable<BotRow>
+        data={data}
+        columns={columns}
+        loading={loading}
+        emptyMessage="No bots found."
+        loadingMessage="Loading bots..."
+        showToolbar
+        toolbar={tableToolbar}
+        showToolbarActions={false}
+        pagination={{
+          currentPage: 1,
+          rowsPerPage: 10,
+          totalRows: data.length,
+          pageSizeOptions: [10, 25, 50],
+        }}
+        uniqueKey="id"
+        hover
+        striped={false}
+      />
+
+      <Modal
+        show={showTabSelectorModal}
+        onHide={() => setShowTabSelectorModal(false)}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Visible tabs</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted small mb-3">
+            Choose which status tabs appear in the table toolbar.
+          </p>
+          {BOT_STATUS_TABS.map((tab) => (
+            <Form.Check
+              key={tab.id}
+              type="checkbox"
+              id={`bots-tab-visible-${tab.id}`}
+              className="mb-2"
+              label={tab.label}
+              checked={tabSelectionDraft.includes(tab.id)}
+              onChange={(e) => applyTabDraftChange(tab.id, e.target.checked)}
+            />
+          ))}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="outline-secondary" onClick={() => setShowTabSelectorModal(false)}>
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              const nextVisible = ["all", ...tabSelectionDraft];
-              setVisibleTabIds(nextVisible);
-              if (statusFilter && !nextVisible.includes(statusFilter)) {
-                setLoading(true);
-                setStatusFilter("");
-              }
-              setShowTabSelectorModal(false);
-            }}
-          >
+          <Button variant="primary" onClick={handleApplyTabSelector}>
             Apply
           </Button>
         </Modal.Footer>
@@ -1435,7 +1491,7 @@ const BotsPage = () => {
         itemType="bot"
         loading={deleteLoading}
       />
-    </React.Fragment>
+    </>
   );
 };
 
