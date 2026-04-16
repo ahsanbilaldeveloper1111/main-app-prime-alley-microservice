@@ -26,7 +26,7 @@ export const sidebarGroups: SidebarGroup[] = [
   {
     heading: 'Services',
     items: [
-      { id: 'account-defaults', label: 'Account Defaults', permission: PERMISSIONS.CONTROL_HUB_SERVICES },
+      { id: 'account-defaults', label: 'Account Defaults', permission: PERMISSIONS.ACCOUNT_DEFAULTS_SERVICES },
       { id: 'users-teams', label: 'Users & Teams', permission: PERMISSIONS.CONTROL_HUB_SERVICES },
       { id: 'smart-crm', label: 'Smart CRM', permission: PERMISSIONS.CRM_SERVICES },
       { id: 'communications', label: 'Communications', permission: PERMISSIONS.COMMUNICATIONS_SERVICES },
