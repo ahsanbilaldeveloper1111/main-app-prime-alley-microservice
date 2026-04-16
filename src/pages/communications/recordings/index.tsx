@@ -161,15 +161,18 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     const now = moment();
     const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    // Match default range in `current` so `applyFilters({ ...currentFilters, ... })` does not drop dates.
+    const startDateUi = now.clone().startOf('day').format('YYYY-MM-DD');
+    const endDateUi = now.clone().endOf('day').format('YYYY-MM-DD');
     return {
       current: {
-        start_date: '',
-        end_date: '',
+        start_date: startDateUi,
+        end_date: endDateUi,
       },
       applied: {
         start_date: startDateApi,
         end_date: endDateApi,
-      }
+      },
     };
   };
   
@@ -482,7 +485,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
   };
 
-  const handleFiltersChange = (filters: any) => {
+  const handleFiltersChange = useCallback((filters: any) => {
     // Format datetime values to include seconds and timezone offset (remove timezone key)
     const formattedFilters: any = { ...filters };
 
@@ -509,11 +512,11 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
     
     if (formattedFilters.end_date) {
-      // date picker returns YYYY-MM-DD; normalize to UTC timestamp expected by API.
+      // date picker returns YYYY-MM-DD; use end of that local day so the range includes the full day.
       let endMoment = moment(formattedFilters.end_date);
       
       if (formattedFilters.end_date.match(/^\d{4}-\d{2}-\d{2}$/) || !formattedFilters.end_date.includes('T')) {
-        endMoment = moment(formattedFilters.end_date).startOf('day');
+        endMoment = moment(formattedFilters.end_date).endOf('day');
       }
       
       // Convert to UTC
@@ -596,7 +599,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
       });
       setChartLoading(false);
     }
-  };
+  }, []);
 
   const handleExport = async (exportType: string, filters: Record<string, any>) => {
     setShowPageLoader(true);
@@ -617,9 +620,12 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     }
   };
 
-  const applyFilters = (nextFilters: Record<string, any>) => {
-    handleFiltersChange(nextFilters);
-  };
+  const applyFilters = useCallback(
+    (nextFilters: Record<string, any>) => {
+      handleFiltersChange(nextFilters);
+    },
+    [handleFiltersChange],
+  );
 
   const callDirectionLabel = (value: string): string => {
     if (value === 'OUTGOING') return 'Outgoing';
