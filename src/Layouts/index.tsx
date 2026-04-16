@@ -1784,7 +1784,7 @@ font-weight:600;
                         </button>
                         )}
 
-                        <button
+                  {   session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALENDAR_WORK_PLANNER) && (   <button
                           type="button"
                           className="user-dropdown-item"
                           onClick={() => router.push("/planner/calendar")}
@@ -1793,7 +1793,7 @@ font-weight:600;
                           <span className="user-dropdown-item-text">
                             Calendar
                           </span>
-                        </button>
+                        </button>)}
 
                         {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
                         <button
