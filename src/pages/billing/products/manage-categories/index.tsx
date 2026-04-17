@@ -3,6 +3,7 @@ import React, {
   ReactElement,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -11,18 +12,15 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Alert,
   Button,
-  Card,
-  Col,
   Form,
   Modal,
-  Row,
-  Spinner,
-  Table,
 } from "react-bootstrap";
+import { Plus } from "lucide-react";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
+import GenericTable, { TableColumn } from "@components/GenericTable";
 import {
   createProductCategory,
   deleteProductCategory,
@@ -30,11 +28,50 @@ import {
   type ProductCategoryData,
   updateProductCategory,
 } from "@utils/accounts";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 
 type ProductCategoryRow = ProductCategoryData & {
   is_active?: boolean;
 };
+
+const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
+  padding: "9px 13px",
+  backgroundColor: "#000000",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "4px",
+  fontSize: "12px",
+  fontWeight: 500,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+};
+
+function CategoryToolbarButton({
+  onClick,
+  children,
+}: Readonly<{
+  onClick: () => void;
+  children: React.ReactNode;
+}>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={ACTION_BUTTON_BASE_STYLE}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#1a1a1a";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "#000000";
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 const ManageCategories = () => {
 
@@ -216,94 +253,146 @@ const ManageCategories = () => {
     }
   }, [categoryToDelete, fetchCategories]);
 
+  const categoryColumns: TableColumn<ProductCategoryRow>[] = useMemo(
+    () => [
+      {
+        key: "id",
+        label: "ID",
+        sortable: true,
+        type: "text",
+      },
+      {
+        key: "name",
+        label: "Name",
+        sortable: true,
+        type: "text",
+      },
+      {
+        key: "description",
+        label: "Description",
+        sortable: true,
+        width: "28%",
+        type: "custom",
+        render: (row) => (
+          <div
+            style={{
+              minWidth: "180px",
+              maxWidth: "320px",
+              whiteSpace: "normal",
+              wordBreak: "break-word",
+            }}
+          >
+            {row.description ?? "-"}
+          </div>
+        ),
+      },
+      {
+        key: "is_active",
+        label: "Active",
+        sortable: true,
+        type: "custom",
+        render: (row) => (row.is_active === false ? "Inactive" : "Active"),
+      },
+      {
+        key: "actions",
+        label: "Actions",
+        sortable: false,
+        type: "custom",
+        render: (row) => (
+          <div className="d-flex gap-1">
+            <button
+              type="button"
+              onClick={() => openEditCategoryModal(row)}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "4px",
+                cursor: "pointer",
+                color: "#0d6efd",
+              }}
+            >
+              <FiEdit size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => openDeleteCategoryModal(row)}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "4px",
+                cursor: "pointer",
+                color: "#dc3545",
+              }}
+            >
+              <FiTrash2 size={16} />
+            </button>
+          </div>
+        ),
+      },
+    ],
+    [openDeleteCategoryModal, openEditCategoryModal],
+  );
+
+  const categoriesToolbarConfig = useMemo(
+    () => ({
+      showSearch: true,
+      searchValue,
+      searchPlaceholder: "Search categories...",
+      onSearchChange: setSearchValue,
+      onSearch: () => {
+        fetchCategories();
+      },
+      showTabs: true,
+      tabs: [
+        {
+          id: "manage_categories",
+          label: "Manage Categories",
+          removable: false,
+        },
+      ],
+      activeTab: "manage_categories",
+      onTabChange: () => {},
+      tabsDropdownLabel: "Products",
+      tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
+      showTableViewDropdown: false,
+      rightActions: (
+        <CategoryToolbarButton onClick={openAddCategoryModal}>
+          <Plus size={16} />
+          Add Category
+        </CategoryToolbarButton>
+      ),
+    }),
+    [fetchCategories, openAddCategoryModal, searchValue],
+  );
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Manage Categories" />
 
-      <PageHeader
-        title="Manage Categories"
-        showSearch={true}
-        searchPlaceholder="Search categories..."
-        searchValue={searchValue}
-        onSearchChange={(value) => setSearchValue(value)}
-        buttons={
-          <div className="d-flex gap-2">
-            <Button variant="primary" onClick={openAddCategoryModal}>
-              Add Category
-            </Button>
-            
-          </div>
-        }
-      />
+      {error ? (
+        <Alert variant="danger" className="mt-3 mb-3">
+          {error}
+        </Alert>
+      ) : null}
 
-      <Row className="mt-3">
-        <Col xs={12}>
-          <Card>
-            <Card.Body>
-              {error ? (
-                <Alert variant="danger" className="mb-3">
-                  {error}
-                </Alert>
-              ) : null}
-
-              {loading ? (
-                <div className="d-flex align-items-center gap-2">
-                  <Spinner size="sm" />
-                  <span>Loading categories…</span>
-                </div>
-              ) : (
-                <Table responsive bordered hover className="mb-0">
-                  <thead>
-                    <tr>
-                      <th style={{ width: 90 }}>ID</th>
-                      <th>Name</th>
-                      <th style={{ width: 140 }}>Description</th>
-                      <th style={{ width: 140 }}>Active</th>
-                      <th style={{ width: 170 }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categories.length ? (
-                      categories.map((c) => (
-                        <tr key={c.id}>
-                          <td>{c.id}</td>
-                          <td>{c.name}</td>
-                          <td>{c.description ?? "-"}</td>
-                          <td>{c.is_active === false ? "Inactive" : "Active"}</td>
-                          <td>
-                            <div className="d-flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline-secondary"
-                                onClick={() => openEditCategoryModal(c)}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline-danger"
-                                onClick={() => openDeleteCategoryModal(c)}
-                              >
-                                Delete
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="text-center text-muted">
-                          No categories found
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </Table>
-              )}
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      <div className="container-fluid mt-3">
+        <GenericTable
+          data={categories}
+          columns={categoryColumns}
+          showActions={false}
+          sortable={true}
+          loading={loading}
+          showToolbarActions={false}
+          emptyMessage="No categories found"
+          loadingMessage="Loading categories..."
+          hover={true}
+          uniqueKey="id"
+          fixedHeight={true}
+          maxHeight="calc(100vh - 300px)"
+          showToolbar={true}
+          toolbar={categoriesToolbarConfig}
+        />
+      </div>
 
       <Modal
         show={showAddCategoryModal}

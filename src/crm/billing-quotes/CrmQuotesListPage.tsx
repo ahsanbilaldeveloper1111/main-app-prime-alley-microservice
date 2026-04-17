@@ -84,6 +84,7 @@ import { useCrmQuotesListPageUploadHandlers } from "@crm/billing-quotes/useCrmQu
 import { CrmQuotesListPageDeleteConfirmationBlock } from "@crm/billing-quotes/CrmQuotesListPageDeleteConfirmationBlock";
 import { CrmQuotesListPageProspectSidebar } from "@crm/billing-quotes/CrmQuotesListPageProspectSidebar";
 import { CrmQuotesListPageQuotesFilterSidebar } from "@crm/billing-quotes/CrmQuotesListPageQuotesFilterSidebar";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 
 export type CrmQuotesListPageProps = Readonly<{
   variant: "billing" | "crm";
@@ -380,6 +381,10 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
 
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
+
+  useEffect(() => {
+    setShowAdvancedFilters(true);
+  }, [setShowAdvancedFilters]);
 
   const prospectQuickFilters = useMemo(
     () => getCrmQuotesListProspectQuickFilters(),
@@ -853,6 +858,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                 columns={quotesColumns.filter((c) =>
                   selectedColumns.includes(c.key),
                 )}
+                showToolbarActions={false}
                 actions={quotesActions}
                 {...getCrmProspectsDataListGenericTableSharedProps({
                   session,
@@ -871,15 +877,22 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                   onRowDoubleClick: (row) =>
                     prospectsTableRowDoubleClick(session, handleViewData, row),
                 })}
-                toolbar={mergeCrmQuotesListProspectsToolbarConfig(
-                  prospectsToolbarConfig,
-                  {
-                    showFiltersSidebar,
-                    setShowAdvancedFilters,
-                    showAdvancedFilterPills,
-                    quotesFilterPills,
-                  },
-                )}
+                toolbar={{
+                  ...mergeCrmQuotesListProspectsToolbarConfig(
+                    prospectsToolbarConfig,
+                    {
+                      showFiltersSidebar,
+                      setShowAdvancedFilters,
+                      showAdvancedFilterPills,
+                      quotesFilterPills,
+                    },
+                  ),
+                  tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
+                  showFilterPills: true,
+                  showMoreFiltersButton: false,
+                  showAdvancedFilters: false,
+                  advancedFiltersOpen: true,
+                }}
                 statsCards={prospectsStatsCards}
                 customBody={renderCrmQuotesListProspectsBoardCustomBody({
                   prospectsViewMode,

@@ -45,6 +45,7 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar, { type FilterField } from "@components/GenericFilterSidebar";
 import { type StatsCardData } from "@components/GenericStatsCards";
 import { deleteProduct, getProducts, type ProductData } from "@utils/accounts";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -197,17 +198,6 @@ const DEFAULT_PRODUCT_TABLE_COLUMN_KEYS: string[] = [
   "base_price",
   "is_active",
   "actions",
-];
-
-const BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS = [
-  { label: "Account Overview", href: "/billing/account-overview" },
-  { label: "Products", href: "/billing/products" },
-  { label: "Quotes", href: "/billing/quotes" },
-  { label: "Order Invoicing", href: "/billing/order-invoicing" },
-  { label: "Subscriptions", href: "/billing/subscriptions" },
-  { label: "Invoices", href: "/billing/invoices" },
-  { label: "Payments", href: "/billing/payments" },
-  { label: "Transactions", href: "/billing/transactions" },
 ];
 
 function parseStoredProductColumnKeys(raw: string | null): string[] | null {
@@ -955,20 +945,30 @@ const BillingManagement = () => {
         type: "custom",
         render: (row: any) => {
           return <div className="d-flex gap-1">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => openProductEditModal(row)}
-            >
-              <FiEdit size={16} />
-            </Button>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => openProductDeleteModal(row)}
-            >
-              <FiTrash2 size={16} />
-            </Button>
+            <button
+  onClick={() => openProductEditModal(row)}
+  style={{
+    background: "transparent",
+    border: "none",
+    padding: "4px",
+    cursor: "pointer",
+    color: "#0d6efd" // blue (edit)
+  }}
+>
+  <FiEdit size={16} />
+</button>
+<button
+  onClick={() => openProductDeleteModal(row)}
+  style={{
+    background: "transparent",
+    border: "none",
+    padding: "4px",
+    cursor: "pointer",
+    color: "#dc3545" // red
+  }}
+>
+  <FiTrash2 size={16} />
+</button>
           </div>;
         },
       },
@@ -1087,7 +1087,6 @@ const BillingManagement = () => {
       },
       ...customTabs,
     ],
-    onTabAdd: () => setShowTabModal(true),
     onTabRemove: (tabId: string) => {
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
       if (activeFilter === tabId) handleFilterChange("all");
@@ -1285,6 +1284,7 @@ const BillingManagement = () => {
                   selectedColumns.includes(c.key),
                 )}
                 actions={productsActions}
+                showToolbarActions={false}
                 showActions={false}
                 // Selection
                 selectable={session?.user?.permissions?.includes(
@@ -1350,10 +1350,11 @@ const BillingManagement = () => {
                 toolbar={{
                   ...productsToolbarConfig,
                   tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
+                  showFiltersButton: false,
                   showFilterPills: true,
                   filterPills: productsFilterPills,
-                  showMoreFiltersButton: true,
-                  onAdvancedFiltersClick: handleOpenFiltersSidebar,
+                  showMoreFiltersButton: false,
+                  showAdvancedFilters: false,
                 }}
                 // Stats cards for metrics
                 statsCards={productsStatsCards}
