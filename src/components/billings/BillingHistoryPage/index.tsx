@@ -13,6 +13,7 @@ import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/Inv
 import { BILLING_FONT } from "@components/billings/shared/styles";
 import { useInvoicePaymentModal } from "@components/billings/InvoicePaymentModal";
 import { getMinifiedCompanies } from "@utils/crm";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
 import GenericTable from "@components/GenericTable";
@@ -565,13 +566,6 @@ function buildBillingHistoryFilterPills(
   ];
 }
 
-const BILLING_NAV_ITEMS = [
-  { label: "Overview", href: "/billing" },
-  { label: "Invoices", href: "/billing-invoices" },
-  { label: "Payments", href: "/billing-payments" },
-  { label: "Subscriptions", href: "/billing-subscription" },
-];
-
 function getPrimaryPaymentMethodType(payment: any): string {
   const directTypes = payment?.payment_method_types;
   if (Array.isArray(directTypes) && directTypes.length > 0) {
@@ -984,7 +978,7 @@ export default function BillingHistoryPage({
   const toolbar = useMemo<ToolbarConfig>(() => ({
     showTabs: true,
     tabsDropdownLabel: "Billing",
-    tabsDropdownItems: BILLING_NAV_ITEMS,
+    tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
     tabs: [{ id: "billing-history", label: "Billing History", count: loadingInvoices ? undefined : billingRows.length }],
     activeTab: "billing-history",
     showSearch: true,
