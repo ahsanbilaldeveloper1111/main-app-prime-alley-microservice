@@ -10,7 +10,7 @@ import React, {
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
-import { Button, Form } from "react-bootstrap";
+import { Form } from "react-bootstrap";
 
 import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
@@ -27,9 +27,11 @@ import { getMinifiedCompanies } from "@utils/crm";
 import moment from "moment";
 import { formatNumber, GlobalDateFormat } from "@utils/Helper";
 import { Package, FileText, Calendar, Plus } from "lucide-react";
+import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
 import { toDateInputValue } from "@utils/dateInputValue";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
@@ -536,23 +538,29 @@ const ProductDetails = () => {
           const productId = row?.product_id ?? row?.product?.id ?? row?.id;
           const isDeleting = deletingProductId != null && deletingProductId === productId;
           return (
-            <div style={{ display: "flex", gap: 8 }}>
-              <Button
-                size="sm"
-                variant="outline-primary"
+            <div className="d-flex gap-1">
+              <button
+                type="button"
                 disabled={!productId || isDeleting}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   handleOpenEditModal(row);
                 }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "4px",
+                  cursor: !productId || isDeleting ? "not-allowed" : "pointer",
+                  color: "#0d6efd",
+                  opacity: !productId || isDeleting ? 0.5 : 1,
+                }}
               >
-                Edit
-              </Button>
+                <FiEdit size={16} />
+              </button>
 
-              <Button
-                size="sm"
-                variant="outline-danger"
+              <button
+                type="button"
                 disabled={!productId || isDeleting}
                 onClick={(e) => {
                   e.preventDefault();
@@ -560,9 +568,18 @@ const ProductDetails = () => {
                   if (!productId) return;
                   openDeleteConfirmation(row);
                 }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "4px",
+                  cursor: !productId || isDeleting ? "not-allowed" : "pointer",
+                  color: "#dc3545",
+                  opacity: !productId || isDeleting ? 0.5 : 1,
+                }}
+                title={isDeleting ? "Deleting..." : "Delete"}
               >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </Button>
+                <FiTrash2 size={16} />
+              </button>
             </div>
           );
         },
@@ -626,6 +643,12 @@ const ProductDetails = () => {
 
   const applyStatusFilter = useCallback((status: string) => {
     setCurrentFilters((prev) => ({ ...prev, status }));
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  const applyBillingCycleFilter = useCallback((billingCycle: string) => {
+    setCurrentFilters((prev) => ({ ...prev, billing_cycle: billingCycle }));
     setPagination((prev) => ({ ...prev, currentPage: 1 }));
     setRefreshKey((k) => k + 1);
   }, []);
@@ -721,7 +744,45 @@ const ProductDetails = () => {
         </div>
       ),
     },
-  ], [currentFilters, applyStatusFilter]);
+    {
+      id: "billing_cycle",
+      label: "Billing Cycle",
+      showDropdown: true,
+      active: !!currentFilters.billing_cycle,
+      activeLabel: currentFilters.billing_cycle ? String(currentFilters.billing_cycle) : undefined,
+      onClear: () => {
+        setCurrentFilters((prev) => {
+          const { billing_cycle, ...rest } = prev;
+          return rest;
+        });
+        setPagination((prev) => ({ ...prev, currentPage: 1 }));
+        setRefreshKey((k) => k + 1);
+      },
+      dropdownContent: (
+        <div style={{ minWidth: 200 }}>
+          {["monthly", "quarterly", "yearly", "one time"].map((cycle) => (
+            <button
+              key={cycle}
+              type="button"
+              style={{
+                padding: "8px 12px",
+                cursor: "pointer",
+                background: currentFilters.billing_cycle === cycle ? "#f0f0f0" : "transparent",
+                borderRadius: "4px",
+                border: "none",
+                width: "100%",
+                textAlign: "left",
+                textTransform: "capitalize",
+              }}
+              onClick={() => applyBillingCycleFilter(cycle)}
+            >
+              {cycle}
+            </button>
+          ))}
+        </div>
+      ),
+    },
+  ], [currentFilters, applyStatusFilter, applyBillingCycleFilter]);
 
   // Add Subscription button
   const renderAddSubscriptionButton = () => (
@@ -757,10 +818,10 @@ const ProductDetails = () => {
         <Plus size={16} />
         Add Subscription
       </button>
+
     </div>
   );
 
-  // Toolbar config following the same pattern as customer-invoices
   const subscriptionsToolbarConfig = useCrmToolbarConfig({
     entity: "invoices" as any,
     searchValue: subscriptionSearch,
@@ -784,7 +845,7 @@ const ProductDetails = () => {
         removable: false,
       },
     ],
-    onTabAdd: () => {},
+    onTabAdd: undefined,
     onTabRemove: () => {},
     tabsDropdownLabel: "Subscriptions",
     onFiltersClick: handleOpenFiltersSidebar,
@@ -883,6 +944,7 @@ const ProductDetails = () => {
       <GenericTable
         data={dataList}
         columns={visibleTableColumns}
+        showToolbarActions={false}
         pagination={{
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
@@ -913,10 +975,11 @@ const ProductDetails = () => {
         showToolbar={true}
         toolbar={{
           ...subscriptionsToolbarConfig,
+          tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
           showFilterPills: true,
           filterPills: subscriptionFilterPills,
-          showMoreFiltersButton: true,
-          onAdvancedFiltersClick: handleOpenFiltersSidebar,
+          showMoreFiltersButton: false,
+          showAdvancedFilters: false,
         }}
       />
 
@@ -1077,7 +1140,7 @@ const ProductDetails = () => {
         title="Customize Columns"
         columns={tableColumns.map((c) => ({ key: c.key, label: c.label }))}
         selectedColumnKeys={selectedColumns}
-        onApply={(keys) => {
+        onApply={(keys: string[]) => {
           setSelectedColumns(keys);
           const w = (globalThis as unknown as { window?: Window }).window;
           if (w) {
