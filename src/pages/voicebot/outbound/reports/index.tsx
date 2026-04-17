@@ -5,7 +5,14 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { FilterPill, TableColumn, ToolbarConfig } from "@components/GenericTable";
 import { StatsCardData } from "@components/GenericStatsCards";
 import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
-import { postReportsCalls, getCampaigns, getReportsCallsBySession } from "@utils/voicebot/outbound";
+import {
+  getCampaigns,
+  getReportsCallsBySession,
+  getVoicebots,
+  normalizeVoicebotsListResponse,
+  postReportsCalls,
+  type PostReportsCallsPayload,
+} from "@utils/voicebot/outbound";
 import { GetCompanies } from "@utils/users";
 import { Row, Col, Button, Form, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -14,6 +21,7 @@ import { formatDuration, GlobalDateTimeFormat } from "@utils/Helper";
 import "@assets/scss/common.scss";
 import moment from "moment";
 import { formatFixed, formatPercent } from "@utils/voicebot/outbound/formatters";
+import { OUTBOUND_VOICEBOT_LIST_PAGE_SIZE } from "@utils/voicebot/outboundVoicebotForm";
 import { Activity, DollarSign, MessageSquareText, PieChart, PhoneCall } from "lucide-react";
 
 function formatCost(value: number): string {
@@ -148,6 +156,7 @@ function formatUsd4(value: unknown): string {
 const defaultFilters = {
   company_id: "",
   campaign_id: "",
+  voicebot_id: "",
   call_status: "",
   date_from: "",
   date_to: "",
@@ -172,6 +181,7 @@ const OutboundReportsPage = () => {
 
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
+  const [voicebots, setVoicebots] = useState<Array<{ id: number | string; name: string }>>([]);
   const [filters, setFilters] = useState(defaultFilters);
   const [data, setData] = useState<CallReportRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -230,6 +240,22 @@ const OutboundReportsPage = () => {
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadVoicebots() {
+      try {
+        const res = await getVoicebots({ page: 1, page_size: OUTBOUND_VOICEBOT_LIST_PAGE_SIZE });
+        if (!cancelled) setVoicebots(normalizeVoicebotsListResponse(res));
+      } catch {
+        if (!cancelled) setVoicebots([]);
+      }
+    }
+    loadVoicebots();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (effectiveCompanyId) fetchCampaigns(effectiveCompanyId);
@@ -442,14 +468,18 @@ const OutboundReportsPage = () => {
     setHasSearched(true);
     try {
       const activeSearch = (searchTerm ?? searchValue).trim();
-      const payload: Record<string, unknown> = {
+      const payload: PostReportsCallsPayload = {
         page_size: filters.page_size,
         page: filters.page,
       };
-      payload.company_id = effectiveCompanyId;
       if (activeSearch) payload.search = activeSearch;
       if (filters.campaign_id) {
-        payload.campaign_id = filters.campaign_id;
+        const n = Number(filters.campaign_id);
+        if (Number.isFinite(n)) payload.campaign_id = n;
+      }
+      if (filters.voicebot_id) {
+        const n = Number(filters.voicebot_id);
+        if (Number.isFinite(n)) payload.voicebot_id = n;
       }
       if (filters.call_status) payload.call_status = filters.call_status;
       if (filters.date_from) payload.date_from = filters.date_from;
@@ -479,7 +509,7 @@ const OutboundReportsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, effectiveCompanyId, searchValue]);
+  }, [filters, searchValue]);
 
   useEffect(() => {
     if (hasSearched) return;
@@ -560,6 +590,12 @@ const OutboundReportsPage = () => {
     return selectedCampaign?.name ?? String(filters.campaign_id);
   })();
 
+  const voicebotActiveLabel = (() => {
+    if (!filters.voicebot_id) return undefined;
+    const selected = voicebots.find((v) => String(v.id) === String(filters.voicebot_id));
+    return selected?.name ?? String(filters.voicebot_id);
+  })();
+
   const callStatusActiveLabel = (() => {
     if (!filters.call_status) return undefined;
     return CALL_STATUS_OPTIONS.find((option) => option.value === filters.call_status)?.label ?? filters.call_status;
@@ -584,17 +620,17 @@ const OutboundReportsPage = () => {
             searchable: true,
             active: Boolean(filters.company_id),
             activeLabel: companyActiveLabel,
-            onClear: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", page: 1 })),
+            onClear: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", voicebot_id: "", page: 1 })),
             dropdownOptions: [
               {
                 label: "All companies",
                 value: "",
-                onClick: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", page: 1 })),
+                onClick: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", voicebot_id: "", page: 1 })),
               },
               ...companies.map((company) => ({
                 label: company.name,
                 value: company.id,
-                onClick: () => setFilters((prev) => ({ ...prev, company_id: company.id, campaign_id: "", page: 1 })),
+                onClick: () => setFilters((prev) => ({ ...prev, company_id: company.id, campaign_id: "", voicebot_id: "", page: 1 })),
               })),
             ],
           } satisfies FilterPill,
@@ -618,6 +654,27 @@ const OutboundReportsPage = () => {
           label: campaign.name,
           value: String(campaign.id),
           onClick: () => setFilters((prev) => ({ ...prev, campaign_id: String(campaign.id), page: 1 })),
+        })),
+      ],
+    },
+    {
+      id: "voicebot_id",
+      label: "Voicebot",
+      showDropdown: true,
+      searchable: true,
+      active: Boolean(filters.voicebot_id),
+      activeLabel: voicebotActiveLabel,
+      onClear: () => setFilters((prev) => ({ ...prev, voicebot_id: "", page: 1 })),
+      dropdownOptions: [
+        {
+          label: "All voicebots",
+          value: "",
+          onClick: () => setFilters((prev) => ({ ...prev, voicebot_id: "", page: 1 })),
+        },
+        ...voicebots.map((v) => ({
+          label: v.name,
+          value: String(v.id),
+          onClick: () => setFilters((prev) => ({ ...prev, voicebot_id: String(v.id), page: 1 })),
         })),
       ],
     },

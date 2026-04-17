@@ -8,39 +8,36 @@ import {
   putCampaign,
   getVoicebots,
   type CreateCampaignPayload,
-  type UpdateCampaignPayload,
 } from "@utils/voicebot/outbound";
+import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID, OUTBOUND_VOICEBOT_LIST_PAGE_SIZE } from "@utils/voicebot/outboundVoicebotForm";
 import { toFormString } from "@utils/voicebot/formDisplay";
-import { GetCompanies } from "@utils/users";
 import { Form, Spinner, Tab, Row, Col, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import { useSession } from "next-auth/react";
 import PageHeader from "@components/PageHeader";
 import { FileText, Users, MessageSquare, Check, Upload, Download } from "lucide-react";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
-}
 
 interface VoicebotOption {
   id: number | string;
   name: string;
 }
 
-interface CreateCampaignFormState extends CreateCampaignPayload {
-  target_list_raw?: string;
-  campaign_script?: string;
-  custom_greeting?: string;
-  input_method?: "manual" | "csv";
+/** UI state for create/edit; API body uses `OUTBOUND_VOICEBOT_CREATE_COMPANY_ID` and ISO `schedule_time`. */
+interface CampaignFormState {
+  name: string;
+  description: string;
+  voicebot_id?: number;
+  target_list_raw: string;
+  campaign_script: string;
+  custom_greeting: string;
+  input_method: "manual" | "csv";
+  schedule_time: string;
+  failure_threshold: number;
 }
 
-const defaultForm: CreateCampaignFormState = {
-  company_id: "",
+const defaultForm: CampaignFormState = {
   name: "",
   description: "",
   voicebot_id: undefined,
@@ -48,12 +45,17 @@ const defaultForm: CreateCampaignFormState = {
   campaign_script: "",
   custom_greeting: "",
   input_method: "manual",
-  schedule_start: "",
-  schedule_end: "",
-  retry_attempts: 3,
-  retry_interval_minutes: 60,
-  status: "draft",
+  schedule_time: "",
+  failure_threshold: 5,
 };
+
+/** Normalize schedule to ISO 8601 (UTC) for API `schedule_time`. */
+function toScheduleTimeIso(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+}
 
 /** Split textarea/CSV into non-empty entries; values are sent to the API as entered (trim + strip quotes only). */
 function parseTargetListRaw(text: string): string[] {
@@ -73,14 +75,32 @@ const TABS = [
 
 interface CampaignFormPageProps {
   editCampaignId?: string;
-  editCompanyId?: string;
 }
 
-function buildFormFromCampaignDetail(detail: Record<string, unknown>, editCompanyId: string): CreateCampaignFormState {
-  const targetList = (detail.target_numbers as string[] | undefined) ?? (detail.target_list as string[] | undefined);
+function scheduleTimeForForm(detail: Record<string, unknown>): string {
+  const st = toFormString(detail.schedule_time);
+  if (st) {
+    const d = new Date(st);
+    if (!Number.isNaN(d.getTime())) {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    return st;
+  }
+  const legacy = toFormString(detail.schedule_start);
+  if (!legacy) return "";
+  const d = new Date(legacy);
+  if (Number.isNaN(d.getTime())) return legacy;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function buildFormFromCampaignDetail(detail: Record<string, unknown>): CampaignFormState {
+  const targetList =
+    (detail.target_numbers as string[] | undefined) ??
+    (detail.target_list as string[] | undefined);
   const targetListRaw = Array.isArray(targetList) ? targetList.join("\n") : "";
   return {
-    company_id: toFormString(detail.company_id ?? editCompanyId),
     name: toFormString(detail.name),
     description: toFormString(detail.description),
     voicebot_id: detail.voicebot_id == null ? undefined : Number(detail.voicebot_id),
@@ -88,93 +108,89 @@ function buildFormFromCampaignDetail(detail: Record<string, unknown>, editCompan
     campaign_script: toFormString(detail.campaign_script),
     custom_greeting: toFormString(detail.custom_greeting),
     input_method: "manual",
-    schedule_start: toFormString(detail.schedule_start),
-    schedule_end: toFormString(detail.schedule_end),
-    retry_attempts: Number(detail.retry_attempts ?? 3),
-    retry_interval_minutes: Number(detail.retry_interval_minutes ?? 60),
-    status: toFormString(detail.status) || "draft",
+    schedule_time: scheduleTimeForForm(detail),
+    failure_threshold: Number(detail.failure_threshold ?? 5),
+  };
+}
+
+function buildCampaignPayload(form: CampaignFormState): CreateCampaignPayload | null {
+  if (!form.name?.trim()) {
+    toast.error("Campaign name is required");
+    return null;
+  }
+  if (form.voicebot_id == null || Number.isNaN(Number(form.voicebot_id))) {
+    toast.error("Select a VoiceBot");
+    return null;
+  }
+  const schedule_time = toScheduleTimeIso(form.schedule_time);
+  if (!schedule_time) {
+    toast.error("Schedule time is required");
+    return null;
+  }
+  const target_numbers = parseTargetListRaw(form.target_list_raw ?? "");
+  if (target_numbers.length === 0) {
+    toast.error("Enter at least one target number (one per line or comma-separated)");
+    return null;
+  }
+  const script = (form.campaign_script ?? "").trim();
+  if (!script) {
+    toast.error("Campaign script is required");
+    return null;
+  }
+  return {
+    company_id: OUTBOUND_VOICEBOT_CREATE_COMPANY_ID,
+    voicebot_id: Number(form.voicebot_id),
+    name: form.name.trim(),
+    description: form.description?.trim() || undefined,
+    campaign_script: script,
+    custom_greeting: (form.custom_greeting ?? "").trim() || undefined,
+    target_numbers,
+    schedule_time,
+    failure_threshold: Number.isFinite(Number(form.failure_threshold))
+      ? Number(form.failure_threshold)
+      : 5,
   };
 }
 
 async function submitCampaignForm(
-  form: CreateCampaignFormState,
+  form: CampaignFormState,
   isEditMode: boolean,
   editCampaignId: string | undefined,
-  router: { push: (url: string) => void }
+  router: { push: (url: string) => void },
 ): Promise<void> {
-  if (!form.company_id || !form.name?.trim()) {
-    toast.error("Company and Campaign Name are required");
-    return;
-  }
-  if (!isEditMode && !(form.campaign_script ?? "").trim()) {
-    toast.error("Campaign Script is required");
-    return;
-  }
+  const payload = buildCampaignPayload(form);
+  if (!payload) return;
+
   if (isEditMode && editCampaignId) {
-    const payload: UpdateCampaignPayload = {
-      company_id: form.company_id || undefined,
-      name: form.name,
-      description: form.description || undefined,
-      retry_attempts: form.retry_attempts,
-      status: "draft",
-      voicebot_id: form.voicebot_id,
-      target_numbers: parseTargetListRaw(form.target_list_raw ?? ""),
-      schedule_start: form.schedule_start || undefined,
-      schedule_end: form.schedule_end || undefined,
-      retry_interval_minutes: form.retry_interval_minutes,
-      campaign_script: (form.campaign_script ?? "").trim(),
-      custom_greeting: (form.custom_greeting ?? "").trim(),
-    };
     await putCampaign(editCampaignId, payload);
     toast.success("Campaign updated");
     router.push("/voicebot/outbound/campaigns");
     return;
   }
-  const targetList = parseTargetListRaw(form.target_list_raw ?? "");
-  if (targetList.length === 0) {
-    toast.error("Enter at least one target number (one per line or comma-separated)");
-    return;
-  }
-  const payload: CreateCampaignPayload & Record<string, unknown> = {
-    company_id: form.company_id,
-    name: form.name,
-    description: form.description || undefined,
-    voicebot_id: form.voicebot_id,
-    target_numbers: targetList,
-    schedule_start: form.schedule_start || undefined,
-    schedule_end: form.schedule_end || undefined,
-    retry_attempts: form.retry_attempts,
-    retry_interval_minutes: form.retry_interval_minutes,
-    status: form.status ?? "draft",
-  };
-  
-  const script = (form.campaign_script ?? "").trim();
-  const greeting = (form.custom_greeting ?? "").trim();
-  if (script) payload.campaign_script = script;
-  if (greeting) payload.custom_greeting = greeting;
+
   await postCampaigns(payload);
+  toast.success("Campaign created");
   router.push("/voicebot/outbound/campaigns");
 }
 
 function useLoadCampaignForEdit(
   editCampaignId: string | undefined,
-  editCompanyId: string | undefined,
   isEditMode: boolean,
-  setForm: React.Dispatch<React.SetStateAction<CreateCampaignFormState>>
+  setForm: React.Dispatch<React.SetStateAction<CampaignFormState>>,
 ): boolean {
   const [loadingCampaign, setLoadingCampaign] = useState(isEditMode);
   useEffect(() => {
-    if (!isEditMode || !editCampaignId || !editCompanyId) {
+    if (!isEditMode || !editCampaignId) {
       if (isEditMode) setLoadingCampaign(false);
       return;
     }
     let cancelled = false;
     setLoadingCampaign(true);
-    getCampaign(editCampaignId, { company_id: editCompanyId })
+    getCampaign(editCampaignId)
       .then((res: Record<string, unknown>) => {
         if (cancelled) return;
         const detail = (res?.data ?? res) as Record<string, unknown>;
-        setForm(buildFormFromCampaignDetail(detail, editCompanyId));
+        setForm(buildFormFromCampaignDetail(detail));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -187,7 +203,7 @@ function useLoadCampaignForEdit(
     return () => {
       cancelled = true;
     };
-  }, [isEditMode, editCampaignId, editCompanyId, setForm]);
+  }, [isEditMode, editCampaignId, setForm]);
   return loadingCampaign;
 }
 
@@ -204,29 +220,18 @@ function useTabNavigation(activeTab: string, setActiveTab: (tab: string) => void
   return { isFirstTab, isLastTab, goPrev, goNext };
 }
 
-function parseCompaniesResponse(res: unknown): CompanyOption[] {
-  if (res === false) return [];
+function parseVoicebotsResponse(res: unknown): VoicebotOption[] {
   const list = Array.isArray(res)
     ? res
     : (res as { results?: Record<string, unknown>[] })?.results ??
       (res as { data?: Record<string, unknown>[] })?.data ??
       [];
   const arr = Array.isArray(list) ? list : [];
-  return arr.map((c) => {
-    const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
-    const id = item.company_id ?? item.identifier ?? item.id ?? "";
-    return { id, company_id: item.company_id ?? item.identifier ?? item.id, name: item.name ?? "" };
+  return arr.map((v) => {
+    const row = v as { id?: number | string; bot_id?: number | string; name?: string };
+    const id = row.id ?? row.bot_id ?? "";
+    return { id, name: row.name ?? "" };
   });
-}
-
-function parseVoicebotsResponse(res: unknown): VoicebotOption[] {
-  const list = Array.isArray(res)
-    ? res
-    : (res as { results?: { id?: number; name?: string }[] })?.results ??
-      (res as { data?: { id?: number; name?: string }[] })?.data ??
-      [];
-  const arr = Array.isArray(list) ? list : [];
-  return arr.map((v) => ({ id: v.id ?? "", name: (v as { name?: string }).name ?? "" }));
 }
 
 interface ValidationItem {
@@ -235,8 +240,12 @@ interface ValidationItem {
   checked: boolean;
 }
 
-function buildValidationItems(form: CreateCampaignFormState, targetCount: number): ValidationItem[] {
-  const basicOk = Boolean(form.name?.trim() && form.company_id && (form.voicebot_id != null || true));
+function buildValidationItems(form: CampaignFormState, targetCount: number): ValidationItem[] {
+  const basicOk = Boolean(
+    form.name?.trim() &&
+      form.voicebot_id != null &&
+      (form.schedule_time ?? "").trim(),
+  );
   const scriptOk = Boolean((form.campaign_script ?? "").trim());
   return [
     { id: "basic", label: "Basic Information", checked: basicOk },
@@ -245,33 +254,17 @@ function buildValidationItems(form: CreateCampaignFormState, targetCount: number
   ];
 }
 
-function renderCompanyOptions(
-  companies: CompanyOption[],
-  isAdmin: boolean,
-  userCompanyIdentifier: string,
-  userCompanyName: string
-): React.ReactNode {
-  if (isAdmin) return companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>);
-  if (userCompanyIdentifier) return <option value={userCompanyIdentifier}>{userCompanyName || userCompanyIdentifier}</option>;
-  return null;
-}
-
 const inputStyle = { width: "100%" as const, padding: "10px 12px", border: "1px solid #e5e7eb", borderRadius: "6px", fontSize: "14px", color: "#1f2937" };
 const labelStyle = { display: "block" as const, fontSize: "13px", fontWeight: 500 as const, color: "#6b7280", marginBottom: "6px" };
 
 interface CampaignFormBodyProps {
   isEditMode: boolean;
   loadingCampaign: boolean;
-  form: CreateCampaignFormState;
-  setForm: React.Dispatch<React.SetStateAction<CreateCampaignFormState>>;
+  form: CampaignFormState;
+  setForm: React.Dispatch<React.SetStateAction<CampaignFormState>>;
   activeTab: string;
   setActiveTab: (tab: string) => void;
-  companies: CompanyOption[];
   voicebots: VoicebotOption[];
-  loadingCompanies: boolean;
-  isAdmin: boolean;
-  userCompanyIdentifier: string;
-  userCompanyName: string;
   validationItems: ValidationItem[];
   targetCount: number;
   isFirstTab: boolean;
@@ -294,12 +287,7 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
     setForm,
     activeTab,
     setActiveTab,
-    companies,
     voicebots,
-    loadingCompanies,
-    isAdmin,
-    userCompanyIdentifier,
-    userCompanyName,
     validationItems,
     targetCount,
     isFirstTab,
@@ -321,7 +309,13 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
       </div>
     );
   }
-  const isSubmitDisabled = submitting || !form.company_id || !form.name?.trim() || (isEditMode ? false : (!(form.campaign_script ?? "").trim() || targetCount === 0));
+  const isSubmitDisabled =
+    submitting ||
+    !form.name?.trim() ||
+    form.voicebot_id == null ||
+    !(form.schedule_time ?? "").trim() ||
+    !(form.campaign_script ?? "").trim() ||
+    targetCount === 0;
   return (
     <>
       <div className="content-grid campaign-create-grid" style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: "24px", alignItems: "start" }}>
@@ -343,33 +337,56 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
                       </Form.Group>
                     </Col>
                     <Col md={6}>
-                      {isAdmin ? (
-                        <Form.Group className="mb-3">
-                          <Form.Label style={labelStyle}>Company <span className="text-danger">*</span></Form.Label>
-                          <Form.Select
-                            value={form.company_id}
-                            onChange={(e) => setForm((f) => ({ ...f, company_id: e.target.value }))}
-                            required
-                            disabled={loadingCompanies}
-                            style={inputStyle}
-                          >
-                            <option value="">Select company</option>
-                            {renderCompanyOptions(companies, true, userCompanyIdentifier, userCompanyName)}
-                          </Form.Select>
-                        </Form.Group>
-                      ) : null}
                       <Form.Group className="mb-3">
-                        <Form.Label style={labelStyle}>Select VoiceBot</Form.Label>
-                        <Form.Select value={form.voicebot_id ?? ""} onChange={(e) => setForm((f) => ({ ...f, voicebot_id: e.target.value ? Number(e.target.value) : undefined }))} style={inputStyle}>
+                        <Form.Label style={labelStyle}>
+                          Select VoiceBot <span className="text-danger">*</span>
+                        </Form.Label>
+                        <Form.Select
+                          value={form.voicebot_id ?? ""}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              voicebot_id: e.target.value ? Number(e.target.value) : undefined,
+                            }))
+                          }
+                          style={inputStyle}
+                        >
                           <option value="">—</option>
-                          {voicebots.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                          {voicebots.map((v) => (
+                            <option key={String(v.id)} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
                         </Form.Select>
                       </Form.Group>
                       <Form.Group className="mb-3">
-                        <Form.Label style={labelStyle}>Status</Form.Label>
-                        <Form.Select value={form.status ?? "draft"} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} style={inputStyle}>
-                          <option value="draft">Draft</option>
-                        </Form.Select>
+                        <Form.Label style={labelStyle}>
+                          Schedule time <span className="text-danger">*</span>
+                        </Form.Label>
+                        <Form.Control
+                          type="datetime-local"
+                          value={form.schedule_time}
+                          onChange={(e) =>
+                            setForm((f) => ({ ...f, schedule_time: e.target.value }))
+                          }
+                          style={inputStyle}
+                        />
+                        <Form.Text className="text-muted">Sent to API as ISO 8601 UTC (e.g. 2026-06-01T09:00:00Z)</Form.Text>
+                      </Form.Group>
+                      <Form.Group className="mb-3">
+                        <Form.Label style={labelStyle}>Failure threshold</Form.Label>
+                        <Form.Control
+                          type="number"
+                          min={0}
+                          value={form.failure_threshold}
+                          onChange={(e) =>
+                            setForm((f) => ({
+                              ...f,
+                              failure_threshold: e.target.value ? Number(e.target.value) : 5,
+                            }))
+                          }
+                          style={inputStyle}
+                        />
                       </Form.Group>
                     </Col>
                   </Row>
@@ -491,24 +508,17 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
 }
 
 const CampaignCreatePage = (props: CampaignFormPageProps) => {
-  const { editCampaignId, editCompanyId } = props;
+  const { editCampaignId } = props;
   const router = useRouter();
-  const { data: session } = useSession();
-  const isAdmin = String(session?.user?.is_admin ?? "") === "1";
-  const userCompanyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier ?? "";
-  const userCompanyName = (session?.user as { company_name?: string })?.company_name ?? userCompanyIdentifier;
-
-  const isEditMode = Boolean(editCampaignId && editCompanyId);
+  const isEditMode = Boolean(editCampaignId);
 
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
-  const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [voicebots, setVoicebots] = useState<VoicebotOption[]>([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(isAdmin);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState<CreateCampaignFormState>({ ...defaultForm });
+  const [form, setForm] = useState<CampaignFormState>({ ...defaultForm });
   const csvInputRef = React.useRef<HTMLInputElement>(null);
 
-  const loadingCampaign = useLoadCampaignForEdit(editCampaignId, editCompanyId, isEditMode, setForm);
+  const loadingCampaign = useLoadCampaignForEdit(editCampaignId, isEditMode, setForm);
   const { isFirstTab, isLastTab, goPrev, goNext } = useTabNavigation(activeTab, setActiveTab);
 
   const handleCsvFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -536,32 +546,9 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
     URL.revokeObjectURL(url);
   };
 
-  const fetchCompanies = useCallback(async () => {
-    if (!isAdmin) {
-      setCompanies([]);
-      setLoadingCompanies(false);
-      return;
-    }
-    setLoadingCompanies(true);
+  const fetchVoicebots = useCallback(async () => {
     try {
-      const res = await GetCompanies();
-      const opts = parseCompaniesResponse(res);
-      setCompanies(opts);
-      if (opts.length > 0 && !form.company_id && !editCampaignId) setForm((f) => ({ ...f, company_id: opts[0].id }));
-    } catch {
-      setCompanies([]);
-    } finally {
-      setLoadingCompanies(false);
-    }
-  }, [editCampaignId, isAdmin, form.company_id]);
-
-  const fetchVoicebots = useCallback(async (companyId: string) => {
-    if (!companyId) {
-      setVoicebots([]);
-      return;
-    }
-    try {
-      const res = await getVoicebots({ company_id: companyId });
+      const res = await getVoicebots({ page: 1, page_size: OUTBOUND_VOICEBOT_LIST_PAGE_SIZE });
       setVoicebots(parseVoicebotsResponse(res));
     } catch {
       setVoicebots([]);
@@ -569,19 +556,8 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
   }, []);
 
   useEffect(() => {
-    fetchCompanies();
-  }, [fetchCompanies]);
-
-  useEffect(() => {
-    if (!isAdmin && userCompanyIdentifier) {
-      setForm((f) => ({ ...f, company_id: userCompanyIdentifier }));
-    }
-  }, [isAdmin, userCompanyIdentifier]);
-
-  useEffect(() => {
-    if (form.company_id) fetchVoicebots(form.company_id);
-    else setVoicebots([]);
-  }, [form.company_id, fetchVoicebots]);
+    fetchVoicebots();
+  }, [fetchVoicebots]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -652,12 +628,7 @@ const CampaignCreatePage = (props: CampaignFormPageProps) => {
             setForm={setForm}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
-            companies={companies}
             voicebots={voicebots}
-            loadingCompanies={loadingCompanies}
-            isAdmin={isAdmin}
-            userCompanyIdentifier={userCompanyIdentifier}
-            userCompanyName={userCompanyName}
             validationItems={validationItems}
             targetCount={targetCount}
             isFirstTab={isFirstTab}

@@ -342,6 +342,16 @@ export const getCallsStats = async (params?: GetCallsStatsParams) => {
   return response.data;
 };
 
+// ---------------------------------------------------------------------------
+// Analytics
+// ---------------------------------------------------------------------------
+
+/** GET /analytics/summary/ - Aggregated analytics summary for inbound */
+export const getAnalyticsSummary = async () => {
+  const response = await axiosInstance.get(`${PREFIX}/analytics/summary/`);
+  return response.data;
+};
+
 /** GET /calls/{callId}/ - Get call details */
 export const getCall = async (callId: string) => {
   const response = await axiosInstance.get(`${PREFIX}/calls/${callId}/`);
