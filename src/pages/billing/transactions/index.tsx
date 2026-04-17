@@ -9,12 +9,55 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { GetPayments } from "@utils/accounting";
 import { getMinifiedCompanies } from "@utils/crm";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 import moment from "moment";
 import { GlobalDateFormat } from "@utils/Helper";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import ColumnEditorModal from "@components/ColumnEditorModal";
+
+const BILLING_TRANSACTIONS_COLUMN_STORAGE_KEY = "billing-transactions-columns";
+const DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS: string[] = [
+  "date_issued",
+  "details",
+  "transaction_number",
+  "subscriptions",
+  "payment_method",
+  "amount",
+  "status",
+];
+
+function parseStoredTransactionColumnKeys(raw: string | null): string[] | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    const allowed = new Set(DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS);
+    const keys = parsed.filter(
+      (k): k is string => typeof k === "string" && allowed.has(k),
+    );
+    return keys.length > 0 ? keys : null;
+  } catch {
+    return null;
+  }
+}
+
+function loadTransactionTableColumnsFromStorage(): string[] {
+  const win = (globalThis as unknown as { window?: Window & { localStorage: Storage } }).window;
+  if (win === undefined) {
+    return [...DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS];
+  }
+  const stored = parseStoredTransactionColumnKeys(
+    win.localStorage.getItem(BILLING_TRANSACTIONS_COLUMN_STORAGE_KEY),
+  );
+  return stored ?? [...DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS];
+}
 
 const ProductDetails = () => {
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
@@ -36,6 +79,10 @@ const ProductDetails = () => {
 
   const [transactionSearch, setTransactionSearch] = useState("");
   const [totalAllTransactions, setTotalAllTransactions] = useState(0);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => [
+    ...DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS,
+  ]);
 
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -56,6 +103,10 @@ const ProductDetails = () => {
     rowsPerPage: 15,
     totalRows: 0,
   });
+
+  useEffect(() => {
+    setSelectedColumns(loadTransactionTableColumnsFromStorage());
+  }, []);
 
   // Sync search bar value → currentFilters so fetch re-runs
   useEffect(() => {
@@ -315,12 +366,11 @@ const ProductDetails = () => {
         removable: false,
       },
     ],
-    onTabAdd: () => {},
     onTabRemove: () => {},
     tabsDropdownLabel: "Transactions",
     onFiltersClick: handleOpenFiltersSidebar,
     onExportClick: () => {},
-    onEditColumnsClick: () => {},
+    onEditColumnsClick: () => setShowColumnEditor(true),
     showImport: false,
     onImportClick: () => {},
     currentTableView: "table",
@@ -393,7 +443,7 @@ const ProductDetails = () => {
 
       <GenericTable
         data={dataList}
-        columns={tableColumns}
+        columns={tableColumns.filter((c) => selectedColumns.includes(c.key))}
         pagination={{
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
@@ -413,17 +463,16 @@ const ProductDetails = () => {
         loadingMessage="Loading transactions..."
         hover={true}
         uniqueKey="id"
-        customizableColumns={true}
-        columnStorageKey="billing-transactions-columns"
         fixedHeight={true}
         maxHeight="calc(100vh - 345px)"
         showToolbar={true}
         toolbar={{
           ...transactionsToolbarConfig,
-          showFilterPills: true,
+          tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
+          showFilterPills: false,
           filterPills: transactionFilterPills,
-          showMoreFiltersButton: true,
-          onAdvancedFiltersClick: handleOpenFiltersSidebar,
+          showMoreFiltersButton: false,
+          showAdvancedFilters: false,
         }}
       />
 
@@ -444,6 +493,24 @@ const ProductDetails = () => {
           setTransactionSearch("");
           setPagination((prev) => ({ ...prev, currentPage: 1 }));
           setRefreshKey((k) => k + 1);
+        }}
+      />
+
+      <ColumnEditorModal
+        show={showColumnEditor}
+        onHide={() => setShowColumnEditor(false)}
+        title="Customize Columns"
+        columns={tableColumns.map((c) => ({ key: c.key, label: c.label }))}
+        selectedColumnKeys={selectedColumns}
+        onApply={(keys: string[]) => {
+          setSelectedColumns(keys);
+          const w = (globalThis as unknown as { window?: Window }).window;
+          if (w) {
+            w.localStorage.setItem(
+              BILLING_TRANSACTIONS_COLUMN_STORAGE_KEY,
+              JSON.stringify(keys),
+            );
+          }
         }}
       />
         </div>{/* End main content area */}
