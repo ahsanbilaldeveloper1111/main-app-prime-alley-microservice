@@ -19,8 +19,8 @@ export const sidebarGroups: SidebarGroup[] = [
   {
     heading: 'Your Preferences',
     items: [
-      { id: 'general-prefs', label: 'General' },
-      { id: 'notifications', label: 'Notifications'},
+      { id: 'general-prefs', label: 'General', permission: PERMISSIONS.VIEW_GENERAL_SETTINGS },
+      { id: 'notifications', label: 'Notifications', permission: PERMISSIONS.VIEW_NOTIFICATIONS_SETTINGS },
     ],
   },
   {
