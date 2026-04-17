@@ -442,7 +442,8 @@ MENU_COLORS: {
     VIEW_HELP_CENTER: 'view-help-center-general-general',
     SET_COMPANY_IMAGE_USERS: 'set-company-image-users',
     MANAGE_HELP_CENTER: 'manage-help-center-general-general',
-
+    VIEW_GENERAL_SETTINGS: 'view-general-settings-general',
+    VIEW_NOTIFICATIONS_SETTINGS: 'view-notification-settings-general',
     //AI chat permissions start
     VIEW_TOOLS_PROFILE_AI_CHAT: 'view-tools-profile-ai-chat',
     ADD_TOOL_PROFILE_AI_CHAT: 'add-tool-profile-ai-chat',

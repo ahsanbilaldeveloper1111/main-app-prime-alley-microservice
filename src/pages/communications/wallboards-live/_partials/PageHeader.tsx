@@ -39,7 +39,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
               <div className="d-flex flex-wrap align-items-center gap-2 w-100 w-md-auto justify-content-start justify-content-md-end">
              
 
-<Link href="/live-monitoring">
+{session?.user?.permissions?.includes('view-live-wallboard-beta-cti') && <Link href="/live-monitoring">
   <Button
     variant="outline-secondary"
     size="sm"
@@ -53,7 +53,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   >
     <span>New View (BETA)</span>
   </Button>
-</Link>
+</Link>}
                 <Button 
                    variant="outline-secondary" 
                   size="sm"
