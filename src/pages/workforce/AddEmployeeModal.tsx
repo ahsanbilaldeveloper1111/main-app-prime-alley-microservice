@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, Form, Modal } from "react-bootstrap";
+import { Form } from "react-bootstrap";
+import { X } from "lucide-react";
 import Select from "@components/AppSelect";
 import { Country } from "country-state-city";
 import { toast } from "react-toastify";
@@ -117,7 +118,11 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   }, [onHide, resetFormState]);
 
   const mainAppDepartmentOptions = useMemo(
-    () => (mainAppDepartments ?? []).map((d) => ({ value: String(d.id), label: String(d.name ?? "—") })),
+    () =>
+      (mainAppDepartments ?? []).map((d: { id?: string | number; name?: string }) => ({
+        value: String(d.id ?? ""),
+        label: String(d.name ?? "—"),
+      })),
     [mainAppDepartments]
   );
 
@@ -202,113 +207,288 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     }
   };
 
-  return (
-    <Modal size="lg" show={show} onHide={handleCancelClick} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>{title}</Modal.Title>
-      </Modal.Header>
-      <Form onSubmit={handleSubmit}>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Department <span className="text-danger">*</span> </Form.Label>
-            <Select<{ value: string; label: string }>
-              className="basic-single"
-              classNamePrefix="select"
-              placeholder={loadingDepartments ? "Loading departments…" : "Select department"}
-              isClearable
-              isSearchable
-              isDisabled={loadingDepartments}
-              isLoading={loadingDepartments}
-              options={mainAppDepartmentOptions}
-              value={mainAppDepartmentOptions.find((o) => o.value === String(form.department_id ?? "")) ?? null}
-              resetSearchOnValueChange={show}
-              onChange={(opt) => {
-                const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
-                setForm((f) => ({ ...f, department_id: deptId, user_id: "" }));
-                if (deptId == null) {
-                  setDepartmentUsers([]);
-                  return;
-                }
-                fetchUsersByDepartment(deptId);
-              }}
-              styles={employeeModalReactSelectStyles}
-            />
-            {loadingDepartments && <Form.Text className="text-muted">Loading…</Form.Text>}
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>User <span className="text-danger">*</span> </Form.Label>
-            <Select<{ value: string; label: string }>
-              className="basic-single"
-              classNamePrefix="select"
-              placeholder={userSelectPlaceholder}
-              isClearable
-              isSearchable
-              isDisabled={!hasDepartmentSelected || userOptionsLoading}
-              isLoading={userOptionsLoading}
-              options={mainAppUserOptions}
-              value={mainAppUserOptions.find((o) => o.value === (form.user_id ?? "")) ?? null}
-              resetSearchOnValueChange={show}
-              onChange={(opt) => setForm((f) => ({ ...f, user_id: opt?.value ?? "" }))}
-              styles={employeeModalReactSelectStyles}
-            />
-            {!userOptionsLoading && hasDepartmentSelected && mainAppUserOptions.length === 0 && (
-              <Form.Text className="text-muted">No users available for this department.</Form.Text>
-            )}
-          </Form.Group>
-          <EmployeeModalProfileFields
-            form={form}
-            setForm={setForm}
-            phoneShowInvalid={phoneShowInvalid}
-            phoneDefaultCountry="US"
-            phoneHelpText="Select country (e.g. +92) then enter a complete phone number."
-            employmentSelectRequired
-          />
+  if (!show) return null;
 
-          <EmployeeModalAddressSection
-            addresses={addresses}
-            addressCountries={addressCountries}
-            getRowId={(a) => a.uiId}
-            onAddAddress={() => setAddresses((prev) => [...prev, createDefaultAddress()])}
-            onRemoveRow={removeAddressById}
-            onUpdateField={updateAddressField}
-            onCountryChange={(rowId, opt) =>
-              updateAddressPatch(rowId, {
-                country: opt?.label ?? "",
-                countryCode: opt?.value ?? "",
-                state: "",
-                stateCode: "",
-                city: "",
-              })
-            }
-            onStateChange={(rowId, opt) =>
-              updateAddressPatch(rowId, {
-                state: opt?.label ?? "",
-                stateCode: opt?.value ?? "",
-                city: "",
-              })
-            }
-            allowAdHocCityOption={false}
-          />
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCancelClick} type="button">
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            type="submit"
-            disabled={
-              submitting ||
-              !requiredValidation.ok ||
-              !addressRowsValidation.ok ||
-              !phoneFieldValid
-            }
+  return (
+    <>
+      <style>
+        {`
+          .add-employee-sidebar {
+            font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+            color: #141414;
+          }
+          .add-employee-sidebar .form-control,
+          .add-employee-sidebar .form-select,
+          .add-employee-sidebar input,
+          .add-employee-sidebar select,
+          .add-employee-sidebar textarea {
+            font-size: 14px;
+            color: #141414;
+          }
+          .add-employee-sidebar .form-control,
+          .add-employee-sidebar .form-select,
+          .add-employee-sidebar input,
+          .add-employee-sidebar select {
+            min-height: 40px;
+          }
+          .add-employee-sidebar .select__control {
+            min-height: 40px;
+            border-color: #8a8a8a;
+            border-radius: 4px;
+          }
+          .add-employee-sidebar .select__value-container,
+          .add-employee-sidebar .select__indicators {
+            min-height: 40px;
+          }
+        `}
+      </style>
+
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1000,
+          background: "transparent",
+        }}
+        aria-hidden="true"
+      />
+
+      <div
+        className="add-employee-sidebar"
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          width: "600px",
+          height: "100vh",
+          backgroundColor: "#ffffff",
+          boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+          zIndex: 999999,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            padding: "20px 24px",
+            borderBottom: "1px solid #eaf0f6",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: "20px",
+              fontWeight: 600,
+              color: "#141414",
+              margin: 0,
+            }}
           >
-            {submitting ? "Creating…" : "Create"}
-          </Button>
-        </Modal.Footer>
-      </Form>
-    </Modal>
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={handleCancelClick}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "4px",
+              cursor: "pointer",
+              color: "#718096",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <Form
+          onSubmit={handleSubmit}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "40px",
+            }}
+          >
+            <Form.Group className="mb-3">
+              <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+                Department <span className="text-danger">*</span>
+              </Form.Label>
+              <Select<{ value: string; label: string }>
+                className="basic-single"
+                classNamePrefix="select"
+                placeholder={loadingDepartments ? "Loading departments..." : "Select department"}
+                isClearable
+                isSearchable
+                isDisabled={loadingDepartments}
+                isLoading={loadingDepartments}
+                options={mainAppDepartmentOptions}
+                value={
+                  mainAppDepartmentOptions.find(
+                    (o: { value: string; label: string }) =>
+                      o.value === String(form.department_id ?? ""),
+                  ) ?? null
+                }
+                resetSearchOnValueChange={show}
+                onChange={(opt: { value: string; label: string } | null) => {
+                  const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
+                  setForm((f: Partial<UserProfilePayload>) => ({ ...f, department_id: deptId, user_id: "" }));
+                  if (deptId == null) {
+                    setDepartmentUsers([]);
+                    return;
+                  }
+                  fetchUsersByDepartment(deptId);
+                }}
+                styles={employeeModalReactSelectStyles}
+              />
+              {loadingDepartments && <Form.Text className="text-muted">Loading...</Form.Text>}
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+                User <span className="text-danger">*</span>
+              </Form.Label>
+              <Select<{ value: string; label: string }>
+                className="basic-single"
+                classNamePrefix="select"
+                placeholder={userSelectPlaceholder}
+                isClearable
+                isSearchable
+                isDisabled={!hasDepartmentSelected || userOptionsLoading}
+                isLoading={userOptionsLoading}
+                options={mainAppUserOptions}
+                value={
+                  mainAppUserOptions.find(
+                    (o: { value: string; label: string }) =>
+                      o.value === (form.user_id ?? ""),
+                  ) ?? null
+                }
+                resetSearchOnValueChange={show}
+                onChange={(opt: { value: string; label: string } | null) =>
+                  setForm((f: Partial<UserProfilePayload>) => ({
+                    ...f,
+                    user_id: opt?.value ?? "",
+                  }))
+                }
+                styles={employeeModalReactSelectStyles}
+              />
+              {!userOptionsLoading && hasDepartmentSelected && mainAppUserOptions.length === 0 && (
+                <Form.Text className="text-muted">No users available for this department.</Form.Text>
+              )}
+            </Form.Group>
+
+            <EmployeeModalProfileFields
+              form={form}
+              setForm={setForm}
+              phoneShowInvalid={phoneShowInvalid}
+              phoneDefaultCountry="US"
+              phoneHelpText="Select country (e.g. +92) then enter a complete phone number."
+              employmentSelectRequired
+            />
+
+            <EmployeeModalAddressSection
+              addresses={addresses}
+              addressCountries={addressCountries}
+              getRowId={(a: AddressFormItemWithId) => a.uiId}
+              onAddAddress={() => setAddresses((prev) => [...prev, createDefaultAddress()])}
+              onRemoveRow={removeAddressById}
+              onUpdateField={updateAddressField}
+              onCountryChange={(
+                rowId: string,
+                opt: { label?: string; value?: string } | null,
+              ) =>
+                updateAddressPatch(rowId, {
+                  country: opt?.label ?? "",
+                  countryCode: opt?.value ?? "",
+                  state: "",
+                  stateCode: "",
+                  city: "",
+                })
+              }
+              onStateChange={(
+                rowId: string,
+                opt: { label?: string; value?: string } | null,
+              ) =>
+                updateAddressPatch(rowId, {
+                  state: opt?.label ?? "",
+                  stateCode: opt?.value ?? "",
+                  city: "",
+                })
+              }
+              allowAdHocCityOption={false}
+            />
+          </div>
+
+          <div
+            style={{
+              padding: "16px 24px",
+              borderTop: "1px solid #eaf0f6",
+              display: "flex",
+              gap: "12px",
+              justifyContent: "flex-start",
+            }}
+          >
+            <button
+              type="submit"
+              disabled={
+                submitting ||
+                !requiredValidation.ok ||
+                !addressRowsValidation.ok ||
+                !phoneFieldValid
+              }
+              style={{
+                padding: "10px 20px",
+                backgroundColor:
+                  submitting || !requiredValidation.ok || !addressRowsValidation.ok || !phoneFieldValid
+                    ? "#cbd5e0"
+                    : "#0091ae",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor:
+                  submitting || !requiredValidation.ok || !addressRowsValidation.ok || !phoneFieldValid
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+            >
+              {submitting ? "Creating..." : "Create"}
+            </button>
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleCancelClick}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: "transparent",
+                color: "#141414",
+                border: "1px solid #8a8a8a",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor: submitting ? "not-allowed" : "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </Form>
+      </div>
+    </>
   );
 };
 
