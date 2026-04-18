@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Form } from "react-bootstrap";
 import { X } from "lucide-react";
 import Select from "@components/AppSelect";
@@ -25,6 +25,8 @@ import {
 export type AddressFormItem = EmployeeModalAddressBase;
 type AddressFieldKey = EmployeeModalAddressFieldKey;
 type AddressFormItemWithId = AddressFormItem & { uiId: string };
+type EmployeeSelectOption = { value: string; label: string };
+type AddressSelectOption = { label?: string; value?: string } | null;
 
 export interface AddEmployeeModalProps {
   show: boolean;
@@ -50,6 +52,132 @@ const defaultForm: Partial<UserProfilePayload> = {
   phone: "",
   status: "active",
 };
+
+const sidebarLabelStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 600,
+  color: "#141414",
+};
+
+const sidebarPanelStyle: CSSProperties = {
+  position: "fixed",
+  top: 0,
+  right: 0,
+  width: "600px",
+  height: "100vh",
+  backgroundColor: "#ffffff",
+  boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+  zIndex: 999999,
+  display: "flex",
+  flexDirection: "column",
+};
+
+const sidebarHeaderStyle: CSSProperties = {
+  padding: "20px 24px",
+  borderBottom: "1px solid #eaf0f6",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+const sidebarTitleStyle: CSSProperties = {
+  fontSize: "20px",
+  fontWeight: 600,
+  color: "#141414",
+  margin: 0,
+};
+
+const sidebarCloseButtonStyle: CSSProperties = {
+  background: "transparent",
+  border: "none",
+  padding: "4px",
+  cursor: "pointer",
+  color: "#718096",
+  display: "flex",
+  alignItems: "center",
+};
+
+const sidebarFormStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  flex: 1,
+  minHeight: 0,
+};
+
+const sidebarContentStyle: CSSProperties = {
+  flex: 1,
+  overflowY: "auto",
+  padding: "40px",
+};
+
+const sidebarFooterStyle: CSSProperties = {
+  padding: "16px 24px",
+  borderTop: "1px solid #eaf0f6",
+  display: "flex",
+  gap: "12px",
+  justifyContent: "flex-start",
+};
+
+const sidebarSecondaryButtonStyle: CSSProperties = {
+  padding: "10px 20px",
+  backgroundColor: "transparent",
+  color: "#141414",
+  border: "1px solid #8a8a8a",
+  borderRadius: "4px",
+  fontSize: "14px",
+  fontWeight: 500,
+};
+
+function getEmployeeUserSelectPlaceholder(
+  hasDepartmentSelected: boolean,
+  userOptionsLoading: boolean,
+): string {
+  if (!hasDepartmentSelected) return "Select department first";
+  if (userOptionsLoading) return "Loading users…";
+  return "Select user";
+}
+
+function findSelectedOption(
+  options: EmployeeSelectOption[],
+  selectedValue: string,
+): EmployeeSelectOption | null {
+  return options.find((option: EmployeeSelectOption) => option.value === selectedValue) ?? null;
+}
+
+function createCountryAddressPatch(
+  option: AddressSelectOption,
+): Partial<AddressFormItemWithId> {
+  return {
+    country: option?.label ?? "",
+    countryCode: option?.value ?? "",
+    state: "",
+    stateCode: "",
+    city: "",
+  };
+}
+
+function createStateAddressPatch(
+  option: AddressSelectOption,
+): Partial<AddressFormItemWithId> {
+  return {
+    state: option?.label ?? "",
+    stateCode: option?.value ?? "",
+    city: "",
+  };
+}
+
+function getPrimaryButtonStyle(isDisabled: boolean): CSSProperties {
+  return {
+    padding: "10px 20px",
+    backgroundColor: isDisabled ? "#cbd5e0" : "#0091ae",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "4px",
+    fontSize: "14px",
+    fontWeight: 500,
+    cursor: isDisabled ? "not-allowed" : "pointer",
+  };
+}
 
 const createDefaultAddress = (): AddressFormItemWithId => ({
   uiId: createEmployeeModalAddressUiId(),
@@ -131,16 +259,11 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
     if (!hasDepartmentSelected) {
       return [];
     }
-    return departmentUsers.map((u) => ({ value: u.phone, label: `${u.name} (${u.phone})` }));
+    return departmentUsers.map((u: DepartmentUserRow) => ({ value: u.phone, label: `${u.name} (${u.phone})` }));
   }, [hasDepartmentSelected, departmentUsers]);
 
   const userOptionsLoading = hasDepartmentSelected ? loadingDepartmentUsers : false;
-  let userSelectPlaceholder = "Select user";
-  if (!hasDepartmentSelected) {
-    userSelectPlaceholder = "Select department first";
-  } else if (userOptionsLoading) {
-    userSelectPlaceholder = "Loading users…";
-  }
+  const userSelectPlaceholder = getEmployeeUserSelectPlaceholder(hasDepartmentSelected, userOptionsLoading);
 
   const removeAddressById = useCallback((addressId: string) => {
     setAddresses((prev) => prev.filter((addr) => addr.uiId !== addressId));
@@ -161,6 +284,8 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
   const addressRowsValidation = useMemo(() => validateEmployeeModalAddressRows(addresses), [addresses]);
   const phoneFieldValid = useMemo(() => isOptionalWorkforcePhoneValid(form.phone), [form.phone]);
   const phoneShowInvalid = Boolean(form.phone?.toString().trim()) && !phoneFieldValid;
+  const isPrimaryDisabled =
+    submitting || !requiredValidation.ok || !addressRowsValidation.ok || !phoneFieldValid;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,76 +383,28 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
 
       <div
         className="add-employee-sidebar"
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: "600px",
-          height: "100vh",
-          backgroundColor: "#ffffff",
-          boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
-          zIndex: 999999,
-          display: "flex",
-          flexDirection: "column",
-        }}
+        style={sidebarPanelStyle}
       >
-        <div
-          style={{
-            padding: "20px 24px",
-            borderBottom: "1px solid #eaf0f6",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "20px",
-              fontWeight: 600,
-              color: "#141414",
-              margin: 0,
-            }}
-          >
+        <div style={sidebarHeaderStyle}>
+          <h2 style={sidebarTitleStyle}>
             {title}
           </h2>
           <button
             type="button"
             onClick={handleCancelClick}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "4px",
-              cursor: "pointer",
-              color: "#718096",
-              display: "flex",
-              alignItems: "center",
-            }}
+            style={sidebarCloseButtonStyle}
           >
             <X size={24} />
           </button>
         </div>
 
-        <Form
-          onSubmit={handleSubmit}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: "40px",
-            }}
-          >
+        <Form onSubmit={handleSubmit} style={sidebarFormStyle}>
+          <div style={sidebarContentStyle}>
             <Form.Group className="mb-3">
-              <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+              <Form.Label style={sidebarLabelStyle}>
                 Department <span className="text-danger">*</span>
               </Form.Label>
-              <Select<{ value: string; label: string }>
+              <Select<EmployeeSelectOption>
                 className="basic-single"
                 classNamePrefix="select"
                 placeholder={loadingDepartments ? "Loading departments..." : "Select department"}
@@ -337,13 +414,13 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                 isLoading={loadingDepartments}
                 options={mainAppDepartmentOptions}
                 value={
-                  mainAppDepartmentOptions.find(
-                    (o: { value: string; label: string }) =>
-                      o.value === String(form.department_id ?? ""),
-                  ) ?? null
+                  findSelectedOption(
+                    mainAppDepartmentOptions,
+                    String(form.department_id ?? ""),
+                  )
                 }
                 resetSearchOnValueChange={show}
-                onChange={(opt: { value: string; label: string } | null) => {
+                onChange={(opt: EmployeeSelectOption | null) => {
                   const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
                   setForm((f: Partial<UserProfilePayload>) => ({ ...f, department_id: deptId, user_id: "" }));
                   if (deptId == null) {
@@ -358,10 +435,10 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+              <Form.Label style={sidebarLabelStyle}>
                 User <span className="text-danger">*</span>
               </Form.Label>
-              <Select<{ value: string; label: string }>
+              <Select<EmployeeSelectOption>
                 className="basic-single"
                 classNamePrefix="select"
                 placeholder={userSelectPlaceholder}
@@ -371,13 +448,13 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
                 isLoading={userOptionsLoading}
                 options={mainAppUserOptions}
                 value={
-                  mainAppUserOptions.find(
-                    (o: { value: string; label: string }) =>
-                      o.value === (form.user_id ?? ""),
-                  ) ?? null
+                  findSelectedOption(
+                    mainAppUserOptions,
+                    String(form.user_id ?? ""),
+                  )
                 }
                 resetSearchOnValueChange={show}
-                onChange={(opt: { value: string; label: string } | null) =>
+                onChange={(opt: EmployeeSelectOption | null) =>
                   setForm((f: Partial<UserProfilePayload>) => ({
                     ...f,
                     user_id: opt?.value ?? "",
@@ -408,63 +485,25 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               onUpdateField={updateAddressField}
               onCountryChange={(
                 rowId: string,
-                opt: { label?: string; value?: string } | null,
+                opt: AddressSelectOption,
               ) =>
-                updateAddressPatch(rowId, {
-                  country: opt?.label ?? "",
-                  countryCode: opt?.value ?? "",
-                  state: "",
-                  stateCode: "",
-                  city: "",
-                })
+                updateAddressPatch(rowId, createCountryAddressPatch(opt))
               }
               onStateChange={(
                 rowId: string,
-                opt: { label?: string; value?: string } | null,
+                opt: AddressSelectOption,
               ) =>
-                updateAddressPatch(rowId, {
-                  state: opt?.label ?? "",
-                  stateCode: opt?.value ?? "",
-                  city: "",
-                })
+                updateAddressPatch(rowId, createStateAddressPatch(opt))
               }
               allowAdHocCityOption={false}
             />
           </div>
 
-          <div
-            style={{
-              padding: "16px 24px",
-              borderTop: "1px solid #eaf0f6",
-              display: "flex",
-              gap: "12px",
-              justifyContent: "flex-start",
-            }}
-          >
+          <div style={sidebarFooterStyle}>
             <button
               type="submit"
-              disabled={
-                submitting ||
-                !requiredValidation.ok ||
-                !addressRowsValidation.ok ||
-                !phoneFieldValid
-              }
-              style={{
-                padding: "10px 20px",
-                backgroundColor:
-                  submitting || !requiredValidation.ok || !addressRowsValidation.ok || !phoneFieldValid
-                    ? "#cbd5e0"
-                    : "#0091ae",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: 500,
-                cursor:
-                  submitting || !requiredValidation.ok || !addressRowsValidation.ok || !phoneFieldValid
-                    ? "not-allowed"
-                    : "pointer",
-              }}
+              disabled={isPrimaryDisabled}
+              style={getPrimaryButtonStyle(isPrimaryDisabled)}
             >
               {submitting ? "Creating..." : "Create"}
             </button>
@@ -473,13 +512,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
               disabled={submitting}
               onClick={handleCancelClick}
               style={{
-                padding: "10px 20px",
-                backgroundColor: "transparent",
-                color: "#141414",
-                border: "1px solid #8a8a8a",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: 500,
+                ...sidebarSecondaryButtonStyle,
                 cursor: submitting ? "not-allowed" : "pointer",
               }}
             >
