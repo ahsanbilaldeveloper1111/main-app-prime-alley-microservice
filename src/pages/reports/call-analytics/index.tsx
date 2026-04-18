@@ -299,7 +299,6 @@ const PageReports = () => {
                         actions={reportActions}
                         showToolbar
                         toolbar={toolbar}
-                        onPreviewClick={handlePreviewClick}
                         emptyMessage="No call reports available for your permissions."
                     />
                 </div>
