@@ -243,12 +243,12 @@ const LiveCallsCampaignsManagement = () => {
         id: t.id,
         name: t.name,
       }));
-      const teamNames =
-        withIds.length > 0
-          ? withIds.map((t) => t.name)
-          : stored.teamName
-            ? [stored.teamName]
-            : [];
+      let teamNames: string[] = [];
+      if (withIds.length > 0) {
+        teamNames = withIds.map((t) => t.name);
+      } else if (stored.teamName) {
+        teamNames = [stored.teamName];
+      }
       if (withIds.length > 0) {
         setTeamsWithIds(withIds);
         setTeams(teamNames);
@@ -262,16 +262,22 @@ const LiveCallsCampaignsManagement = () => {
     }
   }, []);
   useLayoutEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof globalThis.window === "undefined") return;
     hydrateFromStorage();
   }, [hydrateFromStorage]);
   // When gate authenticates on same page (no reload/router), re-hydrate from storage so teams and APIs run
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof globalThis.window === "undefined") return;
     const onAuthenticated = () => hydrateFromStorage();
-    window.addEventListener("finesse-authenticated", onAuthenticated);
+    globalThis.window.addEventListener(
+      "finesse-authenticated",
+      onAuthenticated,
+    );
     return () =>
-      window.removeEventListener("finesse-authenticated", onAuthenticated);
+      globalThis.window.removeEventListener(
+        "finesse-authenticated",
+        onAuthenticated,
+      );
   }, [hydrateFromStorage]);
 
   // Fetch Finesse user and map to TopBar (teams, selectedTeam, agentStatus) – runs when past FinesseAuthGate / after hydrate
@@ -498,9 +504,11 @@ const LiveCallsCampaignsManagement = () => {
 
   useEffect(() => {
     if (!session?.user) return;
-    const t =
-      typeof globalThis.window !== "undefined" ? getFinesseToken() : null;
-    setToken(t);
+    if (globalThis.window === undefined) {
+      setToken(null);
+      return;
+    }
+    setToken(getFinesseToken());
   }, [session?.user]);
 
   useFinesseStomp({
@@ -627,8 +635,8 @@ const LiveCallsCampaignsManagement = () => {
     }
     setStoredTeamId(newTeamId);
     clearFinesseUserData();
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("finesse-require-reauth"));
+    if (typeof globalThis.dispatchEvent === "function") {
+      globalThis.dispatchEvent(new CustomEvent("finesse-require-reauth"));
     }
   };
 
@@ -638,19 +646,14 @@ const LiveCallsCampaignsManagement = () => {
       try {
         await finesseUnlink(username, teamId);
       } catch (err: unknown) {
-        const message =
-          err && typeof err === "object" && "response" in err
-            ? (err as { response?: { data?: { message?: string } } }).response
-                ?.data?.message
-            : err instanceof Error
-              ? err.message
-              : "Unlink failed";
-        toast.error(message ?? "Failed to unlink from Finesse");
+        toast.error(
+          getFinesseApiErrorMessage(err, "Failed to unlink from Finesse"),
+        );
       }
     }
     clearFinesseUserData();
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("finesse-require-reauth"));
+    if (typeof globalThis.dispatchEvent === "function") {
+      globalThis.dispatchEvent(new CustomEvent("finesse-require-reauth"));
     }
   };
 
@@ -979,31 +982,6 @@ const LiveCallsCampaignsManagement = () => {
     );
   };
 
-  const handleMoveColumn = (id: number, direction: "up" | "down") => {
-    const currentIndex = columnMapping.findIndex((c) => c.id === id);
-    if (currentIndex === -1) return;
-
-    if (direction === "up" && currentIndex === 0) return;
-    if (direction === "down" && currentIndex === columnMapping.length - 1)
-      return;
-
-    const newMapping = [...columnMapping];
-    const targetIndex =
-      direction === "up" ? currentIndex - 1 : currentIndex + 1;
-
-    [newMapping[currentIndex], newMapping[targetIndex]] = [
-      newMapping[targetIndex],
-      newMapping[currentIndex],
-    ];
-
-    // Update order
-    newMapping.forEach((col, index) => {
-      col.order = index + 1;
-    });
-
-    setColumnMapping(newMapping);
-  };
-
   const handleUploadContacts = async () => {
     if (!uploadedFile || selectedCampaignId == null) {
       toast.error("Please select a file to upload.");
@@ -1091,7 +1069,7 @@ const LiveCallsCampaignsManagement = () => {
     const nextStart = updates.startTime ?? campaign.startTime;
     const nextEnd = updates.endTime ?? campaign.endTime;
     setCampaigns(
-      campaigns.map((c) => (c.id !== campaignId ? c : { ...c, ...updates })),
+      campaigns.map((c) => (c.id === campaignId ? { ...c, ...updates } : c)),
     );
     const { username, teamId } = getFinesseContext();
     if (!username || teamId == null) return;
@@ -1102,18 +1080,9 @@ const LiveCallsCampaignsManagement = () => {
       });
       toast.success("Campaign schedule updated.");
     } catch (err: unknown) {
-      const msg =
-        (
-          err as {
-            response?: { data?: { message?: string } };
-            message?: string;
-          }
-        )?.response?.data?.message ??
-        (err as Error)?.message ??
-        "Failed to update schedule";
-      toast.error(msg);
+      toast.error(getFinesseApiErrorMessage(err, "Failed to update schedule"));
       setCampaigns(
-        campaigns.map((c) => (c.id !== campaignId ? c : { ...campaign })),
+        campaigns.map((c) => (c.id === campaignId ? { ...campaign } : c)),
       );
     }
   };
@@ -1198,7 +1167,7 @@ const LiveCallsCampaignsManagement = () => {
           // API shape: { uri: "/finesse/api/User/.../WrapUpReason/5", label: "Not Interested", forAll }
           const idFromUri =
             typeof item.uri === "string"
-              ? item.uri.split("/").filter(Boolean).pop()
+              ? item.uri.split("/").findLast(Boolean)
               : undefined;
           const value = String(
             idFromUri ?? item.id ?? item.code ?? item.label ?? item.name ?? "",
@@ -1295,83 +1264,92 @@ const LiveCallsCampaignsManagement = () => {
     }
   };
 
-  const capabilityLoadingBlock =
-    capabilityUsername && capabilityLoading ? (
-      <React.Fragment>
-        <BreadcrumbItem
-          mainTitle=""
-          mainLink=""
-          subTitle="Live Calls Campaigns Management"
-        />
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: "50vh",
-          }}
-        >
-          <Loader
-            size={40}
-            className="text-primary"
-            style={{ animation: "spin 1s linear infinite" }}
+  const renderCapabilityLoadingBlock = (): ReactElement | null => {
+    if (!capabilityUsername) return null;
+    if (capabilityLoading) {
+      return (
+        <React.Fragment>
+          <BreadcrumbItem
+            mainTitle=""
+            mainLink=""
+            subTitle="Live Calls Campaigns Management"
           />
-        </div>
-      </React.Fragment>
-    ) : capabilityUsername && !capabilityLoading && !hasCampaignMgmt ? (
-      <React.Fragment>
-        <BreadcrumbItem
-          mainTitle=""
-          mainLink=""
-          subTitle="Live Calls Campaigns Management"
-        />
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: "70vh",
-            padding: "24px",
-          }}
-        >
           <div
-            className="card"
-            style={{ maxWidth: "420px", width: "100%", padding: "32px" }}
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: "50vh",
+            }}
+          >
+            <Loader
+              size={40}
+              className="text-primary"
+              style={{ animation: "spin 1s linear infinite" }}
+            />
+          </div>
+        </React.Fragment>
+      );
+    }
+    if (!hasCampaignMgmt) {
+      return (
+        <React.Fragment>
+          <BreadcrumbItem
+            mainTitle=""
+            mainLink=""
+            subTitle="Live Calls Campaigns Management"
+          />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: "70vh",
+              padding: "24px",
+            }}
           >
             <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                marginBottom: "24px",
-              }}
+              className="card"
+              style={{ maxWidth: "420px", width: "100%", padding: "32px" }}
             >
-              <AlertCircle size={28} color="#f59e0b" />
-              <h2
+              <div
                 style={{
-                  margin: 0,
-                  fontSize: "22px",
-                  fontWeight: 700,
-                  color: "#1e293b",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  marginBottom: "24px",
                 }}
               >
-                Insufficient Capabilities
-              </h2>
+                <AlertCircle size={28} color="#f59e0b" />
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: "22px",
+                    fontWeight: 700,
+                    color: "#1e293b",
+                  }}
+                >
+                  Insufficient Capabilities
+                </h2>
+              </div>
+              <p
+                style={{
+                  color: "#64748b",
+                  fontSize: "14px",
+                  marginBottom: "24px",
+                }}
+              >
+                You don&apos;t have sufficient capabilities to access Live Calls
+                Campaigns.
+              </p>
             </div>
-            <p
-              style={{
-                color: "#64748b",
-                fontSize: "14px",
-                marginBottom: "24px",
-              }}
-            >
-              You don&apos;t have sufficient capabilities to access Live Calls
-              Campaigns.
-            </p>
           </div>
-        </div>
-      </React.Fragment>
-    ) : null;
+        </React.Fragment>
+      );
+    }
+    return null;
+  };
+  const capabilityLoadingBlock = renderCapabilityLoadingBlock();
 
   return (
     <FinesseAuthGate
@@ -2597,6 +2575,20 @@ const LiveCallsCampaignsManagement = () => {
                       <div
                         className={`checkbox ${selectedCampaigns.length === filteredCampaigns.length && filteredCampaigns.length > 0 ? "checked" : ""}`}
                         onClick={handleSelectAll}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleSelectAll();
+                          }
+                        }}
+                        role="checkbox"
+                        tabIndex={0}
+                        aria-checked={
+                          selectedCampaigns.length ===
+                            filteredCampaigns.length &&
+                          filteredCampaigns.length > 0
+                        }
+                        aria-label="Select all campaigns"
                       >
                         {selectedCampaigns.length ===
                           filteredCampaigns.length &&
@@ -2617,7 +2609,7 @@ const LiveCallsCampaignsManagement = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {campaignsLoading ? (
+                  {campaignsLoading && (
                     <tr>
                       <td
                         colSpan={8}
@@ -2638,7 +2630,8 @@ const LiveCallsCampaignsManagement = () => {
                         <div>Loading campaigns...</div>
                       </td>
                     </tr>
-                  ) : filteredCampaigns.length === 0 ? (
+                  )}
+                  {!campaignsLoading && filteredCampaigns.length === 0 && (
                     <tr>
                       <td
                         colSpan={8}
@@ -2651,7 +2644,9 @@ const LiveCallsCampaignsManagement = () => {
                         No campaigns found.
                       </td>
                     </tr>
-                  ) : (
+                  )}
+                  {!campaignsLoading &&
+                    filteredCampaigns.length > 0 &&
                     filteredCampaigns.map((campaign) => (
                       <tr
                         key={campaign.id}
@@ -2665,6 +2660,18 @@ const LiveCallsCampaignsManagement = () => {
                           <div
                             className={`checkbox ${selectedCampaigns.includes(campaign.id) ? "checked" : ""}`}
                             onClick={() => handleSelectCampaign(campaign.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleSelectCampaign(campaign.id);
+                              }
+                            }}
+                            role="checkbox"
+                            tabIndex={0}
+                            aria-checked={selectedCampaigns.includes(
+                              campaign.id,
+                            )}
+                            aria-label={`Select campaign ${campaign.name}`}
                           >
                             {selectedCampaigns.includes(campaign.id) && (
                               <CheckCircle size={14} color="white" />
@@ -2731,6 +2738,16 @@ const LiveCallsCampaignsManagement = () => {
                           <div
                             className={`toggle-switch ${campaign.enabled ? "enabled" : ""}`}
                             onClick={() => handleToggleCampaign(campaign.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleToggleCampaign(campaign.id);
+                              }
+                            }}
+                            role="switch"
+                            tabIndex={0}
+                            aria-checked={campaign.enabled}
+                            aria-label={`Toggle ${campaign.name}`}
                           >
                             <div className="toggle-slider" />
                           </div>
@@ -2745,8 +2762,7 @@ const LiveCallsCampaignsManagement = () => {
                           </button>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -3003,8 +3019,8 @@ const LiveCallsCampaignsManagement = () => {
                               onChange={(opt) =>
                                 handleColumnValueChange(
                                   column.id,
-                                  ((opt as ContactHeaderValueOption | null)
-                                    ?.value ?? "None") as string,
+                                  (opt as ContactHeaderValueOption | null)
+                                    ?.value ?? "None",
                                 )
                               }
                               placeholder="Select value"

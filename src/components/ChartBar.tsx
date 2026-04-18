@@ -269,6 +269,7 @@ const ChartBar: React.FC<ChartBarProps> = ({
             }
             return getDefaultTooltipFormatter(value, seriesName);
           } catch (error) {
+            console.error("ChartBar tooltip formatter failed:", error);
             return getDefaultTooltipFormatter(
               value,
               `Series ${seriesIndex + 1}`,
