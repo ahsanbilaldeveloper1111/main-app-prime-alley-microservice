@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { Form } from "react-bootstrap";
-import { X } from "lucide-react";
 import { toast } from "react-toastify";
+import WorkforceSidebarShell from "@components/workforce/WorkforceSidebarShell";
+import UserRequestDynamicFieldInput from "@components/workforce/UserRequestDynamicFieldInput";
 import {
   getUserRequestCategories,
   getUserRequestCategoryFields,
@@ -44,40 +45,6 @@ type ActiveChildCategory = {
   is_active?: boolean;
 };
 
-const getFieldKey = (field: UserRequestCategoryField): string | null => {
-  const key = field.key?.trim();
-  return key ?? null;
-};
-
-const getStringValue = (values: Record<string, unknown>, key: string): string => {
-  const value = values[key];
-  return typeof value === "string" ? value : "";
-};
-
-const getStringArrayValue = (values: Record<string, unknown>, key: string): string[] => {
-  const value = values[key];
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === "string");
-  }
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  return [];
-};
-
-const getBooleanValue = (values: Record<string, unknown>, key: string): boolean => Boolean(values[key]);
-
-const isAttachmentField = (fieldType: string): boolean => fieldType === "file" || fieldType === "attachment";
-
-const getBasicInputType = (fieldType: string): "number" | "date" | "text" => {
-  if (fieldType === "number") return "number";
-  if (fieldType === "date") return "date";
-  return "text";
-};
-
 const defaultForm: CreateFormState = {
   user_request_category_id: "",
   subject: "",
@@ -95,87 +62,8 @@ const sidebarLabelStyle: CSSProperties = {
   color: "#141414",
 };
 
-const sidebarPanelStyle: CSSProperties = {
-  position: "fixed",
-  top: 0,
-  right: 0,
-  width: "600px",
-  height: "100vh",
-  backgroundColor: "#ffffff",
-  boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
-  zIndex: 999999,
-  display: "flex",
-  flexDirection: "column",
-};
-
-const sidebarHeaderStyle: CSSProperties = {
-  padding: "20px 24px",
-  borderBottom: "1px solid #eaf0f6",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-};
-
-const sidebarTitleStyle: CSSProperties = {
-  fontSize: "20px",
-  fontWeight: 600,
-  color: "#141414",
-  margin: 0,
-};
-
-const sidebarCloseButtonStyle: CSSProperties = {
-  background: "transparent",
-  border: "none",
-  padding: "4px",
-  cursor: "pointer",
-  color: "#718096",
-  display: "flex",
-  alignItems: "center",
-};
-
-const sidebarFormStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  flex: 1,
-  minHeight: 0,
-};
-
-const sidebarContentStyle: CSSProperties = {
-  flex: 1,
-  overflowY: "auto",
-  padding: "40px",
-};
-
-const sidebarFooterStyle: CSSProperties = {
-  padding: "16px 24px",
-  borderTop: "1px solid #eaf0f6",
-  display: "flex",
-  gap: "12px",
-  justifyContent: "flex-start",
-};
-
-const sidebarSecondaryButtonStyle: CSSProperties = {
-  padding: "10px 20px",
-  backgroundColor: "transparent",
-  color: "#141414",
-  border: "1px solid #8a8a8a",
-  borderRadius: "4px",
-  fontSize: "14px",
-  fontWeight: 500,
-};
-
 const dateFieldGroupStyle: CSSProperties = {
   minWidth: 140,
-};
-
-/** Shape of option items returned by the API on UserRequestCategoryField */
-type FieldOption = { value: string; label: string };
-
-type DynamicFieldInputProps = {
-  field: UserRequestCategoryField;
-  dynamicFields: Record<string, unknown>;
-  onDynamicFieldChange: (key: string, value: unknown) => void;
-  onDynamicFileChange: (key: string, file: File | null) => void;
 };
 
 type SidebarDateInputFieldProps = {
@@ -185,18 +73,6 @@ type SidebarDateInputFieldProps = {
   helpText: string;
   onChange: (next: string) => void;
 };
-
-function getFieldOptions(field: UserRequestCategoryField): FieldOption[] {
-  return (field.options ?? []) as FieldOption[];
-}
-
-function renderFieldOptions(options: FieldOption[]): React.ReactNode {
-  return options.map((option: FieldOption) => (
-    <option key={option.value} value={option.value}>
-      {option.label}
-    </option>
-  ));
-}
 
 const SidebarDateInputField: React.FC<SidebarDateInputFieldProps> = ({
   label,
@@ -216,146 +92,6 @@ const SidebarDateInputField: React.FC<SidebarDateInputFieldProps> = ({
     <Form.Text className="text-muted">{helpText}</Form.Text>
   </Form.Group>
 );
-
-const DynamicFieldInput: React.FC<DynamicFieldInputProps> = ({
-  field,
-  dynamicFields,
-  onDynamicFieldChange,
-  onDynamicFileChange,
-}) => {
-  const key = getFieldKey(field);
-  if (!key) return null;
-
-  if (field.type === "textarea") {
-    return (
-      <Form.Control
-        as="textarea"
-        rows={2}
-        value={getStringValue(dynamicFields, key)}
-        onChange={(e) => onDynamicFieldChange(key, e.target.value)}
-        placeholder={field.config?.placeholder ?? undefined}
-      />
-    );
-  }
-
-  if (isAttachmentField(field.type)) {
-    return (
-      <Form.Control
-        type="file"
-        onChange={(e) => {
-          const file = (e.target as HTMLInputElement).files?.[0] ?? null;
-          onDynamicFileChange(key, file);
-        }}
-      />
-    );
-  }
-
-  if (field.type === "select") {
-    const options = getFieldOptions(field);
-    return (
-      <Form.Select value={getStringValue(dynamicFields, key)} onChange={(e) => onDynamicFieldChange(key, e.target.value)}>
-        <option value="">Select...</option>
-        {renderFieldOptions(options)}
-      </Form.Select>
-    );
-  }
-
-  if (field.type === "multiselect") {
-    const options = getFieldOptions(field);
-    return (
-      <Form.Select
-        multiple
-        value={getStringArrayValue(dynamicFields, key)}
-        onChange={(e) => {
-          const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, (option) => option.value);
-          onDynamicFieldChange(key, selected);
-        }}
-      >
-        {renderFieldOptions(options)}
-      </Form.Select>
-    );
-  }
-
-  if (field.type === "radio") {
-    const options = getFieldOptions(field);
-    return (
-      <div className="d-flex flex-wrap gap-2">
-        {options.map((opt: FieldOption) => (
-          <Form.Check
-            key={opt.value}
-            type="radio"
-            id={`${key}-${opt.value}`}
-            name={key}
-            label={opt.label}
-            value={opt.value}
-            checked={getStringValue(dynamicFields, key) === opt.value}
-            onChange={() => onDynamicFieldChange(key, opt.value)}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  if (field.type === "checkbox") {
-    const selectedValues = getStringArrayValue(dynamicFields, key);
-    const options = getFieldOptions(field);
-    return (
-      <div className="d-flex flex-wrap gap-2">
-        {options.map((opt: FieldOption) => {
-          const checked = selectedValues.includes(opt.value);
-          return (
-            <Form.Check
-              key={opt.value}
-              type="checkbox"
-              id={`${key}-${opt.value}`}
-              label={opt.label}
-              checked={checked}
-              onChange={() => {
-                const nextValues = checked
-                  ? selectedValues.filter((value) => value !== opt.value)
-                  : [...selectedValues, opt.value];
-                onDynamicFieldChange(key, nextValues);
-              }}
-            />
-          );
-        })}
-      </div>
-    );
-  }
-
-  if (field.type === "boolean") {
-    return (
-      <Form.Check
-        type="checkbox"
-        id={`${key}-boolean`}
-        label={field.config?.help_text ?? "Yes / No"}
-        checked={getBooleanValue(dynamicFields, key)}
-        onChange={(e) => onDynamicFieldChange(key, e.target.checked)}
-      />
-    );
-  }
-
-  if (field.type === "toggle") {
-    return (
-      <Form.Check
-        type="switch"
-        id={`${key}-toggle`}
-        label={field.config?.help_text ?? "Enable"}
-        checked={getBooleanValue(dynamicFields, key)}
-        onChange={(e) => onDynamicFieldChange(key, e.target.checked)}
-      />
-    );
-  }
-
-  return (
-    <Form.Control
-      type={getBasicInputType(field.type)}
-      value={getStringValue(dynamicFields, key)}
-      onChange={(e) => onDynamicFieldChange(key, e.target.value)}
-      placeholder={field.config?.placeholder ?? undefined}
-    />
-  );
-};
 
 /** Resolves the effective category id for form submission */
 function resolveSubmitCategoryId(
@@ -414,19 +150,6 @@ function resetCategoryDependentFields(
     user_request_category_id: userRequestCategoryId,
     dynamic_fields: {},
     dynamic_files: {},
-  };
-}
-
-function getPrimaryButtonStyle(submitting: boolean): CSSProperties {
-  return {
-    padding: "10px 20px",
-    backgroundColor: submitting ? "#cbd5e0" : "#0091ae",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "4px",
-    fontSize: "14px",
-    fontWeight: 500,
-    cursor: submitting ? "not-allowed" : "pointer",
   };
 }
 
@@ -613,8 +336,6 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     onHide();
   }, [onHide]);
 
-  if (!show) return null;
-
   return (
     <>
       <style>
@@ -633,38 +354,16 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
         `}
       </style>
 
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 1000,
-          background: "transparent",
-        }}
-        aria-hidden="true"
-      />
-
-      <div
+      <WorkforceSidebarShell
+        isOpen={show}
         className="new-request-sidebar"
-        style={sidebarPanelStyle}
+        title={title}
+        onClose={handleCancelClick}
+        onSubmit={handleSubmit}
+        submitLabel={submitLabel}
+        submitting={submitting}
+        primaryDisabled={submitting}
       >
-        <div style={sidebarHeaderStyle}>
-          <h2 style={sidebarTitleStyle}>
-            {title}
-          </h2>
-          <button
-            type="button"
-            onClick={handleCancelClick}
-            style={sidebarCloseButtonStyle}
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <Form onSubmit={handleSubmit} style={sidebarFormStyle}>
-          <div style={sidebarContentStyle}>
             <Form.Group className="mb-3">
               <Form.Label style={sidebarLabelStyle}>
                 Category <span className="text-danger">*</span>
@@ -771,11 +470,11 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                           {field.label ?? field.key}
                           {field.required && " *"}
                         </Form.Label>
-                        <DynamicFieldInput
+                        <UserRequestDynamicFieldInput
                           field={field}
-                          dynamicFields={form.dynamic_fields}
-                          onDynamicFieldChange={handleDynamicFieldChange}
-                          onDynamicFileChange={handleDynamicFileChange}
+                          values={form.dynamic_fields}
+                          onValueChange={handleDynamicFieldChange}
+                          onFileChange={handleDynamicFileChange}
                         />
                       </div>
                     ))
@@ -783,30 +482,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                 </div>
               </Form.Group>
             )}
-          </div>
-
-          <div style={sidebarFooterStyle}>
-            <button
-              type="submit"
-              disabled={submitting}
-              style={getPrimaryButtonStyle(submitting)}
-            >
-              {submitting ? "Creating…" : submitLabel}
-            </button>
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={handleCancelClick}
-              style={{
-                ...sidebarSecondaryButtonStyle,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </Form>
-      </div>
+      </WorkforceSidebarShell>
     </>
   );
 };
