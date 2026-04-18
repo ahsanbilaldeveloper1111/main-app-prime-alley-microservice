@@ -28,6 +28,19 @@ type AddressFormItemWithId = AddressFormItem & { uiId: string };
 type EmployeeSelectOption = { value: string; label: string };
 type AddressSelectOption = { label?: string; value?: string } | null;
 
+type SidebarSelectFieldProps = {
+  label: string;
+  required?: boolean;
+  placeholder: string;
+  disabled: boolean;
+  loading: boolean;
+  options: EmployeeSelectOption[];
+  value: EmployeeSelectOption | null;
+  onChange: (option: EmployeeSelectOption | null) => void;
+  resetSearchOnValueChange: boolean;
+  helpText?: string;
+};
+
 export interface AddEmployeeModalProps {
   show: boolean;
   onHide: () => void;
@@ -178,6 +191,41 @@ function getPrimaryButtonStyle(isDisabled: boolean): CSSProperties {
     cursor: isDisabled ? "not-allowed" : "pointer",
   };
 }
+
+const SidebarSelectField: React.FC<SidebarSelectFieldProps> = ({
+  label,
+  required = false,
+  placeholder,
+  disabled,
+  loading,
+  options,
+  value,
+  onChange,
+  resetSearchOnValueChange,
+  helpText,
+}) => (
+  <Form.Group className="mb-3">
+    <Form.Label style={sidebarLabelStyle}>
+      {label}
+      {required && <span className="text-danger">*</span>}
+    </Form.Label>
+    <Select<EmployeeSelectOption>
+      className="basic-single"
+      classNamePrefix="select"
+      placeholder={placeholder}
+      isClearable
+      isSearchable
+      isDisabled={disabled}
+      isLoading={loading}
+      options={options}
+      value={value}
+      resetSearchOnValueChange={resetSearchOnValueChange}
+      onChange={onChange}
+      styles={employeeModalReactSelectStyles}
+    />
+    {helpText && <Form.Text className="text-muted">{helpText}</Form.Text>}
+  </Form.Group>
+);
 
 const createDefaultAddress = (): AddressFormItemWithId => ({
   uiId: createEmployeeModalAddressUiId(),
@@ -342,18 +390,11 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
             color: #141414;
           }
-          .add-employee-sidebar .form-control,
-          .add-employee-sidebar .form-select,
-          .add-employee-sidebar input,
-          .add-employee-sidebar select,
-          .add-employee-sidebar textarea {
+          .add-employee-sidebar :is(.form-control, .form-select, input, select, textarea) {
             font-size: 14px;
             color: #141414;
           }
-          .add-employee-sidebar .form-control,
-          .add-employee-sidebar .form-select,
-          .add-employee-sidebar input,
-          .add-employee-sidebar select {
+          .add-employee-sidebar :is(.form-control, .form-select, input, select) {
             min-height: 40px;
           }
           .add-employee-sidebar .select__control {
@@ -361,8 +402,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
             border-color: #8a8a8a;
             border-radius: 4px;
           }
-          .add-employee-sidebar .select__value-container,
-          .add-employee-sidebar .select__indicators {
+          .add-employee-sidebar :is(.select__value-container, .select__indicators) {
             min-height: 40px;
           }
         `}
@@ -400,72 +440,48 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
 
         <Form onSubmit={handleSubmit} style={sidebarFormStyle}>
           <div style={sidebarContentStyle}>
-            <Form.Group className="mb-3">
-              <Form.Label style={sidebarLabelStyle}>
-                Department <span className="text-danger">*</span>
-              </Form.Label>
-              <Select<EmployeeSelectOption>
-                className="basic-single"
-                classNamePrefix="select"
-                placeholder={loadingDepartments ? "Loading departments..." : "Select department"}
-                isClearable
-                isSearchable
-                isDisabled={loadingDepartments}
-                isLoading={loadingDepartments}
-                options={mainAppDepartmentOptions}
-                value={
-                  findSelectedOption(
-                    mainAppDepartmentOptions,
-                    String(form.department_id ?? ""),
-                  )
+            <SidebarSelectField
+              label="Department "
+              required
+              placeholder={loadingDepartments ? "Loading departments..." : "Select department"}
+              disabled={loadingDepartments}
+              loading={loadingDepartments}
+              options={mainAppDepartmentOptions}
+              value={findSelectedOption(mainAppDepartmentOptions, String(form.department_id ?? ""))}
+              resetSearchOnValueChange={show}
+              onChange={(opt: EmployeeSelectOption | null) => {
+                const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
+                setForm((f: Partial<UserProfilePayload>) => ({ ...f, department_id: deptId, user_id: "" }));
+                if (deptId == null) {
+                  setDepartmentUsers([]);
+                  return;
                 }
-                resetSearchOnValueChange={show}
-                onChange={(opt: EmployeeSelectOption | null) => {
-                  const deptId = opt?.value == null || opt.value === "" ? null : (Number(opt.value) || opt.value) as number;
-                  setForm((f: Partial<UserProfilePayload>) => ({ ...f, department_id: deptId, user_id: "" }));
-                  if (deptId == null) {
-                    setDepartmentUsers([]);
-                    return;
-                  }
-                  fetchUsersByDepartment(deptId);
-                }}
-                styles={employeeModalReactSelectStyles}
-              />
-              {loadingDepartments && <Form.Text className="text-muted">Loading...</Form.Text>}
-            </Form.Group>
+                fetchUsersByDepartment(deptId);
+              }}
+              helpText={loadingDepartments ? "Loading..." : undefined}
+            />
 
-            <Form.Group className="mb-3">
-              <Form.Label style={sidebarLabelStyle}>
-                User <span className="text-danger">*</span>
-              </Form.Label>
-              <Select<EmployeeSelectOption>
-                className="basic-single"
-                classNamePrefix="select"
-                placeholder={userSelectPlaceholder}
-                isClearable
-                isSearchable
-                isDisabled={!hasDepartmentSelected || userOptionsLoading}
-                isLoading={userOptionsLoading}
-                options={mainAppUserOptions}
-                value={
-                  findSelectedOption(
-                    mainAppUserOptions,
-                    String(form.user_id ?? ""),
-                  )
-                }
-                resetSearchOnValueChange={show}
-                onChange={(opt: EmployeeSelectOption | null) =>
-                  setForm((f: Partial<UserProfilePayload>) => ({
-                    ...f,
-                    user_id: opt?.value ?? "",
-                  }))
-                }
-                styles={employeeModalReactSelectStyles}
-              />
-              {!userOptionsLoading && hasDepartmentSelected && mainAppUserOptions.length === 0 && (
-                <Form.Text className="text-muted">No users available for this department.</Form.Text>
-              )}
-            </Form.Group>
+            <SidebarSelectField
+              label="User "
+              required
+              placeholder={userSelectPlaceholder}
+              disabled={!hasDepartmentSelected || userOptionsLoading}
+              loading={userOptionsLoading}
+              options={mainAppUserOptions}
+              value={findSelectedOption(mainAppUserOptions, String(form.user_id ?? ""))}
+              resetSearchOnValueChange={show}
+              onChange={(opt: EmployeeSelectOption | null) =>
+                setForm((f: Partial<UserProfilePayload>) => ({
+                  ...f,
+                  user_id: opt?.value ?? "",
+                }))
+              }
+              helpText={
+                !userOptionsLoading && hasDepartmentSelected && mainAppUserOptions.length === 0
+                  ? "No users available for this department."
+                  : undefined
+              }
+            />
 
             <EmployeeModalProfileFields
               form={form}
