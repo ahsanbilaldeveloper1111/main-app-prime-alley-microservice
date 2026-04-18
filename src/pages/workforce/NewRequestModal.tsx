@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { Form } from "react-bootstrap";
 import { X } from "lucide-react";
 import { toast } from "react-toastify";
@@ -35,6 +35,13 @@ type CreateFormState = {
   dynamic_fields: Record<string, unknown>;
   dynamic_files: Record<string, File | null>;
   attachments: File[];
+};
+
+type ActiveChildCategory = {
+  id: number;
+  name?: string | null;
+  code?: string | null;
+  is_active?: boolean;
 };
 
 const getFieldKey = (field: UserRequestCategoryField): string | null => {
@@ -80,6 +87,85 @@ const defaultForm: CreateFormState = {
   dynamic_fields: {},
   dynamic_files: {},
   attachments: [],
+};
+
+const sidebarLabelStyle: CSSProperties = {
+  fontSize: "14px",
+  fontWeight: 600,
+  color: "#141414",
+};
+
+const sidebarPanelStyle: CSSProperties = {
+  position: "fixed",
+  top: 0,
+  right: 0,
+  width: "600px",
+  height: "100vh",
+  backgroundColor: "#ffffff",
+  boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+  zIndex: 999999,
+  display: "flex",
+  flexDirection: "column",
+};
+
+const sidebarHeaderStyle: CSSProperties = {
+  padding: "20px 24px",
+  borderBottom: "1px solid #eaf0f6",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+};
+
+const sidebarTitleStyle: CSSProperties = {
+  fontSize: "20px",
+  fontWeight: 600,
+  color: "#141414",
+  margin: 0,
+};
+
+const sidebarCloseButtonStyle: CSSProperties = {
+  background: "transparent",
+  border: "none",
+  padding: "4px",
+  cursor: "pointer",
+  color: "#718096",
+  display: "flex",
+  alignItems: "center",
+};
+
+const sidebarFormStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  flex: 1,
+  minHeight: 0,
+};
+
+const sidebarContentStyle: CSSProperties = {
+  flex: 1,
+  overflowY: "auto",
+  padding: "40px",
+};
+
+const sidebarFooterStyle: CSSProperties = {
+  padding: "16px 24px",
+  borderTop: "1px solid #eaf0f6",
+  display: "flex",
+  gap: "12px",
+  justifyContent: "flex-start",
+};
+
+const sidebarSecondaryButtonStyle: CSSProperties = {
+  padding: "10px 20px",
+  backgroundColor: "transparent",
+  color: "#141414",
+  border: "1px solid #8a8a8a",
+  borderRadius: "4px",
+  fontSize: "14px",
+  fontWeight: 500,
+};
+
+const dateFieldGroupStyle: CSSProperties = {
+  minWidth: 140,
 };
 
 /** Shape of option items returned by the API on UserRequestCategoryField */
@@ -280,6 +366,35 @@ function resolveIsLoadingDisplayFields(
   return categoryFields[displayFieldsCategoryId] === undefined;
 }
 
+function getActiveChildCategories(children?: ActiveChildCategory[]): ActiveChildCategory[] {
+  return (children ?? []).filter((child: ActiveChildCategory) => child.is_active === true);
+}
+
+function resetCategoryDependentFields(
+  previousForm: CreateFormState,
+  userRequestCategoryId: number | "",
+): CreateFormState {
+  return {
+    ...previousForm,
+    user_request_category_id: userRequestCategoryId,
+    dynamic_fields: {},
+    dynamic_files: {},
+  };
+}
+
+function getPrimaryButtonStyle(submitting: boolean): CSSProperties {
+  return {
+    padding: "10px 20px",
+    backgroundColor: submitting ? "#cbd5e0" : "#0091ae",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "4px",
+    fontSize: "14px",
+    fontWeight: 500,
+    cursor: submitting ? "not-allowed" : "pointer",
+  };
+}
+
 const NewRequestModal: React.FC<NewRequestModalProps> = ({
   show,
   onHide,
@@ -370,7 +485,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
   }, [effectiveCategoryId]);
 
   const topLevelCategories = categories.filter((c) => c.parent_id == null);
-  const subCategories = (selectedParent?.children ?? []).filter((ch: { is_active?: boolean }) => ch.is_active === true);
+  const subCategories = getActiveChildCategories(selectedParent?.children);
   const hasSubCategories = subCategories.length > 0;
 
   const displayFieldsCategoryId = resolveDisplayFieldsCategoryId(
@@ -489,73 +604,25 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
 
       <div
         className="new-request-sidebar"
-        style={{
-          position: "fixed",
-          top: 0,
-          right: 0,
-          width: "600px",
-          height: "100vh",
-          backgroundColor: "#ffffff",
-          boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
-          zIndex: 999999,
-          display: "flex",
-          flexDirection: "column",
-        }}
+        style={sidebarPanelStyle}
       >
-        <div
-          style={{
-            padding: "20px 24px",
-            borderBottom: "1px solid #eaf0f6",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "20px",
-              fontWeight: 600,
-              color: "#141414",
-              margin: 0,
-            }}
-          >
+        <div style={sidebarHeaderStyle}>
+          <h2 style={sidebarTitleStyle}>
             {title}
           </h2>
           <button
             type="button"
             onClick={handleCancelClick}
-            style={{
-              background: "transparent",
-              border: "none",
-              padding: "4px",
-              cursor: "pointer",
-              color: "#718096",
-              display: "flex",
-              alignItems: "center",
-            }}
+            style={sidebarCloseButtonStyle}
           >
             <X size={24} />
           </button>
         </div>
 
-        <Form
-          onSubmit={handleSubmit}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
-          <div
-            style={{
-              flex: 1,
-              overflowY: "auto",
-              padding: "40px",
-            }}
-          >
+        <Form onSubmit={handleSubmit} style={sidebarFormStyle}>
+          <div style={sidebarContentStyle}>
             <Form.Group className="mb-3">
-              <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+              <Form.Label style={sidebarLabelStyle}>
                 Category <span className="text-danger">*</span>
               </Form.Label>
               <Form.Select
@@ -565,15 +632,9 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                   const parentId = val === "" ? "" : Number(val);
                   setSelectedParentId(parentId);
                   const parent = parentId === "" ? null : categories.find((c) => c.id === parentId);
-                  const activeChildrenCount =
-                    (parent as CategoryWithChildren)?.children?.filter((ch: { is_active?: boolean }) => ch.is_active === true).length ?? 0;
-                  const hasChildren = activeChildrenCount > 0;
-                  setForm((f) => ({
-                    ...f,
-                    user_request_category_id: hasChildren ? "" : parentId,
-                    dynamic_fields: {},
-                    dynamic_files: {},
-                  }));
+                  const activeChildren = getActiveChildCategories((parent as CategoryWithChildren)?.children);
+                  const hasChildren = activeChildren.length > 0;
+                  setForm((f) => resetCategoryDependentFields(f, hasChildren ? "" : parentId));
                 }}
                 required
                 disabled={loadingCategories}
@@ -589,23 +650,18 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
 
             {hasSubCategories && (
               <Form.Group className="mb-3">
-                <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+                <Form.Label style={sidebarLabelStyle}>
                   Sub-category (Optional)
                 </Form.Label>
                 <Form.Select
                   value={form.user_request_category_id === "" ? "" : String(form.user_request_category_id)}
                   onChange={(e) => {
                     const val = e.target.value;
-                    setForm((f) => ({
-                      ...f,
-                      user_request_category_id: val === "" ? "" : Number(val),
-                      dynamic_fields: {},
-                      dynamic_files: {},
-                    }));
+                    setForm((f) => resetCategoryDependentFields(f, val === "" ? "" : Number(val)));
                   }}
                 >
                   <option value="">Select sub-category (optional)</option>
-                  {subCategories.map((ch: { id: number; name?: string | null; code?: string | null }) => (
+                  {subCategories.map((ch) => (
                     <option key={ch.id} value={ch.id}>
                       {ch.name ?? ch.code ?? `Sub-category ${ch.id}`}
                     </option>
@@ -615,7 +671,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
             )}
 
             <Form.Group className="mb-3">
-              <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+              <Form.Label style={sidebarLabelStyle}>
                 Subject <span className="text-danger">*</span>
               </Form.Label>
               <Form.Control
@@ -628,7 +684,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+              <Form.Label style={sidebarLabelStyle}>
                 Reason
               </Form.Label>
               <Form.Control
@@ -641,8 +697,8 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
             </Form.Group>
 
             <div className="d-flex gap-3 flex-wrap">
-              <Form.Group className="mb-3 flex-grow-1" style={{ minWidth: 140 }}>
-                <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+              <Form.Group className="mb-3 flex-grow-1" style={dateFieldGroupStyle}>
+                <Form.Label style={sidebarLabelStyle}>
                   Start date
                 </Form.Label>
                 <Form.Control
@@ -652,8 +708,8 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                 />
                 <Form.Text className="text-muted">Optional (YYYY-MM-DD)</Form.Text>
               </Form.Group>
-              <Form.Group className="mb-3 flex-grow-1" style={{ minWidth: 140 }}>
-                <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+              <Form.Group className="mb-3 flex-grow-1" style={dateFieldGroupStyle}>
+                <Form.Label style={sidebarLabelStyle}>
                   End date
                 </Form.Label>
                 <Form.Control
@@ -668,7 +724,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
 
             {displayFieldsCategoryId != null && (isLoadingDisplayFields || displayFields.length > 0) && (
               <Form.Group className="mb-3">
-                <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+                <Form.Label style={sidebarLabelStyle}>
                   Additional fields
                 </Form.Label>
                 <div className="border rounded p-3 bg-light">
@@ -695,28 +751,11 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
             )}
           </div>
 
-          <div
-            style={{
-              padding: "16px 24px",
-              borderTop: "1px solid #eaf0f6",
-              display: "flex",
-              gap: "12px",
-              justifyContent: "flex-start",
-            }}
-          >
+          <div style={sidebarFooterStyle}>
             <button
               type="submit"
               disabled={submitting}
-              style={{
-                padding: "10px 20px",
-                backgroundColor: submitting ? "#cbd5e0" : "#0091ae",
-                color: "#ffffff",
-                border: "none",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: 500,
-                cursor: submitting ? "not-allowed" : "pointer",
-              }}
+              style={getPrimaryButtonStyle(submitting)}
             >
               {submitting ? "Creating…" : submitLabel}
             </button>
@@ -725,13 +764,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
               disabled={submitting}
               onClick={handleCancelClick}
               style={{
-                padding: "10px 20px",
-                backgroundColor: "transparent",
-                color: "#141414",
-                border: "1px solid #8a8a8a",
-                borderRadius: "4px",
-                fontSize: "14px",
-                fontWeight: 500,
+                ...sidebarSecondaryButtonStyle,
                 cursor: submitting ? "not-allowed" : "pointer",
               }}
             >
