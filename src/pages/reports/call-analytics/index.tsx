@@ -12,9 +12,12 @@ import type {
 } from "@components/GenericTable";
 import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import Layout from "@layout/index";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/reports.scss";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 type ReportDefinition = {
     id: string;
@@ -62,7 +65,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across countries with dynamic charts and detailed metrics.",
         type: "Call Outbound",
         href: "/reports/call-analytics/stats/country",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.CALL_STATS_BY_COUNTRY_REPORTS,
     },
     {
         id: "stats-department",
@@ -71,7 +74,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across departments with dynamic charts and detailed metrics.",
         type: "Call Outbound",
         href: "/reports/call-analytics/stats/department",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.CALL_STATS_BY_DEPARTMENT_REPORTS,
     },
     {
         id: "stats-extension",
@@ -80,7 +83,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across extensions with dynamic charts and detailed metrics.",
         type: "Call Outbound",
         href: "/reports/call-analytics/stats/extension",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.CALL_STATS_BY_EXTENSION_REPORTS,
     },
     {
         id: "stats-department-extension",
@@ -89,7 +92,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across departments extensions with dynamic charts and detailed metrics.",
         type: "Inbound/Outbound",
         href: "/reports/call-analytics/stats/department/extension",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.CALL_STATS_BY_DEPARTMENT_EXTENSION_REPORTS,
     },
     {
         id: "stats-general",
@@ -98,7 +101,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across all calls with dynamic charts and detailed metrics.",
         type: "Call Outbound",
         href: "/reports/call-analytics/stats/general",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.GENERAL_CALL_STATISTICS_REPORTS,
     },
     {
         id: "incoming-country",
@@ -107,7 +110,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across countries with dynamic charts and detailed metrics.",
         type: "Call Incoming",
         href: "/reports/call-analytics/incoming/country",
-        permission: "call-reports-by-call-incoming-reports",
+        permission: PERMISSIONS.CALL_INCOMING_BY_COUNTRY_REPORTS,
     },
     {
         id: "incoming-department",
@@ -116,7 +119,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across departments with dynamic charts and detailed metrics.",
         type: "Call Incoming",
         href: "/reports/call-analytics/incoming/department",
-        permission: "call-reports-by-call-incoming-reports",
+        permission: PERMISSIONS.CALL_INCOMING_BY_DEPARTMENT_REPORTS,
     },
     {
         id: "incoming-extension",
@@ -125,7 +128,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across extensions with dynamic charts and detailed metrics.",
         type: "Call Incoming",
         href: "/reports/call-analytics/incoming/extension",
-        permission: "call-reports-by-call-incoming-reports",
+        permission: PERMISSIONS.CALL_INCOMING_BY_EXTENSION_REPORTS,
     },
 ];
 
