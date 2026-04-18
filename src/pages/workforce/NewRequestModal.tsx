@@ -178,6 +178,45 @@ type DynamicFieldInputProps = {
   onDynamicFileChange: (key: string, file: File | null) => void;
 };
 
+type SidebarDateInputFieldProps = {
+  label: string;
+  value: string;
+  min?: string;
+  helpText: string;
+  onChange: (next: string) => void;
+};
+
+function getFieldOptions(field: UserRequestCategoryField): FieldOption[] {
+  return (field.options ?? []) as FieldOption[];
+}
+
+function renderFieldOptions(options: FieldOption[]): React.ReactNode {
+  return options.map((option: FieldOption) => (
+    <option key={option.value} value={option.value}>
+      {option.label}
+    </option>
+  ));
+}
+
+const SidebarDateInputField: React.FC<SidebarDateInputFieldProps> = ({
+  label,
+  value,
+  min,
+  helpText,
+  onChange,
+}) => (
+  <Form.Group className="mb-3 flex-grow-1" style={dateFieldGroupStyle}>
+    <Form.Label style={sidebarLabelStyle}>{label}</Form.Label>
+    <Form.Control
+      type="date"
+      value={value}
+      min={min}
+      onChange={(e) => onChange(e.target.value)}
+    />
+    <Form.Text className="text-muted">{helpText}</Form.Text>
+  </Form.Group>
+);
+
 const DynamicFieldInput: React.FC<DynamicFieldInputProps> = ({
   field,
   dynamicFields,
@@ -212,19 +251,17 @@ const DynamicFieldInput: React.FC<DynamicFieldInputProps> = ({
   }
 
   if (field.type === "select") {
+    const options = getFieldOptions(field);
     return (
       <Form.Select value={getStringValue(dynamicFields, key)} onChange={(e) => onDynamicFieldChange(key, e.target.value)}>
         <option value="">Select...</option>
-        {(field.options ?? []).map((opt: FieldOption) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
+        {renderFieldOptions(options)}
       </Form.Select>
     );
   }
 
   if (field.type === "multiselect") {
+    const options = getFieldOptions(field);
     return (
       <Form.Select
         multiple
@@ -234,19 +271,16 @@ const DynamicFieldInput: React.FC<DynamicFieldInputProps> = ({
           onDynamicFieldChange(key, selected);
         }}
       >
-        {(field.options ?? []).map((opt: FieldOption) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
+        {renderFieldOptions(options)}
       </Form.Select>
     );
   }
 
   if (field.type === "radio") {
+    const options = getFieldOptions(field);
     return (
       <div className="d-flex flex-wrap gap-2">
-        {(field.options ?? []).map((opt: FieldOption) => (
+        {options.map((opt: FieldOption) => (
           <Form.Check
             key={opt.value}
             type="radio"
@@ -264,9 +298,10 @@ const DynamicFieldInput: React.FC<DynamicFieldInputProps> = ({
 
   if (field.type === "checkbox") {
     const selectedValues = getStringArrayValue(dynamicFields, key);
+    const options = getFieldOptions(field);
     return (
       <div className="d-flex flex-wrap gap-2">
-        {(field.options ?? []).map((opt: FieldOption) => {
+        {options.map((opt: FieldOption) => {
           const checked = selectedValues.includes(opt.value);
           return (
             <Form.Check
@@ -395,6 +430,14 @@ function getPrimaryButtonStyle(submitting: boolean): CSSProperties {
   };
 }
 
+function mapCategoryFieldsById(
+  previous: Record<number, UserRequestCategoryField[]>,
+  categoryId: number,
+  fields: UserRequestCategoryField[],
+): Record<number, UserRequestCategoryField[]> {
+  return { ...previous, [categoryId]: fields };
+}
+
 const NewRequestModal: React.FC<NewRequestModalProps> = ({
   show,
   onHide,
@@ -410,6 +453,14 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   /** Selected parent category id (for showing sub-category dropdown) */
   const [selectedParentId, setSelectedParentId] = useState<number | "">("");
+
+  const applyLoadedCategoryFields = useCallback((categoryId: number, fields: UserRequestCategoryField[]) => {
+    setCategoryFields((previous) => mapCategoryFieldsById(previous, categoryId, fields));
+  }, []);
+
+  const applyFailedCategoryFields = useCallback((categoryId: number) => {
+    setCategoryFields((previous) => mapCategoryFieldsById(previous, categoryId, []));
+  }, []);
 
   const loadCategories = useCallback(async () => {
     setLoadingCategories(true);
@@ -444,18 +495,18 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     getUserRequestCategoryFields(id)
       .then((data: UserRequestCategoryField[]) => {
         if (!cancelled) {
-          setCategoryFields((prev) => ({ ...prev, [id]: data ?? [] }));
+          applyLoadedCategoryFields(id, data ?? []);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setCategoryFields((prev) => ({ ...prev, [id]: [] }));
+          applyFailedCategoryFields(id);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [selectedParentId, parentHasChildren]);
+  }, [applyFailedCategoryFields, applyLoadedCategoryFields, selectedParentId, parentHasChildren]);
 
   const effectiveCategoryId = form.user_request_category_id;
   useEffect(() => {
@@ -468,12 +519,12 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     getUserRequestCategoryFields(id)
       .then((data: UserRequestCategoryField[]) => {
         if (!cancelled) {
-          setCategoryFields((prev) => ({ ...prev, [id]: data ?? [] }));
+          applyLoadedCategoryFields(id, data ?? []);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setCategoryFields((prev) => ({ ...prev, [id]: [] }));
+          applyFailedCategoryFields(id);
         }
       })
       .finally(() => {
@@ -482,7 +533,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [effectiveCategoryId]);
+  }, [applyFailedCategoryFields, applyLoadedCategoryFields, effectiveCategoryId]);
 
   const topLevelCategories = categories.filter((c) => c.parent_id == null);
   const subCategories = getActiveChildCategories(selectedParent?.children);
@@ -572,18 +623,11 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
             font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
             color: #141414;
           }
-          .new-request-sidebar .form-control,
-          .new-request-sidebar .form-select,
-          .new-request-sidebar input,
-          .new-request-sidebar select,
-          .new-request-sidebar textarea {
+          .new-request-sidebar :is(.form-control, .form-select, input, select, textarea) {
             font-size: 14px;
             color: #141414;
           }
-          .new-request-sidebar .form-control,
-          .new-request-sidebar .form-select,
-          .new-request-sidebar input,
-          .new-request-sidebar select {
+          .new-request-sidebar :is(.form-control, .form-select, input, select) {
             min-height: 40px;
           }
         `}
@@ -697,29 +741,19 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
             </Form.Group>
 
             <div className="d-flex gap-3 flex-wrap">
-              <Form.Group className="mb-3 flex-grow-1" style={dateFieldGroupStyle}>
-                <Form.Label style={sidebarLabelStyle}>
-                  Start date
-                </Form.Label>
-                <Form.Control
-                  type="date"
-                  value={form.start_date}
-                  onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
-                />
-                <Form.Text className="text-muted">Optional (YYYY-MM-DD)</Form.Text>
-              </Form.Group>
-              <Form.Group className="mb-3 flex-grow-1" style={dateFieldGroupStyle}>
-                <Form.Label style={sidebarLabelStyle}>
-                  End date
-                </Form.Label>
-                <Form.Control
-                  type="date"
-                  value={form.end_date}
-                  min={form.start_date || undefined}
-                  onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
-                />
-                <Form.Text className="text-muted">Optional, must be on or after start date</Form.Text>
-              </Form.Group>
+              <SidebarDateInputField
+                label="Start date"
+                value={form.start_date}
+                onChange={(next: string) => setForm((f) => ({ ...f, start_date: next }))}
+                helpText="Optional (YYYY-MM-DD)"
+              />
+              <SidebarDateInputField
+                label="End date"
+                value={form.end_date}
+                min={form.start_date || undefined}
+                onChange={(next: string) => setForm((f) => ({ ...f, end_date: next }))}
+                helpText="Optional, must be on or after start date"
+              />
             </div>
 
             {displayFieldsCategoryId != null && (isLoadingDisplayFields || displayFields.length > 0) && (
