@@ -69,6 +69,15 @@ import {
 
 type ContactHeaderValueOption = { value: string; label: string };
 
+const VISUALLY_HIDDEN_INPUT_STYLE: React.CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  opacity: 0,
+  pointerEvents: "none",
+  margin: 0,
+};
+
 const CONTACT_HEADER_VALUE_OPTIONS: ContactHeaderValueOption[] = [
   { value: "Phone1", label: "Phone1" },
   { value: "First Name", label: "First Name" },
@@ -148,7 +157,8 @@ function formatImportStatusDisplay(
           minute: "2-digit",
         })
       : "";
-    return `Imported ${count} contacts${date ? ` (${date})` : ""}.`;
+    const dateSuffix = date ? ` (${date})` : "";
+    return `Imported ${count} contacts${dateSuffix}.`;
   }
   if (upper === "IN_PROGRESS") return "Import in progress…";
   if (upper === "FAILURE" || upper === "ERROR") {
@@ -262,12 +272,12 @@ const LiveCallsCampaignsManagement = () => {
     }
   }, []);
   useLayoutEffect(() => {
-    if (typeof globalThis.window === "undefined") return;
+    if (globalThis.window === undefined) return;
     hydrateFromStorage();
   }, [hydrateFromStorage]);
   // When gate authenticates on same page (no reload/router), re-hydrate from storage so teams and APIs run
   useEffect(() => {
-    if (typeof globalThis.window === "undefined") return;
+    if (globalThis.window === undefined) return;
     const onAuthenticated = () => hydrateFromStorage();
     globalThis.window.addEventListener(
       "finesse-authenticated",
@@ -2572,30 +2582,27 @@ const LiveCallsCampaignsManagement = () => {
                 <thead>
                   <tr>
                     <th>
-                      <div
+                      <label
                         className={`checkbox ${selectedCampaigns.length === filteredCampaigns.length && filteredCampaigns.length > 0 ? "checked" : ""}`}
-                        onClick={handleSelectAll}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            handleSelectAll();
-                          }
-                        }}
-                        role="checkbox"
-                        tabIndex={0}
-                        aria-checked={
-                          selectedCampaigns.length ===
-                            filteredCampaigns.length &&
-                          filteredCampaigns.length > 0
-                        }
-                        aria-label="Select all campaigns"
+                        style={{ cursor: "pointer" }}
                       >
+                        <input
+                          type="checkbox"
+                          checked={
+                            selectedCampaigns.length ===
+                              filteredCampaigns.length &&
+                            filteredCampaigns.length > 0
+                          }
+                          onChange={handleSelectAll}
+                          aria-label="Select all campaigns"
+                          style={VISUALLY_HIDDEN_INPUT_STYLE}
+                        />
                         {selectedCampaigns.length ===
                           filteredCampaigns.length &&
                           filteredCampaigns.length > 0 && (
                             <CheckCircle size={14} color="white" />
                           )}
-                      </div>
+                      </label>
                     </th>
                     <th>Campaign Name</th>
                     <th>Campaign Type</th>
@@ -2657,26 +2664,23 @@ const LiveCallsCampaignsManagement = () => {
                         }
                       >
                         <td>
-                          <div
+                          <label
                             className={`checkbox ${selectedCampaigns.includes(campaign.id) ? "checked" : ""}`}
-                            onClick={() => handleSelectCampaign(campaign.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                handleSelectCampaign(campaign.id);
-                              }
-                            }}
-                            role="checkbox"
-                            tabIndex={0}
-                            aria-checked={selectedCampaigns.includes(
-                              campaign.id,
-                            )}
-                            aria-label={`Select campaign ${campaign.name}`}
+                            style={{ cursor: "pointer" }}
                           >
+                            <input
+                              type="checkbox"
+                              checked={selectedCampaigns.includes(campaign.id)}
+                              onChange={() =>
+                                handleSelectCampaign(campaign.id)
+                              }
+                              aria-label={`Select campaign ${campaign.name}`}
+                              style={VISUALLY_HIDDEN_INPUT_STYLE}
+                            />
                             {selectedCampaigns.includes(campaign.id) && (
                               <CheckCircle size={14} color="white" />
                             )}
-                          </div>
+                          </label>
                         </td>
                         <td>
                           <div className="campaign-name">
