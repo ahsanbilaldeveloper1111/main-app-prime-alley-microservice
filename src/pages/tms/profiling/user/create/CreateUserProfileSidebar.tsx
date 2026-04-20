@@ -141,6 +141,27 @@ function getApiErrorMessage(
     return response?.response?.message || response?.message || fallbackMessage;
 }
 
+function toastApiError(
+    response: ResponseWithMessage | null | undefined,
+    fallback: string,
+): boolean {
+    if (response?.success === false) {
+        toast.error(getApiErrorMessage(response, fallback));
+        return true;
+    }
+    return false;
+}
+
+function buildTabSnapshot(
+    tabNumber: number,
+    formData: Record<string, any>,
+): Record<string, any> {
+    return Object.keys(formData).reduce<Record<string, any>>((acc, key) => {
+        acc[`tab-${tabNumber}.${key}`] = formData[key];
+        return acc;
+    }, {});
+}
+
 function buildLdapFormData(
     currentData: VerifyLdapUserParams,
     field: FormFieldKey,
@@ -199,7 +220,7 @@ function buildUserInfoFormData(
     return nextData;
 }
 
-function buildInitialLdapUserFormData(userData: any): VerifyLdapUserParams {
+function buildSharedUserBaseFields(userData: any) {
     return {
         companyName: getUserCompanyName(userData),
         extensionNumber: parseOptionalInteger(userData?.phone_no),
@@ -213,6 +234,12 @@ function buildInitialLdapUserFormData(userData: any): VerifyLdapUserParams {
         department: userData?.department || "",
         jobTitle: userData?.job_title || "",
         password: "",
+    };
+}
+
+function buildInitialLdapUserFormData(userData: any): VerifyLdapUserParams {
+    return {
+        ...buildSharedUserBaseFields(userData),
         client_transactionid: generateCustomId("tms-", 20),
         update_user: true,
         verify: false,
@@ -224,16 +251,13 @@ function buildInitialUserInfoFormData(userData: any): VerifyUserInfoParams {
     const callingAccess = userData?.parent_company?.calling_access?.[0];
 
     return {
-        extensionNumber: parseOptionalInteger(userData?.phone_no),
-        company_id: parseOptionalInteger(userData?.company_id) ?? 0,
-        displayName: userData?.name || "",
+        ...buildSharedUserBaseFields(userData),
         iccid_number: null,
         company: null,
         update_user: true,
         shareLineAppearanceCssName: callingAccess?.back_end_calling_access || "",
         call_repetition: profile?.call_repetition_daily ? "individual" : "company",
         call_repetition_weekly: parseOptionalInteger(profile?.call_repetition_weekly),
-        password: "",
         display: null,
         call_repetition_daily: parseOptionalInteger(profile?.call_repetition_daily),
         allow_dncr:
@@ -248,14 +272,6 @@ function buildInitialUserInfoFormData(userData: any): VerifyUserInfoParams {
         mobile_user: profile?.mobile_user === "Yes" ? MobileUser.Yes : MobileUser.No,
         device_type: null,
         client_transactionid: generateCustomId("tms-", 20),
-        userId: userData?.username || null,
-        country: userData?.country || "",
-        department: userData?.department || "",
-        jobTitle: userData?.job_title || "",
-        companyName: getUserCompanyName(userData),
-        firstName: userData?.first_name || "",
-        lastName: userData?.last_name || "",
-        email: userData?.email || "",
         previous_mobile_user: null,
         previous_device_type: null,
     };
@@ -623,6 +639,13 @@ const CreateUserProfile = ({
         }
     }, [userData, isUpdateMode]);
 
+    const formattedUserId = getFormattedUserId(
+        verifyLdapUserFormData.userId,
+        companyData?.data?.profile?.user_id_prefix,
+    );
+    const resolvedCompanyId = (currentUserCompanyId || companyId || verifyLdapUserFormData.company_id || 0) as number;
+    const resolvedCompanyName = currentUserCompanyName || companyData?.data?.name || verifyLdapUserFormData.companyName;
+
     const scrollToNextStep = (step: number) => {
         setTimeout(() => {
             if (step === 2 && callingAccessCardRef.current) {
@@ -830,15 +853,10 @@ const CreateUserProfile = ({
                 return;
             }
 
-            const formattedUserId = getFormattedUserId(
-                verifyLdapUserFormData.userId,
-                companyData?.data?.profile?.user_id_prefix,
-            );
-
             const formData: VerifyLdapUserParams = {
                 ...verifyLdapUserFormData,
-                company_id: (currentUserCompanyId || verifyLdapUserFormData.company_id || companyId || 0) as number,
-                companyName: currentUserCompanyName || companyData?.data?.name || verifyLdapUserFormData.companyName,
+                company_id: resolvedCompanyId,
+                companyName: resolvedCompanyName,
                 displayName: `${verifyLdapUserFormData.firstName} ${verifyLdapUserFormData.lastName}`.trim(),
                 userId: formattedUserId,
                 verify: true,
@@ -849,24 +867,11 @@ const CreateUserProfile = ({
             const responseVerifyLdapUser = await verifyLdapUser(formData);
             console.log("LDAP user verification", responseVerifyLdapUser);
             
-            if (responseVerifyLdapUser?.success === false) {
-                const errorMessage = getApiErrorMessage(
-                    responseVerifyLdapUser as ResponseWithMessage,
-                    "LDAP user verification failed",
-                );
-                toast.error(errorMessage);
-                return;
-            }
+            if (toastApiError(responseVerifyLdapUser as ResponseWithMessage, "LDAP user verification failed")) return;
 
             setCompletedSteps(prev => new Set(prev).add(1));
 
-            setOriginalFieldValues(prev => ({
-                ...prev,
-                ...Object.keys(verifyLdapUserFormData).reduce((acc, key) => {
-                    acc[`tab-1.${key}`] = verifyLdapUserFormData[key as keyof VerifyLdapUserParams];
-                    return acc;
-                }, {} as Record<string, any>),
-            }));
+            setOriginalFieldValues(prev => ({ ...prev, ...buildTabSnapshot(1, verifyLdapUserFormData) }));
 
             setActiveTab("calling-access");
             scrollToNextStep(2);
@@ -885,11 +890,6 @@ const CreateUserProfile = ({
                 return;
             }
 
-            const formattedUserId = getFormattedUserId(
-                verifyLdapUserFormData.userId,
-                companyData?.data?.profile?.user_id_prefix,
-            );
-
             const formData = {
                 ...verifyLdapUserFormData,
                 userId: formattedUserId,
@@ -906,8 +906,8 @@ const CreateUserProfile = ({
                 previous_mobile_user: verifyUserInfoFormData.previous_mobile_user,
                 previous_device_type: verifyUserInfoFormData.previous_device_type,
                 iccid_number: verifyUserInfoFormData.iccid_number,
-                company_id: (currentUserCompanyId || companyId || verifyLdapUserFormData.company_id || 0) as number,
-                companyName: currentUserCompanyName || companyData?.data?.name || verifyLdapUserFormData.companyName,
+                company_id: resolvedCompanyId,
+                companyName: resolvedCompanyName,
                 verify: true,
             };
 
@@ -916,39 +916,19 @@ const CreateUserProfile = ({
             const responseVerifyUserInfo = await verifyUserInfo(formData);
             console.log("User info verification response:", responseVerifyUserInfo);
             
-            if (responseVerifyUserInfo?.success === false) {
-                const errorMessage = getApiErrorMessage(
-                    responseVerifyUserInfo as ResponseWithMessage,
-                    "User info verification failed",
-                );
-                toast.error(errorMessage);
-                return;
-            }
+            if (toastApiError(responseVerifyUserInfo as ResponseWithMessage, "User info verification failed")) return;
 
             console.log("User info verification successful");
             console.log("Calling add LDAP user API with data:", formData);
             const responseAddLdapUser = await addLdapUser(formData);
             console.log("Add LDAP user response:", responseAddLdapUser);
             
-            if (responseAddLdapUser?.success === false) {
-                const errorMessage = getApiErrorMessage(
-                    responseAddLdapUser as ResponseWithMessage,
-                    "Failed to add LDAP user",
-                );
-                toast.error(errorMessage);
-                return;
-            }
+            if (toastApiError(responseAddLdapUser as ResponseWithMessage, "Failed to add LDAP user")) return;
 
             console.log("LDAP user added successfully");
             setCompletedSteps(prev => new Set(prev).add(2));
 
-            setOriginalFieldValues(prev => ({
-                ...prev,
-                ...Object.keys(verifyUserInfoFormData).reduce((acc, key) => {
-                    acc[`tab-2.${key}`] = verifyUserInfoFormData[key as keyof VerifyUserInfoParams];
-                    return acc;
-                }, {} as Record<string, any>),
-            }));
+            setOriginalFieldValues(prev => ({ ...prev, ...buildTabSnapshot(2, verifyUserInfoFormData) }));
 
             setActiveTab("calling-access");
             scrollToNextStep(3);
