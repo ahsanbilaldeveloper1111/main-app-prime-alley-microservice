@@ -1227,9 +1227,9 @@ export const downloadInvoicePdf = async (id: number): Promise<void> => {
     });
     
     // Check if response is valid
-    if (!response.data || response.data.size === 0) {
-      throw new Error('Empty PDF response received');
-    }
+    // if (!response.data || response.data.size === 0) {
+    //   throw new Error('Empty PDF response received');
+    // }
     
     // Extract filename from content-disposition header if available
     let filename = `invoice-${id}.pdf`;

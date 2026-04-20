@@ -27,10 +27,7 @@ function getCompanyName(companyDetails: any, session: any): string {
 
 function getBusinessTrn(companyDetails: any): string {
   return (
-    companyDetails?.profile?.trn ??
-    companyDetails?.trn ??
-    companyDetails?.business_trn ??
-    companyDetails?.business_trn_number ??
+    companyDetails?.profile?.tax_id ??
     PLACEHOLDER
   );
 }

@@ -73,6 +73,38 @@ const t = {
   muted: {
     fontSize: 13, color: "#666", fontFamily: font, margin: 0, lineHeight: "19px",
   } as React.CSSProperties,
+
+  sectionCard: {
+    border: "1px solid #e8e8e8",
+    borderRadius: 10,
+    background: "#fcfcfc",
+    padding: "14px 14px 12px",
+  } as React.CSSProperties,
+
+  addressCard: {
+    border: "1px solid #ececec",
+    borderRadius: 8,
+    background: "#fff",
+    padding: "10px 12px",
+    marginTop: 8,
+    marginBottom: 8,
+  } as React.CSSProperties,
+
+  sectionBlock: {
+    border: "1px solid #e9e9e9",
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    padding: "16px 18px",
+    boxShadow: "rgba(20,20,20,0.03) 0px 1px 4px 0px",
+  } as React.CSSProperties,
+
+  textareaCard: {
+    border: "1px solid #dcdcdc",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    overflow: "hidden",
+    maxWidth: 520,
+  } as React.CSSProperties,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -115,7 +147,7 @@ function AddBox({ icon, label, onClick }: AddBoxProps) {
       onClick={onClick}
       disabled={isDisabled}
       style={{
-        border: "1px solid rgb(204,204,204)",
+        border: "1px solid #e5e5e5",
         borderRadius: 6,
         width: 360,
         height: 120,
@@ -127,6 +159,7 @@ function AddBox({ icon, label, onClick }: AddBoxProps) {
         cursor: isDisabled ? "default" : "pointer",
         backgroundColor: "#fff",
         marginBottom: 4,
+        boxShadow: "rgba(20,20,20,0.03) 0px 1px 4px 0px",
       }}
     >
       <div style={{
@@ -350,8 +383,8 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
   const selectFromLibraryDisabled = companyNotSelected || productSelectDisabled;
   const customLineItemDisabled = companyNotSelected;
   return (
-    <>
-      <h2 style={t.secHeading}>Line items</h2>
+    <div style={{ ...t.sectionBlock, padding: "18px 20px" }}>
+      <h2 style={{ ...t.secHeading, marginBottom: 14 }}>Line items</h2>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         {selectedCompanyId ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -388,7 +421,7 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
           </div>
         </div>
       </div>
-      <div style={{ boxSizing: "border-box" as const, border: "1px solid rgb(204,204,204)", borderRadius: 8, width: "100%",
+      <div style={{ boxSizing: "border-box" as const, border: "1px solid #e7e7e7", borderRadius: 10, width: "100%",
         position: "relative" as const, overflow: "hidden", backgroundColor: "#fff", padding: "52px 40px",
         display: "flex", alignItems: "center", justifyContent: "center", gap: 64, minHeight: 260 }}>
         {items.length === 0 ? (
@@ -475,7 +508,7 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
           </div>
         )}
       </div>
-      <div style={{ border: "1px solid rgb(204,204,204)", borderTop: "none", borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
+      <div style={{ border: "1px solid #e7e7e7", borderTop: "none", borderBottomLeftRadius: 10, borderBottomRightRadius: 10,
         padding: "20px 24px", backgroundColor: "#fff", marginBottom: 0 }}>
         <div style={{ fontSize: 16, fontWeight: 700, fontFamily: font, marginBottom: 4 }}>Summary</div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px dashed #ddd" }}>
@@ -503,7 +536,7 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
           Items: <strong style={{ color: "#141414" }}>{items.length}</strong> · Currency: <strong style={{ color: "#141414" }}>{currencyCode}</strong>
         </div>
       </div>
-    </>
+      </div>
   );
 }
 
@@ -529,7 +562,7 @@ function CreateInvoicePaymentSection(props: PaymentSectionProps) {
   const storePaymentId = `${paymentFieldId}-store-payment`;
   const partialPaymentsId = `${paymentFieldId}-partial-payments`;
   return (
-    <>
+    <div style={{ ...t.sectionBlock, padding: "18px 20px" }}>
       <h2 style={{ ...t.secHeading, marginBottom: 6 }}>Payment collection</h2>
       <p style={{ ...t.muted, marginBottom: 20 }}>Choose how you want to collect payment for this invoice</p>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, cursor: "not-allowed", opacity: 0.45 }}>
@@ -561,8 +594,8 @@ function CreateInvoicePaymentSection(props: PaymentSectionProps) {
         </button>
       </div>
       {acceptOnline && (
-        <div style={{ position: "relative" as const, borderRadius: 8, backgroundColor: "rgb(255,255,255)", border: "1px solid rgb(204,204,204)",
-          width: 600, boxSizing: "border-box" as const, padding: "20px 24px", marginBottom: 8 }}>
+        <div style={{ position: "relative" as const, borderRadius: 10, backgroundColor: "rgb(255,255,255)", border: "1px solid #e7e7e7",
+          width: "100%", maxWidth: 760, boxSizing: "border-box" as const, padding: "20px 24px", marginBottom: 8 }}>
           <div style={{ marginBottom: 20 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
               <span style={{ fontSize: 14, fontWeight: 600, fontFamily: font }}>Accepted forms of payment *</span>
@@ -695,7 +728,7 @@ function CreateInvoicePaymentSection(props: PaymentSectionProps) {
           </div>
         </div>
       )}
-    </>
+      </div>
   );
 }
 
@@ -1124,7 +1157,7 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
               />
             </div>
 
-            <div style={{ marginBottom: 22 }}>
+            <div style={{ marginBottom: 22, ...t.sectionCard }}>
               <div style={t.label}>Company *</div>
               {isEditMode ? (
                 <div style={{
@@ -1163,13 +1196,15 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
 
             {selectedCompanyId ? (
               <>
-                <div style={{ marginBottom: 18 }}>
+                <div style={{ marginBottom: 18, ...t.sectionCard }}>
                   <div style={t.label}>
                     Billing address <InfoTip text="Billing address printed on the invoice." />
                   </div>
-                  <p style={{ ...t.muted, whiteSpace: "pre-line" }}>
-                    {formatCustomerAddress(customerData)}
-                  </p>
+                  <div style={t.addressCard}>
+                    <p style={{ ...t.muted, whiteSpace: "pre-line" }}>
+                      {formatCustomerAddress(customerData)}
+                    </p>
+                  </div>
                   <button
                     type="button"
                     style={{ ...t.linkSm, border: "none", background: "transparent", padding: 0 }}
@@ -1180,11 +1215,13 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
                   </button>
                 </div>
 
-                <div>
+                <div style={t.sectionCard}>
                   <div style={t.label}>Shipping address</div>
-                  <p style={{ ...t.muted, whiteSpace: "pre-line" }}>
-                    {formatCustomerAddress(customerData)}
-                  </p>
+                  <div style={t.addressCard}>
+                    <p style={{ ...t.muted, whiteSpace: "pre-line" }}>
+                      {formatCustomerAddress(customerData)}
+                    </p>
+                  </div>
                   <button
                     type="button"
                     style={{ ...t.linkSm, border: "none", background: "transparent", padding: 0 }}
@@ -1200,6 +1237,7 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
 
           {/* Right — invoice meta */}
           <div style={{ paddingTop: 48 }}>
+            <div style={t.sectionBlock}>
             <div style={{ display: "flex", gap: 12, marginBottom: 22, flexWrap: "wrap" as const }}>
               <div>
                 <div style={t.label}>
@@ -1242,6 +1280,7 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
               <div style={t.label}>End date</div>
               <DateInput value={endDate || ""} onChange={setEndDate} />
             </div>
+            </div>
           </div>
         </div>
 
@@ -1280,8 +1319,9 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
         <hr style={t.divider} />
         
         {/* ── COMMENTS ── */}
-        <h2 style={t.secHeading}>Comments</h2>
-        <div style={{ border: "1px solid rgb(138,138,138)", borderRadius: 4, backgroundColor: "#fff", overflow: "hidden", maxWidth: 460 }}>
+        <div style={{ ...t.sectionBlock, marginBottom: 18 }}>
+        <h2 style={{ ...t.secHeading, marginBottom: 12 }}>Comments</h2>
+        <div style={t.textareaCard}>
           <textarea
             placeholder="Enter any extra notes that you would like to appear in this invoice."
             value={notes}
@@ -1318,10 +1358,11 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
             ))}
           </div>
         </div>
+        </div>
 
-        <div style={{ marginTop: 22 }}>
-          <h2 style={t.secHeading}>Terms &amp; Conditions</h2>
-          <div style={{ border: "1px solid rgb(138,138,138)", borderRadius: 4, backgroundColor: "#fff", overflow: "hidden", maxWidth: 460 }}>
+        <div style={{ ...t.sectionBlock, marginTop: 22 }}>
+          <h2 style={{ ...t.secHeading, marginBottom: 12 }}>Terms &amp; Conditions</h2>
+          <div style={t.textareaCard}>
             <textarea
               placeholder="Enter terms & conditions"
               value={termsConditions}

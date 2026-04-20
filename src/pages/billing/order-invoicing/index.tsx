@@ -92,17 +92,17 @@ import {
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
-import { CrmOrderViewModal } from "./CrmOrderViewModal";
 import {
+  CrmOrderViewModal,
+  OrderInvoicingOrderSidebar,
+  attachmentMimeIconBackground,
+  buildOrdersListParams,
+  extensionLabelForAssignedTo,
   fulfillmentBadgeVariant,
+  mergeOrdersListFilters,
   orderApprovalBadgeVariant,
   paymentStatusBadgeVariant,
-} from "./CrmOrderViewModal/orderViewModalUtils";
-import { buildOrdersListParams } from "./buildOrdersListParams";
-import { mergeOrdersListFilters } from "./mergeOrdersListFilters";
-import { attachmentMimeIconBackground } from "./attachmentMimeIconColor";
-import { OrderInvoicingOrderSidebar } from "./OrderInvoicingOrderSidebar";
-import { extensionLabelForAssignedTo } from "./orderInvoicingExtensionLabel";
+} from "@components/billings/order-invoicing";
 
 const ignoredHistoryKeys = new Set<string>(["order_stage_id"]);
 

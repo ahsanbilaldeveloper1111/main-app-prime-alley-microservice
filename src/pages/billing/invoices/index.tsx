@@ -387,15 +387,11 @@ async function fetchInvoiceListPage(
 
 const INVOICE_STATUS_FILTER_CHOICES: { value: string; label: string }[] = [
   { value: "", label: "All Status" },
-  { value: STATUS_DRAFT, label: "Draft" },
-  { value: STATUS_SENT, label: "Sent" },
   { value: STATUS_PAID, label: "Paid" },
   { value: STATUS_PENDING, label: "Pending" },
   { value: STATUS_OVERDUE, label: "Overdue" },
   { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
-  { value: STATUS_CANCELLED, label: "Cancelled" },
   { value: STATUS_FAILED, label: "Failed" },
-  { value: STATUS_REFUNDED, label: "Refunded" },
 ];
 
 const invoiceFilterPillButtonStyle: React.CSSProperties = {
@@ -1059,15 +1055,11 @@ const InvoiceList = () => {
           setPendingFilters((prev) => ({ ...prev, status: value || undefined })),
         options: [
           { value: "", label: "All Status" },
-          { value: STATUS_DRAFT, label: "Draft" },
-          { value: STATUS_SENT, label: "Sent" },
           { value: STATUS_PAID, label: "Paid" },
           { value: STATUS_PENDING, label: "Pending" },
           { value: STATUS_OVERDUE, label: "Overdue" },
           { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
-          { value: STATUS_CANCELLED, label: "Cancelled" },
           { value: STATUS_FAILED, label: "Failed" },
-          { value: STATUS_REFUNDED, label: "Refunded" },
         ],
       },
       
