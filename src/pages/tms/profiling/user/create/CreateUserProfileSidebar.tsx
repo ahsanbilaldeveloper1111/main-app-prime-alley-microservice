@@ -830,7 +830,8 @@ const CreateUserProfile = ({
             setActiveTab("calling-access");
             scrollToNextStep(2);
         } catch (error) {
-            toast.error("Failed to verify LDAP user. Please try again.");
+            const message = error instanceof Error ? error.message : "Please try again.";
+            toast.error(`Failed to verify LDAP user. ${message}`);
         }
     };
 
@@ -868,7 +869,8 @@ const CreateUserProfile = ({
 
             toast.success("User info verification and LDAP user creation completed successfully!");
         } catch (error) {
-            toast.error("Failed to verify user info or create LDAP user. Please try again.");
+            const message = error instanceof Error ? error.message : "Please try again.";
+            toast.error(`Failed to verify user info or create LDAP user. ${message}`);
         }
     };
 
