@@ -1,8 +1,7 @@
 import React from "react";
-import { Card, Form, Button, InputGroup } from "react-bootstrap";
+import { Card, Form, Button } from "react-bootstrap";
 import Select from "@components/AppSelect";
 import { VerifyLdapUserParams, CreateUpdateLdapUserParams } from "@models/tms/UnfidiedOp";
-import { Company, User, UserType } from "@models/tms";
 import { generateComplexId } from "@utils/Helper";
 
 interface SelectOption {
@@ -62,31 +61,31 @@ const CreateLdapUserForm: React.FC<CreateLdapUserFormProps> = ({
             <Card.Body>
                 <form id="create-ldap-user">
                     <div className="row">
-                        {!userData?.data?.company_id &&
-                            user?.user_type == UserType.ADMIN && (
-                                <div className="col-sm-6">
-                                    <Form.Group className="mb-3">
-                                        <Form.Label>Company</Form.Label>
-                                        <Select
-                                            value={companyOptions.find((option) => option.label === verifyLdapUserFormData.companyName) || null}
-                                            onChange={(selectedOption: any) => handleCreateFormChange("companyName", selectedOption?.value || "")}
-                                            options={companyOptions}
-                                            placeholder="Select Company"
-                                            isSearchable
-                                            isClearable
-                                            className={touched.companyName && errors.companyName ? "is-invalid" : ""}
-                                            menuPortalTarget={document.body}
-                                            styles={{
-                                                menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
-                                                menu: (base: any) => ({ ...base, zIndex: 9999 })
-                                            }}
-                                        />
-                                        {errors.companyName && touched.companyName && (
-                                            <div className="text-danger small mt-1">{errors.companyName}</div>
-                                        )}
-                                    </Form.Group>
-                                </div>
-                            )}
+                            {!userData?.data?.company_id &&
+                                !company_id && (
+                                    <div className="col-sm-6">
+                                        <Form.Group className="mb-3">
+                                            <Form.Label>Company</Form.Label>
+                                            <Select
+                                                value={companyOptions.find((option) => option.label === verifyLdapUserFormData.companyName) || null}
+                                                onChange={(selectedOption: any) => handleCreateFormChange("companyName", selectedOption?.value || "")}
+                                                options={companyOptions}
+                                                placeholder="Select Company"
+                                                isSearchable
+                                                isClearable
+                                                className={touched.companyName && errors.companyName ? "is-invalid" : ""}
+                                                menuPortalTarget={document.body}
+                                                styles={{
+                                                    menuPortal: (base: any) => ({ ...base, zIndex: 1000001 }),
+                                                    menu: (base: any) => ({ ...base, zIndex: 1000001 })
+                                                }}
+                                            />
+                                            {errors.companyName && touched.companyName && (
+                                                <div className="text-danger small mt-1">{errors.companyName}</div>
+                                            )}
+                                        </Form.Group>
+                                    </div>
+                                )}
 
                         <div className="col-sm-6">
                             <Form.Group className="mb-3">
@@ -179,14 +178,14 @@ const CreateLdapUserForm: React.FC<CreateLdapUserFormProps> = ({
                                         value={availableExtensionsOptions.find((option) => option.value === verifyLdapUserFormData.extensionNumber) || null}
                                         onChange={(selectedOption: any) => handleCreateFormChange("extensionNumber", selectedOption?.value || "")}
                                         options={availableExtensionsOptions}
-                                        placeholder="Select Extension"
+                                        placeholder={availableExtensionsOptions.length > 0 ? "Select Extension" : "No data"}
                                         isSearchable
                                         isClearable
                                         className={touched.extensionNumber && errors.extensionNumber ? "is-invalid" : ""}
                                         menuPortalTarget={document.body}
                                         styles={{
-                                            menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
-                                            menu: (base: any) => ({ ...base, zIndex: 9999 })
+                                            menuPortal: (base: any) => ({ ...base, zIndex: 1000001 }),
+                                            menu: (base: any) => ({ ...base, zIndex: 1000001 })
                                         }}
                                     />
                                     {errors.extensionNumber && touched.extensionNumber && (
@@ -225,14 +224,14 @@ const CreateLdapUserForm: React.FC<CreateLdapUserFormProps> = ({
                                     value={countryOptions.find((option) => option.value === verifyLdapUserFormData.country) || null}
                                     onChange={(selectedOption: any) => handleCreateFormChange("country", selectedOption?.value || "")}
                                     options={countryOptions}
-                                    placeholder="Select Country"
+                                    placeholder={countryOptions.length > 0 ? "Select Country" : "No data"}
                                     isSearchable
                                     isClearable
                                     className={touched.country && errors.country ? "is-invalid" : ""}
                                     menuPortalTarget={document.body}
                                     styles={{
-                                        menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
-                                        menu: (base: any) => ({ ...base, zIndex: 9999 })
+                                        menuPortal: (base: any) => ({ ...base, zIndex: 1000001 }),
+                                        menu: (base: any) => ({ ...base, zIndex: 1000001 })
                                     }}
                                 />
                                 {errors.country && touched.country && (
@@ -335,14 +334,13 @@ const CreateLdapUserForm: React.FC<CreateLdapUserFormProps> = ({
                             }
                         >
                             {getCurrentLoadingState(1) ? (
-                                <>
+                                <output>
                                     <span
                                         className="spinner-border spinner-border-sm me-2"
-                                        role="status"
                                         aria-hidden="true"
                                     ></span>
-                                    Submitting...
-                                </>
+                                    {" "}Submitting...
+                                </output>
                             ) : (
                                 "Continue to Calling Access"
                             )}
