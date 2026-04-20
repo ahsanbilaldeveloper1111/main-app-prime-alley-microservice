@@ -32,7 +32,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
-import moment from "moment";
 import {
   PieChart,
   Pie,
@@ -62,6 +61,8 @@ import "@assets/scss/tabs.scss";
 import {
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
+  formatMeetingDateLocal,
+  formatMeetingTimeLocal,
   formatNumber,
   ModuleSlug,
 } from "@utils/Helper";
@@ -837,7 +838,9 @@ const CrmDashboard = () => {
                   {(dashboardData?.upcoming_meetings || []).slice(0, 5).map((meeting: any, index: number) => {
                     const initials = meeting.name ? meeting.name.charAt(0).toUpperCase() : 'M';
                     const companyName = meeting.lead?.company_name || meeting.deal?.company_name || '';
-                    const meetingTime = meeting.meeting_time ? moment(meeting.meeting_time).format('HH:mm') : '';
+                    const meetingTime = meeting.meeting_time
+                      ? formatMeetingTimeLocal(meeting.meeting_date, meeting.meeting_time)
+                      : '';
                     const meetingRecordType = getMeetingRecordNavigation(meeting.record_type, meeting.record?.id);
                     return (
                       <ListGroup.Item key={meeting.id || index} style={{ padding: '16px 0', border: 'none', borderBottom: index < (dashboardData?.upcoming_meetings?.length || 0) - 1 ? '1px solid #F1F5F9' : 'none' }}>
@@ -871,7 +874,7 @@ const CrmDashboard = () => {
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Calendar size={14} color="#94A3B8" />
                             <span style={{ fontSize: '13px', color: '#64748B' }}>
-                              {formatCrmPreviewDate(meeting.meeting_date)}
+                              {formatMeetingDateLocal(meeting.meeting_date, meeting.meeting_time) || formatCrmPreviewDate(meeting.meeting_date)}
                             </span>
                           </div>
                         </div>

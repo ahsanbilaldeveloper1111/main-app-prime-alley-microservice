@@ -35,6 +35,7 @@ import {
   MessageCircle,
   Search,
   FileText,
+  Play,
 } from "lucide-react";
 import WhatsAppMessageModal from "@components/WhatsAppMessageModalNew";
 import LogSmsModal from "@components/LogSms";
@@ -60,7 +61,12 @@ import {
   type OrderData,
   type HistoryChainRecord,
 } from "@utils/crm";
-import { RECORD_TYPES, ModuleSlug } from "@utils/Helper";
+import {
+  RECORD_TYPES,
+  ModuleSlug,
+  convertLocalMeetingToUtc,
+  formatMeetingDateTimeLocal,
+} from "@utils/Helper";
 import {
   buildFollowUpTaskFields,
   followUpTaskFieldsToApiPayload,
@@ -364,15 +370,26 @@ const RecentActivitiesSection = ({
   );
 };
 
-function renderCallsSection(
-  section: any,
-  sidebarCallRecordingsLoading: boolean,
-  sidebarCallRecordings: any[],
-  recordType: string | null | undefined,
-  recordId: string | number | null | undefined,
-  router: any,
-  EmptyIcon: React.ComponentType<any> | null | undefined,
-) {
+function renderCallsSection(options: {
+  section: any;
+  sidebarCallRecordingsLoading: boolean;
+  sidebarCallRecordings: any[];
+  recordType: string | null | undefined;
+  recordId: string | number | null | undefined;
+  router: any;
+  EmptyIcon: React.ComponentType<any> | null | undefined;
+  onPlayCallRecording?: (recording: any) => void;
+}) {
+  const {
+    section,
+    sidebarCallRecordingsLoading,
+    sidebarCallRecordings,
+    recordType,
+    recordId,
+    router,
+    EmptyIcon,
+    onPlayCallRecording,
+  } = options;
   if (sidebarCallRecordingsLoading) {
     return (
       <div
@@ -501,10 +518,45 @@ function renderCallsSection(
                       {direction}
                     </div>
                   </div>
-                  <Phone
-                    size={16}
-                    style={{ color: "#718096", flexShrink: 0 }}
-                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {onPlayCallRecording && (rec.Id ?? rec.id) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPlayCallRecording(rec);
+                        }}
+                        title="Play recording"
+                        aria-label="Play call recording"
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: "28px",
+                          height: "28px",
+                          padding: 0,
+                          borderRadius: "50%",
+                          border: "1px solid #cfe8ef",
+                          background: "#e6f7fb",
+                          color: "#0091ae",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <Play size={14} />
+                      </button>
+                    )}
+                    <Phone
+                      size={16}
+                      style={{ color: "#718096" }}
+                    />
+                  </div>
                 </div>
               );
             })}
@@ -916,6 +968,18 @@ export interface GenericSidebarProps {
     followUpTaskDueTime: string | null;
     attachments: File[];
   }) => void;
+
+  // Call recording playback
+  onPlayCallRecording?: (recording: any) => void;
+
+  // "Log a ___" actions — opens a modal that writes a single audit-log entry
+  // to the record's history (it does NOT actually send anything; that's the
+  // job of the existing send dialogs wired via `useCrmActivityModals`).
+  onLogCall?: () => void;
+  onLogEmail?: () => void;
+  onLogSms?: () => void;
+  onLogWhatsApp?: () => void;
+  onLogMeeting?: () => void;
 }
 
 // ============================================================================
@@ -5865,6 +5929,12 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   record,
   onWhatsAppLog,
   onSmsLog,
+  onPlayCallRecording,
+  onLogCall,
+  onLogEmail,
+  onLogSms,
+  onLogWhatsApp,
+  onLogMeeting,
 }) => {
   const router = useRouter();
   const emailContextPayload =
@@ -6406,15 +6476,19 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       );
       return;
     }
-    const meeting_date = meetingData.startDate.slice(0, 10);
-    const meeting_time =
+    const localDate = meetingData.startDate.slice(0, 10);
+    const localStartTime =
       meetingData.startTime.length === 5
         ? meetingData.startTime
         : meetingData.startTime.slice(0, 5);
-    const end_time =
+    const localEndTime =
       meetingData.endTime.length === 5
         ? meetingData.endTime
         : meetingData.endTime.slice(0, 5);
+    const startUtc = convertLocalMeetingToUtc(localDate, localStartTime);
+    const endUtc = convertLocalMeetingToUtc(localDate, localEndTime);
+    const meeting_date = startUtc.utcDate;
+    const meeting_time = startUtc.utcTime;
     const extensions = userExtension
       ? [userExtension].map((e) => String(e).slice(0, 15))
       : [meetingData.hostEmail?.slice(0, 15) || "0"];
@@ -6422,8 +6496,10 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       toast.error("Extension is required to create a meeting.");
       return;
     }
-    const start_date_time = `${meeting_date}T${meeting_time}:00`;
-    const end_date_time = `${meeting_date}T${end_time}:00`;
+    const start_date_time =
+      startUtc.utcIso || `${meeting_date}T${meeting_time}:00Z`;
+    const end_date_time =
+      endUtc.utcIso || `${endUtc.utcDate}T${endUtc.utcTime}:00Z`;
     const recordType = record.type as CrmEntityType;
     try {
       await createMeeting({
@@ -6587,6 +6663,26 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   const handleMoreActionSelect = (actionId: string) => {
+    if (actionId === "note") { handleNoteClick(); return; }
+    if (actionId === "task") { handleTaskClick(); return; }
+
+    // "Log a ___" actions: open the dedicated log-activity modal when the
+    // host page provides the corresponding handler. Otherwise, fall back to
+    // the legacy behaviour of navigating to the record detail activity tab
+    // so existing pages keep working until they wire up the new modals.
+    const logHandlerByAction: Record<string, (() => void) | undefined> = {
+      "log-call": onLogCall,
+      "log-email": onLogEmail,
+      "log-sms": onLogSms,
+      "log-whatsapp": onLogWhatsApp,
+      "log-meeting": onLogMeeting,
+    };
+    const logHandler = logHandlerByAction[actionId];
+    if (logHandler) {
+      logHandler();
+      return;
+    }
+
     const activityTypeMap: Record<string, string> = {
       "log-call": "calls",
       "log-whatsapp": "whatsapp",
@@ -6594,8 +6690,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
       "log-meeting": "meetings",
       "log-email": "emails",
     };
-    if (actionId === "note") { handleNoteClick(); return; }
-    if (actionId === "task") { handleTaskClick(); return; }
     const activityType = activityTypeMap[actionId];
     if (activityType) goToRecordDetailActivity(activityType);
   };
@@ -6775,40 +6869,93 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     const campaign = record.campaign as
       | { id?: number; name?: string }
       | undefined;
-    return (field: string, val: unknown): string => {
+
+    const USER_FIELDS = new Set([
+      "assigned_to",
+      "contact_owner",
+      "user_extension",
+    ]);
+    const DATETIME_FIELDS = new Set([
+      "start_date_time",
+      "end_date_time",
+      "meeting_start",
+      "meeting_end",
+    ]);
+    const LOCALE_DATETIME_OPTS: Intl.DateTimeFormatOptions = {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    };
+
+    const formatUserField = (val: unknown): string => {
+      const id =
+        typeof val === "string" || typeof val === "number" ? String(val) : "";
+      return resolveUser ? resolveUser(id) : fmt(val);
+    };
+
+    const formatCampaignField = (val: unknown): string | null => {
       if (
-        (field === "assigned_to" ||
-          field === "contact_owner" ||
-          field === "user_extension") &&
-        resolveUser
-      ) {
-        const id =
-          typeof val === "string" || typeof val === "number" ? String(val) : "";
-        return resolveUser(id);
-      }
-      if (
-        field === "campaign_id" &&
         campaign?.name &&
         val != null &&
         Number(val) === Number(campaign?.id)
-      )
+      ) {
         return campaign.name;
-      if (field === "scheduled_call_at" && val) {
-        try {
-          if (typeof val !== "string" && typeof val !== "number") {
-            return fmt(val);
-          }
-          return new Date(String(val)).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        } catch {
-          return fmt(val);
-        }
       }
+      return null;
+    };
+
+    const formatLocaleDateTime = (
+      val: unknown,
+      toIso?: (raw: string) => string,
+    ): string => {
+      if (typeof val !== "string" && typeof val !== "number") return fmt(val);
+      try {
+        const raw = String(val);
+        const iso = toIso ? toIso(raw) : raw;
+        return new Date(iso).toLocaleString("en-US", LOCALE_DATETIME_OPTS);
+      } catch {
+        return fmt(val);
+      }
+    };
+
+    const ensureTzSuffix = (raw: string): string => {
+      const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+      return hasTz ? raw : `${raw}Z`;
+    };
+
+    const formatMeetingDate = (val: unknown): string => {
+      if (typeof val !== "string" && typeof val !== "number") return fmt(val);
+      const dateStr = String(val).slice(0, 10);
+      const timeStr = String(
+        (record.meeting_time as string | undefined) ?? "00:00",
+      ).slice(0, 5);
+      return formatMeetingDateTimeLocal(dateStr, timeStr) || fmt(val);
+    };
+
+    const formatMeetingTime = (val: unknown): string => {
+      if (typeof val !== "string" && typeof val !== "number") return fmt(val);
+      const dateStr = String(
+        (record.meeting_date as string | undefined) ?? "",
+      ).slice(0, 10);
+      const timeStr = String(val).slice(0, 5);
+      if (!dateStr) return fmt(val);
+      return formatMeetingDateTimeLocal(dateStr, timeStr) || fmt(val);
+    };
+
+    return (field: string, val: unknown): string => {
+      if (USER_FIELDS.has(field) && resolveUser) return formatUserField(val);
+      if (field === "campaign_id") {
+        const name = formatCampaignField(val);
+        if (name !== null) return name;
+      }
+      if (field === "scheduled_call_at" && val) return formatLocaleDateTime(val);
+      if (DATETIME_FIELDS.has(field) && val) {
+        return formatLocaleDateTime(val, ensureTzSuffix);
+      }
+      if (field === "meeting_date" && val) return formatMeetingDate(val);
+      if (field === "meeting_time" && val) return formatMeetingTime(val);
       return fmt(val);
     };
   };
@@ -7700,7 +7847,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                 }
 
                 if (section.id === "calls" || section.id === "call-recordings") {
-                  return renderCallsSection(
+                  return renderCallsSection({
                     section,
                     sidebarCallRecordingsLoading,
                     sidebarCallRecordings,
@@ -7708,7 +7855,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                     recordId,
                     router,
                     EmptyIcon,
-                  );
+                    onPlayCallRecording,
+                  });
                 }
 
                 return renderGenericSectionContent(

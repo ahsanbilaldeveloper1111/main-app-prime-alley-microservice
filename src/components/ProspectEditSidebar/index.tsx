@@ -18,6 +18,8 @@ export interface ProspectFormState {
   phone_country_code: string;
   phoneNumber: string;
   campaign_id: number | null;
+  campaign_name: string | null;
+  campaign_status: string | null;
   contact_owner: string | null;
   lifecycle_stage: string;
   disposition: string;
@@ -69,6 +71,7 @@ interface ProspectMetaSectionProps {
   setContactForm: ProspectEditSidebarProps["setContactForm"];
   availableCampaigns: ProspectEditSidebarProps["availableCampaigns"];
   extensions: ProspectEditSidebarProps["extensions"];
+  isEditing: boolean;
 }
 
 interface ProspectAdditionalSectionProps {
@@ -177,6 +180,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
   setContactForm,
   availableCampaigns,
   extensions,
+  isEditing,
 }) => (
   <div className="contact-form-section" style={{ marginTop: "24px" }}>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
@@ -202,14 +206,65 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
           .filter(
             (o): o is { value: string; label: string } => o != null,
           );
+        const currentCampaignId =
+          contactForm.campaign_id == null
+            ? null
+            : String(contactForm.campaign_id);
+        const campaignIsInActiveList =
+          currentCampaignId != null &&
+          campaignSelectOptions.some((o) => o.value === currentCampaignId);
+        // When editing, if the record points to a campaign that isn't in the
+        // active-campaign dropdown (e.g. the campaign is inactive), pre-fill
+        // and lock the field so users can see — but not change — the value.
+        const shouldLockCampaign =
+          isEditing && currentCampaignId != null && !campaignIsInActiveList;
+
+        if (shouldLockCampaign) {
+          const lockedLabel =
+            contactForm.campaign_name?.trim() ||
+            `Campaign #${currentCampaignId}`;
+          const statusSuffix =
+            contactForm.campaign_status &&
+            contactForm.campaign_status.toLowerCase() !== "active"
+              ? ` (${contactForm.campaign_status})`
+              : "";
+          return (
+            <>
+              <input
+                id="prospect-campaign-select"
+                type="text"
+                value={`${lockedLabel}${statusSuffix}`}
+                disabled
+                readOnly
+                aria-readonly="true"
+                title="This campaign is inactive and cannot be changed."
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1px solid #cbd5e0",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  outline: "none",
+                  backgroundColor: "#f1f5f9",
+                  color: "#475569",
+                  cursor: "not-allowed",
+                }}
+              />
+              <small style={{ color: "#64748b", fontSize: "12px" }}>
+                This campaign is inactive and cannot be changed.
+              </small>
+            </>
+          );
+        }
+
         return (
           <Select
             inputId="prospect-campaign-select"
             value={
-              contactForm.campaign_id == null
+              currentCampaignId == null
                 ? null
                 : campaignSelectOptions.find(
-                    (o) => o.value === String(contactForm.campaign_id),
+                    (o) => o.value === currentCampaignId,
                   ) ?? null
             }
             onChange={(opt: { value: string } | null) =>
@@ -1230,6 +1285,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                   setContactForm={setContactForm}
                   availableCampaigns={availableCampaigns}
                   extensions={extensions}
+                  isEditing={isEditing}
                 />
                 <ProspectAdditionalSection
                   contactForm={contactForm}

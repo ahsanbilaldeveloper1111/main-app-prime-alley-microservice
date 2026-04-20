@@ -74,6 +74,9 @@ import {
   checkRequiredFields,
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
+  formatMeetingDateLocal,
+  convertLocalMeetingToUtc,
+  convertUtcMeetingToLocal,
   RECORD_TYPES,
 } from "@utils/Helper";
 import {
@@ -2190,7 +2193,10 @@ function CrmDealsListScreenDealViewModal({
                                         }}
                                       >
                                         {meeting.meeting_date
-                                          ? moment(meeting.meeting_date).format(
+                                          ? formatMeetingDateLocal(
+                                              meeting.meeting_date,
+                                              meeting.meeting_time,
+                                            ) || moment(meeting.meeting_date).format(
                                               "MMM DD, YYYY",
                                             )
                                           : "N/A"}
@@ -3236,11 +3242,16 @@ export function CrmDealsListScreenView({
 
     setLoadingMeeting(true);
     try {
+      const utcMeeting = convertLocalMeetingToUtc(
+        String(meetingData.meetingDate || "").slice(0, 10),
+        String(meetingData.meetingTime || "").slice(0, 5),
+      );
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
+        meeting_date: utcMeeting.utcDate || meetingData.meetingDate,
+        meeting_time: utcMeeting.utcTime || meetingData.meetingTime,
+        ...(utcMeeting.utcIso && { start_date_time: utcMeeting.utcIso }),
         deal_id: String(meetingData.dealId),
         meeting_outcome: "Scheduled", // Default to "Scheduled" when creating
         extensions:
@@ -3281,11 +3292,16 @@ export function CrmDealsListScreenView({
 
     setLoadingMeeting(true);
     try {
+      const utcMeeting = convertLocalMeetingToUtc(
+        String(meetingData.meetingDate || "").slice(0, 10),
+        String(meetingData.meetingTime || "").slice(0, 5),
+      );
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
+        meeting_date: utcMeeting.utcDate || meetingData.meetingDate,
+        meeting_time: utcMeeting.utcTime || meetingData.meetingTime,
+        ...(utcMeeting.utcIso && { start_date_time: utcMeeting.utcIso }),
         extensions:
           meetingAttendees.length > 0
             ? meetingAttendees.map((user: any) => user.value)
@@ -3325,13 +3341,16 @@ export function CrmDealsListScreenView({
   // Handle edit meeting click
   const handleEditMeeting = useCallback(
     (meeting: any) => {
-      // Format date for input (YYYY-MM-DD)
-      const meetingDate = meeting.meeting_date
+      const utcDateRaw = meeting.meeting_date
         ? new Date(meeting.meeting_date).toISOString().split("T")[0]
         : "";
-
-      // Format time for input (HH:MM)
-      const meetingTime = meeting.meeting_time || "";
+      const utcTimeRaw = meeting.meeting_time || "";
+      const localized = convertUtcMeetingToLocal(
+        utcDateRaw,
+        String(utcTimeRaw || "").slice(0, 5),
+      );
+      const meetingDate = localized.localDate || utcDateRaw;
+      const meetingTime = localized.localTime || utcTimeRaw;
 
       // Set attendees from meeting extensions
       // meeting.extensions is an array of objects with 'extension' property (e.g., { extension: "511", ... })

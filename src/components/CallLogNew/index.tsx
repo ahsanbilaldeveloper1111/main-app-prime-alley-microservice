@@ -544,36 +544,53 @@ const CallCard: React.FC<{
                 </button>
               </div>
               <div style={{ position: 'relative', display: 'inline-block' }}>
-                <select
-                  value={direction}
-                  onChange={(e) => setDirection(e.target.value)}
-                  style={{
-                    appearance: 'none',
-                    background: 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#141414',
-                    paddingRight: '20px',
-                    fontFamily: 'inherit',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="Outbound">Outbound</option>
-                  <option value="Inbound">Inbound</option>
-                </select>
-                <ChevronDown
-                  size={14}
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                    color: '#141414',
-                  }}
-                />
+                {recordingApiRow ? (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: '#141414',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {direction}
+                  </span>
+                ) : (
+                  <>
+                    <select
+                      value={direction}
+                      onChange={(e) => setDirection(e.target.value)}
+                      style={{
+                        appearance: 'none',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        color: '#141414',
+                        paddingRight: '20px',
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                      }}
+                    >
+                      <option value="Outbound">Outbound</option>
+                      <option value="Inbound">Inbound</option>
+                    </select>
+                    <ChevronDown
+                      size={14}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        pointerEvents: 'none',
+                        color: '#141414',
+                      }}
+                    />
+                  </>
+                )}
               </div>
             </div>
           </div>
