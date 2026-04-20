@@ -220,8 +220,26 @@ function buildUserInfoFormData(
     return nextData;
 }
 
+function buildEmptySharedFields() {
+    return {
+        companyName: "",
+        extensionNumber: null as number | null,
+        firstName: "",
+        email: "",
+        lastName: "",
+        displayName: "",
+        userId: null as string | null,
+        country: "",
+        company_id: 0,
+        department: "",
+        jobTitle: "",
+        password: "",
+    };
+}
+
 function buildSharedUserBaseFields(userData: any) {
     return {
+        ...buildEmptySharedFields(),
         companyName: getUserCompanyName(userData),
         extensionNumber: parseOptionalInteger(userData?.phone_no),
         firstName: userData?.first_name || "",
@@ -233,7 +251,6 @@ function buildSharedUserBaseFields(userData: any) {
         company_id: parseOptionalInteger(userData?.company_id) ?? 0,
         department: userData?.department || "",
         jobTitle: userData?.job_title || "",
-        password: "",
     };
 }
 
@@ -328,8 +345,6 @@ const CreateUserProfile = ({
 
     const isDraft = Boolean(userId?.includes("-draftId"));
     const isUpdateMode = !Number.isNaN(numericUserId) && !isDraft;
-
-    console.log(userId, "uid");
     
     // TMS auth has been removed - user is set to null
     // Using 'as' to prevent TypeScript from narrowing to never
@@ -342,18 +357,7 @@ const CreateUserProfile = ({
 
     const [verifyLdapUserFormData, setVerifyLdapUserFormData] =
         useState<VerifyLdapUserParams>({
-            companyName: "",
-            extensionNumber: null,
-            firstName: "",
-            email: "",
-            lastName: "",
-            displayName: "",
-            userId: null,
-            country: "",
-            company_id: 0,
-            department: "",
-            jobTitle: "",
-            password: "",
+            ...buildEmptySharedFields(),
             client_transactionid: generateCustomId("tms-", 20),
             update_user: isUpdateMode,
             verify: false,
@@ -361,16 +365,13 @@ const CreateUserProfile = ({
 
     const [verifyUserInfoFormData, setVerifyUserInfoFormData] =
         useState<VerifyUserInfoParams>({
-            extensionNumber: null,
-            company_id: 0,
-            displayName: "",    
+            ...buildEmptySharedFields(),
             iccid_number: null,
             company: null,
             update_user: false,
             shareLineAppearanceCssName: "",
             call_repetition: null,
             call_repetition_weekly: null,
-            password: "",
             display: null,
             call_repetition_daily: null,
             allow_dncr: DNCRCallingAccess.DISALLOW_DNCR,
@@ -379,14 +380,6 @@ const CreateUserProfile = ({
             mobile_user: MobileUser.No,
             device_type: null,
             client_transactionid: generateCustomId("tms-", 20),
-            userId: null,
-            country: "",
-            department: "",
-            jobTitle: "",
-            companyName: "",
-            firstName: "",
-            lastName: "",
-            email: "",
             previous_mobile_user: null,
             previous_device_type: null,
         });
@@ -442,7 +435,6 @@ const CreateUserProfile = ({
     
     const { data: companyList } = useCompanyList(companyListParams);
 
-    console.log(userData, "userData");
     const { isLoading: isAddUserInfoPending } = useAddUserInfo();
     const { verifyUserInfo, isLoading: isVerifyUserInfoPending } =
         useVerifyUserInfo();
@@ -499,7 +491,6 @@ const CreateUserProfile = ({
             })) || [],
         [availableExtensions],
     );
-    console.log(companyList, "companyListl");
     const companyOptions = useMemo(
         () =>
             (companyList as any)?.map((company: Company) => ({
@@ -508,7 +499,6 @@ const CreateUserProfile = ({
             })) || [],
         [companyList],
     );
-    console.log(companyOptions, "companyOptionsss");
 
     const callRepetitionOptions = useMemo(
         () => [
@@ -533,7 +523,6 @@ const CreateUserProfile = ({
         ],
         [],
     );
-    console.log(touched, "touched");
 
     const invalidateStepsFrom = (stepNumber: number) => {
         setHasPreviousStepChanges(true);
@@ -551,6 +540,20 @@ const CreateUserProfile = ({
         clearFieldError(field as string);
     };
     
+    const handleFieldChangeWithStepCheck = (
+        stepNumber: number,
+        field: FormFieldKey,
+        value: any,
+    ) => {
+        markFieldTouchedAndClearError(field);
+        if (completedSteps.has(stepNumber)) {
+            const originalValue = originalFieldValues[getOriginalFieldValueKey(stepNumber, field)];
+            if (originalValue !== value) {
+                invalidateStepsFrom(stepNumber);
+            }
+        }
+    };
+
     const handleCreateFormChange = (
         field: FormFieldKey,
         value: any,
@@ -562,26 +565,7 @@ const CreateUserProfile = ({
             companyOptions as CompanyOption[],
         );
 
-        console.log(
-            value,
-            data,
-            availableExtensionsOptions[0],
-            "value",
-            "field",
-            field,
-        );
-        console.log(data, "data");
-        markFieldTouchedAndClearError(field);
-
-        if (completedSteps.has(1)) {
-            const originalValue = originalFieldValues[
-                getOriginalFieldValueKey(1, field)
-            ];
-            if (originalValue !== value) {
-                invalidateStepsFrom(1);
-            }
-        }
-
+        handleFieldChangeWithStepCheck(1, field, value);
         setVerifyLdapUserFormData(data);
     };
 
@@ -596,24 +580,7 @@ const CreateUserProfile = ({
             companyData?.data?.profile,
         );
 
-        console.log(data, "data");
-
-        if (completedSteps.has(2)) {
-            const originalValue = originalFieldValues[
-                getOriginalFieldValueKey(2, field)
-            ];
-            console.log(
-                originalValue,
-                "originalValue",
-                originalValue !== value,
-            );
-            if (originalValue !== value) {
-                invalidateStepsFrom(2);
-            }
-        }
-
-        markFieldTouchedAndClearError(field);
-
+        handleFieldChangeWithStepCheck(2, field, value);
         setVerifyUserInfoFormData(data);
     };
 
@@ -775,13 +742,6 @@ const CreateUserProfile = ({
         );
 
         const iccid = iccidData?.id || null;
-        console.log(
-            iccid,
-            "iccidiccid",
-            verifyUserInfoFormData.iccid_number,
-            companyData?.data?.iccids,
-            verifyUserInfoFormData.iccid_number,
-        );
         return (
             (companyData?.data?.calling_access || [])
                 .filter((access: CallingAccess) => {
@@ -825,7 +785,6 @@ const CreateUserProfile = ({
         verifyUserInfoFormData.call_repetition,
         verifyUserInfoFormData.iccid_number,
     ]);
-    console.log(callAccessOptions, "callAccessOptions");
     const iccidOptions = useMemo(() => {
         // Get ICCID options from companyData.iccids array
         const iccids = companyData?.data?.iccids || [];
@@ -842,14 +801,12 @@ const CreateUserProfile = ({
             label: iccid,
         }));
     }, [companyData?.data?.iccids]);
-    console.log(iccidOptions, "iccidOptions");
 
     const submitVerifyLdapUserForm = async () => {
         try {
             setAllTouched();
 
             if (!canProceedToNext(1)) {
-                console.log("Form validation failed");
                 return;
             }
 
@@ -862,10 +819,7 @@ const CreateUserProfile = ({
                 verify: true,
             };
 
-            console.log("Submitting LDAP user form:", formData);
-
             const responseVerifyLdapUser = await verifyLdapUser(formData);
-            console.log("LDAP user verification", responseVerifyLdapUser);
             
             if (toastApiError(responseVerifyLdapUser as ResponseWithMessage, "LDAP user verification failed")) return;
 
@@ -876,7 +830,6 @@ const CreateUserProfile = ({
             setActiveTab("calling-access");
             scrollToNextStep(2);
         } catch (error) {
-            console.error("Error verifying LDAP user:", error);
             toast.error("Failed to verify LDAP user. Please try again.");
         }
     };
@@ -886,46 +839,26 @@ const CreateUserProfile = ({
             setAllTouched();
 
             if (!canProceedToNext(2)) {
-                console.log("Form validation failed");
                 return;
             }
 
             const formData = {
                 ...verifyLdapUserFormData,
+                ...verifyUserInfoFormData,
                 userId: formattedUserId,
-                company: verifyUserInfoFormData.company,
-                shareLineAppearanceCssName: verifyUserInfoFormData.shareLineAppearanceCssName,
-                mobile_user: verifyUserInfoFormData.mobile_user,
-                call_repetition_daily: verifyUserInfoFormData.call_repetition_daily,
-                call_repetition_weekly: verifyUserInfoFormData.call_repetition_weekly,
-                call_repetition: verifyUserInfoFormData.call_repetition,
-                allow_dncr: verifyUserInfoFormData.allow_dncr,
-                display: verifyUserInfoFormData.display,
-                allow_fac_info: verifyUserInfoFormData.allow_fac_info,
-                device_type: verifyUserInfoFormData.device_type,
-                previous_mobile_user: verifyUserInfoFormData.previous_mobile_user,
-                previous_device_type: verifyUserInfoFormData.previous_device_type,
-                iccid_number: verifyUserInfoFormData.iccid_number,
                 company_id: resolvedCompanyId,
                 companyName: resolvedCompanyName,
                 verify: true,
             };
 
-            console.log("Submitting user info form:", formData);
-
             const responseVerifyUserInfo = await verifyUserInfo(formData);
-            console.log("User info verification response:", responseVerifyUserInfo);
             
             if (toastApiError(responseVerifyUserInfo as ResponseWithMessage, "User info verification failed")) return;
 
-            console.log("User info verification successful");
-            console.log("Calling add LDAP user API with data:", formData);
             const responseAddLdapUser = await addLdapUser(formData);
-            console.log("Add LDAP user response:", responseAddLdapUser);
             
             if (toastApiError(responseAddLdapUser as ResponseWithMessage, "Failed to add LDAP user")) return;
 
-            console.log("LDAP user added successfully");
             setCompletedSteps(prev => new Set(prev).add(2));
 
             setOriginalFieldValues(prev => ({ ...prev, ...buildTabSnapshot(2, verifyUserInfoFormData) }));
@@ -935,7 +868,6 @@ const CreateUserProfile = ({
 
             toast.success("User info verification and LDAP user creation completed successfully!");
         } catch (error) {
-            console.error("Error in user verification or LDAP user creation:", error);
             toast.error("Failed to verify user info or create LDAP user. Please try again.");
         }
     };
