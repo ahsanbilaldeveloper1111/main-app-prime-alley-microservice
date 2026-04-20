@@ -22,6 +22,7 @@ import LogSmsModal from "@components/LogSms";
 import WhatsAppMessageModal from "@components/WhatsAppMessageModalNew";
 import { toast } from "react-toastify";
 import { getCrmSessionUserContext } from "@crm/shared/crmSessionUserContext";
+import { convertLocalMeetingToUtc } from "@utils/Helper";
 
 export type CrmRecordType = "prospect" | "lead" | "deal" | "order" | "company";
 
@@ -127,18 +128,24 @@ export function useCrmActivityModals({
       reminders: string[];
       summary: string;
     }) => {
-      const meeting_date = meetingData.startDate.slice(0, 10);
-      const meeting_time =
+      const localDate = meetingData.startDate.slice(0, 10);
+      const localStartTime =
         meetingData.startTime.length === 5
           ? meetingData.startTime
           : meetingData.startTime.slice(0, 5);
-      const end_time =
+      const localEndTime =
         meetingData.endTime.length === 5
           ? meetingData.endTime
           : meetingData.endTime.slice(0, 5);
+      const startUtc = convertLocalMeetingToUtc(localDate, localStartTime);
+      const endUtc = convertLocalMeetingToUtc(localDate, localEndTime);
+      const meeting_date = startUtc.utcDate;
+      const meeting_time = startUtc.utcTime;
       const extensions = [extension.slice(0, 15) || meetingData.hostEmail?.slice(0, 15) || "0"];
-      const start_date_time = `${meeting_date}T${meeting_time}:00`;
-      const end_date_time = `${meeting_date}T${end_time}:00`;
+      const start_date_time =
+        startUtc.utcIso || `${meeting_date}T${meeting_time}:00Z`;
+      const end_date_time =
+        endUtc.utcIso || `${endUtc.utcDate}T${endUtc.utcTime}:00Z`;
       try {
         await createMeeting({
           name: meetingData.title.trim(),

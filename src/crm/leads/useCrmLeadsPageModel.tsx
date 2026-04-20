@@ -56,6 +56,8 @@ import {
   formatDateForTable,
   checkRequiredFields,
   GlobalDateFormat,
+  convertLocalMeetingToUtc,
+  convertUtcMeetingToLocal,
 } from "@utils/Helper";
 import {
   Target,
@@ -1873,11 +1875,16 @@ export function useCrmLeadsPageModel() {
         extensions.push((session?.user as any)?.extension || "admin");
       }
 
+      const utcMeeting = convertLocalMeetingToUtc(
+        String(meetingData.meetingDate || "").slice(0, 10),
+        String(meetingData.meetingTime || "").slice(0, 5),
+      );
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
+        meeting_date: utcMeeting.utcDate || meetingData.meetingDate,
+        meeting_time: utcMeeting.utcTime || meetingData.meetingTime,
+        ...(utcMeeting.utcIso && { start_date_time: utcMeeting.utcIso }),
         extensions,
       };
 
@@ -1948,10 +1955,14 @@ export function useCrmLeadsPageModel() {
   // Handle edit meeting click
   const handleEditMeeting = useCallback(
     (meeting: any) => {
-      const meetingDate = toIsoDateInputValueFromDbField(meeting.meeting_date);
-
-      // Format time for input (HH:MM)
-      const meetingTime = meeting.meeting_time || "";
+      const utcDateRaw = toIsoDateInputValueFromDbField(meeting.meeting_date);
+      const utcTimeRaw = meeting.meeting_time || "";
+      const localized = convertUtcMeetingToLocal(
+        String(utcDateRaw || "").slice(0, 10),
+        String(utcTimeRaw || "").slice(0, 5),
+      );
+      const meetingDate = localized.localDate || utcDateRaw;
+      const meetingTime = localized.localTime || utcTimeRaw;
 
       const meetingExtensionStrings =
         meeting.extensions && Array.isArray(meeting.extensions)

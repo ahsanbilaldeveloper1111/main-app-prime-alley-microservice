@@ -5719,6 +5719,7 @@ const CrmCompanyManagement = () => {
                 }}
                 recordType="company"
                 recordId={selectedCompany?.id || selectedCompany?.rawData?.id}
+                onPlayCallRecording={handlePlayCallRecording}
                 recordLink={{
                   label: "View record",
                   onClick: () => {

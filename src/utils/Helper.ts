@@ -611,6 +611,119 @@ export const formatCrmPreviewDateTime = (
   }
 };
 
+/**
+ * Convert a local-meeting date/time pair (as chosen by the user in a picker)
+ * into UTC strings suitable for transport to the backend. The backend stores
+ * meeting_date / meeting_time / start_date_time / end_date_time in UTC.
+ *
+ * Inputs: localDate "YYYY-MM-DD" and localTime "HH:mm".
+ * Returns UTC-equivalent date ("YYYY-MM-DD"), time ("HH:mm"), and ISO string.
+ */
+export const convertLocalMeetingToUtc = (
+  localDate: string,
+  localTime: string,
+): { utcDate: string; utcTime: string; utcIso: string } => {
+  const m = moment(`${localDate} ${localTime}`, "YYYY-MM-DD HH:mm");
+  if (!m.isValid()) {
+    return { utcDate: localDate, utcTime: localTime, utcIso: "" };
+  }
+  const u = m.clone().utc();
+  return {
+    utcDate: u.format("YYYY-MM-DD"),
+    utcTime: u.format("HH:mm"),
+    utcIso: u.toISOString(),
+  };
+};
+
+/**
+ * Convert UTC-stored meeting date/time values from the backend into local
+ * date/time strings for display / prefilling the meeting form.
+ */
+export const convertUtcMeetingToLocal = (
+  utcDate: string | null | undefined,
+  utcTime: string | null | undefined,
+): { localDate: string; localTime: string } => {
+  if (!utcDate || !utcTime) {
+    return { localDate: utcDate ?? "", localTime: utcTime ?? "" };
+  }
+  const datePart = String(utcDate).slice(0, 10);
+  const timePart = String(utcTime).trim().slice(0, 5);
+  const m = moment.utc(`${datePart} ${timePart}`, "YYYY-MM-DD HH:mm");
+  if (!m.isValid()) {
+    return { localDate: datePart, localTime: timePart };
+  }
+  const l = m.clone().local();
+  return {
+    localDate: l.format("YYYY-MM-DD"),
+    localTime: l.format("HH:mm"),
+  };
+};
+
+/**
+ * Format a UTC-stored meeting (date + time) in the viewer's local timezone.
+ * Returns a human-readable string like "30 March, 2025 at 03:45 PM".
+ */
+export const formatMeetingDateTimeLocal = (
+  utcDate: string | null | undefined,
+  utcTime: string | null | undefined,
+): string => {
+  if (!utcDate) return "";
+  try {
+    const datePart = String(utcDate).slice(0, 10);
+    const timePart = (utcTime ? String(utcTime).trim().slice(0, 5) : "") || "00:00";
+    const m = moment.utc(`${datePart} ${timePart}`, "YYYY-MM-DD HH:mm");
+    if (!m.isValid()) return "";
+    return m.local().format("D MMMM, YYYY [at] hh:mm A");
+  } catch (error) {
+    console.error("Error formatting meeting datetime:", error);
+    return "";
+  }
+};
+
+/**
+ * Format a UTC-stored meeting time (only) in the viewer's local timezone.
+ * Returns a string like "03:45 PM". The date is needed to compute the
+ * correct local time (DST / timezone offsets depend on the date).
+ */
+export const formatMeetingTimeLocal = (
+  utcDate: string | null | undefined,
+  utcTime: string | null | undefined,
+): string => {
+  if (!utcDate || !utcTime) return "";
+  try {
+    const datePart = String(utcDate).slice(0, 10);
+    const timePart = String(utcTime).trim().slice(0, 5);
+    const m = moment.utc(`${datePart} ${timePart}`, "YYYY-MM-DD HH:mm");
+    if (!m.isValid()) return "";
+    return m.local().format("hh:mm A");
+  } catch (error) {
+    console.error("Error formatting meeting time:", error);
+    return "";
+  }
+};
+
+/**
+ * Format a UTC-stored meeting date in the viewer's local timezone. The time
+ * is needed because the local calendar day can shift across the UTC day
+ * boundary.
+ */
+export const formatMeetingDateLocal = (
+  utcDate: string | null | undefined,
+  utcTime: string | null | undefined,
+): string => {
+  if (!utcDate) return "";
+  try {
+    const datePart = String(utcDate).slice(0, 10);
+    const timePart = (utcTime ? String(utcTime).trim().slice(0, 5) : "") || "00:00";
+    const m = moment.utc(`${datePart} ${timePart}`, "YYYY-MM-DD HH:mm");
+    if (!m.isValid()) return "";
+    return m.local().format("D MMMM, YYYY");
+  } catch (error) {
+    console.error("Error formatting meeting date:", error);
+    return "";
+  }
+};
+
 /** Alias of {@link formatDuration} (zero-padded `HH:MM:SS`). */
 export const formatMinutesAndSeconds = (seconds: number): string =>
   formatDuration(seconds);

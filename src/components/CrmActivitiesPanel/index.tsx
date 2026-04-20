@@ -62,6 +62,10 @@ import RichTextEditor from "@pages/help-center/partials/RichTextEditor";
 import {
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
+  convertLocalMeetingToUtc,
+  convertUtcMeetingToLocal,
+  formatMeetingDateLocal,
+  formatMeetingTimeLocal,
   ModuleSlug,
 } from "@utils/Helper";
 import { ListCallLogs } from "@utils/calls";
@@ -855,18 +859,24 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       summary: string;
     }) => {
       if (recordId == null || Number.isNaN(Number(recordId))) return;
-      const meeting_date = meetingData.startDate.slice(0, 10);
-      const meeting_time =
+      const localDate = meetingData.startDate.slice(0, 10);
+      const localStartTime =
         meetingData.startTime.length === 5
           ? meetingData.startTime
           : meetingData.startTime.slice(0, 5);
-      const end_time =
+      const localEndTime =
         meetingData.endTime.length === 5
           ? meetingData.endTime
           : meetingData.endTime.slice(0, 5);
+      const startUtc = convertLocalMeetingToUtc(localDate, localStartTime);
+      const endUtc = convertLocalMeetingToUtc(localDate, localEndTime);
+      const meeting_date = startUtc.utcDate;
+      const meeting_time = startUtc.utcTime;
       const extensions = [extension.slice(0, 15) || "0"];
-      const start_date_time = `${meeting_date}T${meeting_time}:00`;
-      const end_date_time = `${meeting_date}T${end_time}:00`;
+      const start_date_time =
+        startUtc.utcIso || `${meeting_date}T${meeting_time}:00Z`;
+      const end_date_time =
+        endUtc.utcIso || `${endUtc.utcDate}T${endUtc.utcTime}:00Z`;
       try {
         await createMeeting({
           name: meetingData.title.trim(),
@@ -905,30 +915,36 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       try {
         setEditingMeetingId(meeting.id);
         const full = await getMeeting(meeting.id);
-        const date =
+        const utcDateRaw =
           (full as any)?.meeting_date?.slice?.(0, 10) ??
           String((full as any)?.meeting_date ?? meeting.meeting_date ?? "").slice(
             0,
             10,
           );
-        const startTime =
+        const utcStartTimeRaw =
           String((full as any)?.meeting_time ?? meeting.meeting_time ?? "")
             .trim()
             .slice(0, 5) || "09:00";
-        const endTime =
+        const utcEndTimeRaw =
           String((full as any)?.end_time ?? (full as any)?.endTime ?? "").slice(
             0,
             5,
           ) ||
           (() => {
-            const [h, m] = startTime.split(":").map((x) => Number(x));
+            const [h, m] = utcStartTimeRaw.split(":").map((x) => Number(x));
             const d = new Date();
-            d.setHours(h || 0, m || 0, 0, 0);
-            d.setMinutes(d.getMinutes() + 30);
-            const hh = String(d.getHours()).padStart(2, "0");
-            const mm = String(d.getMinutes()).padStart(2, "0");
+            d.setUTCHours(h || 0, m || 0, 0, 0);
+            d.setUTCMinutes(d.getUTCMinutes() + 30);
+            const hh = String(d.getUTCHours()).padStart(2, "0");
+            const mm = String(d.getUTCMinutes()).padStart(2, "0");
             return `${hh}:${mm}`;
           })();
+        const { localDate: date, localTime: startTime } =
+          convertUtcMeetingToLocal(utcDateRaw, utcStartTimeRaw);
+        const { localTime: endTime } = convertUtcMeetingToLocal(
+          utcDateRaw,
+          utcEndTimeRaw,
+        );
         const attendeesRaw =
           (full as any)?.attendees ??
           (full as any)?.emails ??
@@ -974,17 +990,23 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
       summary: string;
     }) => {
       if (editingMeetingId == null) return;
-      const meeting_date = meetingData.startDate.slice(0, 10);
-      const meeting_time =
+      const localDate = meetingData.startDate.slice(0, 10);
+      const localStartTime =
         meetingData.startTime.length === 5
           ? meetingData.startTime
           : meetingData.startTime.slice(0, 5);
-      const end_time =
+      const localEndTime =
         meetingData.endTime.length === 5
           ? meetingData.endTime
           : meetingData.endTime.slice(0, 5);
-      const start_date_time = `${meeting_date}T${meeting_time}:00`;
-      const end_date_time = `${meeting_date}T${end_time}:00`;
+      const startUtc = convertLocalMeetingToUtc(localDate, localStartTime);
+      const endUtc = convertLocalMeetingToUtc(localDate, localEndTime);
+      const meeting_date = startUtc.utcDate;
+      const meeting_time = startUtc.utcTime;
+      const start_date_time =
+        startUtc.utcIso || `${meeting_date}T${meeting_time}:00Z`;
+      const end_date_time =
+        endUtc.utcIso || `${endUtc.utcDate}T${endUtc.utcTime}:00Z`;
       try {
         await updateMeeting(editingMeetingId, {
           name: meetingData.title.trim(),
@@ -2762,6 +2784,12 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                   ? formatCrmPreviewDateTime(meeting.updated_at)
                   : "";
                 const meetingDate = meeting.meeting_date?.slice(0, 10) ?? "";
+                const meetingDateLocal = meetingDate
+                  ? formatMeetingDateLocal(meetingDate, meeting.meeting_time)
+                  : "";
+                const meetingTimeLocal = meeting.meeting_time
+                  ? formatMeetingTimeLocal(meetingDate, meeting.meeting_time)
+                  : "";
                 const iconBtnStyle: React.CSSProperties = {
                   background: "transparent",
                   border: "none",
@@ -2811,10 +2839,8 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
                             }}
                           >
                             {meeting.meeting_type} ·{" "}
-                            {meetingDate
-                              ? formatCrmPreviewDate(meeting.meeting_date)
-                              : "—"}{" "}
-                            {meeting.meeting_time ?? ""}
+                            {meetingDateLocal || "—"}{" "}
+                            {meetingTimeLocal}
                             {meeting.status ? ` · ${meeting.status}` : ""}
                           </p>
                           {meeting.meet_link && (

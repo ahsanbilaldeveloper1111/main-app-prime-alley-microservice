@@ -144,6 +144,23 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
     return `${year}-${month}-${day}`;
   };
 
+  const todayDateString = useMemo(() => formatDateForInput(new Date()), []);
+
+  const isSameCalendarDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const isDateTimeInPast = (date: Date, hhmm: string): boolean => {
+    const [hStr, mStr] = (hhmm || '').split(':');
+    const h = Number(hStr);
+    const m = Number(mStr);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
+    const candidate = new Date(date);
+    candidate.setHours(h, m, 0, 0);
+    return candidate.getTime() < Date.now();
+  };
+
   const [meetingsForCalendar, setMeetingsForCalendar] = useState<
     Array<{ id?: number; name?: string; meeting_date?: string; meeting_time?: string }>
   >([]);
@@ -367,6 +384,14 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
     }
     if (!location.trim()) {
       alert('Please select a location');
+      return;
+    }
+    if (isDateTimeInPast(startDate, startTime)) {
+      alert('Meetings cannot be scheduled in the past. Please pick a future date and time.');
+      return;
+    }
+    if (endTime <= startTime) {
+      alert('End time must be after start time.');
       return;
     }
     const cleanAttendees = normalizeEmailList(attendees);
@@ -622,10 +647,12 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     <input
                       ref={startDateInputRef}
                       type="date"
+                      min={todayDateString}
                       value={formatDateForInput(startDate)}
                       onChange={(e) => {
                         const v = e.target.value;
                         if (!v) return;
+                        if (v < todayDateString) return;
                         handleDateSelect(new Date(`${v}T00:00:00`));
                       }}
                       style={{
@@ -675,9 +702,16 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         width: '100%',
                       }}
                     >
-                      {timeSlots.map(time => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
+                      {timeSlots.map(time => {
+                        const isPast =
+                          isSameCalendarDay(startDate, new Date()) &&
+                          isDateTimeInPast(startDate, time);
+                        return (
+                          <option key={time} value={time} disabled={isPast}>
+                            {time}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
@@ -717,9 +751,21 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         width: '100%',
                       }}
                     >
-                      {timeSlots.map(time => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
+                      {timeSlots.map(time => {
+                        const isPast =
+                          isSameCalendarDay(startDate, new Date()) &&
+                          isDateTimeInPast(startDate, time);
+                        const isBeforeStart = time <= startTime;
+                        return (
+                          <option
+                            key={time}
+                            value={time}
+                            disabled={isPast || isBeforeStart}
+                          >
+                            {time}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
@@ -1289,13 +1335,23 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 const isCurrentDay = isToday(currentDayDate);
                 const isSelectedDay = isSelected(currentDayDate);
                 
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dayAtMidnight = new Date(currentDayDate);
+                dayAtMidnight.setHours(0, 0, 0, 0);
+                const isPastDay = dayAtMidnight.getTime() < today.getTime();
                 return (
                   <div
                     key={day}
                     role="button"
-                    tabIndex={0}
-                    onClick={() => handleDateSelect(currentDayDate)}
+                    tabIndex={isPastDay ? -1 : 0}
+                    aria-disabled={isPastDay}
+                    onClick={() => {
+                      if (isPastDay) return;
+                      handleDateSelect(currentDayDate);
+                    }}
                     onKeyDown={(e) => {
+                      if (isPastDay) return;
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         handleDateSelect(currentDayDate);
@@ -1306,7 +1362,8 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                       textAlign: 'center',
                       borderRight: index < weekDays.length - 1 ? '1px solid #e2e8f0' : 'none',
                       backgroundColor: isSelectedDay ? '#f7fafc' : '#ffffff',
-                      cursor: 'pointer',
+                      cursor: isPastDay ? 'not-allowed' : 'pointer',
+                      opacity: isPastDay ? 0.45 : 1,
                     }}
                   >
                     <div style={{
@@ -1374,10 +1431,15 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                       }}
                       onClick={() => {
                         const d = getWeekDayDate(dayIndex);
-                        handleDateSelect(d);
                         const startHourStr = hour.toString().padStart(2, '0');
-                        setStartTime(`${startHourStr}:00`);
-                        setEndTime(`${startHourStr}:30`);
+                        const nextStart = `${startHourStr}:00`;
+                        const nextEnd = `${startHourStr}:30`;
+                        if (isDateTimeInPast(d, nextStart)) {
+                          return;
+                        }
+                        handleDateSelect(d);
+                        setStartTime(nextStart);
+                        setEndTime(nextEnd);
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#f0f4f8';

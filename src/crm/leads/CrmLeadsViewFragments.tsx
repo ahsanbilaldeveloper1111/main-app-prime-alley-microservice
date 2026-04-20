@@ -27,6 +27,7 @@ import { Country, State, City } from "country-state-city";
 import {
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
+  formatMeetingDateLocal,
   RECORD_TYPES,
 } from "@utils/Helper";
 import {
@@ -1892,9 +1893,14 @@ function CrmLeadViewModalRightPanel() {
                                         }}
                                       >
                                         {meeting.meeting_date
-                                          ? formatCrmPreviewDate(
+                                          ? formatMeetingDateLocal(
                                               meeting.meeting_date,
-                                            ) || "N/A"
+                                              meeting.meeting_time,
+                                            ) ||
+                                            formatCrmPreviewDate(
+                                              meeting.meeting_date,
+                                            ) ||
+                                            "N/A"
                                           : "N/A"}
                                       </div>
                                       {meeting.meeting_outcome && (
