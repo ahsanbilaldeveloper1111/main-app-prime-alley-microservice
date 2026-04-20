@@ -39,6 +39,64 @@ interface MeetingModalProps {
   }) => void | Promise<void>;
 }
 
+type CalendarMeeting = {
+  id?: number;
+  name?: string;
+  meeting_date?: string;
+  meeting_time?: string;
+};
+
+const findMeetingsAtHour = (
+  meetings: ReadonlyArray<CalendarMeeting>,
+  dateKey: string,
+  hour: number,
+): CalendarMeeting[] => {
+  const isMatch = (m: CalendarMeeting) => {
+    const d = (m.meeting_date || '').slice(0, 10);
+    if (d !== dateKey) return false;
+    const t = (m.meeting_time || '').slice(0, 2);
+    const h = Number(t);
+    return !Number.isNaN(h) && h === hour;
+  };
+  return meetings.filter(isMatch);
+};
+
+const MEETING_BADGE_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  top: 4,
+  left: 4,
+  right: 4,
+  backgroundColor: '#e3f2fd',
+  border: '1px solid #2196f3',
+  borderRadius: '4px',
+  padding: '4px 8px',
+  fontSize: '12px',
+  color: '#141414',
+  fontWeight: '500',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const WeekCellMeetingBadge: React.FC<{
+  meetings: ReadonlyArray<CalendarMeeting>;
+  cellDate: Date;
+  hour: number;
+}> = ({ meetings, cellDate, hour }) => {
+  const dateKey = cellDate.toISOString().slice(0, 10);
+  const matches = findMeetingsAtHour(meetings, dateKey, hour);
+  if (matches.length === 0) return null;
+  const first = matches[0];
+  const extra = matches.length - 1;
+  const label = first.name || 'Meeting';
+  return (
+    <div style={MEETING_BADGE_STYLE} title={label}>
+      {label}
+      {extra > 0 ? ` (+${extra})` : ''}
+    </div>
+  );
+};
+
 const MeetingModal: React.FC<MeetingModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -162,7 +220,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
   };
 
   const [meetingsForCalendar, setMeetingsForCalendar] = useState<
-    Array<{ id?: number; name?: string; meeting_date?: string; meeting_time?: string }>
+    CalendarMeeting[]
   >([]);
 
   useEffect(() => {
@@ -1456,44 +1514,11 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         e.currentTarget.style.backgroundColor = '#fafafa';
                       }}
                     >
-                      {(() => {
-                        const cellDate = getWeekDayDate(dayIndex);
-                        const dateKey = cellDate.toISOString().slice(0, 10);
-                        const matches = meetingsForCalendar.filter((m) => {
-                          const d = (m.meeting_date || '').slice(0, 10);
-                          if (d !== dateKey) return false;
-                          const t = (m.meeting_time || '').slice(0, 2);
-                          const h = Number(t);
-                          return !Number.isNaN(h) && h === hour;
-                        });
-                        if (matches.length === 0) return null;
-                        const first = matches[0];
-                        const extra = matches.length - 1;
-                        return (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: 4,
-                              left: 4,
-                              right: 4,
-                              backgroundColor: '#e3f2fd',
-                              border: '1px solid #2196f3',
-                              borderRadius: '4px',
-                              padding: '4px 8px',
-                              fontSize: '12px',
-                              color: '#141414',
-                              fontWeight: '500',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={first.name || 'Meeting'}
-                          >
-                            {first.name || 'Meeting'}
-                            {extra > 0 ? ` (+${extra})` : ''}
-                          </div>
-                        );
-                      })()}
+                      <WeekCellMeetingBadge
+                        meetings={meetingsForCalendar}
+                        cellDate={getWeekDayDate(dayIndex)}
+                        hour={hour}
+                      />
                     </button>
                     );
                   })}
