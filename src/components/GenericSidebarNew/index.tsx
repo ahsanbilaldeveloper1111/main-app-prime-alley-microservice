@@ -6869,84 +6869,93 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     const campaign = record.campaign as
       | { id?: number; name?: string }
       | undefined;
-    return (field: string, val: unknown): string => {
+
+    const USER_FIELDS = new Set([
+      "assigned_to",
+      "contact_owner",
+      "user_extension",
+    ]);
+    const DATETIME_FIELDS = new Set([
+      "start_date_time",
+      "end_date_time",
+      "meeting_start",
+      "meeting_end",
+    ]);
+    const LOCALE_DATETIME_OPTS: Intl.DateTimeFormatOptions = {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    };
+
+    const formatUserField = (val: unknown): string => {
+      const id =
+        typeof val === "string" || typeof val === "number" ? String(val) : "";
+      return resolveUser ? resolveUser(id) : fmt(val);
+    };
+
+    const formatCampaignField = (val: unknown): string | null => {
       if (
-        (field === "assigned_to" ||
-          field === "contact_owner" ||
-          field === "user_extension") &&
-        resolveUser
-      ) {
-        const id =
-          typeof val === "string" || typeof val === "number" ? String(val) : "";
-        return resolveUser(id);
-      }
-      if (
-        field === "campaign_id" &&
         campaign?.name &&
         val != null &&
         Number(val) === Number(campaign?.id)
-      )
-        return campaign.name;
-      if (field === "scheduled_call_at" && val) {
-        try {
-          if (typeof val !== "string" && typeof val !== "number") {
-            return fmt(val);
-          }
-          return new Date(String(val)).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        } catch {
-          return fmt(val);
-        }
-      }
-      if (
-        (field === "start_date_time" ||
-          field === "end_date_time" ||
-          field === "meeting_start" ||
-          field === "meeting_end") &&
-        val
       ) {
-        try {
-          if (typeof val !== "string" && typeof val !== "number") {
-            return fmt(val);
-          }
-          const raw = String(val);
-          const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
-          const iso = hasTz ? raw : `${raw}Z`;
-          return new Date(iso).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-        } catch {
-          return fmt(val);
-        }
+        return campaign.name;
       }
-      if (field === "meeting_date" && val) {
-        const dateStr = String(val).slice(0, 10);
-        const timeStr = String(
-          (record.meeting_time as string | undefined) ?? "00:00",
-        ).slice(0, 5);
-        return formatMeetingDateTimeLocal(dateStr, timeStr) || fmt(val);
-      }
-      if (field === "meeting_time" && val) {
-        const dateStr = String(
-          (record.meeting_date as string | undefined) ?? "",
-        ).slice(0, 10);
-        const timeStr = String(val).slice(0, 5);
-        if (dateStr) {
-          return (
-            formatMeetingDateTimeLocal(dateStr, timeStr) || fmt(val)
-          );
-        }
+      return null;
+    };
+
+    const formatLocaleDateTime = (
+      val: unknown,
+      toIso?: (raw: string) => string,
+    ): string => {
+      if (typeof val !== "string" && typeof val !== "number") return fmt(val);
+      try {
+        const raw = String(val);
+        const iso = toIso ? toIso(raw) : raw;
+        return new Date(iso).toLocaleString("en-US", LOCALE_DATETIME_OPTS);
+      } catch {
         return fmt(val);
       }
+    };
+
+    const ensureTzSuffix = (raw: string): string => {
+      const hasTz = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+      return hasTz ? raw : `${raw}Z`;
+    };
+
+    const formatMeetingDate = (val: unknown): string => {
+      if (typeof val !== "string" && typeof val !== "number") return fmt(val);
+      const dateStr = String(val).slice(0, 10);
+      const timeStr = String(
+        (record.meeting_time as string | undefined) ?? "00:00",
+      ).slice(0, 5);
+      return formatMeetingDateTimeLocal(dateStr, timeStr) || fmt(val);
+    };
+
+    const formatMeetingTime = (val: unknown): string => {
+      if (typeof val !== "string" && typeof val !== "number") return fmt(val);
+      const dateStr = String(
+        (record.meeting_date as string | undefined) ?? "",
+      ).slice(0, 10);
+      const timeStr = String(val).slice(0, 5);
+      if (!dateStr) return fmt(val);
+      return formatMeetingDateTimeLocal(dateStr, timeStr) || fmt(val);
+    };
+
+    return (field: string, val: unknown): string => {
+      if (USER_FIELDS.has(field) && resolveUser) return formatUserField(val);
+      if (field === "campaign_id") {
+        const name = formatCampaignField(val);
+        if (name !== null) return name;
+      }
+      if (field === "scheduled_call_at" && val) return formatLocaleDateTime(val);
+      if (DATETIME_FIELDS.has(field) && val) {
+        return formatLocaleDateTime(val, ensureTzSuffix);
+      }
+      if (field === "meeting_date" && val) return formatMeetingDate(val);
+      if (field === "meeting_time" && val) return formatMeetingTime(val);
       return fmt(val);
     };
   };

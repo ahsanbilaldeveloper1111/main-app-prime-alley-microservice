@@ -931,7 +931,7 @@ const CrmActivitiesPanelInnerRender: React.ForwardRefRenderFunction<
             5,
           ) ||
           (() => {
-            const [h, m] = utcStartTimeRaw.split(":").map((x) => Number(x));
+            const [h, m] = utcStartTimeRaw.split(":").map(Number);
             const d = new Date();
             d.setUTCHours(h || 0, m || 0, 0, 0);
             d.setUTCMinutes(d.getUTCMinutes() + 30);

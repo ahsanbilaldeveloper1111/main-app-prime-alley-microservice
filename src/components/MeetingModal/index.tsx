@@ -1341,29 +1341,26 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 dayAtMidnight.setHours(0, 0, 0, 0);
                 const isPastDay = dayAtMidnight.getTime() < today.getTime();
                 return (
-                  <div
+                  <button
                     key={day}
-                    role="button"
-                    tabIndex={isPastDay ? -1 : 0}
-                    aria-disabled={isPastDay}
+                    type="button"
+                    disabled={isPastDay}
                     onClick={() => {
                       if (isPastDay) return;
                       handleDateSelect(currentDayDate);
-                    }}
-                    onKeyDown={(e) => {
-                      if (isPastDay) return;
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleDateSelect(currentDayDate);
-                      }
                     }}
                     style={{
                       padding: '12px',
                       textAlign: 'center',
                       borderRight: index < weekDays.length - 1 ? '1px solid #e2e8f0' : 'none',
+                      borderTop: 'none',
+                      borderBottom: 'none',
+                      borderLeft: 'none',
                       backgroundColor: isSelectedDay ? '#f7fafc' : '#ffffff',
                       cursor: isPastDay ? 'not-allowed' : 'pointer',
                       opacity: isPastDay ? 0.45 : 1,
+                      font: 'inherit',
+                      color: 'inherit',
                     }}
                   >
                     <div style={{
@@ -1389,7 +1386,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     }}>
                       {currentDayDate.getDate()}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -1420,27 +1417,38 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                   </div>
 
                   {/* Day Cells */}
-                  {weekDays.map((_, dayIndex) => (
-                    <div
+                  {weekDays.map((_, dayIndex) => {
+                    const selectWeekCellSlot = () => {
+                      const d = getWeekDayDate(dayIndex);
+                      const startHourStr = hour.toString().padStart(2, '0');
+                      const nextStart = `${startHourStr}:00`;
+                      const nextEnd = `${startHourStr}:30`;
+                      if (isDateTimeInPast(d, nextStart)) {
+                        return;
+                      }
+                      handleDateSelect(d);
+                      setStartTime(nextStart);
+                      setEndTime(nextEnd);
+                    };
+                    return (
+                    <button
                       key={dayIndex}
+                      type="button"
+                      aria-label={`Schedule meeting at ${hour.toString().padStart(2, '0')}:00`}
                       style={{
                         borderRight: dayIndex < weekDays.length - 1 ? '1px solid #e2e8f0' : 'none',
+                        borderTop: 'none',
+                        borderBottom: 'none',
+                        borderLeft: 'none',
                         backgroundColor: '#fafafa',
                         cursor: 'pointer',
                         position: 'relative',
+                        padding: 0,
+                        font: 'inherit',
+                        color: 'inherit',
+                        textAlign: 'left',
                       }}
-                      onClick={() => {
-                        const d = getWeekDayDate(dayIndex);
-                        const startHourStr = hour.toString().padStart(2, '0');
-                        const nextStart = `${startHourStr}:00`;
-                        const nextEnd = `${startHourStr}:30`;
-                        if (isDateTimeInPast(d, nextStart)) {
-                          return;
-                        }
-                        handleDateSelect(d);
-                        setStartTime(nextStart);
-                        setEndTime(nextEnd);
-                      }}
+                      onClick={selectWeekCellSlot}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#f0f4f8';
                       }}
@@ -1486,8 +1494,9 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                           </div>
                         );
                       })()}
-                    </div>
-                  ))}
+                    </button>
+                    );
+                  })}
                 </div>
               ))}
             </div>
