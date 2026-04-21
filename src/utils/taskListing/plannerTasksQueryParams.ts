@@ -56,9 +56,9 @@ export function applyPlannerTaskFiltersToListParams(
     return;
   }
 
-  const statusId = Number(filters.status);
-  if (Number.isFinite(statusId)) {
-    params.status_id = statusId;
+  const statusLabel = String(filters.status).trim();
+  if (statusLabel !== "") {
+    params.status = statusLabel;
   }
 }
 

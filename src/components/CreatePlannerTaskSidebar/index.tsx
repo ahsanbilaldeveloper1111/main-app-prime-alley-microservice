@@ -3,6 +3,7 @@ import { Form, Row, Col } from "react-bootstrap";
 import {
   X,
   Calendar,
+  Clock,
   FileText,
   Tag,
   Users,
@@ -23,6 +24,10 @@ import {
 } from "@utils/tasks";
 import { listStatuses } from "@utils/work-planner";
 import { getAutoTimezone } from "@utils/Helper";
+import {
+  formatPlannerDueTimeAsUtcIso,
+  parseApiDueTimeToTimeInput,
+} from "@utils/plannerTaskDueTime";
 import RichTextEditor from "../../pages/help-center/partials/RichTextEditor";
 import TaskSecondaryTabs from "@pages/planner/partials/TaskSecondaryTabs";
 import type { PlannerTaskEditScope } from "@planner/taskRowPermissions";
@@ -228,6 +233,7 @@ interface CreateTaskFormData {
   frequency: string;
   repeatInterval: number;
   repeatOn: string;
+  /** Local `HH:mm` for API `due_time`: with start date when recurring, with due date for regular/todo. */
   dueTime: string;
   /** Recurring tasks only; maps to API `is_active`. */
   recurringIsActive: boolean;
@@ -319,46 +325,6 @@ function recurringScheduleField(
     if (got) return got;
   }
   return fromRecord(readNestedRecurring(task));
-}
-
-/**
- * Interprets recurring task start date + local time in the user's timezone,
- * returns UTC ISO-8601 for API `due_time` (e.g. `2026-03-27T18:30:00.000Z`).
- */
-function formatRecurringDueTimeAsUtcIso(
-  startDate: string | null | undefined,
-  dueTimeLocal: string | null | undefined,
-): string | undefined {
-  const dateStr = startDate?.trim() ?? "";
-  const timeRaw = dueTimeLocal?.trim() ?? "";
-  if (!dateStr || !timeRaw) return undefined;
-  const time = timeRaw.slice(0, 5);
-  if (!/^\d{2}:\d{2}$/.test(time)) return undefined;
-  const local = new Date(`${dateStr}T${time}:00`);
-  if (Number.isNaN(local.getTime())) return undefined;
-  return local.toISOString();
-}
-
-/** Fill `<input type="time">` from API `due_time` (UTC ISO string or plain HH:mm). */
-function parseRecurringDueTimeForInput(dueTimeRaw: string | null | undefined): string {
-  if (dueTimeRaw == null || dueTimeRaw === "") return "";
-  const s = String(dueTimeRaw).trim();
-  if (s.includes("T")) {
-    const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) {
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
-      return `${hh}:${mm}`;
-    }
-  }
-  const timePattern = /(\d{1,2}):(\d{2})(?::\d{2})?/;
-  const timeMatch = timePattern.exec(s);
-  if (timeMatch) {
-    const h = Math.min(23, Math.max(0, Number.parseInt(timeMatch[1], 10)));
-    const m = Math.min(59, Math.max(0, Number.parseInt(timeMatch[2], 10)));
-    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-  }
-  return "";
 }
 
 /** Local calendar today as YYYY-MM-DD for `<input type="date" min>`. */
@@ -641,7 +607,7 @@ function buildInitialFormFromEdit(
   const dueTimeRaw = pickRecurringScalar(editTask, "due_time");
   const dueTime =
     typeof dueTimeRaw === "string"
-      ? parseRecurringDueTimeForInput(dueTimeRaw)
+      ? parseApiDueTimeToTimeInput(dueTimeRaw)
       : "";
   const topDue =
     typeof editTask.due_date === "string" && editTask.due_date.trim() !== ""
@@ -1364,10 +1330,17 @@ function buildPlannerSidebarPayloadRecord(
     } else if (fd.frequency === "monthly" && fd.repeatOn.trim()) {
       payload.repeat_on = fd.repeatOn.trim();
     }
-    const dueTimeUtc = formatRecurringDueTimeAsUtcIso(fd.startDate, fd.dueTime);
+    const dueTimeUtc = formatPlannerDueTimeAsUtcIso(fd.startDate, fd.dueTime);
     if (dueTimeUtc) payload.due_time = dueTimeUtc;
     payload.end_date = fd.dueDate || null;
     payload.is_active = fd.recurringIsActive;
+  } else if (taskTypeEff === "regular" || taskTypeEff === "todo") {
+    const dueTimeUtc = formatPlannerDueTimeAsUtcIso(fd.dueDate, fd.dueTime);
+    if (dueTimeUtc) {
+      payload.due_time = dueTimeUtc;
+    } else if (isEdit) {
+      payload.due_time = null;
+    }
   }
   return payload;
 }
@@ -1406,6 +1379,14 @@ function validatePlannerSidebarFormForSubmit(
       toast.error("Please select a day of the week");
       return false;
     }
+  }
+  if (
+    (taskTypeEff === "regular" || taskTypeEff === "todo") &&
+    formData.dueTime.trim() !== "" &&
+    formData.dueDate.trim() === ""
+  ) {
+    toast.error("Please set a due date when adding a due time");
+    return false;
   }
   if (formData.dueDate.trim()) {
     const minDue = minDueDateFromTodayAndStart(formData.startDate);
@@ -2066,12 +2047,18 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
   const handleDueDateInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const v = e.target.value;
-      setFormData((prev) => ({
-        ...prev,
-        dueDate: v
+      setFormData((prev) => {
+        const nextDue = v
           ? clampDueDateToMin(v, minDueDateFromTodayAndStart(prev.startDate))
-          : "",
-      }));
+          : "";
+        const clearTimeBecauseNoDueDate =
+          nextDue.trim() === "" && prev.taskType !== "recurring";
+        return {
+          ...prev,
+          dueDate: nextDue,
+          dueTime: clearTimeBecauseNoDueDate ? "" : prev.dueTime,
+        };
+      });
     },
     [],
   );
@@ -2155,6 +2142,12 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     color: "#141414",
     fontWeight: 600,
     marginBottom: 8,
+  };
+  const dueTimeFieldLabelStyle: React.CSSProperties = {
+    ...labelStyle,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
   };
   const groupClass = "mb-3";
   const dueDateMin = minDueDateFromTodayAndStart(formData.startDate);
@@ -2805,9 +2798,41 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   />
                 </Form.Group>
               </Col>
+              {(formData.taskType === "regular" || formData.taskType === "todo") && (
+                <Col xs={12} md={6}>
+                  <Form.Group className={groupClass}>
+                    <Form.Label
+                      style={dueTimeFieldLabelStyle}
+                      title="Optional — leave empty for no specific time"
+                    >
+                      <Clock size={16} style={{ flexShrink: 0 }} aria-hidden />
+                      <span>
+                        Due time{" "}
+                        <span
+                          style={{
+                            fontWeight: 500,
+                            color: "#64748b",
+                            fontSize: "12px",
+                          }}
+                        >
+                          (optional)
+                        </span>
+                      </span>
+                    </Form.Label>
+                    <Form.Control
+                      type="time"
+                      value={formData.dueTime}
+                      onChange={(e) =>
+                        setFormData({ ...formData, dueTime: e.target.value })
+                      }
+                      className="py-2"
+                      style={{ fontSize: "14px" }}
+                    />
+                  </Form.Group>
+                </Col>
+              )}
 
             </Row>
-
 
             {formData.taskType === "recurring" && (
               <>

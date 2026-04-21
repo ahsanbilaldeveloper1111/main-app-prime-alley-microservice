@@ -21,7 +21,6 @@ import {
   ArrowLeft,
   Edit,
   Trash2,
-  Plus,
   Calendar,
   Send,
   Upload,
@@ -1218,52 +1217,28 @@ const TaskDetailPage = () => {
             {detailTaskKind !== 'todo' && (
               <div className="p-3 bg-light rounded border mb-3">
                 <div className="small text-muted text-uppercase fw-semibold mb-2">Assignees</div>
-                <div className="d-flex flex-wrap gap-2 align-items-center">
-                  {(task.assignees || []).map((assignee: any) => {
-                    const extNumber = assignee.extension_number || '';
-                    const { name, initials } = getExtensionDisplay(extNumber, hierarchyDataExtensions);
-                    const assigneeKey =
-                      assignee.id === undefined || assignee.id === null
-                        ? `assignee-ext-${extNumber || 'unknown'}`
-                        : `assignee-${assignee.id}`;
-                    return (
-                      <div
-                        key={assigneeKey}
-                        title={name}
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {initials || 'UN'}
-                      </div>
-                    );
-                  })}
-                  {taskDetailPermissions.canOpenTaskEdit &&
-                    taskDetailPermissions.taskEditScope === 'full' && (
-                    <Button
-                      type="button"
-                      variant="light"
-                      aria-label="Edit assignees"
-                      className="d-flex align-items-center justify-content-center rounded-circle p-0 border-0"
-                      style={{
-                        width: 36,
-                        height: 36,
-                        backgroundColor: '#e2e8f0',
-                        color: '#64748b',
-                      }}
-                      onClick={() => setShowEditModal(true)}
-                    >
-                      <Plus size={16} />
-                    </Button>
+                <div className="d-flex flex-column gap-2">
+                  {(task.assignees || []).length === 0 ? (
+                    <span className="text-muted" style={{ fontSize: "0.9rem" }}>
+                      —
+                    </span>
+                  ) : (
+                    (task.assignees || []).map((assignee: any) => {
+                      const extNumber = assignee.extension_number || "";
+                      const { name } = getExtensionDisplay(extNumber, hierarchyDataExtensions);
+                      const assigneeKey =
+                        assignee.id === undefined || assignee.id === null
+                          ? `assignee-ext-${extNumber || "unknown"}`
+                          : `assignee-${assignee.id}`;
+                      return (
+                        <span
+                          key={assigneeKey}
+                          style={{ fontSize: "0.9rem", fontWeight: 500, color: "#1e293b" }}
+                        >
+                          {name}
+                        </span>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -1272,34 +1247,22 @@ const TaskDetailPage = () => {
             {watchers.length > 0 && (
               <div className="p-3 bg-light rounded border mb-3">
                 <div className="small text-muted text-uppercase fw-semibold mb-2">Watchers</div>
-                <div className="d-flex flex-wrap gap-2">
+                <div className="d-flex flex-column gap-2">
                   {watchers.map((watcher: any, idx: number) => {
-                    const extNumber = watcher.extension_number ?? watcher ?? '';
+                    const extNumber = watcher.extension_number ?? watcher ?? "";
                     const extStr = String(extNumber);
-                    const { name, initials } = getExtensionDisplay(extStr, hierarchyDataExtensions);
+                    const { name } = getExtensionDisplay(extStr, hierarchyDataExtensions);
                     const watcherKey =
                       watcher.id === undefined || watcher.id === null
-                        ? `watcher-${extStr || 'idx'}-${idx}`
+                        ? `watcher-${extStr || "idx"}-${idx}`
                         : `watcher-${watcher.id}`;
                     return (
-                      <div
+                      <span
                         key={watcherKey}
-                        title={name}
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          color: 'white',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                        }}
+                        style={{ fontSize: "0.9rem", fontWeight: 500, color: "#1e293b" }}
                       >
-                        {initials || '—'}
-                      </div>
+                        {name}
+                      </span>
                     );
                   })}
                 </div>

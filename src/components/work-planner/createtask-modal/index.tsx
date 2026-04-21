@@ -3,6 +3,7 @@ import { Modal, Button, Form, Row, Col, Badge } from 'react-bootstrap';
 import { 
   X, 
   Calendar, 
+  Clock,
   User, 
   FileText, 
   Tag,
@@ -25,6 +26,10 @@ import { toast } from 'react-toastify';
 import { listProjects, createTask, updateTask, listTasks } from '@utils/tasks';
 import { listStatuses } from '@utils/work-planner';
 import { getAutoTimezone } from '@utils/Helper';
+import {
+  formatPlannerDueTimeAsUtcIso,
+  parseApiDueTimeToTimeInput,
+} from '@utils/plannerTaskDueTime';
 import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
 
 interface Extension {
@@ -122,8 +127,28 @@ interface CreateTaskFormData {
   watcherIds: number[];
   dueDate: string;
   startDate: string;
+  /** Local HH:mm for API `due_time` (regular / todo only). */
+  dueTime: string;
   labelIds: number[];
   linkedRecordIds: number[];
+}
+
+function applyDueTimeToPayloadForRegularOrTodo(
+  taskType: 'regular' | 'recurring' | 'todo',
+  payload: Record<string, unknown>,
+  dueDate: string,
+  dueTime: string,
+  isEditMode: boolean,
+): void {
+  if (taskType !== 'regular' && taskType !== 'todo') {
+    return;
+  }
+  const utc = formatPlannerDueTimeAsUtcIso(dueDate, dueTime);
+  if (utc) {
+    payload.due_time = utc;
+  } else if (isEditMode) {
+    payload.due_time = null;
+  }
 }
 
 const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
@@ -197,6 +222,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         return extension ? Number(extension.id) : Number(extNum);
       }) || [];
 
+      const dueTimeRaw = editTask.due_time;
       return {
         title: editTask.title || '',
         description: editTask.description || '',
@@ -207,6 +233,10 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         watcherIds: watcherIds,
         dueDate: formatDateForInput(editTask.due_date),
         startDate: formatDateForInput(editTask.start_date),
+        dueTime:
+          typeof dueTimeRaw === 'string'
+            ? parseApiDueTimeToTimeInput(dueTimeRaw)
+            : '',
         labelIds: editTask.label_ids || editTask.labels?.map((l: any) => l.id) || [],
         linkedRecordIds: []
       };
@@ -222,6 +252,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       watcherIds: [],
       dueDate: '',
       startDate: '',
+      dueTime: '',
       labelIds: [],
       linkedRecordIds: []
     };
@@ -374,6 +405,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         watcherIds: [],
         dueDate: '',
         startDate: '',
+        dueTime: '',
         labelIds: [],
         linkedRecordIds: []
       });
@@ -510,6 +542,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       return;
     }
 
+    if (
+      (taskType === 'regular' || taskType === 'todo') &&
+      formData.dueTime.trim() !== '' &&
+      formData.dueDate.trim() === ''
+    ) {
+      toast.error('Please set a due date when adding a due time');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Map form data to API payload
@@ -546,6 +587,14 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       if (formData.linkedRecordIds && formData.linkedRecordIds.length > 0) {
         payload.parent_task_id = formData.linkedRecordIds[0];
       }
+
+      applyDueTimeToPayloadForRegularOrTodo(
+        taskType,
+        payload,
+        formData.dueDate,
+        formData.dueTime,
+        isEdit,
+      );
 
       // If edit mode, use updateTask API
       if (isEdit && editTask?.id) {
@@ -594,6 +643,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       return;
     }
 
+    if (
+      (taskType === 'regular' || taskType === 'todo') &&
+      formData.dueTime.trim() !== '' &&
+      formData.dueDate.trim() === ''
+    ) {
+      toast.error('Please set a due date when adding a due time');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // Map form data to API payload
@@ -629,6 +687,14 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
       if (formData.linkedRecordIds && formData.linkedRecordIds.length > 0) {
         payload.parent_task_id = formData.linkedRecordIds[0];
       }
+
+      applyDueTimeToPayloadForRegularOrTodo(
+        taskType,
+        payload,
+        formData.dueDate,
+        formData.dueTime,
+        isEdit,
+      );
 
       // If edit mode, use updateTask API
       if (isEdit && editTask?.id) {
@@ -915,7 +981,17 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 type="date"
                 placeholder="Select date"
                 value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFormData((prev) => ({
+                    ...prev,
+                    dueDate: v,
+                    dueTime:
+                      (taskType === 'regular' || taskType === 'todo') && v.trim() === ''
+                        ? ''
+                        : prev.dueTime,
+                  }));
+                }}
                 min={new Date().toISOString().split('T')[0]}
                 className="py-2"
                 style={{ fontSize: '14px' }}
@@ -944,6 +1020,45 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             </Form.Group>
           </Col>
         </Row>
+
+        {(taskType === 'regular' || taskType === 'todo') && (
+          <Row className="mb-3">
+            <Col xs={12} md={6} className="d-flex">
+              <Form.Group className="d-flex flex-column flex-fill mb-0">
+                <Form.Label
+                  className="fw-semibold mb-2"
+                  style={{
+                    fontSize: "14px",
+                    color: "#2d3748",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    minHeight: 44,
+                    whiteSpace: "nowrap",
+                  }}
+                  title="Optional — leave empty for no specific time"
+                >
+                  <Clock size={16} style={{ flexShrink: 0 }} aria-hidden />
+                  <span>
+                    Due time{" "}
+                    <span style={{ fontWeight: 500, color: "#64748b", fontSize: "12px" }}>
+                      (optional)
+                    </span>
+                  </span>
+                </Form.Label>
+                <Form.Control
+                  type="time"
+                  value={formData.dueTime}
+                  onChange={(e) =>
+                    setFormData({ ...formData, dueTime: e.target.value })
+                  }
+                  className="py-2 mt-auto"
+                  style={{ fontSize: "14px" }}
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+        )}
 
         {/* Assignees Field */}
         {taskType !== 'todo' && (

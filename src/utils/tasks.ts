@@ -117,7 +117,10 @@ interface ListTasksParams {
   type?: "regular" | "recurring" | "todo";
   project_id?: number;
   search?: string;
+  /** Filter by workflow status id (legacy); prefer `status` (name) when both are not needed. */
   status_id?: number;
+  /** Filter by workflow status name (query param `status`). */
+  status?: string;
   priority?: string;
   is_completed?: boolean;
   due_date_from?: string;
@@ -142,7 +145,8 @@ interface CreateTaskData {
   status_id?: number;
   priority?: string;
   due_date?: string;
-  due_time?: string;
+  /** UTC ISO timestamp when a calendar due time is set; omit or null when no time. */
+  due_time?: string | null;
   start_date?: string;
   estimated_hours?: string;
   progress?: number;
@@ -178,7 +182,8 @@ interface UpdateTaskData {
   status_id?: number;
   project_id?: number;
   due_date?: string;
-  due_time?: string;
+  /** UTC ISO for due time, or null to clear a previously stored time. */
+  due_time?: string | null;
   timezone?: string;
   start_date?: string;
   end_date?: string;
@@ -664,6 +669,7 @@ function buildListTasksSearchParams(params: ListTasksParams): URLSearchParams {
     project_id,
     search = '',
     status_id,
+    status: statusNameFilter,
     priority,
     is_completed,
     due_date_from,
@@ -684,7 +690,13 @@ function buildListTasksSearchParams(params: ListTasksParams): URLSearchParams {
 
   appendTruthyQueryParam(searchParams, 'project_id', project_id);
   appendTruthyQueryParam(searchParams, 'search', search);
-  appendTruthyQueryParam(searchParams, 'status_id', status_id);
+  const trimmedStatusName =
+    statusNameFilter != null ? String(statusNameFilter).trim() : "";
+  if (trimmedStatusName !== "") {
+    searchParams.append("status", trimmedStatusName);
+  } else {
+    appendTruthyQueryParam(searchParams, "status_id", status_id);
+  }
   appendTruthyQueryParam(searchParams, 'priority', priority);
   appendBooleanIfDefined(searchParams, 'is_completed', is_completed);
   appendTruthyQueryParam(searchParams, 'due_date_from', due_date_from);
