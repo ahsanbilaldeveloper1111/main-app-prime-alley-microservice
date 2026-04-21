@@ -1800,7 +1800,7 @@ export const updateProduct = async (
   try {
     const isMultipart = data.logo_file instanceof File;
     const body = isMultipart ? buildProductMultipartBody(data) : data;
-    const response = await axiosInstance.put(
+    const response = await axiosInstance.post(
       `/accounting/products/${id}`,
       body,
       {
