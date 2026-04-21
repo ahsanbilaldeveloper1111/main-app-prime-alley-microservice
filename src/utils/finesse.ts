@@ -2,6 +2,9 @@ import axiosInstance from "./axios";
 
 const prefix = "finesse";
 
+/** State updates use `/api/v1/finesse/...` per API spec; other Finesse routes remain `/api/finesse/...`. */
+const FINESSE_V1_PREFIX = "v1/finesse";
+
 // ==================== Storage ====================
 
 export const FINESSE_USER_DATA_KEY = "finesseResponseData";
@@ -57,6 +60,9 @@ export interface FinesseUserData {
   teamName?: string;
   teams?: Array<{ id: number; name: string; uri: string }>;
   settings?: Record<string, string>;
+  /** Returned on link/login; normalized into `settings.finesseClusterId` for roster STOMP. */
+  clusterId?: string | number;
+  finesseClusterId?: string | number;
 }
 
 export const setFinesseUserData = (data: FinesseUserData): void => {
@@ -114,6 +120,162 @@ export const clearFinesseUserData = (): void => {
   }
 };
 
+/** After explicit Finesse logout, block auto re-link until the user clicks Connect (Campaign Manager/Console). */
+const FINESSE_MANUAL_RECONNECT_KEY = "finesseManualReconnectRequired";
+
+export const setFinesseManualReconnectRequired = (): void => {
+  if (globalThis.window === undefined) return;
+  try {
+    globalThis.sessionStorage.setItem(FINESSE_MANUAL_RECONNECT_KEY, "1");
+  } catch {
+    // ignore
+  }
+};
+
+export const clearFinesseManualReconnectRequired = (): void => {
+  if (globalThis.window === undefined) return;
+  try {
+    globalThis.sessionStorage.removeItem(FINESSE_MANUAL_RECONNECT_KEY);
+  } catch {
+    // ignore
+  }
+};
+
+export const getFinesseManualReconnectRequired = (): boolean => {
+  if (globalThis.window === undefined) return false;
+  try {
+    return (
+      globalThis.sessionStorage.getItem(FINESSE_MANUAL_RECONNECT_KEY) === "1"
+    );
+  } catch {
+    return false;
+  }
+};
+
+/** User.state / User.pendingState values that mean the agent is signed out of Finesse (incl. admin force sign-out). */
+const FINESSE_LOGGED_OUT_AGENT_STATES = new Set([
+  "LOGOUT",
+  "NOT_LOGGED_IN",
+  "LOGGED_OUT",
+]);
+
+export function isFinesseAgentLoggedOutStateField(value: unknown): boolean {
+  if (value == null) return false;
+  const s = String(value).trim().toUpperCase();
+  return s !== "" && FINESSE_LOGGED_OUT_AGENT_STATES.has(s);
+}
+
+/** Logged-out or offline — used for filters and roster display. */
+export function isFinesseAgentOfflineLikeState(value: unknown): boolean {
+  if (isFinesseAgentLoggedOutStateField(value)) return true;
+  if (value == null) return false;
+  return String(value).trim().toUpperCase() === "OFFLINE";
+}
+
+/**
+ * Effective agent `state` for UI (TopBar) from STOMP / API user rows.
+ * - LOGOUT/OFFLINE pending while state lags → prefer pending.
+ * - READY ↔ NOT_READY transitions often expose NOT_READY in `pendingState` first → prefer pending when set.
+ */
+export function getFinesseEffectiveAgentStateFromStatePayload(
+  payload: unknown,
+): string | undefined {
+  if (payload == null || typeof payload !== "object") return undefined;
+  const p = payload as Record<string, unknown>;
+  let state: unknown = p.state;
+  let pendingState: unknown = p.pendingState;
+  const nested = p.User ?? p.user;
+  if (nested && typeof nested === "object") {
+    const u = nested as Record<string, unknown>;
+    state = state ?? u.state;
+    pendingState = pendingState ?? u.pendingState;
+  }
+  const pendStr =
+    pendingState != null && String(pendingState).trim() !== ""
+      ? String(pendingState).trim()
+      : "";
+  const stateStr =
+    state != null && String(state).trim() !== "" ? String(state).trim() : "";
+
+  if (pendStr !== "") {
+    const pu = pendStr.toUpperCase();
+    if (isFinesseAgentLoggedOutStateField(pendingState) || pu === "OFFLINE") {
+      return pendStr;
+    }
+    if (
+      pu === "NOT_READY" ||
+      pu === "READY" ||
+      pu === "LOGIN" ||
+      pu === "RESERVED_OUTBOUND"
+    ) {
+      return pendStr;
+    }
+  }
+  if (stateStr !== "") return stateStr;
+  if (pendStr !== "") return pendStr;
+  return undefined;
+}
+
+/** Extract login from a Finesse user `state` notification body (flat or nested User). */
+export function getFinesseStateEventLoginId(payload: unknown): string | null {
+  if (payload == null || typeof payload !== "object") return null;
+  const p = payload as Record<string, unknown>;
+  const direct = p.loginId ?? p.loginName;
+  if (typeof direct === "string" && direct.trim() !== "") return direct.trim();
+  const nested = p.User ?? p.user;
+  if (nested && typeof nested === "object") {
+    const u = nested as Record<string, unknown>;
+    const id = u.loginId ?? u.loginName;
+    if (typeof id === "string" && id.trim() !== "") return id.trim();
+  }
+  return null;
+}
+
+export function finesseStatePayloadIndicatesLoggedOut(payload: unknown): boolean {
+  if (payload == null || typeof payload !== "object") return false;
+  const p = payload as Record<string, unknown>;
+  return (
+    isFinesseAgentLoggedOutStateField(p.state) ||
+    isFinesseAgentLoggedOutStateField(p.pendingState)
+  );
+}
+
+/**
+ * When the payload omits login fields, the STOMP destination is still per-user — treat as self.
+ */
+export function finesseStateEventSubjectMatchesViewer(
+  payload: unknown,
+  viewerLogin: string | null | undefined,
+): boolean {
+  if (viewerLogin == null || String(viewerLogin).trim() === "") return false;
+  const id = getFinesseStateEventLoginId(payload);
+  if (id == null || id === "") return true;
+  return id.trim().toLowerCase() === String(viewerLogin).trim().toLowerCase();
+}
+
+export function shouldApplyFinesseRemoteLogoutFromStateEvent(
+  payload: unknown,
+  streamFinesseUserId: string | null | undefined,
+): boolean {
+  if (streamFinesseUserId == null || String(streamFinesseUserId).trim() === "") {
+    return false;
+  }
+  if (!finesseStatePayloadIndicatesLoggedOut(payload)) return false;
+  return finesseStateEventSubjectMatchesViewer(payload, streamFinesseUserId);
+}
+
+/**
+ * Clear Finesse session and show manual “Connect to Finesse” (same as user-initiated logout without unlink API when already gone server-side).
+ */
+export function applyFinesseRemoteForcedLogout(): void {
+  if (globalThis.window === undefined) return;
+  clearFinesseUserData();
+  setFinesseManualReconnectRequired();
+  globalThis.dispatchEvent(
+    new CustomEvent("finesse-require-reauth", { detail: { manualConnect: true } }),
+  );
+}
+
 /**
  * Resolve effective teamId for API calls and UI. When user is linked (data present), uses
  * finesseSelectedTeamId from storage so the teams dropdown and all APIs use the same team.
@@ -127,21 +289,94 @@ export const getEffectiveTeamId = (
 };
 
 /**
- * Normalize user data so teamId is set from teams when API returns teamId null.
+ * Finesse roster STOMP topic uses `/topic/finesse/cluster/{clusterId}/team/{teamId}/roster/state`.
+ * Order: `NEXT_PUBLIC_FINESSE_CLUSTER_ID`, then `clusterId` / `finesseClusterId` from link/login payload
+ * (merged into settings by `normalizeFinesseUserData`), then `settings.finesseClusterId` / `settings.clusterId`.
+ */
+export const getFinesseClusterId = (): string | null => {
+  const env = process.env.NEXT_PUBLIC_FINESSE_CLUSTER_ID;
+  if (env != null && String(env).trim() !== "") return String(env).trim();
+  if (globalThis.window === undefined) return null;
+  try {
+    const data = getFinesseUserData();
+    const s =
+      data?.settings?.finesseClusterId ??
+      data?.settings?.clusterId ??
+      null;
+    if (s != null && String(s).trim() !== "") return String(s).trim();
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
+/**
+ * If GET teamUsers (or similar) includes a cluster id, persist it on the linked user so the
+ * SSE stream can subscribe to `/topic/finesse/cluster/{clusterId}/team/{teamId}/roster/state`.
+ * Returns true when storage was updated (caller may want to reconnect the Finesse EventSource).
+ */
+export function mergeClusterIntoStoredUserFromTeamPayload(teamPayload: unknown): boolean {
+  if (teamPayload == null || typeof teamPayload !== "object") return false;
+  const p = teamPayload as Record<string, unknown>;
+  const fromSettings =
+    typeof p.settings === "object" && p.settings !== null
+      ? (p.settings as Record<string, unknown>)
+      : null;
+  const raw =
+    p.clusterId ??
+    p.finesseClusterId ??
+    fromSettings?.clusterId ??
+    fromSettings?.finesseClusterId;
+  if (raw == null || String(raw).trim() === "") return false;
+  const nextId = String(raw).trim();
+  const ud = getFinesseUserData();
+  if (!ud) return false;
+  const cur =
+    ud.settings?.finesseClusterId ?? ud.settings?.clusterId ?? "";
+  if (String(cur).trim() === nextId) return false;
+  setFinesseUserData({
+    ...ud,
+    settings: { ...ud.settings, finesseClusterId: nextId },
+  });
+  return true;
+}
+
+/**
+ * Normalize user data: merge cluster id from API into `settings.finesseClusterId`, and set
+ * `teamId` from `teams` when API returns teamId null.
  * Call before setFinesseUserData when storing link or getFinesseUser response.
  */
 export const normalizeFinesseUserData = (
   data: FinesseUserData,
 ): FinesseUserData => {
-  if (data.teamId != null) return data;
-  const teams = data.teams;
-  if (!teams?.length) return data;
-  const byName = data.teamName
-    ? teams.find((t) => t.name === data.teamName)
+  let next: FinesseUserData = { ...data };
+
+  const rootCluster = next.clusterId ?? next.finesseClusterId;
+  const settingCluster =
+    next.settings?.finesseClusterId ?? next.settings?.clusterId;
+  let resolvedCluster: string | null = null;
+  if (rootCluster != null && String(rootCluster).trim() !== "") {
+    resolvedCluster = String(rootCluster).trim();
+  } else if (settingCluster != null && String(settingCluster).trim() !== "") {
+    resolvedCluster = String(settingCluster).trim();
+  }
+
+  if (resolvedCluster != null) {
+    next = {
+      ...next,
+      settings: { ...next.settings, finesseClusterId: resolvedCluster },
+    };
+  }
+
+  if (next.teamId != null) return next;
+  const teams = next.teams;
+  if (!teams?.length) return next;
+  const byName = next.teamName
+    ? teams.find((t) => t.name === next.teamName)
     : undefined;
   const resolvedId = byName?.id ?? teams[0]?.id;
-  if (resolvedId == null) return data;
-  return { ...data, teamId: resolvedId };
+  if (resolvedId == null) return next;
+  return { ...next, teamId: resolvedId };
 };
 
 // ==================== Types/Interfaces ====================
@@ -169,6 +404,24 @@ export const finesseUnlink = async (
     finesseUserId: finesseUserId,
     teamId: teamId,
   });
+  return response.data;
+};
+
+export interface FinesseForceSignOutPayload {
+  teamId: number | string;
+  finesseUserId: string;
+  supervisorFinesseUserId: string;
+}
+
+/**
+ * POST /finesse/force-sign-out — supervisor forces an agent session to end in Finesse.
+ * Body: `{ teamId, finesseUserId, supervisorFinesseUserId }`.
+ */
+export const finesseForceSignOut = async (payload: FinesseForceSignOutPayload) => {
+  const response = await axiosInstance.post(
+    `${prefix}/force-sign-out`,
+    payload,
+  );
   return response.data;
 };
 
@@ -378,7 +631,7 @@ export async function assertFinesseTeamSwitchable(
 }
 
 /**
- * POST /finesse/teams/{teamId}/users/{finesseUserId}/state - Update agent state (READY | NOT_READY)
+ * POST /api/v1/finesse/teams/{teamId}/users/{finesseUserId}/state — body `{"newState":"READY"|"NOT_READY"}`.
  */
 export const finesseSetState = async (
   teamId: number | string,
@@ -636,6 +889,34 @@ export const getFinesseCampaignContactsConfig = async (
 ) => {
   const response = await axiosInstance.get(
     `${prefix}/admins/teams/${teamId}/users/${encodeURIComponent(finesseUserId)}/campaigns/${campaignId}/contacts/config`,
+  );
+  return response.data;
+};
+
+/**
+ * GET admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId}/contacts - Get campaign contacts (used for remaining contacts count)
+ */
+export const getFinesseCampaignContacts = async (
+  teamId: number | string,
+  finesseUserId: string,
+  campaignId: number | string,
+) => {
+  const response = await axiosInstance.get(
+    `${prefix}/admins/teams/${teamId}/users/${encodeURIComponent(finesseUserId)}/campaigns/${campaignId}/contacts`,
+  );
+  return response.data;
+};
+
+/**
+ * DELETE admins/teams/{teamId}/users/{finesseUserId}/campaigns/{campaignId}/contacts - Remove campaign contacts (remaining queue)
+ */
+export const deleteFinesseCampaignContacts = async (
+  teamId: number | string,
+  finesseUserId: string,
+  campaignId: number | string,
+) => {
+  const response = await axiosInstance.delete(
+    `${prefix}/admins/teams/${teamId}/users/${encodeURIComponent(finesseUserId)}/campaigns/${campaignId}/contacts`,
   );
   return response.data;
 };

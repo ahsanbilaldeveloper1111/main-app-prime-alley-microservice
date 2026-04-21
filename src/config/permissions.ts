@@ -209,6 +209,10 @@ export const routePermissions: RoutePermission[] = [
                 path: '/campaign-console',
                 permissions: [PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT]
             },
+            {
+                path: '/campaign-agent',
+                permissions: [PERMISSIONS.VIEW_CAMPAIGN_AGENT],
+            },
         ]
     },
     //communications services end

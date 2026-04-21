@@ -4,19 +4,20 @@ import {
   PhoneOff,
   CheckCircle,
   MoreVertical,
-  Mic,
-  MicOff,
   Pause,
-  Phone,
-  Users,
   ChevronDown
 } from 'lucide-react';
+
+export type PreviewContactRow = { label: string; value: string };
 
 interface CallWidgetProps {
   showCallWidget: boolean;
   setShowCallWidget: (show: boolean) => void;
   callStatus: string;
-  callTimer: number;
+  /** Elapsed seconds from preview participant start / state-change time */
+  elapsedSeconds?: number;
+  /** @deprecated Use elapsedSeconds. When elapsedSeconds is omitted, this drives the timer display. */
+  callTimer?: number;
   isMuted: boolean;
   setIsMuted: (muted: boolean) => void;
   isHold: boolean;
@@ -26,15 +27,24 @@ interface CallWidgetProps {
   handleEndCall: () => void;
   formatTime: (seconds: number) => string;
   selectedTeam: string;
+  /** When set, Agent row is shown (e.g. campaign console). */
   activeAgentName?: string;
+  /** When false, Team row is hidden (e.g. campaign manager preview). Default true. */
+  includeTeamRow?: boolean;
   /** Dynamic from preview event */
   campaignName?: string;
   customerNumber?: string;
   dialedNumber?: string;
-  /** e.g. ['ACCEPT','REJECT','CLOSE'] – when both REJECT and CLOSE present, show dropdown */
+  /** Dialog or participant state label from preview */
+  previewStateLabel?: string;
+  /** Contact grid from callVariables + contactHeader mapping */
+  previewContactRows?: PreviewContactRow[];
+  /** e.g. ['ACCEPT','REJECT','CLOSE','RECLASSIFY'] – when both REJECT and CLOSE present, show dropdown */
   previewActions?: string[];
   /** When set, Reject area uses this with action 'REJECT' or 'CLOSE' instead of handleRejectCall */
   onRejectWithAction?: (action: 'REJECT' | 'CLOSE') => void;
+  /** Sends RECLASSIFY dialog action (optional param via prompt in parent) */
+  onReclassify?: () => void | Promise<void>;
   /** When call is connected, clicking Wrap up fetches reasons and opens modal */
   onWrapUpClick?: () => void;
   wrapUpLoading?: boolean;
@@ -47,6 +57,7 @@ const CallWidget: React.FC<CallWidgetProps> = ({
   showCallWidget,
   setShowCallWidget,
   callStatus,
+  elapsedSeconds,
   callTimer,
   isMuted,
   setIsMuted,
@@ -58,16 +69,21 @@ const CallWidget: React.FC<CallWidgetProps> = ({
   formatTime,
   selectedTeam,
   activeAgentName,
+  includeTeamRow = true,
   campaignName,
   customerNumber,
   dialedNumber,
+  previewStateLabel = '',
+  previewContactRows = [],
   previewActions = [],
   onRejectWithAction,
+  onReclassify,
   onWrapUpClick,
   wrapUpLoading = false,
   onHoldToggle,
   holdLoading = false,
 }) => {
+  const effectiveElapsed = elapsedSeconds ?? callTimer ?? 0;
   const [showRejectMenu, setShowRejectMenu] = useState(false);
 
   useEffect(() => {
@@ -194,6 +210,70 @@ const CallWidget: React.FC<CallWidgetProps> = ({
         .call-info-value {
           color: #1e293b;
           font-weight: 600;
+        }
+
+        .call-contact-section {
+          margin-bottom: 14px;
+        }
+
+        .call-contact-title {
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+          color: #64748b;
+          margin-bottom: 8px;
+        }
+
+        .call-contact-grid {
+          display: grid;
+          gap: 6px;
+          max-height: 160px;
+          overflow-y: auto;
+        }
+
+        .call-contact-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 6px 10px;
+          background: #f1f5f9;
+          border-radius: 8px;
+          font-size: 11px;
+        }
+
+        .call-contact-label {
+          color: #64748b;
+          font-weight: 600;
+          flex-shrink: 0;
+          max-width: 48%;
+        }
+
+        .call-contact-value {
+          color: #0f172a;
+          font-weight: 600;
+          text-align: right;
+          word-break: break-word;
+        }
+
+        .btn-reclassify {
+          width: 100%;
+          margin-top: 8px;
+          padding: 8px 12px;
+          border-radius: 10px;
+          border: 2px solid #e2e8f0;
+          background: white;
+          color: #475569;
+          font-weight: 600;
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .btn-reclassify:hover {
+          border-color: #667eea;
+          color: #667eea;
         }
 
         .call-controls {
@@ -366,53 +446,81 @@ const CallWidget: React.FC<CallWidgetProps> = ({
                   Connected
                 </>
               )}
+              {callStatus === 'Wrap up' && (
+                <>
+                  <CheckCircle size={12} />
+                  Wrap up
+                </>
+              )}
             </span>
-            
-            {/* {callStatus === 'Connected' && (
-              <div className="call-timer">{formatTime(callTimer)}</div>
-            )} */}
           </div>
 
           <div className="call-info-grid">
-            {campaignName != null && (
+            {(campaignName != null && String(campaignName).trim() !== '') && (
               <div className="call-info-item">
                 <span className="call-info-label">Campaign</span>
-                <span className="call-info-value">{campaignName || 'N/A'}</span>
+                <span className="call-info-value">{campaignName}</span>
               </div>
             )}
-            <div className="call-info-item">
-              <span className="call-info-label">Agent</span>
-              <span className="call-info-value">{activeAgentName || 'N/A'}</span>
-            </div>
-            <div className="call-info-item">
-              <span className="call-info-label">Team</span>
-              <span className="call-info-value">{selectedTeam.replace(/-/g, ' ')}</span>
-            </div>
-            {(customerNumber != null || dialedNumber != null) && (
+            {(dialedNumber != null && String(dialedNumber).trim() !== '') && (
               <div className="call-info-item">
-                <span className="call-info-label">Customer / Dialed</span>
+                <span className="call-info-label">Dialed number</span>
+                <span className="call-info-value">{dialedNumber}</span>
+              </div>
+            )}
+            {customerNumber != null &&
+              dialedNumber != null &&
+              String(customerNumber).trim() !== '' &&
+              String(customerNumber).trim() !== String(dialedNumber).trim() && (
+                <div className="call-info-item">
+                  <span className="call-info-label">Customer number</span>
+                  <span className="call-info-value">{customerNumber}</span>
+                </div>
+              )}
+            <div className="call-info-item">
+              <span className="call-info-label">State</span>
+              <span
+                className="call-info-value"
+                style={{
+                  color: callStatus === 'Connected' ? '#10b981' : '#f59e0b',
+                }}
+              >
+                {previewStateLabel || callStatus || '—'}
+              </span>
+            </div>
+            <div className="call-info-item">
+              <span className="call-info-label">Elapsed</span>
+              <span className="call-info-value">{formatTime(effectiveElapsed)}</span>
+            </div>
+            {activeAgentName != null && String(activeAgentName).trim() !== '' && (
+              <div className="call-info-item">
+                <span className="call-info-label">Agent</span>
+                <span className="call-info-value">{activeAgentName}</span>
+              </div>
+            )}
+            {includeTeamRow && (
+              <div className="call-info-item">
+                <span className="call-info-label">Team</span>
                 <span className="call-info-value">
-                  {customerNumber && dialedNumber && customerNumber !== dialedNumber
-                    ? `${customerNumber} / ${dialedNumber}`
-                    : (customerNumber || dialedNumber || 'N/A')}
+                  {selectedTeam.replace(/-/g, ' ')}
                 </span>
               </div>
             )}
-            {campaignName == null && customerNumber == null && dialedNumber == null && (
-              <div className="call-info-item">
-                <span className="call-info-label">Customer Number</span>
-                <span className="call-info-value">—</span>
-              </div>
-            )}
-            <div className="call-info-item">
-              <span className="call-info-label">State</span>
-              <span className="call-info-value" style={{ 
-                color: callStatus === 'Connected' ? '#10b981' : '#f59e0b' 
-              }}>
-                {callStatus}
-              </span>
-            </div>
           </div>
+
+          {previewContactRows.length > 0 && (
+            <div className="call-contact-section">
+              <div className="call-contact-title">Contact</div>
+              <div className="call-contact-grid">
+                {previewContactRows.map((row, idx) => (
+                  <div key={`contact-${idx}-${row.label}`} className="call-contact-row">
+                    <span className="call-contact-label">{row.label}</span>
+                    <span className="call-contact-value">{row.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {callStatus === 'Connected' && (
             <>
@@ -460,6 +568,18 @@ const CallWidget: React.FC<CallWidgetProps> = ({
                   </button>
                 )} */}
               </div>
+
+              {previewActions.includes('RECLASSIFY') && onReclassify && (
+                <button
+                  type="button"
+                  className="btn-reclassify"
+                  onClick={() => {
+                    void onReclassify();
+                  }}
+                >
+                  Reclassify
+                </button>
+              )}
 
               {onWrapUpClick && previewActions.includes('UPDATE_CALL_DATA') && (
                 <button
@@ -665,6 +785,18 @@ const CallWidget: React.FC<CallWidgetProps> = ({
                 </>
               )}
             </div>
+
+            {previewActions.includes('RECLASSIFY') && onReclassify && (
+              <button
+                type="button"
+                className="btn-reclassify"
+                onClick={() => {
+                  void onReclassify();
+                }}
+              >
+                Reclassify
+              </button>
+            )}
 
             </>
           )}

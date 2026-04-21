@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useRef, type ReactNode } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  type ReactNode,
+} from 'react';
 import { useSession } from 'next-auth/react';
 import { Loader } from 'lucide-react';
 import BreadcrumbItem from '@common/BreadcrumbItem';
@@ -11,8 +18,11 @@ import {
   normalizeFinesseUserData,
   getStoredTeamId,
   setStoredTeamId,
+  clearFinesseManualReconnectRequired,
+  getFinesseManualReconnectRequired,
   type FinesseUserData,
 } from '@utils/finesse';
+
 export interface FinesseAuthGateProps {
   children: ReactNode;
   /** Breadcrumb subTitle (e.g. "Live Calls Campaigns Management") */
@@ -25,8 +35,8 @@ export interface FinesseAuthGateProps {
 
 /**
  * Requires NextAuth session and Finesse token + user data.
- * If finesseToken or finesseUserData are not available, auto-links with finesseLink({ teamId }).
- * No user interaction (Campaign Console/Manager).
+ * On first visit without a Finesse session, auto-links with finesseLink({ teamId }).
+ * After explicit Finesse logout, shows "Connect to Finesse" until the user clicks.
  */
 export default function FinesseAuthGate({
   children,
@@ -38,8 +48,16 @@ export default function FinesseAuthGate({
   const [isFinesseAuthenticated, setIsFinesseAuthenticated] = useState(false);
   const [finesseError, setFinesseError] = useState<string | null>(null);
   const [isFinesseLoading, setIsFinesseLoading] = useState(false);
+  const [manualConnectMode, setManualConnectMode] = useState(false);
   const linkInFlightRef = useRef(false);
-  // Require both token and user data to be considered authenticated
+
+  useLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (getFinesseManualReconnectRequired()) {
+      setManualConnectMode(true);
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const token = getFinesseToken();
@@ -49,7 +67,7 @@ export default function FinesseAuthGate({
     }
   }, []);
 
-  const attemptAutoLink = async () => {
+  const attemptAutoLink = useCallback(async () => {
     if (typeof window === 'undefined') return;
     if (linkInFlightRef.current) return;
     linkInFlightRef.current = true;
@@ -65,13 +83,15 @@ export default function FinesseAuthGate({
         if (response?.token) {
           setFinesseToken(response.token);
         }
+        clearFinesseManualReconnectRequired();
+        setManualConnectMode(false);
         setIsFinesseAuthenticated(true);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('finesse-authenticated'));
         }
       } else {
         setFinesseError(
-          response?.message || response?.statusCode || 'Authentication failed.'
+          response?.message || response?.statusCode || 'Authentication failed.',
         );
       }
     } catch (err: unknown) {
@@ -94,21 +114,28 @@ export default function FinesseAuthGate({
       setIsFinesseLoading(false);
       linkInFlightRef.current = false;
     }
-  };
-
-  // When team is changed, storage is cleared and this event is fired; re-link without reload
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const onRequireReauth = () => {
-      setIsFinesseAuthenticated(false);
-      setFinesseError(null);
-      void attemptAutoLink();
-    };
-    window.addEventListener('finesse-require-reauth', onRequireReauth);
-    return () => window.removeEventListener('finesse-require-reauth', onRequireReauth);
   }, []);
 
-  // Auto-link on mount when session is available
+  const onRequireReauth = useCallback(
+    (e: Event) => {
+      const manual = (e as CustomEvent<{ manualConnect?: boolean }>).detail?.manualConnect === true;
+      setIsFinesseAuthenticated(false);
+      setFinesseError(null);
+      if (manual) {
+        setManualConnectMode(true);
+        return;
+      }
+      void attemptAutoLink();
+    },
+    [attemptAutoLink],
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.addEventListener('finesse-require-reauth', onRequireReauth);
+    return () => window.removeEventListener('finesse-require-reauth', onRequireReauth);
+  }, [onRequireReauth]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (sessionStatus === 'loading') return;
@@ -117,14 +144,19 @@ export default function FinesseAuthGate({
     const userData = getFinesseUserData();
     if (token && userData) {
       setIsFinesseAuthenticated(true);
+      clearFinesseManualReconnectRequired();
+      setManualConnectMode(false);
+      return;
+    }
+    if (getFinesseManualReconnectRequired()) {
+      setManualConnectMode(true);
       return;
     }
     if (!isFinesseAuthenticated) {
       void attemptAutoLink();
     }
-  }, [session?.user, sessionStatus, isFinesseAuthenticated]);
+  }, [session?.user, sessionStatus, isFinesseAuthenticated, attemptAutoLink]);
 
-  // Session loading
   if (sessionStatus === 'loading') {
     return (
       <>
@@ -147,7 +179,6 @@ export default function FinesseAuthGate({
     );
   }
 
-  // Not signed in
   if (!session?.user) {
     return (
       <>
@@ -165,8 +196,69 @@ export default function FinesseAuthGate({
     );
   }
 
-  // Finesse authentication required (no token or no user data)
   if (!isFinesseAuthenticated) {
+    const manualCard = manualConnectMode ? (
+      <>
+        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>
+          Connect to Finesse
+        </h2>
+        <p
+          style={{
+            color: '#64748b',
+            fontSize: '14px',
+            marginBottom: '24px',
+            marginTop: '10px',
+          }}
+        >
+          {authMessage ??
+            'You signed out from Finesse. Click below to sign in again and continue.'}
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={isFinesseLoading}
+          onClick={() => void attemptAutoLink()}
+          style={{
+            width: '100%',
+            padding: '12px 20px',
+            borderRadius: '10px',
+            fontWeight: 600,
+            border: 'none',
+            cursor: isFinesseLoading ? 'wait' : 'pointer',
+          }}
+        >
+          {isFinesseLoading ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              <Loader size={18} style={{ animation: 'spin 1s linear infinite' }} />
+              Connecting…
+            </span>
+          ) : (
+            'Connect to Finesse'
+          )}
+        </button>
+      </>
+    ) : (
+      <>
+        <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>
+          Connecting to Finesse
+        </h2>
+        <p
+          style={{
+            color: '#64748b',
+            fontSize: '14px',
+            marginBottom: '24px',
+            marginTop: '10px',
+          }}
+        >
+          {authMessage ?? `Preparing access to ${pageLabel}...`}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b' }}>
+          <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
+          <span>{isFinesseLoading ? 'Connecting...' : 'Waiting for connection...'}</span>
+        </div>
+      </>
+    );
+
     return (
       <>
         <BreadcrumbItem mainTitle="" mainLink="" subTitle={subTitle} />
@@ -183,21 +275,7 @@ export default function FinesseAuthGate({
             className="card"
             style={{ maxWidth: '420px', width: '100%', padding: '32px' }}
           >
-            <h2 style={{ margin: 0, fontSize: '22px', fontWeight: 700, color: '#1e293b' }}>Connecting to Finesse</h2>
-            <p
-              style={{
-                color: '#64748b',
-                fontSize: '14px',
-                marginBottom: '24px',
-                marginTop: '10px',
-              }}
-            >
-              {authMessage ?? `Preparing access to ${pageLabel}...`}
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748b' }}>
-              <Loader size={20} style={{ animation: 'spin 1s linear infinite' }} />
-              <span>{isFinesseLoading ? 'Connecting...' : 'Waiting for connection...'}</span>
-            </div>
+            {manualCard}
             {finesseError && (
               <div
                 style={{

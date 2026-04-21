@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import { Search, ChevronDown, CheckCircle } from "lucide-react";
+import { Search, ChevronDown, CheckCircle, User, LogOut } from "lucide-react";
 
 interface StatusOption {
   value: string;
@@ -390,71 +390,42 @@ const TopBar: React.FC<TopBarProps> = ({
             )}
           </div>
 
-          {/* <div className="status-dropdown-container" ref={userMenuRef}>
-            <button 
+          <div className="status-dropdown-container" ref={userMenuRef}>
+            <button
               className="user-menu-button"
+              type="button"
+              title="Account"
+              aria-expanded={showUserMenu}
+              aria-haspopup="menu"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 setShowUserMenu(!showUserMenu);
               }}
-              title="User Menu"
-              type="button"
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: "pointer" }}
             >
-              <User size={20} />
+              <User size={20} aria-hidden />
             </button>
-            
+
             {showUserMenu && (
-              <div className="dropdown-menu" style={{ display: 'block' }}>
-                {/* <button 
+              <div className="dropdown-menu" style={{ display: "block" }}>
+                <button
                   type="button"
                   className="dropdown-item"
+                  style={{ color: "#dc2626" }}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    alert('Profile settings coming soon...');
                     setShowUserMenu(false);
+                    void handleLogout();
                   }}
                 >
-                  <Users size={18} />
-                  <span>Profile</span>
-                </button>
-                <button 
-                  type="button"
-                  className="dropdown-item"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    alert('Settings coming soon...');
-                    setShowUserMenu(false);
-                  }}
-                >
-                  <Settings size={18} />
-                  <span>Settings</span>
-                </button> */}
-          {/* <div style={{ 
-                  height: '1px', 
-                  background: '#f1f5f9', 
-                  margin: '8px 0' 
-                }} />
-                <button 
-                  type="button"
-                  className="dropdown-item" 
-                  style={{ color: '#dc2626' }}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleLogout();
-                    setShowUserMenu(false);
-                  }}
-                >
-                  <LogOut size={18} />
+                  <LogOut size={18} aria-hidden />
                   <span>Logout</span>
                 </button>
-              </div> */}
-          {/* )} */}
-          {/* </div> */}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>

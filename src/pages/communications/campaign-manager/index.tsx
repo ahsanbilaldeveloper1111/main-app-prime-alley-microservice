@@ -27,21 +27,24 @@ import {
   Grid,
   Target,
   Loader,
+  RefreshCw,
 } from "lucide-react";
 
 import AppSelect from "@components/AppSelect";
 import CallWidget from "../campaign-partials/CallWidget";
 import WrapUpModal from "../campaign-partials/WrapUp";
-import type { CallVariableConfig } from "../campaign-partials/WrapUp";
 
 import TopBar, { type TeamOption } from "../campaign-partials/TopBarAgent";
 import FinesseAuthGate from "../campaign-partials/FinesseAuthGate";
 import { toast } from "react-toastify";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { usePermissions } from "@utils/permissionUtils";
 import {
   getFinesseUserData,
   getFinesseToken,
   setFinesseUserData,
   clearFinesseUserData,
+  setFinesseManualReconnectRequired,
   finesseUnlink,
   getFinesseUser,
   finesseSetState,
@@ -50,22 +53,25 @@ import {
   importFinesseCampaignContacts,
   getFinesseCampaignsContactsStatus,
   getFinesseCampaignContactsConfig,
-  sendFinesseDialogAction,
-  getFinesseWrapUpReasons,
+  getFinesseCampaignContacts,
+  deleteFinesseCampaignContacts,
   getEffectiveTeamId,
   getStoredTeamId,
   setStoredTeamId,
   assertFinesseTeamSwitchable,
   getFinesseApiErrorMessage,
+  getFinesseClusterId,
   normalizeFinesseUserData,
   scheduleFinesseCampaign,
   type FinesseUserData,
 } from "@utils/finesse";
-import { useFinesseCapabilities } from "@hooks/live-calls/useFinesseCapabilities";
 import {
-  useFinesseStomp,
-  type FinessePreviewEvent,
-} from "@hooks/live-calls/useFinesseStomp";
+  findRosterEntryForLogin,
+  resolveRosterAgentDisplayState,
+} from "@utils/finesseRosterMerge";
+import { useFinesseCapabilities } from "@hooks/live-calls/useFinesseCapabilities";
+import { useFinesseStomp } from "@hooks/live-calls/useFinesseStomp";
+import { useFinesseCampaignPreview } from "@hooks/live-calls/useFinesseCampaignPreview";
 
 type ContactHeaderValueOption = { value: string; label: string };
 
@@ -103,6 +109,43 @@ export interface CampaignRow {
   pendingContacts: number;
   enabled: boolean;
 }
+
+const extractRemainingContactsCount = (raw: unknown): number | null => {
+  if (raw == null) return null;
+  const data =
+    (raw as { data?: unknown })?.data ??
+    (raw as { responseData?: unknown })?.responseData ??
+    raw;
+  if (Array.isArray(data)) return data.length;
+  if (typeof data !== "object") return null;
+  const d = data as Record<string, unknown>;
+  const numericKeys = [
+    "pendingContacts",
+    "contactsRemaining",
+    "remaining",
+    "remainingContacts",
+    "pendingCount",
+    "pending",
+    "totalPending",
+    "count",
+    "total",
+    "totalElements",
+    "totalContacts",
+  ];
+  for (const key of numericKeys) {
+    const v = d[key];
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))) {
+      return Number(v);
+    }
+  }
+  const arrayKeys = ["contacts", "items", "content", "rows", "results"];
+  for (const key of arrayKeys) {
+    const v = d[key];
+    if (Array.isArray(v)) return v.length;
+  }
+  return null;
+};
 
 const mapApiCampaignToRow = (item: any, index: number): CampaignRow => {
   const timeFrom = item.startTime ?? item.timeFrom ?? "09:00";
@@ -169,8 +212,17 @@ function formatImportStatusDisplay(
   return "—";
 }
 
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
 const LiveCallsCampaignsManagement = () => {
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
+  const canChangeCampaignStatus = hasPermission(
+    PERMISSIONS.CAN_CHANGE_CAMPAIGN_STATUS_TMS,
+  );
+  const canChangeCampaignTiming = hasPermission(
+    PERMISSIONS.CAN_CHANGE_CAMPAIGN_TIMING_TMS,
+  );
   const [teams, setTeams] = useState<string[]>([]);
   const [teamsWithIds, setTeamsWithIds] = useState<TeamOption[]>([]);
   const [selectedTeam, setSelectedTeam] = useState("");
@@ -179,11 +231,6 @@ const LiveCallsCampaignsManagement = () => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [selectedCampaigns, setSelectedCampaigns] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [showCallWidget, setShowCallWidget] = useState(false);
-  const [callTimer, setCallTimer] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isHold, setIsHold] = useState(false);
-  const [callStatus, setCallStatus] = useState("Ringing");
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(
     null,
@@ -194,23 +241,17 @@ const LiveCallsCampaignsManagement = () => {
     Array<{ id: number; key: string; value: string; order: number }>
   >([]);
   const [columnsLoading, setColumnsLoading] = useState(false);
-  const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
-  const [wrapUpReasons, setWrapUpReasons] = useState<
-    Array<{ value: string; label: string }>
-  >([]);
-  const [wrapUpReasonsLoading, setWrapUpReasonsLoading] = useState(false);
-  const [holdLoading, setHoldLoading] = useState(false);
-  const [callVariablesConfig, setCallVariablesConfig] = useState<
-    CallVariableConfig[]
-  >([]);
+  const [uploadModalRemainingCount, setUploadModalRemainingCount] = useState<
+    number | null
+  >(null);
+  const [uploadModalRemainingLoading, setUploadModalRemainingLoading] =
+    useState(false);
+  const [uploadModalClearingContacts, setUploadModalClearingContacts] =
+    useState(false);
 
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const wrapUpEventDialogIdRef = useRef<string | null>(null);
-  const wrapUpAutoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -433,10 +474,17 @@ const LiveCallsCampaignsManagement = () => {
   const [importStatuses, setImportStatuses] = useState<Record<number, unknown>>(
     {},
   );
-  const [previewDialogs, setPreviewDialogs] = useState<
-    Record<string, FinessePreviewEvent>
-  >({});
   const [token, setToken] = useState<string | null>(null);
+
+  const {
+    handlePreviewEvent,
+    getFinesseContext,
+    callWidgetProps,
+    wrapUpModalProps,
+  } = useFinesseCampaignPreview(session, {
+    selectedTeam,
+    includeTeamRow: false,
+  });
 
   const finesseDataForCap = getFinesseUserData();
   const capabilityTeamId = getEffectiveTeamId(finesseDataForCap);
@@ -445,72 +493,79 @@ const LiveCallsCampaignsManagement = () => {
   const { hasCampaignMgmt, loading: capabilityLoading } =
     useFinesseCapabilities(capabilityTeamId, capabilityUsername);
 
-  const activePreviewDialog = useMemo(() => {
-    const dialogs = Object.values(previewDialogs);
-    if (dialogs.length === 0) return null;
-    const active = dialogs
-      .filter((d) => {
-        if ((d as { eventType?: string }).eventType === "ENDED") return false;
-        const p = d.participants?.[0];
-        if (p?.state === "DROPPED") return false;
-        return true;
-      })
-      .sort((a, b) => {
-        const timeA =
-          a.participants?.[0]?.stateChangeTime ??
-          a.participants?.[0]?.startTime ??
-          "";
-        const timeB =
-          b.participants?.[0]?.stateChangeTime ??
-          b.participants?.[0]?.startTime ??
-          "";
-        return new Date(timeB).getTime() - new Date(timeA).getTime();
-      });
-    return active[0] ?? null;
-  }, [previewDialogs]);
-
-  /** teamId is from storage (FINESSE_SELECTED_TEAM_ID_KEY) for all APIs when user is linked. */
-  const getFinesseContext = useCallback(() => {
-    const d = getFinesseUserData();
-    const u = session?.user as { phone?: string } | undefined;
-    return {
-      username: d?.loginId ?? d?.loginName,
-      extension: d?.extension ?? u?.phone,
-      teamId: getEffectiveTeamId(d),
-    };
-  }, [session?.user]);
-
-  const handlePreviewEvent = useCallback((payload: FinessePreviewEvent) => {
-    if (payload?.dialogId == null) return;
-    const eventType = (payload as { eventType?: string }).eventType;
-    const dialogId = String(payload.dialogId);
-    if (eventType === "CREATED") {
-      setPreviewDialogs((prev) => ({ ...prev, [dialogId]: payload }));
-    } else if (eventType === "UPDATED") {
-      setPreviewDialogs((prev) => {
-        const existing = prev[dialogId];
-        if (existing) {
+  /** Fetches remaining contacts per campaign via `/campaigns/{campaignId}/contacts` and merges counts into campaign rows. */
+  const refreshRemainingContacts = useCallback(
+    async (campaignIds: number[]) => {
+      if (campaignIds.length === 0) return;
+      const { username, teamId } = getFinesseContext();
+      if (!username || teamId == null) return;
+      const results = await Promise.all(
+        campaignIds.map(async (id) => {
+          try {
+            const resp = await getFinesseCampaignContacts(teamId, username, id);
+            const count = extractRemainingContactsCount(resp);
+            return { id, count };
+          } catch {
+            return { id, count: null as number | null };
+          }
+        }),
+      );
+      setCampaigns((prev) =>
+        prev.map((c) => {
+          const match = results.find((r) => r.id === c.id);
+          if (!match || match.count == null) return c;
           return {
-            ...prev,
-            [dialogId]: {
-              ...existing,
-              ...payload,
-              participants: payload.participants ?? existing.participants,
-            },
+            ...c,
+            contactsRemaining: match.count,
+            pendingContacts: match.count,
           };
-        }
-        return { ...prev, [dialogId]: payload };
-      });
-    } else if (eventType === "ENDED") {
-      if (wrapUpEventDialogIdRef.current === dialogId)
-        wrapUpEventDialogIdRef.current = null;
-      setPreviewDialogs((prev) => {
-        const next = { ...prev };
-        delete next[dialogId];
-        return next;
-      });
-    }
-  }, []);
+        }),
+      );
+    },
+    [getFinesseContext],
+  );
+
+  const campaignIdsKey = useMemo(
+    () =>
+      campaigns
+        .map((c) => c.id)
+        .sort((a, b) => a - b)
+        .join(","),
+    [campaigns],
+  );
+
+  useEffect(() => {
+    if (!finesseHydrated) return;
+    if (!campaignIdsKey) return;
+    const ids = campaignIdsKey.split(",").map(Number).filter(Number.isFinite);
+    void refreshRemainingContacts(ids);
+  }, [finesseHydrated, campaignIdsKey, refreshRemainingContacts]);
+
+  const rosterClusterId = useMemo(
+    () => getFinesseClusterId(),
+    [finesseHydrated, finesseDataForCap?.loginId, finesseDataForCap?.settings],
+  );
+
+  const handleRosterEvent = useCallback((raw: unknown) => {
+    const d = getFinesseUserData();
+    const self =
+      d?.loginId ?? d?.loginName ?? finesseUsername ?? "";
+    if (!self) return;
+    const patch = findRosterEntryForLogin(raw, self);
+    if (!patch) return;
+    const display = resolveRosterAgentDisplayState(patch);
+    if (!display) return;
+    setAgentStatus(display);
+    const prev = getFinesseUserData();
+    if (!prev) return;
+    setFinesseUserData({
+      ...prev,
+      state: display,
+      ...(patch.stateChangeTime != null
+        ? { stateChangeTime: patch.stateChangeTime }
+        : {}),
+    });
+  }, [finesseUsername]);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -524,72 +579,15 @@ const LiveCallsCampaignsManagement = () => {
   useFinesseStomp({
     token,
     finesseUserId: capabilityUsername,
+    clusterId: rosterClusterId,
+    teamId: capabilityTeamId,
     onStateEvent: (p) => p?.state && setAgentStatus(p.state),
     onErrorEvent: (p) =>
       toast.error((p as { message?: string })?.message ?? "Finesse error"),
     onAuthError: (msg) => toast.error(msg),
     onPreviewEvent: handlePreviewEvent,
+    onRosterEvent: handleRosterEvent,
   });
-
-  // Drive call widget and status from preview event: ALERTING → Ringing, ACTIVE → Connected; sync hold; WRAP_UP/ALERTING+UPDATE_CALL_DATA → show Wrap up button (user clicks to open modal)
-  useEffect(() => {
-    if (!activePreviewDialog?.dialogId) {
-      setShowCallWidget(false);
-      return;
-    }
-    const { extension } = getFinesseContext();
-    const participants = activePreviewDialog.participants ?? [];
-    const agentParticipant =
-      participants.find(
-        (p) => (p as { mediaAddress?: string }).mediaAddress === extension,
-      ) ?? participants[0];
-    const participant =
-      agentParticipant ?? activePreviewDialog.participants?.[0];
-    const dialogState = activePreviewDialog.dialogState ?? participant?.state;
-    const isAlerting =
-      dialogState === "ALERTING" || participant?.state === "ALERTING";
-    const isActive =
-      dialogState === "ACTIVE" || participant?.state === "ACTIVE";
-    const isHeld = participant?.state === "HELD";
-    const hasUpdateCallData =
-      Array.isArray(participant?.actions) &&
-      (participant as { actions?: string[] }).actions?.includes(
-        "UPDATE_CALL_DATA",
-      );
-    const isWrapUpState = participant?.state === "WRAP_UP" && hasUpdateCallData;
-    setShowCallWidget(true);
-    if (isAlerting) {
-      setCallStatus("Ringing");
-    } else if (isWrapUpState) {
-      setCallStatus("Wrap up");
-    } else if (isActive || isHeld) {
-      setCallStatus("Connected");
-      setIsHold(isHeld);
-    }
-  }, [
-    activePreviewDialog?.dialogId,
-    activePreviewDialog?.dialogState,
-    activePreviewDialog?.participants,
-  ]);
-
-  // Simulate call timer
-  useEffect(() => {
-    let interval: NodeJS.Timeout | undefined;
-    if (showCallWidget && callStatus === "Connected") {
-      interval = setInterval(() => {
-        setCallTimer((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [showCallWidget, callStatus]);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
 
   const filteredCampaigns = campaigns.filter(
     (campaign) =>
@@ -597,6 +595,18 @@ const LiveCallsCampaignsManagement = () => {
       (campaign.type ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       campaign.dialerType.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+
+  const uploadModalCampaignRow = useMemo(() => {
+    if (selectedCampaignId == null) return undefined;
+    return campaigns.find((c) => c.id === selectedCampaignId);
+  }, [campaigns, selectedCampaignId]);
+
+  const uploadModalDisplayRemaining = uploadModalRemainingLoading
+    ? null
+    : (uploadModalRemainingCount ??
+      uploadModalCampaignRow?.pendingContacts ??
+      uploadModalCampaignRow?.contactsRemaining ??
+      null);
 
   const handleSelectCampaign = (id: number) => {
     setSelectedCampaigns((prev) =>
@@ -646,7 +656,11 @@ const LiveCallsCampaignsManagement = () => {
     setStoredTeamId(newTeamId);
     clearFinesseUserData();
     if (typeof globalThis.dispatchEvent === "function") {
-      globalThis.dispatchEvent(new CustomEvent("finesse-require-reauth"));
+      globalThis.dispatchEvent(
+        new CustomEvent("finesse-require-reauth", {
+          detail: { manualConnect: false },
+        }),
+      );
     }
   };
 
@@ -662,12 +676,21 @@ const LiveCallsCampaignsManagement = () => {
       }
     }
     clearFinesseUserData();
+    setFinesseManualReconnectRequired();
     if (typeof globalThis.dispatchEvent === "function") {
-      globalThis.dispatchEvent(new CustomEvent("finesse-require-reauth"));
+      globalThis.dispatchEvent(
+        new CustomEvent("finesse-require-reauth", {
+          detail: { manualConnect: true },
+        }),
+      );
     }
   };
 
   const handleToggleCampaign = async (id: number) => {
+    if (!canChangeCampaignStatus) {
+      toast.error("You do not have permission to change campaign status.");
+      return;
+    }
     const campaign = campaigns.find((c) => c.id === id);
     if (!campaign) return;
     const { username, teamId } = getFinesseContext();
@@ -683,7 +706,7 @@ const LiveCallsCampaignsManagement = () => {
       );
       // if (newEnabled) {
       //   setShowCallWidget(true);
-      //   setCallTimer(0);
+      //   setPreviewElapsedSeconds(0);
       //   setCallStatus('Ringing');
       // }
     } catch (err: any) {
@@ -695,177 +718,6 @@ const LiveCallsCampaignsManagement = () => {
     }
   };
 
-  const handleAcceptCall = async () => {
-    const { username, extension, teamId } = getFinesseContext();
-    const dialogId = activePreviewDialog?.dialogId;
-    if (username && extension && dialogId && teamId != null) {
-      try {
-        await sendFinesseDialogAction(teamId, username, String(dialogId), {
-          extension: String(extension),
-          action: "ACCEPT",
-        });
-        setCallStatus("Connected");
-        setCallTimer(0);
-      } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to accept call",
-        );
-      }
-    } else {
-      setCallStatus("Connected");
-      setCallTimer(0);
-    }
-  };
-
-  const handleRejectCall = async () => {
-    const { username, extension, teamId } = getFinesseContext();
-    const dialogId = activePreviewDialog?.dialogId;
-    if (username && extension && dialogId && teamId != null) {
-      try {
-        await sendFinesseDialogAction(teamId, username, String(dialogId), {
-          extension: String(extension),
-          action: "REJECT",
-        });
-      } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to reject call",
-        );
-      }
-    }
-    setShowCallWidget(false);
-    setCallTimer(0);
-    setCallStatus("Ringing");
-  };
-
-  const handleRejectOrClose = async (action: "REJECT" | "CLOSE") => {
-    const { username, extension, teamId } = getFinesseContext();
-    const dialogId = activePreviewDialog?.dialogId;
-    if (username && extension && dialogId && teamId != null) {
-      try {
-        await sendFinesseDialogAction(teamId, username, String(dialogId), {
-          extension: String(extension),
-          action,
-        });
-      } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            `Failed to ${action.toLowerCase()} call`,
-        );
-      }
-    }
-    setShowCallWidget(false);
-    setCallTimer(0);
-    setCallStatus("Ringing");
-  };
-
-  /** Reset local call UI state only (no DROP API). Use when closing wrap-up without submitting. */
-  const resetCallWidgetState = () => {
-    setShowCallWidget(false);
-    setCallTimer(0);
-    setCallStatus("Ringing");
-    setIsMuted(false);
-    setIsHold(false);
-  };
-
-  const dropCallAndReset = async () => {
-    const { username, extension, teamId } = getFinesseContext();
-    const dialogId = activePreviewDialog?.dialogId;
-    if (username && extension && dialogId && teamId != null) {
-      try {
-        await sendFinesseDialogAction(teamId, username, String(dialogId), {
-          extension: String(extension),
-          action: "DROP",
-        });
-      } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to end call",
-        );
-      }
-    }
-    resetCallWidgetState();
-  };
-
-  /** End call: send DROP first; server will send WRAP_UP event, then we show wrap-up modal with wrapUpTimer. */
-  const handleEndCall = async () => {
-    const { username, extension, teamId } = getFinesseContext();
-    const dialogId = activePreviewDialog?.dialogId;
-    if (username && extension && dialogId && teamId != null) {
-      try {
-        await sendFinesseDialogAction(teamId, username, String(dialogId), {
-          extension: String(extension),
-          action: "DROP",
-        });
-      } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to end call",
-        );
-      }
-    }
-  };
-
-  const handleHoldToggle = async (hold: boolean) => {
-    const { username, extension, teamId } = getFinesseContext();
-    const dialogId = activePreviewDialog?.dialogId;
-    if (username && extension && dialogId && teamId != null) {
-      setHoldLoading(true);
-      try {
-        await sendFinesseDialogAction(teamId, username, String(dialogId), {
-          extension: String(extension),
-          action: hold ? "HOLD" : "RETRIEVE",
-        });
-        setIsHold(hold);
-        toast.success(hold ? "Call on hold" : "Call resumed");
-      } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            (hold ? "Failed to hold" : "Failed to resume"),
-        );
-      } finally {
-        setHoldLoading(false);
-      }
-    }
-  };
-
   const handleOpenUploadModal = (campaignId: number) => {
     setSelectedCampaignId(campaignId);
     setShowUploadModal(true);
@@ -873,6 +725,9 @@ const LiveCallsCampaignsManagement = () => {
     setAllowDuplicateContacts(true);
     // Columns are loaded from getFinesseCampaignContactsConfig (manual.fieldsOrder)
     setColumnMapping([]);
+    setUploadModalRemainingCount(null);
+    setUploadModalRemainingLoading(false);
+    setUploadModalClearingContacts(false);
   };
 
   const handleCloseUploadModal = () => {
@@ -882,6 +737,9 @@ const LiveCallsCampaignsManagement = () => {
     setAllowDuplicateContacts(true);
     setColumnMapping([]);
     setColumnsLoading(false);
+    setUploadModalRemainingCount(null);
+    setUploadModalRemainingLoading(false);
+    setUploadModalClearingContacts(false);
   };
 
   const buildColumnMappingFromConfig = useCallback((raw: any) => {
@@ -917,7 +775,24 @@ const LiveCallsCampaignsManagement = () => {
     return [];
   }, []);
 
-  // Load columns config when upload modal opens
+  const loadUploadModalRemainingFromApi =
+    useCallback(async (): Promise<number | null> => {
+      if (selectedCampaignId == null) return null;
+      const { username, teamId } = getFinesseContext();
+      if (!username || teamId == null) return null;
+      try {
+        const resp = await getFinesseCampaignContacts(
+          teamId,
+          username,
+          selectedCampaignId,
+        );
+        return extractRemainingContactsCount(resp);
+      } catch {
+        return null;
+      }
+    }, [getFinesseContext, selectedCampaignId]);
+
+  // Load columns config + remaining contacts when upload modal opens
   useEffect(() => {
     const run = async () => {
       if (!showUploadModal) return;
@@ -926,26 +801,32 @@ const LiveCallsCampaignsManagement = () => {
       if (!username || teamId == null) return;
 
       setColumnsLoading(true);
-      try {
-        const resp = await getFinesseCampaignContactsConfig(
+      setUploadModalRemainingLoading(true);
+      setUploadModalRemainingCount(null);
+
+      const [configOutcome, count] = await Promise.all([
+        getFinesseCampaignContactsConfig(
           teamId,
           username,
           selectedCampaignId,
-        );
-        const mapped = buildColumnMappingFromConfig(resp);
+        )
+          .then((r) => ({ ok: true as const, r }))
+          .catch(() => ({ ok: false as const })),
+        loadUploadModalRemainingFromApi(),
+      ]);
+
+      if (configOutcome.ok) {
+        const mapped = buildColumnMappingFromConfig(configOutcome.r);
         if (mapped.length > 0) {
           setColumnMapping(mapped);
         }
-      } catch (err: any) {
-        // Keep current mapping (defaults) but inform user
-        toast.error(
-          err?.response?.data?.message ??
-            err?.message ??
-            "Failed to load contact columns config.",
-        );
-      } finally {
-        setColumnsLoading(false);
+      } else {
+        toast.error("Failed to load contact columns config.");
       }
+      setColumnsLoading(false);
+
+      setUploadModalRemainingCount(count);
+      setUploadModalRemainingLoading(false);
     };
     void run();
   }, [
@@ -953,6 +834,62 @@ const LiveCallsCampaignsManagement = () => {
     selectedCampaignId,
     getFinesseContext,
     buildColumnMappingFromConfig,
+    loadUploadModalRemainingFromApi,
+  ]);
+
+  const handleRefreshUploadModalContacts = useCallback(async () => {
+    if (selectedCampaignId == null) return;
+    setUploadModalRemainingLoading(true);
+    setUploadModalRemainingCount(null);
+    const count = await loadUploadModalRemainingFromApi();
+    setUploadModalRemainingCount(count);
+    setUploadModalRemainingLoading(false);
+    void refreshRemainingContacts([selectedCampaignId]);
+  }, [
+    loadUploadModalRemainingFromApi,
+    selectedCampaignId,
+    refreshRemainingContacts,
+  ]);
+
+  const handleClearUploadModalContacts = useCallback(async () => {
+    if (selectedCampaignId == null) return;
+    if (uploadModalRemainingLoading || uploadModalClearingContacts) return;
+    if ((uploadModalDisplayRemaining ?? 0) <= 0) return;
+    const { username, teamId } = getFinesseContext();
+    if (!username || teamId == null) {
+      toast.error("user not found.");
+      return;
+    }
+    if (
+      !globalThis.window?.confirm(
+        "Remove all remaining contacts for this campaign? This cannot be undone.",
+      )
+    ) {
+      return;
+    }
+    setUploadModalClearingContacts(true);
+    try {
+      await deleteFinesseCampaignContacts(teamId, username, selectedCampaignId);
+      toast.success("Remaining contacts removed.");
+      setUploadModalRemainingLoading(true);
+      setUploadModalRemainingCount(null);
+      const count = await loadUploadModalRemainingFromApi();
+      setUploadModalRemainingCount(count);
+      await refreshRemainingContacts([selectedCampaignId]);
+    } catch (err: unknown) {
+      toast.error(getFinesseApiErrorMessage(err, "Failed to remove contacts."));
+    } finally {
+      setUploadModalRemainingLoading(false);
+      setUploadModalClearingContacts(false);
+    }
+  }, [
+    selectedCampaignId,
+    uploadModalRemainingLoading,
+    uploadModalClearingContacts,
+    uploadModalDisplayRemaining,
+    getFinesseContext,
+    loadUploadModalRemainingFromApi,
+    refreshRemainingContacts,
   ]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1034,9 +971,11 @@ const LiveCallsCampaignsManagement = () => {
       const arr = Array.isArray(list)
         ? list
         : (list?.campaigns ?? list?.items ?? []);
-      setCampaigns(
-        (arr as any[]).map((item, index) => mapApiCampaignToRow(item, index)),
+      const refreshedRows = (arr as any[]).map((item, index) =>
+        mapApiCampaignToRow(item, index),
       );
+      setCampaigns(refreshedRows);
+      void refreshRemainingContacts(refreshedRows.map((c) => c.id));
       const statusData = await getFinesseCampaignsContactsStatus(
         teamId,
         username,
@@ -1069,6 +1008,10 @@ const LiveCallsCampaignsManagement = () => {
     field: "timeFrom" | "timeTo" | "startTime" | "endTime",
     value: string,
   ) => {
+    if (!canChangeCampaignTiming) {
+      toast.error("You do not have permission to change campaign schedule.");
+      return;
+    }
     const campaign = campaigns.find((c) => c.id === campaignId);
     if (!campaign) return;
     const updates: Partial<CampaignRow> = { [field]: value };
@@ -1094,163 +1037,6 @@ const LiveCallsCampaignsManagement = () => {
       setCampaigns(
         campaigns.map((c) => (c.id === campaignId ? { ...campaign } : c)),
       );
-    }
-  };
-
-  const handleWrapUpSubmit = async (data: {
-    wrapUp: string | string[];
-    variables: Record<string, string>;
-  }) => {
-    const { username, extension, teamId } = getFinesseContext();
-    const dialogId = activePreviewDialog?.dialogId;
-    if (username && extension && dialogId && teamId != null) {
-      const reasons = Array.isArray(data.wrapUp) ? data.wrapUp : [data.wrapUp];
-      const wrapUpItems: string[] = reasons.map((idOrValue) => {
-        const option = wrapUpReasons.find((o) => o.value === String(idOrValue));
-        return option ? option.label : String(idOrValue ?? "");
-      });
-      try {
-        await sendFinesseDialogAction(teamId, username, String(dialogId), {
-          extension: String(extension),
-          action: "UPDATE_CALL_DATA",
-          wrapUpItems,
-        });
-        toast.success("Wrap up submitted.");
-      } catch (err: unknown) {
-        toast.error(
-          (
-            err as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          )?.response?.data?.message ??
-            (err as Error)?.message ??
-            "Failed to submit wrap up",
-        );
-      }
-    }
-    if (wrapUpAutoCloseTimerRef.current) {
-      clearTimeout(wrapUpAutoCloseTimerRef.current);
-      wrapUpAutoCloseTimerRef.current = null;
-    }
-    setIsWrapUpOpen(false);
-  };
-
-  const handleWrapUpMinimize = () => setIsWrapUpOpen(false);
-
-  const startWrapUpAutoCloseTimer = useCallback(() => {
-    if (wrapUpAutoCloseTimerRef.current)
-      clearTimeout(wrapUpAutoCloseTimerRef.current);
-    const seconds = getFinesseUserData()?.wrapUpTimer ?? 10;
-    wrapUpAutoCloseTimerRef.current = setTimeout(() => {
-      setIsWrapUpOpen(false);
-      wrapUpAutoCloseTimerRef.current = null;
-    }, seconds * 1000);
-  }, []);
-
-  /** Fetch wrap-up reasons from API, then open Wrap up modal. When openedFromWrapUpEvent, modal auto-closes after wrapUpTimer seconds. */
-  const handleWrapUpClick = async (
-    _openedFromEndCall?: boolean,
-    openedFromWrapUpEvent?: boolean,
-  ) => {
-    const { username, teamId } = getFinesseContext();
-    if (!username || teamId == null) {
-      toast.error("User not found.");
-      return;
-    }
-    setWrapUpReasonsLoading(true);
-    try {
-      const response = await getFinesseWrapUpReasons(teamId, username);
-      console.log("[Finesse] wrapUpReasons API response:", response);
-      const raw = response?.responseData ?? response?.data ?? response;
-      const list = Array.isArray(raw)
-        ? raw
-        : (raw?.wrapUpReasons ?? raw?.reasonCodes ?? raw?.reasons ?? []);
-      const options: Array<{ value: string; label: string }> = list.map(
-        (item: {
-          uri?: string;
-          id?: number;
-          code?: string;
-          label?: string;
-          name?: string;
-        }) => {
-          // API shape: { uri: "/finesse/api/User/.../WrapUpReason/5", label: "Not Interested", forAll }
-          const idFromUri =
-            typeof item.uri === "string"
-              ? item.uri.split("/").findLast(Boolean)
-              : undefined;
-          const value = String(
-            idFromUri ?? item.id ?? item.code ?? item.label ?? item.name ?? "",
-          );
-          const label = String(
-            item.label ?? item.name ?? item.code ?? value ?? "—",
-          );
-          return { value, label };
-        },
-      );
-      const reasonsToShow = options.length
-        ? options
-        : [{ value: "other", label: "Other" }];
-      setWrapUpReasons(reasonsToShow);
-      // Parse call variables from API (responseData.callVariables, .variables, .callVariableDefinitions, etc.)
-      const data = response?.responseData ?? response?.data ?? response;
-      const callVarsRaw =
-        (
-          data as {
-            callVariables?: Array<{
-              key?: string;
-              name?: string;
-              label?: string;
-            }>;
-          }
-        )?.callVariables ??
-        (
-          data as {
-            variables?: Array<{ key?: string; name?: string; label?: string }>;
-          }
-        )?.variables ??
-        (
-          data as {
-            callVariableDefinitions?: Array<{
-              key?: string;
-              name?: string;
-              label?: string;
-            }>;
-          }
-        )?.callVariableDefinitions;
-      const callVarConfig: CallVariableConfig[] = Array.isArray(callVarsRaw)
-        ? callVarsRaw
-            .map((v: { key?: string; name?: string; label?: string }) => ({
-              key: String(v.key ?? v.name ?? ""),
-              label: String(v.label ?? v.name ?? v.key ?? "—"),
-            }))
-            .filter((v: CallVariableConfig) => v.key)
-        : [];
-      setCallVariablesConfig(callVarConfig);
-      setTimeout(() => {
-        setIsWrapUpOpen(true);
-        if (openedFromWrapUpEvent) startWrapUpAutoCloseTimer();
-      }, 0);
-    } catch (err) {
-      console.error("[Finesse] wrapUpReasons failed:", err);
-      toast.error(
-        (
-          err as {
-            response?: { data?: { message?: string } };
-            message?: string;
-          }
-        )?.response?.data?.message ??
-          (err as Error)?.message ??
-          "Failed to load wrap-up reasons.",
-      );
-      setWrapUpReasons([{ value: "other", label: "Other" }]);
-      setCallVariablesConfig([]);
-      setTimeout(() => {
-        setIsWrapUpOpen(true);
-        if (openedFromWrapUpEvent) startWrapUpAutoCloseTimer();
-      }, 0);
-    } finally {
-      setWrapUpReasonsLoading(false);
     }
   };
 
@@ -2704,6 +2490,12 @@ const LiveCallsCampaignsManagement = () => {
                                 type="time"
                                 className="time-input"
                                 value={campaign.startTime}
+                                disabled={!canChangeCampaignTiming}
+                                title={
+                                  !canChangeCampaignTiming
+                                    ? "You do not have permission to change campaign schedule"
+                                    : undefined
+                                }
                                 onChange={(e) =>
                                   handleTimeChange(
                                     campaign.id,
@@ -2718,6 +2510,12 @@ const LiveCallsCampaignsManagement = () => {
                                 type="time"
                                 className="time-input"
                                 value={campaign.endTime}
+                                disabled={!canChangeCampaignTiming}
+                                title={
+                                  !canChangeCampaignTiming
+                                    ? "You do not have permission to change campaign schedule"
+                                    : undefined
+                                }
                                 onChange={(e) =>
                                   handleTimeChange(
                                     campaign.id,
@@ -2740,17 +2538,32 @@ const LiveCallsCampaignsManagement = () => {
                         </td>
                         <td>
                           <div
-                            className={`toggle-switch ${campaign.enabled ? "enabled" : ""}`}
-                            onClick={() => handleToggleCampaign(campaign.id)}
+                            className={`toggle-switch ${campaign.enabled ? "enabled" : ""} ${!canChangeCampaignStatus ? "opacity-50" : ""}`}
+                            style={
+                              !canChangeCampaignStatus
+                                ? { cursor: "not-allowed" }
+                                : undefined
+                            }
+                            onClick={() => {
+                              if (!canChangeCampaignStatus) return;
+                              void handleToggleCampaign(campaign.id);
+                            }}
                             onKeyDown={(e) => {
+                              if (!canChangeCampaignStatus) return;
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                handleToggleCampaign(campaign.id);
+                                void handleToggleCampaign(campaign.id);
                               }
                             }}
                             role="switch"
-                            tabIndex={0}
+                            tabIndex={canChangeCampaignStatus ? 0 : -1}
                             aria-checked={campaign.enabled}
+                            aria-disabled={!canChangeCampaignStatus}
+                            title={
+                              !canChangeCampaignStatus
+                                ? "You do not have permission to change campaign status"
+                                : undefined
+                            }
                             aria-label={`Toggle ${campaign.name}`}
                           >
                             <div className="toggle-slider" />
@@ -2773,47 +2586,9 @@ const LiveCallsCampaignsManagement = () => {
           </div>
 
           {/* Outgoing Call Widget – dynamic from preview event */}
-          <CallWidget
-            showCallWidget={showCallWidget}
-            setShowCallWidget={setShowCallWidget}
-            callStatus={callStatus}
-            callTimer={callTimer}
-            isMuted={isMuted}
-            setIsMuted={setIsMuted}
-            isHold={isHold}
-            setIsHold={setIsHold}
-            handleAcceptCall={handleAcceptCall}
-            handleRejectCall={handleRejectCall}
-            handleEndCall={handleEndCall}
-            formatTime={formatTime}
-            selectedTeam={selectedTeam}
-            activeAgentName="Campaign Agent"
-            campaignName={activePreviewDialog?.campaignName}
-            customerNumber={activePreviewDialog?.customerNumber}
-            dialedNumber={activePreviewDialog?.dialedNumber}
-            previewActions={activePreviewDialog?.participants?.[0]?.actions}
-            onRejectWithAction={handleRejectOrClose}
-            onWrapUpClick={handleWrapUpClick}
-            wrapUpLoading={wrapUpReasonsLoading}
-            onHoldToggle={handleHoldToggle}
-            holdLoading={holdLoading}
-          />
+          <CallWidget {...callWidgetProps} />
 
-          <WrapUpModal
-            isOpen={isWrapUpOpen}
-            onClose={() => {
-              if (wrapUpAutoCloseTimerRef.current) {
-                clearTimeout(wrapUpAutoCloseTimerRef.current);
-                wrapUpAutoCloseTimerRef.current = null;
-              }
-              setIsWrapUpOpen(false);
-              resetCallWidgetState();
-            }}
-            onSubmit={handleWrapUpSubmit}
-            onMinimize={handleWrapUpMinimize}
-            wrapUpReasons={wrapUpReasons}
-            callVariablesConfig={callVariablesConfig}
-          />
+          <WrapUpModal {...wrapUpModalProps} />
 
           {/* Upload Contacts Modal */}
           {showUploadModal && (
@@ -2833,6 +2608,116 @@ const LiveCallsCampaignsManagement = () => {
                 </div>
 
                 <div className="modal-body">
+                  {selectedCampaignId != null && (
+                    <div
+                      style={{
+                        marginBottom: "24px",
+                        padding: "14px 18px",
+                        background: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "12px",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "12px 16px",
+                        fontSize: "14px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          color: "#475569",
+                          fontWeight: 600,
+                        }}
+                      >
+                        <Target size={18} color="#667eea" />
+                        <span>
+                          {uploadModalCampaignRow?.name ??
+                            `Campaign #${selectedCampaignId}`}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            color: "#64748b",
+                          }}
+                        >
+                          <span style={{ fontWeight: 600 }}>
+                            Remaining contacts
+                          </span>
+                          {uploadModalRemainingLoading ||
+                          uploadModalClearingContacts ? (
+                            <Loader
+                              size={16}
+                              className="text-primary"
+                              style={{ animation: "spin 1s linear infinite" }}
+                            />
+                          ) : (
+                            <span
+                              style={{
+                                fontWeight: 700,
+                                fontSize: "18px",
+                                color: "#1e293b",
+                              }}
+                            >
+                              {uploadModalDisplayRemaining ?? "—"}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className={`action-btn${uploadModalRemainingLoading ? " refreshing" : ""}`}
+                          title="Refresh remaining contacts"
+                          aria-label="Refresh remaining contacts"
+                          onClick={() => {
+                            void handleRefreshUploadModalContacts();
+                          }}
+                          disabled={
+                            uploadModalRemainingLoading ||
+                            uploadModalClearingContacts
+                          }
+                        >
+                          <RefreshCw size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          className="action-btn"
+                          title="Remove all remaining contacts"
+                          aria-label="Remove all remaining contacts"
+                          onClick={() => {
+                            void handleClearUploadModalContacts();
+                          }}
+                          disabled={
+                            uploadModalRemainingLoading ||
+                            uploadModalClearingContacts ||
+                            (uploadModalDisplayRemaining ?? 0) <= 0
+                          }
+                        >
+                          {uploadModalClearingContacts ? (
+                            <Loader
+                              size={18}
+                              style={{ animation: "spin 1s linear infinite" }}
+                            />
+                          ) : (
+                            <Trash2 size={18} />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {/* File Upload Section */}
                   <div className="modal-section">
                     <div className="modal-section-title">
