@@ -44,7 +44,6 @@ import {
   User,
   Mic,
   MicOff,
-  Pause,
   LogOut,
 } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, AreaChart, Area } from 'recharts';
@@ -211,9 +210,9 @@ const LiveCallsAgentsManagement = () => {
         const r = btn.getBoundingClientRect();
         const menuWidth = 200;
         let left = r.right - menuWidth;
-        left = Math.max(12, Math.min(left, window.innerWidth - menuWidth - 12));
+        left = Math.max(12, Math.min(left, globalThis.window.innerWidth - menuWidth - 12));
         const top = r.bottom + 6;
-        const maxHeight = Math.max(140, window.innerHeight - top - 12);
+        const maxHeight = Math.max(140, globalThis.window.innerHeight - top - 12);
         setActionMenuPortal((prev) =>
           prev?.agent.id === agent.id ? null : { agent, top, left, maxHeight },
         );
@@ -242,11 +241,11 @@ const LiveCallsAgentsManagement = () => {
       useEffect(() => {
         if (!actionMenuPortal) return;
         const close = () => setActionMenuPortal(null);
-        window.addEventListener('scroll', close, true);
-        window.addEventListener('resize', close);
+        globalThis.window.addEventListener('scroll', close, true);
+        globalThis.window.addEventListener('resize', close);
         return () => {
-          window.removeEventListener('scroll', close, true);
-          window.removeEventListener('resize', close);
+          globalThis.window.removeEventListener('scroll', close, true);
+          globalThis.window.removeEventListener('resize', close);
         };
       }, [actionMenuPortal]);
     
@@ -280,7 +279,7 @@ const LiveCallsAgentsManagement = () => {
           setFinesseSseToken(null);
           return;
         }
-        if (typeof window === 'undefined') return;
+        if (globalThis.window === undefined) return;
         setFinesseSseToken(getFinesseToken());
       }, [session?.user]);
 
@@ -331,7 +330,7 @@ const LiveCallsAgentsManagement = () => {
             if (payload) {
               const last = lastRosterPayloadRef.current;
               const merged =
-                last != null ? mergeTeamUsersFromRoster(payload, last) : payload;
+                last == null ? payload : mergeTeamUsersFromRoster(payload, last);
               setTeamData(merged ?? payload);
               if (mergeClusterIntoStoredUserFromTeamPayload(payload)) {
                 setStreamConfigBump((b) => b + 1);
@@ -396,13 +395,14 @@ const LiveCallsAgentsManagement = () => {
       });
       // When gate authenticates on same page (no reload), re-hydrate teams and refetch
       useEffect(() => {
-        if (typeof window === 'undefined') return;
+        if (globalThis.window === undefined) return;
         const onAuthenticated = () => {
           hydrateTeamsFromStorage();
           setRefreshTrigger((t) => t + 1);
         };
-        window.addEventListener('finesse-authenticated', onAuthenticated);
-        return () => window.removeEventListener('finesse-authenticated', onAuthenticated);
+        globalThis.window.addEventListener('finesse-authenticated', onAuthenticated);
+        return () =>
+          globalThis.window.removeEventListener('finesse-authenticated', onAuthenticated);
       }, [hydrateTeamsFromStorage]);
 
       // Fetch user team details using teamId from storage (FINESSE_SELECTED_TEAM_ID_KEY)
@@ -443,7 +443,7 @@ const LiveCallsAgentsManagement = () => {
             ? users.find((u) => u.loginId === username)
             : undefined;
         const effFromRow =
-          row != null ? getFinesseEffectiveAgentStateFromStatePayload(row) : undefined;
+          row == null ? undefined : getFinesseEffectiveAgentStateFromStatePayload(row);
         const effFromStore = getFinesseEffectiveAgentStateFromStatePayload(
           getFinesseUserData(),
         );
@@ -482,8 +482,8 @@ const LiveCallsAgentsManagement = () => {
         }
         setStoredTeamId(newTeamId);
         clearFinesseUserData();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(
+        if (globalThis.window !== undefined) {
+          globalThis.window.dispatchEvent(
             new CustomEvent('finesse-require-reauth', { detail: { manualConnect: false } }),
           );
         }
@@ -501,8 +501,8 @@ const LiveCallsAgentsManagement = () => {
         }
         clearFinesseUserData();
         setFinesseManualReconnectRequired();
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(
+        if (globalThis.window !== undefined) {
+          globalThis.window.dispatchEvent(
             new CustomEvent('finesse-require-reauth', { detail: { manualConnect: true } }),
           );
         }
@@ -1231,6 +1231,30 @@ const LiveCallsAgentsManagement = () => {
           border-color: #667eea;
         }
 
+        input[type="checkbox"].checkbox {
+          appearance: none;
+          -webkit-appearance: none;
+          margin: 0;
+          cursor: pointer;
+        }
+
+        .checkbox-wrap {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          vertical-align: middle;
+        }
+
+        .checkbox-check-overlay {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          pointer-events: none;
+        }
+
         .table-container {
           overflow-x: auto;
           overflow-y: visible;
@@ -1766,8 +1790,10 @@ const LiveCallsAgentsManagement = () => {
                     className="bulk-action-btn"
                     type="button"
                     disabled={bulkActionLoading || !canChangeUserStatus}
-                    title={!canChangeUserStatus ? 'You do not have permission to change agent status' : undefined}
-                    onClick={() => void handleBulkStatusChange('READY')}
+                    title={canChangeUserStatus ? undefined : 'You do not have permission to change agent status'}
+                    onClick={() => {
+                      handleBulkStatusChange('READY').catch(() => undefined);
+                    }}
                   >
                     <CheckCircle size={16} />
                     Set Ready
@@ -1776,8 +1802,10 @@ const LiveCallsAgentsManagement = () => {
                     className="bulk-action-btn"
                     type="button"
                     disabled={bulkActionLoading || !canChangeUserStatus}
-                    title={!canChangeUserStatus ? 'You do not have permission to change agent status' : undefined}
-                    onClick={() => void handleBulkStatusChange('NOT_READY')}
+                    title={canChangeUserStatus ? undefined : 'You do not have permission to change agent status'}
+                    onClick={() => {
+                      handleBulkStatusChange('NOT_READY').catch(() => undefined);
+                    }}
                   >
                     <XCircle size={16} />
                     Set Not Ready
@@ -1900,14 +1928,20 @@ const LiveCallsAgentsManagement = () => {
                 <thead>
                   <tr>
                     <th style={{ width: '50px' }}>
-                      <div
-                        className={`checkbox ${selectedAgents.length === filteredAgents.length && filteredAgents.length > 0 ? 'checked' : ''}`}
-                        onClick={handleSelectAll}
-                        style={{ cursor: 'pointer' }}
-                        role="presentation"
-                      >
+                      <div className="checkbox-wrap">
+                        <input
+                          type="checkbox"
+                          className={`checkbox ${selectedAgents.length === filteredAgents.length && filteredAgents.length > 0 ? 'checked' : ''}`}
+                          checked={
+                            selectedAgents.length === filteredAgents.length && filteredAgents.length > 0
+                          }
+                          onChange={handleSelectAll}
+                          aria-label="Select all agents"
+                        />
                         {selectedAgents.length === filteredAgents.length && filteredAgents.length > 0 && (
-                          <CheckCircle size={14} color="white" />
+                          <span className="checkbox-check-overlay">
+                            <CheckCircle size={14} color="white" />
+                          </span>
                         )}
                       </div>
                     </th>
@@ -1925,14 +1959,18 @@ const LiveCallsAgentsManagement = () => {
                       className={selectedAgents.includes(agent.id) ? 'selected' : ''}
                     >
                       <td>
-                        <div
-                          className={`checkbox ${selectedAgents.includes(agent.id) ? 'checked' : ''}`}
-                          onClick={() => handleSelectAgent(agent.id)}
-                          style={{ cursor: 'pointer' }}
-                          role="presentation"
-                        >
+                        <div className="checkbox-wrap">
+                          <input
+                            type="checkbox"
+                            className={`checkbox ${selectedAgents.includes(agent.id) ? 'checked' : ''}`}
+                            checked={selectedAgents.includes(agent.id)}
+                            onChange={() => handleSelectAgent(agent.id)}
+                            aria-label={`Select ${agent.name}`}
+                          />
                           {selectedAgents.includes(agent.id) && (
-                            <CheckCircle size={14} color="white" />
+                            <span className="checkbox-check-overlay">
+                              <CheckCircle size={14} color="white" />
+                            </span>
                           )}
                         </div>
                       </td>
@@ -2031,16 +2069,16 @@ const LiveCallsAgentsManagement = () => {
               type="button"
               className="action-menu-item"
               disabled={!canChangeUserStatus}
-              title={!canChangeUserStatus ? 'You do not have permission to change agent status' : undefined}
+              title={canChangeUserStatus ? undefined : 'You do not have permission to change agent status'}
               onClick={(e) => {
                 e.stopPropagation();
                 if (!canChangeUserStatus) return;
                 const a = actionMenuPortal.agent;
-                if (a.state !== 'OFFLINE') {
-                  void handleSingleAgentStatusChange(a.loginId, 'READY');
-                } else {
+                if (a.state === 'OFFLINE') {
                   toast.warn('Cannot change status of offline agents');
                   setActionMenuPortal(null);
+                } else {
+                  handleSingleAgentStatusChange(a.loginId, 'READY').catch(() => undefined);
                 }
               }}
             >
@@ -2051,16 +2089,16 @@ const LiveCallsAgentsManagement = () => {
               type="button"
               className="action-menu-item"
               disabled={!canChangeUserStatus}
-              title={!canChangeUserStatus ? 'You do not have permission to change agent status' : undefined}
+              title={canChangeUserStatus ? undefined : 'You do not have permission to change agent status'}
               onClick={(e) => {
                 e.stopPropagation();
                 if (!canChangeUserStatus) return;
                 const a = actionMenuPortal.agent;
-                if (a.state !== 'OFFLINE') {
-                  void handleSingleAgentStatusChange(a.loginId, 'NOT_READY');
-                } else {
+                if (a.state === 'OFFLINE') {
                   toast.warn('Cannot change status of offline agents');
                   setActionMenuPortal(null);
+                } else {
+                  handleSingleAgentStatusChange(a.loginId, 'NOT_READY').catch(() => undefined);
                 }
               }}
             >
@@ -2071,11 +2109,11 @@ const LiveCallsAgentsManagement = () => {
               type="button"
               className="action-menu-item danger"
               disabled={!canForceSignOut}
-              title={!canForceSignOut ? 'You do not have permission to force sign-out' : undefined}
+              title={canForceSignOut ? undefined : 'You do not have permission to force sign-out'}
               onClick={(e) => {
                 e.stopPropagation();
                 if (!canForceSignOut) return;
-                void handleForceSignOutAgent(actionMenuPortal.agent.loginId);
+                handleForceSignOutAgent(actionMenuPortal.agent.loginId).catch(() => undefined);
               }}
             >
               <LogOut size={16} />

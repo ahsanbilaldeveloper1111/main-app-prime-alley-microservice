@@ -74,7 +74,7 @@ function formatFinesseReasonLabel(reasonCode: unknown): string | null {
   if (reasonCode == null) return null;
   if (typeof reasonCode === "string") {
     const t = reasonCode.trim();
-    return t !== "" ? t : null;
+    return t === "" ? null : t;
   }
   if (typeof reasonCode === "object" && reasonCode !== null && "label" in reasonCode) {
     const lab = (reasonCode as { label?: unknown }).label;
@@ -262,7 +262,7 @@ const CampaignAgentPage = () => {
   }, [finesseHydrated, session?.user]);
 
   useEffect(() => {
-    void loadSelfProfile();
+    loadSelfProfile().catch(() => undefined);
   }, [loadSelfProfile, finesseUsername]);
 
   const handleTeamChange = async (newTeamName: string, newTeamId: number) => {
@@ -470,7 +470,9 @@ const CampaignAgentPage = () => {
               type="button"
               className="btn btn-outline-primary d-inline-flex align-items-center gap-2"
               disabled={profileLoading}
-              onClick={() => void loadSelfProfile()}
+              onClick={() => {
+                loadSelfProfile().catch(() => undefined);
+              }}
             >
               {profileLoading ? (
                 <Loader size={18} style={{ animation: "spin 1s linear infinite" }} />

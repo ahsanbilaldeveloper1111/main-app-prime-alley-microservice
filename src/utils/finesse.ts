@@ -159,9 +159,48 @@ const FINESSE_LOGGED_OUT_AGENT_STATES = new Set([
   "LOGGED_OUT",
 ]);
 
+/**
+ * Avoid `String(object)` → "[object Object]". Supports primitives and Finesse-style `{ label: string }`.
+ */
+function trimmedStringFromUnknownState(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value).trim();
+  }
+  if (typeof value === "object") {
+    const label = (value as { label?: unknown }).label;
+    if (typeof label === "string") return label.trim();
+    if (typeof label === "number" || typeof label === "boolean") {
+      return String(label).trim();
+    }
+  }
+  return "";
+}
+
+/** Cluster id from API may be string or number; reject objects to avoid `String(object)` noise. */
+function trimmedClusterIdFromUnknown(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    return t === "" ? null : t;
+  }
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return String(raw);
+  }
+  if (typeof raw === "boolean") {
+    return String(raw);
+  }
+  return null;
+}
+
 export function isFinesseAgentLoggedOutStateField(value: unknown): boolean {
   if (value == null) return false;
-  const s = String(value).trim().toUpperCase();
+  const s = trimmedStringFromUnknownState(value).toUpperCase();
   return s !== "" && FINESSE_LOGGED_OUT_AGENT_STATES.has(s);
 }
 
@@ -169,7 +208,7 @@ export function isFinesseAgentLoggedOutStateField(value: unknown): boolean {
 export function isFinesseAgentOfflineLikeState(value: unknown): boolean {
   if (isFinesseAgentLoggedOutStateField(value)) return true;
   if (value == null) return false;
-  return String(value).trim().toUpperCase() === "OFFLINE";
+  return trimmedStringFromUnknownState(value).toUpperCase() === "OFFLINE";
 }
 
 /**
@@ -190,12 +229,8 @@ export function getFinesseEffectiveAgentStateFromStatePayload(
     state = state ?? u.state;
     pendingState = pendingState ?? u.pendingState;
   }
-  const pendStr =
-    pendingState != null && String(pendingState).trim() !== ""
-      ? String(pendingState).trim()
-      : "";
-  const stateStr =
-    state != null && String(state).trim() !== "" ? String(state).trim() : "";
+  const pendStr = trimmedStringFromUnknownState(pendingState);
+  const stateStr = trimmedStringFromUnknownState(state);
 
   if (pendStr !== "") {
     const pu = pendStr.toUpperCase();
@@ -327,8 +362,8 @@ export function mergeClusterIntoStoredUserFromTeamPayload(teamPayload: unknown):
     p.finesseClusterId ??
     fromSettings?.clusterId ??
     fromSettings?.finesseClusterId;
-  if (raw == null || String(raw).trim() === "") return false;
-  const nextId = String(raw).trim();
+  const nextId = trimmedClusterIdFromUnknown(raw);
+  if (nextId == null) return false;
   const ud = getFinesseUserData();
   if (!ud) return false;
   const cur =

@@ -510,14 +510,15 @@ const LiveCallsCampaignsManagement = () => {
           }
         }),
       );
+      const countById = new Map(results.map((r) => [r.id, r.count]));
       setCampaigns((prev) =>
         prev.map((c) => {
-          const match = results.find((r) => r.id === c.id);
-          if (!match || match.count == null) return c;
+          const count = countById.get(c.id);
+          if (count == null) return c;
           return {
             ...c,
-            contactsRemaining: match.count,
-            pendingContacts: match.count,
+            contactsRemaining: count,
+            pendingContacts: count,
           };
         }),
       );
@@ -538,7 +539,7 @@ const LiveCallsCampaignsManagement = () => {
     if (!finesseHydrated) return;
     if (!campaignIdsKey) return;
     const ids = campaignIdsKey.split(",").map(Number).filter(Number.isFinite);
-    void refreshRemainingContacts(ids);
+    refreshRemainingContacts(ids).catch(() => undefined);
   }, [finesseHydrated, campaignIdsKey, refreshRemainingContacts]);
 
   const rosterClusterId = useMemo(
@@ -561,9 +562,9 @@ const LiveCallsCampaignsManagement = () => {
     setFinesseUserData({
       ...prev,
       state: display,
-      ...(patch.stateChangeTime != null
-        ? { stateChangeTime: patch.stateChangeTime }
-        : {}),
+      ...(patch.stateChangeTime == null
+        ? {}
+        : { stateChangeTime: patch.stateChangeTime }),
     });
   }, [finesseUsername]);
 
@@ -828,7 +829,7 @@ const LiveCallsCampaignsManagement = () => {
       setUploadModalRemainingCount(count);
       setUploadModalRemainingLoading(false);
     };
-    void run();
+    run().catch(() => undefined);
   }, [
     showUploadModal,
     selectedCampaignId,
@@ -844,7 +845,7 @@ const LiveCallsCampaignsManagement = () => {
     const count = await loadUploadModalRemainingFromApi();
     setUploadModalRemainingCount(count);
     setUploadModalRemainingLoading(false);
-    void refreshRemainingContacts([selectedCampaignId]);
+    refreshRemainingContacts([selectedCampaignId]).catch(() => undefined);
   }, [
     loadUploadModalRemainingFromApi,
     selectedCampaignId,
@@ -975,7 +976,9 @@ const LiveCallsCampaignsManagement = () => {
         mapApiCampaignToRow(item, index),
       );
       setCampaigns(refreshedRows);
-      void refreshRemainingContacts(refreshedRows.map((c) => c.id));
+      refreshRemainingContacts(refreshedRows.map((c) => c.id)).catch(
+        () => undefined,
+      );
       const statusData = await getFinesseCampaignsContactsStatus(
         teamId,
         username,
@@ -2492,9 +2495,9 @@ const LiveCallsCampaignsManagement = () => {
                                 value={campaign.startTime}
                                 disabled={!canChangeCampaignTiming}
                                 title={
-                                  !canChangeCampaignTiming
-                                    ? "You do not have permission to change campaign schedule"
-                                    : undefined
+                                  canChangeCampaignTiming
+                                    ? undefined
+                                    : "You do not have permission to change campaign schedule"
                                 }
                                 onChange={(e) =>
                                   handleTimeChange(
@@ -2512,9 +2515,9 @@ const LiveCallsCampaignsManagement = () => {
                                 value={campaign.endTime}
                                 disabled={!canChangeCampaignTiming}
                                 title={
-                                  !canChangeCampaignTiming
-                                    ? "You do not have permission to change campaign schedule"
-                                    : undefined
+                                  canChangeCampaignTiming
+                                    ? undefined
+                                    : "You do not have permission to change campaign schedule"
                                 }
                                 onChange={(e) =>
                                   handleTimeChange(
@@ -2538,21 +2541,21 @@ const LiveCallsCampaignsManagement = () => {
                         </td>
                         <td>
                           <div
-                            className={`toggle-switch ${campaign.enabled ? "enabled" : ""} ${!canChangeCampaignStatus ? "opacity-50" : ""}`}
+                            className={`toggle-switch ${campaign.enabled ? "enabled" : ""} ${canChangeCampaignStatus ? "" : "opacity-50"}`}
                             style={
-                              !canChangeCampaignStatus
-                                ? { cursor: "not-allowed" }
-                                : undefined
+                              canChangeCampaignStatus
+                                ? undefined
+                                : { cursor: "not-allowed" }
                             }
                             onClick={() => {
                               if (!canChangeCampaignStatus) return;
-                              void handleToggleCampaign(campaign.id);
+                              handleToggleCampaign(campaign.id).catch(() => undefined);
                             }}
                             onKeyDown={(e) => {
                               if (!canChangeCampaignStatus) return;
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                void handleToggleCampaign(campaign.id);
+                                handleToggleCampaign(campaign.id).catch(() => undefined);
                               }
                             }}
                             role="switch"
@@ -2560,9 +2563,9 @@ const LiveCallsCampaignsManagement = () => {
                             aria-checked={campaign.enabled}
                             aria-disabled={!canChangeCampaignStatus}
                             title={
-                              !canChangeCampaignStatus
-                                ? "You do not have permission to change campaign status"
-                                : undefined
+                              canChangeCampaignStatus
+                                ? undefined
+                                : "You do not have permission to change campaign status"
                             }
                             aria-label={`Toggle ${campaign.name}`}
                           >
@@ -2683,7 +2686,7 @@ const LiveCallsCampaignsManagement = () => {
                           title="Refresh remaining contacts"
                           aria-label="Refresh remaining contacts"
                           onClick={() => {
-                            void handleRefreshUploadModalContacts();
+                            handleRefreshUploadModalContacts().catch(() => undefined);
                           }}
                           disabled={
                             uploadModalRemainingLoading ||
@@ -2698,7 +2701,7 @@ const LiveCallsCampaignsManagement = () => {
                           title="Remove all remaining contacts"
                           aria-label="Remove all remaining contacts"
                           onClick={() => {
-                            void handleClearUploadModalContacts();
+                            handleClearUploadModalContacts().catch(() => undefined);
                           }}
                           disabled={
                             uploadModalRemainingLoading ||
@@ -2725,29 +2728,7 @@ const LiveCallsCampaignsManagement = () => {
                       Select File
                     </div>
 
-                    {!uploadedFile ? (
-                      <div
-                        className="upload-area"
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        <div className="upload-icon">
-                          <Upload size={32} />
-                        </div>
-                        <div className="upload-text">
-                          Click to upload or drag and drop
-                        </div>
-                        <div className="upload-hint">
-                          CSV, XLSX, or TXT files (Max 10MB)
-                        </div>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".csv,.xlsx,.txt"
-                          style={{ display: "none" }}
-                          onChange={handleFileSelect}
-                        />
-                      </div>
-                    ) : (
+                    {uploadedFile ? (
                       <div className="file-info">
                         <div className="file-icon">
                           <CheckCircle size={24} />
@@ -2769,6 +2750,28 @@ const LiveCallsCampaignsManagement = () => {
                         >
                           <Trash2 size={18} />
                         </button>
+                      </div>
+                    ) : (
+                      <div
+                        className="upload-area"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <div className="upload-icon">
+                          <Upload size={32} />
+                        </div>
+                        <div className="upload-text">
+                          Click to upload or drag and drop
+                        </div>
+                        <div className="upload-hint">
+                          CSV, XLSX, or TXT files (Max 10MB)
+                        </div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".csv,.xlsx,.txt"
+                          style={{ display: "none" }}
+                          onChange={handleFileSelect}
+                        />
                       </div>
                     )}
                   </div>

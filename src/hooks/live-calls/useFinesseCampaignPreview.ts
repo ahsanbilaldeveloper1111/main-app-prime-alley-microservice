@@ -314,12 +314,12 @@ export function useFinesseCampaignPreview(
       return;
     }
     const raw =
-      typeof globalThis.window !== "undefined"
-        ? globalThis.window.prompt(
+      globalThis.window === undefined
+        ? null
+        : globalThis.window.prompt(
             "Reclassify parameter (if required by your dialer):",
             "",
-          )
-        : null;
+          );
     if (raw === null) return;
     const actionParam = raw.trim() === "" ? undefined : raw.trim();
     try {

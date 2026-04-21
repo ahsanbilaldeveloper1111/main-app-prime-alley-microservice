@@ -34,7 +34,7 @@ function callVariableAtColumn(map: Map<string, string>, columnIndex: number): st
 function classifyContactHeader(headerRaw: string): "none" | "first" | "last" | "account" | "phone1" | "other" {
   const t = headerRaw.trim().toLowerCase();
   if (!t || t === "none") return "none";
-  const compact = t.replace(/\s+/g, "");
+  const compact = t.replaceAll(/\s+/g, "");
   if (compact === "firstname" || (t.includes("first") && t.includes("name")))
     return "first";
   if (compact === "lastname" || (t.includes("last") && t.includes("name")))
@@ -51,7 +51,7 @@ function classifyContactHeader(headerRaw: string): "none" | "first" | "last" | "
 function titleCaseHeader(h: string): string {
   const t = h.trim();
   if (!t) return t;
-  return t.replace(/\b\w/g, (c) => c.toUpperCase());
+  return t.replaceAll(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function gridLabelForKind(
@@ -78,15 +78,8 @@ type ColumnDef = {
   kind: ReturnType<typeof classifyContactHeader>;
 };
 
-/**
- * @param callVariables — { name, value } pairs from the preview event (participant or dialog).
- */
-export function buildPreviewContactGridRows(
-  callVariables: CallVarRow[] | undefined,
-): PreviewContactGridRow[] {
-  const map = normalizeVarMap(callVariables);
+function collectColumnDefs(map: Map<string, string>): ColumnDef[] {
   const columns: ColumnDef[] = [];
-
   for (const [k, headerVal] of map.entries()) {
     const m = /^contactheader\.column(\d+)$/i.exec(k);
     if (!m) continue;
@@ -97,9 +90,34 @@ export function buildPreviewContactGridRows(
     if (kind === "none") continue;
     columns.push({ index, headerRaw, kind });
   }
-
   columns.sort((a, b) => a.index - b.index);
+  return columns;
+}
 
+function resolveColumnCellValue(map: Map<string, string>, col: ColumnDef): string {
+  if (col.kind === "account") {
+    return (
+      mapGetCI(map, "baaccountnumber") ||
+      callVariableAtColumn(map, col.index)
+    );
+  }
+  if (col.kind === "phone1") {
+    return (
+      mapGetCI(map, "bacustomernumber") ||
+      callVariableAtColumn(map, col.index)
+    );
+  }
+  return callVariableAtColumn(map, col.index);
+}
+
+/**
+ * @param callVariables — { name, value } pairs from the preview event (participant or dialog).
+ */
+export function buildPreviewContactGridRows(
+  callVariables: CallVarRow[] | undefined,
+): PreviewContactGridRow[] {
+  const map = normalizeVarMap(callVariables);
+  const columns = collectColumnDefs(map);
   const hasNameCol = columns.some((c) => c.kind === "first" || c.kind === "last");
   const rows: PreviewContactGridRow[] = [];
 
@@ -110,20 +128,7 @@ export function buildPreviewContactGridRows(
 
   for (const col of columns) {
     if (col.kind === "first" || col.kind === "last") continue;
-
-    let value = "";
-    if (col.kind === "account") {
-      value =
-        mapGetCI(map, "baaccountnumber") ||
-        callVariableAtColumn(map, col.index);
-    } else if (col.kind === "phone1") {
-      value =
-        mapGetCI(map, "bacustomernumber") ||
-        callVariableAtColumn(map, col.index);
-    } else {
-      value = callVariableAtColumn(map, col.index);
-    }
-
+    const value = resolveColumnCellValue(map, col);
     if (!value) continue;
     rows.push({
       label: gridLabelForKind(col.kind, col.headerRaw),

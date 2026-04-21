@@ -52,14 +52,14 @@ export default function FinesseAuthGate({
   const linkInFlightRef = useRef(false);
 
   useLayoutEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     if (getFinesseManualReconnectRequired()) {
       setManualConnectMode(true);
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     const token = getFinesseToken();
     const userData = getFinesseUserData();
     if (token && userData) {
@@ -68,7 +68,7 @@ export default function FinesseAuthGate({
   }, []);
 
   const attemptAutoLink = useCallback(async () => {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     if (linkInFlightRef.current) return;
     linkInFlightRef.current = true;
     setFinesseError(null);
@@ -86,8 +86,8 @@ export default function FinesseAuthGate({
         clearFinesseManualReconnectRequired();
         setManualConnectMode(false);
         setIsFinesseAuthenticated(true);
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('finesse-authenticated'));
+        if (globalThis.window !== undefined) {
+          globalThis.window.dispatchEvent(new CustomEvent('finesse-authenticated'));
         }
       } else {
         setFinesseError(
@@ -125,19 +125,20 @@ export default function FinesseAuthGate({
         setManualConnectMode(true);
         return;
       }
-      void attemptAutoLink();
+      attemptAutoLink().catch(() => undefined);
     },
     [attemptAutoLink],
   );
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.addEventListener('finesse-require-reauth', onRequireReauth);
-    return () => window.removeEventListener('finesse-require-reauth', onRequireReauth);
+    if (globalThis.window === undefined) return;
+    globalThis.window.addEventListener('finesse-require-reauth', onRequireReauth);
+    return () =>
+      globalThis.window.removeEventListener('finesse-require-reauth', onRequireReauth);
   }, [onRequireReauth]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     if (sessionStatus === 'loading') return;
     if (!session?.user) return;
     const token = getFinesseToken();
@@ -153,7 +154,7 @@ export default function FinesseAuthGate({
       return;
     }
     if (!isFinesseAuthenticated) {
-      void attemptAutoLink();
+      attemptAutoLink().catch(() => undefined);
     }
   }, [session?.user, sessionStatus, isFinesseAuthenticated, attemptAutoLink]);
 
@@ -217,7 +218,9 @@ export default function FinesseAuthGate({
           type="button"
           className="btn btn-primary"
           disabled={isFinesseLoading}
-          onClick={() => void attemptAutoLink()}
+          onClick={() => {
+            attemptAutoLink().catch(() => undefined);
+          }}
           style={{
             width: '100%',
             padding: '12px 20px',

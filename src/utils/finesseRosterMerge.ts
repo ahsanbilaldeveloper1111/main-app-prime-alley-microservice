@@ -102,12 +102,12 @@ function rosterEntryToTeamUserRow(e: FinesseRosterAgentPatch): Record<string, un
   const st = rosterEffectiveState(e);
   return {
     loginId,
-    ...(e.firstName != null ? { firstName: e.firstName } : {}),
-    ...(e.lastName != null ? { lastName: e.lastName } : {}),
-    ...(e.extension != null ? { extension: e.extension } : {}),
-    ...(st != null ? { state: st } : {}),
-    ...(e.pendingState != null ? { pendingState: e.pendingState } : {}),
-    ...(e.stateChangeTime != null ? { stateChangeTime: e.stateChangeTime } : {}),
+    ...(e.firstName == null ? {} : { firstName: e.firstName }),
+    ...(e.lastName == null ? {} : { lastName: e.lastName }),
+    ...(e.extension == null ? {} : { extension: e.extension }),
+    ...(st == null ? {} : { state: st }),
+    ...(e.pendingState == null ? {} : { pendingState: e.pendingState }),
+    ...(e.stateChangeTime == null ? {} : { stateChangeTime: e.stateChangeTime }),
   };
 }
 
@@ -134,17 +134,17 @@ export function mergeTeamUsersFromRoster<T extends { users?: Array<Record<string
 
   const merged = existingUsers.map((u) => {
     const key = rosterLoginKey((u as { loginId?: string }).loginId);
-    const patch = key != null ? byLogin.get(key) : undefined;
-    if (!patch) return u;
+    const patch = key == null ? undefined : byLogin.get(key);
+    if (patch == null) return u;
     const displayState = rosterStateForExistingTeamUser(patch);
     const next = {
       ...u,
-      ...(displayState != null ? { state: displayState } : {}),
-      ...(patch.pendingState != null ? { pendingState: patch.pendingState } : {}),
-      ...(patch.stateChangeTime != null ? { stateChangeTime: patch.stateChangeTime } : {}),
-      ...(patch.firstName != null ? { firstName: patch.firstName } : {}),
-      ...(patch.lastName != null ? { lastName: patch.lastName } : {}),
-      ...(patch.extension != null ? { extension: patch.extension } : {}),
+      ...(displayState == null ? {} : { state: displayState }),
+      ...(patch.pendingState == null ? {} : { pendingState: patch.pendingState }),
+      ...(patch.stateChangeTime == null ? {} : { stateChangeTime: patch.stateChangeTime }),
+      ...(patch.firstName == null ? {} : { firstName: patch.firstName }),
+      ...(patch.lastName == null ? {} : { lastName: patch.lastName }),
+      ...(patch.extension == null ? {} : { extension: patch.extension }),
     };
     return next;
   });
@@ -182,7 +182,7 @@ export function mergeAgentProfileFromRoster(
   return {
     ...profile,
     state: display,
-    ...(self.stateChangeTime != null ? { stateChangeTime: self.stateChangeTime } : {}),
+    ...(self.stateChangeTime == null ? {} : { stateChangeTime: self.stateChangeTime }),
   };
 }
 
