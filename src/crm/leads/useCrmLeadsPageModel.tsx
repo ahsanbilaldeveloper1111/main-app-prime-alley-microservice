@@ -12,6 +12,7 @@ import type {
   TabConfig,
 } from "@components/GenericTable";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
 import {
   buildShallowTabFilterPushArgs,
   resolveTabFilterFromUrlQuery,
@@ -1245,6 +1246,25 @@ export function useCrmLeadsPageModel() {
     return extensionData?.display_name || extensionData?.name || extension;
   }
 
+  const sidebarLeadRecordId = useMemo(() => {
+    const rawId = selectedLead?.id ?? selectedLead?.rawData?.id;
+    const numericId = Number(rawId);
+    return Number.isFinite(numericId) && numericId > 0 ? numericId : 0;
+  }, [selectedLead]);
+  const sidebarLeadRecordName = selectedLead?.name ?? "";
+  const sidebarLeadRecordPhone =
+    selectedLead?.phone ?? selectedLead?.rawData?.phone ?? "";
+  const sidebarLeadRecordEmail =
+    selectedLead?.email ?? selectedLead?.rawData?.email ?? "";
+
+  const sidebarLogActivityModals = useCrmLogActivityModals({
+    recordType: "lead",
+    recordId: sidebarLeadRecordId,
+    recordName: sidebarLeadRecordName,
+    recordPhone: sidebarLeadRecordPhone,
+    recordEmail: sidebarLeadRecordEmail,
+  });
+
   // Handle note creation
   const handleNoteCreate = useCallback(
     (note: string, createTask: boolean, taskDueDate?: string) => {
@@ -1254,12 +1274,6 @@ export function useCrmLeadsPageModel() {
         createTask,
         taskDueDate,
       });
-
-      // Here you would typically:
-      // 1. Save the note to your backend/database
-      // 2. If createTask is true, create a task with the due date
-      // 3. Update the UI to show the new note
-      // 4. Maybe refresh the notes section
 
       toast.success(
         `Note saved successfully!${createTask ? " Task created." : ""}`,
@@ -1406,6 +1420,19 @@ export function useCrmLeadsPageModel() {
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
+
+  // Call recording playback (matches prospects sidebar behaviour)
+  const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
+    useState(false);
+  const [selectedRecording, setSelectedRecording] = useState<any>(null);
+  const handlePlayCallRecording = useCallback((recording: any) => {
+    setSelectedRecording(recording);
+    setShowRecordingPlayerModal(true);
+  }, []);
+  const handleCloseRecordingPlayerModal = useCallback(() => {
+    setShowRecordingPlayerModal(false);
+    setSelectedRecording(null);
+  }, []);
 
   const handleMarkLostSubmit = useCallback(async () => {
     if (!leadToMarkLost || !lostReasonId || !lostFeedback.trim()) return;
@@ -2696,7 +2723,12 @@ export function useCrmLeadsPageModel() {
     handleCallClick,
     handleSidebarCall,
     getNameByExtension,
+    sidebarLogActivityModals,
     handleNoteCreate,
+    handlePlayCallRecording,
+    showRecordingPlayerModal,
+    selectedRecording,
+    handleCloseRecordingPlayerModal,
     handleCloseLeadSidebar,
     handleHideLeadSidebarKeepPersistence,
     handleDeleteLead,

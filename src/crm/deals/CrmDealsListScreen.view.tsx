@@ -18,6 +18,7 @@ import GenericTable, {
 } from "@components/GenericTable";
 import KanbanBoard, { type KanbanCardData } from "@components/KanbanBoard";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
@@ -2451,6 +2452,28 @@ export function CrmDealsListScreenView({
   const [showDealSidebar, setShowDealSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
+
+  const sidebarDealRecordId = useMemo(() => {
+    const rawId = selectedDeal?.id ?? selectedDeal?.rawData?.id;
+    const numericId = Number(rawId);
+    return Number.isFinite(numericId) && numericId > 0 ? numericId : 0;
+  }, [selectedDeal]);
+
+  const sidebarLogActivityModals = useCrmLogActivityModals({
+    recordType: "deal",
+    recordId: sidebarDealRecordId,
+    recordName: selectedDeal?.name ?? "",
+    recordPhone:
+      selectedDeal?.phone ??
+      selectedDeal?.rawData?.phone ??
+      selectedDeal?.decision_maker_phone ??
+      "",
+    recordEmail:
+      selectedDeal?.email ??
+      selectedDeal?.rawData?.email ??
+      selectedDeal?.main_decision_maker?.email ??
+      "",
+  });
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">(() =>
@@ -4137,7 +4160,15 @@ export function CrmDealsListScreenView({
             recordId={
               selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined
             }
+            senderName={session?.user?.name || ""}
+            senderEmail={session?.user?.email || ""}
+            resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
+            onLogCall={sidebarLogActivityModals.openLogCall}
+            onLogEmail={sidebarLogActivityModals.openLogEmail}
+            onLogSms={sidebarLogActivityModals.openLogSms}
+            onLogWhatsApp={sidebarLogActivityModals.openLogWhatsApp}
+            onLogMeeting={sidebarLogActivityModals.openLogMeeting}
             crmSummary={selectedDeal?.rawData?.crm_summary ?? selectedDeal?.crm_summary ?? undefined}
             recordLink={{
               label: "View record",
@@ -4202,6 +4233,7 @@ export function CrmDealsListScreenView({
                     const dealId =
                       selectedDeal?.id || selectedDeal?.rawData?.id;
                     if (dealId) {
+                      setShowDealSidebar(false);
                       handleDeleteDeal(dealId, selectedDeal?.name);
                     }
                   },
@@ -4628,6 +4660,7 @@ export function CrmDealsListScreenView({
             ]}
           />
         )}
+        {sidebarLogActivityModals.modals}
       </div>
 
       {/* Delete Deal Modal */}
