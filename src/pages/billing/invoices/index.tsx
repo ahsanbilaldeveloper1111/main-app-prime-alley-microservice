@@ -115,6 +115,24 @@ function parseStoredInvoiceColumnKeys(
   }
 }
 
+function invoiceDownloadActionIcon(
+  row: InvoiceData,
+  downloadingInvoicePdfId: number | null,
+): React.ReactElement {
+  if (downloadingInvoicePdfId === row.id) {
+    return (
+      <Spinner
+        animation="border"
+        role="status"
+        size="sm"
+        style={{ width: "1rem", height: "1rem", verticalAlign: "middle" }}
+        aria-label="Downloading PDF"
+      />
+    );
+  }
+  return <Download size={16} aria-hidden />;
+}
+
 function loadInvoiceTableColumnsFromStorage(): string[] {
   if (globalThis.window === undefined) {
     return [...DEFAULT_INVOICE_TABLE_COLUMN_KEYS];
@@ -938,11 +956,16 @@ const InvoiceList = () => {
     []
   );
 
+  const [downloadingInvoicePdfId, setDownloadingInvoicePdfId] = useState<number | null>(null);
+
   const handleDownloadPDF = useCallback(async (invoice: InvoiceData) => {
+    setDownloadingInvoicePdfId(invoice.id);
     try {
       await downloadInvoicePdf(invoice.id);
     } catch (error) {
       toast.error(`Failed to download invoice PDF: ${getErrorMessage(error)}`);
+    } finally {
+      setDownloadingInvoicePdfId(null);
     }
   }, []);
 
@@ -1015,7 +1038,9 @@ const InvoiceList = () => {
       },
       {
         label: "Download",
-        icon: <Download size={16} />,
+        icon: (row: InvoiceData) =>
+          invoiceDownloadActionIcon(row, downloadingInvoicePdfId),
+        disabled: (row: InvoiceData) => downloadingInvoicePdfId === row.id,
         onClick: (row: InvoiceData) => handleDownloadPDF(row),
       },
     ],
@@ -1024,6 +1049,7 @@ const InvoiceList = () => {
       handleViewInvoice,
       handlePayInvoice,
       handleDownloadPDF,
+      downloadingInvoicePdfId,
       openDeleteInvoiceModal,
       openGeneratePaymentLinkModal,
     ],

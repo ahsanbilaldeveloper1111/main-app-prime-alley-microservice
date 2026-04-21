@@ -112,7 +112,8 @@ export function getVisibleDropdownOptions<T>(
 
 export interface TableAction<T = any> {
   label: string;
-  icon?: React.ReactNode;
+  /** Static icon or a function of row (e.g. show a spinner while an async action runs). */
+  icon?: React.ReactNode | ((row: T) => React.ReactNode);
   onClick?: (row: T) => void;
   variant?: string;
   className?: string;
@@ -131,6 +132,19 @@ export interface TableAction<T = any> {
     toggleVariant?: string;
     toggleClassName?: string;
   };
+}
+
+function resolveTableActionIcon<T>(
+  icon: TableAction<T>["icon"],
+  row: T,
+): React.ReactNode {
+  if (icon == null) {
+    return null;
+  }
+  if (typeof icon === "function") {
+    return (icon as (r: T) => React.ReactNode)(row);
+  }
+  return icon;
 }
 
 /** Row context menu entry (onClick receives the row). Shared by the table and Kanban card menu. */
@@ -179,7 +193,7 @@ export function buildTableContextMenuItems<T>(
       const isDisabled = action.disabled?.(row);
       items.push({
         label: action.label,
-        icon: action.icon,
+        icon: resolveTableActionIcon(action.icon, row),
         onClick: action.onClick,
         divider: false,
         className: isDisabled
@@ -526,7 +540,7 @@ function buildContextMenuItemsForRow<T extends Record<string, any>>(
       items.push({
         reactKey: `gt-ctxm-${seq++}-${action.label}`,
         label: action.label,
-        icon: action.icon,
+        icon: resolveTableActionIcon(action.icon, row),
         onClick: action.onClick,
         divider: false,
         className: isDisabled
@@ -884,7 +898,7 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
                 className={action.className || ""}
                 id={`dropdown-${rowStableKey}-${action.label}`}
               >
-                {action.icon}
+                {resolveTableActionIcon(action.icon, row)}
               </Dropdown.Toggle>
               <Dropdown.Menu
                 onMouseDown={(e) => {
@@ -946,7 +960,7 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
             }`}
             title={isDisabled ? undefined : action.label}
           >
-            {action.icon || action.label}
+            {resolveTableActionIcon(action.icon, row) || action.label}
           </Button>
         );
         if (isDisabled && action.disabledTitle) {
