@@ -1,6 +1,7 @@
 import React from "react";
 import moment from "moment";
 import { Target, ShoppingBag, X } from "lucide-react";
+import { formatOrderFinalTotalDisplay } from "./orderViewModalUtils";
 
 export function OrderViewModalHeader(props: {
   readonly viewingOrder: any;
@@ -105,15 +106,7 @@ export function OrderViewModalHeader(props: {
             </span>
             <span>•</span>
             <span style={{ fontWeight: 600 }}>
-              {viewingOrder.currency || "AED"}{" "}
-              {Number.parseFloat(
-                viewingOrder.final_amount ||
-                  viewingOrder.total_amount ||
-                  "0",
-              ).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {formatOrderFinalTotalDisplay(viewingOrder)}
             </span>
             <span>•</span>
             <span>

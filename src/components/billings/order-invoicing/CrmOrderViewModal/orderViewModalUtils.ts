@@ -68,6 +68,31 @@ export function orderItemsFooterColSpan(items: readonly unknown[]): number {
   return hasDescription ? 6 : 5;
 }
 
+export function formatOrderCurrencyAmount(
+  currency: string | undefined,
+  amount: string | number | undefined,
+): string {
+  const cur = currency || "AED";
+  const raw =
+    typeof amount === "number" ? String(amount) : amount || "0";
+  const n = Number.parseFloat(raw);
+  return `${cur} ${n.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export function formatOrderFinalTotalDisplay(order: {
+  currency?: string;
+  final_amount?: string;
+  total_amount?: string;
+}): string {
+  return formatOrderCurrencyAmount(
+    order.currency,
+    order.final_amount ?? order.total_amount,
+  );
+}
+
 export function extensionDisplayName(
   extensions: any[],
   assignee: unknown,

@@ -16,23 +16,8 @@ import {
   OrderViewField,
   OrderViewGrid,
   OrderViewSection,
+  OrderViewStageBadge,
 } from "./OrderViewModalShared";
-
-function renderStageBadge(stage: { color?: string; name?: string } | null | undefined) {
-  return (
-    <Badge
-      style={{
-        padding: "6px 14px",
-        borderRadius: "20px",
-        fontSize: "12px",
-        fontWeight: 600,
-        backgroundColor: stage?.color || "#6c757d",
-      }}
-    >
-      {stage?.name || "Not assigned"}
-    </Badge>
-  );
-}
 
 function renderAssignee(extensions: any[], assignee: unknown) {
   return (
@@ -52,7 +37,16 @@ function DealSection(props: { readonly relatedDeal: any; readonly extensions: an
         <OrderViewGrid>
           <OrderViewField label="Deal Name" value={relatedDeal.name || "N/A"} />
           {relatedDeal.stage ? (
-            <OrderViewField label="Stage" value={renderStageBadge(relatedDeal.stage)} />
+            <OrderViewField
+              label="Stage"
+              value={
+                <OrderViewStageBadge
+                  variant="field"
+                  stage={relatedDeal.stage}
+                  fallbackLabel="Not assigned"
+                />
+              }
+            />
           ) : null}
           {relatedDeal.net_value ? (
             <OrderViewField
@@ -112,7 +106,16 @@ function LeadSection(props: { readonly relatedLead: any; readonly extensions: an
         <OrderViewGrid>
           <OrderViewField label="Lead Name" value={relatedLead.name} />
           {relatedLead.stage ? (
-            <OrderViewField label="Stage" value={renderStageBadge(relatedLead.stage)} />
+            <OrderViewField
+              label="Stage"
+              value={
+                <OrderViewStageBadge
+                  variant="field"
+                  stage={relatedLead.stage}
+                  fallbackLabel="Not assigned"
+                />
+              }
+            />
           ) : null}
           {relatedLead.lead_potential ? (
             <OrderViewField
