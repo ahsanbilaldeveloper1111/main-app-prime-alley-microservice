@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Modal, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import moment from "moment";
-import { loadStripe } from "@stripe/stripe-js";
+import { loadStripe, type PaymentMethod as StripePaymentMethod, type Stripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useElements, useStripe } from "@stripe/react-stripe-js";
 
 import { GetPaymentMethods, CompletePayment } from "@utils/accounting";
@@ -163,6 +163,77 @@ async function safeCompleteStripePayment(paymentId: string | number): Promise<vo
   }
 }
 
+type StripeCardPaymentUiActions = Readonly<{
+  setCardError: (message: string | null) => void;
+  setIsProcessing: (value: boolean) => void;
+  onPaymentSuccess: () => void;
+}>;
+
+async function finalizeStripeIntentIfReady(
+  intent: { status?: string } | null | undefined,
+  paymentId: string | number | undefined,
+  actions: StripeCardPaymentUiActions,
+): Promise<void> {
+  const status = intent?.status;
+  if (!intentStatusAllowsBackendComplete(status)) {
+    actions.setCardError("Payment authentication incomplete. Please try again.");
+    actions.setIsProcessing(false);
+    return;
+  }
+  if (paymentId != null) {
+    await safeCompleteStripePayment(paymentId);
+  }
+  actions.setIsProcessing(false);
+  actions.onPaymentSuccess();
+  toast.success("Payment processed successfully!");
+}
+
+async function processNewCardStripePaymentSuccess(
+  paymentResult: unknown,
+  stripe: Stripe,
+  paymentMethod: StripePaymentMethod,
+  actions: StripeCardPaymentUiActions,
+): Promise<void> {
+  const pr = paymentResult as { already_completed?: unknown } | null | undefined;
+  if (pr?.already_completed) {
+    actions.setIsProcessing(false);
+    actions.onPaymentSuccess();
+    toast.success("Payment was already completed successfully!");
+    return;
+  }
+
+  const gatewayResponse = extractGatewayResponse(paymentResult);
+  const clientSecret = extractClientSecret(paymentResult, gatewayResponse);
+  const paymentStatus = gatewayResponse?.status ?? (pr as { status?: string } | undefined)?.status;
+  const paymentId = extractPaymentId(paymentResult);
+
+  if (!clientSecret) {
+    if (intentStatusAllowsBackendComplete(paymentStatus) && paymentId != null) {
+      await safeCompleteStripePayment(paymentId);
+    }
+    actions.setIsProcessing(false);
+    actions.onPaymentSuccess();
+    toast.success("Payment processed successfully!");
+    return;
+  }
+
+  if (STRIPE_SKIP_CLIENT_CONFIRM_STATUSES.has(paymentStatus ?? "")) {
+    await finalizeStripeIntentIfReady({ status: paymentStatus }, paymentId, actions);
+    return;
+  }
+
+  const confirmResult = await stripe.confirmCardPayment(clientSecret, {
+    payment_method: paymentMethod.id,
+  });
+  if (confirmResult.error) {
+    actions.setCardError(confirmResult.error.message || "Payment failed");
+    actions.setIsProcessing(false);
+    return;
+  }
+
+  await finalizeStripeIntentIfReady(confirmResult.paymentIntent, paymentId, actions);
+}
+
 type UseCreateInvoicePaymentReturn = Readonly<{
   createInvoicePayment: (
     data: CreateDirectPaymentData,
@@ -306,64 +377,21 @@ const DirectCardPaymentForm: React.FC<{
         buildStripeCreatePaymentIntentPayload(invoice, paymentMethod.id),
         {
           onSuccess: (paymentResult: any) => {
-            (async () => {
-              if (paymentResult?.already_completed) {
+            const ui: StripeCardPaymentUiActions = {
+              setCardError,
+              setIsProcessing,
+              onPaymentSuccess,
+            };
+            processNewCardStripePaymentSuccess(paymentResult, stripe, paymentMethod, ui).catch(
+              (err: unknown) => {
+                const message =
+                  err && typeof err === "object" && "message" in err && typeof (err as { message?: unknown }).message === "string"
+                    ? (err as { message: string }).message
+                    : "Payment processing failed";
+                setCardError(message);
                 setIsProcessing(false);
-                onPaymentSuccess();
-                toast.success("Payment was already completed successfully!");
-                return;
-              }
-
-              const gatewayResponse = extractGatewayResponse(paymentResult);
-              const clientSecret = extractClientSecret(paymentResult, gatewayResponse);
-              const paymentStatus = gatewayResponse?.status ?? paymentResult?.status;
-              const paymentId = extractPaymentId(paymentResult);
-
-              /** Notify backend when Stripe intent is in a settled / in-flight success state. */
-              const tryCompleteDirectPayment = async (intent: { status?: string } | null | undefined) => {
-                const status = intent?.status;
-                if (!intentStatusAllowsBackendComplete(status)) {
-                  setCardError("Payment authentication incomplete. Please try again.");
-                  setIsProcessing(false);
-                  return;
-                }
-                if (paymentId != null) await safeCompleteStripePayment(paymentId);
-                setIsProcessing(false);
-                onPaymentSuccess();
-                toast.success("Payment processed successfully!");
-              };
-
-              if (!clientSecret) {
-                if (intentStatusAllowsBackendComplete(paymentStatus) && paymentId != null) {
-                  await safeCompleteStripePayment(paymentId);
-                }
-                setIsProcessing(false);
-                onPaymentSuccess();
-                toast.success("Payment processed successfully!");
-                return;
-              }
-
-              if (STRIPE_SKIP_CLIENT_CONFIRM_STATUSES.has(paymentStatus ?? "")) {
-                await tryCompleteDirectPayment({ status: paymentStatus });
-                return;
-              }
-
-              // Server often returns status `requires_action` with next_action.type `use_stripe_sdk` (3DS2).
-              // Passing the same payment_method id helps Stripe.js complete SCA reliably.
-              const confirmResult = await stripe.confirmCardPayment(clientSecret, {
-                payment_method: paymentMethod.id,
-              });
-              if (confirmResult.error) {
-                setCardError(confirmResult.error.message || "Payment failed");
-                setIsProcessing(false);
-                return;
-              }
-
-              await tryCompleteDirectPayment(confirmResult.paymentIntent);
-            })().catch((err) => {
-              setCardError(err?.message || "Payment processing failed");
-              setIsProcessing(false);
-            });
+              },
+            );
           },
           onError: (err) => {
             setCardError(err?.message || "Payment processing failed");

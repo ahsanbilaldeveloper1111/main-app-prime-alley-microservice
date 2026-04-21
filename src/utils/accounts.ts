@@ -98,8 +98,10 @@ const ACCOUNTS_AXIOS_STATUS_MESSAGE = /^request failed with status code \d+/i;
 
 /** Removes Axios boilerplate if it was concatenated with an API message. */
 function stripAxiosStatusNoise(text: string): string {
+  // Avoid `\s*…\s*` around the phrase (ReDoS / typescript:S5852): match the fixed
+  // substring only, then normalize whitespace in one pass.
   return text
-    .replaceAll(/\s*Request failed with status code \d+\s*/gi, " ")
+    .replaceAll(/request failed with status code \d+/gi, " ")
     .replaceAll(/\s+/g, " ")
     .trim();
 }

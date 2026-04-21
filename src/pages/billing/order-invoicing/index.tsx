@@ -1873,7 +1873,11 @@ const CrmOrders = () => {
         onViewDetails={() => {
           setShowOrderSidebar(false);
           const id = viewingOrder?.id;
-          if (id != null) void handleViewOrder(Number(id));
+          if (id != null) {
+            handleViewOrder(Number(id)).catch((err: unknown) => {
+              console.error("Failed to open order from sidebar:", err);
+            });
+          }
         }}
       />
 

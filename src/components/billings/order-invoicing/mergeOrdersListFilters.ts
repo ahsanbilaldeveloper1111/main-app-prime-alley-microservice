@@ -1,12 +1,43 @@
 /** Pure merge for `handleFiltersChange` — keeps Sonar cognitive complexity low. */
 
+function filterScalarToString(raw: unknown): string {
+  if (raw == null) {
+    return "";
+  }
+  if (typeof raw === "string") {
+    return raw;
+  }
+  if (
+    typeof raw === "number" ||
+    typeof raw === "boolean" ||
+    typeof raw === "bigint"
+  ) {
+    return String(raw);
+  }
+  if (typeof raw === "object") {
+    const v = (raw as { value?: unknown }).value;
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+      return String(v);
+    }
+    if (typeof v === "bigint") {
+      return String(v);
+    }
+  }
+  return "";
+}
+
 function setStringOrRemove(
   target: Record<string, unknown>,
   key: string,
   raw: unknown,
 ): void {
-  if (raw) {
-    target[key] = String(raw);
+  if (!raw) {
+    delete target[key];
+    return;
+  }
+  const asString = filterScalarToString(raw).trim();
+  if (asString) {
+    target[key] = asString;
   } else {
     delete target[key];
   }

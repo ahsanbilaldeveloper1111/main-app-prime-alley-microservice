@@ -13,7 +13,15 @@ export function extensionLabelForAssignedTo(
     return ext.name;
   }
   if (assignedTo != null && assignedTo !== "") {
-    return String(assignedTo);
+    if (
+      typeof assignedTo === "string" ||
+      typeof assignedTo === "number" ||
+      typeof assignedTo === "boolean" ||
+      typeof assignedTo === "bigint"
+    ) {
+      return String(assignedTo);
+    }
+    return "";
   }
   return "";
 }

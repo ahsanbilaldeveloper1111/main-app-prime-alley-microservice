@@ -867,10 +867,25 @@ function CreateInvoiceCustomerModal(props: CustomerModalProps) {
                 </p>
               ) : null}
             </div>
-            <div style={{ gridColumn: "1 / -1" }}><div style={t.label}>Address</div>
-              <textarea style={{ ...t.input360, width: "100%", height: 88, paddingBlock: 10, resize: "vertical", lineHeight: "20px" }}
-                value={customerForm.address} onChange={(e) => setCustomerForm((p) => ({ ...p, address: e.target.value }))} /></div>
-            <div><div style={t.label}>Postal code</div>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <div style={t.label}>Address</div>
+              <textarea
+                style={{
+                  ...t.input360,
+                  width: "100%",
+                  height: 88,
+                  paddingBlock: 10,
+                  resize: "vertical",
+                  lineHeight: "20px",
+                }}
+                value={customerForm.address}
+                onChange={(e) =>
+                  setCustomerForm((p) => ({ ...p, address: e.target.value }))
+                }
+              />
+            </div>
+            <div>
+              <div style={t.label}>Postal code</div>
               <input
                 style={{ ...t.input360, width: "100%" }}
                 maxLength={CUSTOMER_MODAL_POSTAL_MAX_LEN}
@@ -881,7 +896,8 @@ function CreateInvoiceCustomerModal(props: CustomerModalProps) {
                     postal_code: e.target.value.slice(0, CUSTOMER_MODAL_POSTAL_MAX_LEN),
                   }))
                 }
-              /></div>
+              />
+            </div>
             <div><div style={t.label}>City</div>
               <input
                 style={{ ...t.input360, width: "100%" }}
@@ -973,7 +989,7 @@ function CreateInvoiceCustomerModal(props: CustomerModalProps) {
                         onChange={(e) =>
                           setCustomerForm((p) => ({ ...p, vat_exemption: e.target.checked }))
                         }
-                      />
+                      />{" "}
                       VAT exempt (no VAT charged for this customer)
                     </label>
                   </div>

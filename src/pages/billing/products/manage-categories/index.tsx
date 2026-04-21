@@ -33,7 +33,6 @@ import {
   type ProductCategoryData,
   updateProductCategory,
 } from "@utils/accounts";
-import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import PageHeader from "@components/PageHeader";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
@@ -64,8 +63,21 @@ function categorySortComparableValue(
       return row.description?.trim() ?? "";
     case "is_active":
       return row.is_active === false ? "inactive" : "active";
-    default:
-      return String(row[column as keyof ProductCategoryRow] ?? "");
+    default: {
+      const cell = row[column as keyof ProductCategoryRow];
+      if (cell == null) {
+        return "";
+      }
+      if (
+        typeof cell === "string" ||
+        typeof cell === "number" ||
+        typeof cell === "boolean" ||
+        typeof cell === "bigint"
+      ) {
+        return String(cell);
+      }
+      return "";
+    }
   }
 }
 
@@ -460,8 +472,8 @@ const ManageCategories = () => {
           columns={categoryColumns}
           actions={categoryActions}
           sortable
-          defaultSortColumn={sortState.column}
-          defaultSortDirection={sortState.direction}
+          defaultSortBy={sortState.column}
+          defaultSortOrder={sortState.direction}
           onSort={handleTableSort}
           showToolbar
           toolbar={categoriesToolbarConfig}

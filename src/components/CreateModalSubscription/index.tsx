@@ -99,7 +99,20 @@ const BILLING_CYCLE_OPTIONS: SelectBoxOption[] = [
 const CUSTOM_DESCRIPTION_MAX_LENGTH = 500;
 
 function clampCustomDescriptionState(value: unknown): string {
-  return String(value ?? "").slice(0, CUSTOM_DESCRIPTION_MAX_LENGTH);
+  if (value == null) {
+    return "";
+  }
+  if (typeof value === "string") {
+    return value.slice(0, CUSTOM_DESCRIPTION_MAX_LENGTH);
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value).slice(0, CUSTOM_DESCRIPTION_MAX_LENGTH);
+  }
+  return "";
 }
 
 function parseDiscountValue(

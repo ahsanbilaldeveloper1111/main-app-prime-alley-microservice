@@ -7,8 +7,19 @@ import { getErrorMessage } from "@utils/errors";
 
 function optionalTrimmed(value: unknown): string | undefined {
   if (value == null) return undefined;
-  const s = String(value).trim();
-  return s === "" ? undefined : s;
+  if (typeof value === "string") {
+    const s = value.trim();
+    return s === "" ? undefined : s;
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    const s = String(value).trim();
+    return s === "" ? undefined : s;
+  }
+  return undefined;
 }
 
 function buildCreateCustomerPayload(
@@ -118,7 +129,9 @@ export function useEnsureCustomerForCrmCompany(
       }
     };
 
-    void run();
+    run().catch((e) => {
+      console.error("useEnsureCustomerForCrmCompany: unexpected rejection", e);
+    });
 
     return () => {
       cancelled = true;

@@ -67,3 +67,19 @@ export function orderItemsFooterColSpan(items: readonly unknown[]): number {
   );
   return hasDescription ? 6 : 5;
 }
+
+export function extensionDisplayName(
+  extensions: any[],
+  assignee: unknown,
+): string {
+  const matched = extensions.find(
+    (ext: any) => ext?.id == assignee || ext?.extension == assignee,
+  );
+  return (
+    matched?.display_name ||
+    matched?.name ||
+    (typeof assignee === "string" || typeof assignee === "number"
+      ? String(assignee)
+      : "Not assigned")
+  );
+}
