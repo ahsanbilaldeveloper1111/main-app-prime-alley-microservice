@@ -18,6 +18,24 @@ function toStringFilterValue(value: unknown): string | null {
   return null;
 }
 
+/** Safe status label for query params — never stringifies arbitrary objects. */
+function statusFilterToLabel(value: unknown): string | null {
+  if (typeof value === "string") {
+    const t = value.trim();
+    if (t === "") {
+      return null;
+    }
+    return t;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+  if (typeof value === "boolean") {
+    return String(value);
+  }
+  return null;
+}
+
 /**
  * Mutates Planner listTasks params from sidebar / quick filter state.
  */
@@ -56,8 +74,8 @@ export function applyPlannerTaskFiltersToListParams(
     return;
   }
 
-  const statusLabel = String(filters.status).trim();
-  if (statusLabel !== "") {
+  const statusLabel = statusFilterToLabel(filters.status);
+  if (statusLabel != null) {
     params.status = statusLabel;
   }
 }

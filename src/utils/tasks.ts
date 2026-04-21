@@ -691,8 +691,9 @@ function buildListTasksSearchParams(params: ListTasksParams): URLSearchParams {
   appendTruthyQueryParam(searchParams, 'project_id', project_id);
   appendTruthyQueryParam(searchParams, 'search', search);
   const trimmedStatusName =
-    statusNameFilter != null ? String(statusNameFilter).trim() : "";
-  if (trimmedStatusName !== "") {
+    statusNameFilter == null ? "" : String(statusNameFilter).trim();
+  const hasStatusNameFilter = trimmedStatusName.length > 0;
+  if (hasStatusNameFilter) {
     searchParams.append("status", trimmedStatusName);
   } else {
     appendTruthyQueryParam(searchParams, "status_id", status_id);

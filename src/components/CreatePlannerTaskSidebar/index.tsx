@@ -233,7 +233,7 @@ interface CreateTaskFormData {
   frequency: string;
   repeatInterval: number;
   repeatOn: string;
-  /** Local `HH:mm` for API `due_time`: with start date when recurring, with due date for regular/todo. */
+  /** Local `HH:mm` for API `due_time`: with start date when recurring, with due date for regular and to-do tasks. */
   dueTime: string;
   /** Recurring tasks only; maps to API `is_active`. */
   recurringIsActive: boolean;
@@ -1283,6 +1283,51 @@ function plannerPriorityIdToApiString(priorityId: number | null): string | undef
   return priorityMap[priorityId] || undefined;
 }
 
+function applyPlannerSidebarParentTaskId(
+  payload: Record<string, unknown>,
+  fd: CreateTaskFormData,
+  isEdit: boolean,
+): void {
+  if (isEdit) {
+    payload.parent_task_id =
+      fd.linkedRecordIds.length > 0 ? fd.linkedRecordIds[0] : null;
+    return;
+  }
+  if (fd.linkedRecordIds.length > 0) {
+    payload.parent_task_id = fd.linkedRecordIds[0];
+  }
+}
+
+function applyPlannerSidebarRecurringPayload(
+  payload: Record<string, unknown>,
+  fd: CreateTaskFormData,
+): void {
+  payload.frequency = fd.frequency;
+  payload.repeat_interval = fd.repeatInterval;
+  if (fd.frequency === "weekly" && fd.repeatOn.trim()) {
+    payload.repeat_on = fd.repeatOn.trim().toLowerCase();
+  } else if (fd.frequency === "monthly" && fd.repeatOn.trim()) {
+    payload.repeat_on = fd.repeatOn.trim();
+  }
+  const dueTimeUtc = formatPlannerDueTimeAsUtcIso(fd.startDate, fd.dueTime);
+  if (dueTimeUtc) payload.due_time = dueTimeUtc;
+  payload.end_date = fd.dueDate || null;
+  payload.is_active = fd.recurringIsActive;
+}
+
+function applyPlannerSidebarRegularTodoDueTime(
+  payload: Record<string, unknown>,
+  fd: CreateTaskFormData,
+  isEdit: boolean,
+): void {
+  const dueTimeUtc = formatPlannerDueTimeAsUtcIso(fd.dueDate, fd.dueTime);
+  if (dueTimeUtc) {
+    payload.due_time = dueTimeUtc;
+  } else if (isEdit) {
+    payload.due_time = null;
+  }
+}
+
 function buildPlannerSidebarPayloadRecord(
   fd: CreateTaskFormData,
   extensions: Extension[],
@@ -1316,33 +1361,29 @@ function buildPlannerSidebarPayloadRecord(
     payload.label_ids = fd.labelIds || [];
   }
   if (fd.statusId) payload.status_id = fd.statusId;
-  if (isEdit) {
-    payload.parent_task_id =
-      fd.linkedRecordIds.length > 0 ? fd.linkedRecordIds[0] : null;
-  } else if (fd.linkedRecordIds.length > 0) {
-    payload.parent_task_id = fd.linkedRecordIds[0];
-  }
+  applyPlannerSidebarParentTaskId(payload, fd, isEdit);
   if (taskTypeEff === "recurring") {
-    payload.frequency = fd.frequency;
-    payload.repeat_interval = fd.repeatInterval;
-    if (fd.frequency === "weekly" && fd.repeatOn.trim()) {
-      payload.repeat_on = fd.repeatOn.trim().toLowerCase();
-    } else if (fd.frequency === "monthly" && fd.repeatOn.trim()) {
-      payload.repeat_on = fd.repeatOn.trim();
-    }
-    const dueTimeUtc = formatPlannerDueTimeAsUtcIso(fd.startDate, fd.dueTime);
-    if (dueTimeUtc) payload.due_time = dueTimeUtc;
-    payload.end_date = fd.dueDate || null;
-    payload.is_active = fd.recurringIsActive;
+    applyPlannerSidebarRecurringPayload(payload, fd);
   } else if (taskTypeEff === "regular" || taskTypeEff === "todo") {
-    const dueTimeUtc = formatPlannerDueTimeAsUtcIso(fd.dueDate, fd.dueTime);
-    if (dueTimeUtc) {
-      payload.due_time = dueTimeUtc;
-    } else if (isEdit) {
-      payload.due_time = null;
-    }
+    applyPlannerSidebarRegularTodoDueTime(payload, fd, isEdit);
   }
   return payload;
+}
+
+function validatePlannerSidebarRecurringSubmit(formData: CreateTaskFormData): boolean {
+  if (!formData.statusId) {
+    toast.error("Recurring tasks require a status");
+    return false;
+  }
+  if (!formData.startDate) {
+    toast.error("Recurring tasks require a start date");
+    return false;
+  }
+  if (formData.frequency === "weekly" && !formData.repeatOn.trim()) {
+    toast.error("Please select a day of the week");
+    return false;
+  }
+  return true;
 }
 
 function validatePlannerSidebarFormForSubmit(
@@ -1366,19 +1407,8 @@ function validatePlannerSidebarFormForSubmit(
     formData.taskType as PlannerTaskType,
     taskTypeOptions,
   );
-  if (taskTypeEff === "recurring") {
-    if (!formData.statusId) {
-      toast.error("Recurring tasks require a status");
-      return false;
-    }
-    if (!formData.startDate) {
-      toast.error("Recurring tasks require a start date");
-      return false;
-    }
-    if (formData.frequency === "weekly" && !formData.repeatOn.trim()) {
-      toast.error("Please select a day of the week");
-      return false;
-    }
+  if (taskTypeEff === "recurring" && !validatePlannerSidebarRecurringSubmit(formData)) {
+    return false;
   }
   if (
     (taskTypeEff === "regular" || taskTypeEff === "todo") &&
@@ -1408,6 +1438,50 @@ type PersistPlannerSidebarContext = {
   extensions: Extension[];
 };
 
+async function persistPlannerSidebarEditTask(
+  editTaskId: PlannerApiId,
+  taskTypeEff: PlannerTaskType,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  if (taskTypeEff === "recurring") {
+    return Boolean(
+      await updateRecurringTask(
+        editTaskId,
+        payload as Parameters<typeof updateRecurringTask>[1],
+      ),
+    );
+  }
+  return Boolean(
+    await updateTask(
+      editTaskId,
+      payload as Parameters<typeof updateTask>[1],
+    ),
+  );
+}
+
+async function persistPlannerSidebarCreateTask(
+  ctx: PersistPlannerSidebarContext,
+  taskTypeEff: PlannerTaskType,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  if (taskTypeEff === "recurring") {
+    const recurringPayload: Parameters<typeof createRecurringTask>[0] = {
+      ...(payload as unknown as Parameters<typeof createRecurringTask>[0]),
+      status_id: ctx.formData.statusId as number,
+      start_date: ctx.formData.startDate,
+      end_date: ctx.formData.dueDate || null,
+      type: "recurring",
+    };
+    if (ctx.formData.projectId != null && ctx.formData.projectId > 0) {
+      recurringPayload.project_id = ctx.formData.projectId;
+      recurringPayload.label_ids = ctx.formData.labelIds || [];
+    }
+    return Boolean(await createRecurringTask(recurringPayload));
+  }
+  const withTz = { ...payload, timezone: getAutoTimezone() };
+  return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
+}
+
 async function persistPlannerSidebarTaskFromPayload(
   payloadInput: Record<string, unknown>,
   ctx: PersistPlannerSidebarContext,
@@ -1432,37 +1506,9 @@ async function persistPlannerSidebarTaskFromPayload(
     payload = applyLimitedEditLockAssigneesAndWatchers(payload, locked);
   }
   if (ctx.isEdit && ctx.editTask?.id != null) {
-    if (taskTypeEff === "recurring") {
-      return Boolean(
-        await updateRecurringTask(
-          ctx.editTask.id,
-          payload as Parameters<typeof updateRecurringTask>[1],
-        ),
-      );
-    }
-    return Boolean(
-      await updateTask(
-        ctx.editTask.id,
-        payload as Parameters<typeof updateTask>[1],
-      ),
-    );
+    return persistPlannerSidebarEditTask(ctx.editTask.id, taskTypeEff, payload);
   }
-  if (taskTypeEff === "recurring") {
-    const recurringPayload: Parameters<typeof createRecurringTask>[0] = {
-      ...(payload as unknown as Parameters<typeof createRecurringTask>[0]),
-      status_id: ctx.formData.statusId as number,
-      start_date: ctx.formData.startDate,
-      end_date: ctx.formData.dueDate || null,
-      type: "recurring",
-    };
-    if (ctx.formData.projectId != null && ctx.formData.projectId > 0) {
-      recurringPayload.project_id = ctx.formData.projectId;
-      recurringPayload.label_ids = ctx.formData.labelIds || [];
-    }
-    return Boolean(await createRecurringTask(recurringPayload));
-  }
-  const withTz = { ...payload, timezone: getAutoTimezone() };
-  return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
+  return persistPlannerSidebarCreateTask(ctx, taskTypeEff, payload);
 }
 
 function getSidebarInitialFormData(
@@ -1616,52 +1662,11 @@ function applyPlannerSidebarTaskTypeSelectChange(
   ctx.fetchLinkRecordsForSearch("", mergedOpen.projectId).catch(() => undefined);
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
-const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
-  isOpen = false,
-  onClose,
-  onCreate,
-  onCreateAndOpen,
-  extensions = [],
-  labels: propLabels = [],
-  project: propProject,
-  statuses: propStatuses = [],
-  task: editTask,
-  isEdit = false,
-  selectedStatusForTask = null,
-  taskTypeChoices,
-  lockProjectSelection = false,
-  taskEditScope = "full",
-}) => {
-  const taskTypeOptions = useMemo(
-    () => normalizeTaskTypeOptions(taskTypeChoices),
-    [taskTypeChoices],
-  );
-
-  const getInitialFormData = (): CreateTaskFormData =>
-    getSidebarInitialFormData(
-      isEdit,
-      editTask,
-      extensions,
-      propProject,
-      propStatuses,
-      selectedStatusForTask,
-    );
-
-  const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
-  const [searchQuery, setSearchQuery] = useState("");
-  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState("");
-  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
-  const [watcherSearchQuery, setWatcherSearchQuery] = useState("");
-  const [showWatcherDropdown, setShowWatcherDropdown] = useState(false);
+function usePlannerSidebarReferenceLists(isOpen: boolean) {
   const [fetchedProjects, setFetchedProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [genericStatuses, setGenericStatuses] = useState<Status[]>([]);
   const [loadingGenericStatuses, setLoadingGenericStatuses] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [linkedRecordsFromApi, setLinkedRecordsFromApi] = useState<LinkedRecord[]>([]);
-  const [loadingLinkedRecords, setLoadingLinkedRecords] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1678,13 +1683,14 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
               statuses?: Project["statuses"];
               labels?: Project["labels"];
             }) => ({
-            id: project.id,
-            name: project.name,
-            icon: "",
-            color: project.color || "#3b82f6",
-            statuses: project.statuses || [],
-            labels: project.labels || [],
-          }));
+              id: project.id,
+              name: project.name,
+              icon: "",
+              color: project.color || "#3b82f6",
+              statuses: project.statuses || [],
+              labels: project.labels || [],
+            }),
+          );
           setFetchedProjects(projectsList);
         }
       } catch (error) {
@@ -1713,6 +1719,252 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     };
     fetchGenericStatuses();
   }, [isOpen]);
+
+  return {
+    fetchedProjects,
+    loadingProjects,
+    genericStatuses,
+    loadingGenericStatuses,
+  };
+}
+
+type PlannerSidebarCreateModeStatusSyncParams = Readonly<{
+  isOpen: boolean;
+  isEdit: boolean;
+  formDataProjectId: number | null;
+  formDataTaskType: PlannerTaskTypeOrUnset;
+  fetchedProjects: Project[];
+  genericStatuses: Status[];
+  loadingGenericStatuses: boolean;
+  selectedStatusForTask: number | null;
+  propStatuses: Status[];
+  setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
+}>;
+
+function usePlannerSidebarCreateModeStatusSync(
+  params: PlannerSidebarCreateModeStatusSyncParams,
+): void {
+  useEffect(() => {
+    const {
+      isOpen,
+      isEdit,
+      formDataProjectId,
+      fetchedProjects,
+      genericStatuses,
+      loadingGenericStatuses,
+      selectedStatusForTask,
+      propStatuses,
+      setFormData,
+    } = params;
+    if (!isOpen || isEdit) return;
+    if (formDataProjectId && fetchedProjects.length === 0) return;
+    if (!formDataProjectId && loadingGenericStatuses) return;
+
+    const availableStatuses = resolveSidebarStatusesForProject(
+      formDataProjectId,
+      fetchedProjects,
+      genericStatuses,
+      propStatuses,
+    );
+    if (availableStatuses.length === 0) return;
+
+    const idInList = (id: number | null): boolean =>
+      id != null &&
+      availableStatuses.some((s) => String(s.id) === String(id));
+
+    setFormData((prev) => {
+      if (
+        selectedStatusForTask != null &&
+        idInList(selectedStatusForTask)
+      ) {
+        if (prev.statusId === selectedStatusForTask) return prev;
+        return { ...prev, statusId: selectedStatusForTask };
+      }
+
+      if (idInList(prev.statusId)) {
+        return prev;
+      }
+
+      const preferred = resolvePreferredStatusId(availableStatuses, null);
+      if (preferred == null || prev.statusId === preferred) return prev;
+      return { ...prev, statusId: preferred };
+    });
+  }, [
+    params.isOpen,
+    params.isEdit,
+    params.formDataProjectId,
+    params.formDataTaskType,
+    params.fetchedProjects,
+    params.genericStatuses,
+    params.loadingGenericStatuses,
+    params.selectedStatusForTask,
+    params.propStatuses,
+    params.setFormData,
+  ]);
+}
+
+function useNormalizedPlannerTaskTypeOptions(
+  taskTypeChoices: readonly PlannerTaskType[] | undefined,
+): PlannerTaskType[] {
+  return useMemo(
+    () => normalizeTaskTypeOptions(taskTypeChoices),
+    [taskTypeChoices],
+  );
+}
+
+function usePlannerSidebarWeeklyRepeatOnGuard(
+  isOpen: boolean,
+  taskType: PlannerTaskTypeOrUnset,
+  frequency: string,
+  repeatOn: string,
+  setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>,
+): void {
+  useEffect(() => {
+    if (!isOpen || taskType !== "recurring" || frequency !== "weekly") {
+      return;
+    }
+    const v = repeatOn.trim().toLowerCase();
+    if (!isWeeklyRepeatOnValue(v)) {
+      setFormData((prev) => ({ ...prev, repeatOn: "monday" }));
+    }
+  }, [isOpen, taskType, frequency, repeatOn, setFormData]);
+}
+
+function usePlannerSidebarBodyScrollLock(isOpen: boolean): void {
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isOpen]);
+}
+
+type PlannerSidebarFormOpenLifecycleParams = Readonly<{
+  isOpen: boolean;
+  isEdit: boolean;
+  editTask: PlannerEditTask | undefined;
+  fetchedProjectsLength: number;
+  loadingProjects: boolean;
+  selectedStatusForTask: number | null;
+  taskTypeOptions: PlannerTaskType[];
+  propProject: Project | undefined;
+  propStatuses: Status[];
+  getInitialFormData: () => CreateTaskFormData;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
+}>;
+
+function usePlannerSidebarFormOpenLifecycle(
+  params: PlannerSidebarFormOpenLifecycleParams,
+): void {
+  useEffect(() => {
+    const {
+      isOpen,
+      isEdit,
+      editTask,
+      getInitialFormData,
+      taskTypeOptions,
+      propProject,
+      selectedStatusForTask,
+      propStatuses,
+      setSearchQuery,
+      setFormData,
+    } = params;
+    if (isOpen) {
+      setSearchQuery("");
+      if (
+        shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
+          isEdit,
+          editTask,
+          params.fetchedProjectsLength,
+          params.loadingProjects,
+        )
+      ) {
+        return;
+      }
+      setFormData(
+        mergeOpenedPlannerSidebarFormData(getInitialFormData(), taskTypeOptions),
+      );
+    } else {
+      setSearchQuery("");
+      setFormData(
+        emptyPlannerSidebarFormWhenClosed(
+          propProject,
+          selectedStatusForTask,
+          propStatuses,
+        ),
+      );
+    }
+  }, [
+    params.isOpen,
+    params.editTask,
+    params.isEdit,
+    params.fetchedProjectsLength,
+    params.loadingProjects,
+    params.selectedStatusForTask,
+    params.taskTypeOptions,
+  ]);
+}
+
+function mapExtensionsToPlannerUsers(extensions: Extension[]): UserType[] {
+  return extensions.map((ext) => ({
+    id: Number(ext.id),
+    name: ext.name,
+    avatar: "",
+    initials: ext.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase(),
+  }));
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
+  isOpen = false,
+  onClose,
+  onCreate,
+  onCreateAndOpen,
+  extensions = [],
+  labels: propLabels = [],
+  project: propProject,
+  statuses: propStatuses = [],
+  task: editTask,
+  isEdit = false,
+  selectedStatusForTask = null,
+  taskTypeChoices,
+  lockProjectSelection = false,
+  taskEditScope = "full",
+}) => {
+  const taskTypeOptions = useNormalizedPlannerTaskTypeOptions(taskTypeChoices);
+
+  const getInitialFormData = (): CreateTaskFormData =>
+    getSidebarInitialFormData(
+      isEdit,
+      editTask,
+      extensions,
+      propProject,
+      propStatuses,
+      selectedStatusForTask,
+    );
+
+  const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = useState("");
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [watcherSearchQuery, setWatcherSearchQuery] = useState("");
+  const [showWatcherDropdown, setShowWatcherDropdown] = useState(false);
+  const {
+    fetchedProjects,
+    loadingProjects,
+    genericStatuses,
+    loadingGenericStatuses,
+  } = usePlannerSidebarReferenceLists(isOpen);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [linkedRecordsFromApi, setLinkedRecordsFromApi] = useState<LinkedRecord[]>([]);
+  const [loadingLinkedRecords, setLoadingLinkedRecords] = useState(false);
 
   const fetchLinkRecordsForSearch = useCallback(
     async (query: string, currentProjectId?: number | null) => {
@@ -1778,60 +2030,24 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     fetchLinkRecordsForSearch(searchQuery, formData.projectId).catch(() => undefined);
   }, [isOpen, fetchLinkRecordsForSearch]);
 
-  useEffect(() => {
-    if (isOpen) {
-      setSearchQuery("");
-      if (
-        shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
-          isEdit,
-          editTask,
-          fetchedProjects.length,
-          loadingProjects,
-        )
-      ) {
-        return;
-      }
-      setFormData(
-        mergeOpenedPlannerSidebarFormData(getInitialFormData(), taskTypeOptions),
-      );
-    } else {
-      setSearchQuery("");
-      setFormData(
-        emptyPlannerSidebarFormWhenClosed(
-          propProject,
-          selectedStatusForTask,
-          propStatuses,
-        ),
-      );
-    }
-  }, [
+  usePlannerSidebarFormOpenLifecycle({
     isOpen,
-    editTask,
     isEdit,
-    fetchedProjects.length,
+    editTask,
+    fetchedProjectsLength: fetchedProjects.length,
     loadingProjects,
     selectedStatusForTask,
     taskTypeOptions,
-  ]);
+    propProject,
+    propStatuses,
+    getInitialFormData,
+    setSearchQuery,
+    setFormData,
+  });
 
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isOpen]);
+  usePlannerSidebarBodyScrollLock(isOpen);
 
-  const users: UserType[] = extensions.map((ext) => ({
-    id: Number(ext.id),
-    name: ext.name,
-    avatar: "",
-    initials: ext.name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .substring(0, 2)
-      .toUpperCase(),
-  }));
+  const users: UserType[] = mapExtensionsToPlannerUsers(extensions);
 
   const projects: Project[] = resolveSidebarProjects(fetchedProjects, propProject);
 
@@ -1842,65 +2058,26 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     propStatuses,
   );
 
-  useEffect(() => {
-    if (!isOpen || isEdit) return;
-    if (formData.projectId && fetchedProjects.length === 0) return;
-    if (!formData.projectId && loadingGenericStatuses) return;
-
-    const availableStatuses = resolveSidebarStatusesForProject(
-      formData.projectId,
-      fetchedProjects,
-      genericStatuses,
-      propStatuses,
-    );
-    if (availableStatuses.length === 0) return;
-
-    const idInList = (id: number | null): boolean =>
-      id != null &&
-      availableStatuses.some((s) => String(s.id) === String(id));
-
-    setFormData((prev) => {
-      if (
-        selectedStatusForTask != null &&
-        idInList(selectedStatusForTask)
-      ) {
-        if (prev.statusId === selectedStatusForTask) return prev;
-        return { ...prev, statusId: selectedStatusForTask };
-      }
-
-      if (idInList(prev.statusId)) {
-        return prev;
-      }
-
-      const preferred = resolvePreferredStatusId(availableStatuses, null);
-      if (preferred == null || prev.statusId === preferred) return prev;
-      return { ...prev, statusId: preferred };
-    });
-  }, [
+  usePlannerSidebarCreateModeStatusSync({
     isOpen,
-    formData.projectId,
-    formData.taskType,
+    isEdit,
+    formDataProjectId: formData.projectId,
+    formDataTaskType: formData.taskType,
     fetchedProjects,
     genericStatuses,
     loadingGenericStatuses,
-    isEdit,
     selectedStatusForTask,
     propStatuses,
-  ]);
+    setFormData,
+  });
 
-  useEffect(() => {
-    if (
-      !isOpen ||
-      formData.taskType !== "recurring" ||
-      formData.frequency !== "weekly"
-    ) {
-      return;
-    }
-    const v = formData.repeatOn.trim().toLowerCase();
-    if (!isWeeklyRepeatOnValue(v)) {
-      setFormData((prev) => ({ ...prev, repeatOn: "monday" }));
-    }
-  }, [isOpen, formData.taskType, formData.frequency, formData.repeatOn]);
+  usePlannerSidebarWeeklyRepeatOnGuard(
+    isOpen,
+    formData.taskType,
+    formData.frequency,
+    formData.repeatOn,
+    setFormData,
+  );
 
   const priorities: Priority[] = [
     { id: 0, name: "Select Priority", icon: "", color: "#6c757d" },

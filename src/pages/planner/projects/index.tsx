@@ -1267,7 +1267,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   actions,
   sessionUserPhoneOrExtension,
 }) => {
-  const router = useRouter();
   const { hasPermission } = usePermissions();
   const canPreviewEditTask = hasPermission("edit-tasks-work-planner");
   // Track which project rows are expanded
@@ -3387,7 +3386,7 @@ const WorkPlannerProjects = () => {
             label: "Project overview",
             icon: <Eye size={14} />,
             onClick: (row) => {
-              void router.push(`/planner/projects/${row.id}`,);
+              router.push(`/planner/projects/${row.id}`).catch(() => undefined);
             },
           },
           {
