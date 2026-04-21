@@ -7,7 +7,7 @@ import { Elements, CardElement, useElements, useStripe } from "@stripe/react-str
 
 import { GetPaymentMethods, CompletePayment } from "@utils/accounting";
 import type { InvoiceData, CreateDirectPaymentData, PaymentIntentResponse } from "@utils/accounts";
-import { createDirectPayment } from "@utils/accounts";
+import { createDirectPayment, getCustomerPaymentMethods } from "@utils/accounts";
 import { formatNumber, getCompanyByCrmId } from "@utils/Helper";
 
 /** Intent states where the payment has been accepted by Stripe (incl. async capture / 3DS done). */
@@ -48,6 +48,113 @@ function extractPaymentId(paymentResult: any): string | number | undefined {
   );
 }
 
+/** Processing fee applied when charging by card (matches product copy: 3%). */
+const CARD_PAYMENT_PROCESSING_FEE_RATE = 0.03;
+
+function roundCurrency2(value: number): number {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
+function getOutstandingInvoiceBaseAmount(invoice: InvoiceData): number {
+  const due = Number.parseFloat(String(invoice.amount_due ?? ""));
+  if (Number.isFinite(due) && due > 0) {
+    return roundCurrency2(due);
+  }
+  return roundCurrency2(Number.parseFloat(String(invoice.total_amount ?? "0")));
+}
+
+function computeCardPaymentTotals(invoice: InvoiceData | null): {
+  base_amount: number;
+  processing_fee: number;
+  amount: number;
+} {
+  if (invoice == null) {
+    return { base_amount: 0, processing_fee: 0, amount: 0 };
+  }
+  const base_amount = getOutstandingInvoiceBaseAmount(invoice);
+  const processing_fee = roundCurrency2(base_amount * CARD_PAYMENT_PROCESSING_FEE_RATE);
+  const amount = roundCurrency2(base_amount + processing_fee);
+  return { base_amount, processing_fee, amount };
+}
+
+function resolveInvoicePaymentCustomerId(invoice: InvoiceData): number {
+  const companyRecordId = invoice.crm_company_id;
+  if (companyRecordId!=null) {
+    return Number(companyRecordId);
+  }
+  if (invoice.tenant_id!=null) {
+    return Number(invoice.tenant_id);
+  }
+  throw new Error("No customer ID found");
+}
+
+function buildStripeCreatePaymentIntentPayload(
+  invoice: InvoiceData,
+  paymentMethodId: string,
+): CreateDirectPaymentData {
+  const { base_amount, processing_fee, amount } = computeCardPaymentTotals(invoice);
+  const currency_code = (String(invoice.currency_code || "USD").trim() || "USD").toUpperCase();
+  return {
+    invoice_id: Number(invoice.id),
+    payment_method: "stripe",
+    payment_mode: String(invoice.payment_mode || "one_time"),
+    amount,
+    processing_fee,
+    base_amount,
+    payment_method_id: paymentMethodId,
+    currency_code,
+    currency: currency_code.toLowerCase(),
+    notes: `Payment for invoice ${invoice.invoice_number}`,
+    customer_id: resolveInvoicePaymentCustomerId(invoice),
+  };
+}
+
+type PaymentChargeBreakdownProps = Readonly<{
+  currencyCode: string;
+  baseAmount: number;
+  processingFee: number;
+  totalCharged: number;
+}>;
+
+function PaymentChargeBreakdown({
+  currencyCode,
+  baseAmount,
+  processingFee,
+  totalCharged,
+}: PaymentChargeBreakdownProps) {
+  return (
+    <div className="card border mb-3 small">
+      <div className="card-body py-3">
+        <div className="text-success fw-semibold mb-2">
+          Full payment: invoice will be marked paid when this succeeds.
+        </div>
+        <div className="d-flex justify-content-between py-1">
+          <span className="text-muted">Payment amount</span>
+          <span className="fw-medium">
+            {currencyCode} {formatNumber(baseAmount)}
+          </span>
+        </div>
+        <div className="d-flex justify-content-between py-1">
+          <span className="text-muted">Processing fee (3%)</span>
+          <span className="text-danger fw-medium">
+            + {currencyCode} {formatNumber(processingFee)}
+          </span>
+        </div>
+        <hr className="my-2" />
+        <div className="d-flex justify-content-between fw-bold">
+          <span>Total charged</span>
+          <span className="text-primary">
+            {currencyCode} {formatNumber(totalCharged)}
+          </span>
+        </div>
+        <div className="text-muted mt-2" style={{ fontSize: "0.75rem" }}>
+          Estimated fee; actual fee is determined at payment time.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function safeCompleteStripePayment(paymentId: string | number): Promise<void> {
   try {
     await CompletePayment({ payment_id: paymentId, payment_method: "stripe" });
@@ -83,7 +190,8 @@ function getPaymentFailureMessage(response: unknown): string | null {
   const message =
     (typeof r?.message === "string" && r.message.trim()) ||
     (typeof r?.data?.message === "string" && r.data.message.trim()) ||
-    (typeof r?.error === "string" && r.error.trim());
+    (typeof r?.error === "string" && r.error.trim()) ||
+    (typeof r?.data?.error === "string" && r.data.error.trim());
 
   return message || "Payment failed";
 }
@@ -132,13 +240,10 @@ const useCreateInvoicePayment = (): UseCreateInvoicePaymentReturn => {
 };
 
 const DirectCardPaymentForm: React.FC<{
-  amount: number;
-  currency: string;
-  invoiceId: number;
-  customerId: number;
+  invoice: InvoiceData;
   onPaymentSuccess: () => void;
   onPaymentError: (error: string) => void;
-}> = ({ amount, currency, invoiceId, customerId, onPaymentSuccess, onPaymentError }) => {
+}> = ({ invoice, onPaymentSuccess, onPaymentError }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -198,13 +303,7 @@ const DirectCardPaymentForm: React.FC<{
       }
 
       await createInvoicePayment(
-        {
-          amount,
-          currency: currency.toLowerCase(),
-          payment_method_id: paymentMethod.id,
-          invoice_id: invoiceId,
-          customer_id: customerId,
-        },
+        buildStripeCreatePaymentIntentPayload(invoice, paymentMethod.id),
         {
           onSuccess: (paymentResult: any) => {
             (async () => {
@@ -354,10 +453,8 @@ export function InvoicePaymentModal({
 
   const { createInvoicePayment, isCreateInvoicePaymentPending } = useCreateInvoicePayment();
 
-  const invoiceId = Number(invoice?.id ?? 0);
-  const customerId = Number.parseInt(String(invoice?.company_id ?? "0"), 10);
-  const totalAmount = Number.parseFloat(String(invoice?.total_amount ?? "0"));
-  const currencyCode = String(invoice?.currency_code ?? "USD");
+  const currencyCode = (String(invoice?.currency_code ?? "USD").trim() || "USD").toUpperCase();
+  const chargeTotals = useMemo(() => computeCardPaymentTotals(invoice), [invoice]);
 
   const resolvedCompanyName =
     getCompanyByCrmId(invoice?.company?.crm_company_id, companyOptions) ??
@@ -376,29 +473,44 @@ export function InvoicePaymentModal({
     setStripePublishableKey(key);
   }, []);
 
-  const getPaymentMethods = useCallback(async () => {
+  /**
+   * Customer (billed party) invoices: saved cards from `/accounting/customer/payment-methods/:profileId`
+   * (same profile id as payment-intent `customer_id`). Tenant self-pay: legacy `accounting/get-payment-methods`.
+   */
+  const loadPaymentMethodsList = useCallback(async () => {
     setIsLoadingPaymentMethods(true);
     setPaymentMethodsError("");
     try {
+      if (!invoice) {
+        setPaymentMethods([]);
+        return;
+      }
+      const tenantSelfPay = invoice.is_tenant_invoice === true;
+      const profileId = resolveInvoicePaymentCustomerId(invoice);
+      if (!tenantSelfPay && profileId > 0) {
+        const methods = await getCustomerPaymentMethods(profileId);
+        setPaymentMethods(methods as PaymentMethod[]);
+        return;
+      }
       const response = (await GetPaymentMethods()) as any;
       const methods = (response?.payment_methods || []) as PaymentMethod[];
       setPaymentMethods(methods);
     } catch (err: any) {
-      console.error("InvoicePaymentModal getPaymentMethods error:", err);
+      console.error("InvoicePaymentModal loadPaymentMethodsList error:", err);
       setPaymentMethods([]);
       setPaymentMethodsError(err?.message || "Failed to load payment methods");
     } finally {
       setIsLoadingPaymentMethods(false);
     }
-  }, []);
+  }, [invoice]);
 
   useEffect(() => {
     if (!show) return;
     loadStripePublishableKey();
-    getPaymentMethods().catch((err) => {
-      console.error("InvoicePaymentModal getPaymentMethods failed:", err);
+    loadPaymentMethodsList().catch((err) => {
+      console.error("InvoicePaymentModal loadPaymentMethodsList failed:", err);
     });
-  }, [show, loadStripePublishableKey, getPaymentMethods]);
+  }, [show, loadStripePublishableKey, loadPaymentMethodsList]);
 
   useEffect(() => {
     if (!show) return;
@@ -507,13 +619,7 @@ export function InvoicePaymentModal({
 
     setIsProcessingPayment(true);
     await createInvoicePayment(
-      {
-        amount: Number.parseFloat(String(invoice.total_amount || "0")),
-        currency: (invoice.currency_code || "USD").toLowerCase(),
-        payment_method_id: selectedCardId,
-        invoice_id: Number(invoice.id),
-        customer_id: Number.parseInt(String(invoice.company_id || "0"), 10),
-      },
+      buildStripeCreatePaymentIntentPayload(invoice, selectedCardId),
       {
         onSuccess: (paymentResult: any) => {
           handleSavedCardPaymentSuccess(paymentResult).catch((err) => {
@@ -666,6 +772,17 @@ export function InvoicePaymentModal({
         </div>
 
         <div className="mb-4">
+          <h6 className="mb-2">Card charge (saved or direct)</h6>
+          <p className="text-muted small mb-2">
+            Card payments include a 3% processing fee on the outstanding invoice amount (saved cards and new
+            card details use the same charge).
+          </p>
+          <PaymentChargeBreakdown
+            currencyCode={currencyCode}
+            baseAmount={chargeTotals.base_amount}
+            processingFee={chargeTotals.processing_fee}
+            totalCharged={chargeTotals.amount}
+          />
           <h6 className="mb-3">Payment Method</h6>
           <ul className="nav nav-tabs mb-3">
             <li className="nav-item">
@@ -700,10 +817,7 @@ export function InvoicePaymentModal({
                 {stripePublishableKey ? (
                   <Elements stripe={loadStripe(stripePublishableKey)}>
                     <DirectCardPaymentForm
-                      amount={totalAmount}
-                      currency={currencyCode}
-                      invoiceId={invoiceId}
-                      customerId={customerId}
+                      invoice={invoice}
                       onPaymentSuccess={handleDirectPaymentSuccess}
                       onPaymentError={handleDirectPaymentError}
                     />

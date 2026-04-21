@@ -264,6 +264,7 @@ export interface InvoiceData {
   invoice_date: string;
   due_date: string;
   amount_due: string;
+  tenant_id?: string;
   subtotal: string;
   tax_amount: string;
   total_amount: string;
@@ -272,6 +273,7 @@ export interface InvoiceData {
   notes: string | null;
   terms_conditions: string | null;
   is_recurring: boolean;
+  crm_company_id?: number | string;
   recurring_frequency: string | null;
   /** Subscription / recurring end date from API (create/update use this key). */
   end_date?: string | null;
@@ -1877,6 +1879,7 @@ export const getProductCategories = async (
   }
 };
 
+// Stripe Payment Methods
 
 // Stripe Payment Methods
 export const getPaymentMethods = async (
@@ -1932,7 +1935,59 @@ export const getPaymentMethods = async (
     throw error;
   }
 };
+export const getCustomerPaymentMethods = async (
+  profileId: number
+): Promise<PaymentMethodData[]> => {
+  try {
+    const response = await axiosInstance.get(
+      `/accounting/stripe/payment-methods/customer/${profileId}`
+    );
 
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const d = env.data as { payment_methods?: unknown } | unknown[] | null;
+      const rawList =
+        d != null && typeof d === "object" && !Array.isArray(d) && "payment_methods" in d
+          ? (d as { payment_methods: unknown[] }).payment_methods
+          : d;
+      const paymentMethods = Array.isArray(rawList) ? rawList : [];
+
+      // Transform the response to match our PaymentMethodData interface
+      return paymentMethods.map((pm: any) => ({
+        id: pm.id,
+        type: pm.type,
+        card: pm.card
+          ? {
+              brand: pm.card.brand,
+              last4: pm.card.last4,
+              exp_month: pm.card.exp_month,
+              exp_year: pm.card.exp_year,
+            }
+          : undefined,
+        bank_account: pm.bank_account
+          ? {
+              bank_name: pm.bank_account.bank_name,
+              last4: pm.bank_account.last4,
+              routing_number: pm.bank_account.routing_number,
+            }
+          : undefined,
+        billing_details: pm.billing_details
+          ? {
+              name: pm.billing_details.name,
+            }
+          : undefined,
+        is_default: pm.is_default,
+        created_at: new Date(pm.created * 1000).toISOString(), // Convert Unix timestamp to ISO string
+      }));
+    }
+
+    // Fallback to extractData if structure is different
+    return extractData<PaymentMethodData[]>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch payment methods");
+    throw error;
+  }
+};
 export const createPaymentMethod = async (
   profileId: number,
   data: any
@@ -2121,10 +2176,17 @@ export const getPublishableKey = async (): Promise<string> => {
 
 // Direct Payment Interfaces
 export interface CreateDirectPaymentData {
-  amount: number;
-  currency: string;
-  payment_method_id: string;
   invoice_id: number;
+  payment_method: string;
+  payment_mode: string;
+  amount: number;
+  processing_fee: number;
+  base_amount: number;
+  payment_method_id: string;
+  currency_code: string;
+  /** Lowercase currency (kept for API compatibility). */
+  currency: string;
+  notes: string;
   customer_id: number;
 }
 

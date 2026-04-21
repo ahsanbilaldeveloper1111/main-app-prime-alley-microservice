@@ -63,6 +63,15 @@ function normalizeCustomerField(value: unknown): string {
   return "";
 }
 
+/** Normalizes VAT rate for display and API (two decimal places, percent without %). */
+function formatVatRateString(vat: unknown): string {
+  const raw = typeof vat === "string" || typeof vat === "number" ? String(vat) : "";
+  const s = raw.replaceAll("%", "").trim();
+  const n = Number(s);
+  if (!Number.isFinite(n)) return "0.00";
+  return n.toFixed(2);
+}
+
 function buildCustomerUpdatePayload(params: {
   crmCompanyId: string;
   customerData: any;
@@ -73,6 +82,9 @@ function buildCustomerUpdatePayload(params: {
     postal_code: string;
     city: string;
     country: string;
+    tax_id: string;
+    vat_rate: string;
+    vat_exemption: boolean;
   };
 }): CustomerUpdatePayload {
   const { crmCompanyId, customerData, customerForm } = params;
@@ -95,7 +107,7 @@ function buildCustomerUpdatePayload(params: {
       ? (customerData.profile as Record<string, unknown>)
       : {};
   const profileKeys = ["address", "postal_code", "city", "country"] as const;
-  const profilePatch: Record<string, string> = {};
+  const profilePatch: Record<string, unknown> = {};
   for (const key of profileKeys) {
     const next = normalizeCustomerField(customerForm[key]);
     const prev = normalizeCustomerField(prevProfile[key]);
@@ -103,6 +115,25 @@ function buildCustomerUpdatePayload(params: {
       profilePatch[key] = next;
     }
   }
+
+  const nextTaxId = normalizeCustomerField(customerForm.tax_id);
+  const prevTaxId = normalizeCustomerField(prevProfile.tax_id);
+  if (nextTaxId !== prevTaxId) {
+    profilePatch.tax_id = nextTaxId;
+  }
+
+  const nextVatRate = formatVatRateString(customerForm.vat_rate);
+  const prevVatRate = formatVatRateString(prevProfile.vat_rate);
+  if (nextVatRate !== prevVatRate) {
+    profilePatch.vat_rate = nextVatRate;
+  }
+
+  const nextExempt = Boolean(customerForm.vat_exemption);
+  const prevExempt = Boolean(prevProfile.vat_exemption);
+  if (nextExempt !== prevExempt) {
+    profilePatch.vat_exemption = nextExempt;
+  }
+
   if (Object.keys(profilePatch).length > 0) {
     payload.profile = profilePatch;
   }
@@ -159,6 +190,9 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
     postal_code: string;
     city: string;
     country: string;
+    tax_id: string;
+    vat_rate: string;
+    vat_exemption: boolean;
   }>({
     phone: "",
     email: "",
@@ -166,6 +200,9 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
     postal_code: "",
     city: "",
     country: "",
+    tax_id: "",
+    vat_rate: "0.00",
+    vat_exemption: false,
   });
 
   const [customerProducts, setCustomerProducts] = useState<ProductPricingData[]>([]);
@@ -254,6 +291,9 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
         postal_code: String(p?.postal_code ?? ""),
         city: String(p?.city ?? ""),
         country: String(p?.country ?? ""),
+        tax_id: String(p?.tax_id ?? ""),
+        vat_rate: formatVatRateString(p?.vat_rate),
+        vat_exemption: Boolean(p?.vat_exemption),
       });
       setCustomerModalOpen(true);
     },
@@ -330,18 +370,11 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
     return Number.isFinite(n) ? n : 0;
   };
 
-  const formatVatRate2 = useCallback((vat: unknown): string => {
-    const raw =
-      typeof vat === "string" || typeof vat === "number" ? String(vat) : "";
-    const s = raw.replaceAll("%", "").trim();
-    const n = Number(s);
-    if (!Number.isFinite(n)) return "0.00";
-    return n.toFixed(2);
-  }, []);
+  const formatVatRate2 = useCallback((vat: unknown): string => formatVatRateString(vat), []);
 
   const customerVatRate = useMemo(
-    () => formatVatRate2(customerData?.profile?.vat_rate),
-    [customerData, formatVatRate2],
+    () => formatVatRateString(customerData?.profile?.vat_rate),
+    [customerData],
   );
 
   const lineSubtotal = useCallback((it: InvoiceLineItem) => it.quantity * it.unit_price, []);

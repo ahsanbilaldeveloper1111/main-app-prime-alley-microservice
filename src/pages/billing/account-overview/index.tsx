@@ -37,6 +37,42 @@ function getErrorMessage(error: unknown): string {
   return "Unknown error";
 }
 
+function formatVatRateString(vat: unknown): string {
+  const raw = typeof vat === "string" || typeof vat === "number" ? String(vat) : "";
+  const s = raw.replaceAll("%", "").trim();
+  const n = Number(s);
+  if (!Number.isFinite(n)) return "0.00";
+  return n.toFixed(2);
+}
+
+/**
+ * VAT % field: decimals allowed (e.g. 22.5), one dot, up to 2 fractional digits, range 0–100 on save.
+ */
+function sanitizeVatPercentDecimalInput(raw: string): string {
+  let t = raw.replaceAll(",", ".").replaceAll(/[^\d.]/g, "");
+  if (t === "") return "";
+  if (t === ".") return "0.";
+  const firstDot = t.indexOf(".");
+  if (firstDot === -1) {
+    return t.slice(0, 3);
+  }
+  let intPart = t.slice(0, firstDot).slice(0, 3);
+  if (intPart === "") intPart = "0";
+  const decPart = t.slice(firstDot + 1).replaceAll(".", "").slice(0, 2);
+  if (t.endsWith(".") && decPart.length === 0) {
+    return `${intPart}.`;
+  }
+  return decPart.length > 0 ? `${intPart}.${decPart}` : intPart;
+}
+
+function parseVatPercentToClampedNumber(raw: string): number {
+  const s = raw.trim();
+  if (s === "") return 0;
+  const n = Number.parseFloat(s);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, n));
+}
+
 const BILLING_ROUTES = {
   invoices: "/billing/invoices",
   subscriptions: "/billing/subscriptions",
@@ -354,6 +390,12 @@ const AccountOverview = () => {
 
   const [showBillingEditModal, setShowBillingEditModal] = useState(false);
   const [showManageAccountModal, setShowManageAccountModal] = useState(false);
+  const [showTaxEditModal, setShowTaxEditModal] = useState(false);
+  const [taxEditSaving, setTaxEditSaving] = useState(false);
+  const [taxForm, setTaxForm] = useState<{ vat_rate: string; vat_exemption: boolean }>({
+    vat_rate: "0.00",
+    vat_exemption: false,
+  });
 
   // Initialize billingInfo when modal opens or companyDetails changes
   useEffect(() => {
@@ -398,6 +440,44 @@ const AccountOverview = () => {
     }
   };
 
+  const openTaxEditModal = useCallback(() => {
+    const p = companyDetails?.profile ?? customerData?.profile;
+    setTaxForm({
+      vat_rate: formatVatRateString(p?.vat_rate),
+      vat_exemption: Boolean(p?.vat_exemption),
+    });
+    setShowTaxEditModal(true);
+  }, [companyDetails, customerData]);
+
+  const handleSaveTaxInfo = useCallback(async () => {
+    if (!selectedCompanyId) {
+      toast.error("Select a company first");
+      return;
+    }
+    setTaxEditSaving(true);
+    try {
+      await ensureCustomerExistsForCrmCompany(selectedCompanyId);
+      const n = parseVatPercentToClampedNumber(taxForm.vat_rate);
+      await updateCustomer(selectedCompanyId, {
+        crm_company_id: selectedCompanyId,
+        profile: {
+          vat_rate: formatVatRateString(String(n)),
+          vat_exemption: taxForm.vat_exemption,
+        },
+      });
+      toast.success("Tax information updated");
+      setShowTaxEditModal(false);
+      const { customer } = await ensureCustomerExistsForCrmCompany(selectedCompanyId);
+      setCustomerData(customer);
+      setCompanyDetails(customer);
+    } catch (err) {
+      toast.error(`Failed to update tax information: ${getErrorMessage(err)}`, {
+        toastId: "billing_overview_tax_update_failed",
+      });
+    } finally {
+      setTaxEditSaving(false);
+    }
+  }, [selectedCompanyId, taxForm]);
 
   const [dashboardCounters, setDashboardCounters] = useState<any>(null);
   const getDashboardCounters = useCallback(async (crmCompanyId: string | number) => {
@@ -672,16 +752,30 @@ const AccountOverview = () => {
         <Col md={6} lg={3} className="mb-3">
           <Card className='billing-details-cards'>
             <Card.Body className="p-2">
-              <div className="d-flex align-items-center gap-2 mb-2">
-                <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
-                  width: '28px', 
-                  height: '28px', 
-                  backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                  flexShrink: 0 
-                }}>
-                  <FileText size={14} style={{ color: '#fbbf24' }} />
+              <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center gap-2 min-w-0">
+                  <div className="rounded-circle d-flex align-items-center justify-content-center" style={{ 
+                    width: '28px', 
+                    height: '28px', 
+                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                    flexShrink: 0 
+                  }}>
+                    <FileText size={14} style={{ color: '#fbbf24' }} />
+                  </div>
+                  <h6 className="mb-0 text-truncate" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Tax Information</h6>
                 </div>
-                <h6 className="mb-0" style={{ fontWeight: '600', fontSize: '0.85rem' }}>Tax Information</h6>
+                <Button
+                  variant="outline-primary"
+                  size="sm"
+                  className="flex-shrink-0 py-0 px-2"
+                  style={{ fontSize: '0.7rem', lineHeight: 1.5 }}
+                  disabled={!selectedCompanyId || isLoadingCustomer}
+                  onClick={() => openTaxEditModal()}
+                  title="Edit VAT rate and exemption"
+                >
+                  <Edit size={12} className="me-1" aria-hidden />
+                  Edit
+                </Button>
               </div>
               
               <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
@@ -694,7 +788,9 @@ const AccountOverview = () => {
               <div className="d-flex justify-content-between align-items-center py-1 border-bottom">
                 <small className="text-muted" style={{ fontSize: '0.75rem' }}>VAT Rate</small>
                 <span className="fw-semibold" style={{ fontSize: '0.8rem' }}>
-                {companyDetails?.profile?.vat_rate} %
+                {companyDetails?.profile?.vat_rate != null && String(companyDetails.profile.vat_rate).trim() !== ""
+                  ? `${formatVatRateString(companyDetails.profile.vat_rate)} %`
+                  : "N/A"}
                 </span>
               </div>
               
@@ -1232,6 +1328,74 @@ const AccountOverview = () => {
               disabled={isSavingBillingInfo}
             >
               Save Changes
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        <Modal
+          show={showTaxEditModal}
+          onHide={() => {
+            if (!taxEditSaving) setShowTaxEditModal(false);
+          }}
+          backdrop={taxEditSaving ? "static" : true}
+          keyboard={!taxEditSaving}
+          centered
+        >
+          <Modal.Header closeButton={!taxEditSaving}>
+            <Modal.Title>Edit tax information</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <p className="text-muted small mb-3">
+              VAT rate and exemption are saved on the accounting customer profile for this company.
+            </p>
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label>VAT rate (%)</Form.Label>
+                <Form.Control
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="e.g. 22 or 22.5"
+                  value={taxForm.vat_rate}
+                  onChange={(e) =>
+                    setTaxForm((p) => ({
+                      ...p,
+                      vat_rate: sanitizeVatPercentDecimalInput(e.target.value),
+                    }))
+                  }
+                  onBlur={() => {
+                    setTaxForm((p) => ({
+                      ...p,
+                      vat_rate:
+                        p.vat_rate.trim() === ""
+                          ? "0.00"
+                          : formatVatRateString(String(parseVatPercentToClampedNumber(p.vat_rate))),
+                    }));
+                  }}
+                  aria-describedby="account-overview-vat-rate-hint"
+                />
+                <Form.Text id="account-overview-vat-rate-hint" muted>
+                  Up to two decimal places. Values are clamped between 0 and 100.
+                </Form.Text>
+              </Form.Group>
+              <Form.Check
+                type="checkbox"
+                id="account-overview-vat-exemption"
+                className="mb-0"
+                label="VAT exempt (no VAT charged for this customer)"
+                checked={taxForm.vat_exemption}
+                onChange={(e) =>
+                  setTaxForm((p) => ({ ...p, vat_exemption: e.target.checked }))
+                }
+              />
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="outline-secondary" disabled={taxEditSaving} onClick={() => setShowTaxEditModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={taxEditSaving} onClick={() => handleSaveTaxInfo().then(() => undefined)}>
+              {taxEditSaving ? "Saving…" : "Save"}
             </Button>
           </Modal.Footer>
         </Modal>

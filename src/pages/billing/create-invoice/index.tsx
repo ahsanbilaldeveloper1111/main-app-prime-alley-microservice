@@ -732,12 +732,37 @@ function CreateInvoicePaymentSection(props: PaymentSectionProps) {
   );
 }
 
+type CustomerFormTaxFields = Readonly<{
+  tax_id: string;
+  vat_rate: string;
+  vat_exemption: boolean;
+}>;
+
 type CustomerModalProps = Readonly<{
   open: boolean;
   section: "billing" | "shipping";
   onClose: () => void;
-  customerForm: { phone: string; email: string; address: string; postal_code: string; city: string; country: string };
-  setCustomerForm: React.Dispatch<React.SetStateAction<{ phone: string; email: string; address: string; postal_code: string; city: string; country: string }>>;
+  customerForm: {
+    phone: string;
+    email: string;
+    address: string;
+    postal_code: string;
+    city: string;
+    country: string;
+  } & CustomerFormTaxFields;
+  setCustomerForm: React.Dispatch<
+    React.SetStateAction<
+      {
+        phone: string;
+        email: string;
+        address: string;
+        postal_code: string;
+        city: string;
+        country: string;
+      } & CustomerFormTaxFields
+    >
+  >;
+  formatVatRate2: (vat: unknown) => string;
   onSave: () => Promise<void>;
   resolvingCustomer: boolean;
 }>;
@@ -746,9 +771,10 @@ const CUSTOMER_MODAL_EMAIL_MAX_LEN = 50;
 const CUSTOMER_MODAL_POSTAL_MAX_LEN = 50;
 const CUSTOMER_MODAL_CITY_MAX_LEN = 100;
 const CUSTOMER_MODAL_COUNTRY_MAX_LEN = 100;
+const CUSTOMER_MODAL_TAX_ID_MAX_LEN = 64;
 
 function CreateInvoiceCustomerModal(props: CustomerModalProps) {
-  const { open, section, onClose, customerForm, setCustomerForm, onSave, resolvingCustomer } = props;
+  const { open, section, onClose, customerForm, setCustomerForm, formatVatRate2, onSave, resolvingCustomer } = props;
   const emailTrimmed = customerForm.email.trim();
   const emailHasContent = emailTrimmed.length > 0;
   const emailInvalid = emailHasContent && !isValidEmail(emailTrimmed);
@@ -880,6 +906,80 @@ function CreateInvoiceCustomerModal(props: CustomerModalProps) {
                   }))
                 }
               /></div>
+
+            <div style={{ gridColumn: "1 / -1", marginTop: 4 }}>
+              <div
+                style={{
+                  border: "1px solid #e8e8e8",
+                  borderRadius: 8,
+                  padding: 12,
+                  background: "#fafafa",
+                }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 10, color: "#141414" }}>
+                  Tax information
+                </div>
+                <p style={{ ...t.muted, marginTop: 0, marginBottom: 12, fontSize: 12 }}>
+                  Stored on the customer profile and used for new line items and tax display.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                  <div>
+                    <div style={t.label}>VAT number</div>
+                    <input
+                      type="text"
+                      autoComplete="off"
+                      maxLength={CUSTOMER_MODAL_TAX_ID_MAX_LEN}
+                      style={{ ...t.input360, width: "100%" }}
+                      value={customerForm.tax_id}
+                      onChange={(e) =>
+                        setCustomerForm((p) => ({
+                          ...p,
+                          tax_id: e.target.value.slice(0, CUSTOMER_MODAL_TAX_ID_MAX_LEN),
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <div style={t.label}>VAT rate (%)</div>
+                    <input
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      style={{ ...t.input360, width: "100%" }}
+                      value={customerForm.vat_rate}
+                      onChange={(e) =>
+                        setCustomerForm((p) => ({
+                          ...p,
+                          vat_rate: formatVatRate2(e.target.value),
+                        }))
+                      }
+                    />
+                  </div>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        cursor: "pointer",
+                        fontSize: 14,
+                        color: "#141414",
+                        userSelect: "none" as const,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={customerForm.vat_exemption}
+                        onChange={(e) =>
+                          setCustomerForm((p) => ({ ...p, vat_exemption: e.target.checked }))
+                        }
+                      />
+                      VAT exempt (no VAT charged for this customer)
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div style={{ padding: 16, borderTop: "1px solid #eee", display: "flex", justifyContent: "flex-end", gap: 10 }}>
@@ -1432,6 +1532,7 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
           onClose={() => setCustomerModalOpen(false)}
           customerForm={customerForm}
           setCustomerForm={setCustomerForm}
+          formatVatRate2={formatVatRate2}
           onSave={saveCustomerModal}
           resolvingCustomer={resolvingCustomer}
         />
