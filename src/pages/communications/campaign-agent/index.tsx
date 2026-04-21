@@ -328,7 +328,7 @@ const CampaignAgentPage = () => {
       await finesseSetState(teamId, username, state);
       setAgentStatus(state);
       setAgentProfile((prev) => (prev ? { ...prev, state } : prev));
-      void loadSelfProfile();
+      loadSelfProfile().catch(() => undefined);
     } catch (err: unknown) {
       toast.error(
         getFinesseApiErrorMessage(err, "Failed to update agent state."),

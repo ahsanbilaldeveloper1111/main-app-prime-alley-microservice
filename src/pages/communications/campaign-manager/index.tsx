@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useRef,
+  useId,
   useMemo,
   useCallback,
 } from "react";
@@ -252,6 +253,7 @@ const LiveCallsCampaignsManagement = () => {
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadFileInputId = useId();
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -705,11 +707,6 @@ const LiveCallsCampaignsManagement = () => {
       setCampaigns((prev) =>
         prev.map((c) => (c.id === id ? { ...c, enabled: newEnabled } : c)),
       );
-      // if (newEnabled) {
-      //   setShowCallWidget(true);
-      //   setPreviewElapsedSeconds(0);
-      //   setCallStatus('Ringing');
-      // }
     } catch (err: any) {
       toast.error(
         err?.response?.data?.message ??
@@ -2752,9 +2749,10 @@ const LiveCallsCampaignsManagement = () => {
                         </button>
                       </div>
                     ) : (
-                      <div
+                      <label
+                        htmlFor={uploadFileInputId}
                         className="upload-area"
-                        onClick={() => fileInputRef.current?.click()}
+                        style={{ cursor: "pointer" }}
                       >
                         <div className="upload-icon">
                           <Upload size={32} />
@@ -2766,13 +2764,14 @@ const LiveCallsCampaignsManagement = () => {
                           CSV, XLSX, or TXT files (Max 10MB)
                         </div>
                         <input
+                          id={uploadFileInputId}
                           ref={fileInputRef}
                           type="file"
                           accept=".csv,.xlsx,.txt"
                           style={{ display: "none" }}
                           onChange={handleFileSelect}
                         />
-                      </div>
+                      </label>
                     )}
                   </div>
 

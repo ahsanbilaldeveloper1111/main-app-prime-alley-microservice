@@ -417,7 +417,7 @@ const TopBar: React.FC<TopBarProps> = ({
                     e.preventDefault();
                     e.stopPropagation();
                     setShowUserMenu(false);
-                    void handleLogout();
+                    Promise.resolve(handleLogout()).catch(() => undefined);
                   }}
                 >
                   <LogOut size={18} aria-hidden />

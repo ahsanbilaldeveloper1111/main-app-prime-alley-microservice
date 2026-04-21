@@ -23,6 +23,26 @@ import {
   type FinesseUserData,
 } from '@utils/finesse';
 
+function getFinesseLinkErrorMessage(err: unknown): string {
+  if (
+    err &&
+    typeof err === 'object' &&
+    'response' in err &&
+    err.response &&
+    typeof err.response === 'object' &&
+    'data' in err.response &&
+    err.response.data &&
+    typeof err.response.data === 'object' &&
+    'message' in err.response.data
+  ) {
+    return String((err.response.data as { message?: string }).message);
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return 'Authentication failed.';
+}
+
 export interface FinesseAuthGateProps {
   children: ReactNode;
   /** Breadcrumb subTitle (e.g. "Live Calls Campaigns Management") */
@@ -95,21 +115,7 @@ export default function FinesseAuthGate({
         );
       }
     } catch (err: unknown) {
-      const message =
-        err &&
-        typeof err === 'object' &&
-        'response' in err &&
-        err.response &&
-        typeof err.response === 'object' &&
-        'data' in err.response &&
-        err.response.data &&
-        typeof err.response.data === 'object' &&
-        'message' in err.response.data
-          ? String((err.response.data as { message?: string }).message)
-          : err instanceof Error
-            ? err.message
-            : 'Authentication failed.';
-      setFinesseError(message);
+      setFinesseError(getFinesseLinkErrorMessage(err));
     } finally {
       setIsFinesseLoading(false);
       linkInFlightRef.current = false;

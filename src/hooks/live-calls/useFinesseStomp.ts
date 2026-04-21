@@ -83,6 +83,91 @@ function isSSEPayload(value: unknown): value is SSEPayload {
   return typeof value === "object" && value !== null && "type" in value;
 }
 
+type SseCallbackBundle = {
+  onStateEvent?: (payload: FinesseStateEvent) => void;
+  onErrorEvent?: (payload: unknown) => void;
+  onConnectionChange?: (connected: boolean) => void;
+  onAuthError?: (message: string) => void;
+  onPreviewEvent?: (payload: FinessePreviewEvent) => void;
+  onRosterEvent?: (payload: unknown) => void;
+  onStompConnected?: () => void;
+};
+
+function normalizeStateEventPayload(
+  data: unknown,
+  effective: string | undefined,
+): FinesseStateEvent {
+  if (effective != null && typeof data === "object" && data !== null) {
+    return { ...data, state: effective } as FinesseStateEvent;
+  }
+  return data as FinesseStateEvent;
+}
+
+function handleSSEStatePayload(
+  data: unknown,
+  finesseUserId: string,
+  onStateEvent?: (payload: FinesseStateEvent) => void,
+): void {
+  if (!data) return;
+  if (shouldApplyFinesseRemoteLogoutFromStateEvent(data, finesseUserId)) {
+    applyFinesseRemoteForcedLogout();
+    toast.info(
+      "Your Finesse session was ended. Use Connect to Finesse to sign in again.",
+      { toastId: "finesse-remote-forced-logout" },
+    );
+    return;
+  }
+  const effective = getFinesseEffectiveAgentStateFromStatePayload(data);
+  onStateEvent?.(normalizeStateEventPayload(data, effective));
+}
+
+function logStompErrorInDevelopment(payload: SSEPayload): void {
+  if (process.env.NODE_ENV !== "development") return;
+  const err = payload as SSEPayload & { message?: string };
+  console.error("[Finesse SSE] STOMP error:", err.message ?? err.body ?? "");
+}
+
+function dispatchSsePayload(
+  payload: SSEPayload,
+  finesseUserId: string,
+  cb: SseCallbackBundle,
+): void {
+  const { type, data, message } = payload;
+
+  switch (type) {
+    case SSE_TYPE.STOMP_CONNECTED:
+      cb.onConnectionChange?.(true);
+      cb.onStompConnected?.();
+      return;
+    case SSE_TYPE.STOMP_CLOSED:
+      cb.onConnectionChange?.(false);
+      return;
+    case SSE_TYPE.AUTH_REQUIRED:
+      cb.onAuthError?.(message ?? DEFAULT_AUTH_MESSAGE);
+      cb.onConnectionChange?.(false);
+      return;
+    case SSE_TYPE.STATE:
+      handleSSEStatePayload(data, finesseUserId, cb.onStateEvent);
+      return;
+    case SSE_TYPE.ERROR:
+      cb.onErrorEvent?.(data ?? payload);
+      return;
+    case SSE_TYPE.PREVIEW:
+      if (data) cb.onPreviewEvent?.(data as FinessePreviewEvent);
+      return;
+    case SSE_TYPE.ROSTER_STATE:
+      if (data !== undefined) cb.onRosterEvent?.(data);
+      return;
+    case SSE_TYPE.PING:
+      return;
+    case SSE_TYPE.STOMP_ERROR:
+      logStompErrorInDevelopment(payload);
+      cb.onConnectionChange?.(false);
+      return;
+    default:
+  }
+}
+
 /**
  * Connects to the Finesse STOMP proxy via SSE (/api/finesse-ws-stream).
  * Subscribes to state and optional preview dialog events; callbacks are
@@ -143,7 +228,7 @@ export function useFinesseStomp({
       return;
     }
 
-    if (typeof globalThis.window === "undefined") return;
+    if (globalThis.window === undefined) return;
 
     const params = new URLSearchParams({
       token,
@@ -176,68 +261,7 @@ export function useFinesseStomp({
       } catch {
         return;
       }
-
-      const { type, data, message } = payload;
-      const cb = callbacksRef.current;
-
-      switch (type) {
-        case SSE_TYPE.STOMP_CONNECTED:
-          cb.onConnectionChange?.(true);
-          cb.onStompConnected?.();
-          break;
-        case SSE_TYPE.STOMP_CLOSED:
-          cb.onConnectionChange?.(false);
-          break;
-        case SSE_TYPE.AUTH_REQUIRED:
-          cb.onAuthError?.(message ?? DEFAULT_AUTH_MESSAGE);
-          cb.onConnectionChange?.(false);
-          break;
-        case SSE_TYPE.STATE:
-          if (data) {
-            if (
-              shouldApplyFinesseRemoteLogoutFromStateEvent(data, finesseUserId)
-            ) {
-              applyFinesseRemoteForcedLogout();
-              toast.info(
-                "Your Finesse session was ended. Use Connect to Finesse to sign in again.",
-                { toastId: "finesse-remote-forced-logout" },
-              );
-            } else {
-              const effective =
-                getFinesseEffectiveAgentStateFromStatePayload(data);
-              const normalized =
-                effective != null && typeof data === "object" && data !== null
-                  ? ({ ...data, state: effective } as FinesseStateEvent)
-                  : (data as FinesseStateEvent);
-              cb.onStateEvent?.(normalized);
-            }
-          }
-          break;
-        case SSE_TYPE.ERROR:
-          cb.onErrorEvent?.(data ?? payload);
-          break;
-        case SSE_TYPE.PREVIEW:
-          if (data) cb.onPreviewEvent?.(data as FinessePreviewEvent);
-          break;
-        case SSE_TYPE.ROSTER_STATE:
-          if (data !== undefined) cb.onRosterEvent?.(data);
-          break;
-        case SSE_TYPE.PING:
-          break;
-        case SSE_TYPE.STOMP_ERROR: {
-          const err = payload as SSEPayload & { message?: string };
-          if (process.env.NODE_ENV === "development") {
-            console.error(
-              "[Finesse SSE] STOMP error:",
-              err.message ?? err.body ?? "",
-            );
-          }
-          cb.onConnectionChange?.(false);
-          break;
-        }
-        default:
-          break;
-      }
+      dispatchSsePayload(payload, finesseUserId, callbacksRef.current);
     };
 
     es.onerror = () => {

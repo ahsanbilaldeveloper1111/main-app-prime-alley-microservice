@@ -1,12 +1,18 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { createPortal } from "react-dom";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericListPage from "@components/GenericListPage";
 import { Row, Col } from "react-bootstrap";
 import { useSession } from 'next-auth/react';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Users,
   Settings,
@@ -355,10 +361,9 @@ const LiveCallsAgentsManagement = () => {
       const handleTeamRosterEvent = useCallback(
         (raw: unknown) => {
           if (
-            raw &&
+            raw != null &&
             typeof raw === 'object' &&
-            '__finesseRosterUnparsed' in (raw as object) &&
-            (raw as { __finesseRosterUnparsed?: boolean }).__finesseRosterUnparsed === true
+            Reflect.get(raw, '__finesseRosterUnparsed') === true
           ) {
             scheduleTeamSyncFromRoster();
             return;

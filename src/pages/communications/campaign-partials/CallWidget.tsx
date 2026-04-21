@@ -10,7 +10,7 @@ import {
 
 export type PreviewContactRow = { label: string; value: string };
 
-interface CallWidgetProps {
+export type CallWidgetProps = Readonly<{
   showCallWidget: boolean;
   setShowCallWidget: (show: boolean) => void;
   callStatus: string;
@@ -51,7 +51,7 @@ interface CallWidgetProps {
   /** When provided, Hold/Resume calls this (e.g. dialog action API) instead of only setting local state */
   onHoldToggle?: (hold: boolean) => void | Promise<void>;
   holdLoading?: boolean;
-}
+}>;
 
 function hasTrimmedText(value: string | undefined | null): boolean {
   return value != null && value.trim() !== '';
@@ -85,11 +85,11 @@ function rejectPrimaryLabelContent(
   return 'Reject';
 }
 
-function CallWidgetHeaderBar({
-  setShowCallWidget,
-}: {
+type CallWidgetHeaderBarProps = Readonly<{
   setShowCallWidget: (show: boolean) => void;
-}) {
+}>;
+
+function CallWidgetHeaderBar({ setShowCallWidget }: CallWidgetHeaderBarProps) {
   return (
     <div className="call-widget-header">
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -113,7 +113,9 @@ function CallWidgetHeaderBar({
   );
 }
 
-function CallWidgetStatusLabel({ callStatus }: { callStatus: string }) {
+type CallWidgetStatusLabelProps = Readonly<{ callStatus: string }>;
+
+function CallWidgetStatusLabel({ callStatus }: CallWidgetStatusLabelProps) {
   return (
     <div className="call-status">
       <span className={`call-status-badge ${callStatus === 'Connected' ? 'connected' : ''}`}>
@@ -140,7 +142,7 @@ function CallWidgetStatusLabel({ callStatus }: { callStatus: string }) {
   );
 }
 
-type CallWidgetMetaRowsProps = {
+type CallWidgetMetaRowsProps = Readonly<{
   campaignName?: string;
   dialedNumber?: string;
   customerNumber?: string;
@@ -151,7 +153,7 @@ type CallWidgetMetaRowsProps = {
   activeAgentName?: string;
   includeTeamRow: boolean;
   selectedTeam: string;
-};
+}>;
 
 function CallWidgetMetaRows({
   campaignName,
@@ -215,14 +217,16 @@ function CallWidgetMetaRows({
       {includeTeamRow && (
         <div className="call-info-item">
           <span className="call-info-label">Team</span>
-          <span className="call-info-value">{selectedTeam.replace(/-/g, ' ')}</span>
+          <span className="call-info-value">{selectedTeam.replaceAll('-', ' ')}</span>
         </div>
       )}
     </div>
   );
 }
 
-function CallWidgetContactPreview({ rows }: { rows: PreviewContactRow[] }) {
+type CallWidgetContactPreviewProps = Readonly<{ rows: PreviewContactRow[] }>;
+
+function CallWidgetContactPreview({ rows }: CallWidgetContactPreviewProps) {
   if (rows.length === 0) return null;
   return (
     <div className="call-contact-section">
@@ -254,13 +258,12 @@ const WRAP_UP_BTN_STYLE: React.CSSProperties = {
   color: 'white',
 };
 
-function WrapUpButton({
-  onClick,
-  loading,
-}: {
+type WrapUpButtonProps = Readonly<{
   onClick: () => void;
   loading: boolean;
-}) {
+}>;
+
+function WrapUpButton({ onClick, loading }: WrapUpButtonProps) {
   return (
     <button
       className="btn-wrap-up"
@@ -284,7 +287,7 @@ function WrapUpButton({
   );
 }
 
-type ConnectedCallPanelProps = {
+type ConnectedCallPanelProps = Readonly<{
   previewActions: string[];
   isHold: boolean;
   setIsHold: (hold: boolean) => void;
@@ -294,7 +297,7 @@ type ConnectedCallPanelProps = {
   onWrapUpClick?: () => void;
   wrapUpLoading: boolean;
   handleEndCall: () => void;
-};
+}>;
 
 function ConnectedCallPanel({
   previewActions,
@@ -358,7 +361,7 @@ function ConnectedCallPanel({
   );
 }
 
-type RingingCallPanelProps = {
+type RingingCallPanelProps = Readonly<{
   previewActions: string[];
   hasReject: boolean;
   hasClose: boolean;
@@ -372,7 +375,7 @@ type RingingCallPanelProps = {
   onWrapUpClick?: () => void;
   wrapUpLoading: boolean;
   onReclassify?: () => void | Promise<void>;
-};
+}>;
 
 function RingingCallPanel({
   previewActions,
