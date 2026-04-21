@@ -183,7 +183,8 @@ function PricingRowFormFields({
           />
         </Field>
       )}
-      <Field label="Discount">
+      {/* Chooses discount applicability for this product row (`discount_applicability_id`); empty option = no discount. */}
+      {/* <Field label="Discount">
         <SelectBox
           options={[{ value: "", label: "No Discount" }]}
           value={row.discount_applicability_id ?? ""}
@@ -195,7 +196,7 @@ function PricingRowFormFields({
           isClearable={false}
           isDisabled={submitting}
         />
-      </Field>
+      </Field> */}
       <Field label="Status">
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <ToggleSwitch
