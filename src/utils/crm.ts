@@ -1000,7 +1000,7 @@ export const createCrmData = async (payload: {
   scheduled_call_at?: string;
   company_domain?: string;
   company_name?: string;
-  source_file?: string;
+  source?: string;
   tag_ids?: number[];
   directory?: string;
 }): Promise<any> => {
@@ -1063,7 +1063,7 @@ export const updateCrmData = async (
     scheduled_call_at?: string;
     company_domain?: string;
     company_name?: string;
-    source_file?: string;
+    source?: string;
     tag_ids?: number[];
   },
 ): Promise<any> => {

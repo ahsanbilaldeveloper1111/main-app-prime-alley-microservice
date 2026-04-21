@@ -35,6 +35,8 @@ import CrmAssociatedCompaniesCard from "@components/CrmAssociatedCompaniesCard";
 import CrmProfileSection from "@components/CrmProfileSection";
 import CrmRecordSummarySection from "@components/CrmRecordSummarySection";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
+import type { CrmAuditLogRecordType } from "@utils/crm";
 import { useCti } from "@hooks/useCti";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
@@ -241,6 +243,19 @@ export function CrmDetailPageLayout( // NOSONAR
     onMeetingScheduled: () => activitiesPanelRef.current?.refetchMeetings?.(),
   });
 
+  // Audit-log (manual "Log a ___") entries are only supported for non-company records.
+  const supportsLogActivity = config.recordType !== "company";
+  const logActivityModals = useCrmLogActivityModals({
+    recordType: (supportsLogActivity
+      ? config.recordType
+      : "lead") as CrmAuditLogRecordType,
+    recordId: supportsLogActivity ? config.recordId : 0,
+    recordName: config.recordName,
+    recordPhone: config.recordPhone,
+    recordEmail: config.recordEmail,
+    onLogged: () => activitiesPanelRef.current?.refetchNotes?.(),
+  });
+
   const handleCall = useCallback(
     async (phoneNumber: string) => {
       const numberToDial = (phoneNumber || "").trim();
@@ -398,6 +413,15 @@ export function CrmDetailPageLayout( // NOSONAR
   const moreActions = [
     { label: "SMS", onClick: activityModals.openSms },
     { label: "WhatsApp", onClick: activityModals.openWhatsApp },
+    ...(supportsLogActivity
+      ? [
+          { label: "Log a Call", onClick: logActivityModals.openLogCall },
+          { label: "Log an Email", onClick: logActivityModals.openLogEmail },
+          { label: "Log an SMS", onClick: logActivityModals.openLogSms },
+          { label: "Log a WhatsApp", onClick: logActivityModals.openLogWhatsApp },
+          { label: "Log a Meeting", onClick: logActivityModals.openLogMeeting },
+        ]
+      : []),
   ];
 
   const sidebarCtx = { collapsedSections, toggleSection };
@@ -1151,6 +1175,7 @@ export function CrmDetailPageLayout( // NOSONAR
       />
 
       {activityModals.modals}
+      {supportsLogActivity && logActivityModals.modals}
 
       <DeleteConfirmationModal
         show={showDeleteModal}

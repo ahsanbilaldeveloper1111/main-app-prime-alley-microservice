@@ -1288,7 +1288,11 @@ export function CrmProspectsContactsListPage({
                 // },
                 {
                   label: "Delete",
-                  onClick: () => handleDeleteData(selectedProspect),
+                  onClick: () => {
+                    const prospectToDelete = selectedProspect;
+                    setShowProspectSidebar(false);
+                    handleDeleteData(prospectToDelete);
+                  },
                 },
               ],
             }}
