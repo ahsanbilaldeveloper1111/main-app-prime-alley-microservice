@@ -112,7 +112,8 @@ export function getVisibleDropdownOptions<T>(
 
 export interface TableAction<T = any> {
   label: string;
-  icon?: React.ReactNode;
+  /** Static icon or a function of row (e.g. show a spinner while an async action runs). */
+  icon?: React.ReactNode | ((row: T) => React.ReactNode);
   onClick?: (row: T) => void;
   variant?: string;
   className?: string;
@@ -130,12 +131,20 @@ export interface TableAction<T = any> {
     align?: "start" | "end";
     toggleVariant?: string;
     toggleClassName?: string;
-    /**
-     * When true, the right-click context menu shows one row (action label) that opens a
-     * flyout submenu instead of listing every option at the top level.
-     */
-    nestInContextMenu?: boolean;
   };
+}
+
+function resolveTableActionIcon<T>(
+  icon: TableAction<T>["icon"],
+  row: T,
+): React.ReactNode {
+  if (icon == null) {
+    return null;
+  }
+  if (typeof icon === "function") {
+    return (icon as (r: T) => React.ReactNode)(row);
+  }
+  return icon;
 }
 
 /** Row context menu entry (onClick receives the row). Shared by the table and Kanban card menu. */
@@ -169,53 +178,34 @@ function buildDropdownContextMenuItems<T>(
   action: TableAction<T>,
   row: T,
 ): TableContextMenuItem<T>[] {
-  const opts = getVisibleDropdownOptions(action.dropdown!.options, row);
-  if (opts.length === 0) return [];
-
-  const mapOption = (o: DropdownOption<T>): TableContextMenuItem<T> => ({
-    label: o.label,
-    icon: o.icon,
-    onClick: o.onClick,
-    divider: o.divider ?? false,
-    className: o.className,
-  });
-
-  if (action.dropdown!.nestInContextMenu) {
-    return [{ label: action.label, icon: action.icon, submenu: opts.map(mapOption) }];
-  }
-  return opts.map(mapOption);
-}
-
-function buildClickActionContextMenuItem<T>(
-  action: TableAction<T>,
-  row: T,
-): TableContextMenuItem<T> {
-  const isDisabled = action.disabled?.(row);
-  return {
-    label: action.label,
-    icon: action.icon,
-    onClick: action.onClick,
-    divider: false,
-    className: isDisabled
-      ? action.disabledClassName || "text-muted"
-      : action.className,
-    disabled: isDisabled,
-    disabledTitle: action.disabledTitle,
-    disabledClassName: action.disabledClassName,
-  };
-}
-
-export function buildTableContextMenuItems<T>(
-  actions: TableAction<T>[],
-  row: T,
-): TableContextMenuItem<T>[] {
   const items: TableContextMenuItem<T>[] = [];
   for (const action of actions) {
     if (action.show && !action.show(row)) continue;
     if (action.dropdown) {
-      items.push(...buildDropdownContextMenuItems(action, row));
+      const opts = getVisibleDropdownOptions(action.dropdown.options, row);
+      for (const o of opts) {
+        items.push({
+          label: o.label,
+          icon: o.icon,
+          onClick: o.onClick,
+          divider: o.divider ?? false,
+          className: o.className,
+        });
+      }
     } else if (action.onClick && !action.render) {
-      items.push(buildClickActionContextMenuItem(action, row));
+      const isDisabled = action.disabled?.(row);
+      items.push({
+        label: action.label,
+        icon: resolveTableActionIcon(action.icon, row),
+        onClick: action.onClick,
+        divider: false,
+        className: isDisabled
+          ? action.disabledClassName || "text-muted"
+          : action.className,
+        disabled: isDisabled,
+        disabledTitle: action.disabledTitle,
+        disabledClassName: action.disabledClassName,
+      });
     }
   }
   return items;
@@ -622,7 +612,7 @@ function buildContextMenuItemsForRow<T extends Record<string, any>>(
       items.push({
         reactKey: `gt-ctxm-${seq++}-${action.label}`,
         label: action.label,
-        icon: action.icon,
+        icon: resolveTableActionIcon(action.icon, row),
         onClick: action.onClick,
         divider: false,
         className: isDisabled
@@ -981,7 +971,7 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
                 className={action.className || ""}
                 id={`dropdown-${rowStableKey}-${action.label}`}
               >
-                {action.icon}
+                {resolveTableActionIcon(action.icon, row)}
               </Dropdown.Toggle>
               <Dropdown.Menu
                 onMouseDown={(e) => {
@@ -1043,7 +1033,7 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
             }`}
             title={isDisabled ? undefined : action.label}
           >
-            {action.icon || action.label}
+            {resolveTableActionIcon(action.icon, row) || action.label}
           </Button>
         );
         if (isDisabled && action.disabledTitle) {

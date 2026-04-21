@@ -16,6 +16,7 @@ import { getMinifiedCompanies } from "@utils/crm";
 import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
+import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import GenericTable from "@components/GenericTable";
 import type { FilterPill, ToolbarConfig, TableColumn, TableAction } from "@components/GenericTable";
 
@@ -774,11 +775,16 @@ export default function BillingHistoryPage({
     [],
   );
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
-  const [ordersSelected, setOrdersSelected] = useState<string[]>([]);
-  const [invoicesSelected, setInvoicesSelected] = useState<string[]>([]);
-  const [creditsSelected, setCreditsSelected] = useState<string[]>([]);
-  const [refundsSelected, setRefundsSelected] = useState<string[]>([]);
-  const [usageLimitsSelected, setUsageLimitsSelected] = useState<string[]>([]);
+  const [ensureCustomerRefreshKey, setEnsureCustomerRefreshKey] = useState(0);
+
+  const bumpInvoicesAfterCustomerCreated = useCallback(() => {
+    setEnsureCustomerRefreshKey((k) => k + 1);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(customerCompanyPicker ? selectedCompanyId : null, {
+    onCreated: bumpInvoicesAfterCustomerCreated,
+    errorToastId: "billing_history_ensure_customer_failed",
+  });
 
   const selectedCompanyLabel = useMemo(() => {
     if (!selectedCompanyId) return "";
@@ -916,6 +922,7 @@ export default function BillingHistoryPage({
     statusFilter,
     paymentStatusFilter,
     selectedCompanyId,
+    ensureCustomerRefreshKey,
   ]);
 
   const filterPills = useMemo<FilterPill[]>(

@@ -7,36 +7,17 @@ import React, {
   useMemo,
   useEffect,
 } from "react";
-import {
-  Layout,
-  BreadcrumbItem,
-  GenericTable,
-  GenericSidebar,
-  GenericFilterSidebar,
-  StatsCards,
-  OrderEditModal,
-  type TableColumn,
-  type TableAction,
-} from "@crm/orders/orderListOrderPageFrame";
-import {
-  FiUpload,
-  FiDatabase,
-  FiSearch,
-  FiFilter,
-  FiTrash2,
-  FiEye,
-  FiUser,
-  FiUsers,
-  FiPhone,
-  FiMessageCircle,
-  FiPlay,
-  FiClock,
-  FiX,
-  FiAlertCircle,
-  FiCalendar,
-  FiTarget,
-  FiMoreVertical,
-} from "@crm/orders/orderListFiIcons";
+import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericTable, {
+  TableColumn,
+  TableAction,
+} from "@components/GenericTable";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
+import GenericFilterSidebar from "@components/GenericFilterSidebar";
+import StatsCards from "@components/GenericStatsCards";
+import OrderEditModal from "@components/OrderEditModal";
+import { FiFilter } from "react-icons/fi";
 import {
   getOrders,
   getOrder,
@@ -53,40 +34,18 @@ import {
   getDealAttachments,
   downloadDealAttachment,
   getMinifiedCompanies,
-} from "@crm/orders/orderListCrmApi";
+} from "@utils/crm";
+import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { GetHierarchyData } from "@utils/users";
-import {
-  Button,
-  Row,
-  Col,
-  Badge,
-  Dropdown,
-  Form,
-  Card,
-  Table,
-  InputGroup,
-  Modal,
-  Spinner,
-} from "@crm/orders/orderListBootstrap";
+import { Button, Row, Col, Badge, Form, Card, Modal } from "react-bootstrap";
 import Select, { type SingleValue } from "react-select";
-
-type OrderInvoicingSelectOption = { value: string | number; label: string };
-
-const toOptionalSelectString = (value: string | number | null | undefined) => {
-  if (value === null || value === undefined) return null;
-  return String(value);
-};
 import {
   GlobalDateFormat,
   ModuleSlug,
   formatDateForTable,
 } from "@utils/Helper";
 import {
-  Target,
   CheckCircle,
-  TrendingUp,
-  BarChart3,
-  Plus,
   Eye,
   Edit,
   Trash2,
@@ -95,41 +54,17 @@ import {
   X,
   Users,
   PlusCircle,
-  Zap,
-  Star,
-  Clock,
-  Search,
-  Filter,
   Layers,
-  Calendar,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   DollarSign,
   Activity,
   FileText,
   ShoppingCart,
-  AlertTriangle,
-  RefreshCw,
-  History,
-  Mail,
-  Phone,
-  Building2,
-  Package,
-  Link2,
-  User,
   Paperclip,
   Upload,
   DownloadIcon,
   RotateCcw,
   AlertCircle,
-  Handshake,
-  Info,
-} from "@crm/orders/orderListLucideHeavy";
+} from "lucide-react";
 import {
   PieChart,
   Pie,
@@ -141,26 +76,127 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-} from "@crm/orders/orderListRecharts";
-import Link from "next/link";
+} from "recharts";
 import { toast } from "react-toastify";
 
 import {
   SuccessfulModal,
   FormModal,
   DeleteConfirmationModal,
-  PhoneDisplay,
-  KPICard,
-  FilterBar,
-  getInitials,
-  getRandomColor,
-  customSelectStyles,
 } from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
 import moment from "moment";
-import { buildCrmOrdersListGetOrdersParams } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
+import {
+  CrmKPICard as KPICard,
+  CrmFilterBar as FilterBar,
+} from "@components/crm/CrmListPageUi";
+import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import {
+  CrmOrderViewModal,
+  OrderInvoicingOrderSidebar,
+  attachmentMimeIconBackground,
+  buildOrdersListParams,
+  extensionLabelForAssignedTo,
+  fulfillmentBadgeVariant,
+  mergeOrdersListFilters,
+  orderApprovalBadgeVariant,
+  paymentStatusBadgeVariant,
+} from "@components/billings/order-invoicing";
 
-const ignoredKeys = ["order_stage_id"];
+const ignoredHistoryKeys = new Set<string>(["order_stage_id"]);
+
+function assignedSelectValue(
+  opt: SingleValue<{ value: string | number }>,
+): string | null {
+  const value = opt?.value;
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  return null;
+}
+
+function transformOrderListRow(order: any, extensions: any[]) {
+  const assignedLabel = extensionLabelForAssignedTo(
+    extensions,
+    order?.assigned_to,
+  );
+  return {
+    id: order.id,
+    orderNumber: order.order_number || "",
+    customer: order.customer_name || "",
+    customerEmail: order.customer_email || "",
+    customerPhone: order.customer_phone || "",
+    deal: order.deal?.name || order.deal_id || "",
+    dealId: order.deal_id || null,
+    stage: order.stage?.name || "No Stage",
+    stageColor: order.stage?.color || "grey",
+    stageId: order.order_stage_id || null,
+    value: order.final_amount || order.total_amount || "0",
+    currency: order.currency || "AED",
+    approvalStatus: order.order_approval_status || null,
+    fulfillmentStatus: order.fulfillment_status || null,
+    paymentStatus: order.payment_status || null,
+    orderDate: order.order_date
+      ? moment(order.order_date).format(GlobalDateFormat)
+      : "-",
+    assignedUser: assignedLabel,
+    expectedDeliveryDate: formatDateForTable(order.expected_delivery_date),
+    actualDeliveryDate: formatDateForTable(order.actual_delivery_date),
+    owner: assignedLabel,
+    created: formatDateForTable(order.created_at),
+    contractType: order.contract_type || "",
+    contractLength: order.contract_length || "",
+    contractStartDate: formatDateForTable(order.contract_start_date),
+    contractEndDate: formatDateForTable(order.contract_end_date),
+    billingModel: order.billing_model || "",
+    billingStatus: order.billing_status || "",
+    paymentTerms: order.payment_terms || "",
+    progressDial: order.progress_dial || 0,
+    pocName: order.poc_name || order.customer_name || "",
+    pocTitle: order.poc_title || "",
+    pocPhone: order.poc_phone || "",
+    company: order.company || order.deal?.company_name || "",
+    industry: order.industry || order.deal?.industry || "",
+    status: order.status || "pending",
+    rawData: order,
+  };
+}
+
+async function loadDealAndLeadForOrder(orderData: {
+  deal_id?: number | string | null;
+}): Promise<{ deal: any; lead: any }> {
+  let deal: any = null;
+  let lead: any = null;
+  if (!orderData.deal_id) {
+    return { deal, lead };
+  }
+  try {
+    deal = await getDeal(Number(orderData.deal_id));
+    if (!deal?.ticket_id) {
+      return { deal, lead };
+    }
+    try {
+      lead = await getLead(Number(deal.ticket_id));
+      if (
+        lead.contact_persons &&
+        typeof lead.contact_persons === "string"
+      ) {
+        try {
+          lead.contact_persons = JSON.parse(lead.contact_persons);
+        } catch (e) {
+          console.error("Failed to parse contact_persons:", e);
+          lead.contact_persons = [];
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch lead:", error);
+    }
+  } catch (error) {
+    console.error("Failed to fetch deal:", error);
+  }
+  return { deal, lead };
+}
 
 const CrmOrders = () => {
   const { data: session } = useSession();
@@ -176,7 +212,18 @@ const CrmOrders = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
   const [companies, setCompanies] = useState<{ id: string | number; name?: string }[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | ''>('');
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>(
+    "",
+  );
+
+  const onAccountingCustomerCreated = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(selectedCompanyId || null, {
+    onCreated: onAccountingCustomerCreated,
+    errorToastId: "billing_order_invoicing_ensure_customer_failed",
+  });
 
   // Delete Modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -191,14 +238,11 @@ const CrmOrders = () => {
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [relatedDeal, setRelatedDeal] = useState<any>(null);
   const [relatedLead, setRelatedLead] = useState<any>(null);
-  const [loadingDeal, setLoadingDeal] = useState(false);
-  const [loadingLead, setLoadingLead] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("tab1");
 
   // Sidebar states
   const [showOrderSidebar, setShowOrderSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -229,30 +273,11 @@ const CrmOrders = () => {
   const [lostFeedback, setLostFeedback] = useState("");
 
   // UI State
-  const [showOrdersAnalytics, setShowOrdersAnalytics] = useState(false);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showOrdersAnalytics] = useState(false);
+  const [showAdvancedFilters] = useState(false);
   const [showFilterBar, setShowFilterBar] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [ordersSearch, setOrdersSearch] = useState("");
-  const [selectedOrdersColumns, setSelectedOrdersColumns] = useState<string[]>(
-    () => {
-      const saved = localStorage.getItem("ordersSelectedColumns");
-      return saved
-        ? JSON.parse(saved)
-        : [
-            "orderNumber",
-            "customer",
-            "deal",
-            "stage",
-            "value",
-            "approvalStatus",
-            "fulfillmentStatus",
-            "assignedUser",
-            "orderDate",
-            "owner",
-          ];
-    },
-  );
   const [ordersPagination, setOrdersPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -296,15 +321,12 @@ const CrmOrders = () => {
     async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
-        const params = buildCrmOrdersListGetOrdersParams({
-          filters: currentFilters,
+        const params = buildOrdersListParams(
           page,
           perPage,
-          tableSort: null,
-          normalizeSearch: false,
-          ownerParamStyle: "assigned_to",
-          crmCompanyId: selectedCompanyId,
-        });
+          currentFilters,
+          selectedCompanyId,
+        );
 
         const response: any = await getOrders(params);
         console.log("Raw response from getOrders:", response);
@@ -397,8 +419,7 @@ const CrmOrders = () => {
         tabFromUrl === "all" ||
         tabFromUrl === "lost" ||
         tabFromUrl === "deleted" ||
-        (stages.length > 0 &&
-          stages.some((s: any) => s.id.toString() === tabFromUrl));
+        stages.some((s: any) => s.id.toString() === tabFromUrl);
       if (isValidFilter && tabFromUrl !== activeFilter) {
         setActiveFilter(tabFromUrl);
       }
@@ -561,142 +582,7 @@ const CrmOrders = () => {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) => {
-      const newFilters = { ...prev };
-
-      // Handle stage_id filter (single value)
-      if ("stage_id" in filters) {
-        if (filters.stage_id) {
-          newFilters.stage_id = String(filters.stage_id);
-        } else {
-          delete newFilters.stage_id;
-        }
-      }
-
-      // Handle assigned_to filter (single value)
-      if ("assigned_to" in filters) {
-        if (filters.assigned_to) {
-          newFilters.assigned_to = String(filters.assigned_to);
-        } else {
-          delete newFilters.assigned_to;
-        }
-      }
-
-      // Handle search
-      if ("search" in filters) {
-        if (filters.search) {
-          newFilters.search = filters.search;
-        } else {
-          delete newFilters.search;
-        }
-      }
-
-      // Handle is_lost filter
-      if ("is_lost" in filters) {
-        newFilters.is_lost = filters.is_lost;
-      }
-
-      // Handle include_lost filter
-      if ("include_lost" in filters) {
-        if (filters.include_lost) {
-          newFilters.include_lost = true;
-        } else {
-          delete newFilters.include_lost;
-        }
-      }
-
-      // Handle include_archived filter
-      if ("include_archived" in filters) {
-        if (filters.include_archived) {
-          newFilters.include_archived = true;
-        } else {
-          delete newFilters.include_archived;
-        }
-      }
-
-      // Handle industry filter
-      if ("industry" in filters) {
-        if (filters.industry) {
-          newFilters.industry = filters.industry;
-        } else {
-          delete newFilters.industry;
-        }
-      }
-
-      // Handle order_value_min filter
-      if ("order_value_min" in filters) {
-        if (filters.order_value_min) {
-          newFilters.order_value_min = String(filters.order_value_min);
-        } else {
-          delete newFilters.order_value_min;
-        }
-      }
-
-      // Handle order_value_max filter
-      if ("order_value_max" in filters) {
-        if (filters.order_value_max) {
-          newFilters.order_value_max = String(filters.order_value_max);
-        } else {
-          delete newFilters.order_value_max;
-        }
-      }
-
-      // Handle order_stage_id filter (note: this is different from stage_id, it's order_stage_id)
-      if ("order_stage_id" in filters) {
-        if (filters.order_stage_id) {
-          newFilters.order_stage_id = String(filters.order_stage_id);
-        } else {
-          delete newFilters.order_stage_id;
-        }
-      }
-
-      // Handle order_approval_status filter
-      if ("order_approval_status" in filters) {
-        if (filters.order_approval_status) {
-          newFilters.order_approval_status = filters.order_approval_status;
-        } else {
-          delete newFilters.order_approval_status;
-        }
-      }
-
-      // Handle fulfillment_status filter
-      if ("fulfillment_status" in filters) {
-        if (filters.fulfillment_status) {
-          newFilters.fulfillment_status = filters.fulfillment_status;
-        } else {
-          delete newFilters.fulfillment_status;
-        }
-      }
-
-      // Handle payment_status filter
-      if ("payment_status" in filters) {
-        if (filters.payment_status) {
-          newFilters.payment_status = filters.payment_status;
-        } else {
-          delete newFilters.payment_status;
-        }
-      }
-
-      // Handle date_from filter
-      if ("date_from" in filters) {
-        if (filters.date_from) {
-          newFilters.date_from = filters.date_from;
-        } else {
-          delete newFilters.date_from;
-        }
-      }
-
-      // Handle date_to filter
-      if ("date_to" in filters) {
-        if (filters.date_to) {
-          newFilters.date_to = filters.date_to;
-        } else {
-          delete newFilters.date_to;
-        }
-      }
-
-      return newFilters;
-    });
+    setCurrentFilters((prev) => mergeOrdersListFilters(prev, filters));
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -731,78 +617,35 @@ const CrmOrders = () => {
 
   const fetchOrderDetails = useCallback(async (orderId: number) => {
     setLoadingOrder(true);
-    setLoadingDeal(true);
-    setLoadingLead(true);
     setRelatedDeal(null);
     setRelatedLead(null);
     try {
       const orderData: any = await getOrder(orderId);
       setViewingOrder(orderData);
+      const { deal, lead } = await loadDealAndLeadForOrder(orderData);
+      setRelatedDeal(deal);
+      setRelatedLead(lead);
+      setLoadingOrder(false);
+    } catch (error) {
+      console.error("Failed to fetch order:", error);
+      setLoadingOrder(false);
+    }
+  }, []);
 
-      // Fetch deal information if deal_id exists
-      if (orderData.deal_id) {
-        try {
-          const dealData: any = await getDeal(Number(orderData.deal_id));
-          setRelatedDeal(dealData);
-
-          // Fetch lead information if ticket_id exists (ticket_id contains the lead_id)
-          if (dealData.ticket_id) {
-            try {
-              const leadData: any = await getLead(Number(dealData.ticket_id));
-
-              // Parse contact_persons if it's a string
-              if (
-                leadData.contact_persons &&
-                typeof leadData.contact_persons === "string"
-              ) {
-                try {
-                  leadData.contact_persons = JSON.parse(
-                    leadData.contact_persons,
-                  );
-                } catch (e) {
-                  console.error("Failed to parse contact_persons:", e);
-                  leadData.contact_persons = [];
-                }
-              }
-
-              setRelatedLead(leadData);
-            } catch (error) {
-              console.error("Failed to fetch lead:", error);
-              // Don't show error toast as lead is optional
-            }
-          }
-          setLoadingDeal(false);
-        } catch (error) {
-          console.error("Failed to fetch deal:", error);
-          setLoadingDeal(false);
-          // Don't show error toast as deal is optional
-        }
-      } else {
-        setLoadingDeal(false);
+  const handleViewOrder = useCallback(
+    async (orderId: number) => {
+      await fetchOrderDetails(orderId);
+      try {
+        setShowOrderViewModal(true);
+      } catch (error) {
+        console.error("Failed to fetch order:", error);
+        toast.error("Failed to load order details");
+      } finally {
+        setLoadingOrder(false);
       }
-      setLoadingLead(false);
-      setLoadingOrder(false);
-    } catch (error) {
-      console.error("Failed to fetch order:", error);
-      setLoadingOrder(false);
-      setLoadingDeal(false);
-      setLoadingLead(false);
-    }
-  }, []);
-
-  const handleViewOrder = useCallback(async (orderId: number) => {
-    await fetchOrderDetails(orderId);
-    try {
-      setShowOrderViewModal(true);
-    } catch (error) {
-      console.error("Failed to fetch order:", error);
-      toast.error("Failed to load order details");
-    } finally {
-      setLoadingOrder(false);
-      setLoadingDeal(false);
-      setLoadingLead(false);
-    }
-  }, []);
+    },
+    [fetchOrderDetails],
+  );
 
   const handleDeleteOrder = useCallback(
     (orderId: number, orderNumber?: string) => {
@@ -830,7 +673,8 @@ const CrmOrders = () => {
 
   // Restore Order Handler
   const handleRestoreOrder = useCallback(async (orderId: number) => {
-    if (!window.confirm("Are you sure you want to restore this order?")) return;
+    if (!globalThis.confirm("Are you sure you want to restore this order?"))
+      return;
 
     try {
       await restoreOrder(orderId);
@@ -873,277 +717,11 @@ const CrmOrders = () => {
     }
   }, [orderToMarkLost, lostReasonId, lostFeedback]);
 
-  // Helper functions
-  const handleSort = (
-    column: string,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-  ) => {
-    const newDirection =
-      paginationState.sortBy === column &&
-      paginationState.sortOrder === "asc"
-        ? "desc"
-        : "asc";
-    setPaginationState({
-      ...paginationState,
-      sortBy: column,
-      sortOrder: newDirection,
-      currentPage: 1,
-    });
-  };
-
-  const sortData = <T extends Record<string, any>>(
-    data: T[],
-    sortBy: string,
-    sortOrder: "asc" | "desc",
-  ): T[] => {
-    if (!sortBy) return data;
-
-    return [...data].sort((a, b) => {
-      let aVal = a[sortBy];
-      let bVal = b[sortBy];
-
-      if (aVal === undefined) aVal = "";
-      if (bVal === undefined) bVal = "";
-
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-  };
-
-  const paginateData = <T,>(
-    data: T[],
-    currentPage: number,
-    rowsPerPage: number,
-  ): T[] => {
-    const startIndex = (currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-    return data.slice(startIndex, endIndex);
-  };
-
-  const getTotalPages = (dataLength: number, rowsPerPage: number): number => {
-    return Math.ceil(dataLength / rowsPerPage);
-  };
-
-  const renderPaginationControls = (
-    dataLength: number,
-    paginationState: any,
-    setPaginationState: (state: any) => void,
-    label: string,
-  ) => {
-    const totalPages = getTotalPages(dataLength, paginationState.rowsPerPage);
-    const { currentPage, rowsPerPage } = paginationState;
-    const startRow = (currentPage - 1) * rowsPerPage + 1;
-    const endRow = Math.min(currentPage * rowsPerPage, dataLength);
-
-    return (
-      <div className="d-flex justify-content-between align-items-center mt-3">
-        <div className="d-flex align-items-center gap-2">
-          <span className="text-muted small">Show</span>
-          <Form.Select
-            size="sm"
-            value={rowsPerPage}
-            onChange={(e) =>
-              setPaginationState({
-                ...paginationState,
-                rowsPerPage: Number(e.target.value),
-                currentPage: 1,
-              })
-            }
-            style={{ width: "auto" }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-          </Form.Select>
-          <span className="text-muted small">entries</span>
-        </div>
-
-        <div className="text-muted small">
-          Showing {startRow} to {endRow} of {dataLength} {label}
-        </div>
-
-        <div className="d-flex gap-1">
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPaginationState({ ...paginationState, currentPage: 1 })
-            }
-          >
-            <ChevronsLeft size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === 1}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: currentPage - 1,
-              })
-            }
-          >
-            <ChevronLeft size={14} />
-          </Button>
-
-          {[...Array(totalPages)].map((_, index) => {
-            const pageNum = index + 1;
-            if (
-              pageNum === 1 ||
-              pageNum === totalPages ||
-              (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
-            ) {
-              return (
-                <Button
-                  key={pageNum}
-                  size="sm"
-                  variant={
-                    currentPage === pageNum ? "primary" : "outline-secondary"
-                  }
-                  onClick={() =>
-                    setPaginationState({
-                      ...paginationState,
-                      currentPage: pageNum,
-                    })
-                  }
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
-              return (
-                <span key={pageNum} className="px-2">
-                  ...
-                </span>
-              );
-            }
-            return null;
-          })}
-
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: currentPage + 1,
-              })
-            }
-          >
-            <ChevronRight size={14} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-secondary"
-            disabled={currentPage === totalPages}
-            onClick={() =>
-              setPaginationState({
-                ...paginationState,
-                currentPage: totalPages,
-              })
-            }
-          >
-            <ChevronsRight size={14} />
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderSortIcon = (column: string, paginationState: any) => {
-    if (paginationState.sortBy !== column) {
-      return <ArrowUpDown size={14} className="ms-1 text-muted" />;
-    }
-    return paginationState.sortOrder === "asc" ? (
-      <ArrowUp size={14} className="ms-1" />
-    ) : (
-      <ArrowDown size={14} className="ms-1" />
-    );
-  };
-
-  // Transform API order data to UI format
-  const transformOrderData = (order: any) => {
-    return {
-      id: order.id,
-      orderNumber: order.order_number || "",
-      customer: order.customer_name || "",
-      customerEmail: order.customer_email || "",
-      customerPhone: order.customer_phone || "",
-      deal: order.deal?.name || order.deal_id || "",
-      dealId: order.deal_id || null,
-      stage: order.stage?.name || "No Stage",
-      stageColor: order.stage?.color || "grey",
-      stageId: order.order_stage_id || null,
-      value: order.final_amount || order.total_amount || "0",
-      currency: order.currency || "AED",
-      approvalStatus: order.order_approval_status || null,
-      fulfillmentStatus: order.fulfillment_status || null,
-      paymentStatus: order.payment_status || null,
-      //orderDate: formatDateForTable(order.order_date),
-      orderDate: order.order_date
-        ? moment(order.order_date).format(GlobalDateFormat)
-        : "-",
-      assignedUser:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.name ||
-        order.assigned_to ||
-        "",
-      expectedDeliveryDate: formatDateForTable(order.expected_delivery_date),
-      actualDeliveryDate: formatDateForTable(order.actual_delivery_date),
-      owner:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.name ||
-        order.assigned_to ||
-        "",
-      created: formatDateForTable(order.created_at),
-      contractType: order.contract_type || "",
-      contractLength: order.contract_length || "",
-      contractStartDate: formatDateForTable(order.contract_start_date),
-      contractEndDate: formatDateForTable(order.contract_end_date),
-      billingModel: order.billing_model || "",
-      billingStatus: order.billing_status || "",
-      paymentTerms: order.payment_terms || "",
-      progressDial: order.progress_dial || 0,
-      pocName: order.poc_name || order.customer_name || "",
-      pocTitle: order.poc_title || "",
-      pocPhone: order.poc_phone || "",
-      company: order.company || order.deal?.company_name || "",
-      industry: order.industry || order.deal?.industry || "",
-      status: order.status || "pending",
-      rawData: order, // Keep original data for actions
-    };
-  };
-
   // Calculate analytics data
   const analyticsData = useMemo(() => {
-    const transformedOrders = ordersData.map(transformOrderData);
+    const transformedOrders = ordersData.map((o) =>
+      transformOrderListRow(o, extensions),
+    );
 
     const total = summaryTiles ? totalOrders : transformedOrders.length;
     const delivered = transformedOrders.filter(
@@ -1160,7 +738,8 @@ const CrmOrders = () => {
 
     // Calculate total value
     const totalValue = transformedOrders.reduce((sum, o) => {
-      const value = parseFloat(String(o.value).replace(/[^0-9.-]/g, "")) || 0;
+      const value =
+        Number.parseFloat(String(o.value).replaceAll(/[^0-9.-]/g, "")) || 0;
       return sum + value;
     }, 0);
 
@@ -1191,12 +770,14 @@ const CrmOrders = () => {
 
   // Transform orders data (no client-side filtering - API handles it)
   const filteredOrders = useMemo(() => {
-    return ordersData.map(transformOrderData);
+    return ordersData.map((o) => transformOrderListRow(o, extensions));
   }, [ordersData, extensions]);
 
   // Calculate filter counts (using summary_tiles if available, otherwise from data)
   const filterCounts = useMemo(() => {
-    const transformed = ordersData.map(transformOrderData);
+    const transformed = ordersData.map((o) =>
+      transformOrderListRow(o, extensions),
+    );
     const counts: Record<string, number> = {
       all: summaryTiles?.total_orders || totalOrders || transformed.length,
       lost:
@@ -1300,7 +881,7 @@ const CrmOrders = () => {
         type: "custom",
         render: (row) => (
           <span className="fw-semibold">
-            {row.currency} {parseFloat(String(row.value)).toLocaleString()}
+            {row.currency} {Number.parseFloat(String(row.value)).toLocaleString()}
           </span>
         ),
       },
@@ -1311,13 +892,7 @@ const CrmOrders = () => {
         type: "custom",
         render: (row) => (
           <Badge
-            bg={
-              row.approvalStatus?.toLowerCase() === "approved"
-                ? "success"
-                : row.approvalStatus?.toLowerCase() === "rejected"
-                  ? "danger"
-                  : "warning"
-            }
+            bg={orderApprovalBadgeVariant(row.approvalStatus)}
           >
             {row.approvalStatus}
           </Badge>
@@ -1330,16 +905,7 @@ const CrmOrders = () => {
         sortable: true,
         type: "custom",
         render: (row) => (
-          <Badge
-            bg={
-              row.fulfillmentStatus?.toLowerCase().includes("completed") ||
-              row.fulfillmentStatus?.toLowerCase().includes("delivered")
-                ? "success"
-                : row.fulfillmentStatus?.toLowerCase().includes("progress")
-                  ? "primary"
-                  : "secondary"
-            }
-          >
+          <Badge bg={fulfillmentBadgeVariant(row.fulfillmentStatus)}>
             {row.fulfillmentStatus}
           </Badge>
         ),
@@ -1351,15 +917,7 @@ const CrmOrders = () => {
         sortable: true,
         type: "custom",
         render: (row) => (
-          <Badge
-            bg={
-              row.paymentStatus?.toLowerCase() === "paid"
-                ? "success"
-                : row.paymentStatus?.toLowerCase() === "partial"
-                  ? "warning"
-                  : "danger"
-            }
-          >
+          <Badge bg={paymentStatusBadgeVariant(row.paymentStatus)}>
             {row.paymentStatus}
           </Badge>
         ),
@@ -1494,7 +1052,6 @@ const CrmOrders = () => {
     handleRestoreOrder,
     handleDeleteOrder,
     handleMarkLost,
-    fetchOrderDetails,
   ]);
 
   if (!session?.user?.permissions?.includes("list-crm-orders")) {
@@ -1740,7 +1297,7 @@ const CrmOrders = () => {
                               ];
                               return (
                                 <Cell
-                                  key={`cell-${index}`}
+                                  key={`pie-stage-${stage}-${count}`}
                                   fill={colors[index % colors.length]}
                                 />
                               );
@@ -1893,9 +1450,11 @@ const CrmOrders = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const opt =
-                        selected as SingleValue<OrderInvoicingSelectOption>;
-                      const assignedToValue = toOptionalSelectString(opt?.value);
+                      const opt = selected as SingleValue<{
+                        value: string | number;
+                        label: string | number;
+                      }>;
+                      const assignedToValue = assignedSelectValue(opt);
                       setOrdersFilters((prev) => ({
                         ...prev,
                         assignedTo: assignedToValue,
@@ -1931,9 +1490,11 @@ const CrmOrders = () => {
                         : null
                     }
                     onChange={(selected) => {
-                      const opt =
-                        selected as SingleValue<OrderInvoicingSelectOption>;
-                      const stageValue = toOptionalSelectString(opt?.value);
+                      const opt = selected as SingleValue<{
+                        value: string;
+                        label: string;
+                      }>;
+                      const stageValue = opt?.value ?? null;
                       setOrdersFilters((prev) => ({
                         ...prev,
                         stage: stageValue,
@@ -2232,7 +1793,7 @@ const CrmOrders = () => {
             currentPage: ordersPagination.currentPage,
             rowsPerPage: ordersPagination.rowsPerPage,
             totalRows: totalOrders,
-            pageSizeOptions: [10, 15, 25, 50, 100],
+            pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
           }}
           onPaginationChange={(page, rowsPerPage) => {
             setOrdersPagination({
@@ -2244,7 +1805,6 @@ const CrmOrders = () => {
           sortable={true}
           onRowClick={async (row) => {
             if (session?.user?.permissions?.includes("list-crm-orders")) {
-              setSelectedOrder(row.rawData || row);
               setShowOrderSidebar(true);
               // Fetch full order details including related deal and lead
               await fetchOrderDetails(row.rawData?.id || row.id);
@@ -2290,601 +1850,35 @@ const CrmOrders = () => {
       />
 
       {/* Order Sidebar */}
-      <GenericSidebar
+      <OrderInvoicingOrderSidebar
         isOpen={showOrderSidebar}
         onClose={() => {
           setShowOrderSidebar(false);
-          setSelectedOrder(null);
           setViewingOrder(null);
           setRelatedDeal(null);
           setRelatedLead(null);
         }}
-        moduleSlug={ModuleSlug.BILLING}
-        title={
-          viewingOrder?.order_number ||
-          `Order #${viewingOrder?.id}` ||
-          "Order Details"
-        }
-        subtitle={viewingOrder?.customer_name || ""}
-        metadata={viewingOrder?.id ? `Order ID: ${viewingOrder.id}` : ""}
-        email={viewingOrder?.customer_email || ""}
-        phone={viewingOrder?.customer_phone || ""}
-        avatar={{
-          name: viewingOrder?.customer_name || "Order",
-          useIcon: true,
+        viewingOrder={viewingOrder}
+        relatedDeal={relatedDeal}
+        relatedLead={relatedLead}
+        extensions={extensions}
+        session={session}
+        activeFilter={activeFilter}
+        onEditOrder={() => {
+          setShowOrderSidebar(false);
+          const id = viewingOrder?.id;
+          if (id != null) setEditingOrderId(Number(id));
+          setShowEditModal(true);
         }}
-        width="420px"
-        tabs={[
-          {
-            id: "general",
-            label: "General Information",
-            sections: [
-              {
-                id: "order-info",
-                title: "Order Information",
-                icon: ShoppingBag,
-                fields: [
-                  {
-                    label: "Order Number",
-                    value:
-                      viewingOrder?.order_number ||
-                      `ORD-${viewingOrder?.id}` ||
-                      "N/A",
-                    type: "text" as const,
-                  },
-                  {
-                    label: "Stage",
-                    value: viewingOrder?.stage?.name || "Not assigned",
-                    type: "badge" as const,
-                    badgeVariant: "secondary",
-                    show: !!viewingOrder?.stage,
-                  },
-                  {
-                    label: "Status",
-                    value: viewingOrder?.status || "N/A",
-                    type: "badge" as const,
-                    badgeVariant:
-                      viewingOrder?.status?.toLowerCase() === "completed"
-                        ? "success"
-                        : viewingOrder?.status?.toLowerCase() === "pending"
-                          ? "warning"
-                          : "secondary",
-                  },
-                  {
-                    label: "Final Amount",
-                    value:
-                      viewingOrder?.final_amount || viewingOrder?.total_amount
-                        ? `${viewingOrder?.currency || "AED"} ${parseFloat(String(viewingOrder.final_amount || viewingOrder.total_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : "N/A",
-                    type: "text" as const,
-                    icon: DollarSign,
-                  },
-                  {
-                    label: "Order Date",
-                    value: viewingOrder?.order_date,
-                    type: "date" as const,
-                    icon: Calendar,
-                    show: !!viewingOrder?.order_date,
-                  },
-                  {
-                    label: "Expected Delivery",
-                    value: viewingOrder?.expected_delivery_date,
-                    type: "date" as const,
-                    icon: Calendar,
-                    show: !!viewingOrder?.expected_delivery_date,
-                  },
-                  {
-                    label: "Industry",
-                    value: viewingOrder?.industry || "N/A",
-                    type: "text" as const,
-                    show: !!viewingOrder?.industry,
-                  },
-                ],
-              },
-              {
-                id: "customer-info",
-                title: "Company Information",
-                icon: User,
-                fields: [
-                  {
-                    label: "Company Name",
-                    value: viewingOrder?.customer_name || "N/A",
-                    type: "text" as const,
-                    icon: Building2,
-                  },
-                  {
-                    label: "Email",
-                    value: viewingOrder?.customer_email || "N/A",
-                    type: "text" as const,
-                    icon: Mail,
-                    show: !!viewingOrder?.customer_email,
-                  },
-                  {
-                    label: "Phone",
-                    value: viewingOrder?.customer_phone || "N/A",
-                    type: "text" as const,
-                    icon: Phone,
-                    show: !!viewingOrder?.customer_phone,
-                  },
-                  {
-                    label: "Address",
-                    value: viewingOrder?.customer_address || "N/A",
-                    type: "text" as const,
-                    show: !!viewingOrder?.customer_address,
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            id: "lead-deal",
-            label: "Lead/Deal Information",
-            sections: [
-              // Deal Information Section
-              ...(relatedDeal
-                ? [
-                    {
-                      id: "deal-info",
-                      title: "Deal Information",
-                      icon: Link2,
-                      fields: [
-                        {
-                          label: "Deal Name",
-                          value: relatedDeal?.name || "N/A",
-                          type: "text" as const,
-                        },
-                        {
-                          label: "Stage",
-                          value: relatedDeal?.stage?.name || "Not assigned",
-                          type: "badge" as const,
-                          badgeVariant: "primary",
-                          show: !!relatedDeal?.stage,
-                        },
-                        {
-                          label: "Deal Value",
-                          value:
-                            relatedDeal?.net_value || relatedDeal?.grand_total
-                              ? `${relatedDeal?.currency || "AED"} ${parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total)).toLocaleString()}`
-                              : "N/A",
-                          type: "text" as const,
-                          icon: DollarSign,
-                          show: !!(
-                            relatedDeal?.net_value || relatedDeal?.grand_total
-                          ),
-                        },
-                        {
-                          label: "Assigned To",
-                          value:
-                            extensions.find(
-                              (ext: any) =>
-                                ext?.id == relatedDeal?.assigned_to ||
-                                ext?.extension == relatedDeal?.assigned_to,
-                            )?.display_name ||
-                            extensions.find(
-                              (ext: any) =>
-                                ext?.id == relatedDeal?.assigned_to ||
-                                ext?.extension == relatedDeal?.assigned_to,
-                            )?.name ||
-                            relatedDeal?.assigned_to ||
-                            "Not assigned",
-                          type: "text" as const,
-                          icon: User,
-                          show: !!relatedDeal?.assigned_to,
-                        },
-                        {
-                          label: "Created Date",
-                          value: relatedDeal?.created_at,
-                          type: "date" as const,
-                          icon: Calendar,
-                          show: !!relatedDeal?.created_at,
-                        },
-                      ],
-                    },
-                  ]
-                : []),
-              // Deal Company Information Section
-              ...(relatedDeal?.company_name
-                ? [
-                    {
-                      id: "deal-company-info",
-                      title: "Deal Company Information",
-                      icon: Building2,
-                      fields: [
-                        {
-                          label: "Company Name",
-                          value: relatedDeal?.company_name || "N/A",
-                          type: "text" as const,
-                          icon: Building2,
-                        },
-                        {
-                          label: "Industry",
-                          value: relatedDeal?.industry || "N/A",
-                          type: "text" as const,
-                          show: !!relatedDeal?.industry,
-                        },
-                      ],
-                    },
-                  ]
-                : []),
-              // Lead Information Section
-              ...(relatedLead
-                ? [
-                    {
-                      id: "lead-info",
-                      title: "Lead Information",
-                      icon: Target,
-                      fields: [
-                        {
-                          label: "Lead Name",
-                          value: relatedLead?.name || "N/A",
-                          type: "text" as const,
-                        },
-                        {
-                          label: "Stage",
-                          value: relatedLead?.stage?.name || "Not assigned",
-                          type: "badge" as const,
-                          badgeVariant: "primary",
-                          show: !!relatedLead?.stage,
-                        },
-                        {
-                          label: "Lead Potential",
-                          value: relatedLead?.lead_potential || "N/A",
-                          type: "badge" as const,
-                          badgeVariant:
-                            relatedLead?.lead_potential === "Hot"
-                              ? "danger"
-                              : relatedLead?.lead_potential === "Warm"
-                                ? "warning"
-                                : "secondary",
-                          show: !!relatedLead?.lead_potential,
-                        },
-                        {
-                          label: "Status",
-                          value: relatedLead?.status || "N/A",
-                          type: "text" as const,
-                          show: !!relatedLead?.status,
-                        },
-                        {
-                          label: "Assigned To",
-                          value:
-                            extensions.find(
-                              (ext: any) =>
-                                ext?.id == relatedLead?.assigned_to ||
-                                ext?.extension == relatedLead?.assigned_to,
-                            )?.display_name ||
-                            extensions.find(
-                              (ext: any) =>
-                                ext?.id == relatedLead?.assigned_to ||
-                                ext?.extension == relatedLead?.assigned_to,
-                            )?.name ||
-                            relatedLead?.assigned_to ||
-                            "Not assigned",
-                          type: "text" as const,
-                          icon: User,
-                          show: !!relatedLead?.assigned_to,
-                        },
-                        {
-                          label: "Created Date",
-                          value: relatedLead?.created_at,
-                          type: "date" as const,
-                          icon: Calendar,
-                          show: !!relatedLead?.created_at,
-                        },
-                      ],
-                    },
-                  ]
-                : []),
-              // Campaign Information Section - only if campaign exists
-              ...(relatedLead?.campaign
-                ? [
-                    {
-                      id: "campaign-info",
-                      title: "Campaign Information",
-                      icon: FileText,
-                      fields: [
-                        {
-                          label: "Campaign Name",
-                          value: relatedLead?.campaign?.name || "N/A",
-                          type: "text" as const,
-                        },
-                      ],
-                    },
-                  ]
-                : []),
-              // Prospect Information Section - only if crm_data exists
-              ...(relatedLead?.crm_data
-                ? [
-                    {
-                      id: "prospect-info",
-                      title: "Prospect Information",
-                      icon: User,
-                      fields: [
-                        {
-                          label: "CRM Data ID",
-                          value: relatedLead?.crm_data?.id
-                            ? `#${relatedLead.crm_data.id}`
-                            : "N/A",
-                          type: "text" as const,
-                          show: !!relatedLead?.crm_data?.id,
-                        },
-                        {
-                          label: "Name",
-                          value:
-                            relatedLead?.crm_data?.name ||
-                            relatedLead?.crm_data?.data?.name ||
-                            "N/A",
-                          type: "text" as const,
-                        },
-                        {
-                          label: "Phone",
-                          value:
-                            relatedLead?.crm_data?.phone ||
-                            relatedLead?.crm_data?.data?.phone ||
-                            "N/A",
-                          type: "text" as const,
-                          icon: Phone,
-                        },
-                        {
-                          label: "Source File",
-                          value: relatedLead?.crm_data?.source_file || "N/A",
-                          type: "text" as const,
-                          show: !!relatedLead?.crm_data?.source_file,
-                        },
-                        {
-                          label: "Uploaded By",
-                          value: relatedLead?.crm_data?.uploaded_by || "N/A",
-                          type: "text" as const,
-                          icon: User,
-                          show: !!relatedLead?.crm_data?.uploaded_by,
-                        },
-                        {
-                          label: "Created At",
-                          value: relatedLead?.crm_data?.created_at,
-                          type: "date" as const,
-                          icon: Calendar,
-                          show: !!relatedLead?.crm_data?.created_at,
-                        },
-                      ],
-                    },
-                  ]
-                : []),
-              // Empty state if no deal or lead information at all
-              ...(!relatedDeal && !relatedLead
-                ? [
-                    {
-                      id: "no-info",
-                      title: "No Information Available",
-                      icon: AlertCircle,
-                      emptyState: {
-                        icon: AlertCircle,
-                        message:
-                          "No deal or lead information available for this order",
-                      },
-                    },
-                  ]
-                : []),
-            ],
-          },
-          {
-            id: "additional-info",
-            label: "Additional Information",
-            sections: [
-              {
-                id: "additional-details",
-                title: "Additional Information",
-                icon: FileText,
-                fields: [
-                  {
-                    label: "Approval Status",
-                    value: viewingOrder?.order_approval_status || "Not Set",
-                    type: "badge" as const,
-                    badgeVariant:
-                      viewingOrder?.order_approval_status?.toLowerCase() ===
-                      "approved"
-                        ? "success"
-                        : viewingOrder?.order_approval_status?.toLowerCase() ===
-                            "rejected"
-                          ? "danger"
-                          : "warning",
-                  },
-                  {
-                    label: "Fulfillment Status",
-                    value: viewingOrder?.fulfillment_status || "Not Set",
-                    type: "badge" as const,
-                    badgeVariant:
-                      viewingOrder?.fulfillment_status
-                        ?.toLowerCase()
-                        .includes("completed") ||
-                      viewingOrder?.fulfillment_status
-                        ?.toLowerCase()
-                        .includes("delivered")
-                        ? "success"
-                        : viewingOrder?.fulfillment_status
-                              ?.toLowerCase()
-                              .includes("progress")
-                          ? "primary"
-                          : "secondary",
-                  },
-                  {
-                    label: "Payment Status",
-                    value: viewingOrder?.payment_status || "Not Set",
-                    type: "badge" as const,
-                    badgeVariant:
-                      viewingOrder?.payment_status?.toLowerCase() === "paid"
-                        ? "success"
-                        : viewingOrder?.payment_status?.toLowerCase() ===
-                            "partial"
-                          ? "warning"
-                          : "danger",
-                  },
-                  {
-                    label: "Assigned To",
-                    value:
-                      extensions.find(
-                        (ext: any) =>
-                          ext?.id == viewingOrder?.assigned_to ||
-                          ext?.extension == viewingOrder?.assigned_to,
-                      )?.display_name ||
-                      extensions.find(
-                        (ext: any) =>
-                          ext?.id == viewingOrder?.assigned_to ||
-                          ext?.extension == viewingOrder?.assigned_to,
-                      )?.name ||
-                      viewingOrder?.assigned_to ||
-                      "Not assigned",
-                    type: "text" as const,
-                    icon: User,
-                    show: !!viewingOrder?.assigned_to,
-                  },
-                  {
-                    label: "Contract Length",
-                    value: viewingOrder?.contract_length || "N/A",
-                    type: "text" as const,
-                    show: !!viewingOrder?.contract_length,
-                  },
-                ],
-              },
-              {
-                id: "notes",
-                title: "Notes",
-                icon: FileText,
-                fields: viewingOrder?.notes
-                  ? [
-                      {
-                        label: "Notes",
-                        value: viewingOrder?.notes,
-                        type: "text" as const,
-                      },
-                    ]
-                  : [],
-                emptyState: !viewingOrder?.notes
-                  ? {
-                      icon: FileText,
-                      message: "No notes available",
-                    }
-                  : undefined,
-              },
-            ],
-          },
-          {
-            id: "history",
-            label: "History",
-            sections: [
-              {
-                id: "activity-history",
-                title: "Activity History",
-                icon: History,
-                badge: {
-                  value: viewingOrder?.histories?.length || 0,
-                  variant: "secondary",
-                },
-                emptyState:
-                  !viewingOrder?.histories ||
-                  viewingOrder.histories.length === 0
-                    ? {
-                        icon: History,
-                        message: "No activity history yet",
-                      }
-                    : undefined,
-                customContent:
-                  viewingOrder?.histories &&
-                  viewingOrder.histories.length > 0 ? (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "16px",
-                      }}
-                    >
-                      {viewingOrder.histories.map(
-                        (history: any, idx: number) => (
-                          <div
-                            key={history.id || idx}
-                            style={{
-                              padding: "16px",
-                              backgroundColor: "#f9fafb",
-                              borderRadius: "10px",
-                              border: "1px solid #f3f4f6",
-                              position: "relative",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "13px",
-                                fontWeight: "600",
-                                color: "#111827",
-                                marginBottom: "6px",
-                              }}
-                            >
-                              {history.action || "Activity"}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                color: "#6b7280",
-                                marginBottom: "4px",
-                              }}
-                            >
-                              by{" "}
-                              {history.user?.name ||
-                                history.created_by ||
-                                "System"}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                color: "#9ca3af",
-                              }}
-                            >
-                              {history.created_at
-                                ? formatDateForTable(history.created_at)
-                                : "N/A"}
-                            </div>
-                            {history.description && (
-                              <div
-                                style={{
-                                  marginTop: "8px",
-                                  fontSize: "12px",
-                                  color: "#4b5563",
-                                  fontStyle: "italic",
-                                }}
-                              >
-                                {history.description}
-                              </div>
-                            )}
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  ) : undefined,
-              },
-            ],
-          },
-        ]}
-        actions={[
-          {
-            label: "Edit Order",
-            icon: Edit,
-            onClick: () => {
-              setShowOrderSidebar(false);
-              setEditingOrderId(viewingOrder?.id);
-              setShowEditModal(true);
-            },
-            variant: "primary",
-            show:
-              session?.user?.permissions?.includes("edit-crm-orders") &&
-              activeFilter !== "lost",
-          },
-          {
-            label: "View Details",
-            icon: Eye,
-            onClick: () => {
-              setShowOrderSidebar(false);
-              handleViewOrder(viewingOrder?.id);
-            },
-            variant: "outline-primary",
-          },
-        ]}
+        onViewDetails={() => {
+          setShowOrderSidebar(false);
+          const id = viewingOrder?.id;
+          if (id != null) {
+            handleViewOrder(Number(id)).catch((err: unknown) => {
+              console.error("Failed to open order from sidebar:", err);
+            });
+          }
+        }}
       />
 
       {/* Filters Sidebar */}
@@ -2922,7 +1916,11 @@ const CrmOrders = () => {
                 })()
               : null,
             onChange: (selected) => {
-              const assignedToValue = selected ? selected.value : null;
+              const opt = selected as SingleValue<{
+                value: string | number;
+                label: string | number;
+              }>;
+              const assignedToValue = assignedSelectValue(opt);
               setOrdersFilters((prev) => ({
                 ...prev,
                 assignedTo: assignedToValue,
@@ -2953,7 +1951,11 @@ const CrmOrders = () => {
                 })()
               : null,
             onChange: (selected) => {
-              const stageValue = selected ? selected.value : null;
+              const opt = selected as SingleValue<{
+                value: string;
+                label: string;
+              }>;
+              const stageValue = opt?.value ?? null;
               setOrdersFilters((prev) => ({
                 ...prev,
                 stage: stageValue,
@@ -3199,2966 +2201,22 @@ const CrmOrders = () => {
         isSubmitDisabled={!lostReasonId || !lostFeedback.trim()}
       />
 
-      {/* Order View Modal */}
       {viewingOrder && (
-        <Modal
+        <CrmOrderViewModal
+          viewingOrder={viewingOrder}
           show={showOrderViewModal}
           onHide={() => setShowOrderViewModal(false)}
-          size="xl"
-          centered
-          className="order-view-modal"
-        >
-          {/* Modern Header with Gradient */}
-          <div
-            style={{
-              background: "#fff",
-              color: "black",
-              padding: "24px 32px",
-              position: "relative",
-              borderTopLeftRadius: "12px",
-              borderTopRightRadius: "12px",
-              boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-              borderBottom: "1px solid #ccc",
-            }}
-          >
-            <button
-              onClick={() => setShowOrderViewModal(false)}
-              style={{
-                position: "absolute",
-                top: "16px",
-                right: "16px",
-                background: "rgba(255,255,255,0.15)",
-                backdropFilter: "blur(10px)",
-                border: "1px solid rgba(255,255,255,0.2)",
-                color: "black",
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-                e.currentTarget.style.transform = "scale(1.05)";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              <X size={18} />
-            </button>
-
-            {/* Header Content */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-              <div
-                style={{
-                  width: "64px",
-                  height: "64px",
-                  borderRadius: "16px",
-                  background: "#f59e0b",
-                  backdropFilter: "blur(10px)",
-                  border: "2px solid rgba(255,255,255,0.3)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "28px",
-                  fontWeight: "700",
-                  flexShrink: 0,
-                  color: "#fff",
-                }}
-              >
-                <ShoppingBag size={32} style={{ color: "white" }} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h2
-                  style={{
-                    margin: 0,
-                    fontWeight: 700,
-                    fontSize: "26px",
-                    textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {viewingOrder.order_number || `Order #${viewingOrder.id}`}
-                </h2>
-                <div
-                  style={{
-                    marginTop: "6px",
-                    opacity: 0.95,
-                    fontSize: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                    color: "#000",
-                  }}
-                >
-                  <span
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "6px",
-                    }}
-                  >
-                    <Target size={14} />
-                    {viewingOrder.stage?.name || "No stage"}
-                  </span>
-                  <span>•</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {viewingOrder.currency || "AED"}{" "}
-                    {parseFloat(
-                      viewingOrder.final_amount ||
-                        viewingOrder.total_amount ||
-                        "0",
-                    ).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </span>
-                  <span>•</span>
-                  <span>
-                    {viewingOrder.order_date
-                      ? moment(viewingOrder.order_date).format("MMM DD, YYYY")
-                      : "N/A"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <Modal.Body
-            style={{
-              padding: 0,
-              maxHeight: "calc(90vh - 200px)",
-              overflowY: "auto",
-            }}
-          >
-            {loadingOrder ? (
-              <div
-                style={{
-                  padding: "48px 20px",
-                  textAlign: "center",
-                }}
-              >
-                <Spinner
-                  animation="border"
-                  variant="primary"
-                  size="sm"
-                  style={{ marginBottom: "12px" }}
-                />
-                <p
-                  className="mb-0"
-                  style={{ color: "#6b7280", fontSize: "14px" }}
-                >
-                  Loading order details...
-                </p>
-              </div>
-            ) : (
-              <>
-                <style>{`
-            .order-detail-filter-buttons {
-              display: flex;
-              flex-direction: row;
-              align-items: center;
-              gap: 12px;
-              flex-wrap: wrap;
-              margin-bottom: 0;
-              padding: 0;
-              width: 100%;
-            }
-
-            .order-detail-filter-button {
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              padding: 10px 20px;
-              border-radius: 8px;
-              border: 1px solid;
-              font-weight: 500;
-              font-size: 14px;
-              cursor: pointer;
-              transition: all 0.2s ease;
-              background: white;
-              white-space: nowrap;
-            }
-
-            .order-detail-filter-button:hover {
-              transform: translateY(-1px);
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            }
-
-            .order-detail-filter-button.active {
-              color: white;
-            }
-
-            .order-detail-filter-button.active .filter-icon {
-              color: white;
-            }
-
-            .order-detail-filter-button:not(.active) .filter-icon {
-              color: inherit;
-            }
-
-            .filter-icon {
-              width: 18px;
-              height: 18px;
-              flex-shrink: 0;
-            }
-          `}</style>
-
-                {/* Main Content Grid */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 360px",
-                    minHeight: "500px",
-                  }}
-                >
-                  {/* Left Panel - Main Information */}
-                  <div
-                    style={{
-                      padding: "32px",
-                      borderRight: "1px solid #e5e7eb",
-                    }}
-                  >
-                    {/* Tabs Navigation */}
-                    <div className="order-detail-filter-buttons mb-4">
-                      <button
-                        className={`order-detail-filter-button ${activeTab === "tab1" ? "active" : ""}`}
-                        onClick={() => setActiveTab("tab1")}
-                        style={{
-                          backgroundColor:
-                            activeTab === "tab1" ? "#f59e0b" : "white",
-                          borderColor: "#f59e0b",
-                          color: activeTab === "tab1" ? "white" : "#f59e0b",
-                        }}
-                      >
-                        <ShoppingBag className="filter-icon" size={18} />
-                        <span>General Information</span>
-                      </button>
-                      <button
-                        className={`order-detail-filter-button ${activeTab === "tab2" ? "active" : ""}`}
-                        onClick={() => setActiveTab("tab2")}
-                        style={{
-                          backgroundColor:
-                            activeTab === "tab2" ? "#f59e0b" : "white",
-                          borderColor: "#f59e0b",
-                          color: activeTab === "tab2" ? "white" : "#f59e0b",
-                        }}
-                      >
-                        <FileText className="filter-icon" size={18} />
-                        <span>Lead/Deal Information</span>
-                      </button>
-                      <button
-                        className={`order-detail-filter-button ${activeTab === "additional-info" ? "active" : ""}`}
-                        onClick={() => setActiveTab("additional-info")}
-                        style={{
-                          backgroundColor:
-                            activeTab === "additional-info"
-                              ? "#f59e0b"
-                              : "white",
-                          borderColor: "#f59e0b",
-                          color:
-                            activeTab === "additional-info"
-                              ? "white"
-                              : "#f59e0b",
-                        }}
-                      >
-                        <Info className="filter-icon" size={18} />
-                        <span>Additional Information</span>
-                      </button>
-                      <button
-                        className={`order-detail-filter-button ${activeTab === "history" ? "active" : ""}`}
-                        onClick={() => setActiveTab("history")}
-                        style={{
-                          backgroundColor:
-                            activeTab === "history" ? "#f59e0b" : "white",
-                          borderColor: "#f59e0b",
-                          color: activeTab === "history" ? "white" : "#f59e0b",
-                        }}
-                      >
-                        <History className="filter-icon" size={18} />
-                        <span>History</span>
-                      </button>
-                    </div>
-
-                    {/* Tab Content */}
-                    {activeTab === "tab1" && (
-                      <div>
-                        {/* Quick Info Cards */}
-                        <div
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(2, 1fr)",
-                            gap: "16px",
-                            marginBottom: "28px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              padding: "20px",
-                              borderRadius: "12px",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-4px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 8px 16px rgba(245, 158, 11, 0.15)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "44px",
-                                  height: "44px",
-                                  borderRadius: "10px",
-                                  background:
-                                    viewingOrder.stage?.color || "#6c757d",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <Target size={20} style={{ color: "white" }} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    fontWeight: 700,
-                                    color: "#6b7280",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.8px",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  Stage
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "15px",
-                                    color: "#1f2937",
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {viewingOrder.stage?.name || "Not assigned"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              padding: "20px",
-                              borderRadius: "12px",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-4px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 8px 16px rgba(245, 158, 11, 0.15)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "44px",
-                                  height: "44px",
-                                  borderRadius: "10px",
-                                  background:
-                                    viewingOrder.status?.toLowerCase() ===
-                                    "completed"
-                                      ? "#10b981"
-                                      : viewingOrder.status?.toLowerCase() ===
-                                          "pending"
-                                        ? "#f59e0b"
-                                        : "#6c757d",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <CheckCircle
-                                  size={20}
-                                  style={{ color: "white" }}
-                                />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    fontWeight: 700,
-                                    color: "#6b7280",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.8px",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  Status
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "15px",
-                                    color: "#1f2937",
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {viewingOrder.status || "N/A"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              padding: "20px",
-                              borderRadius: "12px",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-4px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 8px 16px rgba(245, 158, 11, 0.15)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "44px",
-                                  height: "44px",
-                                  borderRadius: "10px",
-                                  background: "#10b981",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <DollarSign
-                                  size={20}
-                                  style={{ color: "white" }}
-                                />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    fontWeight: 700,
-                                    color: "#10b981",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.8px",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  Final Amount
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "15px",
-                                    color: "#1f2937",
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {viewingOrder.currency || "AED"}{" "}
-                                  {parseFloat(
-                                    viewingOrder.final_amount ||
-                                      viewingOrder.total_amount ||
-                                      "0",
-                                  ).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              padding: "20px",
-                              borderRadius: "12px",
-                              transition: "all 0.3s ease",
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.transform =
-                                "translateY(-4px)";
-                              e.currentTarget.style.boxShadow =
-                                "0 8px 16px rgba(245, 158, 11, 0.15)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "44px",
-                                  height: "44px",
-                                  borderRadius: "10px",
-                                  background: "#3b82f6",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                <Calendar
-                                  size={20}
-                                  style={{ color: "white" }}
-                                />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    fontWeight: 700,
-                                    color: "#3b82f6",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.8px",
-                                    marginBottom: "4px",
-                                  }}
-                                >
-                                  Order Date
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "15px",
-                                    color: "#1f2937",
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {viewingOrder.order_date
-                                    ? formatDateForTable(
-                                        viewingOrder.order_date,
-                                      )
-                                    : "N/A"}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Order Information Section */}
-                        <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
-                            Order Details
-                          </h5>
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "12px",
-                              padding: "20px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "140px 1fr",
-                                gap: "16px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                  color: "#6b7280",
-                                  fontSize: "14px",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                <ShoppingBag
-                                  size={16}
-                                  style={{ color: "#f59e0b" }}
-                                />
-                                Order Number
-                              </div>
-                              <div
-                                style={{
-                                  color: "#1f2937",
-                                  fontSize: "15px",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                {viewingOrder.order_number ||
-                                  `ORD-${viewingOrder.id}`}
-                              </div>
-
-                              {viewingOrder.expected_delivery_date && (
-                                <>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "8px",
-                                      color: "#6b7280",
-                                      fontSize: "14px",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    <Calendar
-                                      size={16}
-                                      style={{ color: "#f59e0b" }}
-                                    />
-                                    Expected Delivery
-                                  </div>
-                                  <div
-                                    style={{
-                                      color: "#1f2937",
-                                      fontSize: "15px",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    {formatDateForTable(
-                                      viewingOrder.expected_delivery_date,
-                                    )}
-                                  </div>
-                                </>
-                              )}
-
-                              {viewingOrder.industry && (
-                                <>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "8px",
-                                      color: "#6b7280",
-                                      fontSize: "14px",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    <Building2
-                                      size={16}
-                                      style={{ color: "#f59e0b" }}
-                                    />
-                                    Industry
-                                  </div>
-                                  <div
-                                    style={{
-                                      color: "#1f2937",
-                                      fontSize: "15px",
-                                      fontWeight: 500,
-                                    }}
-                                  >
-                                    {viewingOrder.industry}
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Company Information Section */}
-                        <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
-                            Company Information
-                          </h5>
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "12px",
-                              padding: "20px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: "16px 24px",
-                              }}
-                            >
-                              {viewingOrder.customer_name && (
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Company Name
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "8px",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: "30px",
-                                        height: "30px",
-                                        borderRadius: "50%",
-                                        backgroundColor: getRandomColor(
-                                          viewingOrder.customer_name,
-                                        ),
-                                        color: "#fff",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "10px",
-                                        fontWeight: "600",
-                                        flexShrink: 0,
-                                      }}
-                                    >
-                                      {getInitials(viewingOrder.customer_name)}
-                                    </div>
-                                    <span>{viewingOrder.customer_name}</span>
-                                  </div>
-                                </div>
-                              )}
-                              {viewingOrder.customer_email && (
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Email
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    <Mail
-                                      size={14}
-                                      style={{
-                                        color: "#f59e0b",
-                                        marginRight: "6px",
-                                        display: "inline",
-                                      }}
-                                    />
-                                    {viewingOrder.customer_email}
-                                  </div>
-                                </div>
-                              )}
-                              {viewingOrder.customer_phone && (
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Phone
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    <PhoneDisplay
-                                      phone={viewingOrder.customer_phone || ""}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                              {viewingOrder.customer_address && (
-                                <div style={{ gridColumn: "1 / -1" }}>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Address
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {viewingOrder.customer_address}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Order Items/Products */}
-                        {viewingOrder.items &&
-                          Array.isArray(viewingOrder.items) &&
-                          viewingOrder.items.length > 0 && (
-                            <div style={{ marginBottom: "28px" }}>
-                              <h5
-                                style={{
-                                  fontSize: "15px",
-                                  fontWeight: 700,
-                                  color: "#1f2937",
-                                  marginBottom: "16px",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: "8px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    width: "4px",
-                                    height: "18px",
-                                    background:
-                                      "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                    borderRadius: "2px",
-                                  }}
-                                />
-                                Order Items
-                                <Badge
-                                  bg="secondary"
-                                  style={{
-                                    marginLeft: "8px",
-                                    fontSize: "11px",
-                                    fontWeight: 600,
-                                    padding: "4px 10px",
-                                    borderRadius: "6px",
-                                  }}
-                                >
-                                  {viewingOrder.items.length}
-                                </Badge>
-                              </h5>
-                              <div
-                                style={{
-                                  background: "white",
-                                  border: "1px solid #e5e7eb",
-                                  borderRadius: "12px",
-                                  overflow: "hidden",
-                                }}
-                              >
-                                <div style={{ overflowX: "auto" }}>
-                                  <Table
-                                    hover
-                                    style={{
-                                      width: "100%",
-                                      marginBottom: 0,
-                                      tableLayout: "auto",
-                                    }}
-                                  >
-                                    <thead style={{ background: "#f9fafb" }}>
-                                      <tr>
-                                        <th
-                                          style={{
-                                            padding: "12px 16px",
-                                            fontSize: "11px",
-                                            fontWeight: 700,
-                                            color: "#6b7280",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
-                                          }}
-                                        >
-                                          #
-                                        </th>
-                                        <th
-                                          style={{
-                                            padding: "12px 16px",
-                                            fontSize: "11px",
-                                            fontWeight: 700,
-                                            color: "#6b7280",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
-                                          }}
-                                        >
-                                          Product Name
-                                        </th>
-                                        <th
-                                          style={{
-                                            padding: "12px 16px",
-                                            fontSize: "11px",
-                                            fontWeight: 700,
-                                            color: "#6b7280",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
-                                          }}
-                                        >
-                                          SKU
-                                        </th>
-                                        <th
-                                          style={{
-                                            padding: "12px 16px",
-                                            fontSize: "11px",
-                                            fontWeight: 700,
-                                            color: "#6b7280",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
-                                          }}
-                                        >
-                                          Quantity
-                                        </th>
-                                        {viewingOrder.items.some(
-                                          (item: any) => item.description,
-                                        ) && (
-                                          <th
-                                            style={{
-                                              padding: "12px 16px",
-                                              fontSize: "11px",
-                                              fontWeight: 700,
-                                              color: "#6b7280",
-                                              textTransform: "uppercase",
-                                              letterSpacing: "0.5px",
-                                            }}
-                                          >
-                                            Description
-                                          </th>
-                                        )}
-                                        <th
-                                          style={{
-                                            padding: "12px 16px",
-                                            fontSize: "11px",
-                                            fontWeight: 700,
-                                            color: "#6b7280",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
-                                          }}
-                                        >
-                                          Unit Price
-                                        </th>
-                                        <th
-                                          style={{
-                                            padding: "12px 16px",
-                                            fontSize: "11px",
-                                            fontWeight: 700,
-                                            color: "#6b7280",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
-                                          }}
-                                        >
-                                          Total Price
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {viewingOrder.items.map(
-                                        (item: any, index: number) => (
-                                          <tr
-                                            key={item.id || index}
-                                            style={{
-                                              borderBottom: "1px solid #f3f4f6",
-                                            }}
-                                          >
-                                            <td
-                                              style={{
-                                                padding: "14px 16px",
-                                                fontSize: "13px",
-                                                color: "#1f2937",
-                                              }}
-                                            >
-                                              {index + 1}
-                                            </td>
-                                            <td
-                                              style={{
-                                                padding: "14px 16px",
-                                                fontSize: "13px",
-                                                color: "#1f2937",
-                                                fontWeight: 600,
-                                              }}
-                                            >
-                                              {item.product_name ||
-                                                item.product?.name ||
-                                                "N/A"}
-                                            </td>
-                                            <td
-                                              style={{
-                                                padding: "14px 16px",
-                                                fontSize: "13px",
-                                                color: "#6b7280",
-                                              }}
-                                            >
-                                              {item.product?.sku || "N/A"}
-                                            </td>
-                                            <td
-                                              style={{
-                                                padding: "14px 16px",
-                                                fontSize: "13px",
-                                                color: "#1f2937",
-                                              }}
-                                            >
-                                              {item.quantity || "0"}
-                                            </td>
-                                            {viewingOrder.items.some(
-                                              (i: any) => i.description,
-                                            ) && (
-                                              <td
-                                                style={{
-                                                  padding: "14px 16px",
-                                                  fontSize: "13px",
-                                                  color: "#6b7280",
-                                                  maxWidth: "200px",
-                                                  overflow: "hidden",
-                                                  textOverflow: "ellipsis",
-                                                  whiteSpace: "nowrap",
-                                                }}
-                                              >
-                                                {item.description || "-"}
-                                              </td>
-                                            )}
-                                            <td
-                                              style={{
-                                                padding: "14px 16px",
-                                                fontSize: "13px",
-                                                color: "#1f2937",
-                                              }}
-                                            >
-                                              {viewingOrder.currency || "AED"}{" "}
-                                              {parseFloat(
-                                                item.unit_price || "0",
-                                              ).toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                              })}
-                                            </td>
-                                            <td
-                                              style={{
-                                                padding: "14px 16px",
-                                                fontSize: "13px",
-                                                color: "#1f2937",
-                                                fontWeight: 600,
-                                              }}
-                                            >
-                                              {viewingOrder.currency || "AED"}{" "}
-                                              {parseFloat(
-                                                item.total_price || "0",
-                                              ).toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                              })}
-                                            </td>
-                                          </tr>
-                                        ),
-                                      )}
-                                    </tbody>
-                                    <tfoot
-                                      style={{
-                                        background: "#f9fafb",
-                                        fontWeight: 600,
-                                      }}
-                                    >
-                                      <tr>
-                                        <td
-                                          colSpan={
-                                            viewingOrder.items.some(
-                                              (item: any) => item.description,
-                                            )
-                                              ? 6
-                                              : 5
-                                          }
-                                          style={{
-                                            padding: "12px 16px",
-                                            textAlign: "right",
-                                            fontSize: "13px",
-                                            color: "#6b7280",
-                                          }}
-                                        >
-                                          Subtotal:
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "12px 16px",
-                                            fontSize: "13px",
-                                            color: "#1f2937",
-                                          }}
-                                        >
-                                          {viewingOrder.currency || "AED"}{" "}
-                                          {parseFloat(
-                                            viewingOrder.total_amount || "0",
-                                          ).toLocaleString(undefined, {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                          })}
-                                        </td>
-                                      </tr>
-                                      {viewingOrder.discount_amount &&
-                                        parseFloat(
-                                          viewingOrder.discount_amount,
-                                        ) > 0 && (
-                                          <tr>
-                                            <td
-                                              colSpan={
-                                                viewingOrder.items.some(
-                                                  (item: any) =>
-                                                    item.description,
-                                                )
-                                                  ? 6
-                                                  : 5
-                                              }
-                                              style={{
-                                                padding: "12px 16px",
-                                                textAlign: "right",
-                                                fontSize: "13px",
-                                                color: "#6b7280",
-                                              }}
-                                            >
-                                              Discount:
-                                            </td>
-                                            <td
-                                              style={{
-                                                padding: "12px 16px",
-                                                fontSize: "13px",
-                                                color: "#dc2626",
-                                              }}
-                                            >
-                                              - {viewingOrder.currency || "AED"}{" "}
-                                              {parseFloat(
-                                                viewingOrder.discount_amount,
-                                              ).toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                              })}
-                                            </td>
-                                          </tr>
-                                        )}
-                                      {viewingOrder.tax_amount &&
-                                        parseFloat(viewingOrder.tax_amount) >
-                                          0 && (
-                                          <tr>
-                                            <td
-                                              colSpan={
-                                                viewingOrder.items.some(
-                                                  (item: any) =>
-                                                    item.description,
-                                                )
-                                                  ? 6
-                                                  : 5
-                                              }
-                                              style={{
-                                                padding: "12px 16px",
-                                                textAlign: "right",
-                                                fontSize: "13px",
-                                                color: "#6b7280",
-                                              }}
-                                            >
-                                              Tax:
-                                            </td>
-                                            <td
-                                              style={{
-                                                padding: "12px 16px",
-                                                fontSize: "13px",
-                                                color: "#1f2937",
-                                              }}
-                                            >
-                                              {viewingOrder.currency || "AED"}{" "}
-                                              {parseFloat(
-                                                viewingOrder.tax_amount,
-                                              ).toLocaleString(undefined, {
-                                                minimumFractionDigits: 2,
-                                                maximumFractionDigits: 2,
-                                              })}
-                                            </td>
-                                          </tr>
-                                        )}
-                                      <tr style={{ fontSize: "16px" }}>
-                                        <td
-                                          colSpan={
-                                            viewingOrder.items.some(
-                                              (item: any) => item.description,
-                                            )
-                                              ? 6
-                                              : 5
-                                          }
-                                          style={{
-                                            padding: "12px 16px",
-                                            textAlign: "right",
-                                            fontSize: "14px",
-                                            color: "#1f2937",
-                                            fontWeight: 700,
-                                          }}
-                                        >
-                                          Total:
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: "12px 16px",
-                                            fontSize: "14px",
-                                            color: "#1f2937",
-                                            fontWeight: 700,
-                                          }}
-                                        >
-                                          {viewingOrder.currency || "AED"}{" "}
-                                          {parseFloat(
-                                            viewingOrder.final_amount ||
-                                              viewingOrder.total_amount ||
-                                              "0",
-                                          ).toLocaleString(undefined, {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                          })}
-                                        </td>
-                                      </tr>
-                                    </tfoot>
-                                  </Table>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                      </div>
-                    )}
-
-                    {activeTab === "tab2" && (
-                      <div>
-                        {/* Deal Information */}
-                        {relatedDeal && (
-                          <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
-                              Deal Information
-                            </h5>
-                            <div
-                              style={{
-                                background: "#f9fafb",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "20px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "1fr 1fr",
-                                  gap: "16px 24px",
-                                }}
-                              >
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Deal Name
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {relatedDeal.name || "N/A"}
-                                  </div>
-                                </div>
-                                {relatedDeal.stage && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Stage
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <Badge
-                                        style={{
-                                          padding: "6px 14px",
-                                          borderRadius: "20px",
-                                          fontSize: "12px",
-                                          fontWeight: 600,
-                                          backgroundColor:
-                                            relatedDeal.stage?.color ||
-                                            "#6c757d",
-                                        }}
-                                      >
-                                        {relatedDeal.stage?.name ||
-                                          "Not assigned"}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                )}
-                                {relatedDeal.net_value && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Deal Value
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {relatedDeal.currency || "AED"}{" "}
-                                      {parseFloat(
-                                        String(
-                                          relatedDeal.net_value ||
-                                            relatedDeal.grand_total ||
-                                            0,
-                                        ),
-                                      ).toLocaleString()}
-                                    </div>
-                                  </div>
-                                )}
-                                {relatedDeal.assigned_to && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Assigned To
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <User
-                                        size={14}
-                                        style={{
-                                          color: "#f59e0b",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {extensions.find(
-                                        (ext: any) =>
-                                          ext?.id == relatedDeal?.assigned_to ||
-                                          ext?.extension ==
-                                            relatedDeal?.assigned_to,
-                                      )?.display_name ||
-                                        extensions.find(
-                                          (ext: any) =>
-                                            ext?.id ==
-                                              relatedDeal?.assigned_to ||
-                                            ext?.extension ==
-                                              relatedDeal?.assigned_to,
-                                        )?.name ||
-                                        relatedDeal.assigned_to ||
-                                        "Not assigned"}
-                                    </div>
-                                  </div>
-                                )}
-                                {relatedDeal.created_at && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Created Date
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <Calendar
-                                        size={14}
-                                        style={{
-                                          color: "#f59e0b",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {relatedDeal.created_at
-                                        ? formatDateForTable(
-                                            relatedDeal.created_at,
-                                          )
-                                        : "N/A"}
-                                    </div>
-                                  </div>
-                                )}
-                                {relatedDeal.company_name && (
-                                  <div style={{ gridColumn: "1 / -1" }}>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Company Name
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <Building2
-                                        size={14}
-                                        style={{
-                                          color: "#f59e0b",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {relatedDeal.company_name}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Lead Information */}
-                        {relatedLead && (
-                          <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
-                              Lead Information
-                            </h5>
-                            <div
-                              style={{
-                                background: "#f9fafb",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "20px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "1fr 1fr",
-                                  gap: "16px 24px",
-                                }}
-                              >
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Lead Name
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {relatedLead.name}
-                                  </div>
-                                </div>
-                                {relatedLead.stage && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Stage
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <Badge
-                                        style={{
-                                          padding: "6px 14px",
-                                          borderRadius: "20px",
-                                          fontSize: "12px",
-                                          fontWeight: 600,
-                                          backgroundColor:
-                                            relatedLead.stage?.color ||
-                                            "#6c757d",
-                                        }}
-                                      >
-                                        {relatedLead.stage?.name ||
-                                          "Not assigned"}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                )}
-                                {relatedLead.lead_potential && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Lead Potential
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <Badge
-                                        bg={
-                                          relatedLead.lead_potential === "Hot"
-                                            ? "danger"
-                                            : relatedLead.lead_potential ===
-                                                "Warm"
-                                              ? "warning"
-                                              : "secondary"
-                                        }
-                                        style={{
-                                          padding: "6px 14px",
-                                          borderRadius: "20px",
-                                          fontSize: "12px",
-                                          fontWeight: 600,
-                                        }}
-                                      >
-                                        {relatedLead.lead_potential || "N/A"}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                )}
-                                {relatedLead.user_extension && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Assigned To
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      <User
-                                        size={14}
-                                        style={{
-                                          color: "#f59e0b",
-                                          marginRight: "6px",
-                                          display: "inline",
-                                        }}
-                                      />
-                                      {extensions.find(
-                                        (ext: any) =>
-                                          ext?.id ==
-                                            relatedLead?.user_extension ||
-                                          ext?.extension ==
-                                            relatedLead?.user_extension,
-                                      )?.display_name ||
-                                        extensions.find(
-                                          (ext: any) =>
-                                            ext?.id ==
-                                              relatedLead?.user_extension ||
-                                            ext?.extension ==
-                                              relatedLead?.user_extension,
-                                        )?.name ||
-                                        relatedLead.user_extension ||
-                                        "Not assigned"}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Campaign Information */}
-                        {relatedLead?.campaign && (
-                          <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
-                              Campaign Information
-                            </h5>
-                            <div
-                              style={{
-                                background: "#f9fafb",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "20px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "1fr 1fr",
-                                  gap: "16px 24px",
-                                }}
-                              >
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Campaign Name
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {relatedLead.campaign.name}
-                                  </div>
-                                </div>
-                                {relatedLead.campaign_field_values &&
-                                  Object.keys(relatedLead.campaign_field_values)
-                                    .length > 0 &&
-                                  Object.entries(
-                                    relatedLead.campaign_field_values,
-                                  ).map(([key, value]: [string, any]) => (
-                                    <div key={key}>
-                                      <div
-                                        style={{
-                                          fontSize: "12px",
-                                          fontWeight: 700,
-                                          color: "#6b7280",
-                                          textTransform: "uppercase",
-                                          letterSpacing: "0.5px",
-                                          marginBottom: "6px",
-                                        }}
-                                      >
-                                        {key}
-                                      </div>
-                                      <div
-                                        style={{
-                                          fontSize: "14px",
-                                          color: "#1f2937",
-                                          fontWeight: 500,
-                                          wordBreak: "break-word",
-                                        }}
-                                      >
-                                        {String(value)}
-                                      </div>
-                                    </div>
-                                  ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Prospect Information */}
-                        {relatedLead?.crm_data && (
-                          <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
-                              Prospect Information
-                            </h5>
-                            <div
-                              style={{
-                                background: "#f9fafb",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "20px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "1fr 1fr",
-                                  gap: "16px 24px",
-                                }}
-                              >
-                                {relatedLead.crm_data.id && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      CRM Data ID
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      #{relatedLead.crm_data.id}
-                                    </div>
-                                  </div>
-                                )}
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Name
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {relatedLead.crm_data.name ||
-                                      (relatedLead.crm_data.data &&
-                                        relatedLead.crm_data.data.name) ||
-                                      "N/A"}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Phone
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    <PhoneDisplay
-                                      phone={
-                                        relatedLead.crm_data.phone ||
-                                        (relatedLead.crm_data.data &&
-                                          relatedLead.crm_data.data.phone) ||
-                                        ""
-                                      }
-                                    />
-                                  </div>
-                                </div>
-                                {relatedLead.crm_data.source_file && (
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        color: "#6b7280",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.5px",
-                                        marginBottom: "6px",
-                                      }}
-                                    >
-                                      Source File
-                                    </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "#1f2937",
-                                        fontWeight: 500,
-                                        wordBreak: "break-word",
-                                      }}
-                                    >
-                                      {relatedLead.crm_data.source_file}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {activeTab === "additional-info" && (
-                      <div>
-                        {/* Additional Information Section */}
-                        <div style={{ marginBottom: "28px" }}>
-                          <h5
-                            style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
-                              color: "#1f2937",
-                              marginBottom: "16px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "4px",
-                                height: "18px",
-                                background:
-                                  "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                borderRadius: "2px",
-                              }}
-                            />
-                            Additional Information
-                          </h5>
-                          <div
-                            style={{
-                              background: "#f9fafb",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "12px",
-                              padding: "20px",
-                            }}
-                          >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: "16px 24px",
-                              }}
-                            >
-                              <div>
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    color: "#6b7280",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.5px",
-                                    marginBottom: "6px",
-                                  }}
-                                >
-                                  Approval Status
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "14px",
-                                    color: "#1f2937",
-                                    fontWeight: 500,
-                                    wordBreak: "break-word",
-                                  }}
-                                >
-                                  {viewingOrder.order_approval_status ? (
-                                    <Badge
-                                      bg={
-                                        viewingOrder.order_approval_status?.toLowerCase() ===
-                                        "approved"
-                                          ? "success"
-                                          : viewingOrder.order_approval_status?.toLowerCase() ===
-                                              "rejected"
-                                            ? "danger"
-                                            : "warning"
-                                      }
-                                    >
-                                      {viewingOrder.order_approval_status}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted">Not Set</span>
-                                  )}
-                                </div>
-                              </div>
-                              <div>
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    color: "#6b7280",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.5px",
-                                    marginBottom: "6px",
-                                  }}
-                                >
-                                  Fulfillment Status
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "14px",
-                                    color: "#1f2937",
-                                    fontWeight: 500,
-                                    wordBreak: "break-word",
-                                  }}
-                                >
-                                  {viewingOrder.fulfillment_status ? (
-                                    <Badge
-                                      bg={
-                                        viewingOrder.fulfillment_status
-                                          ?.toLowerCase()
-                                          .includes("completed") ||
-                                        viewingOrder.fulfillment_status
-                                          ?.toLowerCase()
-                                          .includes("delivered")
-                                          ? "success"
-                                          : viewingOrder.fulfillment_status
-                                                ?.toLowerCase()
-                                                .includes("progress")
-                                            ? "primary"
-                                            : "secondary"
-                                      }
-                                    >
-                                      {viewingOrder.fulfillment_status}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted">Not Set</span>
-                                  )}
-                                </div>
-                              </div>
-                              <div>
-                                <div
-                                  style={{
-                                    fontSize: "12px",
-                                    fontWeight: 700,
-                                    color: "#6b7280",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.5px",
-                                    marginBottom: "6px",
-                                  }}
-                                >
-                                  Payment Status
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "14px",
-                                    color: "#1f2937",
-                                    fontWeight: 500,
-                                    wordBreak: "break-word",
-                                  }}
-                                >
-                                  {viewingOrder.payment_status ? (
-                                    <Badge
-                                      bg={
-                                        viewingOrder.payment_status?.toLowerCase() ===
-                                        "paid"
-                                          ? "success"
-                                          : viewingOrder.payment_status?.toLowerCase() ===
-                                              "partial"
-                                            ? "warning"
-                                            : "danger"
-                                      }
-                                    >
-                                      {viewingOrder.payment_status}
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted">Not Set</span>
-                                  )}
-                                </div>
-                              </div>
-                              {viewingOrder.assigned_to && (
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Assigned To
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    <User
-                                      size={14}
-                                      style={{
-                                        color: "#f59e0b",
-                                        marginRight: "6px",
-                                        display: "inline",
-                                      }}
-                                    />
-                                    {extensions.find(
-                                      (ext: any) =>
-                                        ext?.id == viewingOrder?.assigned_to ||
-                                        ext?.extension ==
-                                          viewingOrder?.assigned_to,
-                                    )?.display_name ||
-                                      extensions.find(
-                                        (ext: any) =>
-                                          ext?.id ==
-                                            viewingOrder?.assigned_to ||
-                                          ext?.extension ==
-                                            viewingOrder?.assigned_to,
-                                      )?.name ||
-                                      viewingOrder.assigned_to ||
-                                      "Not assigned"}
-                                  </div>
-                                </div>
-                              )}
-                              {viewingOrder.contract_length && (
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 700,
-                                      color: "#6b7280",
-                                      textTransform: "uppercase",
-                                      letterSpacing: "0.5px",
-                                      marginBottom: "6px",
-                                    }}
-                                  >
-                                    Contract Length
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "#1f2937",
-                                      fontWeight: 500,
-                                      wordBreak: "break-word",
-                                    }}
-                                  >
-                                    {viewingOrder.contract_length}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Notes */}
-                        {viewingOrder.notes && (
-                          <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
-                              Notes
-                            </h5>
-                            <div
-                              style={{
-                                background: "#fffbeb",
-                                border: "1px solid #fcd34d",
-                                borderRadius: "12px",
-                                padding: "16px 20px",
-                                fontSize: "14px",
-                                color: "#78350f",
-                                lineHeight: "1.6",
-                                whiteSpace: "pre-wrap",
-                              }}
-                            >
-                              {viewingOrder.notes}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {activeTab === "history" && (
-                      <div>
-                        {/* Activity History */}
-                        {viewingOrder.histories &&
-                        Array.isArray(viewingOrder.histories) &&
-                        viewingOrder.histories.length > 0 ? (
-                          <div style={{ marginBottom: "28px" }}>
-                            <h5
-                              style={{
-                                fontSize: "15px",
-                                fontWeight: 700,
-                                color: "#1f2937",
-                                marginBottom: "16px",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "4px",
-                                  height: "18px",
-                                  background:
-                                    "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                                  borderRadius: "2px",
-                                }}
-                              />
-                              Activity History
-                              <Badge
-                                bg="secondary"
-                                style={{
-                                  marginLeft: "8px",
-                                  fontSize: "11px",
-                                  fontWeight: 600,
-                                  padding: "4px 10px",
-                                  borderRadius: "6px",
-                                }}
-                              >
-                                {viewingOrder.histories.length}
-                              </Badge>
-                            </h5>
-                            <div
-                              style={{
-                                background: "white",
-                                border: "1px solid #e5e7eb",
-                                borderRadius: "12px",
-                                padding: "20px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  position: "relative",
-                                  paddingLeft: "30px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    content: "",
-                                    position: "absolute",
-                                    left: "8px",
-                                    top: 0,
-                                    bottom: 0,
-                                    width: "2px",
-                                    background: "#e5e7eb",
-                                  }}
-                                />
-                                {viewingOrder.histories.map(
-                                  (history: any, idx: number) => (
-                                    <div
-                                      key={history.id || idx}
-                                      style={{
-                                        position: "relative",
-                                        paddingBottom:
-                                          idx <
-                                          viewingOrder.histories.length - 1
-                                            ? "20px"
-                                            : "0",
-                                      }}
-                                    >
-                                      <div
-                                        style={{
-                                          content: "",
-                                          position: "absolute",
-                                          left: "-26px",
-                                          top: "4px",
-                                          width: "12px",
-                                          height: "12px",
-                                          borderRadius: "50%",
-                                          background:
-                                            history.event === "created"
-                                              ? "#10b981"
-                                              : "#f59e0b",
-                                          border: "3px solid white",
-                                          boxShadow: "0 0 0 2px #e5e7eb",
-                                        }}
-                                      />
-                                      <div
-                                        style={{
-                                          background: "#f9fafb",
-                                          padding: "12px 16px",
-                                          borderRadius: "8px",
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            fontSize: "12px",
-                                            color: "#6b7280",
-                                            fontWeight: 600,
-                                            marginBottom: "4px",
-                                          }}
-                                        >
-                                          {new Date(
-                                            history.created_at,
-                                          ).toLocaleString()}
-                                        </div>
-                                        <div
-                                          style={{
-                                            fontSize: "14px",
-                                            color: "#1f2937",
-                                            marginBottom: "4px",
-                                            fontWeight: 500,
-                                          }}
-                                        >
-                                          {history.event === "created"
-                                            ? "Created"
-                                            : history.event === "updated"
-                                              ? "Updated"
-                                              : history.event}
-                                        </div>
-                                        {history.description && (
-                                          <div
-                                            style={{
-                                              fontSize: "13px",
-                                              color: "#6b7280",
-                                              marginBottom: "8px",
-                                            }}
-                                          >
-                                            {history.description}
-                                          </div>
-                                        )}
-                                        {history.changes &&
-                                          Object.keys(history.changes).length >
-                                            0 && (
-                                            <div
-                                              style={{
-                                                fontSize: "12px",
-                                                color: "#6b7280",
-                                              }}
-                                            >
-                                              {Object.entries(
-                                                history.changes,
-                                              ).map(
-                                                ([key, change]: [
-                                                  string,
-                                                  any,
-                                                ]) => {
-                                                  if (
-                                                    ignoredKeys.includes(key)
-                                                  ) {
-                                                    return null;
-                                                  }
-                                                  return (
-                                                    <div
-                                                      key={key}
-                                                      style={{
-                                                        marginTop: "4px",
-                                                      }}
-                                                    >
-                                                      <strong>{key}:</strong>{" "}
-                                                      {change.old
-                                                        ? `${change.old} → `
-                                                        : ""}
-                                                      {change.new || "N/A"}
-                                                    </div>
-                                                  );
-                                                },
-                                              )}
-                                            </div>
-                                          )}
-                                      </div>
-                                    </div>
-                                  ),
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div
-                            style={{
-                              padding: "40px",
-                              textAlign: "center",
-                              color: "#6b7280",
-                              background: "#f9fafb",
-                              border: "2px dashed #d1d5db",
-                              borderRadius: "12px",
-                            }}
-                          >
-                            <History
-                              size={40}
-                              style={{ marginBottom: "12px", opacity: 0.5 }}
-                            />
-                            <div style={{ fontSize: "14px", fontWeight: 500 }}>
-                              No activity history found
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Right Panel - Quick Actions & Info */}
-                  <div
-                    style={{
-                      padding: "32px 24px",
-                      background: "#fafbfc",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "24px",
-                    }}
-                  >
-                    {/* Quick Actions */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Quick Actions
-                      </h6>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "10px",
-                        }}
-                      >
-                        {session?.user?.permissions?.includes(
-                          "edit-crm-orders",
-                        ) && (
-                          <button
-                            style={{
-                              background: "white",
-                              border: "1px solid #e5e7eb",
-                              borderRadius: "10px",
-                              padding: "12px 16px",
-                              cursor: "pointer",
-                              transition: "all 0.2s ease",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "12px",
-                              fontSize: "14px",
-                              fontWeight: 500,
-                              color: "#1f2937",
-                            }}
-                            onClick={() => {
-                              setShowOrderViewModal(false);
-                              window.location.href = `/crm/orders/${viewingOrder.id}/edit`;
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.borderColor = "#f59e0b";
-                              e.currentTarget.style.background = "#fffbeb";
-                              e.currentTarget.style.transform =
-                                "translateX(4px)";
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.borderColor = "#e5e7eb";
-                              e.currentTarget.style.background = "white";
-                              e.currentTarget.style.transform = "translateX(0)";
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "32px",
-                                height: "32px",
-                                borderRadius: "8px",
-                                background: "#f59e0b",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Edit size={16} style={{ color: "white" }} />
-                            </div>
-                            Edit Order
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Status Overview */}
-                    <div>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Status Overview
-                      </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "14px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Stage
-                            </span>
-                            <Badge
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                padding: "4px 10px",
-                                borderRadius: "6px",
-                                backgroundColor:
-                                  viewingOrder.stage?.color || "#6c757d",
-                              }}
-                            >
-                              {viewingOrder.stage?.name || "N/A"}
-                            </Badge>
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Status
-                            </span>
-                            <Badge
-                              bg={
-                                viewingOrder.status?.toLowerCase() ===
-                                "completed"
-                                  ? "success"
-                                  : viewingOrder.status?.toLowerCase() ===
-                                      "pending"
-                                    ? "warning"
-                                    : "secondary"
-                              }
-                              style={{ fontSize: "11px", padding: "4px 10px" }}
-                            >
-                              {viewingOrder.status || "N/A"}
-                            </Badge>
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Total Amount
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {viewingOrder.currency || "AED"}{" "}
-                              {parseFloat(
-                                viewingOrder.final_amount ||
-                                  viewingOrder.total_amount ||
-                                  "0",
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </span>
-                          </div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: "13px",
-                                color: "#6b7280",
-                                fontWeight: 500,
-                              }}
-                            >
-                              Items
-                            </span>
-                            <span
-                              style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 600,
-                              }}
-                            >
-                              {viewingOrder.items?.length || 0}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Order Summary */}
-                    <div style={{ flex: 1 }}>
-                      <h6
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          color: "#6b7280",
-                          textTransform: "uppercase",
-                          letterSpacing: "0.5px",
-                          marginBottom: "14px",
-                        }}
-                      >
-                        Order Summary
-                      </h6>
-                      <div
-                        style={{
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: "10px",
-                          padding: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "12px",
-                          }}
-                        >
-                          {viewingOrder.order_date && (
-                            <div>
-                              <div
-                                style={{
-                                  fontSize: "11px",
-                                  color: "#6b7280",
-                                  fontWeight: 600,
-                                  marginBottom: "4px",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                }}
-                              >
-                                Order Date
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                {moment(viewingOrder.order_date).format(
-                                  "MMM DD, YYYY",
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {viewingOrder.expected_delivery_date && (
-                            <div>
-                              <div
-                                style={{
-                                  fontSize: "11px",
-                                  color: "#6b7280",
-                                  fontWeight: 600,
-                                  marginBottom: "4px",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                }}
-                              >
-                                Expected Delivery
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: "13px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                }}
-                              >
-                                {moment(
-                                  viewingOrder.expected_delivery_date,
-                                ).format("MMM DD, YYYY")}
-                              </div>
-                            </div>
-                          )}
-
-                          {viewingOrder.payment_status && (
-                            <div>
-                              <div
-                                style={{
-                                  fontSize: "11px",
-                                  color: "#6b7280",
-                                  fontWeight: 600,
-                                  marginBottom: "4px",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                }}
-                              >
-                                Payment Status
-                              </div>
-                              <Badge
-                                bg={
-                                  viewingOrder.payment_status?.toLowerCase() ===
-                                  "paid"
-                                    ? "success"
-                                    : viewingOrder.payment_status?.toLowerCase() ===
-                                        "partial"
-                                      ? "warning"
-                                      : "danger"
-                                }
-                                style={{
-                                  fontSize: "11px",
-                                  padding: "4px 10px",
-                                }}
-                              >
-                                {viewingOrder.payment_status}
-                              </Badge>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </Modal.Body>
-
-          {/* Footer */}
-          <div
-            style={{
-              padding: "20px 32px",
-              borderTop: "1px solid #e5e7eb",
-              background: "white",
-              borderBottomLeftRadius: "12px",
-              borderBottomRightRadius: "12px",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div style={{ fontSize: "13px", color: "#6b7280" }}>
-              Order ID: <strong>#{viewingOrder.id}</strong>
-            </div>
-            <Button
-              variant="outline-secondary"
-              onClick={() => setShowOrderViewModal(false)}
-              style={{
-                padding: "10px 24px",
-                borderRadius: "8px",
-                fontWeight: 600,
-                fontSize: "14px",
-                border: "2px solid #e5e7eb",
-                transition: "all 0.2s ease",
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.borderColor = "#f59e0b";
-                e.currentTarget.style.color = "#f59e0b";
-                e.currentTarget.style.background = "#fffbeb";
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.borderColor = "#e5e7eb";
-                e.currentTarget.style.color = "#6c757d";
-                e.currentTarget.style.background = "white";
-              }}
-            >
-              Close
-            </Button>
-          </div>
-        </Modal>
+          loadingOrder={loadingOrder}
+          relatedDeal={relatedDeal}
+          relatedLead={relatedLead}
+          extensions={extensions}
+          activeTab={activeTab}
+          onActiveTabChange={setActiveTab}
+          session={session}
+          ignoredHistoryKeys={ignoredHistoryKeys}
+        />
       )}
+
 
       {/* Manage Attachments Modal */}
       {selectedOrderForAttachments && (
@@ -6239,11 +2297,11 @@ const CrmOrders = () => {
                 >
                   {uploadingFile ? (
                     <>
-                      <div
+                      <span
                         className="spinner-border spinner-border-sm"
-                        role="status"
+                        aria-hidden="true"
                       />
-                      Uploading...
+                      <span>Uploading...</span>
                     </>
                   ) : (
                     <>
@@ -6263,104 +2321,109 @@ const CrmOrders = () => {
                 Order Attachments ({attachments.length})
               </h6>
 
-              {loadingAttachments ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
+              {(() => {
+                if (loadingAttachments) {
+                  return (
+                    <output
+                      className="d-block text-center py-5"
+                      aria-live="polite"
+                    >
+                      <span
+                        className="spinner-border text-primary"
+                        aria-hidden="true"
+                      />
+                      <span className="visually-hidden">
+                        Loading attachments…
+                      </span>
+                    </output>
+                  );
+                }
+                if (attachments.length === 0) {
+                  return (
+                    <div className="text-center py-4 text-muted">
+                      <Paperclip size={48} className="mb-3 opacity-25" />
+                      <div>No order attachments yet</div>
+                      <small>Upload files using the form above</small>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="d-flex flex-column gap-2 mb-4">
+                    {attachments.map((attachment: any) => (
+                      <Card key={attachment.id} className="border shadow-sm">
+                        <Card.Body className="p-3">
+                          <div className="d-flex align-items-center justify-content-between">
+                            <div className="d-flex align-items-center gap-3 flex-grow-1">
+                              <div
+                                className="rounded d-flex align-items-center justify-content-center"
+                                style={{
+                                  width: "45px",
+                                  height: "45px",
+                                  background: attachmentMimeIconBackground(
+                                    attachment.mime_type,
+                                  ),
+                                  color: "white",
+                                }}
+                              >
+                                <FileText size={22} />
+                              </div>
+
+                              <div className="flex-grow-1">
+                                <div
+                                  className="fw-semibold"
+                                  style={{ fontSize: "14px" }}
+                                >
+                                  {attachment.name}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#6c757d",
+                                  }}
+                                >
+                                  {formatFileSize(attachment.file_size)} •{" "}
+                                  {attachment.created_at
+                                    ? formatDateForTable(attachment.created_at)
+                                    : "N/A"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="d-flex gap-1">
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-2 text-primary"
+                                title="Download"
+                                onClick={() =>
+                                  handleDownloadAttachment(attachment.id)
+                                }
+                              >
+                                <DownloadIcon size={18} />
+                              </Button>
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="p-2 text-danger"
+                                title="Delete"
+                                onClick={() => {
+                                  setAttachmentToDelete({
+                                    id: attachment.id,
+                                    name: attachment.name,
+                                  });
+                                  setShowDeleteAttachmentModal(true);
+                                }}
+                              >
+                                <Trash2 size={18} />
+                              </Button>
+                            </div>
+                          </div>
+                        </Card.Body>
+                      </Card>
+                    ))}
                   </div>
-                </div>
-              ) : attachments.length === 0 ? (
-                <div className="text-center py-4 text-muted">
-                  <Paperclip size={48} className="mb-3 opacity-25" />
-                  <div>No order attachments yet</div>
-                  <small>Upload files using the form above</small>
-                </div>
-              ) : (
-                <div className="d-flex flex-column gap-2 mb-4">
-                  {attachments.map((attachment: any) => (
-                    <Card key={attachment.id} className="border shadow-sm">
-                      <Card.Body className="p-3">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <div className="d-flex align-items-center gap-3 flex-grow-1">
-                            {/* File Icon */}
-                            <div
-                              className="rounded d-flex align-items-center justify-content-center"
-                              style={{
-                                width: "45px",
-                                height: "45px",
-                                background: attachment.mime_type?.includes(
-                                  "pdf",
-                                )
-                                  ? "#dc3545"
-                                  : attachment.mime_type?.includes("csv") ||
-                                      attachment.mime_type?.includes("excel") ||
-                                      attachment.mime_type?.includes(
-                                        "spreadsheet",
-                                      )
-                                    ? "#198754"
-                                    : attachment.mime_type?.includes("image")
-                                      ? "#0d6efd"
-                                      : "#6c757d",
-                                color: "white",
-                              }}
-                            >
-                              <FileText size={22} />
-                            </div>
-
-                            {/* File Info */}
-                            <div className="flex-grow-1">
-                              <div
-                                className="fw-semibold"
-                                style={{ fontSize: "14px" }}
-                              >
-                                {attachment.name}
-                              </div>
-                              <div
-                                style={{ fontSize: "12px", color: "#6c757d" }}
-                              >
-                                {formatFileSize(attachment.file_size)} •{" "}
-                                {attachment.created_at
-                                  ? formatDateForTable(attachment.created_at)
-                                  : "N/A"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="d-flex gap-1">
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-primary"
-                              title="Download"
-                              onClick={() =>
-                                handleDownloadAttachment(attachment.id)
-                              }
-                            >
-                              <DownloadIcon size={18} />
-                            </Button>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-danger"
-                              title="Delete"
-                              onClick={() => {
-                                setAttachmentToDelete({
-                                  id: attachment.id,
-                                  name: attachment.name,
-                                });
-                                setShowDeleteAttachmentModal(true);
-                              }}
-                            >
-                              <Trash2 size={18} />
-                            </Button>
-                          </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                );
+              })()}
 
               {/* Deal Attachments Section */}
               {selectedOrderForAttachments?.deal_id && (
@@ -6377,104 +2440,101 @@ const CrmOrders = () => {
                     </Badge>
                   </h6>
 
-                  {loadingAttachments ? (
-                    <div className="text-center py-5">
-                      <div
-                        className="spinner-border text-primary"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                    </div>
-                  ) : dealAttachments.length === 0 ? (
-                    <div className="text-center py-4 text-muted">
-                      <Paperclip size={48} className="mb-3 opacity-25" />
-                      <div>No deal attachments</div>
-                    </div>
-                  ) : (
-                    <div className="d-flex flex-column gap-2">
-                      {dealAttachments.map((attachment: any) => (
-                        <Card
-                          key={`deal-${attachment.id}`}
-                          className="border shadow-sm"
-                          style={{ opacity: 0.9 }}
+                  {(() => {
+                    if (loadingAttachments) {
+                      return (
+                        <output
+                          className="d-block text-center py-5"
+                          aria-live="polite"
                         >
-                          <Card.Body className="p-3">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <div className="d-flex align-items-center gap-3 flex-grow-1">
-                                {/* File Icon */}
-                                <div
-                                  className="rounded d-flex align-items-center justify-content-center"
-                                  style={{
-                                    width: "45px",
-                                    height: "45px",
-                                    background: attachment.mime_type?.includes(
-                                      "pdf",
-                                    )
-                                      ? "#dc3545"
-                                      : attachment.mime_type?.includes("csv") ||
-                                          attachment.mime_type?.includes(
-                                            "excel",
-                                          ) ||
-                                          attachment.mime_type?.includes(
-                                            "spreadsheet",
-                                          )
-                                        ? "#198754"
-                                        : attachment.mime_type?.includes(
-                                              "image",
-                                            )
-                                          ? "#0d6efd"
-                                          : "#6c757d",
-                                    color: "white",
-                                  }}
-                                >
-                                  <FileText size={22} />
-                                </div>
-
-                                {/* File Info */}
-                                <div className="flex-grow-1">
+                          <span
+                            className="spinner-border text-primary"
+                            aria-hidden="true"
+                          />
+                          <span className="visually-hidden">
+                            Loading attachments…
+                          </span>
+                        </output>
+                      );
+                    }
+                    if (dealAttachments.length === 0) {
+                      return (
+                        <div className="text-center py-4 text-muted">
+                          <Paperclip size={48} className="mb-3 opacity-25" />
+                          <div>No deal attachments</div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="d-flex flex-column gap-2">
+                        {dealAttachments.map((attachment: any) => (
+                          <Card
+                            key={`deal-${attachment.id}`}
+                            className="border shadow-sm"
+                            style={{ opacity: 0.9 }}
+                          >
+                            <Card.Body className="p-3">
+                              <div className="d-flex align-items-center justify-content-between">
+                                <div className="d-flex align-items-center gap-3 flex-grow-1">
                                   <div
-                                    className="fw-semibold"
-                                    style={{ fontSize: "14px" }}
-                                  >
-                                    {attachment.name}
-                                  </div>
-                                  <div
+                                    className="rounded d-flex align-items-center justify-content-center"
                                     style={{
-                                      fontSize: "12px",
-                                      color: "#6c757d",
+                                      width: "45px",
+                                      height: "45px",
+                                      background: attachmentMimeIconBackground(
+                                        attachment.mime_type,
+                                      ),
+                                      color: "white",
                                     }}
                                   >
-                                    {formatFileSize(attachment.file_size)} •{" "}
-                                    {attachment.created_at
-                                      ? formatDateForTable(
-                                          attachment.created_at,
-                                        )
-                                      : "N/A"}
+                                    <FileText size={22} />
+                                  </div>
+
+                                  <div className="flex-grow-1">
+                                    <div
+                                      className="fw-semibold"
+                                      style={{ fontSize: "14px" }}
+                                    >
+                                      {attachment.name}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "12px",
+                                        color: "#6c757d",
+                                      }}
+                                    >
+                                      {formatFileSize(attachment.file_size)} •{" "}
+                                      {attachment.created_at
+                                        ? formatDateForTable(
+                                            attachment.created_at,
+                                          )
+                                        : "N/A"}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
 
-                              {/* Actions - Download only */}
-                              <div className="d-flex gap-1">
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-2 text-primary"
-                                  title="Download"
-                                  onClick={() =>
-                                    handleDownloadDealAttachment(attachment.id)
-                                  }
-                                >
-                                  <DownloadIcon size={18} />
-                                </Button>
+                                <div className="d-flex gap-1">
+                                  <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-2 text-primary"
+                                    title="Download"
+                                    onClick={() =>
+                                      handleDownloadDealAttachment(
+                                        attachment.id,
+                                      )
+                                    }
+                                  >
+                                    <DownloadIcon size={18} />
+                                  </Button>
+                                </div>
                               </div>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
+                            </Card.Body>
+                          </Card>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </div>

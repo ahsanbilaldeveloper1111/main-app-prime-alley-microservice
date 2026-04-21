@@ -1,14 +1,14 @@
 import "@assets/scss/datatable-style.scss";
 import React, {
   ReactElement,
-  useEffect,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
+  useState,
 } from "react";
 import Layout from "@layout/index";
 import { formatNumber } from "@utils/Helper";
-import { useState } from "react";
 import { Row, Col, Button, Badge, Card, Form } from "react-bootstrap";
 import { Check, CheckCircle, Receipt, Ban, AlertCircle, Eye, X, Layers, FileText, Calendar, Filter } from "lucide-react";
 
@@ -24,9 +24,11 @@ import moment from "moment";
 import FormModal from "@pages/partial/FormModal";
 
 import GenericTable, { TableColumn } from "@components/GenericTable";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericSidebar from "@components/GenericSidebar";
 import { ModuleSlug } from "@utils/Helper";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 
 interface PaymentRow {
   id: number;
@@ -45,6 +47,16 @@ const BillingHistory = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [companies, setCompanies] = useState<{ id: string | number; name?: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | "">("");
+
+  const onAccountingCustomerCreated = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(selectedCompanyId, {
+    onCreated: onAccountingCustomerCreated,
+    errorToastId: "billing_payment_history_ensure_customer_failed",
+  });
+
   const [currentFilters, setCurrentFilters] = useState<{
     status?: string;
     search?: string;
@@ -371,7 +383,7 @@ const BillingHistory = () => {
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
           totalRows: totalRecords,
-          pageSizeOptions: [10, 15, 25, 50],
+          pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
         }}
         onPaginationChange={(page, rowsPerPage) => {
           setPagination((prev) => ({ ...prev, currentPage: page, rowsPerPage }));

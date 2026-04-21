@@ -56,6 +56,11 @@ export function extractAccountingApiData<T>(response: any): T {
   }
 
   if (envelope.success === true && envelope.data !== undefined) {
+    // DELETE and similar calls often return `{ success: true, data: null }`. Unwrapping would
+    // yield `null` and lose `success`/`message`, so keep the envelope for callers.
+    if (envelope.data === null) {
+      return envelope as unknown as T;
+    }
     return envelope.data as T;
   }
 

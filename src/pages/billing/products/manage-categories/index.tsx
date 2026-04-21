@@ -15,62 +15,70 @@ import {
   Form,
   Modal,
 } from "react-bootstrap";
-import { Plus } from "lucide-react";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
+import { Edit, PlusCircle, Trash2 } from "lucide-react";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import GenericTable, { TableColumn } from "@components/GenericTable";
+import GenericTable, {
+  type FilterPill,
+  type TableAction,
+  type TableColumn,
+  type ToolbarConfig,
+} from "@components/GenericTable";
 import {
   createProductCategory,
   deleteProductCategory,
+  getAccountsAxiosErrorMessage,
   getProductCategoriesList,
   type ProductCategoryData,
   updateProductCategory,
 } from "@utils/accounts";
-import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import PageHeader from "@components/PageHeader";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
+
+const CATEGORY_NAME_MAX_LENGTH = 150;
+const CATEGORY_DESCRIPTION_MAX_LENGTH = 500;
 
 type ProductCategoryRow = ProductCategoryData & {
   is_active?: boolean;
 };
 
-const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
-  padding: "9px 13px",
-  backgroundColor: "#000000",
-  color: "#ffffff",
-  border: "none",
-  borderRadius: "4px",
-  fontSize: "12px",
-  fontWeight: 500,
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  gap: "8px",
-};
+type CategoryStatusFilter = "all" | "active" | "inactive";
 
-function CategoryToolbarButton({
-  onClick,
-  children,
-}: Readonly<{
-  onClick: () => void;
-  children: React.ReactNode;
-}>) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={ACTION_BUTTON_BASE_STYLE}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = "#1a1a1a";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "#000000";
-      }}
-    >
-      {children}
-    </button>
-  );
+function categoryStatusActiveLabel(
+  filter: CategoryStatusFilter,
+): string | undefined {
+  if (filter === "active") return "Active";
+  if (filter === "inactive") return "Inactive";
+  return undefined;
+}
+
+function categorySortComparableValue(
+  row: ProductCategoryRow,
+  column: string,
+): string {
+  switch (column) {
+    case "description":
+      return row.description?.trim() ?? "";
+    case "is_active":
+      return row.is_active === false ? "inactive" : "active";
+    default: {
+      const cell = row[column as keyof ProductCategoryRow];
+      if (cell == null) {
+        return "";
+      }
+      if (
+        typeof cell === "string" ||
+        typeof cell === "number" ||
+        typeof cell === "boolean" ||
+        typeof cell === "bigint"
+      ) {
+        return String(cell);
+      }
+      return "";
+    }
+  }
 }
 
 const ManageCategories = () => {
@@ -79,7 +87,18 @@ const ManageCategories = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<ProductCategoryRow[]>([]);
-  const [searchValue, setSearchValue] = useState("");
+  const [categoriesTotal, setCategoriesTotal] = useState(0);
+  const [search, setSearch] = useState("");
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    perPage: 15,
+  });
+  const [sortState, setSortState] = useState<{
+    column: string;
+    direction: "asc" | "desc";
+  }>({ column: "name", direction: "asc" });
+  const [statusFilter, setStatusFilter] =
+    useState<CategoryStatusFilter>("all");
 
   const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
   const [addCategoryPayload, setAddCategoryPayload] = useState<{
@@ -123,28 +142,59 @@ const ManageCategories = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await getProductCategoriesList({ search: searchValue });
+      const trimmed = search.trim();
+      const params: Record<string, string | boolean | number> = {
+        page: pagination.currentPage,
+        limit: pagination.perPage,
+      };
+      if (trimmed) {
+        params.search = trimmed;
+      }
+      if (statusFilter === "active") {
+        params.is_active = true;
+      } else if (statusFilter === "inactive") {
+        params.is_active = false;
+      }
+      const response = await getProductCategoriesList(params);
 
       if (currentRequestId !== requestIdRef.current) return;
 
       console.log("Product categories response:", response);
-      setCategories(Array.isArray(response) ? response : []);
+      setCategories(Array.isArray(response.data) ? response.data : []);
+      setCategoriesTotal(
+        typeof response.pagination?.total === "number"
+          ? response.pagination.total
+          : response.data.length,
+      );
     } catch (e: any) {
       if (currentRequestId !== requestIdRef.current) return;
 
       console.error("Failed to fetch product categories:", e);
-      setError(e?.message || "Failed to fetch product categories");
+      setError(
+        getAccountsAxiosErrorMessage(e, "Failed to fetch product categories"),
+      );
       setCategories([]);
+      setCategoriesTotal(0);
     } finally {
       if (currentRequestId === requestIdRef.current) {
         setLoading(false);
       }
     }
-  }, [searchValue]);
+  }, [search, statusFilter, pagination.currentPage, pagination.perPage]);
 
   useEffect(() => {
     fetchCategories();
   }, [fetchCategories]);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    setSearch(value);
+  }, []);
+
+  const applyStatusFilter = useCallback((next: CategoryStatusFilter) => {
+    setStatusFilter(next);
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, []);
 
   const openAddCategoryModal = useCallback(() => {
     setAddCategoryPayload({
@@ -158,9 +208,11 @@ const ManageCategories = () => {
 
   const openEditCategoryModal = useCallback((category: ProductCategoryRow) => {
     setEditingCategory(category);
+    const rawName = category.name ?? "";
+    const rawDescription = category.description ?? "";
     setEditCategoryPayload({
-      name: category.name ?? "",
-      description: category.description ?? "",
+      name: rawName.slice(0, CATEGORY_NAME_MAX_LENGTH),
+      description: rawDescription.slice(0, CATEGORY_DESCRIPTION_MAX_LENGTH),
       is_active: category.is_active ?? true,
     });
     setEditCategoryError(null);
@@ -189,13 +241,14 @@ const ManageCategories = () => {
           description: addCategoryPayload.description,
           is_active: addCategoryPayload.is_active,
         };
-        const created = await createProductCategory(payload);
-        console.log("Created product category:", created);
+         await createProductCategory(payload);
         setShowAddCategoryModal(false);
         await fetchCategories();
       } catch (err: any) {
         console.error("Failed to create product category:", err);
-        setAddCategoryError(err?.message || "Failed to create product category");
+        setAddCategoryError(
+          getAccountsAxiosErrorMessage(err, "Failed to create product category"),
+        );
       } finally {
         setCreatingCategory(false);
       }
@@ -229,7 +282,9 @@ const ManageCategories = () => {
         await fetchCategories();
       } catch (err: any) {
         console.error("Failed to update product category:", err);
-        setEditCategoryError(err?.message || "Failed to update product category");
+        setEditCategoryError(
+          getAccountsAxiosErrorMessage(err, "Failed to update product category"),
+        );
       } finally {
         setUpdatingCategory(false);
       }
@@ -246,8 +301,11 @@ const ManageCategories = () => {
       setShowDeleteModal(false);
       setCategoryToDelete(null);
       await fetchCategories();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to delete product category:", err);
+      setError(
+        getAccountsAxiosErrorMessage(err, "Failed to delete product category"),
+      );
     } finally {
       setDeletingCategory(false);
     }
@@ -255,142 +313,190 @@ const ManageCategories = () => {
 
   const categoryColumns: TableColumn<ProductCategoryRow>[] = useMemo(
     () => [
-      {
-        key: "id",
-        label: "ID",
-        sortable: true,
-        type: "text",
-      },
+     
       {
         key: "name",
         label: "Name",
         sortable: true,
         type: "text",
+        emptyValue: "—",
       },
       {
         key: "description",
         label: "Description",
         sortable: true,
-        width: "28%",
-        type: "custom",
-        render: (row) => (
-          <div
-            style={{
-              minWidth: "180px",
-              maxWidth: "320px",
-              whiteSpace: "normal",
-              wordBreak: "break-word",
-            }}
-          >
-            {row.description ?? "-"}
-          </div>
-        ),
+        type: "text",
+        width: "260px",
+        emptyValue: "-",
+        accessor: (row) => row.description?.trim() ?? "",
       },
       {
         key: "is_active",
         label: "Active",
         sortable: true,
-        type: "custom",
-        render: (row) => (row.is_active === false ? "Inactive" : "Active"),
-      },
-      {
-        key: "actions",
-        label: "Actions",
-        sortable: false,
-        type: "custom",
-        render: (row) => (
-          <div className="d-flex gap-1">
-            <button
-              type="button"
-              onClick={() => openEditCategoryModal(row)}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px",
-                cursor: "pointer",
-                color: "#0d6efd",
-              }}
-            >
-              <FiEdit size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={() => openDeleteCategoryModal(row)}
-              style={{
-                background: "transparent",
-                border: "none",
-                padding: "4px",
-                cursor: "pointer",
-                color: "#dc3545",
-              }}
-            >
-              <FiTrash2 size={16} />
-            </button>
-          </div>
-        ),
+        type: "badge",
+        accessor: (row) => (row.is_active === false ? "Inactive" : "Active"),
+        badge: {
+          getVariant: (row) =>
+            row.is_active === false ? "secondary" : "success",
+        },
       },
     ],
-    [openDeleteCategoryModal, openEditCategoryModal],
+    [],
   );
 
-  const categoriesToolbarConfig = useMemo(
+  const categoryActions: TableAction<ProductCategoryRow>[] = useMemo(
+    () => [
+      {
+        label: "Edit",
+        icon: <Edit size={16} />,
+        onClick: (row) => openEditCategoryModal(row),
+        variant: "link" as const,
+      },
+      {
+        label: "Delete",
+        icon: <Trash2 size={16} />,
+        onClick: (row) => openDeleteCategoryModal(row),
+        variant: "link" as const,
+        className: "text-danger",
+      },
+    ],
+    [openEditCategoryModal, openDeleteCategoryModal],
+  );
+
+  const sortedCategories = useMemo(() => {
+    const { column, direction } = sortState;
+    return [...categories].sort((a, b) => {
+      const aStr = categorySortComparableValue(a, column).toLowerCase();
+      const bStr = categorySortComparableValue(b, column).toLowerCase();
+      if (aStr < bStr) return direction === "asc" ? -1 : 1;
+      if (aStr > bStr) return direction === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [categories, sortState]);
+
+  const handleTableSort = useCallback((column: string, direction: "asc" | "desc") => {
+    setSortState({ column, direction });
+  }, []);
+
+  const handleToolbarSearch = useCallback(() => {
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+  }, []);
+
+  const categoryStatusPills = useMemo<FilterPill[]>(
+    () => [
+      {
+        id: "category-status",
+        label: "Status",
+        showDropdown: true,
+        active: statusFilter !== "all",
+        activeLabel: categoryStatusActiveLabel(statusFilter),
+        onClear: () => applyStatusFilter("all"),
+        dropdownOptions: [
+          {
+            label: "All",
+            value: "all",
+            onClick: () => applyStatusFilter("all"),
+          },
+          {
+            label: "Active",
+            value: "active",
+            onClick: () => applyStatusFilter("active"),
+          },
+          {
+            label: "Inactive",
+            value: "inactive",
+            onClick: () => applyStatusFilter("inactive"),
+          },
+        ],
+      },
+    ],
+    [statusFilter, applyStatusFilter],
+  );
+
+  const categoriesToolbarConfig = useMemo<ToolbarConfig>(
     () => ({
       showSearch: true,
-      searchValue,
-      searchPlaceholder: "Search categories...",
-      onSearchChange: setSearchValue,
-      onSearch: () => {
-        fetchCategories();
-      },
-      showTabs: true,
-      tabs: [
-        {
-          id: "manage_categories",
-          label: "Manage Categories",
-          removable: false,
-        },
-      ],
-      activeTab: "manage_categories",
-      onTabChange: () => {},
-      tabsDropdownLabel: "Products",
-      tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
-      showTableViewDropdown: false,
+      searchValue: search,
+      searchPlaceholder: "Search categories by name",
+      onSearchChange: handleSearchChange,
+      onSearch: handleToolbarSearch,
+      showFilterPills: true,
+      showMoreFiltersButton: false,
+      filterPills: categoryStatusPills,
       rightActions: (
-        <CategoryToolbarButton onClick={openAddCategoryModal}>
-          <Plus size={16} />
-          Add Category
-        </CategoryToolbarButton>
+        <div className="d-flex gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={openAddCategoryModal}
+            className="d-flex align-items-center gap-2"
+          >
+            <PlusCircle size={16} aria-hidden />
+            Add Category
+          </Button>
+        </div>
       ),
     }),
-    [fetchCategories, openAddCategoryModal, searchValue],
+    [
+      search,
+      handleSearchChange,
+      handleToolbarSearch,
+      openAddCategoryModal,
+      categoryStatusPills,
+    ],
   );
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Manage Categories" />
+      <BreadcrumbItem
+        mainTitle="Categories"
+        mainLink="/billing/products/manage-categories"
+        subTitle="Manage Categories"
+      />
 
-      {error ? (
-        <Alert variant="danger" className="mt-3 mb-3">
-          {error}
-        </Alert>
-      ) : null}
+      <PageHeader 
+        title="Manage Categories"
+        showSearch={false}
+      />
 
-      <div className="container-fluid mt-3">
-        <GenericTable
-          data={categories}
+      <div>
+        {error ? (
+          <Alert variant="danger" className="mb-3">
+            {error}
+          </Alert>
+        ) : null}
+
+        <GenericTable<ProductCategoryRow>
+          data={sortedCategories}
           columns={categoryColumns}
-          showActions={false}
-          sortable={true}
-          loading={loading}
-          showToolbarActions={false}
-          emptyMessage="No categories found"
-          loadingMessage="Loading categories..."
-          hover={true}
-          uniqueKey="id"
-          fixedHeight={true}
-          maxHeight="calc(100vh - 300px)"
-          showToolbar={true}
+          actions={categoryActions}
+          sortable
+          defaultSortBy={sortState.column}
+          defaultSortOrder={sortState.direction}
+          onSort={handleTableSort}
+          showToolbar
           toolbar={categoriesToolbarConfig}
+          showToolbarActions={false}
+          pagination={{
+            currentPage: pagination.currentPage,
+            rowsPerPage: pagination.perPage,
+            totalRows: categoriesTotal,
+            pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
+          }}
+          onPaginationChange={(page, rowsPerPage) => {
+            setPagination({ currentPage: page, perPage: rowsPerPage });
+          }}
+          loading={loading}
+          loadingMessage="Loading categories…"
+          emptyMessage={
+            <div className="text-center p-5">
+              <p className="text-muted">No categories found</p>
+            </div>
+          }
+          hover
+          bordered
+          uniqueKey="id"
         />
       </div>
 
@@ -413,16 +519,28 @@ const ManageCategories = () => {
             ) : null}
 
             <Form.Group className="mb-3" controlId="categoryName">
-              <Form.Label>Name</Form.Label>
+              <Form.Label>Name <span className="text-danger">*</span></Form.Label>
               <Form.Control
                 value={addCategoryPayload.name}
                 onChange={(e) =>
-                  setAddCategoryPayload((p) => ({ ...p, name: e.target.value }))
+                  setAddCategoryPayload((p) => ({
+                    ...p,
+                    name: e.target.value.slice(0, CATEGORY_NAME_MAX_LENGTH),
+                  }))
                 }
                 placeholder="Category name"
+                maxLength={CATEGORY_NAME_MAX_LENGTH}
                 required
                 disabled={creatingCategory}
+                aria-describedby="categoryNameCharHint"
               />
+              <Form.Text
+                id="categoryNameCharHint"
+                className={`small ${addCategoryPayload.name.length >= CATEGORY_NAME_MAX_LENGTH ? "text-warning" : "text-muted"}`}
+              >
+                {addCategoryPayload.name.length} / {CATEGORY_NAME_MAX_LENGTH}{" "}
+                characters
+              </Form.Text>
             </Form.Group>
 
             <Form.Group className="mb-3" controlId="categoryDescription">
@@ -434,12 +552,24 @@ const ManageCategories = () => {
                 onChange={(e) =>
                   setAddCategoryPayload((p) => ({
                     ...p,
-                    description: e.target.value,
+                    description: e.target.value.slice(
+                      0,
+                      CATEGORY_DESCRIPTION_MAX_LENGTH,
+                    ),
                   }))
                 }
                 placeholder="Optional description"
+                maxLength={CATEGORY_DESCRIPTION_MAX_LENGTH}
                 disabled={creatingCategory}
+                aria-describedby="categoryDescriptionCharHint"
               />
+              <Form.Text
+                id="categoryDescriptionCharHint"
+                className={`small ${addCategoryPayload.description.length >= CATEGORY_DESCRIPTION_MAX_LENGTH ? "text-warning" : "text-muted"}`}
+              >
+                {addCategoryPayload.description.length} /{" "}
+                {CATEGORY_DESCRIPTION_MAX_LENGTH} characters
+              </Form.Text>
             </Form.Group>
 
             <Form.Group controlId="categoryIsActive">
@@ -465,7 +595,13 @@ const ManageCategories = () => {
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={creatingCategory}>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={
+                creatingCategory || !addCategoryPayload.name.trim()
+              }
+            >
               {creatingCategory ? "Saving..." : "Save"}
             </Button>
           </Modal.Footer>
@@ -495,12 +631,24 @@ const ManageCategories = () => {
               <Form.Control
                 value={editCategoryPayload.name}
                 onChange={(e) =>
-                  setEditCategoryPayload((p) => ({ ...p, name: e.target.value }))
+                  setEditCategoryPayload((p) => ({
+                    ...p,
+                    name: e.target.value.slice(0, CATEGORY_NAME_MAX_LENGTH),
+                  }))
                 }
                 placeholder="Category name"
+                maxLength={CATEGORY_NAME_MAX_LENGTH}
                 required
                 disabled={updatingCategory}
+                aria-describedby="editCategoryNameCharHint"
               />
+              <Form.Text
+                id="editCategoryNameCharHint"
+                className={`small ${editCategoryPayload.name.length >= CATEGORY_NAME_MAX_LENGTH ? "text-warning" : "text-muted"}`}
+              >
+                {editCategoryPayload.name.length} / {CATEGORY_NAME_MAX_LENGTH}{" "}
+                characters
+              </Form.Text>
             </Form.Group>
 
             <Form.Group className="mb-3" controlId="editCategoryDescription">
@@ -512,12 +660,24 @@ const ManageCategories = () => {
                 onChange={(e) =>
                   setEditCategoryPayload((p) => ({
                     ...p,
-                    description: e.target.value,
+                    description: e.target.value.slice(
+                      0,
+                      CATEGORY_DESCRIPTION_MAX_LENGTH,
+                    ),
                   }))
                 }
                 placeholder="Optional description"
+                maxLength={CATEGORY_DESCRIPTION_MAX_LENGTH}
                 disabled={updatingCategory}
+                aria-describedby="editCategoryDescriptionCharHint"
               />
+              <Form.Text
+                id="editCategoryDescriptionCharHint"
+                className={`small ${editCategoryPayload.description.length >= CATEGORY_DESCRIPTION_MAX_LENGTH ? "text-warning" : "text-muted"}`}
+              >
+                {editCategoryPayload.description.length} /{" "}
+                {CATEGORY_DESCRIPTION_MAX_LENGTH} characters
+              </Form.Text>
             </Form.Group>
 
             <Form.Group controlId="editCategoryIsActive">
@@ -543,8 +703,14 @@ const ManageCategories = () => {
             >
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={updatingCategory}>
-              {updatingCategory ? "Saving..." : "Save"}
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={
+                updatingCategory || !editCategoryPayload.name.trim()
+              }
+            >
+              {updatingCategory ? "Updating..." : "Update"}
             </Button>
           </Modal.Footer>
         </Form>
