@@ -6,8 +6,13 @@ import {
   MoreVertical,
   Phone as PhoneIcon,
   Mail,
+  Tags,
 } from "lucide-react";
 import type { TableAction } from "@components/GenericTable";
+import {
+  CRM_PERSON_DISPOSITION_OPTIONS,
+  getCrmPersonRowDispositionRaw,
+} from "@utils/crmPersonDisposition";
 
 export type BuildCrmProspectsContactsTableActionsParams = {
   session: { user?: { permissions?: string[] } } | null;
@@ -23,6 +28,8 @@ export type BuildCrmProspectsContactsTableActionsParams = {
   setDeleteModalMode: (mode: "single" | "bulk" | null) => void;
   setItemToDelete: (row: any) => void;
   setShowDeleteModal: (open: boolean) => void;
+  /** Right-click / row menu: quick-set disposition (same permission as Edit). */
+  onDispositionChange?: (row: any, dispositionValue: string) => void | Promise<void>;
 };
 
 export function buildCrmProspectsContactsTableActions({
@@ -39,6 +46,7 @@ export function buildCrmProspectsContactsTableActions({
   setDeleteModalMode,
   setItemToDelete,
   setShowDeleteModal,
+  onDispositionChange,
 }: BuildCrmProspectsContactsTableActionsParams): TableAction<any>[] {
   return [
     ...(session?.user?.permissions?.includes("view-crm-data-management")
@@ -61,6 +69,30 @@ export function buildCrmProspectsContactsTableActions({
               setShowCreateContactSidebar(true);
             },
             variant: "link" as const,
+          },
+        ]
+      : []),
+    ...(session?.user?.permissions?.includes("view-crm-data-management") &&
+    onDispositionChange
+      ? [
+          {
+            label: "Disposition",
+            icon: <Tags size={16} />,
+            variant: "link" as const,
+            dropdown: {
+              align: "end" as const,
+              nestInContextMenu: true,
+              options: CRM_PERSON_DISPOSITION_OPTIONS.map(
+                ({ value, label }) => ({
+                  label,
+                  onClick: (row: any) => {
+                    void onDispositionChange(row, value);
+                  },
+                  show: (row: any) =>
+                    getCrmPersonRowDispositionRaw(row) !== value,
+                }),
+              ),
+            },
           },
         ]
       : []),

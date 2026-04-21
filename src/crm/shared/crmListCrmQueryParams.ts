@@ -4,8 +4,8 @@ import { ModuleSlug } from "@utils/Helper";
 export type CrmListPaginationSlice = {
   currentPage: number;
   rowsPerPage: number;
-  sortColumn: string;
-  sortDirection: "asc" | "desc";
+  sortBy: string;
+  sortOrder: "asc" | "desc";
 };
 
 function copyTruthyFilterToParam(
@@ -32,6 +32,12 @@ function mergeUserExtensionsParam(
   target: Record<string, any>,
   filters: Record<string, any>,
 ): void {
+  if (filters.user_extension_filter?.length) {
+    target.user_extension_filter = Array.isArray(filters.user_extension_filter)
+      ? filters.user_extension_filter
+      : [filters.user_extension_filter];
+    return;
+  }
   if (!filters.user_extension?.length) return;
   target.user_extensions = Array.isArray(filters.user_extension)
     ? filters.user_extension
@@ -122,9 +128,9 @@ export function buildCrmListTableCrmDataParams(
     ...overrides,
   };
   applySharedCrmListGetCrmDataFilters(params, memoizedFilters);
-  if (pagination.sortColumn) {
-    params.sort_column = pagination.sortColumn;
-    params.sort_direction = pagination.sortDirection;
+  if (pagination.sortBy) {
+    params.sort_by = pagination.sortBy;
+    params.sort_order = pagination.sortOrder;
   }
   params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
   return params;
@@ -163,4 +169,36 @@ export function computeCrmListAdvancedFiltersApplied(
     !!currentFilters.scheduled_call_to;
 
   return hasCampaign || hasTags || hasSource || hasNextCall;
+}
+
+/**
+ * Copy a fixed set of keys from a filter object onto API params when values are truthy.
+ * Use for leads/deals/orders/tasks-style lists to avoid repeating `if (filters.x) params.x = …`.
+ */
+export function copyTruthyKeysToParams(
+  target: Record<string, any>,
+  source: Record<string, any>,
+  keys: readonly string[],
+): void {
+  for (const key of keys) {
+    const v = source[key];
+    if (v) {
+      target[key] = v;
+    }
+  }
+}
+
+/**
+ * Copy keys when `source[key] !== undefined` (preserves explicit `null` if needed by API).
+ */
+export function copyDefinedKeysToParams(
+  target: Record<string, any>,
+  source: Record<string, any>,
+  keys: readonly string[],
+): void {
+  for (const key of keys) {
+    if (source[key] !== undefined) {
+      target[key] = source[key];
+    }
+  }
 }

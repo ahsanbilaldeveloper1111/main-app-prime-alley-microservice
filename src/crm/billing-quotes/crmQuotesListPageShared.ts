@@ -20,6 +20,14 @@ export const crmQuotesListDefaultTableColumnIds = [
   "created_at",
 ] as const;
 
+/** Primary localStorage key for quotes list column visibility (billing + CRM). */
+export const CRM_QUOTES_LIST_VISIBLE_COLUMNS_STORAGE_KEY =
+  "crm-quotes-visible-columns-v1";
+
+export const CRM_QUOTES_LIST_VISIBLE_COLUMNS_LEGACY_KEYS = [
+  "crmDataSelectedColumns",
+] as const;
+
 const crmCampaignFetchBatchSize = 50;
 
 export type HistoryActivityWithOptionalCampaignIds = {

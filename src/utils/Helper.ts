@@ -718,6 +718,18 @@ export const formatNumber = (
   }).format(numAmount);
 };
 
+/** Human-readable file size for CRM attachment lists (shared by deals, approvals, orders). */
+export const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  const idx = Math.min(Math.max(i, 0), sizes.length - 1);
+  return (
+    Math.round((bytes / Math.pow(k, idx)) * 100) / 100 + " " + sizes[idx]
+  );
+};
+
 /**
  * Get cached session or fetch new one if cache is expired
  * This prevents multiple session fetches when checking permissions multiple times

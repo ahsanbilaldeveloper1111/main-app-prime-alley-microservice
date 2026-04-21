@@ -178,6 +178,76 @@ export const validateResponse = (response: any, $endPoint: string = '') => {
   }
 }
 
+function readDialResponseInnerPayload(data: unknown): Record<string, unknown> {
+  if (data == null || typeof data !== "object") {
+    return {};
+  }
+  const top = data as Record<string, unknown>;
+  const inner = top.responseData;
+  if (inner != null && typeof inner === "object" && !Array.isArray(inner)) {
+    return inner as Record<string, unknown>;
+  }
+  return top;
+}
+
+/**
+ * Extract CTI call id from a successful dialCall API payload (shapes vary by backend).
+ */
+export function extractCallIdFromDialApiData(data: unknown): string | undefined {
+  const inner = readDialResponseInnerPayload(data);
+  const direct = inner.callId ?? inner.call_id;
+  if (typeof direct === "string" && direct.length > 0) {
+    return direct;
+  }
+  const parties = inner.parties;
+  if (Array.isArray(parties) && parties[0] && typeof parties[0] === "object") {
+    const p = parties[0] as Record<string, unknown>;
+    const fromParty = p.callId ?? p.call_id;
+    if (typeof fromParty === "string" && fromParty.length > 0) {
+      return fromParty;
+    }
+  }
+  return undefined;
+}
+
+/** Line status string from dialCall success body (e.g. RINGING, CONNECTED). */
+export function extractDialApiLineStatus(data: unknown): string | undefined {
+  const inner = readDialResponseInnerPayload(data);
+  const s = inner.status ?? inner.callStatus;
+  return typeof s === "string" ? s : undefined;
+}
+
+/**
+ * Map CTI dial response status to activeCalls / floating-bar status.
+ */
+export function mapDialApiStatusToActiveCallStatus(
+  status: string | undefined,
+): "dialing" | "ringing" | "connected" | "onHold" | "ended" {
+  if (!status) {
+    return "dialing";
+  }
+  const u = status.toUpperCase();
+  switch (u) {
+    case "RINGING":
+    case "ALERTING":
+    case "PROCEEDING":
+      return "ringing";
+    case "CONNECTED":
+    case "ANSWERED":
+    case "RETRIEVED":
+      return "connected";
+    case "ON_HOLD":
+    case "HELD":
+      return "onHold";
+    case "ENDED":
+    case "DISCONNECTED":
+    case "DROPPED":
+      return "ended";
+    default:
+      return "dialing";
+  }
+}
+
 /**
  * Make a call using the CTI dial API
  * @param params - The dialing parameters
@@ -390,6 +460,28 @@ export const GetOngoingCall = async (params: any): Promise<any> => {
       error: CTI_ERROR_MESSAGES.NETWORK_ERROR_GET_ONGOING_CALLS
     }
   }
+}
+
+/**
+ * Other party's DN on the active call (for transfer/hold APIs that must not use self).
+ * Inbound: user is callee → remote is {@link callingAddress}.
+ * Outbound: user is caller → remote is {@link calledAddress}.
+ */
+export function getRemotePartyDnForTransfer(
+  userAddress: string | null | undefined,
+  callingAddress: string | null | undefined,
+  calledAddress: string | null | undefined,
+): string {
+  const userAddr = String(userAddress ?? "") 
+  const callingAddr = String(callingAddress ?? "") 
+  const calledAddr = String(calledAddress ?? "")
+  if (userAddr && calledAddr === userAddr && callingAddr) {
+    return callingAddr
+  }
+  if (userAddr && callingAddr === userAddr && calledAddr) {
+    return calledAddr
+  }
+  return calledAddr || callingAddr
 }
 
 /**

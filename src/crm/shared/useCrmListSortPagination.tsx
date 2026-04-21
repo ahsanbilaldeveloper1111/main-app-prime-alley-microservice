@@ -14,8 +14,8 @@ import { getTotalPages } from "./crmListSortPaginationUtils";
 type CrmListPagination = {
   currentPage: number;
   rowsPerPage: number;
-  sortColumn: string;
-  sortDirection: "asc" | "desc";
+  sortBy: string;
+  sortOrder: "asc" | "desc";
 };
 
 interface UseCrmListSortPaginationParams {
@@ -33,22 +33,22 @@ export function useCrmListSortPagination({
 }: UseCrmListSortPaginationParams) {
   const handleSort = (column: string) => {
     const newDirection =
-      pagination.sortColumn === column && pagination.sortDirection === "asc"
+      pagination.sortBy === column && pagination.sortOrder === "asc"
         ? "desc"
         : "asc";
     setPagination({
       ...pagination,
-      sortColumn: column,
-      sortDirection: newDirection,
+      sortBy: column,
+      sortOrder: newDirection,
       currentPage: 1,
     });
   };
 
   const renderSortIcon = (column: string) => {
-    if (pagination.sortColumn !== column) {
+    if (pagination.sortBy !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return pagination.sortDirection === "asc" ? (
+    return pagination.sortOrder === "asc" ? (
       <ArrowUp size={14} className="ms-1" />
     ) : (
       <ArrowDown size={14} className="ms-1" />

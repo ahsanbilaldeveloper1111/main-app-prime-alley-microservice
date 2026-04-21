@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useProjectSettingsTabListState, paginatedSlice } from '@planner/projectTabTableShared';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import Select from 'react-select';
 import { UserPlus, Edit, Trash2, Users, Filter } from 'lucide-react';
@@ -61,16 +62,15 @@ const MembersTab: React.FC<MembersTabProps> = ({
   const [formData, setFormData] = useState({ extension_number: '', role: 'member' });
   const [processing, setProcessing] = useState(false);
 
-  // Pagination and search states
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortColumn: '',
-    sortDirection: 'asc' as 'asc' | 'desc',
-  });
-  const [searchValue, setSearchValue] = useState('');
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [selectedColumns] = useState<string[]>(['member', 'extension_number', 'role']);
+  const {
+    pagination,
+    setPagination,
+    searchValue,
+    setSearchValue,
+    selectedItems,
+    setSelectedItems,
+    selectedColumns,
+  } = useProjectSettingsTabListState(['member', 'extension_number', 'role']);
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -356,11 +356,15 @@ const MembersTab: React.FC<MembersTabProps> = ({
     return result;
   }, [enrichedMembers, searchValue, roleFilter]);
 
-  const paginatedMembers = useMemo(() => {
-    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
-    const end = start + pagination.rowsPerPage;
-    return filteredMembers.slice(start, end);
-  }, [filteredMembers, pagination.currentPage, pagination.rowsPerPage]);
+  const paginatedMembers = useMemo(
+    () =>
+      paginatedSlice(
+        filteredMembers,
+        pagination.currentPage,
+        pagination.rowsPerPage,
+      ),
+    [filteredMembers, pagination.currentPage, pagination.rowsPerPage],
+  );
 
   const countMembersByRole = useCallback((role: string) => {
     const r = role.toLowerCase();
@@ -627,6 +631,7 @@ const MembersTab: React.FC<MembersTabProps> = ({
           actions={actions}
           showActions={isAllow && actions.length > 0}
           actionsLabel="Actions"
+          showToolbarActions={false}
           
           // Selection
           selectable={isAllow}
@@ -654,13 +659,13 @@ const MembersTab: React.FC<MembersTabProps> = ({
           
           // Sorting
           sortable={true}
-          defaultSortColumn={pagination.sortColumn}
-          defaultSortDirection={pagination.sortDirection}
+          defaultSortBy={pagination.sortBy}
+          defaultSortOrder={pagination.sortOrder}
           onSort={(column, direction) => {
             setPagination((prev) => ({
               ...prev,
-              sortColumn: column,
-              sortDirection: direction,
+              sortBy: column,
+              sortOrder: direction,
               currentPage: 1,
             }));
           }}

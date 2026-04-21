@@ -34,6 +34,9 @@ export function useCrmListAssignmentContactSidebarState() {
   const [campaignsById, setCampaignsById] = useState<Record<number, string>>(
     {},
   );
+  const [campaignStatusById, setCampaignStatusById] = useState<
+    Record<number, string>
+  >({});
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
   const assignmentEntries = {
@@ -41,7 +44,9 @@ export function useCrmListAssignmentContactSidebarState() {
     assignmentDistribution, setAssignmentDistribution, totalEntriesToAssign, setTotalEntriesToAssign,
     customDistribution, setCustomDistribution, assignmentCounts, setAssignmentCounts,
     availableTags, setAvailableTags, availableCampaigns, setAvailableCampaigns,
-    campaignsById, setCampaignsById, selectedItems, setSelectedItems,
+    campaignsById, setCampaignsById,
+    campaignStatusById, setCampaignStatusById,
+    selectedItems, setSelectedItems,
   };
 
   const [afterCallData, setAfterCallData] = useState({

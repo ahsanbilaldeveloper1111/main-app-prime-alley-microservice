@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useProjectSettingsTabListState, paginatedSlice } from '@planner/projectTabTableShared';
+import { ProjectSettingsPresetColorPicker } from '@planner/ProjectSettingsPresetColorPicker';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, Tag } from 'lucide-react';
 import { createProjectLabel, updateProjectLabel, deleteProjectLabel } from '@utils/tasks';
@@ -47,16 +49,15 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
   const [formData, setFormData] = useState({ name: '', color: '#4680FF' });
   const [processing, setProcessing] = useState(false);
 
-  // Pagination and search states
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    rowsPerPage: 15,
-    sortColumn: '',
-    sortDirection: 'asc' as 'asc' | 'desc',
-  });
-  const [searchValue, setSearchValue] = useState('');
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
-  const [selectedColumns] = useState<string[]>(['name', 'color', 'tasks']);
+  const {
+    pagination,
+    setPagination,
+    searchValue,
+    setSearchValue,
+    selectedItems,
+    setSelectedItems,
+    selectedColumns,
+  } = useProjectSettingsTabListState(['name', 'color', 'tasks']);
   const [colorFilter, setColorFilter] = useState<string | null>(null);
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
@@ -125,12 +126,6 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     setSelectedLabel(label);
     setShowDeleteModal(true);
   }, []);
-
-  const predefinedColors = [
-    '#4680FF', '#2CA87F', '#FFB64D', '#DC2626', '#9E9E9E',
-    '#667EEA', '#F56565', '#48BB78', '#ED8936', '#4FC3F7',
-    '#06b6d4', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'
-  ];
 
   // ── Enrich labels with task count (from API fields when present) ─────────
   const enrichedLabels = useMemo(
@@ -256,11 +251,15 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
     return result;
   }, [enrichedLabels, searchValue, colorFilter]);
 
-  const paginatedLabels = useMemo(() => {
-    const start = (pagination.currentPage - 1) * pagination.rowsPerPage;
-    const end = start + pagination.rowsPerPage;
-    return filteredLabels.slice(start, end);
-  }, [filteredLabels, pagination.currentPage, pagination.rowsPerPage]);
+  const paginatedLabels = useMemo(
+    () =>
+      paginatedSlice(
+        filteredLabels,
+        pagination.currentPage,
+        pagination.rowsPerPage,
+      ),
+    [filteredLabels, pagination.currentPage, pagination.rowsPerPage],
+  );
 
   // ── Stats Cards ───────────────────────────────────────────────────────────
   const statsCardsData: StatsCardData[] = useMemo(() => {
@@ -510,13 +509,13 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
           
           // Sorting
           sortable={true}
-          defaultSortColumn={pagination.sortColumn}
-          defaultSortDirection={pagination.sortDirection}
+          defaultSortBy={pagination.sortBy}
+          defaultSortOrder={pagination.sortOrder}
           onSort={(column, direction) => {
             setPagination((prev) => ({
               ...prev,
-              sortColumn: column,
-              sortDirection: direction,
+              sortBy: column,
+              sortOrder: direction,
               currentPage: 1,
             }));
           }}
@@ -563,29 +562,11 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Color</Form.Label>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                {predefinedColors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, color })}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '6px',
-                      backgroundColor: color,
-                      border: formData.color === color ? '3px solid #1F2937' : '2px solid #E5E9F2',
-                      cursor: 'pointer',
-                      padding: 0
-                    }}
-                  />
-                ))}
-              </div>
-              <Form.Control
-                type="color"
-                value={formData.color}
-                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                style={{ width: '100%', height: '40px' }}
+              <ProjectSettingsPresetColorPicker
+                color={formData.color}
+                onColorChange={(next) =>
+                  setFormData((prev) => ({ ...prev, color: next }))
+                }
               />
             </Form.Group>
           </Form>
@@ -622,29 +603,11 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Color</Form.Label>
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                {predefinedColors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, color })}
-                    style={{
-                      width: '32px',
-                      height: '32px',
-                      borderRadius: '6px',
-                      backgroundColor: color,
-                      border: formData.color === color ? '3px solid #1F2937' : '2px solid #E5E9F2',
-                      cursor: 'pointer',
-                      padding: 0
-                    }}
-                  />
-                ))}
-              </div>
-              <Form.Control
-                type="color"
-                value={formData.color}
-                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                style={{ width: '100%', height: '40px' }}
+              <ProjectSettingsPresetColorPicker
+                color={formData.color}
+                onColorChange={(next) =>
+                  setFormData((prev) => ({ ...prev, color: next }))
+                }
               />
             </Form.Group>
           </Form>

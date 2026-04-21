@@ -63,27 +63,9 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 /** Row from `getProducts` / list-products — not CRM `getCrmData`. */
 type BillingProductRow = ProductData & Record<string, unknown>;
 
-let customFieldIdSeq = 0;
-function createCustomFieldId(fieldName: string): string {
-  const w = (globalThis as unknown as { window?: Window }).window;
-  const cryptoObj = w?.crypto;
-
-  if (cryptoObj?.randomUUID) {
-    return `${cryptoObj.randomUUID()}-${fieldName}`;
-  }
-
-  if (cryptoObj?.getRandomValues) {
-    const bytes = new Uint8Array(16);
-    cryptoObj.getRandomValues(bytes);
-    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-    return `${hex}-${fieldName}`;
-  }
-
-  customFieldIdSeq += 1;
-  return `${Date.now()}-${customFieldIdSeq}-${fieldName}`;
-}
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 
 const VALID_FILTERS = new Set(["all"]);
 
@@ -350,6 +332,30 @@ const ACTION_BUTTON_BASE_STYLE: React.CSSProperties = {
   gap: "8px",
 };
 
+function BillingProductsToolbarButton({
+  onClick,
+  children,
+}: Readonly<{
+  onClick: () => void;
+  children: React.ReactNode;
+}>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={ACTION_BUTTON_BASE_STYLE}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#1a1a1a";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "#000000";
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 const BillingManagement = () => {
   const { data: session } = useSession();
   const router = useRouter();
@@ -602,8 +608,8 @@ const BillingManagement = () => {
       memoizedFilters.created_at_to,
       pagination.currentPage,
       pagination.rowsPerPage,
-      pagination.sortColumn,
-      pagination.sortDirection,
+      pagination.sortBy,
+      pagination.sortOrder,
     ],
   );
 
@@ -1055,20 +1061,30 @@ const BillingManagement = () => {
         type: "custom",
         render: (row: any) => {
           return <div className="d-flex gap-1">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => openProductEditModal(row)}
-            >
-              <FiEdit size={16} />
-            </Button>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => openProductDeleteModal(row)}
-            >
-              <FiTrash2 size={16} />
-            </Button>
+            <button
+  onClick={() => openProductEditModal(row)}
+  style={{
+    background: "transparent",
+    border: "none",
+    padding: "4px",
+    cursor: "pointer",
+    color: "#0d6efd" // blue (edit)
+  }}
+>
+  <FiEdit size={16} />
+</button>
+<button
+  onClick={() => openProductDeleteModal(row)}
+  style={{
+    background: "transparent",
+    border: "none",
+    padding: "4px",
+    cursor: "pointer",
+    color: "#dc3545" // red
+  }}
+>
+  <FiTrash2 size={16} />
+</button>
           </div>;
         },
       },
@@ -1187,8 +1203,7 @@ const BillingManagement = () => {
       },
       ...customTabs,
     ],
-    onTabAdd: () => setShowTabModal(true),
-    onTabRemove: (tabId) => {
+    onTabRemove: (tabId: string) => {
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
       if (activeFilter === tabId) handleFilterChange("all");
     },
@@ -1462,6 +1477,7 @@ const BillingManagement = () => {
                   selectedColumns.includes(c.key),
                 )}
                 actions={productsActions}
+                showToolbarActions={false}
                 showActions={false}
                 // Pagination
                 pagination={{
@@ -1479,13 +1495,13 @@ const BillingManagement = () => {
                 }}
                 // Sorting
                 sortable={true}
-                defaultSortColumn={pagination.sortColumn}
-                defaultSortDirection={pagination.sortDirection}
+                defaultSortBy={pagination.sortBy}
+                defaultSortOrder={pagination.sortOrder}
                 onSort={(column, direction) => {
                   setPagination((prev) => ({
                     ...prev,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                     currentPage: 1,
                   }));
                 }}
@@ -1514,6 +1530,8 @@ const BillingManagement = () => {
                 showToolbar={true}
                 toolbar={{
                   ...productsToolbarConfig,
+                  tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
+                  showFiltersButton: false,
                   showFilterPills: true,
                   showViewSwitcher: false,
                   filterPills: productsFilterPills,
@@ -1787,7 +1805,7 @@ const BillingManagement = () => {
         title="Customize Columns"
         columns={productsColumns.map((c) => ({ key: c.key, label: c.label }))}
         selectedColumnKeys={selectedColumns}
-        onApply={(keys) => {
+        onApply={(keys: string[]) => {
           setSelectedColumns(keys);
           const w = (globalThis as unknown as { window?: Window }).window;
           if (w) {
@@ -1817,8 +1835,7 @@ const BillingManagement = () => {
       {/* Create Contact Sidebar */}
       {renderCreateContactSidebar()}
       {/* Create Product Modal */}
-       {/* Create Product Modal */}
-       {showCreateProductModal && (
+      {showCreateProductModal && (
         <CreateProductModal
           key={createProductModalKey}
           productId={editingProductId ?? undefined}

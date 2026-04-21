@@ -1,0 +1,44 @@
+---
+description: SonarQube-inspired code quality standards for this repository
+alwaysApply: true
+---
+
+# SonarQube Code Quality
+
+- Prefer simple, readable code: small functions, early returns, and shallow nesting.
+- Remove duplication before adding code; extract shared hooks, helpers, constants, or components.
+- Keep branching easy to follow; avoid repeated conditions, nested ternaries, and dense boolean expressions.
+- Handle errors explicitly; never leave empty `catch` blocks or silently ignore failures.
+- Use precise types in TypeScript; avoid `any`, unsafe casts, and non-null assertions unless clearly justified.
+- Keep React render paths pure; no side effects in render, correct hook dependencies, and stable list keys.
+- Delete dead code, unreachable branches, unused variables, and commented-out implementations instead of leaving them behind.
+- Validate nullable or external data at boundaries; prefer safe access and guard clauses over assumptions.
+- Avoid suppressing lint or quality rules; if suppression is unavoidable, keep it narrow and explain why.
+- Leave touched code clearer, safer, and easier to test than before.
+
+## Quick examples
+
+```ts
+// Bad
+if (user && user.profile && user.profile.name) save(user.profile.name);
+
+// Good
+const profileName = user?.profile?.name;
+if (!profileName) return;
+save(profileName);
+```
+
+```ts
+// Bad
+try {
+  await submit();
+} catch (error) {}
+
+// Good
+try {
+  await submit();
+} catch (error) {
+  reportError(error);
+  throw error;
+}
+```

@@ -20,15 +20,15 @@ function sortComparableString(value: unknown): string {
 
 export function sortData<T extends Record<string, unknown>>(
   data: T[],
-  sortColumn: string,
-  sortDirection: "asc" | "desc",
+  sortBy: string,
+  sortOrder: "asc" | "desc",
 ): T[] {
-  if (!sortColumn) return data;
+  if (!sortBy) return data;
 
-  const factor = sortDirection === "asc" ? 1 : -1;
+  const factor = sortOrder === "asc" ? 1 : -1;
   return [...data].sort((a, b) => {
-    const aStr = sortComparableString(a[sortColumn]).toLowerCase();
-    const bStr = sortComparableString(b[sortColumn]).toLowerCase();
+    const aStr = sortComparableString(a[sortBy]).toLowerCase();
+    const bStr = sortComparableString(b[sortBy]).toLowerCase();
     return aStr.localeCompare(bStr) * factor;
   });
 }

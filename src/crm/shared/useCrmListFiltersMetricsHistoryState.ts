@@ -6,6 +6,7 @@ import {
 } from "react";
 import type { NextRouter } from "next/router";
 import type { TabConfig } from "@components/GenericTable";
+import { loadVisibleColumnKeys } from "@utils/crmListVisibleColumnsStorage";
 import {
   useCrmListPageTabCreateContactAndFilter,
   type CrmListContactSidebarParams,
@@ -20,8 +21,8 @@ import {
 type CrmListPagination = {
   currentPage: number;
   rowsPerPage: number;
-  sortColumn: string;
-  sortDirection: "asc" | "desc";
+  sortBy: string;
+  sortOrder: "asc" | "desc";
 };
 
 const DEFAULT_PAGE_FILTERS = {
@@ -46,6 +47,9 @@ export type UseCrmListFiltersMetricsHistoryStateParams<M> = {
   router: NextRouter;
   validFilters: string[];
   defaultColumnIds: string[];
+  /** When set, initial column selection is restored from localStorage. */
+  selectedColumnsStorageKey?: string;
+  selectedColumnsLegacyStorageKeys?: readonly string[];
   initialMetrics: M;
   setCampaignsById: Dispatch<SetStateAction<Record<number, string>>>;
 } & CrmListContactSidebarParams<CrmListContactFormState>;
@@ -61,6 +65,8 @@ export function useCrmListFiltersMetricsHistoryState<M>(
     router,
     validFilters,
     defaultColumnIds,
+    selectedColumnsStorageKey,
+    selectedColumnsLegacyStorageKeys,
     initialMetrics,
     setCampaignsById,
     showAddContactsDropdown,
@@ -75,6 +81,7 @@ export function useCrmListFiltersMetricsHistoryState<M>(
     setContactFormLoading,
     sourceField,
     loadFailedMessage,
+    seedNewContactForm,
   } = params;
 
   const [activeFilter, setActiveFilter] = useState("all");
@@ -91,15 +98,23 @@ export function useCrmListFiltersMetricsHistoryState<M>(
   const [viewMode, setViewMode] = useState<"table" | "board">("table");
 
   const defaultSelectedColumns = [...defaultColumnIds];
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(
-    () => defaultSelectedColumns,
-  );
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
+    if (!selectedColumnsStorageKey) {
+      return defaultSelectedColumns;
+    }
+    return loadVisibleColumnKeys(
+      selectedColumnsStorageKey,
+      defaultColumnIds,
+      defaultColumnIds,
+      selectedColumnsLegacyStorageKeys,
+    );
+  });
 
   const [pagination, setPagination] = useState<CrmListPagination>({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc",
+    sortBy: "",
+    sortOrder: "asc",
   });
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -124,6 +139,7 @@ export function useCrmListFiltersMetricsHistoryState<M>(
     setContactFormLoading,
     sourceField,
     loadFailedMessage,
+    seedNewContactForm,
   });
 
   const [clearSelectedRows, setClearSelectedRows] = useState(false);

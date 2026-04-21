@@ -47,13 +47,7 @@ export const useModuleSelection = (
                 try {
                     const modules = await GetModules();
                     if (modules && Array.isArray(modules)) {
-                        // Filter modules based on user permissions (same as user view page)
-                        const permissionFilteredModules = modules.filter(module => {
-                            const moduleSlug = Object.values(ModuleSlug).find(slug => slug === module.slug);
-                            const hasPermission = moduleSlug && session?.user?.permissions?.includes("view-" + moduleSlug) || moduleSlug && session?.user?.permissions?.includes(moduleSlug + "-services") || moduleSlug && session?.user?.permissions?.includes(moduleSlug + "-services");
-                            return hasPermission;
-                        });
-                        setAllModules(permissionFilteredModules);
+                        setAllModules(modules);
                     }
                 } catch (error) {
                     console.error('Error fetching modules:', error);

@@ -2,13 +2,22 @@ import React, { type RefObject } from "react";
 import { ChevronDown, Trash2 } from "lucide-react";
 import {
   createEmptyCrmListContactFormState,
+  resolveDefaultContactOwnerExtension,
+  type CrmExtensionLikeForOwnerDefault,
   type CrmListContactFormState,
 } from "@utils/crmContactFormFromCrmItem";
 import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspectsContactsListPageConfig";
 
 export type CrmProspectsContactsAddContactsButtonProps = Readonly<{
   addContactsRef: RefObject<HTMLDivElement | null>;
-  session: { user?: { permissions?: string[] } } | null;
+  session: {
+    user?: {
+      permissions?: string[];
+      phone?: string | number | null;
+      extension?: string | number | null;
+    };
+  } | null;
+  extensions: readonly CrmExtensionLikeForOwnerDefault[];
   config: CrmProspectsContactsListPageConfig;
   selectedItems: unknown[];
   showAddContactsDropdown: boolean;
@@ -24,6 +33,7 @@ export type CrmProspectsContactsAddContactsButtonProps = Readonly<{
 export function CrmProspectsContactsAddContactsButton({
   addContactsRef,
   session,
+  extensions,
   config,
   selectedItems,
   showAddContactsDropdown,
@@ -126,7 +136,14 @@ export function CrmProspectsContactsAddContactsButton({
               onClick={() => {
                 setShowAddContactsDropdown(false);
                 setEditingContactId(null);
-                setContactForm(createEmptyCrmListContactFormState("source_file"));
+                setContactForm(
+                  createEmptyCrmListContactFormState("source_file", {
+                    defaultContactOwner: resolveDefaultContactOwnerExtension(
+                      session?.user,
+                      extensions,
+                    ),
+                  }),
+                );
                 setShowCreateContactSidebar(true);
               }}
               style={{

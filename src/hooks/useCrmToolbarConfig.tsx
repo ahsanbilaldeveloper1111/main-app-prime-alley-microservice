@@ -15,6 +15,169 @@ function isProspectsLikeEntity(entity: CrmEntityType): boolean {
   return entity === "prospects" || entity === "contacts";
 }
 
+function getProspectsLikeOwnerFilterValue(
+  entity: CrmEntityType,
+  filters: Record<string, any>,
+): unknown {
+  if (entity === "prospects" || entity === "contacts") {
+    return filters.user_extension_filter;
+  }
+  return filters.user_extension;
+}
+
+function shouldUseOwnerLabel(entity: CrmEntityType): boolean {
+  return (
+    isProspectsLikeEntity(entity) ||
+    entity === "leads" ||
+    entity === "deals" ||
+    entity === "orders" ||
+    entity === "approvals"
+  );
+}
+
+function getOwnerFilterKey(entity: CrmEntityType): "user_extension_filter" | "user_extension" {
+  return entity === "prospects" || entity === "contacts"
+    ? "user_extension_filter"
+    : "user_extension";
+}
+
+function hasProspectsLikeOwnerFilter(value: unknown): boolean {
+  if (!value) {
+    return false;
+  }
+  if (!Array.isArray(value)) {
+    return true;
+  }
+  return value.length > 0;
+}
+
+/** Safe display when no extension row matches; avoids String(object) → "[object Object]". */
+function extensionIdToFallbackLabel(extensionId: unknown): string {
+  if (
+    typeof extensionId === "string" ||
+    typeof extensionId === "number" ||
+    typeof extensionId === "boolean" ||
+    typeof extensionId === "bigint"
+  ) {
+    return String(extensionId);
+  }
+  if (extensionId !== null && typeof extensionId === "object") {
+    const record = extensionId as Record<string, unknown>;
+    for (const key of ["id", "value", "extension"] as const) {
+      const v = record[key];
+      if (typeof v === "string" || typeof v === "number") {
+        return String(v);
+      }
+    }
+  }
+  return "";
+}
+
+function findExtensionLabel(
+  extensionId: unknown,
+  extensions: Array<{ id?: string; extension?: string; display_name?: string; name?: string }>,
+): string | undefined {
+  if (!extensionId) {
+    return undefined;
+  }
+  const ext = extensions.find((item: any) => (item.id || item.extension) === extensionId);
+  if (ext) {
+    return ext.display_name || ext.name || ext.extension;
+  }
+  const fallback = extensionIdToFallbackLabel(extensionId);
+  return fallback || undefined;
+}
+
+function getOwnerFilterValue(
+  entity: CrmEntityType,
+  prospectsLikeOwnerFilterValue: unknown,
+  currentFilters: Record<string, any>,
+): unknown {
+  if (!isProspectsLikeEntity(entity)) {
+    return currentFilters.assigned_to;
+  }
+  if (Array.isArray(prospectsLikeOwnerFilterValue)) {
+    return prospectsLikeOwnerFilterValue[0];
+  }
+  return prospectsLikeOwnerFilterValue;
+}
+
+function buildOwnerPill({
+  entity,
+  currentFilters,
+  extensions,
+  handleFiltersChange,
+  refresh,
+}: {
+  entity: CrmEntityType;
+  currentFilters: Record<string, any>;
+  extensions: Array<{ id?: string; extension?: string; display_name?: string; name?: string }>;
+  handleFiltersChange: (filters: Record<string, any>) => void;
+  refresh: () => void;
+}): FilterPill {
+  const ownerLabel = shouldUseOwnerLabel(entity) ? "Owner" : "Associate with";
+  const isOwnerArray = isProspectsLikeEntity(entity);
+  const prospectsLikeOwnerFilterValue = getProspectsLikeOwnerFilterValue(entity, currentFilters);
+  const hasOwnerFilter = isOwnerArray
+    ? hasProspectsLikeOwnerFilter(prospectsLikeOwnerFilterValue)
+    : Boolean(currentFilters.assigned_to);
+  const ownerFilterValue = getOwnerFilterValue(
+    entity,
+    prospectsLikeOwnerFilterValue,
+    currentFilters,
+  );
+  const ownerActiveLabel = findExtensionLabel(ownerFilterValue, extensions);
+
+  const clearOwner = () => {
+    if (isProspectsLikeEntity(entity)) {
+      const key = getOwnerFilterKey(entity);
+      handleFiltersChange({
+        ...currentFilters,
+        [key]: undefined,
+      });
+    } else {
+      handleFiltersChange({ ...currentFilters, assigned_to: undefined });
+    }
+    refresh();
+  };
+
+  return {
+    id: "contact_owner",
+    label: ownerLabel,
+    showDropdown: true,
+    searchable: shouldUseOwnerLabel(entity),
+    active: !!hasOwnerFilter,
+    activeLabel: ownerActiveLabel,
+    onClear: clearOwner,
+    dropdownOptions: [
+      {
+        label: "All Owners",
+        value: "all",
+        onClick: clearOwner,
+      },
+      ...extensions.map((ext) => ({
+        label: ext.display_name || ext.name || ext.extension || String(ext.id ?? ext.extension ?? ""),
+        value: String(ext.id ?? ext.extension),
+        onClick: () => {
+          if (isProspectsLikeEntity(entity)) {
+            const key = getOwnerFilterKey(entity);
+            handleFiltersChange({
+              ...currentFilters,
+              [key]: [ext.id || ext.extension],
+            });
+          } else {
+            handleFiltersChange({
+              ...currentFilters,
+              assigned_to: ext.id || ext.extension,
+            });
+          }
+          refresh();
+        },
+      })),
+    ],
+  };
+}
+
 export interface UseCrmToolbarConfigOptions {
   entity: CrmEntityType;
 
@@ -167,87 +330,15 @@ export function useCrmToolbarConfig(
   const filterPills = useMemo((): FilterPill[] => {
     const pills: FilterPill[] = [];
 
-    // Owner / Associate pill (all entities)
-    const ownerLabel =
-      isProspectsLikeEntity(entity) ||
-      entity === "leads" ||
-      entity === "deals" ||
-      entity === "orders" ||
-      entity === "approvals"
-        ? "Owner"
-        : "Associate with";
-
-    const isOwnerArray = isProspectsLikeEntity(entity);
-    const hasOwnerFilter = isOwnerArray
-      ? currentFilters.user_extension &&
-        (Array.isArray(currentFilters.user_extension)
-          ? currentFilters.user_extension.length > 0
-          : true)
-      : !!currentFilters.assigned_to;
-
-    const ownerActiveLabel = (() => {
-      if (isProspectsLikeEntity(entity)) {
-        const extId = Array.isArray(currentFilters.user_extension)
-          ? currentFilters.user_extension[0]
-          : currentFilters.user_extension;
-        if (!extId) return undefined;
-        const ext = extensions.find((e: any) => (e.id || e.extension) === extId);
-        return ext ? ext.display_name || ext.name || ext.extension : String(extId);
-      }
-      const extId = currentFilters.assigned_to;
-      if (!extId) return undefined;
-      const ext = extensions.find((e: any) => (e.id || e.extension) === extId);
-      return ext ? ext.display_name || ext.name || ext.extension : String(extId);
-    })();
-
-    const clearOwner = () => {
-      if (isProspectsLikeEntity(entity)) {
-        handleFiltersChange({ ...currentFilters, user_extension: undefined });
-      } else {
-        handleFiltersChange({ ...currentFilters, assigned_to: undefined });
-      }
-      refresh();
-    };
-
-    pills.push({
-      id: "contact_owner",
-      label: ownerLabel,
-      showDropdown: true,
-      searchable:
-        isProspectsLikeEntity(entity) ||
-        entity === "leads" ||
-        entity === "deals" ||
-        entity === "orders" ||
-        entity === "approvals",
-      active: !!hasOwnerFilter,
-      activeLabel: ownerActiveLabel,
-      onClear: clearOwner,
-      dropdownOptions: [
-        {
-          label: "All Owners",
-          value: "all",
-          onClick: clearOwner,
-        },
-        ...extensions.map((ext) => ({
-          label: ext.display_name || ext.name || ext.extension || String(ext.id ?? ext.extension ?? ""),
-          value: String(ext.id ?? ext.extension),
-          onClick: () => {
-            if (isProspectsLikeEntity(entity)) {
-              handleFiltersChange({
-                ...currentFilters,
-                user_extension: [ext.id || ext.extension],
-              });
-            } else {
-              handleFiltersChange({
-                ...currentFilters,
-                assigned_to: ext.id || ext.extension,
-              });
-            }
-            refresh();
-          },
-        })),
-      ],
-    });
+    pills.push(
+      buildOwnerPill({
+        entity,
+        currentFilters,
+        extensions,
+        handleFiltersChange,
+        refresh,
+      }),
+    );
 
     // Create date pill (prospects, contacts, leads)
     if (isProspectsLikeEntity(entity) || entity === "leads") {
@@ -431,10 +522,15 @@ export function useCrmToolbarConfig(
       searchPlaceholder,
       onSearchChange: (value: string) => {
         onSearchChange(value);
-        if (!normalizeSearchQuery(value)) {
+        const q = normalizeSearchQuery(value);
+        if (!q) {
           handleFiltersChange({ ...currentFilters, search: undefined });
           refresh();
+          return;
         }
+        handleFiltersChange({ ...currentFilters, search: q });
+        onPaginationReset?.();
+        refresh();
       },
       onSearch: () => {
         const q = normalizeSearchQuery(searchValue);

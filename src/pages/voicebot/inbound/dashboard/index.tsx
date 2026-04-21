@@ -98,7 +98,7 @@ const InboundDashboardPage = () => {
       });
       const rows: CompanyTableRow[] = await Promise.all(
         companyList.map(async (c) => {
-          const cid = String(c.company_id ?? c.id ?? "");
+          const cid = String(c.id ?? c.company_id ?? "");
           try {
             const res = await getCallsStats(cid ? { company_id: cid } : undefined);
             const data = (res as { data?: { total_calls?: number; total_cost?: number } })?.data ?? (res as { total_calls?: number; total_cost?: number });

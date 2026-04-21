@@ -5,6 +5,11 @@ import CreatableSelect from "react-select/creatable";
 import PhoneInput from "react-phone-number-input";
 import { Dropdown, Spinner, Form } from "react-bootstrap";
 import RichNoteEditor from "@components/RichNoteEditor";
+import {
+  CRM_PERSON_DISPOSITION_OPTIONS,
+  formatCrmPersonDispositionLabel,
+} from "@utils/crmPersonDisposition";
+import { getDatetimeLocalMinNow } from "@utils/datetimeLocalInput";
 
 export interface ProspectFormState {
   firstName: string;
@@ -41,7 +46,8 @@ export interface ProspectEditSidebarProps {
   ) => void;
   contactFormLoading: boolean;
   contactFormLoadError: string | null;
-  availableCampaigns: Array<{ id: number; label: string }>;
+  /** Matches CRM list loaders: `{ value, label, id }` with stable numeric id in `id` or string id in `value`. */
+  availableCampaigns: Array<{ id?: number; value?: string; label: string }>;
   extensions: any[];
   availableTags: Array<{ value: string; label: string; id: number }>;
   onClose: () => void;
@@ -69,6 +75,7 @@ interface ProspectAdditionalSectionProps {
   contactForm: ProspectFormState;
   setContactForm: ProspectEditSidebarProps["setContactForm"];
   availableTags: ProspectEditSidebarProps["availableTags"];
+  isEditing: boolean;
   updateCustomField: (
     index: number,
     key: "field_name" | "field_value",
@@ -127,6 +134,44 @@ const getUpdatedFormForPhoneChange = (
   }
 };
 
+const PROSPECT_LEGAL_BASIS_OPTIONS = [
+  "Legitimate interest",
+  "Consent",
+  "Contract",
+  "Legal obligation",
+  "Vital interests",
+  "Public task",
+] as const;
+
+function campaignSelectOptionValue(c: {
+  id?: number;
+  value?: string;
+}): string | null {
+  if (c.id != null && Number.isFinite(Number(c.id))) {
+    return String(c.id);
+  }
+  const v = c.value;
+  if (v != null && String(v).trim() !== "") {
+    return String(v);
+  }
+  return null;
+}
+
+function toggleProspectLegalBasisOption(
+  option: string,
+  setContactForm: ProspectEditSidebarProps["setContactForm"],
+): void {
+  setContactForm((prev) => {
+    const selected = prev.legal_basis.includes(option);
+    return {
+      ...prev,
+      legal_basis: selected
+        ? prev.legal_basis.filter((b) => b !== option)
+        : [...prev.legal_basis, option],
+    };
+  });
+}
+
 const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
   contactForm,
   setContactForm,
@@ -137,7 +182,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
         htmlFor="prospect-campaign-select"
-        className="contact-form-label contact-form-label-required"
+        className="contact-form-label"
         style={{
           display: "block",
           fontSize: "14px",
@@ -146,13 +191,17 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
           marginBottom: "8px",
         }}
       >
-        Campaign <span style={{ color: "#f2545b" }}>*</span>
+        Campaign
       </label>
       {(() => {
-        const campaignSelectOptions = availableCampaigns.map((c) => ({
-          value: String(c.id),
-          label: c.label,
-        }));
+        const campaignSelectOptions = availableCampaigns
+          .map((c) => {
+            const value = campaignSelectOptionValue(c);
+            return value ? { value, label: c.label } : null;
+          })
+          .filter(
+            (o): o is { value: string; label: string } => o != null,
+          );
         return (
           <Select
             inputId="prospect-campaign-select"
@@ -163,10 +212,17 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
                     (o) => o.value === String(contactForm.campaign_id),
                   ) ?? null
             }
-            onChange={(opt: any) =>
-              setContactForm({
-                ...contactForm,
-                campaign_id: opt?.value ? Number(opt.value) : null,
+            onChange={(opt: { value: string } | null) =>
+              setContactForm((prev) => {
+                const raw = opt?.value;
+                const nextId =
+                  raw != null && raw !== ""
+                    ? Number(raw)
+                    : Number.NaN;
+                return {
+                  ...prev,
+                  campaign_id: Number.isFinite(nextId) ? nextId : null,
+                };
               })
             }
             options={campaignSelectOptions}
@@ -309,29 +365,22 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
             color: contactForm.disposition ? "#141414" : "#a0aec0",
           }}
         >
-          {contactForm.disposition || "Select..."}
+          {contactForm.disposition
+            ? formatCrmPersonDispositionLabel(contactForm.disposition)
+            : "Select..."}
         </Dropdown.Toggle>
         <Dropdown.Menu style={{ width: "100%" }}>
-          {[
-            "interested",
-            "not_interested",
-            "callback_requested",
-            "no_answer",
-            "busy",
-            "do_not_call",
-            "wrong_number",
-            "follow_up",
-          ].map((d) => (
+          {CRM_PERSON_DISPOSITION_OPTIONS.map(({ value, label }) => (
             <Dropdown.Item
-              key={d}
+              key={value}
               onClick={() =>
                 setContactForm({
                   ...contactForm,
-                  disposition: d,
+                  disposition: value,
                 })
               }
             >
-              {d.replaceAll("_", " ")}
+              {label}
             </Dropdown.Item>
           ))}
         </Dropdown.Menu>
@@ -351,7 +400,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
       >
         Legal basis for processing contact&apos;s data
       </label>
-      <Dropdown>
+      <Dropdown autoClose="outside">
         <Dropdown.Toggle
           id="prospect-legal-basis-dropdown"
           variant="outline-secondary"
@@ -371,36 +420,21 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
             : "Select..."}
         </Dropdown.Toggle>
         <Dropdown.Menu style={{ width: "100%", padding: "8px" }}>
-          {[
-            "Legitimate interest",
-            "Consent",
-            "Contract",
-            "Legal obligation",
-            "Vital interests",
-            "Public task",
-          ].map((option) => (
+          {PROSPECT_LEGAL_BASIS_OPTIONS.map((option) => (
             <Dropdown.Item
               key={option}
               as="div"
               style={{ padding: "4px 8px" }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const isSelected = contactForm.legal_basis.includes(option);
-                setContactForm({
-                  ...contactForm,
-                  legal_basis: isSelected
-                    ? contactForm.legal_basis.filter((b) => b !== option)
-                    : [...contactForm.legal_basis, option],
-                });
-              }}
+              onMouseDown={(e) => e.preventDefault()}
             >
               <Form.Check
                 type="checkbox"
                 id={`prospect-legal-basis-${option}`}
                 label={option}
                 checked={contactForm.legal_basis.includes(option)}
-                onChange={() => {}}
+                onChange={() =>
+                  toggleProspectLegalBasisOption(option, setContactForm)
+                }
               />
             </Dropdown.Item>
           ))}
@@ -414,9 +448,18 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
   contactForm,
   setContactForm,
   availableTags,
+  isEditing,
   updateCustomField,
   removeCustomField,
-}) => (
+}) => {
+  const scheduledFloor = getDatetimeLocalMinNow();
+  const allowLegacyPastScheduled =
+    isEditing &&
+    contactForm.scheduled_call_at !== "" &&
+    contactForm.scheduled_call_at < scheduledFloor;
+  const scheduledInputMin = allowLegacyPastScheduled ? undefined : scheduledFloor;
+
+  return (
   <div
     className="contact-form-section"
     style={{
@@ -480,13 +523,28 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
       <input
         id="prospect-scheduled-call-input"
         type="datetime-local"
+        {...(scheduledInputMin === undefined ? {} : { min: scheduledInputMin })}
         value={contactForm.scheduled_call_at}
-        onChange={(e) =>
+        onFocus={(e) => {
+          const floor = getDatetimeLocalMinNow();
+          const cur = contactForm.scheduled_call_at;
+          if (isEditing && cur !== "" && cur < floor) {
+            e.currentTarget.removeAttribute("min");
+          } else {
+            e.currentTarget.min = floor;
+          }
+        }}
+        onChange={(e) => {
+          const v = e.target.value;
+          const minVal = getDatetimeLocalMinNow();
+          if (v !== "" && v < minVal) {
+            return;
+          }
           setContactForm({
             ...contactForm,
-            scheduled_call_at: e.target.value,
-          })
-        }
+            scheduled_call_at: v,
+          });
+        }}
         style={{
           width: "100%",
           padding: "10px 12px",
@@ -515,12 +573,10 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
         inputId="prospect-tags-select"
         isMulti
         value={contactForm.tags}
-        onChange={(selected) =>
-          setContactForm({
-            ...contactForm,
-            tags: selected ? [...selected] : [],
-          })
-        }
+        onChange={(selected) => {
+          const tags = selected ? [...selected] : [];
+          setContactForm((prev: any) => ({ ...prev, tags }));
+        }}
         options={availableTags.map((t: any) => ({
           value: t.value,
           label: t.label,
@@ -540,7 +596,7 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
     </div>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
-        htmlFor="prospect-note-editor"
+        htmlFor="prospect-description-editor"
         className="contact-form-label"
         style={{
           display: "block",
@@ -550,13 +606,13 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
           marginBottom: "8px",
         }}
       >
-        Note
+        Description
       </label>
       <RichNoteEditor
-        id="prospect-note-editor"
+        id="prospect-description-editor"
         value={contactForm.note ?? ""}
         onChange={(html) => setContactForm({ ...contactForm, note: html })}
-        placeholder="Notes about this contact"
+        placeholder="Add a description for this contact"
         height={80}
       />
     </div>
@@ -687,7 +743,8 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
       </div>
     )}
   </div>
-);
+  );
+};
 
 const ProspectSidebarFooter: React.FC<ProspectSidebarFooterProps> = ({
   isFormValid,
@@ -1039,8 +1096,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
 
   return (
     <>
-      <button
-        type="button"
+      <div
         className="contact-sidebar-overlay"
         style={{
           position: "fixed",
@@ -1050,12 +1106,8 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
           bottom: 0,
           zIndex: 1000,
           background: "transparent",
-          border: "none",
-          padding: 0,
-          margin: 0,
         }}
-        onClick={onClose}
-        aria-label="Close prospect sidebar"
+        aria-hidden="true"
       />
 
         <div
@@ -1183,6 +1235,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                   contactForm={contactForm}
                   setContactForm={setContactForm}
                   availableTags={availableTags}
+                  isEditing={isEditing}
                   updateCustomField={updateCustomField}
                   removeCustomField={removeCustomField}
                 />

@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { generateEmail } from "@utils/communication";
+import { buildFollowUpTaskFields } from "@utils/crmFollowUpTaskDue";
 
 /** Normalize recipient to array (single string or array of strings). */
 function normalizeRecipientEmails(v?: string | string[]): string[] {
@@ -36,8 +37,9 @@ interface EmailModalProps {
     bcc: string[];
     subject: string;
     body: string;
-    createTask: boolean;
-    taskDueDate?: string;
+    createFollowUpTask: boolean;
+    followUpTaskDueDate: string | null;
+    followUpTaskDueTime: string | null;
     attachments?: File[];
   }) => void | Promise<void>;
 }
@@ -565,10 +567,14 @@ const EmailModal: React.FC<EmailModalProps> = ({
     }
     setConfirmSendWithoutSubject(false);
     const bodyToSend = bodyEditorRef.current?.innerHTML?.trim() ?? emailBody;
-    const dateToSend =
-      activityDate === "Custom..." ? customDate : activityDate;
-    const timeToSend =
+    const timeForFollowUp =
       activityDate === "Custom..." ? customTime : activityTime;
+    const followUp = buildFollowUpTaskFields(
+      createTask,
+      activityDate,
+      customDate,
+      timeForFollowUp,
+    );
     setSendLoading(true);
     try {
       await onSend({
@@ -577,8 +583,7 @@ const EmailModal: React.FC<EmailModalProps> = ({
         bcc: bccEmails,
         subject,
         body: bodyToSend,
-        createTask,
-        taskDueDate: createTask ? `${dateToSend} ${timeToSend}` : undefined,
+        ...followUp,
         attachments: attachments.length > 0 ? attachments : undefined,
       });
       setToEmails([]);

@@ -40,6 +40,7 @@ import {
 import { getMinifiedCompanies } from "@utils/crm";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { formatNumber } from "@utils/Helper";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -429,6 +430,7 @@ function buildInvoiceStatusFilterPills(
   applyInvoiceFiltersAndRefresh: () => void,
   handleStatusFilterPillSelect: (optValue: string) => void,
   handleInvoiceDateFromPillChange: (nextValue: string | undefined) => void,
+  handleInvoiceDateToPillChange: (nextValue: string | undefined) => void,
 ): FilterPill[] {
   return [
     {
@@ -496,6 +498,38 @@ function buildInvoiceStatusFilterPills(
             onMouseDown={(e) => e.stopPropagation()}
             onChange={(e) =>
               handleInvoiceDateFromPillChange(e.target.value || undefined)
+            }
+          />
+        </div>
+      ),
+    },
+    {
+      id: "date_to",
+      label: "Date To",
+      showDropdown: true,
+      active: !!currentFilters.date_to,
+      activeLabel: currentFilters.date_to || undefined,
+      onClear: () => {
+        setCurrentFilters((prev) => {
+          const { date_to, ...rest } = prev;
+          return rest;
+        });
+        applyInvoiceFiltersAndRefresh();
+      },
+      dropdownContent: (
+        <div style={{ minWidth: 220, padding: "4px 0" }}>
+          <input
+            type="date"
+            value={currentFilters.date_to ?? ""}
+            style={{
+              width: "100%",
+              padding: "6px 12px",
+              border: "1px solid #e5e7eb",
+              borderRadius: 4,
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onChange={(e) =>
+              handleInvoiceDateToPillChange(e.target.value || undefined)
             }
           />
         </div>
@@ -1233,6 +1267,20 @@ const InvoiceList = () => {
     [applyInvoiceFiltersAndRefresh],
   );
 
+  const handleInvoiceDateToPillChange = useCallback(
+    (nextValue: string | undefined) => {
+      setCurrentFilters((prev) => {
+        if (!nextValue) {
+          const { date_to, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, date_to: nextValue };
+      });
+      applyInvoiceFiltersAndRefresh();
+    },
+    [applyInvoiceFiltersAndRefresh],
+  );
+
   // Filter pills must use GenericTable `FilterPill` shape (`showDropdown` + `dropdownContent` / `dropdownOptions`), not ad-hoc `type`/`options`.
   const invoiceFilterPills = React.useMemo<FilterPill[]>(
     () =>
@@ -1242,12 +1290,14 @@ const InvoiceList = () => {
         applyInvoiceFiltersAndRefresh,
         handleStatusFilterPillSelect,
         handleInvoiceDateFromPillChange,
+        handleInvoiceDateToPillChange,
       ),
     [
       currentFilters,
       applyInvoiceFiltersAndRefresh,
       handleStatusFilterPillSelect,
       handleInvoiceDateFromPillChange,
+      handleInvoiceDateToPillChange,
     ],
   );
 
@@ -1337,6 +1387,7 @@ const InvoiceList = () => {
   const invoicesToolbarConfig: ToolbarConfig = {
     showTabs: true,
     tabsDropdownLabel: "Invoices",
+    tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
     tabs: [
       {
         id: "all",
@@ -1347,7 +1398,6 @@ const InvoiceList = () => {
     ],
     activeTab: "all",
     onTabChange: () => {},
-    onTabAdd: () => {},
     onTabRemove: () => {},
 
     showSearch: true,
@@ -1375,9 +1425,8 @@ const InvoiceList = () => {
 
     showFilterPills: true,
     filterPills: invoiceFilterPills,
-    showMoreFiltersButton: true,
-    showAdvancedFilters: true,
-    onAdvancedFiltersClick: handleOpenFiltersSidebar,
+    showMoreFiltersButton: false,
+    showAdvancedFilters: false,
 
     showSortButton: true,
     showExportButton: false,
@@ -1397,22 +1446,26 @@ const InvoiceList = () => {
         subTitle="Invoices"
       />
 
-      <div className="container-fluid">
-        <div className="mb-3 d-flex align-items-center gap-2">
-          <Form.Select
-            size="sm"
-            style={{ width: '220px' }}
-            value={String(selectedCompanyId)}
-            onChange={(e) => setSelectedCompanyId(e.target.value === '' ? '' : e.target.value)}
-          >
-            <option value="">All companies</option>
-            {companyOptions.map((c: { id: string | number; name?: string }) => (
-              <option key={c.id} value={c.id}>
-                {c.name ?? c.id}
-              </option>
-            ))}
-          </Form.Select>
-        </div>
+      {/* Main flex container — table + sidebar side-by-side */}
+      <div style={{ display: "flex", gap: "0", height: "calc(100vh)", overflow: "hidden" }}>
+        {/* Main content area */}
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden" }}>
+          <div className="container-fluid">
+            <div className="mb-3 d-flex align-items-center gap-2">
+              <Form.Select
+                size="sm"
+                style={{ width: '220px' }}
+                value={String(selectedCompanyId)}
+                onChange={(e) => setSelectedCompanyId(e.target.value === '' ? '' : e.target.value)}
+              >
+                <option value="">All companies</option>
+                {companyOptions.map((c: { id: string | number; name?: string }) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name ?? c.id}
+                  </option>
+                ))}
+              </Form.Select>
+            </div>
 
       <GenericTable<InvoiceData>
         data={invoiceList}
@@ -1448,20 +1501,104 @@ const InvoiceList = () => {
         fixedHeight={true}
         maxHeight="calc(100vh - 345px)"
       />
+          </div>
       </div>
 
-      <GenericSidebar
-        isOpen={showInvoiceSidebar}
-        onClose={closeInvoiceSidebar}
+        {/* Invoice Detail Sidebar — rendered alongside the table */}
+        {showInvoiceSidebar && (
+        <GenericSidebar
+          isOpen={showInvoiceSidebar}
+          onClose={closeInvoiceSidebar}
         title={selectedInvoiceSidebar ? `Invoice #${selectedInvoiceSidebar.invoice_number}` : "Invoice Details"}
         subtitle={selectedInvoiceSidebar?.company?.name ?? ""}
-        metadata={selectedInvoiceSidebar?.due_date ? `Due: ${moment(selectedInvoiceSidebar.due_date).format("DD-MMM-YYYY")}` : undefined}
+        avatar={{
+          initials: selectedInvoiceSidebar ? `#${String(selectedInvoiceSidebar.invoice_number).slice(-2)}` : "IN",
+          name: selectedInvoiceSidebar ? `Invoice #${selectedInvoiceSidebar.invoice_number}` : "Invoice",
+          gradient: "#6366F1",
+        }}
         width="400px"
+        quickActions={[
+          {
+            id: "view-invoice",
+            label: "View Full Invoice",
+            icon: Eye,
+            onClick: () => {
+              if (selectedInvoiceSidebar) {
+                setSelectedInvoiceForView(toInvoiceViewData(selectedInvoiceSidebar));
+                setShowViewInvoiceModal(true);
+                closeInvoiceSidebar();
+              }
+            },
+          },
+          ...(canPaySelectedInvoice
+            ? [
+                {
+                  id: "pay-now",
+                  label: "Pay Now",
+                  icon: DollarSign,
+                  onClick: () => {
+                    if (selectedInvoiceSidebar) {
+                      handlePayInvoice(selectedInvoiceSidebar);
+                      closeInvoiceSidebar();
+                    }
+                  },
+                },
+              ]
+            : []),
+          {
+            id: "download-pdf",
+            label: "Download PDF",
+            icon: Download,
+            onClick: () => {
+              if (selectedInvoiceSidebar) {
+                handleDownloadPDF(selectedInvoiceSidebar);
+              }
+            },
+          },
+        ]}
+        actionsDropdown={{
+          label: "Actions",
+          items: [
+            {
+              label: "View Full Invoice",
+              onClick: () => {
+                if (selectedInvoiceSidebar) {
+                  setSelectedInvoiceForView(toInvoiceViewData(selectedInvoiceSidebar));
+                  setShowViewInvoiceModal(true);
+                  closeInvoiceSidebar();
+                }
+              },
+            },
+            ...(canPaySelectedInvoice
+              ? [
+                  {
+                    label: "Pay Now",
+                    onClick: () => {
+                      if (selectedInvoiceSidebar) {
+                        handlePayInvoice(selectedInvoiceSidebar);
+                        closeInvoiceSidebar();
+                      }
+                    },
+                  },
+                ]
+              : []),
+            {
+              label: "Download PDF",
+              onClick: () => {
+                if (selectedInvoiceSidebar) {
+                  handleDownloadPDF(selectedInvoiceSidebar);
+                }
+              },
+            },
+          ],
+        }}
         sections={[
           {
             id: "invoice-info",
             title: "Invoice Information",
             icon: FileText,
+            collapsible: true,
+            defaultExpanded: true,
             fields: [
               { label: "Invoice Number", value: selectedInvoiceSidebar ? `#${selectedInvoiceSidebar.invoice_number}` : "N/A" },
               {
@@ -1500,49 +1637,18 @@ const InvoiceList = () => {
             id: "company-info",
             title: "Bill To",
             icon: FileText,
+            collapsible: true,
+            defaultExpanded: true,
             fields: [
               { label: "Company", value: selectedInvoiceSidebar?.company?.name ?? "N/A" },
               { label: "Country", value: selectedInvoiceSidebar?.company?.country ?? "N/A" },
             ].filter((f) => f.value !== "N/A" || f.label === "Company"),
           },
         ]}
-        actions={[
-          {
-            label: "View Full Invoice",
-            icon: FileText,
-            variant: "primary",
-            onClick: () => {
-              if (selectedInvoiceSidebar) {
-                setSelectedInvoiceForView(toInvoiceViewData(selectedInvoiceSidebar));
-                setShowViewInvoiceModal(true);
-                closeInvoiceSidebar();
-              }
-            },
-          },
-          {
-            label: "Pay Now",
-            icon: DollarSign,
-            variant: "success",
-            show: canPaySelectedInvoice,
-            onClick: () => {
-              if (selectedInvoiceSidebar) {
-                handlePayInvoice(selectedInvoiceSidebar);
-                closeInvoiceSidebar();
-              }
-            },
-          },
-          {
-            label: "Download PDF",
-            icon: Download,
-            variant: "outline-primary",
-            onClick: () => {
-              if (selectedInvoiceSidebar) {
-                handleDownloadPDF(selectedInvoiceSidebar);
-              }
-            },
-          },
-        ]}
-      />
+        />
+        )}
+      </div>
+      {/* End flex container */}
 
       <GenericFilterSidebar
         isOpen={showFiltersSidebar}
@@ -1614,7 +1720,7 @@ const InvoiceList = () => {
         title="Customize Columns"
         columns={tableColumns.map((c) => ({ key: c.key, label: c.label }))}
         selectedColumnKeys={selectedInvoiceTableColumns}
-        onApply={(keys) => {
+        onApply={(keys: string[]) => {
           setSelectedInvoiceTableColumns(keys);
           if (globalThis.window !== undefined) {
             globalThis.window.localStorage.setItem(

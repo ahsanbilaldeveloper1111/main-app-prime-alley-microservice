@@ -3,6 +3,7 @@ import React, {
   useState,
   useCallback,
   useMemo,
+  useEffect,
   useRef,
   type Dispatch,
   type SetStateAction,
@@ -10,14 +11,11 @@ import React, {
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   Button,
-  Row,
-  Col,
   Form,
   Modal,
 } from "react-bootstrap";
 import CreatableSelect from "react-select/creatable";
 import { toast } from "react-toastify";
-import { FiCalendar, FiTarget } from "react-icons/fi";
 import {
   Users,
   Calendar,
@@ -38,9 +36,12 @@ import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { StatsCardData } from "@components/GenericStatsCards";
 import {
+  CrmDataItem,
   CrmDataMetrics,
   downloadExampleCsv,
+  updateCrmData,
 } from "@utils/crm";
+import { buildCrmPersonListRowDispositionUpdatePayload } from "@utils/crmPersonDispositionQuickUpdate";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -61,7 +62,11 @@ import {
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
-import { type CrmListContactFormState } from "@utils/crmContactFormFromCrmItem";
+import {
+  createEmptyCrmListContactFormState,
+  resolveDefaultContactOwnerExtension,
+  type CrmListContactFormState,
+} from "@utils/crmContactFormFromCrmItem";
 import { useCrmListAssignmentContactSidebarState } from "@crm/shared/useCrmListAssignmentContactSidebarState";
 import { useCrmListPageCoreState } from "@crm/shared/useCrmListPageCoreState";
 import { useCrmListFiltersMetricsHistoryState } from "@crm/shared/useCrmListFiltersMetricsHistoryState";
@@ -73,12 +78,12 @@ import { useCrmListDataOperations } from "@crm/shared/useCrmListDataOperations";
 import { useCrmListNavigationHandlers } from "@crm/shared/useCrmListNavigationHandlers";
 import { CrmListCreateContactSidebar } from "@crm/shared/CrmListCreateContactSidebar";
 import { CrmListPipelineModals } from "@crm/shared/CrmListPipelineModals";
+import { useCrmListCallRecordingViewModalState } from "@crm/shared/useCrmListCallRecordingViewModalState";
+import { CrmProspectsListExportModalFiltersBody } from "@crm/shared/CrmProspectsListExportModalFiltersBody";
+import { CrmProspectsListAddTabModal } from "@crm/shared/CrmProspectsListAddTabModal";
+import { buildCrmProspectsListPipelineModalsProps } from "@crm/shared/buildCrmProspectsListPipelineModalsProps";
+import { getCrmProspectsDataListGenericTableSharedProps } from "@crm/shared/getCrmProspectsDataListGenericTableSharedProps";
 import { CrmListViewDataModal } from "@crm/shared/CrmListViewDataModal";
-import {
-  applyCrmListExportDateRangePreset,
-  crmListExportDateRangePresetValue,
-  CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS,
-} from "@crm/shared/crmListExportModalDateRangePresets";
 import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspectsContactsListPageConfig";
 import { CrmListDeleteModalAdditionalInfo } from "@crm/shared/CrmListDeleteModalAdditionalInfo";
 import { CrmListPageScopedLayoutStyles } from "@crm/shared/CrmListPageScopedLayoutStyles";
@@ -91,11 +96,27 @@ import {
   fetchCrmProspectsEntryCountsForFilters,
   getProspectsContactsDeleteModalItemName,
   mergeCrmProspectsToolbarFilterPills,
-  persistCrmDataSelectedColumns,
+  persistCrmProspectsContactsSelectedColumns,
   resetActiveFilterIfRemovedTabMatches,
 } from "@crm/shared/crmProspectsContactsListPageHelpers";
 import { renderCrmProspectsKanbanTableCustomBody } from "@crm/shared/crmProspectsContactsListPageKanbanCustomBody";
 import { prospectsTableRowDoubleClick } from "@crm/shared/crmProspectsContactsListPageTableRowHandlers";
+
+function resolveDeleteModalProps(
+  mode: "single" | "bulk" | null,
+  handlers: { bulk: () => void; single: () => void },
+  copy: { itemTypeBulk: string; itemTypeSingle: string },
+) {
+  return {
+    onConfirm: mode === "bulk" ? handlers.bulk : handlers.single,
+    itemType: mode === "bulk" ? copy.itemTypeBulk : copy.itemTypeSingle,
+  };
+}
+
+function resolveNumericProspectId(prospect: any): number {
+  const raw = prospect?.id ?? prospect?.data?.id ?? prospect?.data?.data?.id ?? Number.NaN;
+  return Number(raw);
+}
 
 export function CrmProspectsContactsListPage({
   config,
@@ -161,6 +182,8 @@ export function CrmProspectsContactsListPage({
     setAvailableCampaigns,
     campaignsById,
     setCampaignsById,
+    campaignStatusById,
+    setCampaignStatusById,
     selectedItems,
     setSelectedItems,
     afterCallData,
@@ -205,6 +228,17 @@ export function CrmProspectsContactsListPage({
     setContactFormLoading,
   } = useCrmListAssignmentContactSidebarState();
 
+  const seedNewContactForm = useCallback(
+    () =>
+      createEmptyCrmListContactFormState("source_file", {
+        defaultContactOwner: resolveDefaultContactOwnerExtension(
+          session?.user,
+          extensions,
+        ),
+      }),
+    [session?.user, extensions],
+  );
+
   const deleteModalItemName = useMemo(
     () =>
       getProspectsContactsDeleteModalItemName(
@@ -221,19 +255,19 @@ export function CrmProspectsContactsListPage({
     ],
   );
 
-  // Call recordings state (used when view modal passes recording props)
-  const [callRecordings] = useState<any[]>([]);
-  const [callRecordingsLoading] = useState(false);
-  const [callRecordingsTotal] = useState(0);
-  const [selectedRecording, setSelectedRecording] = useState<any>(null);
-  const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
-    useState(false);
-  const [downloadingRecordings, setDownloadingRecordings] = useState<
-    Set<string>
-  >(new Set());
-  const [downloadProgress, setDownloadProgress] = useState<
-    Record<string, number>
-  >({});
+  const {
+    callRecordings,
+    callRecordingsLoading,
+    callRecordingsTotal,
+    selectedRecording,
+    setSelectedRecording,
+    showRecordingPlayerModal,
+    setShowRecordingPlayerModal,
+    downloadingRecordings,
+    setDownloadingRecordings,
+    downloadProgress,
+    setDownloadProgress,
+  } = useCrmListCallRecordingViewModalState();
 
   const {
     activeFilter,
@@ -289,6 +323,8 @@ export function CrmProspectsContactsListPage({
       "last_called_at", "last_call_end_reason", "disposition",
       "scheduled_call_at", "tags",
     ],
+    selectedColumnsStorageKey: config.selectedColumnsStorageKey,
+    selectedColumnsLegacyStorageKeys: config.selectedColumnsLegacyStorageKeys,
     initialMetrics: {
       assigned_records: 0,
       unassigned_records: 0,
@@ -312,6 +348,7 @@ export function CrmProspectsContactsListPage({
     setContactFormLoading,
     sourceField: "source_file",
     loadFailedMessage: config.listLoadFailedMessage,
+    seedNewContactForm,
   });
 
   const prospectsCalculateEntryCounts = useCallback(async () => {
@@ -384,8 +421,8 @@ export function CrmProspectsContactsListPage({
       memoizedFilters,
       pagination.currentPage,
       pagination.rowsPerPage,
-      pagination.sortColumn,
-      pagination.sortDirection,
+      pagination.sortBy,
+      pagination.sortOrder,
     ],
   );
 
@@ -416,6 +453,7 @@ export function CrmProspectsContactsListPage({
     setAvailableTags,
     setAvailableCampaigns,
     setCampaignsById,
+    setCampaignStatusById,
     setSelectedItems,
     setCurrentFilters,
     setExportFilters,
@@ -429,6 +467,19 @@ export function CrmProspectsContactsListPage({
     setPagination,
     computeAdvancedFiltersApplied: config.computeAdvancedFiltersApplied,
   });
+
+  /** Prospects only: Overdue metric switches to Scheduled tab + API overdue filter. */
+  const handleProspectOverdueMetricClick = useCallback(() => {
+    if (config.operationsEntityName !== "prospects") {
+      return;
+    }
+    handleFilterChange("scheduled");
+    applyTableFiltersPatch({ scheduled_call_status: "overdue" });
+  }, [
+    applyTableFiltersPatch,
+    config.operationsEntityName,
+    handleFilterChange,
+  ]);
 
   const {
     fetchCrmData,
@@ -472,11 +523,42 @@ export function CrmProspectsContactsListPage({
     refreshKey,
   });
 
+  const dispositionQuickUpdateInFlightRef = useRef<Set<number>>(new Set());
+
+  const handleDispositionQuickUpdate = useCallback(
+    async (row: any, dispositionValue: string) => {
+      const id = row?.id;
+      if (typeof id !== "number") {
+        return;
+      }
+      if (dispositionQuickUpdateInFlightRef.current.has(id)) {
+        return;
+      }
+      dispositionQuickUpdateInFlightRef.current.add(id);
+      try {
+        const payload = buildCrmPersonListRowDispositionUpdatePayload(
+          row as CrmDataItem & Record<string, unknown>,
+          dispositionValue,
+        );
+        await updateCrmData(
+          id,
+          payload as unknown as Parameters<typeof updateCrmData>[1],
+        );
+        fetchCrmData();
+      } catch {
+        // Errors are surfaced by updateCrmData
+      } finally {
+        dispositionQuickUpdateInFlightRef.current.delete(id);
+      }
+    },
+    [fetchCrmData],
+  );
+
   const {
-    handleCloseSidebar: handleCloseProspectSidebar,
+    handleCloseSidebar: handleCloseProspectSidebarCore,
     handleOpenFiltersSidebar,
     handleCloseFiltersSidebar,
-    handlePreviewClick,
+    handlePreviewClick: handlePreviewClickCore,
     handleFirstColumnClick,
   } = useCrmListNavigationHandlers({
     sidebarFetchTokenRef: sidebarProspectFetchTokenRef,
@@ -487,6 +569,59 @@ export function CrmProspectsContactsListPage({
     router,
     buildDetailUrl: (row: any) => config.navigationDetailPath(row),
   });
+
+  const previewPersistenceKey = config.previewPersistenceLocalStorageKey;
+  /** Ensures we only attempt storage-based restore once per mount (not on every refetch). */
+  const didInitialPreviewRestoreRef = useRef(false);
+
+  const writePreviewIdToStorage = useCallback(
+    (row: { id?: unknown }) => {
+      const id = Number(row?.id);
+      if (!Number.isFinite(id) || id <= 0) return;
+      if (globalThis.window === undefined) return;
+      try {
+        globalThis.localStorage.setItem(previewPersistenceKey, String(id));
+      } catch {
+        /* quota / private mode */
+      }
+    },
+    [previewPersistenceKey],
+  );
+
+  const clearPreviewIdFromStorage = useCallback(() => {
+    if (globalThis.window === undefined) return;
+    try {
+      globalThis.localStorage.removeItem(previewPersistenceKey);
+    } catch {
+      /* ignore */
+    }
+  }, [previewPersistenceKey]);
+
+  /** User dismissed preview (X): close and forget persisted id. */
+  const handleCloseProspectSidebar = useCallback(() => {
+    handleCloseProspectSidebarCore();
+    clearPreviewIdFromStorage();
+  }, [handleCloseProspectSidebarCore, clearPreviewIdFromStorage]);
+
+  /** Navigate away (e.g. View record) while keeping id so back-navigation can reopen preview. */
+  const handleHideProspectSidebarKeepPersistence = useCallback(() => {
+    handleCloseProspectSidebarCore();
+  }, [handleCloseProspectSidebarCore]);
+
+  const handlePreviewClick = useCallback(
+    (row: CrmDataItem) => {
+      handlePreviewClickCore(row);
+      writePreviewIdToStorage(row);
+    },
+    [handlePreviewClickCore, writePreviewIdToStorage],
+  );
+
+  // Auto-restore of the preview sidebar from localStorage is intentionally disabled.
+  // We still persist the last preview id so future re-enablement is possible without data migration.
+  useEffect(() => {
+    if (didInitialPreviewRestoreRef.current) return;
+    didInitialPreviewRestoreRef.current = true;
+  }, []);
 
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
@@ -514,7 +649,7 @@ export function CrmProspectsContactsListPage({
     });
   };
 
-  // Stats cards data for metrics
+  // Stats cards data for metrics (prospects: only Overdue is clickable → list filter)
   const prospectsStatsCards: StatsCardData[] = useMemo(
     () => [
       {
@@ -526,7 +661,7 @@ export function CrmProspectsContactsListPage({
         subtitle: config.stats.subtitleAssignedUnassigned(metrics),
       },
       {
-        title: "Scheduled",
+        title: "Upcoming",
         value: metrics.scheduled_records ?? 0,
         icon: Calendar,
         iconColor: "#10B981",
@@ -546,6 +681,9 @@ export function CrmProspectsContactsListPage({
           text: "Client-defined",
           dotColor: "#F97316",
         },
+        ...(config.operationsEntityName === "prospects"
+          ? { onClick: handleProspectOverdueMetricClick }
+          : {}),
       },
       {
         title: config.stats.convertedCardTitle,
@@ -581,12 +719,22 @@ export function CrmProspectsContactsListPage({
         },
       },
     ],
-    [config.stats, metrics],
+    [
+      config.operationsEntityName,
+      config.stats,
+      handleProspectOverdueMetricClick,
+      metrics,
+    ],
   );
 
   const prospectsColumns = useMemo(
-    () => buildCrmProspectsContactsTableColumns(config, extensions),
-    [config, extensions],
+    () =>
+      buildCrmProspectsContactsTableColumns(
+        config,
+        extensions,
+        campaignStatusById,
+      ),
+    [campaignStatusById, config, extensions],
   );
 
   const prospectsActions = useMemo(
@@ -605,6 +753,7 @@ export function CrmProspectsContactsListPage({
         setDeleteModalMode,
         setItemToDelete,
         setShowDeleteModal,
+        onDispositionChange: handleDispositionQuickUpdate,
       }),
     [
       session,
@@ -620,6 +769,7 @@ export function CrmProspectsContactsListPage({
       setDeleteModalMode,
       setItemToDelete,
       setShowDeleteModal,
+      handleDispositionQuickUpdate,
     ],
   );
 
@@ -634,6 +784,8 @@ export function CrmProspectsContactsListPage({
       setEditingContactId,
       fetchCrmData,
       sourceField: "source_file",
+      extensions,
+      showCreateContactSidebar,
     });
 
   const closeCreateContactSidebar = useCallback(() => {
@@ -674,8 +826,12 @@ export function CrmProspectsContactsListPage({
     onEditColumnsClick: () => setShowColumnEditor(true),
     showImport: true,
     onImportClick: () => setShowUploadModal(true),
-    currentTableView: prospectsViewMode,
-    onTableViewChange: setProspectsViewMode,
+    ...(config.enableBoardView
+      ? {
+          currentTableView: prospectsViewMode,
+          onTableViewChange: setProspectsViewMode,
+        }
+      : {}),
     extensions,
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
@@ -683,6 +839,7 @@ export function CrmProspectsContactsListPage({
       <CrmProspectsContactsAddContactsButton
         addContactsRef={addContactsRef}
         session={session}
+        extensions={extensions}
         config={config}
         selectedItems={selectedItems}
         showAddContactsDropdown={showAddContactsDropdown}
@@ -745,66 +902,23 @@ export function CrmProspectsContactsListPage({
                   selectedColumns.includes(c.key),
                 )}
                 actions={prospectsActions}
-                showActions={false}
-                // Selection
-                selectable={session?.user?.permissions?.includes(
-                  "delete-crm-data-management",
-                )}
-                selectedRows={dataList.filter((item) =>
-                  selectedItems.includes(item.id),
-                )}
-                onSelectionChange={(selected) => {
-                  setSelectedItems(selected.map((item) => item.id));
-                  setClearSelectedRows(false);
-                }}
-                // Column customization
-                // customizableColumns={true}
-                // defaultSelectedColumns={defaultSelectedColumns}
-                // columnStorageKey="crmDataSelectedColumns"
-
-                // Pagination
-                pagination={{
-                  currentPage: pagination.currentPage,
-                  rowsPerPage: pagination.rowsPerPage,
-                  totalRows: totalRecords,
-                  pageSizeOptions: [10, 15, 25, 50, 100],
-                }}
-                onPaginationChange={(page, rowsPerPage) => {
-                  setPagination({
-                    ...pagination,
-                    currentPage: page,
-                    rowsPerPage,
-                  });
-                }}
-                // Sorting
-                sortable={true}
-                defaultSortColumn={pagination.sortColumn}
-                defaultSortDirection={pagination.sortDirection}
-                onSort={(column, direction) => {
-                  setPagination((prev) => ({
-                    ...prev,
-                    sortColumn: column,
-                    sortDirection: direction,
-                    currentPage: 1,
-                  }));
-                }}
-                // Row interactions
-                onPreviewClick={(row) => handlePreviewClick(row)}
-                onFirstColumnClick={(row) => handleFirstColumnClick(row)}
-                onRowDoubleClick={(row) =>
-                  prospectsTableRowDoubleClick(session, handleViewData, row)
-                }
-                // Loading & styling
-                loading={loading}
-                emptyMessage={config.tableCopy.emptyMessage}
-                loadingMessage={config.tableCopy.loadingMessage}
-                hover={true}
-                uniqueKey="id"
-                // Fixed height mode
-                fixedHeight={true}
-                maxHeight="calc(100vh - 345px)"
-                // Toolbar
-                showToolbar={true}
+                {...getCrmProspectsDataListGenericTableSharedProps({
+                  session,
+                  dataList,
+                  selectedItems,
+                  setSelectedItems,
+                  setClearSelectedRows,
+                  pagination,
+                  setPagination,
+                  loading,
+                  totalRecords,
+                  emptyMessage: config.tableCopy.emptyMessage,
+                  loadingMessage: config.tableCopy.loadingMessage,
+                  onPreviewClick: (row) => handlePreviewClick(row),
+                  onFirstColumnClick: (row) => handleFirstColumnClick(row),
+                  onRowDoubleClick: (row) =>
+                    prospectsTableRowDoubleClick(session, handleViewData, row),
+                })}
                 toolbar={{
                   ...prospectsToolbarConfig,
                   // Remove the "+ More" pill on this page
@@ -823,14 +937,17 @@ export function CrmProspectsContactsListPage({
                 }}
                 // Stats cards for metrics
                 statsCards={prospectsStatsCards}
-                // When Board View is selected, show board content instead of table
-                customBody={renderCrmProspectsKanbanTableCustomBody({
-                  prospectsViewMode,
-                  dataList,
-                  prospectsActions,
-                  handleViewData,
-                  prospectsSearch,
-                })}
+                customBody={
+                  config.enableBoardView
+                    ? renderCrmProspectsKanbanTableCustomBody({
+                        prospectsViewMode,
+                        dataList,
+                        prospectsActions,
+                        handleViewData,
+                        prospectsSearch,
+                      })
+                    : undefined
+                }
               />
             </div>
           </div>
@@ -983,15 +1100,12 @@ export function CrmProspectsContactsListPage({
               setDeleteModalMode(null);
               setItemToDelete(null);
             }}
-            onConfirm={
-              deleteModalMode === "bulk" ? handleBulkDelete : confirmDelete
-            }
+            {...resolveDeleteModalProps(
+              deleteModalMode,
+              { bulk: handleBulkDelete, single: confirmDelete },
+              config.deleteModalCopy,
+            )}
             itemName={deleteModalItemName}
-            itemType={
-              deleteModalMode === "bulk"
-                ? config.deleteModalCopy.itemTypeBulk
-                : config.deleteModalCopy.itemTypeSingle
-            }
             additionalInfo={
               <CrmListDeleteModalAdditionalInfo
                 mode={deleteModalMode}
@@ -1003,81 +1117,81 @@ export function CrmProspectsContactsListPage({
           />
 
           <CrmListPipelineModals
-            assignment={{
-              show: showDataAssignmentModal,
-              onHide: handleDataAssignmentModalClose,
-              title: config.assignmentModal.title,
-              desc: config.assignmentModal.desc,
-              onSubmit: handleDataAssignmentSubmit,
-              onCancel: handleDataAssignmentModalClose,
-            }}
-            assignmentForm={{
-              entityLabel: config.assignmentModal.entityLabel,
-              assignmentFilters,
-              setAssignmentFilters,
-              availableTags,
-              availableCampaigns,
-              assignmentCounts,
-              assignmentCampaign,
-              setAssignmentCampaign,
-              totalEntriesToAssign,
-              setTotalEntriesToAssign,
-              assignmentDistribution,
-              setAssignmentDistribution,
-              customDistribution,
-              setCustomDistribution,
-            }}
-            afterCall={{
-              show: showAfterCallModal,
-              onHide: () => setShowAfterCallModal(false),
-              onSubmit: handleAfterCallSubmit,
-              afterCallData,
-              setAfterCallData,
-            }}
-            schedule={{
-              show: showScheduleModal,
-              onHide: () => setShowScheduleModal(false),
-              isEditingSchedule,
-              selectedEntryForSchedule,
-              scheduleData,
-              setScheduleData,
-              onSubmit: handleScheduleSubmit,
-              onCancel: handleScheduleModalClose,
-            }}
-            unschedule={{
-              show: showUnscheduleModal,
-              onHide: () => {
-                setShowUnscheduleModal(false);
-                setEntryToUnschedule(null);
+            {...buildCrmProspectsListPipelineModalsProps({
+              assignment: {
+                show: showDataAssignmentModal,
+                onHide: handleDataAssignmentModalClose,
+                title: config.assignmentModal.title,
+                desc: config.assignmentModal.desc,
+                onSubmit: handleDataAssignmentSubmit,
+                onCancel: handleDataAssignmentModalClose,
+                entityLabel: config.assignmentModal.entityLabel,
+                assignmentFilters,
+                setAssignmentFilters,
+                availableTags,
+                availableCampaigns,
+                assignmentCounts,
+                assignmentCampaign,
+                setAssignmentCampaign,
+                totalEntriesToAssign,
+                setTotalEntriesToAssign,
+                assignmentDistribution,
+                setAssignmentDistribution,
+                customDistribution,
+                setCustomDistribution,
               },
-              entryToUnschedule,
-              onConfirm: confirmUnscheduleCall,
-            }}
-            history={{
-              show: showHistoryModal,
-              onHide: () => setShowHistoryModal(false),
-              onClose: () => setShowHistoryModal(false),
-              historyData,
-              historyLoading,
-              historyPagination,
-              fetchHistoryData,
-              campaignsById,
-              getNameByExtension,
-            }}
-            success={{
-              show: showSuccessfulModal,
-              onHide: () => setShowSuccessfulModal(false),
-              title: successModalTitle,
-              description: successModalDescription,
-            }}
-            recording={{
-              show: showRecordingPlayerModal,
-              onHide: () => {
-                setShowRecordingPlayerModal(false);
-                setSelectedRecording(null);
+              afterCall: {
+                show: showAfterCallModal,
+                onHide: () => setShowAfterCallModal(false),
+                onSubmit: handleAfterCallSubmit,
+                afterCallData,
+                setAfterCallData,
               },
-              recording: selectedRecording,
-            }}
+              schedule: {
+                show: showScheduleModal,
+                onHide: () => setShowScheduleModal(false),
+                isEditingSchedule,
+                selectedEntryForSchedule,
+                scheduleData,
+                setScheduleData,
+                onSubmit: handleScheduleSubmit,
+                onCancel: handleScheduleModalClose,
+              },
+              unschedule: {
+                show: showUnscheduleModal,
+                onHide: () => {
+                  setShowUnscheduleModal(false);
+                  setEntryToUnschedule(null);
+                },
+                entryToUnschedule,
+                onConfirm: confirmUnscheduleCall,
+              },
+              history: {
+                show: showHistoryModal,
+                onHide: () => setShowHistoryModal(false),
+                onClose: () => setShowHistoryModal(false),
+                historyData,
+                historyLoading,
+                historyPagination,
+                fetchHistoryData,
+                campaignsById,
+                getNameByExtension,
+              },
+              success: {
+                show: showSuccessfulModal,
+                onHide: () => setShowSuccessfulModal(false),
+                title: successModalTitle,
+                description: successModalDescription,
+              },
+              recording: {
+                show: showRecordingPlayerModal,
+                onHide: () => {
+                  setShowRecordingPlayerModal(false);
+                  setSelectedRecording(null);
+                },
+                recording: selectedRecording,
+              },
+            })}
           />
         </div>{" "}
         {/* End main content area */}
@@ -1102,28 +1216,18 @@ export function CrmProspectsContactsListPage({
               gradient: getRandomColor(selectedProspect?.name || ""),
             }}
             recordType="prospect"
-            recordId={
-              selectedProspect?.id ?? selectedProspect?.data?.id ?? undefined
-            }
+            recordId={resolveNumericProspectId(selectedProspect) || undefined}
             resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
             crmSummary={
-              selectedProspect?.crm_summary ??
-              selectedProspect?.data?.crm_summary ??
-              (selectedProspect as any)?.data?.data?.crm_summary ??
-              undefined
+              selectedProspect?.crm_summary ?? selectedProspect?.data?.crm_summary ?? undefined
             }
             recordLink={{
               label: "View record",
               onClick: () => {
-                const prospectId = Number(
-                  selectedProspect?.id ??
-                    selectedProspect?.data?.id ??
-                    (selectedProspect as any)?.data?.data?.id ??
-                    Number.NaN,
-                );
+                const prospectId = resolveNumericProspectId(selectedProspect);
                 if (!Number.isFinite(prospectId) || prospectId <= 0) return;
-                handleCloseProspectSidebar();
+                handleHideProspectSidebarKeepPersistence();
                 router.push(config.sidebar.buildDetailUrlFromNumericId(prospectId));
               },
             }}
@@ -1251,11 +1355,10 @@ export function CrmProspectsContactsListPage({
                   action: {
                     label: "Log activity",
                     onClick: () => {
-                      const id = selectedProspect?.id ?? selectedProspect?.data?.id ?? "";
-                      if (id) {
-                        router.push(config.sidebar.buildLogActivityUrl(id));
-                        handleCloseProspectSidebar();
-                      }
+                      const id = resolveNumericProspectId(selectedProspect);
+                      if (!id) return;
+                      router.push(config.sidebar.buildLogActivityUrl(id));
+                      handleHideProspectSidebarKeepPersistence();
                     },
                   },
                 },
@@ -1522,7 +1625,10 @@ export function CrmProspectsContactsListPage({
         selectedColumnKeys={selectedColumns}
         onApply={(keys) => {
           setSelectedColumns(keys);
-          persistCrmDataSelectedColumns(config.columnEditorLocalStorage, keys);
+          persistCrmProspectsContactsSelectedColumns(
+            config.selectedColumnsStorageKey,
+            keys,
+          );
         }}
       />
       {/* Export Modal */}
@@ -1538,177 +1644,20 @@ export function CrmProspectsContactsListPage({
         exporting={exporting}
         exportButtonLabel="Export"
       >
-        <hr />
-        <h6 className="mb-3">Export filters</h6>
-          <Row>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Associate with</Form.Label>
-                <Form.Select
-                  value={
-                    exportFilters.user_extension
-                      ? String(exportFilters.user_extension)
-                      : ""
-                  }
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v) next.user_extension = v;
-                      else delete next.user_extension;
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="">All owners</option>
-                  {extensions.map((ext) => (
-                    <option
-                      key={String(ext.id || ext.extension)}
-                      value={String(ext.id || ext.extension)}
-                    >
-                      {ext.display_name ||
-                        ext.name ||
-                        ext.id ||
-                        ext.extension ||
-                        ""}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-            </Col>
-            <Col md={6}>
-              <Form.Group className="mb-3">
-                <Form.Label>Lead status</Form.Label>
-                <Form.Select
-                  value={exportFilters.disposition || ""}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setExportFilters((prev) => {
-                      const next = { ...prev };
-                      if (v) next.disposition = v;
-                      else delete next.disposition;
-                      return next;
-                    });
-                  }}
-                >
-                  <option value="">All status</option>
-                  <option value="hot_lead">Hot Lead</option>
-                  <option value="warm_lead">Warm Lead</option>
-                  <option value="cold_lead">Cold Lead</option>
-                  <option value="interested">Interested</option>
-                  <option value="callback_requested">Callback Requested</option>
-                  <option value="no_answer">No Answer</option>
-                  <option value="not_interested">Not Interested</option>
-                  <option value="follow_up">Follow Up</option>
-                </Form.Select>
-              </Form.Group>
-            </Col>
-          </Row>
-          <Row>
-            {CRM_LIST_EXPORT_MODAL_DEFAULT_DATE_RANGE_FIELDS.map(
-              ({ label, keys }) => (
-                <Col md={6} key={keys.from}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>{label}</Form.Label>
-                    <Form.Select
-                      value={crmListExportDateRangePresetValue(
-                        exportFilters,
-                        keys,
-                      )}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setExportFilters((prev) =>
-                          applyCrmListExportDateRangePreset(prev, v, keys),
-                        );
-                      }}
-                    >
-                      <option value="all">All time</option>
-                      <option value="today">Today</option>
-                      <option value="week">Last 7 days</option>
-                      <option value="month">Last 30 days</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-              ),
-            )}
-          </Row>
-          <Form.Group className="mb-0">
-            <Form.Label>Search (optional)</Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="Filter by name, phone, etc."
-              value={exportFilters.search || ""}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                setExportFilters((prev) => {
-                  const next = { ...prev };
-                  if (v) next.search = v;
-                  else delete next.search;
-                  return next;
-                });
-              }}
-            />
-          </Form.Group>
+        <CrmProspectsListExportModalFiltersBody
+          extensions={extensions}
+          exportFilters={exportFilters}
+          setExportFilters={setExportFilters}
+        />
       </CrmExportModal>
-      {/* Add Tab Modal */}
-      <Modal show={showTabModal} onHide={() => setShowTabModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Add New Tab</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <p className="text-muted mb-3">Select a filter to add as a new tab</p>
-          <div className="d-grid gap-2">
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.some((t) => t.id === "scheduled")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "scheduled",
-                      label: "Scheduled",
-                      count: metrics.scheduled_records,
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "scheduled")}
-            >
-              <FiCalendar size={16} className="me-2" />
-              Scheduled
-            </Button>
-            <Button
-              variant="outline-primary"
-              onClick={() => {
-                if (!customTabs.some((t) => t.id === "has_leads")) {
-                  setCustomTabs([
-                    ...customTabs,
-                    {
-                      id: "has_leads",
-                      label: "Convert to Leads",
-                      removable: true,
-                    },
-                  ]);
-                  setShowTabModal(false);
-                  toast.success("Tab added successfully!");
-                }
-              }}
-              disabled={customTabs.some((t) => t.id === "has_leads")}
-            >
-              <FiTarget size={16} className="me-2" />
-              Convert to Leads
-            </Button>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowTabModal(false)}>
-            Cancel
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <CrmProspectsListAddTabModal
+        show={showTabModal}
+        onHide={() => setShowTabModal(false)}
+        customTabs={customTabs}
+        setCustomTabs={setCustomTabs}
+        scheduledRecordsCount={metrics.scheduled_records}
+        hasLeadsTabLabel="Converted Leads"
+      />
       {/* Create Contact Sidebar */}
       <CrmListCreateContactSidebar
         show={showCreateContactSidebar}

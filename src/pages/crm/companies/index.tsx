@@ -169,6 +169,8 @@ import {
 } from "@components/crm/CrmListPageUi";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
+import { getDatetimeLocalMinNow } from "@utils/datetimeLocalInput";
+import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 
 type CompanyAssignedToSelectOption = {
   value: string | number;
@@ -744,8 +746,8 @@ const CrmCompanyManagement = () => {
   const [pagination, setPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [dataList, setDataList] = useState<CrmDataItem[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -843,12 +845,24 @@ const CrmCompanyManagement = () => {
         per_page: pagination.rowsPerPage,
         ...overrides,
       };
-      if (memoizedFilters.search) params.search = memoizedFilters.search;
-      if (memoizedFilters.campaign_id?.length)
-        params.campaign_ids = memoizedFilters.campaign_id;
-      if (memoizedFilters.tags?.length) params.tags = memoizedFilters.tags;
-      if (memoizedFilters.assignment_status)
-        params.assignment_status = memoizedFilters.assignment_status;
+      const assignWhenTruthy = (sourceKey: string, targetKey = sourceKey) => {
+        const value = memoizedFilters[sourceKey];
+        if (value) {
+          params[targetKey] = value;
+        }
+      };
+
+      const assignArrayWhenNotEmpty = (sourceKey: string, targetKey = sourceKey) => {
+        const value = memoizedFilters[sourceKey];
+        if (Array.isArray(value) && value.length > 0) {
+          params[targetKey] = value;
+        }
+      };
+
+      assignWhenTruthy("search");
+      assignArrayWhenNotEmpty("campaign_id", "campaign_ids");
+      assignArrayWhenNotEmpty("tags");
+      assignWhenTruthy("assignment_status");
       if (memoizedFilters.user_extension?.length) {
         const ownerValues = Array.isArray(memoizedFilters.user_extension)
           ? memoizedFilters.user_extension
@@ -864,34 +878,25 @@ const CrmCompanyManagement = () => {
         memoizedFilters.is_viewed !== ""
       )
         params.is_viewed = memoizedFilters.is_viewed;
-      // Create date filter: backend expects date_from / date_to
-      if (memoizedFilters.created_at_from)
-        params.date_from = memoizedFilters.created_at_from;
-      if (memoizedFilters.created_at_to)
-        params.date_to = memoizedFilters.created_at_to;
-      if (memoizedFilters.last_called_at_from)
-        params.last_called_at_from = memoizedFilters.last_called_at_from;
-      if (memoizedFilters.last_called_at_to)
-        params.last_called_at_to = memoizedFilters.last_called_at_to;
-      if (memoizedFilters.has_scheduled_calls !== undefined)
+      assignWhenTruthy("created_at_from", "date_from");
+      assignWhenTruthy("created_at_to", "date_to");
+      assignWhenTruthy("last_called_at_from");
+      assignWhenTruthy("last_called_at_to");
+      if (memoizedFilters.has_scheduled_calls !== undefined) {
         params.has_scheduled_calls = memoizedFilters.has_scheduled_calls;
-      if (memoizedFilters.has_tickets !== undefined)
+      }
+      if (memoizedFilters.has_tickets !== undefined) {
         params.has_tickets = memoizedFilters.has_tickets;
-      if (memoizedFilters.scheduled_call_status)
-        params.scheduled_call_status = memoizedFilters.scheduled_call_status;
-      if (memoizedFilters.scheduled_call_from)
-        params.scheduled_call_from = memoizedFilters.scheduled_call_from;
-      if (memoizedFilters.scheduled_call_to)
-        params.scheduled_call_to = memoizedFilters.scheduled_call_to;
-      if (memoizedFilters.source_file)
-        params.source_file = memoizedFilters.source_file;
-      if (memoizedFilters.tag_ids?.length)
-        params.tag_ids = memoizedFilters.tag_ids;
-      if (memoizedFilters.disposition)
-        params.disposition = memoizedFilters.disposition;
-      if (pagination.sortColumn) {
-        params.sort_column = pagination.sortColumn;
-        params.sort_direction = pagination.sortDirection;
+      }
+      assignWhenTruthy("scheduled_call_status");
+      assignWhenTruthy("scheduled_call_from");
+      assignWhenTruthy("scheduled_call_to");
+      assignWhenTruthy("source_file");
+      assignArrayWhenNotEmpty("tag_ids");
+      assignWhenTruthy("disposition");
+      if (pagination.sortBy) {
+        params.sort_by = pagination.sortBy;
+        params.sort_order = pagination.sortOrder;
       }
       params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;
       return params;
@@ -900,8 +905,8 @@ const CrmCompanyManagement = () => {
       memoizedFilters,
       pagination.currentPage,
       pagination.rowsPerPage,
-      pagination.sortColumn,
-      pagination.sortDirection,
+      pagination.sortBy,
+      pagination.sortOrder,
     ],
   );
 
@@ -1754,12 +1759,6 @@ const CrmCompanyManagement = () => {
     [router],
   );
 
-  // Handle close company sidebar
-  const handleCloseCompanySidebar = useCallback(() => {
-    setShowCompanySidebar(false);
-    setSelectedCompany(null);
-  }, []);
-
   // Handle open filters sidebar
   const handleOpenFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(true);
@@ -1770,10 +1769,45 @@ const CrmCompanyManagement = () => {
     setShowFiltersSidebar(false);
   }, []);
 
-  // Handle preview button click - shows sidebar
-  const handlePreviewClick = useCallback((company: any) => {
+  const handlePreviewClickBase = useCallback((company: any) => {
     setSelectedCompany(company);
     setShowCompanySidebar(true);
+  }, []);
+
+  const openCompanyPreviewById = useCallback(
+    (id: number) => {
+      handlePreviewClickBase({ id, rawData: { id } });
+    },
+    [handlePreviewClickBase],
+  );
+
+  const { writePreviewIdToStorage, clearPreviewIdFromStorage } =
+    useCrmListPreviewPersistence({
+      localStorageKey: "crm-companies-list-preview-record-id",
+      listLoading: loading,
+      openPreviewByNumericId: openCompanyPreviewById,
+    });
+
+  const handlePreviewClick = useCallback(
+    (company: any) => {
+      const cid = company?.id ?? company?.rawData?.id;
+      if (cid != null) writePreviewIdToStorage(Number(cid));
+      handlePreviewClickBase(company);
+    },
+    [handlePreviewClickBase, writePreviewIdToStorage],
+  );
+
+  // Handle close company sidebar (X): clear persisted preview id
+  const handleCloseCompanySidebar = useCallback(() => {
+    setShowCompanySidebar(false);
+    setSelectedCompany(null);
+    clearPreviewIdFromStorage();
+  }, [clearPreviewIdFromStorage]);
+
+  /** Hide sidebar when navigating to detail so browser back can restore preview. */
+  const handleHideCompanySidebarKeepPersistence = useCallback(() => {
+    setShowCompanySidebar(false);
+    setSelectedCompany(null);
   }, []);
 
   // Stats cards data for metrics
@@ -2513,9 +2547,18 @@ const CrmCompanyManagement = () => {
     const isFormValid =
       contactForm.firstName?.trim() || contactForm.lastName?.trim();
 
+    const scheduledFloor = getDatetimeLocalMinNow();
+    const isEditingContact = editingContactId != null;
+    const allowLegacyPastScheduled =
+      isEditingContact &&
+      contactForm.scheduled_call_at !== "" &&
+      contactForm.scheduled_call_at < scheduledFloor;
+    const scheduledInputMin = allowLegacyPastScheduled
+      ? undefined
+      : scheduledFloor;
+
     return (
       <>
-        {/* Overlay */}
         <div
           className="contact-sidebar-overlay"
           style={{
@@ -2525,8 +2568,9 @@ const CrmCompanyManagement = () => {
             right: 0,
             bottom: 0,
             zIndex: 1000,
+            background: "transparent",
           }}
-          onClick={() => setShowCreateContactSidebar(false)}
+          aria-hidden="true"
         />
 
         {/* Sidebar */}
@@ -3276,13 +3320,28 @@ const CrmCompanyManagement = () => {
                       </label>
                       <input
                         type="datetime-local"
+                        min={scheduledInputMin}
                         value={contactForm.scheduled_call_at}
-                        onChange={(e) =>
+                        onFocus={(e) => {
+                          const floor = getDatetimeLocalMinNow();
+                          const cur = contactForm.scheduled_call_at;
+                          if (isEditingContact && cur !== "" && cur < floor) {
+                            e.currentTarget.removeAttribute("min");
+                          } else {
+                            e.currentTarget.min = floor;
+                          }
+                        }}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const minVal = getDatetimeLocalMinNow();
+                          if (v !== "" && v < minVal) {
+                            return;
+                          }
                           setContactForm({
                             ...contactForm,
-                            scheduled_call_at: e.target.value,
-                          })
-                        }
+                            scheduled_call_at: v,
+                          });
+                        }}
                         style={{
                           width: "100%",
                           padding: "10px 12px",
@@ -4250,13 +4309,13 @@ const CrmCompanyManagement = () => {
                 }}
                 // Sorting
                 sortable={true}
-                defaultSortColumn={pagination.sortColumn}
-                defaultSortDirection={pagination.sortDirection}
+                defaultSortBy={pagination.sortBy}
+                defaultSortOrder={pagination.sortOrder}
                 onSort={(column, direction) => {
                   setPagination({
                     ...pagination,
-                    sortColumn: column,
-                    sortDirection: direction,
+                    sortBy: column,
+                    sortOrder: direction,
                   });
                 }}
                 // Row interactions
@@ -4389,7 +4448,10 @@ const CrmCompanyManagement = () => {
                           company_domain:
                             company.data?.company_domain || undefined,
                           company_name: company.data?.company_name || undefined,
-                          source: company.data?.source || undefined,
+                          source_file:
+                            company.data?.source_file ||
+                            company.data?.source ||
+                            undefined,
                         });
                       }}
                       searchValue={companySearch}
@@ -5661,13 +5723,13 @@ const CrmCompanyManagement = () => {
                   label: "View record",
                   onClick: () => {
                     if (selectedCompany?.id != null) {
+                      handleHideCompanySidebarKeepPersistence();
                       router.push(
                         `/crm/detailspage?type=companies&id=${encodeURIComponent(
                           String(selectedCompany.id)
                         )}`
                       );
                     }
-                    setShowCompanySidebar(false);
                   },
                 }}
                 onNoteCreate={handleNoteCreate}

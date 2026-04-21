@@ -253,7 +253,6 @@ const AttendancePage = () => {
     }
   };
 
-  const statusAccent = status?.is_checked_in ? "#059669" : "#d97706";
   const statusBg = status?.is_checked_in ? "#ecfdf5" : "#fffbeb";
 
   const userFilterOptions = useMemo(
@@ -365,15 +364,6 @@ const AttendancePage = () => {
     [getDisplayName],
   );
 
-  const attendanceToolbar = useMemo<ToolbarConfig>(
-    () => ({
-      showFilterPills: true,
-      filterPills: attendanceFilterPills,
-      showMoreFiltersButton: false,
-    }),
-    [attendanceFilterPills],
-  );
-
   const isCheckedIn = status?.is_checked_in === true;
   const statusContent = (() => {
     if (statusLoading) {
@@ -429,103 +419,106 @@ const AttendancePage = () => {
     );
   })();
 
-  return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Attendance" />
-
-      {/* <PageHeader title="Attendance" showSearch={false} /> */}
-
-      {/* Current status & Check In / Out */}
-      <div
-        style={{
-          backgroundColor: "white",
-          borderRadius: "12px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-          border: "1px solid #e5e7eb",
-          padding: "24px 28px",
-          marginBottom: "24px",
-          borderLeft: `4px solid ${status ? statusAccent : "#9ca3af"}`,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
+  const attendanceToolbar = useMemo<ToolbarConfig>(
+    () => ({
+      showTabs: true,
+      tabs: [
+        {
+          id: "attendance-records",
+          label: "Attendance records",
+          count: pagination?.total,
+        },
+      ],
+      activeTab: "attendance-records",
+      showFiltersButton: true,
+      showFilterPills: false,
+      filterPills: attendanceFilterPills,
+      showMoreFiltersButton: false,
+      rightActions: (
+        <div
+          className="attendance-toolbar-right"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            gap: "60px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            className="attendance-status-content"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
             {statusContent}
           </div>
           {session?.user?.permissions?.includes("check-in-out-attendence-staff-management") && (
-          <div style={{ display: "flex", gap: "10px" }}>
-            {!isCheckedIn && (
-              <Button
-                variant="success"
-                size="sm"
-                disabled={statusLoading || checkInOutLoading}
-                onClick={handleCheckIn}
-                style={{
-                  fontWeight: "600",
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                <LogIn size={18} />
-                {checkInOutLoading ? "…" : "Check In"}
-              </Button>
-            )}
-            {isCheckedIn && (
-              <Button
-                variant="warning"
-                size="sm"
-                disabled={statusLoading || checkInOutLoading}
-                onClick={handleCheckOut}
-                style={{
-                  fontWeight: "600",
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                <LogOut size={18} />
-                {checkInOutLoading ? "…" : "Check Out"}
-              </Button>
-            )}
-          </div>
-          )}
-
-        </div>
-      </div>
-
-      {/* Table header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "16px",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <h2 style={{ fontSize: "24px", fontWeight: "600", color: "#1f2937", margin: 0 }}>
-            Attendance records
-          </h2>
-          {pagination != null && (
-            <span
-              style={{
-                padding: "4px 12px",
-                backgroundColor: "#e5e7eb",
-                borderRadius: "16px",
-                fontSize: "14px",
-                fontWeight: "600",
-                color: "#374151",
-              }}
-            >
-              {pagination.total}
-            </span>
+            <div className="attendance-check-actions" style={{ display: "flex", gap: "10px" }}>
+              {!isCheckedIn && (
+                <Button
+                  variant="success"
+                  size="sm"
+                  disabled={statusLoading || checkInOutLoading}
+                  onClick={handleCheckIn}
+                  style={{
+                    fontWeight: "600",
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <LogIn size={18} />
+                  {checkInOutLoading ? "…" : "Check In"}
+                </Button>
+              )}
+              {isCheckedIn && (
+                <Button
+                  variant="warning"
+                  size="sm"
+                  disabled={statusLoading || checkInOutLoading}
+                  onClick={handleCheckOut}
+                  style={{
+                    fontWeight: "600",
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <LogOut size={18} />
+                  {checkInOutLoading ? "…" : "Check Out"}
+                </Button>
+              )}
+            </div>
           )}
         </div>
-      </div>
+      ),
+    }),
+    [
+      attendanceFilterPills,
+      pagination?.total,
+      statusContent,
+      session?.user?.permissions,
+      isCheckedIn,
+      statusLoading,
+      checkInOutLoading,
+      handleCheckIn,
+      handleCheckOut,
+    ],
+  );
+
+  return (
+    <div className="attendance-page-shell">
+      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Attendance" />
+
+      {/* <PageHeader title="Attendance" showSearch={false} /> */}
 
         <GenericTable<AttendanceRecord>
           data={records}
@@ -564,7 +557,62 @@ const AttendancePage = () => {
         itemType="attendance record"
         loading={deleting}
       />
-    </React.Fragment>
+
+      <style jsx global>{`
+        /* Desktop: no change — tabs left, rightActions right */
+        .attendance-page-shell .attendance-toolbar-right {
+          min-width: 0;
+        }
+
+        /*
+         * ≤ 991px: stack rightActions ABOVE the tab row so the tab
+         * stays flush against the table (column-reverse = DOM order
+         * is [tabs, rightActions] but visually [rightActions, tabs]).
+         */
+        @media (max-width: 991.98px) {
+          .attendance-page-shell .gt-toolbar-tabs-section .d-flex.align-items-center.gap-3 {
+            flex-direction: column-reverse;
+            align-items: stretch;
+            gap: 0 !important;
+          }
+
+          /* cancel the inline margin-left:auto on the rightActions wrapper */
+          .attendance-page-shell .gt-toolbar-tabs-section .d-flex.align-items-center.gap-3 > div:last-child {
+            margin-left: 0 !important;
+            width: 100%;
+            padding-bottom: 10px;
+          }
+
+          .attendance-page-shell .attendance-toolbar-right {
+            width: 100%;
+            justify-content: space-between !important;
+            gap: 12px !important;
+          }
+
+          .attendance-page-shell .attendance-status-content {
+            min-width: 0;
+          }
+        }
+
+        /* ≤ 767px: also stack status + buttons vertically */
+        @media (max-width: 767.98px) {
+          .attendance-page-shell .attendance-toolbar-right {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 10px !important;
+          }
+
+          .attendance-page-shell .attendance-check-actions {
+            width: 100%;
+          }
+
+          .attendance-page-shell .attendance-check-actions .btn {
+            flex: 1;
+            justify-content: center;
+          }
+        }
+      `}</style>
+    </div>
   );
 };
 

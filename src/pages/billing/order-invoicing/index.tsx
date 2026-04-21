@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@crm/orders/orderListPageOrderScss";
 import { useRouter } from "next/router";
 import React, {
   ReactElement,
@@ -61,7 +61,7 @@ import {
   ShoppingCart,
   Paperclip,
   Upload,
-  Download as DownloadIcon,
+  DownloadIcon,
   RotateCcw,
   AlertCircle,
 } from "lucide-react";
@@ -79,11 +79,11 @@ import {
 } from "recharts";
 import { toast } from "react-toastify";
 
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import FormModal from "@pages/partial/FormModal";
-import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import {
+  SuccessfulModal,
+  FormModal,
+  DeleteConfirmationModal,
+} from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import {
@@ -281,8 +281,8 @@ const CrmOrders = () => {
   const [ordersPagination, setOrdersPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
-    sortColumn: "",
-    sortDirection: "asc" as "asc" | "desc",
+    sortBy: "",
+    sortOrder: "asc" as "asc" | "desc",
   });
   const [ordersFilters, setOrdersFilters] = useState({
     assignedTo: null as string | null,

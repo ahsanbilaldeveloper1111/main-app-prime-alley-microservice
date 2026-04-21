@@ -298,8 +298,14 @@ MENU_COLORS: {
     REPORTS_SERVICES: 'reports-services',
     AUDIT_LOGS_SERVICES: 'audit-logs-services-services',
     GENERAL_SERVICES: 'general-services-services',
+    PRODUCT_UPDATES_SERVICES: 'product-updates-services',
+    USERS_TEAMS_SERVICES: 'users-teams_services',
+    FOR_VIEW_HELP_CENTER_SERVICES: 'view-help-center-general-general',
+
+    
     //OLD
     CONTROL_HUB_SERVICES: 'control-hub-services',
+    ACCOUNT_DEFAULTS_SERVICES: 'account-defaults-services',
     VIEW_USERS_CONTROLHUB: 'view-users',
     VIEW_RANKS_CONTROLHUB: 'view-ranks',
     VIEW_GROUPS_CONTROLHUB: 'view-groups',
@@ -423,7 +429,9 @@ MENU_COLORS: {
     
     VIEW_CALL_DASHBOARD: 'dashboard-call-logs',
     VIEW_CALL_LOGS: 'view-call-logs',
+    VIEW_CALL_LOGS_FILTERS: 'filters-call-logs',
     VIEW_CALL_RECORDINGS: 'view-call-recordings',
+    VIEW_CALL_RECORDINGS_FILTERS: 'filters-call-recordings',
     VIEW_CALL_REPORTS: 'view-call-reports',
     CALL_REPORTS_BY_STATISTICS_REPORTS: 'call-reports-by-statistics-reports',
     CALL_REPORTS_BY_CALL_INCOMING_REPORTS: 'call-reports-by-call-incoming-reports',
@@ -434,7 +442,8 @@ MENU_COLORS: {
     VIEW_HELP_CENTER: 'view-help-center-general-general',
     SET_COMPANY_IMAGE_USERS: 'set-company-image-users',
     MANAGE_HELP_CENTER: 'manage-help-center-general-general',
-
+    VIEW_GENERAL_SETTINGS: 'view-general-settings-general',
+    VIEW_NOTIFICATIONS_SETTINGS: 'view-notification-settings-general',
     //AI chat permissions start
     VIEW_TOOLS_PROFILE_AI_CHAT: 'view-tools-profile-ai-chat',
     ADD_TOOL_PROFILE_AI_CHAT: 'add-tool-profile-ai-chat',

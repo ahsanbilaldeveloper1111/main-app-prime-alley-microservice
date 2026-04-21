@@ -299,6 +299,7 @@ export const stopBargeInMonitoringLocal = async (
 
     setShowPageLoader(true)
     const response = await stopBargeInMonitoringAPI(stopParams).finally(() => {
+      
       setShowPageLoader(false)
     })
     

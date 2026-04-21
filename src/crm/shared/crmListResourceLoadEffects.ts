@@ -1,7 +1,12 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import { ModuleSlug } from "@utils/Helper";
 import { GetHierarchyData } from "@utils/users";
-import { getCrmDataTags, getCampaigns } from "@utils/crm";
+import {
+  type CampaignData,
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+  getCrmDataTags,
+  getCampaigns,
+} from "@utils/crm";
 import { CRM_LIST_PAGE_STATIC_TAGS } from "@utils/crmListPageStaticData";
 
 export type CrmListTagOption = { value: string; label: string; id: number };
@@ -12,6 +17,9 @@ type SetAvailableCampaigns = Dispatch<
   SetStateAction<Array<{ value: string; label: string; id: number }>>
 >;
 type SetCampaignsById = Dispatch<SetStateAction<Record<number, string>>>;
+type SetCampaignStatusById = Dispatch<
+  SetStateAction<Record<number, string>>
+>;
 
 export function useCrmListExtensionsLoadEffect(setExtensions: SetExtensions) {
   useEffect(() => {
@@ -94,11 +102,15 @@ export function useCrmListCampaignsOnRefreshEffect(
   setAvailableCampaigns: SetAvailableCampaigns,
   setCampaignsById: SetCampaignsById,
   campaignsByIdMode: CampaignsByIdUpdateMode = "merge",
+  setCampaignStatusById?: SetCampaignStatusById,
 ) {
   useEffect(() => {
     const loadCampaigns = async () => {
       try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
+        const campaignsResponse = await getCampaigns({
+          per_page: 1000,
+          filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+        });
         const campaignOptions = campaignsResponse.data.map(
           (campaign: { id: number; name: string }) => ({
             value: campaign.id.toString(),
@@ -109,8 +121,12 @@ export function useCrmListCampaignsOnRefreshEffect(
         setAvailableCampaigns(campaignOptions);
 
         const campaignsMap: Record<number, string> = {};
-        campaignsResponse.data.forEach((campaign: { id: number; name: string }) => {
+        const statusMap: Record<number, string> = {};
+        campaignsResponse.data.forEach((campaign: CampaignData) => {
           campaignsMap[campaign.id] = campaign.name;
+          if (campaign.status != null && campaign.status !== "") {
+            statusMap[campaign.id] = campaign.status;
+          }
         });
 
         if (campaignsByIdMode === "merge") {
@@ -120,6 +136,17 @@ export function useCrmListCampaignsOnRefreshEffect(
           }));
         } else {
           setCampaignsById(campaignsMap);
+        }
+
+        if (setCampaignStatusById) {
+          if (campaignsByIdMode === "merge") {
+            setCampaignStatusById((prev: Record<number, string>) => ({
+              ...prev,
+              ...statusMap,
+            }));
+          } else {
+            setCampaignStatusById(statusMap);
+          }
         }
       } catch (error) {
         console.error("Failed to load campaigns:", error);
@@ -132,6 +159,7 @@ export function useCrmListCampaignsOnRefreshEffect(
     setAvailableCampaigns,
     setCampaignsById,
     campaignsByIdMode,
+    setCampaignStatusById,
   ]);
 }
 

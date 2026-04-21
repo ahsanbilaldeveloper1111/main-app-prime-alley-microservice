@@ -1,4 +1,8 @@
-import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, type MutableRefObject, type Dispatch, type SetStateAction } from "react";
+import {
+  isDuplicateRingingEventForOpenModal,
+  shouldCloseIncomingModalOnCallEndEvent,
+} from "@utils/incomingCallMatching";
 
 /** Ref object for incoming-call auto-dismiss timer (avoid React's MutableRefObject import for Sonar/deprecation). */
 export type FloatingBarIncomingTimerRef = {
@@ -82,6 +86,167 @@ function closeIncomingSession(
 }
 
 /**
+ * Remote hang-up before answer usually arrives as DISCONNECTED/DROPPED; ENDED is also possible.
+ * `shouldCloseIncomingModalOnCallEndEvent` requires a matching call id and, for DISCONNECTED/DROPPED,
+ * that the party’s `calledAddress` is our incoming callee DN so consult legs on other DNs do not
+ * dismiss the modal.
+ */
+const INCOMING_SESSION_AUTO_CLOSE_EVENT_TYPES = new Set([
+  "ENDED",
+  "DISCONNECTED",
+  "DROPPED",
+]);
+
+function isRingingDuplicateForOpenModal(
+  eventData: EventParty,
+  cur: FloatingBarIncomingCallState | null,
+  showIncomingCallModal: boolean
+): boolean {
+  if (!cur || !showIncomingCallModal) {
+    return false;
+  }
+  return isDuplicateRingingEventForOpenModal(eventData, cur);
+}
+
+function getRegisteredDeviceForUser(
+  dnsMap: DnsMapShape | undefined,
+  userAddress: string
+): { deviceName?: string; deviceType?: string } | undefined {
+  const userDeviceInfo = dnsMap?.[userAddress];
+  const userDevices = userDeviceInfo ? Object.values(userDeviceInfo.devices || {}) : [];
+  return userDevices.find((device) => device.terminalState === "REGISTERED");
+}
+
+type IncomingDeps = {
+  setIncomingCall: Dispatch<SetStateAction<FloatingBarIncomingCallState | null>>;
+  setIncomingCallContext: (v: FloatingBarIncomingCallState | null) => void;
+  setShowIncomingCallModal: Dispatch<SetStateAction<boolean>>;
+  setShowIncomingCallModalContext: (v: boolean) => void;
+  incomingTimerRef: FloatingBarIncomingTimerRef;
+};
+
+function handleIncomingCallEventBranch(args: {
+  latestEvent: LogEvent;
+  eventData: EventParty | undefined;
+  userAddress: string;
+  logTailIndex: number;
+  lastIncomingOpenLogIndexRef: MutableRefObject<number>;
+  deps: IncomingDeps;
+}): boolean {
+  const { latestEvent, eventData, userAddress, logTailIndex, lastIncomingOpenLogIndexRef, deps } = args;
+  if (latestEvent.eventType !== "INCOMING_CALL" || eventData?.calledAddress !== userAddress) {
+    return false;
+  }
+  if (logTailIndex <= lastIncomingOpenLogIndexRef.current) {
+    return true;
+  }
+  openIncomingSession(
+    {
+      callId: eventData.callId || `incoming_${Date.now()}`,
+      callingAddress: eventData.callingAddress ?? "",
+      calledAddress: eventData.calledAddress ?? "",
+      controllerAddress: eventData.controllerAddress || userAddress,
+      controllerDeviceName: eventData.controllerDeviceName || "WebCTI",
+      controllerDeviceType: eventData.controllerDeviceType || "SOFT_HARD",
+      startTime: new Date(),
+    },
+    deps.setIncomingCall,
+    deps.setIncomingCallContext,
+    deps.setShowIncomingCallModal,
+    deps.setShowIncomingCallModalContext,
+    deps.incomingTimerRef
+  );
+  lastIncomingOpenLogIndexRef.current = logTailIndex;
+  return true;
+}
+
+function handleRingingEventBranch(args: {
+  latestEvent: LogEvent;
+  eventData: EventParty | undefined;
+  userAddress: string;
+  logTailIndex: number;
+  dnsMap: DnsMapShape | undefined;
+  showIncomingCallModal: boolean;
+  lastIncomingOpenLogIndexRef: MutableRefObject<number>;
+  incomingCallRef: MutableRefObject<FloatingBarIncomingCallState | null>;
+  deps: IncomingDeps;
+}): boolean {
+  const {
+    latestEvent,
+    eventData,
+    userAddress,
+    logTailIndex,
+    dnsMap,
+    showIncomingCallModal,
+    lastIncomingOpenLogIndexRef,
+    incomingCallRef,
+    deps,
+  } = args;
+  if (latestEvent.eventType !== "RINGING" || eventData?.calledAddress !== userAddress) {
+    return false;
+  }
+  if (logTailIndex <= lastIncomingOpenLogIndexRef.current) {
+    return true;
+  }
+  if (isRingingDuplicateForOpenModal(eventData, incomingCallRef.current, showIncomingCallModal)) {
+    lastIncomingOpenLogIndexRef.current = logTailIndex;
+    return true;
+  }
+  const activeUserDevice = getRegisteredDeviceForUser(dnsMap, userAddress);
+  openIncomingSession(
+    {
+      callId: eventData.callId || `incoming_${Date.now()}`,
+      callingAddress: eventData.callingAddress ?? "",
+      calledAddress: eventData.calledAddress ?? "",
+      controllerAddress: userAddress,
+      controllerDeviceName: activeUserDevice?.deviceName || "",
+      controllerDeviceType: activeUserDevice?.deviceType || "",
+      startTime: new Date(),
+    },
+    deps.setIncomingCall,
+    deps.setIncomingCallContext,
+    deps.setShowIncomingCallModal,
+    deps.setShowIncomingCallModalContext,
+    deps.incomingTimerRef
+  );
+  lastIncomingOpenLogIndexRef.current = logTailIndex;
+  return true;
+}
+
+function handleCallEndEventBranch(args: {
+  latestEvent: LogEvent;
+  incomingCallRef: MutableRefObject<FloatingBarIncomingCallState | null>;
+  incomingTimerRef: FloatingBarIncomingTimerRef;
+  setIncomingCall: Dispatch<SetStateAction<FloatingBarIncomingCallState | null>>;
+  setIncomingCallContext: (v: FloatingBarIncomingCallState | null) => void;
+  setShowIncomingCallModal: Dispatch<SetStateAction<boolean>>;
+  setShowIncomingCallModalContext: (v: boolean) => void;
+}): void {
+  const { latestEvent, incomingCallRef, incomingTimerRef } = args;
+  const cur = incomingCallRef.current;
+  if (!cur || !latestEvent.parties?.length) {
+    return;
+  }
+  if (!INCOMING_SESSION_AUTO_CLOSE_EVENT_TYPES.has(latestEvent.eventType ?? "")) {
+    return;
+  }
+  const eventType = latestEvent.eventType;
+  const matchedParty = latestEvent.parties.find((p) =>
+    shouldCloseIncomingModalOnCallEndEvent(p, cur, eventType),
+  );
+  if (!matchedParty) {
+    return;
+  }
+  closeIncomingSession(
+    incomingTimerRef,
+    args.setShowIncomingCallModal,
+    args.setShowIncomingCallModalContext,
+    args.setIncomingCall,
+    args.setIncomingCallContext
+  );
+}
+
+/**
  * Syncs incoming-call modal state from CTI eventLog (timer kept in a ref to avoid effect dependency churn).
  */
 export function useGlobalFloatingBarIncomingCall({
@@ -107,80 +272,62 @@ export function useGlobalFloatingBarIncomingCall({
 }) {
   const incomingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const incomingCallRef = useRef<FloatingBarIncomingCallState | null>(null);
+  /** Prevents reopening from the same stale eventLog tail after dismiss (effect re-runs when modal closes). */
+  const lastIncomingOpenLogIndexRef = useRef(-1);
   incomingCallRef.current = incomingCall;
 
   useEffect(() => {
     if (!eventLog?.length || !userAddress) return;
 
+    const logTailIndex = eventLog.length - 1;
     const latestEvent = eventLog.at(-1);
     if (!latestEvent) return;
 
     const eventData = latestEvent.parties?.[0];
-
-    if (latestEvent.eventType === "INCOMING_CALL" && eventData?.calledAddress === userAddress) {
-      openIncomingSession(
-        {
-          callId: eventData.callId || `incoming_${Date.now()}`,
-          callingAddress: eventData.callingAddress ?? "",
-          calledAddress: eventData.calledAddress ?? "",
-          controllerAddress: eventData.controllerAddress || userAddress,
-          controllerDeviceName: eventData.controllerDeviceName || "WebCTI",
-          controllerDeviceType: eventData.controllerDeviceType || "SOFT_HARD",
-          startTime: new Date(),
-        },
-        setIncomingCall,
-        setIncomingCallContext,
-        setShowIncomingCallModal,
-        setShowIncomingCallModalContext,
-        incomingTimerRef
-      );
-      return;
-    }
+    const incomingDeps: IncomingDeps = {
+      setIncomingCall,
+      setIncomingCallContext,
+      setShowIncomingCallModal,
+      setShowIncomingCallModalContext,
+      incomingTimerRef,
+    };
 
     if (
-      latestEvent.eventType === "RINGING" &&
-      eventData?.calledAddress === userAddress &&
-      !showIncomingCallModal
+      handleIncomingCallEventBranch({
+        latestEvent,
+        eventData,
+        userAddress,
+        logTailIndex,
+        lastIncomingOpenLogIndexRef,
+        deps: incomingDeps,
+      })
     ) {
-      const userDeviceInfo = dnsMap?.[userAddress];
-      const userDevices = userDeviceInfo ? Object.values(userDeviceInfo.devices || {}) : [];
-      const activeUserDevice = userDevices.find((device) => device.terminalState === "REGISTERED");
-
-      openIncomingSession(
-        {
-          callId: eventData.callId || `incoming_${Date.now()}`,
-          callingAddress: eventData.callingAddress ?? "",
-          calledAddress: eventData.calledAddress ?? "",
-          controllerAddress: userAddress,
-          controllerDeviceName: activeUserDevice?.deviceName || "",
-          controllerDeviceType: activeUserDevice?.deviceType || "",
-          startTime: new Date(),
-        },
-        setIncomingCall,
-        setIncomingCallContext,
-        setShowIncomingCallModal,
-        setShowIncomingCallModalContext,
-        incomingTimerRef
-      );
       return;
     }
-
-    const endTypes = ["DISCONNECTED", "DROPPED", "ENDED"];
-    if (endTypes.includes(latestEvent.eventType ?? "") && eventData && incomingCallRef.current) {
-      const cur = incomingCallRef.current;
-      const sameCall =
-        eventData.callId === cur.callId ||
-        (eventData.callingAddress === cur.callingAddress && eventData.calledAddress === cur.calledAddress);
-      if (sameCall) {
-        closeIncomingSession(
-          incomingTimerRef,
-          setShowIncomingCallModal,
-          setShowIncomingCallModalContext,
-          setIncomingCall,
-          setIncomingCallContext
-        );
-      }
+    if (
+      handleRingingEventBranch({
+        latestEvent,
+        eventData,
+        userAddress,
+        logTailIndex,
+        dnsMap,
+        showIncomingCallModal,
+        lastIncomingOpenLogIndexRef,
+        incomingCallRef,
+        deps: incomingDeps,
+      })
+    ) {
+      return;
     }
+    handleCallEndEventBranch({
+      latestEvent,
+      incomingCallRef,
+      incomingTimerRef,
+      setIncomingCall,
+      setIncomingCallContext,
+      setShowIncomingCallModal,
+      setShowIncomingCallModalContext,
+    });
   }, [
     eventLog,
     userAddress,

@@ -22,6 +22,8 @@ export interface StatsCardData {
     onClick: () => void;
   };
   additionalText?: string;
+  /** When set, the whole card is clickable (e.g. apply a list filter). */
+  onClick?: () => void;
 }
 
 interface StatsCardsProps {
@@ -47,23 +49,27 @@ const StatsCards: React.FC<StatsCardsProps> = ({
       border: '1px solid #cccccc'
     }}>
       {data.map((card) => {
-        const IconComponent = card.icon;
-        const iconColor = card.iconColor || '#6366F1';
-        const iconBgColor = card.iconBgColor || '#EEF2FF';
         const cardKey = card.title + '|' + String(card.value) + '|' + (card.subtitle || '') + '|' + (card.additionalText || '');
+        const interactive = typeof card.onClick === 'function';
+        const shellStyle: React.CSSProperties = {
+          padding: '20px 0 40px 0',
+          borderRadius: interactive ? '8px' : undefined,
+          transition: interactive ? 'background-color 0.15s ease' : undefined,
+          ...(interactive
+            ? {
+                cursor: 'pointer' as const,
+                border: 'none',
+                background: 'transparent',
+                width: '100%',
+                font: 'inherit',
+                textAlign: 'inherit' as const,
+                display: 'block',
+              }
+            : {}),
+        };
 
-        return (
-          <div 
-            key={cardKey}
-            style={{
-              
-              
-              padding: '20px 0 40px 0',
-              
-            }}
-          >
-          
-
+        const cardBody = (
+          <React.Fragment>
             {/* Title */}
             <div style={{
               fontSize: '14px',
@@ -148,6 +154,31 @@ const StatsCards: React.FC<StatsCardsProps> = ({
                 <span>{card.subtitle}</span>
               </div>
             )}
+          </React.Fragment>
+        );
+
+        if (interactive) {
+          return (
+            <button
+              key={cardKey}
+              type="button"
+              onClick={card.onClick}
+              style={shellStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#F9FAFB';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              {cardBody}
+            </button>
+          );
+        }
+
+        return (
+          <div key={cardKey} style={shellStyle}>
+            {cardBody}
           </div>
         );
       })}

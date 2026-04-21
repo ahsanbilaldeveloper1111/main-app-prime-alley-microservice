@@ -6,7 +6,7 @@ import { Button, Card, Col, Row, Alert, Badge } from 'react-bootstrap'
 import { toast } from 'react-toastify'
 import Link from 'next/link'
 import useCtiStomp from '../../../hooks/useCtiStomp'
-import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, getAllUserDevices, mergeCalls,transferCalls, RemoveCall, attendCall} from '../../../utils/dialer'
+import { makeCall, endCall, holdCall, resumeCall, getCallingDeviceInfo, getRemotePartyDnForTransfer, getAllUserDevices, mergeCalls,transferCalls, RemoveCall, attendCall} from '../../../utils/dialer'
 import DeviceSelectionModal from '../../../components/DeviceSelectionModal'
 import Select from 'react-select'
 import { FaLastfmSquare } from 'react-icons/fa'
@@ -956,13 +956,17 @@ const CtiDialer = () => {
       }
 
       setShowPageLoader(true);
+      const transferAddress =
+        getRemotePartyDnForTransfer(userAddress, call.callingAddress, call.calledAddress) ||
+        call.calledAddress ||
+        call.number
       // Call the transfer API
       const result = await transferCalls({
         callId: call.callId,
         transferInitiatorAddress: callingDevice.callingAddress,
         transferInitiatorDeviceType: callingDevice.callingDeviceType,
         transferInitiatorDeviceName: callingDevice.callingDeviceName,
-        transferAddress: call.calledAddress || call.number,
+        transferAddress,
         targetAddress: targetExtension,
         mode: 'CONSULT'
       })

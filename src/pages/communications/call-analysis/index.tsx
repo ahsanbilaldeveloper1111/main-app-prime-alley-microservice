@@ -3,10 +3,10 @@ import React, { ReactElement, useEffect, useState, useRef, useCallback, useMemo 
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
-import StatsCards, { StatsCardData } from '@components/GenericStatsCards';
+import { StatsCardData } from '@components/GenericStatsCards';
 import { DownloadCallRecording } from '@utils/calls';
 import { GetImagicalTranscriptions } from '@utils/aiml';
-import { Badge, Button, Col, Modal, Row } from 'react-bootstrap';
+import { Badge, Button, Modal } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { ModuleSlug, formatDateTimeToLocal, GlobalDateTimeFormat, formatDuration, encodeAnalysisData, GlobalDateFormat, convertDateTimeWithOffsetToLocal, GlobalTimeFormat } from '@utils/Helper';
@@ -297,7 +297,7 @@ const AnalyzeRecordings = () => {
         let startDate = defaultStartDate;
         let endDate = defaultEndDate;
         
-        if (filters.start_datetime && filters.start_datetime.trim()) {
+        if (filters.start_datetime?.trim()) {
             // If it's already in UTC format (ends with Z), use it as is
             if (filters.start_datetime.endsWith('Z') || filters.start_datetime.includes('T')) {
                 startDate = filters.start_datetime;
@@ -308,7 +308,7 @@ const AnalyzeRecordings = () => {
             }
         }
         
-        if (filters.end_datetime && filters.end_datetime.trim()) {
+        if (filters.end_datetime?.trim()) {
             // If it's already in UTC format (ends with Z), use it as is
             if (filters.end_datetime.endsWith('Z') || filters.end_datetime.includes('T')) {
                 endDate = filters.end_datetime;
@@ -477,7 +477,20 @@ const AnalyzeRecordings = () => {
         return '';
     };
 
+    const selectedStartDateTime = String(currentFilters?.start_datetime || '');
+    const selectedEndDateTime = String(currentFilters?.end_datetime || '');
+
     const tableToolbar = useMemo(() => ({
+        showTabs: true,
+        tabs: [
+            {
+                id: 'call-analysis-title',
+                label: 'Call Analysis',
+                removable: false,
+            },
+        ],
+        activeTab: 'call-analysis-title',
+        onTabChange: () => {},
         showSearch: true,
         searchValue,
         searchPlaceholder: 'Search call recordings...',
@@ -590,12 +603,45 @@ const AnalyzeRecordings = () => {
                 })),
             },
         ],
+        rightActions: (
+            <div className="d-flex align-items-center gap-2 call-analysis-date-range-wrap">
+                {selectedStartDateTime && selectedEndDateTime && moment.utc(selectedStartDateTime).isValid() && moment.utc(selectedEndDateTime).isValid() && (
+                    <div
+                        className="d-flex align-items-center gap-2 call-analysis-date-chip"
+                        style={{
+                            background: '#f8fafc',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '10px',
+                            padding: '6px 10px',
+                        }}
+                    >
+                        <span
+                            className="d-inline-flex align-items-center justify-content-center"
+                            style={{
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '6px',
+                                background: '#eef2ff',
+                                color: '#4f46e5',
+                            }}
+                        >
+                            <Calendar size={14} />
+                        </span>
+                        <span className="call-analysis-date-text" style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                            {formatDateTimeToLocal(selectedStartDateTime, GlobalDateTimeFormat)} - {formatDateTimeToLocal(selectedEndDateTime, GlobalDateTimeFormat)}
+                        </span>
+                    </div>
+                )}
+            </div>
+        ),
     }), [
         searchValue,
         currentFilters,
         hierarchyDataExtensions,
         fetchTableData,
         applyFilters,
+        selectedStartDateTime,
+        selectedEndDateTime,
     ]);
 
     rowsPerPageRef.current = paginationInfo.perPage;
@@ -642,7 +688,8 @@ const AnalyzeRecordings = () => {
                 setDownloadProgress(prev => {
                     const currentProgress = prev[uuid] || 0;
                     if (currentProgress < 90) {
-                        return { ...prev, [uuid]: currentProgress + Math.random() * 15 };
+                        const randomIncrement = (crypto.getRandomValues(new Uint8Array(1))[0] / 255) * 15;
+                        return { ...prev, [uuid]: currentProgress + randomIncrement };
                     }
                     return prev;
                 });
@@ -811,60 +858,34 @@ const AnalyzeRecordings = () => {
 
     return (
         <React.Fragment>
-            <BreadcrumbItem mainTitle="Call Analysis" mainLink="/communications/call-analysis" subTitle="Call Analysis" showPageLoader={showPageLoader} />
-
-            <Row className="mb-3">
-                <Col md={12}>
-                    <div className="page-header-title style-2">
-                        <Row className="d-flex justify-content-between align-items-center">
-                            <Col md={4}>
-                                <h2 className="mb-0">Call Analysis</h2>
-                            </Col>
-
-                            <Col md={8} className="d-flex justify-content-end">
-                                <div className="action-buttons">
-                                    <div className="d-flex align-items-center gap-2">
-                                       
-                                    </div>
-                                </div>
-                            </Col>
-                        </Row>
-                    </div>
-                </Col>
-            </Row>
-
-            <div className="mb-4">
-                <StatsCards data={statsCardsData} gridMinWidth="160px" />
-            </div>
-
-            {currentFilters.start_datetime && currentFilters.end_datetime && (
-                <div
-                    className="mb-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
-                    style={{
-                        background: '#f8fafc',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '10px',
-                        padding: '10px 12px',
+            <div className="call-analysis-page">
+                <style
+                    dangerouslySetInnerHTML={{
+                        __html: `
+                            .call-analysis-page .gt-toolbar-tabs-section .gt-tab-button { margin-left: 12px; }
+                            .call-analysis-page .call-analysis-date-chip { max-width: 100%; }
+                            .call-analysis-page .call-analysis-date-text { white-space: nowrap; line-height: 1.35; }
+                            @media (max-width: 992px) {
+                              .call-analysis-page .gt-toolbar-tabs-section > .d-flex {
+                                flex-wrap: wrap;
+                                row-gap: 8px;
+                              }
+                              .call-analysis-page .call-analysis-date-range-wrap {
+                                width: 100%;
+                              }
+                              .call-analysis-page .call-analysis-date-chip {
+                                width: 100%;
+                              }
+                              .call-analysis-page .call-analysis-date-text {
+                                white-space: normal !important;
+                                overflow-wrap: anywhere;
+                                word-break: break-word;
+                              }
+                            }
+                        `,
                     }}
-                >
-                    <div className="d-flex align-items-center gap-2">
-                        <span
-                            className="d-inline-flex align-items-center justify-content-center"
-                            style={{ width: '30px', height: '30px', borderRadius: '8px', background: '#eef2ff', color: '#4f46e5' }}
-                        >
-                            <Calendar size={16} />
-                        </span>
-                        <div className="d-flex align-items-center gap-2">
-                            <span className="text-muted" style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.3px' }}>
-                                Selected Date Range
-                            </span>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
-                                {formatDateTimeToLocal(currentFilters.start_datetime, GlobalDateTimeFormat)} — {formatDateTimeToLocal(currentFilters.end_datetime, GlobalDateTimeFormat)}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            )}
+                />
+                <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Analysis" showPageLoader={showPageLoader} />
 
             {/* Data Table */}
             {session?.user?.permissions?.includes('transcriptions-analysis-aiml') && (
@@ -879,6 +900,8 @@ const AnalyzeRecordings = () => {
                     showToolbar={true}
                     toolbar={tableToolbar}
                     showToolbarActions={false}
+                    statsCards={statsCardsData}
+                    metricsGridMinWidth="160px"
                     pagination={{
                         currentPage: paginationInfo.currentPage,
                         rowsPerPage: paginationInfo.perPage,
@@ -895,6 +918,7 @@ const AnalyzeRecordings = () => {
                     uniqueKey="uuid"
                 />
             )}
+            </div>
 
             {/* Media Player Modal */}
             <Modal

@@ -2,7 +2,7 @@ import React, { ReactElement, useState, useCallback, useMemo, useEffect, useRef 
 import Layout from '@layout/index';
 import '@assets/scss/datatable-style.scss';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import { Row, Col, Modal, Button } from 'react-bootstrap';
+import { Modal, Button } from 'react-bootstrap';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { ListGsmInbox, MarkAsRead } from '@utils/GsmManagement';
 import moment from 'moment';
@@ -267,6 +267,16 @@ const GsmInbox = () => {
   };
 
   const tableToolbar = useMemo(() => ({
+    showTabs: true,
+    tabs: [
+      {
+        id: 'text-messages-title',
+        label: 'Text Messages',
+        removable: false,
+      },
+    ],
+    activeTab: 'text-messages-title',
+    onTabChange: () => {},
     showSearch: false,
     showFiltersButton: false,
     showFilterPills: true,
@@ -303,6 +313,12 @@ const GsmInbox = () => {
           color: #141414 !important;
           font-weight: 100 !important;
         }
+          div.pagination-buttons .btn.btn-primary {
+            color: #ffffff !important;
+          }
+            .btn.show {
+            color: #ffffff !important;
+            }
         .text-messages-page .generic-table-responsive { border: none !important; }
         .text-messages-page thead,
         .text-messages-page tbody,
@@ -310,6 +326,7 @@ const GsmInbox = () => {
         .text-messages-page tr,
         .text-messages-page td,
         .text-messages-page th { border: 1px solid #DBE0E5 !important; }
+        .text-messages-page .gt-toolbar-tabs-section .gt-tab-button { margin-left: 12px; }
 
         /* Keep readable column widths and allow horizontal scroll instead of squeezing text */
         .text-messages-page .generic-table { min-width: 1080px; }
@@ -328,23 +345,10 @@ const GsmInbox = () => {
 
       <div className="text-messages-page">
       <BreadcrumbItem
-        mainTitle="Text Messages"
-        mainLink="/communications/text-messages"
+        mainTitle=""
+        mainLink=""
         subTitle="Text Messages"
       />
-
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                <h2 className="mb-0">Text Messages</h2>
-              </Col>
-              <Col md={8} className="d-flex justify-content-end" />
-            </Row>
-          </div>
-        </Col>
-      </Row>
 
       {session?.user?.permissions?.includes('list-gsm-inbox') && (
         <GenericTable<GsmInboxRow>

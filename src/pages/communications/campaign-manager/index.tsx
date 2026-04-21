@@ -47,6 +47,8 @@ import {
   getEffectiveTeamId,
   getStoredTeamId,
   setStoredTeamId,
+  assertFinesseTeamSwitchable,
+  getFinesseApiErrorMessage,
   normalizeFinesseUserData,
   scheduleFinesseCampaign,
   type FinesseUserData,
@@ -153,6 +155,7 @@ const LiveCallsCampaignsManagement = () => {
       const [showUploadModal, setShowUploadModal] = useState(false);
       const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
       const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+      const [allowDuplicateContacts, setAllowDuplicateContacts] = useState(true);
       const [columnMapping, setColumnMapping] = useState<Array<{id: number, key: string, value: string, order: number}>>([]);
       const [columnsLoading, setColumnsLoading] = useState(false);
       const [isWrapUpOpen, setIsWrapUpOpen] = useState(false);
@@ -473,13 +476,29 @@ const LiveCallsCampaignsManagement = () => {
       const handleTeamChange = async (newTeamName: string, newTeamId: number) => {
         const currentTeamId = getStoredTeamId();
         if (Number(currentTeamId) === newTeamId) return;
+        const previousTeamName = selectedTeam;
+        const stored = getFinesseUserData();
+        const usernameForCheck =
+          stored?.loginId ??
+          stored?.loginName ??
+          (session?.user as { username?: string } | undefined)?.username ??
+          '';
+        const switchCheck = await assertFinesseTeamSwitchable(newTeamId, usernameForCheck || undefined, [
+          teamsWithIds,
+          stored?.teams,
+        ]);
+        if (!switchCheck.ok) {
+          toast.error(switchCheck.message);
+          setSelectedTeam(previousTeamName);
+          return;
+        }
         const { username, teamId } = getFinesseContext();
         if (username && teamId != null) {
           try {
             await finesseUnlink(username, teamId);
           } catch (err: unknown) {
-            const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? (err as Error)?.message ?? 'Unlink failed';
-            toast.error(msg);
+            toast.error(getFinesseApiErrorMessage(err, 'Unlink failed'));
+            setSelectedTeam(previousTeamName);
             return;
           }
         }
@@ -651,6 +670,7 @@ const LiveCallsCampaignsManagement = () => {
         setSelectedCampaignId(campaignId);
         setShowUploadModal(true);
         setUploadedFile(null);
+        setAllowDuplicateContacts(true);
         // Columns are loaded from getFinesseCampaignContactsConfig (manual.fieldsOrder)
         setColumnMapping([]);
       };
@@ -659,6 +679,7 @@ const LiveCallsCampaignsManagement = () => {
         setShowUploadModal(false);
         setSelectedCampaignId(null);
         setUploadedFile(null);
+        setAllowDuplicateContacts(true);
         setColumnMapping([]);
         setColumnsLoading(false);
       };
@@ -794,7 +815,7 @@ const LiveCallsCampaignsManagement = () => {
           });
 
           await importFinesseCampaignContacts(teamId, username, selectedCampaignId, uploadedFile, {
-            allowDuplicateContacts: true,
+            allowDuplicateContacts,
             importType: 'MANUAL',
             contactHeaders,
           });
@@ -977,7 +998,7 @@ const LiveCallsCampaignsManagement = () => {
 
   return (
     <FinesseAuthGate subTitle="Live Calls Campaigns Management" pageLabel="Live Calls Campaigns">
-      {capabilityLoadingBlock ? capabilityLoadingBlock : (
+      {capabilityLoadingBlock ?? (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Live Calls Campaigns Management" />
 
@@ -2402,6 +2423,43 @@ const LiveCallsCampaignsManagement = () => {
                     </button>
                   </div>
                 )}
+              </div>
+
+              <div className="modal-section">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                      Allow duplicate contacts
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#64748b', maxWidth: '420px' }}>
+                      When off, the import may reject or skip rows that duplicate existing contacts.
+                    </div>
+                  </div>
+                  <div
+                    className={`toggle-switch ${allowDuplicateContacts ? 'enabled' : ''}`}
+                    onClick={() => setAllowDuplicateContacts((v) => !v)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setAllowDuplicateContacts((v) => !v);
+                      }
+                    }}
+                    role="switch"
+                    tabIndex={0}
+                    aria-checked={allowDuplicateContacts}
+                    title={allowDuplicateContacts ? 'Duplicates allowed' : 'Duplicates not allowed'}
+                  >
+                    <div className="toggle-slider" />
+                  </div>
+                </div>
               </div>
 
               {/* Import Status (reference: UpdateContactsModal initialImportStatus) */}

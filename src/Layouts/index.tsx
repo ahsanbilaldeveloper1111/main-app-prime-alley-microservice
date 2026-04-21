@@ -1,18 +1,23 @@
-import React, { ReactNode, useMemo, useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/router';
-import Footer from '@components/Footer';
-import ApplicationCustomerSidebar, { SIDEBAR_WIDTH_COLLAPSED, SIDEBAR_WIDTH_EXPANDED } from './Moduler/AppCustomerSidebar';
+import React, { ReactNode, useMemo, useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
+import Footer from "@components/Footer";
+import ApplicationCustomerSidebar, {
+  SIDEBAR_WIDTH_COLLAPSED,
+  SIDEBAR_WIDTH_EXPANDED,
+} from "./Moduler/AppCustomerSidebar";
 import { useSession } from "next-auth/react";
-import { useNotifications } from '../contexts/NotificationContext';
-import { HEADER_CONSTANTS} from "@constants/headerConstants";
-import { useDialerModal } from '../contexts/DialerModalContext';
-import NotificationsSidebar from '@components/Notificationssidebar';
-import BreezeAssistantSidebar from '@components/BreezeAssistantSidebar';
+import { useNotifications } from "../contexts/NotificationContext";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { useDialerModal } from "../contexts/DialerModalContext";
+import NotificationsSidebar from "@components/Notificationssidebar";
+import BreezeAssistantSidebar from "@components/BreezeAssistantSidebar";
 import { getCurrentUserCompanyImage } from "@utils/company";
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from "../hooks/useAuth";
 
-import { 
-  Bell, ChevronDown, MoreVertical, 
+import {
+  Bell,
+  ChevronDown,
+  MoreVertical, 
   Phone,
   Search,
   X,
@@ -38,41 +43,47 @@ import { CreateTicketSidebar } from '@components/renderCreateTicketForm';
 import { toast } from "react-toastify";
 import { getErrorMessage } from "@utils/errors";
 import CreateTaskModal from '@components/CreatePlannerTaskSidebar';
+import {
+  hasReliableCtiCallId,
+  isSameCtiCallForActiveLookup,
+  resolveCallIdForAttendApi,
+  shouldDismissIncomingModalForAnsweredElsewhere,
+} from "../utils/incomingCallMatching";
 
 interface LayoutProps {
-	children: ReactNode;
+  children: ReactNode;
 }
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** Device row from CTI dnsMap (before dialer normalization). */
 interface CtiDnsDevice {
-	deviceName?: string;
-	deviceType?: string;
-	terminalState?: string;
+  deviceName?: string;
+  deviceType?: string;
+  terminalState?: string;
 }
 
 /** Active call entry from CTI `activeCalls` map (see `CtiContext`). */
 interface CtiActiveCallEntry {
-	id: string;
-	number: string;
-	startTime: Date;
-	status: string;
-	callId?: string;
-	callingAddress?: string;
-	calledAddress?: string;
-	callingDeviceName?: string;
-	callingDeviceType?: string;
-	duration?: number;
+  id: string;
+  number: string;
+  startTime: Date;
+  status: string;
+  callId?: string;
+  callingAddress?: string;
+  calledAddress?: string;
+  callingDeviceName?: string;
+  callingDeviceType?: string;
+  duration?: number;
 }
 
 /** Normalized device list from `getAllUserDevices` (see `src/utils/dialer.ts`). */
 interface CtiDialerDevice {
-	deviceName: string;
-	deviceType: string;
-	terminalState: string;
-	when: string;
-	details: string;
+  deviceName: string;
+  deviceType: string;
+  terminalState: string;
+  when: string;
+  details: string;
 }
 
 interface SearchableRouteItem {
@@ -86,16 +97,11 @@ type DnsMapLike = Record<
 > | null | undefined;
 
 function findMatchingActiveCall(
-	activeCalls: Map<string, CtiActiveCallEntry>,
-	incomingCall: IncomingCallData
+  activeCalls: Map<string, CtiActiveCallEntry>,
+  incomingCall: IncomingCallData,
 ): CtiActiveCallEntry | undefined {
-	const calls = Array.from(activeCalls.values());
-	return calls.find(
-		(call) =>
-			call.callId === incomingCall.callId ||
-			(call.callingAddress === incomingCall.callingAddress &&
-				call.calledAddress === incomingCall.calledAddress)
-	);
+  const calls = Array.from(activeCalls.values());
+  return calls.find((call) => isSameCtiCallForActiveLookup(call, incomingCall));
 }
 
 function findAnsweredIncomingCall(
@@ -123,47 +129,52 @@ function getNotificationsOverflowLabel(totalUnreadCount: number): string {
 }
 
 function getUserDevicesFromDnsMap(
-	dnsMap: DnsMapLike,
-	userAddress: string | undefined | null
+  dnsMap: DnsMapLike,
+  userAddress: string | undefined | null,
 ): CtiDnsDevice[] {
-	const userDeviceInfo = dnsMap?.[userAddress || ''];
-	if (!userDeviceInfo?.devices) return [];
-	return Object.values(userDeviceInfo.devices);
+  const userDeviceInfo = dnsMap?.[userAddress || ""];
+  if (!userDeviceInfo?.devices) return [];
+  return Object.values(userDeviceInfo.devices);
 }
 
 function pickControllerDevice(
-	userDevices: CtiDnsDevice[],
-	preferredDeviceName?: string | null
+  userDevices: CtiDnsDevice[],
+  preferredDeviceName?: string | null,
 ): CtiDnsDevice | null {
-	if (!userDevices.length) return null;
-	if (preferredDeviceName) {
-		const match = userDevices.find((device) => device.deviceName === preferredDeviceName);
-		if (match) return match;
-	}
-	return (
-		userDevices.find((device) => device.terminalState === 'REGISTERED') || userDevices[0] || null
-	);
+  if (!userDevices.length) return null;
+  if (preferredDeviceName) {
+    const match = userDevices.find(
+      (device) => device.deviceName === preferredDeviceName,
+    );
+    if (match) return match;
+  }
+  return (
+    userDevices.find((device) => device.terminalState === "REGISTERED") ||
+    userDevices[0] ||
+    null
+  );
 }
 
 const Layout = ({ children }: LayoutProps) => {
-
-	const router = useRouter();
-	const { data: session, status } = useSession();
+  const router = useRouter();
+  const { data: session, status } = useSession();
   const { logout } = useAuth();
 	const { unreadCount } = useNotifications();
 	const { isOpen: isDialerOpen, openDialer, closeDialer } = useDialerModal();
-  const { 
-		isInitialized, 
-		userAddress, 
-		dnsMap, 
-		attendCall, 
+  const {
+		isInitialized,
+		userAddress,
+		dnsMap,
+		attendCall,
 		endCall,
 		getUserDataExtensions,
 		activeCalls,
+		callStateMap,
 		makeCall,
 		dialNumber,
 		getAllUserDevices
 	} = useCti();
+
 	const { incomingCall, showIncomingCallModal, setIncomingCall, setShowIncomingCallModal } = useIncomingCall();
 	const { hasPermission } = usePermissions();
 	const [isDialing, setIsDialing] = useState(false);
@@ -215,381 +226,462 @@ const Layout = ({ children }: LayoutProps) => {
     };
     w.addEventListener("breeze-assistant:open", handler as EventListener);
     return () => {
-      w.removeEventListener(
-        "breeze-assistant:open",
-        handler as EventListener,
-      );
+      w.removeEventListener("breeze-assistant:open", handler as EventListener);
     };
   }, []);
 
   // When session is invalid (e.g. server restarted and in-memory store was cleared), redirect to signin.
   useEffect(() => {
-    if (status !== 'unauthenticated') return;
-    if (router.pathname.startsWith('/auth/') || router.pathname === '/access-denied') return;
+    if (status !== "unauthenticated") return;
+    if (
+      router.pathname.startsWith("/auth/") ||
+      router.pathname === "/access-denied"
+    )
+      return;
     const callbackUrl = encodeURIComponent(router.asPath);
-    router.replace(`/auth/signin?reason=session_expired&callbackUrl=${callbackUrl}`);
+    router.replace(
+      `/auth/signin?reason=session_expired&callbackUrl=${callbackUrl}`,
+    );
   }, [status, router.pathname, router.asPath]);
 
   // Permission check: session has permissions from store (not cookie). Redirect to access-denied if user lacks required perms for this route.
   useEffect(() => {
-    if (status !== 'authenticated' || !session?.user || router.pathname === '/access-denied') return;
-    const pathname = router.asPath.split('?')[0] || router.pathname;
+    if (
+      status !== "authenticated" ||
+      !session?.user ||
+      router.pathname === "/access-denied"
+    )
+      return;
+    const pathname = router.asPath.split("?")[0] || router.pathname;
     const required = getRequiredPermissions(pathname).filter(Boolean);
     if (required.length === 0) return;
     const userPerms = session.user.permissions ?? [];
     if (!canAccessRoute(userPerms, pathname)) {
-      router.replace('/access-denied');
+      router.replace("/access-denied");
     }
   }, [router.pathname, router.asPath, status, session?.user?.permissions]);
 
-	useEffect(() => {
-		let cancelled = false;
-		getCurrentUserCompanyImage()
-      .then((blob: Blob | null) => {
-				if (cancelled) return;
-				if (blob && blob.size > 0) {
-					setHeaderLogoUrl('');
-				} else {
-					setHeaderLogoUrl(null);
-				}
-			})
-			.catch(() => {
-				if (!cancelled) setHeaderLogoUrl(null);
-			});
-		return () => {
-			cancelled = true;
-			const url = headerLogoUrlRef.current;
-			if (url) {
-				URL.revokeObjectURL(url);
-				headerLogoUrlRef.current = null;
-			}
-		};
-	}, []);
+  useEffect(() => {
+    let cancelled = false;
+    getCurrentUserCompanyImage()
+      .then((blob) => {
+        if (cancelled) return;
+        if (blob && blob.size > 0) {
+          setHeaderLogoUrl("");
+        } else {
+          setHeaderLogoUrl(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setHeaderLogoUrl(null);
+      });
+    return () => {
+      cancelled = true;
+      const url = headerLogoUrlRef.current;
+      if (url) {
+        URL.revokeObjectURL(url);
+        headerLogoUrlRef.current = null;
+      }
+    };
+  }, []);
 
-	useEffect(() => {
-		const handleClickOutside = (e: MouseEvent) => {
-			if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target as Node)) {
-				setShowSearchSuggestions(false);
-				setSearchQuery('');
-			}
-      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        searchWrapperRef.current &&
+        !searchWrapperRef.current.contains(e.target as Node)
+      ) {
+        setShowSearchSuggestions(false);
+        setSearchQuery("");
+      }
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(e.target as Node)
+      ) {
         setShowUserDropdown(false);
       }
-      if (iconsDropdownRef.current && !iconsDropdownRef.current.contains(e.target as Node)) {
-        setShowIconsDropdown(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const totalUnreadCount = unreadCount;
+
+  const [loggedInName, setLoggedInName] = useState("");
+  const [loggedInCompanyName, setLoggedInCompanyName] = useState("");
+  const [loggedInUserProfilePicture, setLoggedInUserProfilePicture] =
+    useState("");
+
+  useEffect(() => {
+    if (status !== "loading" && session?.user) {
+      setLoggedInName(session.user.name ?? "");
+      setLoggedInCompanyName(session.user.company_name ?? "");
+      setLoggedInUserProfilePicture(session.user.profile_picture ?? "");
+    }
+  }, [
+    status,
+    session?.user?.name,
+    session?.user?.company_name,
+    session?.user?.profile_picture,
+  ]);
+
+  const profileImageUrl = loggedInUserProfilePicture
+    ? getStorageImageUrl(loggedInUserProfilePicture) || null
+    : null;
+
+  useEffect(() => {
+    if (isDialerOpen && dialerButtonRef.current) {
+      const buttonRect = dialerButtonRef.current.getBoundingClientRect();
+      const popupWidth = Math.min(625, window.innerWidth - 40);
+      const popupHeight = 400;
+      const spacing = 10;
+
+      let right = window.innerWidth - buttonRect.right;
+
+      if (buttonRect.right - popupWidth < 20) {
+        right = 20;
       }
-		};
-		document.addEventListener('mousedown', handleClickOutside);
-		return () => document.removeEventListener('mousedown', handleClickOutside);
-	}, []);
 
-	const totalUnreadCount = unreadCount;
+      let top = buttonRect.bottom + spacing;
 
-  const [loggedInName, setLoggedInName] = useState('');
-  const [loggedInCompanyName, setLoggedInCompanyName] = useState('');
-	const [loggedInUserProfilePicture, setLoggedInUserProfilePicture] = useState('');
+      if (top + popupHeight > window.innerHeight - 20) {
+        top = buttonRect.top - popupHeight - spacing;
+        if (top < 90) {
+          top = 90;
+        }
+      }
 
-	useEffect(() => {
-		if (status !== "loading" && session?.user) {
-		  setLoggedInName(session.user.name ?? '');
-		  setLoggedInCompanyName(session.user.company_name ?? '');
-		  setLoggedInUserProfilePicture(session.user.profile_picture ?? '');
-		}
-	}, [
-	  status,
-	  session?.user?.name,
-	  session?.user?.company_name,
-	  session?.user?.profile_picture,
-	]);
+      setDialerPosition({ top, right });
+    }
+  }, [isDialerOpen]);
 
-	const profileImageUrl = loggedInUserProfilePicture 
-		? (getStorageImageUrl(loggedInUserProfilePicture) || null)
-		: null;
+  const formatPhoneNumber = (number: string): string => {
+    if (number.startsWith("+")) {
+      return number;
+    }
 
-	useEffect(() => {
-		if (isDialerOpen && dialerButtonRef.current) {
-			const buttonRect = dialerButtonRef.current.getBoundingClientRect();
-			const popupWidth = Math.min(625, window.innerWidth - 40);
-			const popupHeight = 400;
-			const spacing = 10;
-			
-			let right = window.innerWidth - buttonRect.right;
-			
-			if (buttonRect.right - popupWidth < 20) {
-				right = 20;
-			}
-			
-			let top = buttonRect.bottom + spacing;
-			
-			if (top + popupHeight > window.innerHeight - 20) {
-				top = buttonRect.top - popupHeight - spacing;
-				if (top < 90) {
-					top = 90;
-				}
-			}
-			
-			setDialerPosition({ top, right });
-		}
-	}, [isDialerOpen]);
+    const digits = number.replaceAll(/\D/g, "");
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    return number;
+  };
 
-	const formatPhoneNumber = (number: string): string => {
-		if (number.startsWith("+")) {
-			return number;
-		}
-		
-		const digits = number.replaceAll(/\D/g, "");
-		if (digits.length === 10) {
-			return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-		}
-		return number;
-	};
+  const isDeviceRegistered = useMemo(() => {
+    if (!userAddress || !dnsMap?.[userAddress]) {
+      return false;
+    }
 
-	const isDeviceRegistered = useMemo(() => {
-		if (!userAddress || !dnsMap?.[userAddress]) {
-			return false;
-		}
-		
-    const userDevices = Object.values(dnsMap[userAddress]?.devices || {}) as CtiDnsDevice[];
-		if (userDevices.length === 0) {
-			return false;
-		}
-		
-		return userDevices.some((device: CtiDnsDevice) => device.terminalState === 'REGISTERED');
-	}, [userAddress, dnsMap]);
+    const userDevices = Object.values(dnsMap[userAddress]?.devices || {});
+    if (userDevices.length === 0) {
+      return false;
+    }
 
-	const incomingCallUserData = useMemo(() => {
-		if (!incomingCall?.callingAddress || !getUserDataExtensions) {
-			return null;
-		}
-		
-		try {
-			const userDataExtensions = getUserDataExtensions() || {};
-			const callNumber = incomingCall.callingAddress;
-			const dnString = String(callNumber);
-			const dnNumber = Number(callNumber);
-			
-			const data = userDataExtensions[callNumber] || userDataExtensions[dnString] || userDataExtensions[dnNumber] || null;
-			return data;
-		} catch (error) {
-			toast.error(`Failed to load incoming call data: ${getErrorMessage(error)}`, {
-				toastId: "layout_incoming_call_data_failed",
-			});
-			return null;
-		}
-	}, [incomingCall, getUserDataExtensions]);
+    return userDevices.some(
+      (device: CtiDnsDevice) => device.terminalState === "REGISTERED",
+    );
+  }, [userAddress, dnsMap]);
 
-	const incomingCallUserName = useMemo(() => {
-		if (!incomingCallUserData) {
-			return incomingCall?.callingAddress || "Unknown";
-		}
-		return incomingCallUserData.name || incomingCallUserData.user_name || incomingCall?.callingAddress || "Unknown";
-	}, [incomingCallUserData, incomingCall]);
+  const incomingCallUserData = useMemo(() => {
+    if (!incomingCall?.callingAddress || !getUserDataExtensions) {
+      return null;
+    }
 
-	const incomingCallUserImageUrl = useMemo(() => {
-		if (!incomingCallUserData) {
-			return UserDummyImage.src;
-		}
-		
-		const imagePath = incomingCallUserData?.image_path;
-		if (imagePath) {
-			const url = getStorageImageUrl(imagePath);
-			return url || UserDummyImage.src;
-		}
-		return UserDummyImage.src;
-	}, [incomingCallUserData]);
+    try {
+      const userDataExtensions = getUserDataExtensions() || {};
+      const callNumber = incomingCall.callingAddress;
+      const dnString = String(callNumber);
+      const dnNumber = Number(callNumber);
 
-	// Close incoming call popup when the call is answered/connected (e.g. from Jabber or another device)
-	useEffect(() => {
-    if (!showIncomingCallModal || !incomingCall) {
+      const data =
+        userDataExtensions[callNumber] ||
+        userDataExtensions[dnString] ||
+        userDataExtensions[dnNumber] ||
+        null;
+      return data;
+    } catch (error) {
+      toast.error(
+        `Failed to load incoming call data: ${getErrorMessage(error)}`,
+        {
+          toastId: "layout_incoming_call_data_failed",
+        },
+      );
+      return null;
+    }
+  }, [incomingCall, getUserDataExtensions]);
+
+  const incomingCallUserName = useMemo(() => {
+    if (!incomingCallUserData) {
+      return incomingCall?.callingAddress || "Unknown";
+    }
+    return (
+      incomingCallUserData.name ||
+      incomingCallUserData.user_name ||
+      incomingCall?.callingAddress ||
+      "Unknown"
+    );
+  }, [incomingCallUserData, incomingCall]);
+
+  const incomingCallUserImageUrl = useMemo(() => {
+    if (!incomingCallUserData) {
+      return UserDummyImage.src;
+    }
+
+    const imagePath = incomingCallUserData?.image_path;
+    if (imagePath) {
+      const url = getStorageImageUrl(imagePath);
+      return url || UserDummyImage.src;
+    }
+    return UserDummyImage.src;
+  }, [incomingCallUserData]);
+
+  // Close incoming call popup when the call is answered/connected elsewhere (e.g. Jabber).
+  // Do not treat `dialing` as answered — transfer/consult often passes through that state first.
+  useEffect(() => {
+    if (!showIncomingCallModal || !incomingCall) return;
+    const calls = Array.from(activeCalls.values());
+    const answeredMatch = calls.find((call) =>
+      shouldDismissIncomingModalForAnsweredElsewhere(call, incomingCall),
+    );
+    if (answeredMatch) {
+      setShowIncomingCallModal(false);
+      setIncomingCall(null);
+    }
+  }, [
+    showIncomingCallModal,
+    incomingCall,
+    activeCalls,
+    setShowIncomingCallModal,
+    setIncomingCall,
+  ]);
+
+  const closeIncomingCallModal = () => {
+    setShowIncomingCallModal(false);
+    setIncomingCall(null);
+  };
+
+  const handleAttendCall = async () => {
+    if (!hasPermission("dial-call-cti")) {
       return;
     }
 
-    const answeredMatch = findAnsweredIncomingCall(activeCalls, incomingCall);
-		if (answeredMatch) {
-			setShowIncomingCallModal(false);
-			setIncomingCall(null);
-		}
-	}, [showIncomingCallModal, incomingCall, activeCalls, setShowIncomingCallModal, setIncomingCall]);
+    if (!incomingCall) {
+      return;
+    }
 
-	const closeIncomingCallModal = () => {
-		setShowIncomingCallModal(false);
-		setIncomingCall(null);
-	};
+    const { callId: attendCallId } = resolveCallIdForAttendApi(
+      incomingCall,
+      Array.from(activeCalls.values()),
+      { callStateMap: callStateMap ?? undefined },
+    );
 
-	const handleAttendCall = async () => {
-		if (!hasPermission("dial-call-cti")) {
-			return;
-		}
+    const userDevices = getUserDevicesFromDnsMap(dnsMap, userAddress);
+    const preferredName = incomingCall.controllerDeviceName?.trim() || null;
+    const activeDevice = pickControllerDevice(userDevices, preferredName);
+    if (!activeDevice) {
+      toast.error(
+        "No CTI device available to answer. Check that your phone is registered.",
+        {
+          toastId: "layout_attend_no_device",
+        },
+      );
+      return;
+    }
 
-		if (!incomingCall) {
-			return;
-		}
+    if (!hasReliableCtiCallId(attendCallId)) {
+      toast.error(
+        "Call id is not ready yet. Wait a moment and try again, or refresh if this persists.",
+        { toastId: "layout_attend_no_call_id" },
+      );
+      return;
+    }
 
-		const userDevices = getUserDevicesFromDnsMap(dnsMap, userAddress);
-		const activeDevice = pickControllerDevice(userDevices, incomingCall.controllerDeviceName);
-		if (!activeDevice) return;
+    setIsDialing(true);
+    try {
+      const controllerAddress =
+        incomingCall.controllerAddress?.trim() || userAddress || "";
 
-		setIsDialing(true);
-		try {
-			const result = await attendCall({
-				callId: incomingCall.callId,
-				callingAddress: incomingCall.callingAddress,
-				calledAddress: incomingCall.calledAddress,
-				controllerAddress: userAddress || '',
-				controllerDeviceName: activeDevice.deviceName || 'WebCTI',
-				controllerDeviceType: activeDevice.deviceType || 'SOFT_HARD'
-			});
+      const result = await attendCall({
+        callId: attendCallId,
+        callingAddress: incomingCall.callingAddress,
+        calledAddress: incomingCall.calledAddress,
+        controllerAddress,
+        controllerDeviceName: activeDevice.deviceName || "WebCTI",
+        controllerDeviceType: activeDevice.deviceType || "SOFT_HARD",
+      });
 
-			if (result.success) {
-				closeIncomingCallModal();
-			}
-		} catch (error) {
-			toast.error(`Failed to attend call: ${getErrorMessage(error)}`, {
-				toastId: "layout_attend_call_failed",
-			});
-		} finally {
-			setIsDialing(false);
-		}
-	};
+      if (result.success) {
+        closeIncomingCallModal();
+      } else {
+        const errMsg =
+          (result as { error?: string }).error ||
+          "Could not answer the call. Please try again.";
+        toast.error(errMsg, { toastId: "layout_attend_api_failed" });
+      }
+    } catch (error) {
+      toast.error(`Failed to attend call: ${getErrorMessage(error)}`, {
+        toastId: "layout_attend_call_failed",
+      });
+    } finally {
+      setIsDialing(false);
+    }
+  };
 
-	const handleRejectCall = async () => {
-		if (!incomingCall) return closeIncomingCallModal();
+  const handleRejectCall = async () => {
+    if (!incomingCall) return closeIncomingCallModal();
 
-		try {
-			const matchingActiveCall = findMatchingActiveCall(activeCalls, incomingCall);
-			const userDevices = getUserDevicesFromDnsMap(dnsMap, userAddress);
-			const controllerDevice = pickControllerDevice(userDevices, incomingCall.controllerDeviceName);
+    try {
+      const matchingActiveCall = findMatchingActiveCall(
+        activeCalls,
+        incomingCall,
+      );
+      const userDevices = getUserDevicesFromDnsMap(dnsMap, userAddress);
+      const rejectPreferred = incomingCall.controllerDeviceName?.trim() || null;
+      const controllerDevice = pickControllerDevice(
+        userDevices,
+        rejectPreferred,
+      );
 
-			if (!controllerDevice || !incomingCall.callId) return;
+      const { callId: rejectCallId } = resolveCallIdForAttendApi(
+        incomingCall,
+        Array.from(activeCalls.values()),
+        { callStateMap: callStateMap ?? undefined },
+      );
 
-			const callingDeviceName = matchingActiveCall?.callingDeviceName || '';
-			const callingDeviceType = matchingActiveCall?.callingDeviceType || '';
+      if (!controllerDevice || !hasReliableCtiCallId(rejectCallId)) return;
 
-			await endCall({
-				callId: incomingCall.callId,
-				callingAddress: incomingCall.callingAddress,
-				calledAddress: incomingCall.calledAddress,
-				callingDeviceType,
-				callingDeviceName,
-				controllerAddress: userAddress || '',
-				controllerDeviceName: controllerDevice.deviceName || '',
-				controllerDeviceType: controllerDevice.deviceType || ''
-			});
-		} catch (error) {
-			toast.error(`Unable to reject call: ${getErrorMessage(error)}`, {
-				toastId: "layout_reject_call_failed",
-			});
-		} finally {
-			closeIncomingCallModal();
-		}
-	};
+      const rowForReject =
+        Array.from(activeCalls.values()).find(
+          (c) => c.callId === rejectCallId,
+        ) ?? matchingActiveCall;
+      const callingDeviceName = rowForReject?.callingDeviceName || "";
+      const callingDeviceType = rowForReject?.callingDeviceType || "";
 
-	const handleNumberClick = (num: string) => {
-		setDialedNumber(prev => prev + num);
-	};
+      await endCall({
+        callId: rejectCallId,
+        callingAddress: incomingCall.callingAddress,
+        calledAddress: incomingCall.calledAddress,
+        callingDeviceType,
+        callingDeviceName,
+        controllerAddress: userAddress || "",
+        controllerDeviceName: controllerDevice.deviceName || "",
+        controllerDeviceType: controllerDevice.deviceType || "",
+      });
+    } catch (error) {
+      toast.error(`Unable to reject call: ${getErrorMessage(error)}`, {
+        toastId: "layout_reject_call_failed",
+      });
+    } finally {
+      closeIncomingCallModal();
+    }
+  };
 
-	const handleDial = async (numberToDial: string = dialedNumber) => {
-		if (!numberToDial.trim()) {
-			return;
-		}
+  const handleNumberClick = (num: string) => {
+    setDialedNumber((prev) => prev + num);
+  };
 
-		const userDevices = getAllUserDevices();
-		if (!userDevices) {
-			return;
-		}
+  const handleDial = async (numberToDial: string = dialedNumber) => {
+    if (!numberToDial.trim()) {
+      return;
+    }
 
-		if (userDevices.length > 1) {
-			setAvailableDevices(userDevices);
-			setPendingDialedNumber(numberToDial);
-			setShowDeviceSelectionModal(true);
-			return;
-		}
+    const userDevices = getAllUserDevices();
+    if (!userDevices) {
+      return;
+    }
 
-		setIsDialing(true);
-		try {
-			const result = await dialNumber(numberToDial);
+    if (userDevices.length > 1) {
+      setAvailableDevices(userDevices);
+      setPendingDialedNumber(numberToDial);
+      setShowDeviceSelectionModal(true);
+      return;
+    }
 
-			if (result.success) {
-				setDialedNumber("");
-				closeDialer();
-			}
-		} catch (error) {
-			toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
-				toastId: "layout_dial_failed",
-			});
-		} finally {
-			setIsDialing(false);
-		}
-	};
+    setIsDialing(true);
+    try {
+      const result = await dialNumber(numberToDial);
 
-	const handleDeviceSelect = async (device: CtiDialerDevice) => {
-		const callingDevice = {
-			callingAddress: userAddress,
-			callingDeviceType: device.deviceType,
-			callingDeviceName: device.deviceName,
-		};
+      if (result.success) {
+        setDialedNumber("");
+        closeDialer();
+      }
+    } catch (error) {
+      toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
+        toastId: "layout_dial_failed",
+      });
+    } finally {
+      setIsDialing(false);
+    }
+  };
 
-		const callerInfo = {
-			callingAddress: userAddress,
-			callingDeviceName: device.deviceName,
-			callingDeviceType: device.deviceType,
-			selectedAt: new Date().toISOString(),
-		};
+  const handleDeviceSelect = async (device: CtiDialerDevice) => {
+    const callingDevice = {
+      callingAddress: userAddress,
+      callingDeviceType: device.deviceType,
+      callingDeviceName: device.deviceName,
+    };
 
-		localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+    const callerInfo = {
+      callingAddress: userAddress,
+      callingDeviceName: device.deviceName,
+      callingDeviceType: device.deviceType,
+      selectedAt: new Date().toISOString(),
+    };
 
-		setShowDeviceSelectionModal(false);
-		setAvailableDevices([]);
-		
-		const numberToDial = pendingDialedNumber;
-		setPendingDialedNumber("");
+    localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
 
-		setIsDialing(true);
-		try {
-			const result = await makeCall({
-				callingAddress: callingDevice.callingAddress,
-				calledAddress: numberToDial,
-				callingDeviceType: callingDevice.callingDeviceType,
-				callingDeviceName: callingDevice.callingDeviceName,
-			});
+    setShowDeviceSelectionModal(false);
+    setAvailableDevices([]);
 
-			if (result.success) {
-				setDialedNumber("");
-				closeDialer();
-			}
-		} catch (error) {
-			toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
-				toastId: "layout_make_call_failed",
-			});
-		} finally {
-			setIsDialing(false);
-		}
-	};
+    const numberToDial = pendingDialedNumber;
+    setPendingDialedNumber("");
 
-	const mainContentWidth = useMemo(() => {
-		if (!showBreezeAssistant) return '100%';
-		if (breezeMaximized) return '0%';
-		return 'calc(100% - 400px)';
-	}, [showBreezeAssistant, breezeMaximized]);
+    setIsDialing(true);
+    try {
+      const result = await makeCall({
+        callingAddress: callingDevice.callingAddress,
+        calledAddress: numberToDial,
+        callingDeviceType: callingDevice.callingDeviceType,
+        callingDeviceName: callingDevice.callingDeviceName,
+      });
 
-	const dialpadButtons = [
-		{ num: '1' },
-		{ num: '2' },
-		{ num: '3' },
-		{ num: '4' },
-		{ num: '5' },
-		{ num: '6' },
-		{ num: '7' },
-		{ num: '8' },
-		{ num: '9' },
-		{ num: '*' },
-		{ num: '0' },
-		{ num: '#' }
-	];
+      if (result.success) {
+        setDialedNumber("");
+        closeDialer();
+      }
+    } catch (error) {
+      toast.error(`Failed to place call: ${getErrorMessage(error)}`, {
+        toastId: "layout_make_call_failed",
+      });
+    } finally {
+      setIsDialing(false);
+    }
+  };
 
-	return (
-		<>
-		<style>{`
+  const mainContentWidth = useMemo(() => {
+    if (!showBreezeAssistant) return "100%";
+    if (breezeMaximized) return "0%";
+    return "calc(100% - 400px)";
+  }, [showBreezeAssistant, breezeMaximized]);
+
+  const dialpadButtons = [
+    { num: "1" },
+    { num: "2" },
+    { num: "3" },
+    { num: "4" },
+    { num: "5" },
+    { num: "6" },
+    { num: "7" },
+    { num: "8" },
+    { num: "9" },
+    { num: "*" },
+    { num: "0" },
+    { num: "#" },
+  ];
+
+  return (
+    <>
+      <style>{`
         .main-content-wrapper {
           transition: margin-left 0.3s ease-in-out;
         }
@@ -1180,123 +1272,148 @@ font-weight:600;
         <nav
           className="navbar navbar-expand-lg app-topbar-merged"
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: 0,
-            left: isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED,
+            left: isSidebarExpanded
+              ? SIDEBAR_WIDTH_EXPANDED
+              : SIDEBAR_WIDTH_COLLAPSED,
             width: `calc(100% - ${isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED}px)`,
             zIndex: 999,
-            transition: 'left 0.3s ease-in-out, width 0.3s ease-in-out',
+            transition: "left 0.3s ease-in-out, width 0.3s ease-in-out",
           }}
         >
-        <div className="container-fluid p-0" style={{ height: '48px' }}>
-          <div className="d-flex align-items-center h-100 w-100">
-            {/* Search bar */}
-            <div ref={searchWrapperRef} className="crm-prime-search-wrapper" style={{ position: 'relative' }}>
-              <Search className="crm-prime-search-icon" size={14} style={{ right: '40px' }} />
-              <input
-                type="text"
-                className="crm-prime-search-input"
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setShowSearchSuggestions(true);
-                }}
-                onFocus={() => searchQuery.trim() && setShowSearchSuggestions(true)}
-                style={{ paddingRight: '68px' }}
-              />
-              {showSearchSuggestions && searchQuery.trim() && searchSuggestions.length > 0 && (
-                <div
-                  className="create-dropdown-menu"
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    marginTop: 4,
-                    maxHeight: 320,
-                    overflowY: 'auto',
+          <div className="container-fluid p-0" style={{ height: "48px" }}>
+            <div className="d-flex align-items-center h-100 w-100">
+              {/* Search bar */}
+              <div
+                ref={searchWrapperRef}
+                className="crm-prime-search-wrapper"
+                style={{ position: "relative" }}
+              >
+                <Search
+                  className="crm-prime-search-icon"
+                  size={14}
+                  style={{ right: "40px" }}
+                />
+                <input
+                  type="text"
+                  className="crm-prime-search-input"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setShowSearchSuggestions(true);
                   }}
-                >
-                  {searchSuggestions.map((r: SearchableRouteItem) => (
-                    <button
-                      key={r.path}
-                      type="button"
-                      className="create-dropdown-item"
-                      onClick={() => {
-                        if (canAccessRoute(session?.user?.permissions, r.path)) {
-                          router.push(r.path);
-                          setSearchQuery('');
-                          setShowSearchSuggestions(false);
-                        }
-                      }}
-                    >
-                      <span>{r.label}</span>
-                      <span className="text-muted small ms-1">{r.path}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {/* Create Button */}
-                <div >
-                
-                <button
-                  type="button"
-                  className="crm-prime-create-btn"
-                  onClick={() => setShowCreateDropdown(!showCreateDropdown)}
-                  title="Create new"
-                >
-                  <Plus size={14} />
-                    </button>
-                
-                
-                {/* Create Dropdown */}
-                {showCreateDropdown && (
-                  <>
-                    <button
-                      type="button"
-                      aria-label="Close create menu"
-                      style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 1040,
-                        background: 'transparent',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'default',
-                      }}
-                      onClick={() => setShowCreateDropdown(false)}
-                    />
-                      <div className="create-dropdown-menu">
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LEADS) && (
-                        <button type="button" className="create-dropdown-item" onClick={() => {
-                          setShowCreateDropdown(false);
-                          setShowCreateLeadModal(true);
-                        }}>
-                        Lead
+                />
+                {showSearchSuggestions && searchSuggestions.length > 0 && (
+                  <div
+                    className="create-dropdown-menu"
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      marginTop: 4,
+                      maxHeight: 320,
+                      overflowY: "auto",
+                      zIndex: 1050,
+                    }}
+                  >
+                    {searchSuggestions.map((r: SearchableRouteItem) => (
+                      <button
+                        key={r.path}
+                        type="button"
+                        className="create-dropdown-item"
+                        onClick={() => {
+                          if (canAccessRoute(session?.user?.permissions, r.path)) {
+                            router.push(r.path);
+                            setSearchQuery("");
+                            setShowSearchSuggestions(false);
+                          }
+                        }}
+                      >
+                        <span>{r.label}</span>
+                        <span className="text-muted small ms-1">{r.path}</span>
                       </button>
-                      )}
+                    ))}
+                  </div>
+                )}
+              </div>
+              {/* Create Button */}
+              <div>
+                  <button
+                    type="button"
+                    className="crm-prime-create-btn"
+                    onClick={() => setShowCreateDropdown(!showCreateDropdown)}
+                    title="Create new"
+                  >
+                    <Plus size={14} />
+                  </button>
 
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_COMPANIES_CRM) && (
-                        <button className="create-dropdown-item" onClick={() => {
-                          setShowCreateDropdown(false);
-                          setShowCreateCompanySidebar(true);
-                        }}>
-                        Company
+                  {/* Create Dropdown */}
+                  {showCreateDropdown && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="Close create menu"
+                        style={{
+                          position: "fixed",
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          zIndex: 1040,
+                          background: "transparent",
+                          border: "none",
+                          padding: 0,
+                          cursor: "default",
+                        }}
+                        onClick={() => setShowCreateDropdown(false)}
+                      />
+                      <div className="create-dropdown-menu">
+                        {session?.user?.permissions?.includes(
+                          PERMISSIONS.VIEW_CRM_LEADS,
+                        ) && (
+                          <button
+                            type="button"
+                            className="create-dropdown-item"
+                            onClick={() => {
+                              setShowCreateDropdown(false);
+                              setShowCreateLeadModal(true);
+                            }}
+                          >
+                            Lead
                           </button>
                         )}
 
-                        {session?.user?.permissions?.includes(PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM) && (
-                        <button type="button" className="create-dropdown-item" onClick={() => {
-                          setShowCreateDropdown(false);
-                          router.push('/crm/inbox');
-                        }}>
-                        Inbox
-                      </button>
-                      )}
+                        {session?.user?.permissions?.includes(
+                          PERMISSIONS.VIEW_COMPANIES_CRM,
+                        ) && (
+                          <button
+                            className="create-dropdown-item"
+                            onClick={() => {
+                              setShowCreateDropdown(false);
+                              setShowCreateCompanySidebar(true);
+                            }}
+                          >
+                            Company
+                          </button>
+                        )}
+
+                        {session?.user?.permissions?.includes(
+                          PERMISSIONS.VIEW_WHATSAPP_MESSAGES_CRM,
+                        ) && (
+                          <button
+                            type="button"
+                            className="create-dropdown-item"
+                            onClick={() => {
+                              setShowCreateDropdown(false);
+                              router.push("/crm/inbox");
+                            }}
+                          >
+                            Inbox
+                          </button>
+                        )}
 
                         {session?.user?.permissions?.includes(PERMISSIONS.MANAGE_HELP_CENTER) && (
                         <button className="create-dropdown-item" onClick={() => {
@@ -1305,7 +1422,7 @@ font-weight:600;
                         }}>
                         Ticket
                           </button>
-                      )}
+                        )}
 
                         {session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
                         <button type="button" className="create-dropdown-item" onClick={() => {
@@ -1314,12 +1431,11 @@ font-weight:600;
                         }}>
                         Task
                           </button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
 
             {/* Icons and user menu */}
             <div className="ms-auto d-flex align-items-center" style={{ gap: '10px' }}>
@@ -1346,7 +1462,7 @@ font-weight:600;
                     </button>
                   )}
 
-                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.COMMUNICATIONS_SERVICES) && session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
                     <button
                       type="button"
                       className="crm-prime-topbar-icon"
@@ -1359,7 +1475,6 @@ font-weight:600;
                     </button>
                   )}
 
-                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_USER_NOTIFICATIONS) && (
                     <button
                       type="button"
                       className={`crm-prime-topbar-icon ${totalUnreadCount > 0 ? 'has-badge' : ''}`}
@@ -1369,9 +1484,9 @@ font-weight:600;
                     >
                       <Bell size={14} />
                     </button>
-                  )}
+                  
 
-                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_HELP_CENTER) && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.FOR_VIEW_HELP_CENTER_SERVICES) && (   
                     <button
                       type="button"
                       className="crm-prime-topbar-icon"
@@ -1380,9 +1495,10 @@ font-weight:600;
                     >
                       <HelpCircle size={18} />
                     </button>
-                  )}
+                    )}
+                  
 
-                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.GENERAL_SERVICES) && (
                     <button
                       type="button"
                       className="crm-prime-topbar-icon"
@@ -1421,7 +1537,6 @@ font-weight:600;
                           <span>Dialer</span>
                         </button>
                       )}
-
                       {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CTI) && (
                         <button
                           type="button"
@@ -1464,7 +1579,7 @@ font-weight:600;
                         </button>
                       )}
 
-                      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_SETTINGS) && (
+                      {session?.user?.permissions?.includes(PERMISSIONS.GENERAL_SERVICES) && (
                         <button
                           type="button"
                           className="topbar-overflow-item"
@@ -1492,7 +1607,7 @@ font-weight:600;
 
               {/* Assistant Icon */}
                 {/* <button className="crm-prime-topbar-icon" title="AI Assistant" style={{ width: 'auto', padding: '0 12px', gap: '6px' }}> */}
-                {session?.user?.permissions?.includes(PERMISSIONS.LIVE_CHAT_USERS) && (
+                {session?.user?.permissions?.includes(PERMISSIONS.AI_ML_SERVICES) && (
               <button 
                 type="button"
                 className="crm-prime-topbar-icon" 
@@ -1503,72 +1618,85 @@ font-weight:600;
                 <Sparkles size={18} />
                 <span className="crm-prime-assistant-label">AI Assistant</span>
                   </button>
-              )}
+                )}
 
-              {/* Divider */}
-              <div style={{ 
-                width: '1px', 
-                height: '28px', 
-                background: 'rgba(255, 255, 255, 0.2)',
-                margin: '0 4px'
-              }} />
+                {/* Divider */}
+                <div
+                  style={{
+                    width: "1px",
+                    height: "28px",
+                    background: "rgba(255, 255, 255, 0.2)",
+                    margin: "0 4px",
+                  }}
+                />
 
-             
-
-            
-
-              {/* User Menu with Dropdown */}
-              <div ref={userDropdownRef} style={{ position: 'relative' }}>
-                <button
-                  type="button"
-                  className="crm-prime-user-menu"
-                  onClick={() => setShowUserDropdown(!showUserDropdown)}
-                >
-                  <div className="crm-prime-user-avatar">
-                    {headerLogoUrl ? (
-                      <img src={headerLogoUrl} alt={loggedInCompanyName || ''} />
-                    ) : (
-                      loggedInCompanyName?.charAt(0)?.toUpperCase() || <User size={14} />
-                    )}
-                  </div>
-                  <div className="crm-prime-user-info">
-                    <div>
-                      <div className="crm-prime-user-name">{loggedInCompanyName || ''}</div>
+                {/* User Menu with Dropdown */}
+                <div ref={userDropdownRef} style={{ position: "relative" }}>
+                  <button
+                    type="button"
+                    className="crm-prime-user-menu"
+                    onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  >
+                    <div className="crm-prime-user-avatar">
+                      {headerLogoUrl ? (
+                        <img
+                          src={headerLogoUrl}
+                          alt={loggedInCompanyName || ""}
+                        />
+                      ) : (
+                        loggedInCompanyName?.charAt(0)?.toUpperCase() || (
+                          <User size={14} />
+                        )
+                      )}
                     </div>
-                    <ChevronDown size={14} style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
-                  </div>
-                </button>
+                    <div className="crm-prime-user-info">
+                      <div>
+                        <div className="crm-prime-user-name">
+                          {loggedInCompanyName || ""}
+                        </div>
+                      </div>
+                      <ChevronDown
+                        size={14}
+                        style={{ color: "rgba(255, 255, 255, 0.6)" }}
+                      />
+                    </div>
+                  </button>
 
-                {/* User Dropdown Menu */}
-                {showUserDropdown && (
+                  {/* User Dropdown Menu */}
+                  {showUserDropdown && (
                     <div className="user-dropdown-menu">
                       {/* Header */}
                       <div className="user-dropdown-header">
                         <div className="user-dropdown-avatar">
                           {profileImageUrl ? (
-                            <img src={profileImageUrl} alt={loggedInName || ''} />
+                            <img
+                              src={profileImageUrl}
+                              alt={loggedInName || ""}
+                            />
                           ) : (
-                            <div style={{ 
-                              width: '100%', 
-                              height: '100%', 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center',
-                              fontSize: '16px',
-                              fontWeight: 600,
-                              color: '#006162'
-                            }}>
-                              {loggedInName?.charAt(0)?.toUpperCase() || 'H'}
+                            <div
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "16px",
+                                fontWeight: 600,
+                                color: "#006162",
+                              }}
+                            >
+                              {loggedInName?.charAt(0)?.toUpperCase() || "H"}
                             </div>
                           )}
-                          </div>
-                          
+                        </div>
+
                         <div className="user-dropdown-header-text">
                           <div className="user-dropdown-name">
-                            {loggedInName || ''}
+                            {loggedInName || ""}
                           </div>
                           <div className="user-dropdown-email">
-                            {session?.user?.role || ''}
+                            {session?.user?.role || ""}
                           </div>
                           <a href="/profile" className="user-dropdown-link">
                             Profile & Preferences
@@ -1603,17 +1731,23 @@ font-weight:600;
 
                       {/* Account */}
                       <div className="user-dropdown-section">
-                        <div className="user-dropdown-section-label">Account</div>
+                        <div className="user-dropdown-section-label">
+                          Account
+                        </div>
                         <div className="user-dropdown-account-info">
-                          <div className="user-dropdown-account-name">{session?.user?.company_name}</div>
-                          <div className="user-dropdown-account-id">{session?.user?.company_identifier}</div>
+                          <div className="user-dropdown-account-name">
+                            {session?.user?.company_name}
+                          </div>
+                          <div className="user-dropdown-account-id">
+                            {session?.user?.company_identifier}
+                          </div>
                         </div>
                       </div>
 
                       {/* Links */}
                       <div className="user-dropdown-section">
                         
-                          {session?.user?.permissions?.includes('tickets-tickets') && (
+                          {session?.user?.permissions?.includes(PERMISSIONS.TICKETS_SERVICES) && (
                             <button
                               type="button"
                               className="user-dropdown-item"
@@ -1627,7 +1761,7 @@ font-weight:600;
                             </button>
                           )}
                           
-                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_PRICING_FEATURES) && (
+                          {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
                         <button type="button" className="user-dropdown-item" onClick={() => router.push('/pricing')}>
                           {/* <CreditCard className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Pricing & Features</span>
@@ -1635,7 +1769,7 @@ font-weight:600;
                             </button>
                           )}
                           
-                          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING) && (
+                          {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
                         <button type="button" className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Account & Billing</span>
@@ -1643,40 +1777,57 @@ font-weight:600;
                         )}
 
                           
-{session?.user?.permissions?.includes(PERMISSIONS.VIEW_TASKSLIST_WORK_PLANNER) && (
+                        {session?.user?.permissions?.includes(PERMISSIONS.WORK_PLANNER_SERVICES) && (
                         <button type="button" className="user-dropdown-item" onClick={() => router.push('/planner/tasks')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Tasks</span>
                         </button>
                         )}
 
-<button type="button" className="user-dropdown-item" onClick={() => router.push('/planner/calendar')}>
+                  {   session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALENDAR_WORK_PLANNER) && (   <button
+                          type="button"
+                          className="user-dropdown-item"
+                          onClick={() => router.push("/planner/calendar")}
+                        >
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
-                          <span className="user-dropdown-item-text">Calendar</span>
-                        </button>
+                          <span className="user-dropdown-item-text">
+                            Calendar
+                          </span>
+                        </button>)}
 
-
-
-
-                          
-                        <button type="button" className="user-dropdown-item user-dropdown-credits-head">
+                        {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
+                        <button
+                          type="button"
+                          className="user-dropdown-item user-dropdown-credits-head"
+                        >
                           <div className="d-flex align-items-center justify-content-between w-100 gap-2">
                             <span className="user-dropdown-item-text">Prime Credits</span>
                             <span className="user-dropdown-item-badge">New</span>
                           </div>
-                            
-                          
                           <div className="user-dropdown-credits-count">0 of 0 credits available</div>
                         </button>
-                        <button type="button" className="user-dropdown-item">
+                        )}
+                        {session?.user?.permissions?.includes(PERMISSIONS.PRODUCT_UPDATES_SERVICES) && (
+                          <button type="button" className="user-dropdown-item">
                           {/* <Briefcase className="user-dropdown-item-icon" size={14} /> */}
-                          <span className="user-dropdown-item-text">Product Updates</span>
+                          <span className="user-dropdown-item-text">
+                            Product Updates
+                          </span>
                         </button>
-                        
-                        <button type="button" className="user-dropdown-item" onClick={() => router.push('/main-settings')}>
-                          {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
-                          <span className="user-dropdown-item-text">Settings</span>
-                        </button>
+                        )}
+
+                        {session?.user?.permissions?.includes(PERMISSIONS.GENERAL_SERVICES) && (
+                          <button
+                          type="button"
+                          className="user-dropdown-item"
+                          onClick={() => router.push("/main-settings")}
+                        >
+                            {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
+                            <span className="user-dropdown-item-text">
+                            Settings
+                          </span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Footer with Sign out and Privacy */}
@@ -1700,210 +1851,236 @@ font-weight:600;
                         </button>
                       </div>
                     </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </nav>
+        </nav>
 
-			{/* Incoming Call Modal */}
-			{showIncomingCallModal && incomingCall && (
-				<div
-					className="bg-white rounded shadow"
-					style={{
-						position: "fixed",
-						top: "60px",
-						right: "20px",
-						zIndex: 1050,
-						maxWidth: "400px",
-						width: "auto",
-						padding: "1rem",
-						boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-					}}
-				>
-					<div className="d-flex align-items-center gap-3">
-						<div style={{ width: "48px", height: "48px", minWidth: "48px" }}>
-							<img
-								src={incomingCallUserImageUrl}
-								alt={incomingCallUserName}
-								className="rounded-circle"
-								style={{
-									width: "100%",
-									height: "100%",
-									objectFit: "cover",
-								}}
-								onError={(e) => {
-									e.currentTarget.src = UserDummyImage.src;
-								}}
-							/>
-						</div>
-						<div className="flex-grow-1">
-							<h6 className="mb-1" style={{ fontSize: '14px', fontWeight: 600 }}>
-								{incomingCallUserName}
-							</h6>
-							<div style={{ fontSize: '13px', color: '#6c757d' }}>
-								{formatPhoneNumber(incomingCall.callingAddress)}
-							</div>
-							<div style={{ fontSize: '12px', color: '#22c55e', marginTop: '4px' }}>
-								Incoming call...
-							</div>
-						</div>
-						<div className="d-flex gap-2">
-							<button
-								type="button"
-								onClick={handleRejectCall}
-								className="btn btn-sm btn-outline-danger rounded-circle"
-								style={{ width: '36px', height: '36px', padding: 0 }}
-							>
-								<X size={18} />
-							</button>
-							<button
-								type="button"
-								onClick={handleAttendCall}
-								disabled={isDialing}
-								className="btn btn-sm btn-success rounded-circle"
-								style={{ width: '36px', height: '36px', padding: 0 }}
-							>
-								<Phone size={18} />
-							</button>
-						</div>
-					</div>
-				</div>
-			)}
+        {/* Incoming call (attend/reject): primary UI for the transfer recipient / callee while the offer
+            is pending. Transfer initiator keeps GlobalFloatingCallBar on their consult leg instead. */}
+        {showIncomingCallModal && incomingCall && (
+          <div
+            className="bg-white rounded shadow"
+            style={{
+              position: "fixed",
+              top: "60px",
+              right: "20px",
+              zIndex: 1050,
+              maxWidth: "400px",
+              width: "auto",
+              padding: "1rem",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            }}
+          >
+            <div className="d-flex align-items-center gap-3">
+              <div style={{ width: "48px", height: "48px", minWidth: "48px" }}>
+                <img
+                  src={incomingCallUserImageUrl}
+                  alt={incomingCallUserName}
+                  className="rounded-circle"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                  onError={(e) => {
+                    e.currentTarget.src = UserDummyImage.src;
+                  }}
+                />
+              </div>
+              <div className="flex-grow-1">
+                <h6
+                  className="mb-1"
+                  style={{ fontSize: "14px", fontWeight: 600 }}
+                >
+                  {incomingCallUserName}
+                </h6>
+                <div style={{ fontSize: "13px", color: "#6c757d" }}>
+                  {formatPhoneNumber(incomingCall?.callingAddress ?? "")}
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#22c55e",
+                    marginTop: "4px",
+                  }}
+                >
+                  Incoming call...
+                </div>
+              </div>
+              <div className="d-flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleRejectCall}
+                  className="btn btn-sm btn-outline-danger rounded-circle"
+                  style={{ width: "36px", height: "36px", padding: 0 }}
+                >
+                  <X size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAttendCall}
+                  disabled={isDialing}
+                  className="btn btn-sm btn-success rounded-circle"
+                  style={{ width: "36px", height: "36px", padding: 0 }}
+                >
+                  <Phone size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-			{/* Dialer Popup */}
-			{isDialerOpen && (
-				<>
-					<button
-						type="button"
-						aria-label="Close dialer"
-						style={{
-							position: 'fixed',
-							top: 0,
-							left: 0,
-							right: 0,
-							bottom: 0,
-							zIndex: 1040,
-							backgroundColor: 'transparent',
-							border: 'none',
-							padding: 0,
-							cursor: 'default',
-						}}
-						onClick={() => {
-							closeDialer();
-							setDialedNumber("");
-						}}
-					/>
-					<div
-						className="bg-white rounded shadow"
-						style={{
-							position: 'fixed',
-							top: `${dialerPosition.top}px`,
-							right: `${dialerPosition.right}px`,
-							zIndex: 1050,
-							width: 'calc(100vw - 40px)',
-							maxWidth: '320px',
-							padding: '1rem',
-						}}
-					>
-						<div className="d-flex align-items-center justify-content-between mb-3">
-							<h6 className="mb-0" style={{ fontSize: '14px', fontWeight: 600 }}>Dialer</h6>
-							<span className={`badge ${isDeviceRegistered ? 'bg-success' : 'bg-danger'}`} style={{ fontSize: '11px' }}>
-								{isDeviceRegistered ? 'Online' : 'Offline'}
-							</span>
-						</div>
+        {/* Dialer Popup */}
+        {isDialerOpen && (
+          <>
+            <button
+              type="button"
+              aria-label="Close dialer"
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 1040,
+                backgroundColor: "transparent",
+                border: "none",
+                padding: 0,
+                cursor: "default",
+              }}
+              onClick={() => {
+                closeDialer();
+                setDialedNumber("");
+              }}
+            />
+            <div
+              className="bg-white rounded shadow"
+              style={{
+                position: "fixed",
+                top: `${dialerPosition.top}px`,
+                right: `${dialerPosition.right}px`,
+                zIndex: 1050,
+                width: "calc(100vw - 40px)",
+                maxWidth: "320px",
+                padding: "1rem",
+              }}
+            >
+              <div className="d-flex align-items-center justify-content-between mb-3">
+                <h6
+                  className="mb-0"
+                  style={{ fontSize: "14px", fontWeight: 600 }}
+                >
+                  Dialer
+                </h6>
+                <span
+                  className={`badge ${isDeviceRegistered ? "bg-success" : "bg-danger"}`}
+                  style={{ fontSize: "11px" }}
+                >
+                  {isDeviceRegistered ? "Online" : "Offline"}
+                </span>
+              </div>
 
-						<div className="mb-3">
-							<input
-								type="text"
-								value={dialedNumber}
-								onChange={(e) => {
-									let value = e.target.value;
-									if (value.startsWith("+")) {
-										const afterPlus = value.slice(1).replaceAll(/\D/g, "");
-										value = "+" + afterPlus;
-										if (afterPlus.length <= 15) {
-											setDialedNumber(value);
-										}
-									} else {
-										const digitsOnly = value.replaceAll(/\D/g, "");
-										if (digitsOnly.length <= 15) {
-											setDialedNumber(digitsOnly);
-										}
-									}
-								}}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" && dialedNumber.trim()) {
-										handleDial();
-									}
-								}}
-								disabled={!isDeviceRegistered}
-								placeholder="Enter number"
-								className="form-control"
-								autoFocus
-							/>
-						</div>
+              <div className="mb-3">
+                <input
+                  type="text"
+                  value={dialedNumber}
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    if (value.startsWith("+")) {
+                      const afterPlus = value.slice(1).replaceAll(/\D/g, "");
+                      value = "+" + afterPlus;
+                      if (afterPlus.length <= 15) {
+                        setDialedNumber(value);
+                      }
+                    } else {
+                      const digitsOnly = value.replaceAll(/\D/g, "");
+                      if (digitsOnly.length <= 15) {
+                        setDialedNumber(digitsOnly);
+                      }
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && dialedNumber.trim()) {
+                      handleDial();
+                    }
+                  }}
+                  disabled={!isDeviceRegistered}
+                  placeholder="Enter number"
+                  className="form-control"
+                  autoFocus
+                />
+              </div>
 
-						<div className="mb-3">
-							<div className="row g-2">
-								{dialpadButtons.map((btn) => (
-									<div key={btn.num} className="col-4">
-										<button
-											type="button"
-											onClick={() => handleNumberClick(btn.num)}
-											className="btn btn-outline-secondary w-100"
-											disabled={!isDeviceRegistered}
-											style={{ height: '48px', fontSize: '18px', fontWeight: 600 }}
-										>
-											{btn.num}
-										</button>
-									</div>
-								))}
-							</div>
-						</div>
+              <div className="mb-3">
+                <div className="row g-2">
+                  {dialpadButtons.map((btn) => (
+                    <div key={btn.num} className="col-4">
+                      <button
+                        type="button"
+                        onClick={() => handleNumberClick(btn.num)}
+                        className="btn btn-outline-secondary w-100"
+                        disabled={!isDeviceRegistered}
+                        style={{
+                          height: "48px",
+                          fontSize: "18px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {btn.num}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-						<button
-							type="button"
-							onClick={() => handleDial()}
-							disabled={!dialedNumber.trim() || isDialing || !isDeviceRegistered}
-							className="btn btn-primary w-100"
-						>
-							{isDialing ? "Dialing..." : "Call"}
-						</button>
-					</div>
-				</>
-			)}
+              <button
+                type="button"
+                onClick={() => handleDial()}
+                disabled={
+                  !dialedNumber.trim() || isDialing || !isDeviceRegistered
+                }
+                className="btn btn-primary w-100"
+              >
+                {isDialing ? "Dialing..." : "Call"}
+              </button>
+            </div>
+          </>
+        )}
 
-			<DeviceSelectionModal
-				show={showDeviceSelectionModal}
-				onHide={() => {
-					setShowDeviceSelectionModal(false);
-					setAvailableDevices([]);
-					setPendingDialedNumber("");
-				}}
-				devices={availableDevices}
-				onSelectDevice={handleDeviceSelect}
-				extensionNumber={userAddress || ""}
-			/>
-		
-		<div
+        <DeviceSelectionModal
+          show={showDeviceSelectionModal}
+          onHide={() => {
+            setShowDeviceSelectionModal(false);
+            setAvailableDevices([]);
+            setPendingDialedNumber("");
+          }}
+          devices={availableDevices}
+          onSelectDevice={handleDeviceSelect}
+          extensionNumber={userAddress || ""}
+        />
+
+        <div
           className="d-flex flex-grow-1 app-content-area"
           style={{
-            position: 'relative',
-            marginTop: '48px',
-            marginLeft: isSidebarExpanded ? SIDEBAR_WIDTH_EXPANDED : SIDEBAR_WIDTH_COLLAPSED,
-            transition: 'margin-left 0.3s ease-in-out',
+            position: "relative",
+            marginTop: "48px",
+            marginLeft: isSidebarExpanded
+              ? SIDEBAR_WIDTH_EXPANDED
+              : SIDEBAR_WIDTH_COLLAPSED,
+            transition: "margin-left 0.3s ease-in-out",
           }}
         >
-            <ApplicationCustomerSidebar
-              sidebarOpen={sidebarOpen}
-              setSidebarOpen={setSidebarOpen}
-              isSidebarExpanded={isSidebarExpanded}
-              setSidebarExpanded={setIsSidebarExpanded}
-            />
+          <ApplicationCustomerSidebar
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            isSidebarExpanded={isSidebarExpanded}
+            setSidebarExpanded={setIsSidebarExpanded}
+          />
 
-				{/* <div className="flex-grow-1 p-3 main-content-wrapper" style={{ 
+          {/* <div className="flex-grow-1 p-3 main-content-wrapper" style={{ 
 				overflowY: 'auto',
 				// width: showBreezeAssistant ? 'calc(100% - 400px)' : '100%',
         width: showBreezeAssistant && !breezeMaximized ? 'calc(100% - 400px)' : '100%',
@@ -1915,36 +2092,35 @@ font-weight:600;
 				</div>
 			</div> */}
 
+          <div
+            className="flex-grow-1 p-3 main-content-wrapper"
+            style={{
+              overflowY: "auto",
+              width: mainContentWidth,
+              overflow: breezeMaximized ? "hidden" : "auto",
+              transition: "width 0.3s ease-in-out",
+            }}
+          >
+            <div className="pc-content">{children}</div>
+          </div>
 
-<div
-  className="flex-grow-1 p-3 main-content-wrapper"
-  style={{
-    overflowY: 'auto',
-    width: mainContentWidth,
-    overflow: breezeMaximized ? 'hidden' : 'auto',
-    transition: 'width 0.3s ease-in-out'
-  }}
->
-  <div className="pc-content">
-    {children}
-  </div>
-</div>
-      
+          {/* Breeze AI Assistant Sidebar */}
+          {showBreezeAssistant && (
+            <BreezeAssistantSidebar
+              isOpen={showBreezeAssistant}
+              onClose={() => {
+                setShowBreezeAssistant(false);
+                setBreezeMaximized(false);
+              }}
+              isMaximized={breezeMaximized}
+              onMaximizeChange={(v) => setBreezeMaximized(v)}
+              width={breezeMaximized ? "100%" : "400px"}
+            />
+          )}
+        </div>
 
-			{/* Breeze AI Assistant Sidebar */}
-			{showBreezeAssistant && (
-<BreezeAssistantSidebar
-       isOpen={showBreezeAssistant}
-       onClose={() => { setShowBreezeAssistant(false); setBreezeMaximized(false); }}
-       isMaximized={breezeMaximized}
-       onMaximizeChange={(v) => setBreezeMaximized(v)}
-       width={breezeMaximized ? '100%' : '400px'}
-    />
-			)}
-		</div>
-
-		<Footer />
-		</div>
+        <Footer />
+      </div>
 
     	{/* Notifications Sidebar */}
 		<NotificationsSidebar

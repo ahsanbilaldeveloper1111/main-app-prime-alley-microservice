@@ -44,6 +44,57 @@ const MONITORING_PERM_SET = new Set([
 
 const DEVICE_ACTIVE_CALL_STATES = new Set(['CONNECTED', 'ON_HOLD', 'ANSWERED', 'RETRIEVED'])
 
+/** Matches stable labels from computeUserCardCallStatus for connected/live calls. */
+const USER_CARD_MONITORING_ELIGIBLE_STATUS = new Set([
+  'ONGOING',
+  'CONNECTED',
+  'Conference Call',
+  'On Hold',
+])
+
+function callHasEstablishedPartyForDn(
+  call: {
+    parties?: { callingAddress?: string; calledAddress?: string; callStatus?: string }[]
+  } | null | undefined,
+  dn: string
+): boolean {
+  if (!call?.parties?.length) {
+    return false
+  }
+  return call.parties.some(
+    (p) =>
+      (p.callingAddress === dn || p.calledAddress === dn) &&
+      DEVICE_ACTIVE_CALL_STATES.has(p.callStatus || '')
+  )
+}
+
+/** True while call is still setting up — hide monitor controls until a leg is established. */
+function isUserCardRingingPhaseForMonitoring(
+  callStatus: string | undefined,
+  call: any,
+  dn: string
+): boolean {
+  const statusIndicatesEstablished =
+    callStatus != null && USER_CARD_MONITORING_ELIGIBLE_STATUS.has(callStatus)
+  const callLevelEstablished = DEVICE_ACTIVE_CALL_STATES.has(call?.currentState || '')
+  if (statusIndicatesEstablished || callHasEstablishedPartyForDn(call, dn) || callLevelEstablished) {
+    return false
+  }
+  return (
+    callStatus === 'OUTGOING' ||
+    callStatus === 'Calling' ||
+    callStatus === 'Ringing' ||
+    call?.currentState === 'RINGING' ||
+    Boolean(
+      call?.parties?.some(
+        (p: { callingAddress?: string; calledAddress?: string; callStatus?: string }) =>
+          (p.callingAddress === dn || p.calledAddress === dn) &&
+          (p.callStatus === 'RINGING' || p.callStatus === 'DIALING')
+      )
+    )
+  )
+}
+
 export function applyUserCardDeviceClick(ctx: UserCardDeviceClickContext): void {
   const {
     dn,
@@ -166,9 +217,21 @@ function statusFromActivePartyForDn(
   dn: string,
   isConferenceCall: boolean
 ): string | undefined {
-  const activeParty = filtered.find(
-    (p: any) => p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED'
-  )
+  const statusPriority: Record<string, number> = {
+    CONNECTED: 6,
+    ANSWERED: 6,
+    RETRIEVED: 6,
+    ON_HOLD: 5,
+    RINGING: 3,
+    DIALING: 2,
+  }
+
+  const activeParty = filtered
+    .filter((p: any) => p.callStatus !== 'DROPPED' && p.callStatus !== 'DISCONNECTED')
+    .sort(
+      (a: any, b: any) =>
+        (statusPriority[b.callStatus || ''] ?? 0) - (statusPriority[a.callStatus || ''] ?? 0)
+    )[0]
   if (!activeParty) {
     return undefined
   }
@@ -308,18 +371,7 @@ export function computeUserCardMonitoringDerived({
 }) {
   const monitoringWithSessions = activeMonitoring
 
-  const isRingingCall =
-    callStatus === 'OUTGOING' ||
-    callStatus === 'Calling' ||
-    callStatus === 'Ringing' ||
-    call?.currentState === 'RINGING' ||
-    Boolean(
-      call?.parties?.some(
-        (p: { callingAddress?: string; calledAddress?: string; callStatus?: string }) =>
-          (p.callingAddress === dn || p.calledAddress === dn) &&
-          (p.callStatus === 'RINGING' || p.callStatus === 'DIALING')
-      )
-    )
+  const isRingingCall = isUserCardRingingPhaseForMonitoring(callStatus, call, dn)
 
   const showCallControls = active && call && sectionKey !== 'downOffline' && !isRingingCall
 
@@ -347,8 +399,18 @@ export function computeUserCardMonitoringDerived({
       (activeMonitoring.dn || (monitoringWithSessions.sessions?.length ?? 0) > 0)
   )
 
-  const thisCardIsMonitored =
-    monitoringWithSessions.sessions?.some((s) => s.dn === dn) || activeMonitoring.dn === dn
+  let thisCardIsMonitored =
+    monitoringWithSessions.sessions?.some((s) => String(s.dn) === String(dn)) ||
+    (activeMonitoring.dn != null && String(activeMonitoring.dn) === String(dn))
+
+  if (
+    userAddress &&
+    String(dn) === String(userAddress) &&
+    activeMonitoring.dn != null &&
+    String(userAddress) === String(activeMonitoring.dn)
+  ) {
+    thisCardIsMonitored = false
+  }
 
   const disableStartMonitoringMustStopFirst =
     supervisorIsAlreadyMonitoring && !thisCardIsMonitored

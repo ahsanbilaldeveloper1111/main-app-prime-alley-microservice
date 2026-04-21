@@ -507,7 +507,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
         const list = await getCustomerProductPricingList(crmCompanyId, {
           page: 1,
           per_page: 200,
-          sort_direction: "desc",
+          sort_order: "desc",
         } as any);
         setCustomerProducts(Array.isArray(list) ? list : []);
       } catch (e) {

@@ -32,6 +32,7 @@ import {
   getDealAttachments,
   uploadDealAttachment,
   deleteDealAttachment,
+  CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
   getCampaigns,
   getCrmDataTags,
   updateCrmData,
@@ -711,7 +712,10 @@ const ProspectDetailPage: NextPageWithLayout = () => {
   useEffect(() => {
     const loadCampaigns = async () => {
       try {
-        const campaignsResponse = await getCampaigns({ per_page: 1000 });
+        const campaignsResponse = await getCampaigns({
+          per_page: 1000,
+          filters: CRM_CAMPAIGNS_LIST_ACTIVE_ONLY,
+        });
         const campaignOptions = campaignsResponse.data.map(
           (campaign: { id: number; name: string }) => ({
             value: campaign.id.toString(),
@@ -880,11 +884,6 @@ const ProspectDetailPage: NextPageWithLayout = () => {
         return;
       }
 
-      if (data.campaign_id == null) {
-        toast.error("Campaign is required");
-        return;
-      }
-
       const phoneForPayload =
         data.phone_country_code && data.phoneNumber?.trim()
           ? `${data.phone_country_code} ${data.phoneNumber.trim()}`
@@ -923,10 +922,9 @@ const ProspectDetailPage: NextPageWithLayout = () => {
           phone: phoneForPayload,
           campaign_id: data.campaign_id ?? null,
           company_domain: data.company_domain?.trim() || undefined,
-          source: data.source_file?.trim() || undefined,
+          source_file: data.source_file?.trim() || undefined,
           scheduled_call_at: data.scheduled_call_at || undefined,
           data: dataPayload,
-          tag_ids: data.tags?.length ? data.tags.map((t: { id: number }) => t.id) : [],
         });
 
         setShowEditContactSidebar(false);
@@ -938,7 +936,7 @@ const ProspectDetailPage: NextPageWithLayout = () => {
         setEditContactLoading(false);
       }
     },
-    []
+    [],
   );
 
   const allDeals =
@@ -1006,8 +1004,7 @@ const ProspectDetailPage: NextPageWithLayout = () => {
         prospectForm?.email?.trim() &&
         prospectForm?.phoneNumber?.trim() &&
         prospectForm?.firstName?.trim() &&
-        prospectForm?.lastName?.trim() &&
-        prospectForm?.campaign_id != null;
+        prospectForm?.lastName?.trim();
 
       return (
         <ProspectEditSidebar

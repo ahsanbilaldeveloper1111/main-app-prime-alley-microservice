@@ -4,10 +4,9 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
 import { ListCallLogs, DownloadCallsExport } from '@utils/calls';
-import { Row, Col, Form, Button } from 'react-bootstrap';
+import { Form, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
-import StatsCards from '@components/GenericStatsCards';
 import { Phone, Hash, PhoneIncoming, PhoneOutgoing, Calendar } from 'lucide-react';
 import moment from 'moment';
 
@@ -17,6 +16,9 @@ import '@assets/scss/common.scss';
 import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserDate, formatDuration, GlobalDateFormat, GlobalTimeFormat, formatDateTimeToLocal, GlobalDateTimeFormat, ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { isExactPhoneMatch, normalizePhoneValue } from '@utils/phoneMatch';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -31,6 +33,52 @@ interface CallLogRow {
     extension?: string;
     phone_number?: string;
     [key: string]: any;
+}
+
+function extractCallLogRows(response: any): CallLogRow[] {
+    const rawData = response?.data;
+    if (Array.isArray(rawData)) return rawData;
+    if (Array.isArray(rawData?.data)) return rawData.data;
+    if (Array.isArray(rawData?.rows)) return rawData.rows;
+    if (Array.isArray(response?.dataList)) return response.dataList;
+    if (Array.isArray(response?.rows)) return response.rows;
+    return [];
+}
+
+/** Map alternate API field names and split combined UTC datetimes when Date/Time are missing */
+function normalizeCallLogRow(row: CallLogRow & Record<string, unknown>): CallLogRow {
+    const next: CallLogRow = { ...row };
+    if (!next.username) {
+        next.username =
+            (row.user_name as string) ??
+            (row.agent_name as string) ??
+            (row.Username as string) ??
+            next.username;
+    }
+    if (!next.phone_number) {
+        next.phone_number =
+            (row.phone as string) ?? (row.number as string) ?? (row.PhoneNumber as string) ?? next.phone_number;
+    }
+    if (typeof next.is_answered === 'boolean') {
+        next.is_answered = next.is_answered ? 'Yes' : 'No';
+    }
+
+    if (next.Date && next.Time) return next;
+
+    const isoCandidate =
+        (row.call_datetime as string) ??
+        (row.start_time as string) ??
+        (row.call_date_time as string) ??
+        (row.datetime as string) ??
+        (row.created_at as string);
+    if (typeof isoCandidate === 'string' && isoCandidate.includes('T')) {
+        const m = moment.utc(isoCandidate);
+        if (m.isValid()) {
+            next.Date = m.format('YYYY-MM-DD');
+            next.Time = m.format('HH:mm:ss');
+        }
+    }
+    return next;
 }
 
 interface Summary {
@@ -178,7 +226,7 @@ const CallLogs = () => {
                 ),
         },
         {
-            key: 'Duration',
+            key: 'duration',
             label: 'Duration',
             sortable: true,
             render: (row) => formatDuration(Number.parseInt(String(row.duration), 10) || 0),
@@ -194,15 +242,19 @@ const CallLogs = () => {
         const now = moment();
         const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
         const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+        // UI filter state must include the same default date range as `applied`; otherwise any
+        // pill change via `applyFilters({ ...currentFilters, ... })` drops start/end and breaks the API query.
+        const startDateUi = now.clone().startOf('day').format('YYYY-MM-DD');
+        const endDateUi = now.clone().endOf('day').format('YYYY-MM-DD');
         return {
             current: {
-                start_datetime: '',
-                end_datetime: ''
+                start_datetime: startDateUi,
+                end_datetime: endDateUi,
             },
             applied: {
                 start_datetime: startDateApi,
-                end_datetime: endDateApi
-            }
+                end_datetime: endDateApi,
+            },
         };
     };
     
@@ -297,22 +349,16 @@ const CallLogs = () => {
                 moduleSlug: ModuleSlug.CALL_LOGS,
             }, 'call-logs/list');
 
-            // Handle various API response structures (flat, nested, DataTables style)
-            const rawData = response?.data;
-            let rowsArray: CallLogRow[] = [];
-            if (Array.isArray(rawData)) {
-                rowsArray = rawData;
-            } else if (Array.isArray(rawData?.data)) {
-                rowsArray = rawData.data;
-            } else if (Array.isArray(response?.dataList)) {
-                rowsArray = response.dataList;
-            }
+            let rowsArray: CallLogRow[] = extractCallLogRows(response).map((r) =>
+                normalizeCallLogRow(r as CallLogRow & Record<string, unknown>),
+            );
 
             const exactPhoneFilter = normalizePhoneValue(appliedFiltersRef.current?.phone_number);
             if (exactPhoneFilter) {
                 rowsArray = rowsArray.filter((row) => isExactPhoneMatch(row.phone_number, exactPhoneFilter));
             }
 
+            const rawData = response?.data;
             const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
             const total =
                 response?.recordsTotal ??
@@ -357,7 +403,7 @@ const CallLogs = () => {
         fetchCallLogs(1, rowsPerPageRef.current, '');
     }, [refreshKey, fetchCallLogs]);
 
-    const handleFiltersChange = (filters: any) => {
+    const handleFiltersChange = useCallback((filters: any) => {
         // Format datetime values to include seconds and timezone offset (remove timezone key)
         const formattedFilters: any = { ...filters };
 
@@ -417,9 +463,10 @@ const CallLogs = () => {
         
         // Trigger refresh for GenericListPage to fetch new data
         setRefreshKey((prev) => prev + 1);
-    };
+    }, []);
 
     const handleExport = async () => {
+        if (isExporting) return;
         setIsExporting(true);
         try {
             const exportPayload = {
@@ -436,9 +483,12 @@ const CallLogs = () => {
         }
     };
 
-    const applyFilters = (nextFilters: Record<string, any>) => {
-        handleFiltersChange(nextFilters);
-    };
+    const applyFilters = useCallback(
+        (nextFilters: Record<string, any>) => {
+            handleFiltersChange(nextFilters);
+        },
+        [handleFiltersChange],
+    );
 
     const callDirectionLabel = (value: string): string => {
         if (value === 'OUTGOING') return 'Outgoing';
@@ -455,6 +505,16 @@ const CallLogs = () => {
     };
 
     const tableToolbar = useMemo<any>(() => ({
+        showTabs: true,
+        tabs: [
+            {
+                id: 'call-logs-title',
+                label: 'Call Logs',
+                removable: false,
+            },
+        ],
+        activeTab: 'call-logs-title',
+        onTabChange: () => {},
         showSearch: true,
         searchValue,
         searchPlaceholder: 'Search by username, extension, phone...',
@@ -463,7 +523,9 @@ const CallLogs = () => {
             setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
             fetchCallLogs(1, tablePagination.rowsPerPage, searchValue.trim());
         },
-        showFiltersButton: true,
+        showFiltersButton: session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS_FILTERS),
+        showExportButton: session?.user?.permissions?.includes('export-call-logs'),
+        onExportClick: () => handleExport(),
         showFilterPills: true,
         showMoreFiltersButton: false,
         filterPills: [
@@ -600,61 +662,28 @@ const CallLogs = () => {
                 ),
             },
         ],
-        rightActions: (
-            <div className="d-flex align-items-center gap-2">
-                {session?.user?.permissions?.includes('export-call-logs') && (
-                    <button
-                        type="button"
-                        className="btn btn-outline-secondary btn-sm"
-                        onClick={() => handleExport()}
-                        disabled={isExporting}
-                    >
-                        {isExporting ? 'Exporting...' : 'Export'}
-                    </button>
-                )}
-            </div>
-        ),
     }), [
         searchValue,
         tablePagination.rowsPerPage,
         fetchCallLogs,
         currentFilters,
-        appliedFilters,
         hierarchyDataExtensions,
         hierarchyDataDepartments,
         session?.user?.permissions,
         isExporting,
         applyFilters,
+        handleExport,
     ]);
 
     
     return (
-        <React.Fragment>
+        <div className="call-logs-page">
+            <style
+                dangerouslySetInnerHTML={{
+                    __html: `.call-logs-page .gt-toolbar-tabs-section .gt-tab-button { margin-left: 12px; }`,
+                }}
+            />
             <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Logs" showPageLoader={showPageLoader} />
-           
-
-            <Row className="mb-3">
-            <Col md={12}>
-                <div className="page-header-title style-2">
-                <Row className="d-flex justify-content-between align-items-center">
-                    <Col md={4}>
-                      
-                      <h2 className="mb-0">Call Logs</h2>
-                    </Col>
-
-
-                    <Col md={8} className="d-flex justify-content-end" />
-                  </Row>
-               
-                
-                </div>
-            </Col>
-            </Row>
-
-           
-            <div className="mb-4">
-              <StatsCards data={statsCardsData} gridMinWidth="180px" />
-            </div>
 
             {showDateRange && startDateTime && endDateTime && moment.utc(startDateTime).isValid() && moment.utc(endDateTime).isValid() && (
                 <div
@@ -707,6 +736,8 @@ const CallLogs = () => {
                     showToolbar={true}
                     toolbar={tableToolbar}
                     showToolbarActions={false}
+                    statsCards={statsCardsData}
+                    metricsGridMinWidth="180px"
                     pagination={{
                         currentPage: tablePagination.currentPage,
                         rowsPerPage: tablePagination.rowsPerPage,
@@ -723,7 +754,7 @@ const CallLogs = () => {
                     uniqueKey="id"
                 />
             )}
-        </React.Fragment>
+        </div>
     );
 };
 

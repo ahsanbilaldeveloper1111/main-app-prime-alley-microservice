@@ -24,10 +24,8 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
   const [confirmText, setConfirmText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const prevLoadingRef = useRef(loading);
-  /** Sync guard so double Enter / double click cannot fire onConfirm before re-render */
   const confirmLockRef = useRef(false);
 
-  // Reset confirm text and submit guard when modal closes
   useEffect(() => {
     if (!show) {
       setConfirmText("");
@@ -62,6 +60,9 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
   };
 
   const handleClose = () => {
+    if (loading || isSubmitting) {
+      return;
+    }
     setConfirmText("");
     setIsSubmitting(false);
     confirmLockRef.current = false;
@@ -98,7 +99,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
       centered
       style={{ zIndex: 999999 }}
     >
-      <Modal.Header closeButton className="border-bottom">
+      <Modal.Header closeButton={!loading && !isSubmitting} className="border-bottom">
         <Modal.Title>Confirm Deletion</Modal.Title>
       </Modal.Header>
       <Modal.Body className="p-4">

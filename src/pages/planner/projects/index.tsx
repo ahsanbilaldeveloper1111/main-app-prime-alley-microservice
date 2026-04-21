@@ -57,6 +57,7 @@ import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { StatsCardData } from "@components/GenericStatsCards";
 import GenericFilterSidebar, { type FilterOption, FilterField } from "@components/GenericFilterSidebar";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
+import GenericSidebar from "@components/GenericSidebarNew";
 import GenericTable, {
   TableColumn,
   TableAction,
@@ -65,7 +66,6 @@ import GenericTable, {
   TabConfig,
 } from "@components/GenericTable";
 import {
-  Badge,
   Button,
   Col,
   Container,
@@ -698,7 +698,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
                   right: 8,
                 }}
               >
-                <Eye size={12} />
+                {/* <Eye size={12} /> */}
                 Preview/Edit
               </button>
             )}
@@ -1223,6 +1223,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
   /** Only one project row actions menu open at a time (controlled Dropdown). */
   const [openProjectActionsId, setOpenProjectActionsId] = useState<string | null>(null);
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
 
   const buildSelectedProjectsFromIds = (selectedIds: Set<string>): Project[] => {
     const selected: Project[] = [];
@@ -1315,6 +1316,14 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
     setShowCreateTaskSidebar(true);
   };
 
+  function handleProjectRowMouseEnter(projectId: string) {
+    setHoveredProjectId(projectId);
+  }
+
+  function handleProjectRowMouseLeave(projectId: string) {
+    setHoveredProjectId((prev) => (prev === projectId ? null : prev));
+  }
+
   // Build the custom table body
   const renderTableBody = () => {
     if (loading) {
@@ -1357,6 +1366,8 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           key={`project-${project.id}`}
           className="generic-table-row clickable"
           onClick={() => onProjectClick(project)}
+          onMouseEnter={() => handleProjectRowMouseEnter(project.id)}
+          onMouseLeave={() => handleProjectRowMouseLeave(project.id)}
           style={{ backgroundColor: isExpanded ? "#f0f7ff" : undefined }}
         >
           {/* Checkbox */}
@@ -1370,7 +1381,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           </td>
 
           {/* Expand chevron + Project name */}
-          <td>
+          <td style={{ position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {/* Chevron toggle */}
               <button
@@ -1412,6 +1423,20 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                 <project.icon size={20} style={{ color: project.iconColor }} />
               </div>
               <span style={{ fontWeight: 600 }}>{project.name}</span>
+
+              {hoveredProjectId === project.id && (
+                <button
+                type="button"
+                className="preview-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onProjectClick(project);
+                }}
+                style={{ position: "absolute", right: 8, fontSize: "12px", color: "#141414", border: "1px solid #141414", borderRadius: "4px", backgroundColor: "#ffffff" }}
+              >
+                Preview
+              </button>
+              )}
             </div>
           </td>
 
@@ -1452,7 +1477,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                     >
                       <MoreVertical size={16} />
                     </Dropdown.Toggle>
-                    <Dropdown.Menu align="end">
+                    <Dropdown.Menu align="end" popperConfig={{ strategy: "fixed" }} renderOnMount>
                       <Dropdown.Item
                         as="button"
                         type="button"
@@ -1598,6 +1623,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         columns={columns}
         actions={actions}
         showActions={true}
+        showToolbarActions={false}
         actionsLabel="Actions"
         selectable={true}
         selectedRows={projects.filter((p) => selectedProjects.has(p.id))}
@@ -1717,23 +1743,37 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
   formatTimeAgo,
   formatDateTime,
 }) => {
+  if (!show || !selectedProject) {
+    return null;
+  }
+
   const resolvedStatus =
-    selectedProjectDetails ? getProjectStatusFromApiStatus(selectedProjectDetails.status) : selectedProject?.status;
+    selectedProjectDetails ? getProjectStatusFromApiStatus(selectedProjectDetails.status) : selectedProject.status;
+
+  const sidebarStartDate = formatProjectSidebarDate(
+    selectedProjectDetails?.start_date ?? selectedProject.apiData?.start_date ?? undefined,
+  );
+  const sidebarEndDate = formatProjectSidebarDate(
+    selectedProjectDetails?.end_date ?? selectedProject.apiData?.end_date ?? undefined,
+  );
+  const sidebarProjectColor = selectedProjectDetails?.color?.trim() || selectedProject.iconColor;
+  const projectMembers = selectedProjectDetails?.members || selectedProject.members;
+  const progressPercent = Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100);
 
   const activityActorDisplayName = (extension: string) =>
     extension === "system" ? "System" : getUserNameFromExtension(extension);
 
-  const recentActivityContent = (() => {
-    if (loadingActivities) return <Spinner animation="border" size="sm" />;
-    if (projectActivities.length === 0) {
-      return (
-        <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
-          No recent activity
-        </div>
-      );
-    }
-
-    return (
+  let recentActivityContent: React.ReactNode;
+  if (loadingActivities) {
+    recentActivityContent = <Spinner animation="border" size="sm" />;
+  } else if (projectActivities.length === 0) {
+    recentActivityContent = (
+      <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
+        No recent activity
+      </div>
+    );
+  } else {
+    recentActivityContent = (
       <div className="d-flex flex-column gap-3">
         {projectActivities.slice(0, 10).map((activity: any, idx: number) => {
           const ext = activity.extension_number || "system";
@@ -1776,19 +1816,19 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
         })}
       </div>
     );
-  })();
+  }
 
-  const historyContent = (() => {
-    if (loadingActivities) return <Spinner animation="border" size="sm" />;
-    if (projectActivities.length === 0) {
-      return (
-        <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
-          No history available
-        </div>
-      );
-    }
-
-    return (
+  let historyContent: React.ReactNode;
+  if (loadingActivities) {
+    historyContent = <Spinner animation="border" size="sm" />;
+  } else if (projectActivities.length === 0) {
+    historyContent = (
+      <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
+        No history available
+      </div>
+    );
+  } else {
+    historyContent = (
       <div className="d-flex flex-column gap-2">
         {projectActivities.map((activity: any, idx: number) => {
           const ext = activity.extension_number || "system";
@@ -1828,230 +1868,124 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
         })}
       </div>
     );
-  })();
+  }
 
-  const bodyContent = (() => {
-    if (loadingProjectDetails) {
-      return (
-        <div className="text-center py-5">
-          <Spinner animation="border" />
-          <p className="mt-3 text-muted">Loading project details...</p>
-        </div>
-      );
-    }
+  const descriptionHtml = selectedProjectDetails?.description?.trim();
 
-    if (!selectedProject) return null;
-
-    const sidebarStartDate = formatProjectSidebarDate(
-      selectedProjectDetails?.start_date ?? selectedProject.apiData?.start_date ?? undefined,
-    );
-    const sidebarEndDate = formatProjectSidebarDate(
-      selectedProjectDetails?.end_date ?? selectedProject.apiData?.end_date ?? undefined,
-    );
-    const sidebarProjectColor =
-      selectedProjectDetails?.color?.trim() || selectedProject.iconColor;
-
-    return (
-      <>
-        <Row className="g-2 mb-3">
-          <Col xs={6}>
-            <div className="detail-section">
-              <div className="detail-label">Open Tasks</div>
-              <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#3b82f6" }}>{selectedProject.open}</div>
-            </div>
-          </Col>
-          <Col xs={6}>
-            <div className="detail-section">
-              <div className="detail-label">Overdue Tasks</div>
-              {loadingOverdueTasks ? (
-                <Spinner animation="border" size="sm" />
-              ) : (
-                <div
-                  style={{
-                    fontSize: "1.75rem",
-                    fontWeight: 700,
-                    color: overdueTasks.length > 0 ? "#ef4444" : "#10b981",
-                  }}
-                >
-                  {overdueTasks.length}
-                </div>
-              )}
-            </div>
-          </Col>
-        </Row>
-
-        <div className="detail-section">
-          <div className="detail-label">Project Progress</div>
-          <ProgressBar
-            now={Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)}
-            style={{ height: 10, marginBottom: "0.5rem" }}
-            variant="primary"
-          />
-          <div style={{ fontSize: "0.875rem", color: "#64748b", textAlign: "right" }}>
-            {Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)}% Complete
-          </div>
-        </div>
-
-        <Row className="g-2 mb-3">
-          <Col xs={6}>
-            <div
-              className="detail-section"
-              style={{ height: "100%", display: "flex", flexDirection: "column", padding: "0.75rem" }}
-            >
-              <div className="detail-label">Owner / PM</div>
-              <div
-                style={{
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "#334155",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  marginTop: "auto",
-                }}
-              >
-                <span>
-                  {selectedProjectDetails?.owner_extension_number
-                    ? getUserNameFromExtension(selectedProjectDetails.owner_extension_number)
-                    : selectedProject.owner}
-                </span>
+  return (
+    <GenericSidebar
+      isOpen={show}
+      onClose={onHide}
+      width="470px"
+      title={selectedProject.name}
+      subtitle={resolvedStatus.toUpperCase()}
+      avatar={{
+        name: selectedProject.name,
+        initials: selectedProject.name.slice(0, 1).toUpperCase(),
+        gradient: selectedProject.iconColor,
+      }}
+      actionsDropdown={{
+        label: "Actions",
+        items: [
+          {
+            label: "Open Project",
+            onClick: () => {
+              globalThis.window?.open(`/planner/projects/${selectedProject.id}`, "_blank");
+            },
+          },
+        ],
+      }}
+      sections={[
+        {
+          id: "project-overview",
+          title: "Overview",
+          icon: FolderOpen,
+          collapsible: true,
+          defaultExpanded: true,
+          isLoading: loadingProjectDetails,
+          fields: [
+            { label: "Open Tasks", value: selectedProject.open },
+            {
+              label: "Overdue Tasks",
+              value: loadingOverdueTasks ? "Loading..." : overdueTasks.length,
+            },
+            {
+              label: "Owner / PM",
+              value: selectedProjectDetails?.owner_extension_number
+                ? getUserNameFromExtension(selectedProjectDetails.owner_extension_number)
+                : selectedProject.owner,
+            },
+            {
+              label: "Status",
+              value: resolvedStatus.toUpperCase(),
+              type: "badge",
+              badgeVariant: getProjectStatusVariant(resolvedStatus),
+            },
+            {
+              label: "Last Updated",
+              value: selectedProjectDetails?.updated_at ?? selectedProject.lastUpdate,
+              type: "date",
+              icon: Calendar,
+            },
+          ],
+        },
+        {
+          id: "project-progress",
+          title: "Progress",
+          icon: AlertCircle,
+          collapsible: true,
+          defaultExpanded: true,
+          customContent: (
+            <>
+              <ProgressBar now={progressPercent} style={{ height: 10, marginBottom: "0.5rem" }} variant="primary" />
+              <div style={{ fontSize: "0.875rem", color: "#64748b", textAlign: "right" }}>
+                {progressPercent}% Complete
               </div>
+            </>
+          ),
+        },
+        {
+          id: "project-dates",
+          title: "Dates & Color",
+          icon: CalendarDays,
+          collapsible: true,
+          defaultExpanded: true,
+          fields: [
+            { label: "Start Date", value: sidebarStartDate, type: "date", icon: Calendar },
+            { label: "End Date", value: sidebarEndDate, type: "date", icon: CalendarDays },
+            { label: "Color", value: sidebarProjectColor.toUpperCase() },
+          ],
+        },
+        {
+          id: "project-members",
+          title: `Team Members (${projectMembers.length})`,
+          icon: Users,
+          collapsible: true,
+          defaultExpanded: true,
+          customContent: (
+            <div className="d-flex flex-column gap-2">
+              {projectMembers.map((member: any) => {
+                const ext = member.extension_number || member.name || "";
+                const key = String(
+                  member?.id ?? member?.extension_number ?? member?.name ?? `${ext}-${member?.role ?? ""}`,
+                );
+                return (
+                  <div key={key} style={{ fontSize: "0.85rem", color: "#334155" }}>
+                    {member.user?.name || getUserNameFromExtension(ext)}
+                    {member.role ? ` (${member.role})` : ""}
+                  </div>
+                );
+              })}
             </div>
-          </Col>
-          <Col xs={6}>
-            <div
-              className="detail-section"
-              style={{ height: "100%", display: "flex", flexDirection: "column", padding: "0.75rem" }}
-            >
-              <div className="detail-label">Status</div>
-              <div style={{ marginTop: "auto" }}>
-                <Badge
-                  bg={getProjectStatusVariant(resolvedStatus ?? selectedProject.status)}
-                  style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.5rem 0.75rem" }}
-                >
-                  {(resolvedStatus ?? selectedProject.status).toUpperCase()}
-                </Badge>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        <Row className="g-2 mb-3">
-          <Col xs={6}>
-            <div className="detail-section">
-              <div className="detail-label">
-                Team Members ({selectedProjectDetails?.members?.length || selectedProject.members.length})
-              </div>
-              <div className="d-flex flex-wrap gap-2">
-                {(selectedProjectDetails?.members || selectedProject.members).map((member: any) => {
-                  const ext = member.extension_number || member.name || "";
-                  const key = String(
-                    member?.id ?? member?.extension_number ?? member?.name ?? `${ext}-${member?.role ?? ""}`,
-                  );
-                  return (
-                    <div
-                      key={key}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                        backgroundColor: "white",
-                        width: "100%",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "0.8125rem",
-                          fontWeight: 500,
-                          color: "#334155",
-                          flex: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {member.user?.name || getUserNameFromExtension(ext)} {member.role ? `(${member.role})` : ""}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </Col>
-
-          <Col xs={6}>
-            <div className="detail-section">
-              <div className="detail-label">Last Updated</div>
-              <div className="d-flex align-items-center" style={{ fontSize: "0.875rem", fontWeight: 500 }}>
-                <Calendar size={16} className="me-2 text-muted" />
-                <span>
-                  {selectedProjectDetails?.updated_at
-                    ? formatDateGlobal(selectedProjectDetails.updated_at) || selectedProject.lastUpdate
-                    : selectedProject.lastUpdate}
-                </span>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        <Row className="g-2 mb-3">
-          <Col xs={12} sm={4}>
-            <div className="detail-section">
-              <div className="detail-label">Start date</div>
-              <div
-                className="d-flex align-items-center"
-                style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}
-              >
-                <Calendar size={16} className="me-2 text-muted flex-shrink-0" />
-                <span>{sidebarStartDate ?? "—"}</span>
-              </div>
-            </div>
-          </Col>
-          <Col xs={12} sm={4}>
-            <div className="detail-section">
-              <div className="detail-label">End date</div>
-              <div
-                className="d-flex align-items-center"
-                style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}
-              >
-                <CalendarDays size={16} className="me-2 text-muted flex-shrink-0" />
-                <span>{sidebarEndDate ?? "—"}</span>
-              </div>
-            </div>
-          </Col>
-          <Col xs={12} sm={4}>
-            <div className="detail-section">
-              <div className="detail-label">Color</div>
-              <div className="d-flex align-items-center gap-2 flex-wrap" style={{ marginTop: 4 }}>
-                <span
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 6,
-                    backgroundColor: sidebarProjectColor,
-                    border: "1px solid #e2e8f0",
-                    flexShrink: 0,
-                  }}
-                  title={sidebarProjectColor}
-                  aria-hidden
-                />
-                <span
-                  style={{
-                    fontSize: "0.8125rem",
-                    color: "#64748b",
-                    fontFamily: "ui-monospace, monospace",
-                  }}
-                >
-                  {sidebarProjectColor.toUpperCase()}
-                </span>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        {selectedProjectDetails?.description?.trim() && (
-          <div className="detail-section">
-            <div className="detail-label">Description</div>
+          ),
+        },
+        {
+          id: "project-description",
+          title: "Description",
+          icon: ExternalLink,
+          collapsible: true,
+          defaultExpanded: true,
+          customContent: descriptionHtml ? (
             <div
               className="task-description-html"
               style={{
@@ -2062,133 +1996,43 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
                 overflowX: "auto",
                 wordBreak: "break-word",
               }}
-              dangerouslySetInnerHTML={{
-                __html: String(selectedProjectDetails.description).trim(),
-              }}
+              dangerouslySetInnerHTML={{ __html: String(descriptionHtml) }}
             />
-          </div>
-        )}
-
-        <Nav variant="tabs" className="detail-tabs" activeKey={detailTab} onSelect={(k) => k && setDetailTab(k)}>
-          <Nav.Item>
-            <Nav.Link eventKey="Activity">Activity</Nav.Link>
-          </Nav.Item>
-          <Nav.Item>
-            <Nav.Link eventKey="History">History</Nav.Link>
-          </Nav.Item>
-        </Nav>
-
-        <div style={{ marginTop: "1.5rem" }}>
-          {detailTab === "Activity" && (
-            <div>
-              <div className="detail-label" style={{ marginBottom: "1rem" }}>
-                Recent Activity
+          ) : (
+            <span style={{ color: "#9ca3af", fontSize: "0.875rem" }}>No description</span>
+          ),
+        },
+        {
+          id: "project-activity",
+          title: "Activity & History",
+          icon: Clock,
+          collapsible: true,
+          defaultExpanded: true,
+          customContent: (
+            <>
+              <Nav
+                variant="tabs"
+                className="detail-tabs"
+                activeKey={detailTab}
+                onSelect={(k) => {
+                  if (k) setDetailTab(k);
+                }}
+              >
+                <Nav.Item>
+                  <Nav.Link eventKey="Activity">Activity</Nav.Link>
+                </Nav.Item>
+                <Nav.Item>
+                  <Nav.Link eventKey="History">History</Nav.Link>
+                </Nav.Item>
+              </Nav>
+              <div style={{ marginTop: "1rem" }}>
+                {detailTab === "Activity" ? recentActivityContent : historyContent}
               </div>
-              {recentActivityContent}
-            </div>
-          )}
-          {detailTab === "History" && (
-            <div>
-              <div className="detail-label" style={{ marginBottom: "1rem" }}>
-                Project History
-              </div>
-              {historyContent}
-            </div>
-          )}
-        </div>
-      </>
-    );
-  })();
-
-  return (
-    <Offcanvas show={show} onHide={onHide} placement="end" className="project-detail-panel">
-      <Offcanvas.Header style={{ position: "relative" }}>
-        <Offcanvas.Title>
-          <div className="d-flex align-items-center gap-3">
-            {selectedProject && (
-              <>
-                <div className="project-icon" style={{ backgroundColor: selectedProject.iconColor + "20" }}>
-                  <selectedProject.icon size={24} style={{ color: selectedProject.iconColor }} />
-                </div>
-                <div>
-                  <div className="fw-bold" style={{ fontSize: "1.125rem", marginBottom: "0.25rem" }}>
-                    {selectedProject.name}
-                  </div>
-                  <Badge bg={getProjectStatusVariant(selectedProject.status)} style={{ fontSize: "0.7rem" }}>
-                    {selectedProject.status.toUpperCase()}
-                  </Badge>
-                </div>
-              </>
-            )}
-          </div>
-        </Offcanvas.Title>
-
-        <div className="d-flex align-items-center gap-2">
-          {selectedProject && (
-            <Button
-              variant="link"
-              className="p-0"
-              onClick={() => {
-                globalThis.window?.open(`/planner/projects/${selectedProject.id}`, "_blank");
-              }}
-              style={{
-                color: "#6b7280",
-                textDecoration: "none",
-                width: 32,
-                height: 32,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 4,
-              }}
-            >
-              <ExternalLink size={18} />
-            </Button>
-          )}
-          <Button
-            variant="link"
-            className="p-0"
-            onClick={onHide}
-            style={{
-              color: "#6b7280",
-              textDecoration: "none",
-              width: 32,
-              height: 32,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 4,
-            }}
-          >
-            <X size={18} />
-          </Button>
-        </div>
-      </Offcanvas.Header>
-
-      <Offcanvas.Body>
-        <style>{`
-          .project-detail-panel .task-description-html ul,
-          .project-detail-panel .task-description-html ol {
-            padding-left: 1.25rem;
-            margin: 0.5rem 0;
-          }
-          .project-detail-panel .task-description-html p {
-            margin: 0.35rem 0;
-          }
-          .project-detail-panel .task-description-html p:first-child {
-            margin-top: 0;
-          }
-          .project-detail-panel .task-description-html p:last-child {
-            margin-bottom: 0;
-          }
-          .project-detail-panel .task-description-html a {
-            color: #4680ff;
-            text-decoration: underline;
-          }
-        `}</style>
-        {bodyContent}
-      </Offcanvas.Body>
-    </Offcanvas>
+            </>
+          ),
+        },
+      ]}
+    />
   );
 };
 
@@ -2833,6 +2677,7 @@ const WorkPlannerProjects = () => {
     showFilterPills: true,
     filterPills: filterPills,
     showFiltersButton: true,
+    showMoreFiltersButton: false,
     onFiltersClick: () => setShowFilterSidebar(true),
     rightActions: (
       <button
@@ -2851,6 +2696,9 @@ const WorkPlannerProjects = () => {
           lineHeight: "14px",
           backgroundColor: "rgb(20, 20, 20)",
           color: "#ffffff",
+          position: "absolute",
+          right: "35px",
+          top: "21px",
         }}
         onClick={handleCreateProject}
       >
@@ -2950,46 +2798,50 @@ const WorkPlannerProjects = () => {
               showResetButton
             />
 
-            {/* CHANGED: Replaced GenericTable with ExpandableProjectTable */}
-            <ExpandableProjectTable
-              projects={filteredProjects}
-              loading={loading}
-              extensions={(hierarchyDataExtensions as any[]) || []}
-              sessionUserPhoneOrExtension={sessionUserPhoneOrExtension}
-              onProjectClick={handleProjectClick}
-              onEditProject={handleEditProject}
-              onDeleteProject={handleDeleteProject}
-              pagination={pagination}
-              onPaginationChange={(page, rowsPerPage) => setPagination((prev) => ({ ...prev, page, limit: rowsPerPage }))}
-              toolbarConfig={toolbarConfig}
-              statsCards={statsCardsData}
-              selectedProjects={selectedProjects}
-              onSelectionChange={(selected) => setSelectedProjects(new Set(selected.map((p) => p.id)))}
-              columns={projectTableColumns}
-              actions={projectTableActions}
-            />
+            <div style={{ display: "flex", alignItems: "stretch", gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* CHANGED: Replaced GenericTable with ExpandableProjectTable */}
+                <ExpandableProjectTable
+                  projects={filteredProjects}
+                  loading={loading}
+                  extensions={(hierarchyDataExtensions as any[]) || []}
+                  sessionUserPhoneOrExtension={sessionUserPhoneOrExtension}
+                  onProjectClick={handleProjectClick}
+                  onEditProject={handleEditProject}
+                  onDeleteProject={handleDeleteProject}
+                  pagination={pagination}
+                  onPaginationChange={(page, rowsPerPage) => setPagination((prev) => ({ ...prev, page, limit: rowsPerPage }))}
+                  toolbarConfig={toolbarConfig}
+                  statsCards={statsCardsData}
+                  selectedProjects={selectedProjects}
+                  onSelectionChange={(selected) => setSelectedProjects(new Set(selected.map((p) => p.id)))}
+                  columns={projectTableColumns}
+                  actions={projectTableActions}
+                />
+              </div>
+
+              <ProjectDetailOffcanvas
+                show={showProjectDetail}
+                onHide={() => setShowProjectDetail(false)}
+                selectedProject={selectedProject}
+                selectedProjectDetails={selectedProjectDetails}
+                loadingProjectDetails={loadingProjectDetails}
+                loadingOverdueTasks={loadingOverdueTasks}
+                overdueTasks={overdueTasks}
+                detailTab={detailTab}
+                setDetailTab={setDetailTab}
+                loadingActivities={loadingActivities}
+                projectActivities={projectActivities}
+                getUserNameFromExtension={getUserNameFromExtension}
+                getAvatarColor={getAvatarColor}
+                getInitials={getInitials}
+                getActionColor={getActionColor}
+                formatTimeAgo={formatTimeAgo}
+                formatDateTime={formatDateTime}
+              />
+            </div>
           </Container>
         </div>
-
-        <ProjectDetailOffcanvas
-          show={showProjectDetail}
-          onHide={() => setShowProjectDetail(false)}
-          selectedProject={selectedProject}
-          selectedProjectDetails={selectedProjectDetails}
-          loadingProjectDetails={loadingProjectDetails}
-          loadingOverdueTasks={loadingOverdueTasks}
-          overdueTasks={overdueTasks}
-          detailTab={detailTab}
-          setDetailTab={setDetailTab}
-          loadingActivities={loadingActivities}
-          projectActivities={projectActivities}
-          getUserNameFromExtension={getUserNameFromExtension}
-          getAvatarColor={getAvatarColor}
-          getInitials={getInitials}
-          getActionColor={getActionColor}
-          formatTimeAgo={formatTimeAgo}
-          formatDateTime={formatDateTime}
-        />
 
         {/* Project Form Modal */}
         <Modal show={showProjectModal} onHide={resetProjectModalState} centered size="lg">

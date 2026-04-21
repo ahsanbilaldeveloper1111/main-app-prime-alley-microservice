@@ -3,7 +3,7 @@ import React from "react";
 /**
  * Shared max width for CRM Smart module description columns so action columns stay visible.
  */
-export const CRM_TABLE_DESCRIPTION_MAX_WIDTH = "min(260px, 32vw)";
+export const CRM_TABLE_DESCRIPTION_MAX_WIDTH = "100%";
 
 type CrmTruncatedDescriptionCellProps = Readonly<{
   text: string | null | undefined;
@@ -29,6 +29,7 @@ export function CrmTruncatedDescriptionCell({
       title={raw}
       style={{
         display: "block",
+        minWidth: 0,
         maxWidth: CRM_TABLE_DESCRIPTION_MAX_WIDTH,
         overflow: "hidden",
         textOverflow: "ellipsis",

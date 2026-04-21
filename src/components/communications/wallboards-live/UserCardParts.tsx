@@ -143,6 +143,7 @@ type DeviceOrbActiveMonitoring = Readonly<{
 type RegisteredDeviceOrbsProps = Readonly<{
   devices: CtiDevice[]
   dn: string
+  userAddress: string | null | undefined
   activeMonitoring: DeviceOrbActiveMonitoring
   getCallStateForDevice: (dn: string, deviceName: string) => any
   onDeviceClick: (deviceName: string, deviceType: string, terminalState: string) => void
@@ -151,10 +152,17 @@ type RegisteredDeviceOrbsProps = Readonly<{
 function UserCardRegisteredDeviceOrbs({
   devices,
   dn,
+  userAddress,
   activeMonitoring,
   getCallStateForDevice,
   onDeviceClick,
 }: RegisteredDeviceOrbsProps) {
+  const viewerIsMonitoredAgentOnOwnCard =
+    userAddress != null &&
+    activeMonitoring.dn != null &&
+    String(userAddress) === String(dn) &&
+    String(userAddress) === String(activeMonitoring.dn)
+
   return (
     <>
       {devices.map((device) => {
@@ -164,6 +172,7 @@ function UserCardRegisteredDeviceOrbs({
         const isDeviceActiveCall = Boolean(deviceCall) && ACTIVE_DEVICE_CALL_STATES.has(callState)
 
         const isCurrentlyMonitored =
+          !viewerIsMonitoredAgentOnOwnCard &&
           activeMonitoring.dn === dn &&
           Boolean(activeMonitoring.type) &&
           activeMonitoring.deviceName === deviceName
@@ -345,6 +354,7 @@ export function UserCardDeviceOrbRow({
       <UserCardRegisteredDeviceOrbs
         devices={visibleDevices}
         dn={dn}
+        userAddress={userAddress}
         activeMonitoring={activeMonitoring}
         getCallStateForDevice={getCallStateForDevice}
         onDeviceClick={onDeviceClick}
