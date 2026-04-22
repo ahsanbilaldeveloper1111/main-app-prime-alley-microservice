@@ -89,7 +89,6 @@ export function firstExtensionOrIdString(...candidates: unknown[]): string {
 export function applyListTabFiltersToParams(
   params: ListTasksParams,
   filters: ListTabFiltersState,
-  statuses: { id?: number; name: string }[],
 ): void {
   const trimmed = filters.searchTerm?.trim();
   if (trimmed) {
@@ -97,11 +96,7 @@ export function applyListTabFiltersToParams(
   }
 
   if (filters.filterStatus && filters.filterStatus !== 'All Status') {
-    const statusObj = statuses.find((s) => s.name === filters.filterStatus);
-    const id = statusObj?.id;
-    if (id != null) {
-      params.status_id = id;
-    }
+    params.status = filters.filterStatus;
   }
 
   if (filters.filterPriority && filters.filterPriority !== 'All Priority') {
