@@ -139,6 +139,15 @@ function primitiveString(value: unknown): string | null {
     return null;
 }
 
+/** Display label for hierarchy rows (departments, extensions in simple dropdowns, etc.). */
+export function hierarchyItemLabel(item: { id: unknown; name?: unknown }): string {
+    return primitiveString(item.name) ?? primitiveString(item.id) ?? '';
+}
+
+export function hierarchyItemIdString(item: { id: unknown }): string {
+    return primitiveString(item.id) ?? '';
+}
+
 function extensionPillId(ext: ExtensionEntity): string {
     return primitiveString(ext.id) ?? '';
 }

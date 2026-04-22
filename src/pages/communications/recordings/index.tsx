@@ -32,13 +32,16 @@ const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false })
 
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import {
-    buildExtensionMultiSelectPillOption,
-    createDateTimeDropdownContent,
-    formatDateTimePillLabel,
     formatEndDateValueForApi,
     formatStartDateValueForApi,
-    isExtensionFilterAllSelected,
 } from '@pages/communications/shared/communicationsDateExtensionFilters';
+import {
+    buildCallDirectionFilterPill,
+    buildDepartmentFilterPill,
+    buildEndDateTimeFilterPill,
+    buildExtensionNumberMultiSelectFilterPill,
+    buildStartDateTimeFilterPill,
+} from '@pages/communications/shared/communicationsFilterPillFactories';
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
 // Interfaces
@@ -588,13 +591,6 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     [handleFiltersChange],
   );
 
-  const callDirectionLabel = (value: string): string => {
-    if (value === 'OUTGOING') return 'Outgoing';
-    if (value === 'INCOMING') return 'Incoming';
-    if (value === 'Both') return 'Both';
-    return '';
-  };
-
   const selectedStartDateTime = String(appliedFilters?.start_date || startDateTime || '');
   const selectedEndDateTime = String(appliedFilters?.end_date || endDateTime || '');
 
@@ -625,66 +621,18 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     showFilterPills: true,
     showMoreFiltersButton: false,
     filterPills: [
-      {
-        id: 'call_direction',
-        label: 'Call Direction',
-        showDropdown: true,
-        active: Boolean(currentFilters.call_direction),
-        activeLabel: callDirectionLabel(currentFilters.call_direction ?? ''),
-        onClear: () => applyFilters({ ...currentFilters, call_direction: '' }),
-        dropdownOptions: [
-          { label: 'Outgoing', value: 'OUTGOING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'OUTGOING' }) },
-          { label: 'Incoming', value: 'INCOMING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'INCOMING' }) },
-          { label: 'Both', value: 'Both', onClick: () => applyFilters({ ...currentFilters, call_direction: 'Both' }) },
-        ],
-      },
-      {
-        id: 'extension_number',
-        label: 'Extension',
-        showDropdown: true,
-        searchable: true,
-        multiSelect: true,
-        onSelectAll: () => {
-          const allSelected = isExtensionFilterAllSelected(
-            extensionAllIds,
-            currentFilters.extension_number,
-          );
-          applyFilters({
-            ...currentFilters,
-            extension_number: allSelected ? [] : extensionAllIds,
-          });
-        },
-        selectAllLabel: isExtensionFilterAllSelected(
-          extensionAllIds,
-          currentFilters.extension_number,
-        )
-          ? 'Deselect all'
-          : 'Select all',
-        active: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0,
-        activeLabel: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0
-          ? `${currentFilters.extension_number.length} selected`
-          : undefined,
-        onClear: () => applyFilters({ ...currentFilters, extension_number: [] }),
-        dropdownOptions: hierarchyDataExtensions.map((ext: any) =>
-          buildExtensionMultiSelectPillOption(ext, currentFilters, applyFilters),
-        ),
-      },
-      {
-        id: 'department',
-        label: 'Department',
-        showDropdown: true,
-        searchable: true,
-        active: Array.isArray(currentFilters.department) && currentFilters.department.length > 0,
-        activeLabel: Array.isArray(currentFilters.department) && currentFilters.department.length > 0
-          ? `${currentFilters.department.length} selected`
-          : undefined,
-        onClear: () => applyFilters({ ...currentFilters, department: [] }),
-        dropdownOptions: hierarchyDataDepartments.map((dept: any) => ({
-          label: String(dept.name ?? dept.id),
-          value: String(dept.id),
-          onClick: () => applyFilters({ ...currentFilters, department: [String(dept.id)] }),
-        })),
-      },
+      buildCallDirectionFilterPill(currentFilters, applyFilters),
+      buildExtensionNumberMultiSelectFilterPill(
+        extensionAllIds,
+        hierarchyDataExtensions,
+        currentFilters,
+        applyFilters,
+      ),
+      buildDepartmentFilterPill(
+        hierarchyDataDepartments,
+        currentFilters,
+        applyFilters,
+      ),
       {
         id: 'username',
         label: 'Username',
@@ -717,36 +665,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
           (v) => applyFilters({ ...currentFilters, remote_party_number: v }),
         ),
       },
-      {
-        id: 'start_date',
-        label: 'Start Date & Time',
-        showDropdown: true,
-        active: Boolean(currentFilters.start_date),
-        activeLabel: formatDateTimePillLabel(currentFilters.start_date, 'start'),
-        activeLabelOnly: true,
-        onClear: () => applyFilters({ ...currentFilters, start_date: '' }),
-        dropdownContent: createDateTimeDropdownContent(
-          currentFilters.start_date ?? '',
-          (v) => setCurrentFilters({ ...currentFilters, start_date: v }),
-          (v) => applyFilters({ ...currentFilters, start_date: v }),
-          'start',
-        ),
-      },
-      {
-        id: 'end_date',
-        label: 'End Date & Time',
-        showDropdown: true,
-        active: Boolean(currentFilters.end_date),
-        activeLabel: formatDateTimePillLabel(currentFilters.end_date, 'end'),
-        activeLabelOnly: true,
-        onClear: () => applyFilters({ ...currentFilters, end_date: '' }),
-        dropdownContent: createDateTimeDropdownContent(
-          currentFilters.end_date ?? '',
-          (v) => setCurrentFilters({ ...currentFilters, end_date: v }),
-          (v) => applyFilters({ ...currentFilters, end_date: v }),
-          'end',
-        ),
-      },
+      buildStartDateTimeFilterPill('start_date', currentFilters, setCurrentFilters, applyFilters),
+      buildEndDateTimeFilterPill('end_date', currentFilters, setCurrentFilters, applyFilters),
     ],
     rightActions: (
       <div className="d-flex align-items-center gap-2 call-recordings-date-range-wrap">
@@ -785,6 +705,7 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     paginationInfo.perPage,
     fetchCallLogsOriginal,
     currentFilters,
+    setCurrentFilters,
     hierarchyDataExtensions,
     hierarchyDataDepartments,
     hierarchyDataUsers,

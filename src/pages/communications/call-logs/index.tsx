@@ -18,13 +18,17 @@ import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { isExactPhoneMatch, normalizePhoneValue } from '@utils/phoneMatch';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import {
-    buildExtensionMultiSelectPillOption,
-    createDateTimeDropdownContent,
-    formatDateTimePillLabel,
     formatEndDateValueForApi,
     formatStartDateValueForApi,
-    isExtensionFilterAllSelected,
 } from '@pages/communications/shared/communicationsDateExtensionFilters';
+import {
+    buildCallDirectionFilterPill,
+    buildCallStatusFilterPill,
+    buildDepartmentFilterPill,
+    buildEndDateTimeFilterPill,
+    buildExtensionNumberMultiSelectFilterPill,
+    buildStartDateTimeFilterPill,
+} from '@pages/communications/shared/communicationsFilterPillFactories';
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -428,20 +432,6 @@ const CallLogs = () => {
         [handleFiltersChange],
     );
 
-    const callDirectionLabel = (value: string): string => {
-        if (value === 'OUTGOING') return 'Outgoing';
-        if (value === 'INCOMING') return 'Incoming';
-        if (value === 'Both') return 'Both';
-        return '';
-    };
-
-    const callStatusLabel = (value: string): string => {
-        if (value === 'Answered') return 'Answered';
-        if (value === 'Not Answered') return 'Not Answered';
-        if (value === 'Both') return 'Both';
-        return '';
-    };
-
     const tableToolbar = useMemo<any>(() => {
         const extensionAllIds = hierarchyDataExtensions.map((ext: any) => String(ext.id));
         return {
@@ -469,32 +459,8 @@ const CallLogs = () => {
         showFilterPills: true,
         showMoreFiltersButton: false,
         filterPills: [
-            {
-                id: 'call_direction',
-                label: 'Call Direction',
-                showDropdown: true,
-                active: Boolean(currentFilters.call_direction),
-                activeLabel: callDirectionLabel(currentFilters.call_direction ?? ''),
-                onClear: () => applyFilters({ ...currentFilters, call_direction: '' }),
-                dropdownOptions: [
-                    { label: 'Outgoing', value: 'OUTGOING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'OUTGOING' }) },
-                    { label: 'Incoming', value: 'INCOMING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'INCOMING' }) },
-                    { label: 'Both', value: 'Both', onClick: () => applyFilters({ ...currentFilters, call_direction: 'Both' }) },
-                ],
-            },
-            {
-                id: 'call_status',
-                label: 'Call Status',
-                showDropdown: true,
-                active: Boolean(currentFilters.call_status),
-                activeLabel: callStatusLabel(currentFilters.call_status ?? ''),
-                onClear: () => applyFilters({ ...currentFilters, call_status: '' }),
-                dropdownOptions: [
-                    { label: 'Answered', value: 'Answered', onClick: () => applyFilters({ ...currentFilters, call_status: 'Answered' }) },
-                    { label: 'Not Answered', value: 'Not Answered', onClick: () => applyFilters({ ...currentFilters, call_status: 'Not Answered' }) },
-                    { label: 'Both', value: 'Both', onClick: () => applyFilters({ ...currentFilters, call_status: 'Both' }) },
-                ],
-            },
+            buildCallDirectionFilterPill(currentFilters, applyFilters),
+            buildCallStatusFilterPill(currentFilters, applyFilters),
             {
                 id: 'traffic_type',
                 label: 'Traffic Type',
@@ -522,56 +488,17 @@ const CallLogs = () => {
                     { label: 'All', value: '', onClick: () => applyFilters({ ...currentFilters, destination_type: '' }) },
                 ],
             },
-            {
-                id: 'extension_number',
-                label: 'Extension',
-                showDropdown: true,
-                searchable: true,
-                multiSelect: true,
-                onSelectAll: () => {
-                    const allSelected = isExtensionFilterAllSelected(
-                        extensionAllIds,
-                        currentFilters.extension_number,
-                    );
-                    applyFilters({
-                        ...currentFilters,
-                        extension_number: allSelected ? [] : extensionAllIds,
-                    });
-                },
-                selectAllLabel: isExtensionFilterAllSelected(
-                    extensionAllIds,
-                    currentFilters.extension_number,
-                )
-                    ? 'Deselect all'
-                    : 'Select all',
-                active: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0,
-                activeLabel: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0
-                    ? `${currentFilters.extension_number.length} selected`
-                    : undefined,
-                onClear: () => applyFilters({ ...currentFilters, extension_number: [] }),
-                dropdownOptions: hierarchyDataExtensions.map((ext: any) =>
-                    buildExtensionMultiSelectPillOption(ext, currentFilters, applyFilters),
-                ),
-            },
-            {
-                id: 'department',
-                label: 'Department',
-                showDropdown: true,
-                searchable: true,
-                active: Array.isArray(currentFilters.department) && currentFilters.department.length > 0,
-                activeLabel: Array.isArray(currentFilters.department) && currentFilters.department.length > 0
-                    ? `${currentFilters.department.length} selected`
-                    : undefined,
-                onClear: () => applyFilters({ ...currentFilters, department: [] }),
-                dropdownOptions: hierarchyDataDepartments.map((dept: any) => ({
-                    label: String(dept.name ?? dept.id),
-                    value: String(dept.id),
-                    onClick: () => applyFilters({
-                        ...currentFilters,
-                        department: [String(dept.id)],
-                    }),
-                })),
-            },
+            buildExtensionNumberMultiSelectFilterPill(
+                extensionAllIds,
+                hierarchyDataExtensions,
+                currentFilters,
+                applyFilters,
+            ),
+            buildDepartmentFilterPill(
+                hierarchyDataDepartments,
+                currentFilters,
+                applyFilters,
+            ),
             {
                 id: 'phone_number',
                 label: 'Numbers',
@@ -585,36 +512,8 @@ const CallLogs = () => {
                     (value) => applyFilters({ ...currentFilters, phone_number: value }),
                 ),
             },
-            {
-                id: 'start_datetime',
-                label: 'Start Date & Time',
-                showDropdown: true,
-                active: Boolean(currentFilters.start_datetime),
-                activeLabel: formatDateTimePillLabel(currentFilters.start_datetime, 'start'),
-                activeLabelOnly: true,
-                onClear: () => applyFilters({ ...currentFilters, start_datetime: '' }),
-                dropdownContent: createDateTimeDropdownContent(
-                    currentFilters.start_datetime ?? '',
-                    (value) => setCurrentFilters({ ...currentFilters, start_datetime: value }),
-                    (value) => applyFilters({ ...currentFilters, start_datetime: value }),
-                    'start',
-                ),
-            },
-            {
-                id: 'end_datetime',
-                label: 'End Date & Time',
-                showDropdown: true,
-                active: Boolean(currentFilters.end_datetime),
-                activeLabel: formatDateTimePillLabel(currentFilters.end_datetime, 'end'),
-                activeLabelOnly: true,
-                onClear: () => applyFilters({ ...currentFilters, end_datetime: '' }),
-                dropdownContent: createDateTimeDropdownContent(
-                    currentFilters.end_datetime ?? '',
-                    (value) => setCurrentFilters({ ...currentFilters, end_datetime: value }),
-                    (value) => applyFilters({ ...currentFilters, end_datetime: value }),
-                    'end',
-                ),
-            },
+            buildStartDateTimeFilterPill('start_datetime', currentFilters, setCurrentFilters, applyFilters),
+            buildEndDateTimeFilterPill('end_datetime', currentFilters, setCurrentFilters, applyFilters),
         ],
     };
     }, [
@@ -622,6 +521,7 @@ const CallLogs = () => {
         tablePagination.rowsPerPage,
         fetchCallLogs,
         currentFilters,
+        setCurrentFilters,
         hierarchyDataExtensions,
         hierarchyDataDepartments,
         session?.user?.permissions,
