@@ -76,6 +76,32 @@ function CardActions({
   );
 }
 
+function CardProductWithIncludes({ product }: Readonly<{ product: string }>) {
+  return (
+    <div style={s.colValue}>
+      {product}{" "}
+      <LinkButton onClick={() => null} style={s.link}>
+        includes
+      </LinkButton>
+    </div>
+  );
+}
+
+function CardAmountFooter({
+  label,
+  amount,
+}: Readonly<{ label: string; amount: string }>) {
+  return (
+    <>
+      <hr style={s.hr} />
+      <div style={s.balanceRow}>
+        <span style={s.balanceLabel}>{label}</span>
+        <span style={s.balanceAmount}>{amount}</span>
+      </div>
+    </>
+  );
+}
+
 // ── Shared styles ──────────────────────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
   page: {
@@ -574,50 +600,69 @@ function DateRangeDropdown({
             {isCustom && (
               <div style={{ paddingTop: 8, borderTop: "1px solid #eee" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 12, color: "#666", fontFamily: font, fontWeight: 700, marginBottom: 4 }}>
-                      From
-                    </div>
-                    <input
-                      type="date"
-                      value={dateFrom}
-                      max={dateTo || undefined}
-                      onChange={(e) => onChangeDateFrom(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "8px 10px",
-                        borderRadius: 6,
-                        border: "1px solid #ccc",
-                        fontFamily: font,
-                        fontSize: 13,
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: "#666", fontFamily: font, fontWeight: 700, marginBottom: 4 }}>
-                      To
-                    </div>
-                    <input
-                      type="date"
-                      value={dateTo}
-                      min={dateFrom || undefined}
-                      onChange={(e) => onChangeDateTo(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "8px 10px",
-                        borderRadius: 6,
-                        border: "1px solid #ccc",
-                        fontFamily: font,
-                        fontSize: 13,
-                      }}
-                    />
-                  </div>
+                  <DateRangeInputField
+                    label="From"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={onChangeDateFrom}
+                  />
+                  <DateRangeInputField
+                    label="To"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={onChangeDateTo}
+                  />
                 </div>
               </div>
             )}
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function DateRangeInputField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: Readonly<{
+  label: string;
+  value: string;
+  min?: string;
+  max?: string;
+  onChange: (value: string) => void;
+}>) {
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 12,
+          color: "#666",
+          fontFamily: font,
+          fontWeight: 700,
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </div>
+      <input
+        type="date"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          width: "100%",
+          padding: "8px 10px",
+          borderRadius: 6,
+          border: "1px solid #ccc",
+          fontFamily: font,
+          fontSize: 13,
+        }}
+      />
     </div>
   );
 }
@@ -786,23 +831,14 @@ function InvoiceCard({
         <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr" }}>
           <div>
             <div style={s.colLabel}>Products</div>
-            <div style={s.colValue}>
-              {product}{" "}
-              <LinkButton onClick={() => null} style={s.link}>
-                includes
-              </LinkButton>
-            </div>
+            <CardProductWithIncludes product={product} />
           </div>
           <div>
             <div style={s.colLabel}>Invoice amount</div>
             <div style={s.colValue}>{amount}</div>
           </div>
         </div>
-        <hr style={s.hr} />
-        <div style={s.balanceRow}>
-          <span style={s.balanceLabel}>Invoice balance</span>
-          <span style={s.balanceAmount}>{balance}</span>
-        </div>
+        <CardAmountFooter label="Invoice balance" amount={balance} />
       </div>
     </div>
   );
@@ -837,12 +873,7 @@ function PaymentCard({
         <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr 1fr" }}>
           <div>
             <div style={s.colLabel}>Products</div>
-            <div style={s.colValue}>
-              {product}{" "}
-              <LinkButton onClick={() => null} style={s.link}>
-                includes
-              </LinkButton>
-            </div>
+            <CardProductWithIncludes product={product} />
           </div>
           <div>
             <div style={s.colLabel}>Paid for invoice</div>
@@ -865,11 +896,7 @@ function PaymentCard({
             </div>
           </div>
         </div>
-        <hr style={s.hr} />
-        <div style={s.balanceRow}>
-          <span style={s.balanceLabel}>Amount paid</span>
-          <span style={s.balanceAmount}>{amount}</span>
-        </div>
+        <CardAmountFooter label="Amount paid" amount={amount} />
       </div>
     </div>
   );
@@ -894,19 +921,10 @@ function OrderCard({
         <div style={{ ...s.colGrid, gridTemplateColumns: "1fr 1fr" }}>
           <div>
             <div style={s.colLabel}>Products</div>
-            <div style={s.colValue}>
-              {product}{" "}
-              <LinkButton onClick={() => null} style={s.link}>
-                includes
-              </LinkButton>
-            </div>
+            <CardProductWithIncludes product={product} />
           </div>
         </div>
-        <hr style={s.hr} />
-        <div style={s.balanceRow}>
-          <span style={s.balanceLabel}>Amount</span>
-          <span style={s.balanceAmount}>{amount}</span>
-        </div>
+        <CardAmountFooter label="Amount" amount={amount} />
       </div>
     </div>
   );

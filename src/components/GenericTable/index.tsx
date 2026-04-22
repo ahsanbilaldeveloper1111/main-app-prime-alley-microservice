@@ -112,8 +112,7 @@ export function getVisibleDropdownOptions<T>(
 
 export interface TableAction<T = any> {
   label: string;
-  /** Static icon or a function of row (e.g. show a spinner while an async action runs). */
-  icon?: React.ReactNode | ((row: T) => React.ReactNode);
+  icon?: React.ReactNode;
   onClick?: (row: T) => void;
   variant?: string;
   className?: string;
@@ -134,26 +133,11 @@ export interface TableAction<T = any> {
   };
 }
 
-function resolveTableActionIcon<T>(
-  icon: TableAction<T>["icon"],
-  row: T,
-): React.ReactNode {
-  if (icon == null) {
-    return null;
-  }
-  if (typeof icon === "function") {
-    return (icon as (r: T) => React.ReactNode)(row);
-  }
-  return icon;
-}
-
 /** Row context menu entry (onClick receives the row). Shared by the table and Kanban card menu. */
 export type TableContextMenuItem<T = unknown> = {
   label: string;
   icon?: React.ReactNode;
-  /** Present for leaf items; omitted when `submenu` is set. */
-  onClick?: (row: T) => void;
-  submenu?: TableContextMenuItem<T>[];
+  onClick: (row: T) => void;
   divider?: boolean;
   className?: string;
   disabled?: boolean;
@@ -165,8 +149,7 @@ export type TableContextMenuItem<T = unknown> = {
 export interface BoundTableContextMenuItem {
   label: string;
   icon?: React.ReactNode;
-  onClick?: () => void;
-  submenu?: BoundTableContextMenuItem[];
+  onClick: () => void;
   divider?: boolean;
   className?: string;
   disabled?: boolean;
@@ -174,8 +157,8 @@ export interface BoundTableContextMenuItem {
   disabledClassName?: string;
 }
 
-function buildDropdownContextMenuItems<T>(
-  action: TableAction<T>,
+export function buildTableContextMenuItems<T>(
+  actions: TableAction<T>[],
   row: T,
 ): TableContextMenuItem<T>[] {
   const items: TableContextMenuItem<T>[] = [];
@@ -196,7 +179,7 @@ function buildDropdownContextMenuItems<T>(
       const isDisabled = action.disabled?.(row);
       items.push({
         label: action.label,
-        icon: resolveTableActionIcon(action.icon, row),
+        icon: action.icon,
         onClick: action.onClick,
         divider: false,
         className: isDisabled
@@ -211,126 +194,24 @@ function buildDropdownContextMenuItems<T>(
   return items;
 }
 
-function bindTableContextMenuItemsToRow<T>(
-  items: TableContextMenuItem<T>[],
-  row: T,
-): BoundTableContextMenuItem[] {
-  return items.map((item) => {
-    const bound: BoundTableContextMenuItem = {
-      label: item.label,
-      icon: item.icon,
-      divider: item.divider,
-      className: item.className,
-      disabled: item.disabled,
-      disabledTitle: item.disabledTitle,
-      disabledClassName: item.disabledClassName,
-    };
-    if (item.submenu && item.submenu.length > 0) {
-      bound.submenu = bindTableContextMenuItemsToRow(item.submenu, row);
-    } else if (item.onClick) {
-      bound.onClick = () => item.onClick!(row);
-    }
-    return bound;
-  });
-}
-
 export function buildBoundTableContextMenuItems<T>(
   actions: TableAction<T>[],
   row: T,
 ): BoundTableContextMenuItem[] {
-  return bindTableContextMenuItemsToRow(buildTableContextMenuItems(actions, row), row);
+  return buildTableContextMenuItems(actions, row).map((item) => ({
+    label: item.label,
+    icon: item.icon,
+    onClick: () => item.onClick(row),
+    divider: item.divider,
+    className: item.className,
+    disabled: item.disabled,
+    disabledTitle: item.disabledTitle,
+    disabledClassName: item.disabledClassName,
+  }));
 }
 
 /** One row in `gt-context-menu`; `onClick` is a bound handler (no row argument). */
 export type GtContextMenuItemRow = BoundTableContextMenuItem;
-
-function renderGtContextMenuItemRow(
-  item: GtContextMenuItemRow,
-  idx: number,
-  keyPrefix: string,
-  onClose: () => void,
-): React.ReactNode {
-  const key = `${keyPrefix}-${item.label}-${idx}-${item.className ?? ""}`;
-
-  if (item.submenu && item.submenu.length > 0) {
-    return (
-      <React.Fragment key={key}>
-        <div className="gt-context-menu-submenu-host">
-          <div
-            className={`gt-context-menu-item gt-context-menu-item--parent ${item.className || ""}`}
-            role="menuitem"
-            aria-haspopup="menu"
-          >
-            {item.icon && (
-              <span className="gt-context-menu-icon">{item.icon}</span>
-            )}
-            <span className="gt-context-menu-item-label">{item.label}</span>
-            <ChevronRight
-              size={16}
-              className="gt-context-menu-chevron"
-              aria-hidden
-            />
-          </div>
-          <div className="gt-context-submenu" role="menu">
-            {item.submenu.map((sub, subIdx) =>
-              renderGtContextMenuItemRow(sub, subIdx, `${key}-sub`, onClose),
-            )}
-          </div>
-        </div>
-        {item.divider ? <div className="gt-context-menu-divider" /> : null}
-      </React.Fragment>
-    );
-  }
-
-  const runClick = () => {
-    item.onClick?.();
-    onClose();
-  };
-
-  return (
-    <React.Fragment key={key}>
-      {item.disabled && item.disabledTitle ? (
-        <span
-          className="gt-context-menu-disabled-wrapper"
-          title={item.disabledTitle}
-        >
-          <button
-            type="button"
-            className={`gt-context-menu-item ${item.className || ""}`}
-            disabled
-            onClick={(e) => e.stopPropagation()}
-            role="menuitem"
-          >
-            {item.icon && (
-              <span className="gt-context-menu-icon">{item.icon}</span>
-            )}
-            {item.label}
-          </button>
-        </span>
-      ) : (
-        <button
-          type="button"
-          className={`gt-context-menu-item ${item.className || ""}`}
-          disabled={item.disabled}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!item.disabled) {
-              runClick();
-            }
-          }}
-          role="menuitem"
-          title={item.disabled ? item.disabledTitle : undefined}
-        >
-          {item.icon && (
-            <span className="gt-context-menu-icon">{item.icon}</span>
-          )}
-          {item.label}
-        </button>
-      )}
-      {item.divider ? <div className="gt-context-menu-divider" /> : null}
-    </React.Fragment>
-  );
-}
 
 /** Shared markup for context menu rows (GenericTable right‑click + Kanban card menu). */
 export const GtContextMenuItemList: React.FC<{
@@ -338,9 +219,52 @@ export const GtContextMenuItemList: React.FC<{
   onClose: () => void;
 }> = ({ items, onClose }) => (
   <>
-    {items.map((item, idx) =>
-      renderGtContextMenuItemRow(item, idx, "gt-ctx", onClose),
-    )}
+    {items.map((item, idx) => (
+      <React.Fragment
+        key={`${item.label}-${idx}-${item.className ?? ""}`}
+      >
+        {item.disabled && item.disabledTitle ? (
+          <span
+            className="gt-context-menu-disabled-wrapper"
+            title={item.disabledTitle}
+          >
+            <button
+              type="button"
+              className={`gt-context-menu-item ${item.className || ""}`}
+              disabled
+              onClick={(e) => e.stopPropagation()}
+              role="menuitem"
+            >
+              {item.icon && (
+                <span className="gt-context-menu-icon">{item.icon}</span>
+              )}
+              {item.label}
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className={`gt-context-menu-item ${item.className || ""}`}
+            disabled={item.disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!item.disabled) {
+                item.onClick();
+                onClose();
+              }
+            }}
+            role="menuitem"
+            title={item.disabled ? item.disabledTitle : undefined}
+          >
+            {item.icon && (
+              <span className="gt-context-menu-icon">{item.icon}</span>
+            )}
+            {item.label}
+          </button>
+        )}
+        {item.divider && <div className="gt-context-menu-divider" />}
+      </React.Fragment>
+    ))}
   </>
 );
 
@@ -383,15 +307,6 @@ export interface FilterPill {
     value: string;
     onClick?: () => void;
   }>;
-  /** Override the default `Dropdown.Menu` inline styles (e.g. remove maxHeight/overflow for portalled selects). */
-  dropdownMenuStyle?: React.CSSProperties;
-}
-
-export interface ToolbarTabsDropdownItem {
-  label: string;
-  href?: string;
-  onClick?: () => void;
-  disabled?: boolean;
 }
 
 export interface ToolbarConfig {
@@ -410,7 +325,6 @@ export interface ToolbarConfig {
   onTabAdd?: () => void;
   onTabRemove?: (tabId: string) => void;
   tabsDropdownLabel?: string;
-  tabsDropdownItems?: ToolbarTabsDropdownItem[];
 
   // View controls
   showViewSwitcher?: boolean;
@@ -479,8 +393,8 @@ export interface GenericTableProps<T = any> {
 
   // Sorting
   sortable?: boolean;
-  defaultSortBy?: string;
-  defaultSortOrder?: "asc" | "desc";
+  defaultSortColumn?: string;
+  defaultSortDirection?: "asc" | "desc";
   onSort?: (column: string, direction: "asc" | "desc") => void;
 
   // Actions
@@ -612,7 +526,7 @@ function buildContextMenuItemsForRow<T extends Record<string, any>>(
       items.push({
         reactKey: `gt-ctxm-${seq++}-${action.label}`,
         label: action.label,
-        icon: resolveTableActionIcon(action.icon, row),
+        icon: action.icon,
         onClick: action.onClick,
         divider: false,
         className: isDisabled
@@ -902,7 +816,6 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
       style={{
         textAlign: col.align || "left",
         position: colIdx === 0 ? "relative" : undefined,
-        ...(col.width ? { width: col.width, maxWidth: col.width } : {}),
       }}
     >
       {firstColumnClickable ? (
@@ -971,7 +884,7 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
                 className={action.className || ""}
                 id={`dropdown-${rowStableKey}-${action.label}`}
               >
-                {resolveTableActionIcon(action.icon, row)}
+                {action.icon}
               </Dropdown.Toggle>
               <Dropdown.Menu
                 onMouseDown={(e) => {
@@ -1033,7 +946,7 @@ function GenericTableRowActionsCell<T extends Record<string, any>>({
             }`}
             title={isDisabled ? undefined : action.label}
           >
-            {resolveTableActionIcon(action.icon, row) || action.label}
+            {action.icon || action.label}
           </Button>
         );
         if (isDisabled && action.disabledTitle) {
@@ -1059,8 +972,8 @@ const GenericTable = <T extends Record<string, any>>({
   pagination,
   onPaginationChange,
   sortable = true,
-  defaultSortBy = "",
-  defaultSortOrder = "asc",
+  defaultSortColumn = "",
+  defaultSortDirection = "asc",
   onSort,
   actions = [],
   showActions = true,
@@ -1101,9 +1014,9 @@ const GenericTable = <T extends Record<string, any>>({
   const columnCustomizerPlaceholderId = useId();
   const columnCustomizerActionsHeaderId = useId();
   // Sorting state (synced from props when parent controls sort, e.g. server-side)
-  const [sortBy, setSortBy] = useState(defaultSortBy);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
-    defaultSortOrder,
+  const [sortColumn, setSortColumn] = useState(defaultSortColumn);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(
+    defaultSortDirection,
   );
   const baseActionsEnabled = showActions && actions.length > 0;
   const allSelectableColumnKeys = useMemo(() => {
@@ -1113,9 +1026,9 @@ const GenericTable = <T extends Record<string, any>>({
   }, [columns, baseActionsEnabled]);
 
   useEffect(() => {
-    setSortBy(defaultSortBy);
-    setSortOrder(defaultSortOrder);
-  }, [defaultSortBy, defaultSortOrder]);
+    setSortColumn(defaultSortColumn);
+    setSortDirection(defaultSortDirection);
+  }, [defaultSortColumn, defaultSortDirection]);
 
   // Column selection state (uncontrolled when selectedColumns prop is not provided)
   const [selectedColumns, setSelectedColumns] = useState<string[]>(() => {
@@ -1191,8 +1104,8 @@ const GenericTable = <T extends Record<string, any>>({
     }
   }, [toolbar?.showFilterPills]);
 
-  const getBoundContextMenuItems = useMemo(() => {
-    return (row: T) => buildBoundTableContextMenuItems(actions, row);
+  const getContextMenuItems = useMemo(() => {
+    return (row: T) => buildTableContextMenuItems(actions, row);
   }, [actions]);
 
   // Close context menu on outside click or Escape
@@ -1240,20 +1153,20 @@ const GenericTable = <T extends Record<string, any>>({
 
   // Sort data (client-side if no onSort provided) — before selection handlers that depend on it
   const sortedData = useMemo(() => {
-    if (onSort || !sortBy) return data;
+    if (onSort || !sortColumn) return data;
 
     return [...data].sort((a, b) => {
-      const aVal = a[sortBy as keyof T] ?? "";
-      const bVal = b[sortBy as keyof T] ?? "";
+      const aVal = a[sortColumn as keyof T] ?? "";
+      const bVal = b[sortColumn as keyof T] ?? "";
 
       const aStr = String(aVal).toLowerCase();
       const bStr = String(bVal).toLowerCase();
 
-      if (aStr < bStr) return sortOrder === "asc" ? -1 : 1;
-      if (aStr > bStr) return sortOrder === "asc" ? 1 : -1;
+      if (aStr < bStr) return sortDirection === "asc" ? -1 : 1;
+      if (aStr > bStr) return sortDirection === "asc" ? 1 : -1;
       return 0;
     });
-  }, [data, sortBy, sortOrder, onSort]);
+  }, [data, sortColumn, sortDirection, onSort]);
 
   // Check if a row is selected
   const isSelected = (row: T) => {
@@ -1295,9 +1208,9 @@ const GenericTable = <T extends Record<string, any>>({
     if (!sortable) return;
 
     const newDirection =
-      sortBy === column && sortOrder === "asc" ? "desc" : "asc";
-    setSortBy(column);
-    setSortOrder(newDirection);
+      sortColumn === column && sortDirection === "asc" ? "desc" : "asc";
+    setSortColumn(column);
+    setSortDirection(newDirection);
 
     if (onSort) {
       onSort(column, newDirection);
@@ -1306,10 +1219,10 @@ const GenericTable = <T extends Record<string, any>>({
 
   // Render sort icon
   const renderSortIcon = (column: string) => {
-    if (sortBy !== column) {
+    if (sortColumn !== column) {
       return <ArrowUpDown size={14} className="ms-1 text-muted" />;
     }
-    return sortOrder === "asc" ? (
+    return sortDirection === "asc" ? (
       <ArrowUp size={14} className="ms-1" />
     ) : (
       <ArrowDown size={14} className="ms-1" />
@@ -1338,7 +1251,7 @@ const GenericTable = <T extends Record<string, any>>({
     }
   };
 
-  /** Escape scroll/overflow parents so the menu is not clipped. */
+  /** Escape scroll/overflow parents (short tables clip `position: absolute` menus). */
   const columnSelectorMenuPopperConfig = useMemo(
     () => ({ strategy: "fixed" as const }),
     [],
@@ -1346,7 +1259,6 @@ const GenericTable = <T extends Record<string, any>>({
 
   const renderColumnCustomizerDropdown = (toggleId: string) => (
     <Dropdown
-      drop="down"
       align="end"
       autoClose="outside"
       onClick={(e: React.MouseEvent) => e.stopPropagation()}
@@ -1363,7 +1275,6 @@ const GenericTable = <T extends Record<string, any>>({
       <Dropdown.Menu
         align="end"
         className="column-selector-menu"
-        renderOnMount
         popperConfig={columnSelectorMenuPopperConfig}
       >
         {columnCatalog.map((c) => (
@@ -1424,17 +1335,6 @@ const GenericTable = <T extends Record<string, any>>({
     </Dropdown>
   );
 
-  // Default CRM dropdown items (backward compatibility fallback)
-  const defaultCrmDropdownItems: ToolbarTabsDropdownItem[] = [
-    { label: "Prospects", href: "/crm/prospects" },
-    { label: "Leads", href: "/crm/leads" },
-    { label: "Deals", href: "/crm/deals" },
-    { label: "Orders", href: "/crm/orders" },
-    { label: "Company", href: "/crm/companies" },
-    { label: "Inbox", href: "/crm/inbox" },
-    { label: "Approvals", href: "/crm/approvals" },
-  ];
-
   // Render toolbar
   const renderToolbar = () => {
     if (!showToolbar || !toolbar) return null;
@@ -1451,7 +1351,7 @@ const GenericTable = <T extends Record<string, any>>({
         {toolbar.showTabs && toolbar.tabs && toolbar.tabs.length > 0 && (
           <div className="gt-toolbar-tabs-section">
             <div className="d-flex align-items-center gap-3">
-              {/* Dropdown: use provided items or fall back to default CRM items */}
+              {/* Dropdown (if provided) */}
               {toolbar.tabsDropdownLabel && (
                 <Dropdown>
                   <Dropdown.Toggle
@@ -1462,32 +1362,29 @@ const GenericTable = <T extends Record<string, any>>({
                     <span>{toolbar.tabsDropdownLabel}</span>
                   </Dropdown.Toggle>
                   <Dropdown.Menu style={{ zIndex: "99" }}>
-                    {(toolbar.tabsDropdownItems ?? defaultCrmDropdownItems).map(
-                      (item) => {
-                        const handleItemClick = () => {
-                          if (item.disabled) {
-                            return;
-                          }
-                          if (item.onClick) {
-                            item.onClick();
-                            return;
-                          }
-                          if (item.href) {
-                            router.push(item.href);
-                          }
-                        };
-
-                        return (
-                          <Dropdown.Item
-                            key={item.label}
-                            disabled={item.disabled}
-                            onClick={handleItemClick}
-                          >
-                            {item.label}
-                          </Dropdown.Item>
-                        );
-                      },
-                    )}
+                    <Dropdown.Item
+                      onClick={() => router.push("/crm/prospects")}
+                    >
+                      Prospects
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => router.push("/crm/leads")}>
+                      Leads
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => router.push("/crm/deals")}>
+                      Deals
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => router.push("/crm/orders")}>
+                      Orders
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => router.push("/crm/companies")}>
+                      Company
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => router.push("/crm/inbox")}>
+                      Inbox
+                    </Dropdown.Item>
+                    <Dropdown.Item onClick={() => router.push("/crm/approvals")}>
+                      Approvals
+                    </Dropdown.Item>
                   </Dropdown.Menu>
                 </Dropdown>
               )}
@@ -1698,8 +1595,8 @@ const GenericTable = <T extends Record<string, any>>({
                           onClick={() => handleSort(col.key)}
                         >
                           {col.label}
-                          {sortBy === col.key &&
-                            (sortOrder === "asc" ? " ↑" : " ↓")}
+                          {sortColumn === col.key &&
+                            (sortDirection === "asc" ? " ↑" : " ↓")}
                         </Dropdown.Item>
                       ))
                     )}
@@ -1827,7 +1724,7 @@ const GenericTable = <T extends Record<string, any>>({
                         )}
                       </Dropdown.Toggle>
                       <Dropdown.Menu
-                        style={pill.dropdownMenuStyle ?? { maxHeight: "280px", overflowY: "auto" }}
+                        style={{ maxHeight: "280px", overflowY: "auto" }}
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         <GenericTableFilterPillMenuBody
@@ -2045,12 +1942,11 @@ const GenericTable = <T extends Record<string, any>>({
           onMouseEnter={() => setHoveredRowIndex(index)}
           onMouseLeave={() => setHoveredRowIndex(null)}
           onContextMenu={(e) => {
-            // Context menu is independent of the visible actions column (e.g. showActions={false}).
-            if (actions.length === 0) return;
-            const items = getBoundContextMenuItems(row);
-            if (items.length === 0) return;
+            if (!actionsColumnVisible) return;
             e.preventDefault();
             e.stopPropagation();
+            const items = getContextMenuItems(row);
+            if (items.length === 0) return;
             setContextMenu({ x: e.clientX, y: e.clientY, row });
           }}
           className={`generic-table-row ${rowClassName?.(row, index) || ""} ${isClickable ? "clickable" : ""}`}
@@ -2087,6 +1983,7 @@ const GenericTable = <T extends Record<string, any>>({
             <td
               className="generic-table-td"
               style={{ width: "52px" }}
+              aria-hidden
             />
           )}
           {actionsColumnVisible && (
@@ -2119,7 +2016,16 @@ const GenericTable = <T extends Record<string, any>>({
           role="menu"
         >
           <GtContextMenuItemList
-            items={getBoundContextMenuItems(contextMenu.row)}
+            items={getContextMenuItems(contextMenu.row).map((item) => ({
+              label: item.label,
+              icon: item.icon,
+              className: item.className,
+              divider: item.divider,
+              disabled: item.disabled,
+              disabledTitle: item.disabledTitle,
+              disabledClassName: item.disabledClassName,
+              onClick: () => item.onClick(contextMenu.row),
+            }))}
             onClose={() => setContextMenu(null)}
           />
         </div>
