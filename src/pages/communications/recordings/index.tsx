@@ -101,25 +101,51 @@ interface DateFilterMenuProps {
   onChange: (value: string) => void;
   onApply: (value: string) => void;
   closeMenu: () => void;
+  variant: 'start' | 'end';
 }
-const DateFilterMenu: React.FC<DateFilterMenuProps> = ({ value, onChange, onApply, closeMenu }) => (
-  <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-    <Form.Control
-      size="sm"
-      type="date"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-    <div className="d-flex justify-content-end gap-2">
-      <Button variant="outline-secondary" size="sm" onClick={closeMenu}>Cancel</Button>
-      <Button
-        variant="primary"
+
+/**
+ * `datetime-local` needs `YYYY-MM-DDTHH:mm` (or with seconds, trimmed to minutes for the control).
+ * Accepts date-only, ISO strings, and existing local values from filter state.
+ */
+function toDateTimeLocalInputValue(raw: string | undefined, variant: 'start' | 'end'): string {
+  if (raw == null || String(raw).trim() === '') return '';
+  const t = String(raw).trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(t)) {
+    return t;
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(t)) {
+    return t.slice(0, 16);
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
+    return variant === 'end' ? `${t}T23:59` : `${t}T00:00`;
+  }
+  const m = moment(t);
+  return m.isValid() ? m.format('YYYY-MM-DDTHH:mm') : '';
+}
+
+const DateFilterMenu: React.FC<DateFilterMenuProps> = ({ value, onChange, onApply, closeMenu, variant }) => {
+  const inputValue = toDateTimeLocalInputValue(value, variant);
+  return (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 280 }}>
+      <Form.Control
         size="sm"
-        onClick={() => { onApply(value); closeMenu(); }}
-      >Apply</Button>
+        type="datetime-local"
+        step={60}
+        value={inputValue}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <div className="d-flex justify-content-end gap-2">
+        <Button variant="outline-secondary" size="sm" onClick={closeMenu}>Cancel</Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => { onApply(inputValue); closeMenu(); }}
+        >Apply</Button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Dropdown content factories (defined outside CallRecordings to satisfy Sonar) ──
 
@@ -139,12 +165,86 @@ function createDateDropdownContent(
   value: string,
   onChange: (v: string) => void,
   onApply: (v: string) => void,
+  variant: 'start' | 'end',
 ) {
   return function DateDropdownRender({ closeMenu }: { closeMenu: () => void }) {
     return (
-      <DateFilterMenu value={value} onChange={onChange} onApply={onApply} closeMenu={closeMenu} />
+      <DateFilterMenu
+        value={value}
+        onChange={onChange}
+        onApply={onApply}
+        closeMenu={closeMenu}
+        variant={variant}
+      />
     );
   };
+}
+
+function recordingsDateTimePillLabel(raw: string | undefined, variant: 'start' | 'end'): string | undefined {
+  if (raw == null || String(raw).trim() === '') return undefined;
+  const local = toDateTimeLocalInputValue(raw, variant);
+  if (!local) {
+    const m = moment(String(raw).trim());
+    return m.isValid() ? m.format('MMM D, YYYY h:mm A') : undefined;
+  }
+  return moment(local, 'YYYY-MM-DDTHH:mm').format('MMM D, YYYY h:mm A');
+}
+
+function recordingsExtensionPillOption(
+  ext: { id: unknown; name?: unknown },
+  currentFilters: Record<string, unknown>,
+  applyFilters: (f: Record<string, unknown>) => void,
+) {
+  const idStr = String(ext.id);
+  const selectedIds = Array.isArray(currentFilters.extension_number)
+    ? (currentFilters.extension_number as string[]).map(String)
+    : [];
+  const isSelected = selectedIds.includes(idStr);
+  return {
+    label: String(ext.name ?? ext.id),
+    value: idStr,
+    selected: isSelected,
+    onClick: () => {
+      const next = isSelected
+        ? selectedIds.filter((x) => x !== idStr)
+        : [...selectedIds, idStr];
+      applyFilters({ ...currentFilters, extension_number: next });
+    },
+  };
+}
+
+function recordingsExtensionAllSelected(allIds: string[], extensionFilter: unknown): boolean {
+  if (allIds.length === 0) return false;
+  if (!Array.isArray(extensionFilter) || extensionFilter.length !== allIds.length) {
+    return false;
+  }
+  const selected = new Set((extensionFilter as string[]).map(String));
+  return allIds.every((id) => selected.has(id));
+}
+
+function recordingsFormatStartDateForApi(value: string): string {
+  let startMoment = moment(value);
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+    startMoment = moment(value + ':00');
+  } else if (!value.includes('T')) {
+    startMoment = moment(value).startOf('day');
+  }
+  return startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+}
+
+function recordingsFormatEndDateForApi(value: string): string {
+  let endMoment = moment(value);
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+    const timePart = value.split('T')[1];
+    if (timePart === '23:59') {
+      endMoment = moment(value + ':59');
+    } else {
+      endMoment = moment(value + ':00');
+    }
+  } else if (!value.includes('T')) {
+    endMoment = moment(value).endOf('day');
+  }
+  return endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
 }
 
 const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactNode } = () => {
@@ -165,8 +265,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     // Match default range in `current` so `applyFilters({ ...currentFilters, ... })` does not drop dates.
-    const startDateUi = now.clone().startOf('day').format('YYYY-MM-DD');
-    const endDateUi = now.clone().endOf('day').format('YYYY-MM-DD');
+    const startDateUi = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
+    const endDateUi = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
     return {
       current: {
         start_date: startDateUi,
@@ -503,27 +603,14 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
     delete formattedFilters.end_datetime;
     
     if (formattedFilters.start_date) {
-      // date picker returns YYYY-MM-DD; normalize to UTC timestamp expected by API.
-      let startMoment = moment(formattedFilters.start_date);
-      
-      if (formattedFilters.start_date.match(/^\d{4}-\d{2}-\d{2}$/) || !formattedFilters.start_date.includes('T')) {
-        startMoment = moment(formattedFilters.start_date).startOf('day');
-      }
-      
-      // Convert to UTC
-      formattedFilters.start_date = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+      formattedFilters.start_date = recordingsFormatStartDateForApi(
+        String(formattedFilters.start_date),
+      );
     }
-    
     if (formattedFilters.end_date) {
-      // date picker returns YYYY-MM-DD; use end of that local day so the range includes the full day.
-      let endMoment = moment(formattedFilters.end_date);
-      
-      if (formattedFilters.end_date.match(/^\d{4}-\d{2}-\d{2}$/) || !formattedFilters.end_date.includes('T')) {
-        endMoment = moment(formattedFilters.end_date).endOf('day');
-      }
-      
-      // Convert to UTC
-      formattedFilters.end_date = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+      formattedFilters.end_date = recordingsFormatEndDateForApi(
+        String(formattedFilters.end_date),
+      );
     }
 
     const normalizedRemotePartyNumber = normalizePhoneValue(formattedFilters.remote_party_number);
@@ -640,7 +727,9 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
   const selectedStartDateTime = String(appliedFilters?.start_date || startDateTime || '');
   const selectedEndDateTime = String(appliedFilters?.end_date || endDateTime || '');
 
-  const tableToolbar = useMemo(() => ({
+  const tableToolbar = useMemo(() => {
+    const extensionAllIds = hierarchyDataExtensions.map((ext: any) => String(ext.id));
+    return {
     showTabs: true,
     tabs: [
       {
@@ -683,16 +772,31 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         label: 'Extension',
         showDropdown: true,
         searchable: true,
+        multiSelect: true,
+        onSelectAll: () => {
+          const allSelected = recordingsExtensionAllSelected(
+            extensionAllIds,
+            currentFilters.extension_number,
+          );
+          applyFilters({
+            ...currentFilters,
+            extension_number: allSelected ? [] : extensionAllIds,
+          });
+        },
+        selectAllLabel: recordingsExtensionAllSelected(
+          extensionAllIds,
+          currentFilters.extension_number,
+        )
+          ? 'Deselect all'
+          : 'Select all',
         active: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0,
         activeLabel: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0
           ? `${currentFilters.extension_number.length} selected`
           : undefined,
         onClear: () => applyFilters({ ...currentFilters, extension_number: [] }),
-        dropdownOptions: hierarchyDataExtensions.map((ext: any) => ({
-          label: String(ext.name ?? ext.id),
-          value: String(ext.id),
-          onClick: () => applyFilters({ ...currentFilters, extension_number: [String(ext.id)] }),
-        })),
+        dropdownOptions: hierarchyDataExtensions.map((ext: any) =>
+          recordingsExtensionPillOption(ext, currentFilters, applyFilters),
+        ),
       },
       {
         id: 'department',
@@ -747,13 +851,14 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         label: 'Start Date & Time',
         showDropdown: true,
         active: Boolean(currentFilters.start_date),
-        activeLabel: currentFilters.start_date ? moment(currentFilters.start_date).format('MMM DD, YYYY') : undefined,
+        activeLabel: recordingsDateTimePillLabel(currentFilters.start_date, 'start'),
         activeLabelOnly: true,
         onClear: () => applyFilters({ ...currentFilters, start_date: '' }),
         dropdownContent: createDateDropdownContent(
           currentFilters.start_date ?? '',
           (v) => setCurrentFilters({ ...currentFilters, start_date: v }),
           (v) => applyFilters({ ...currentFilters, start_date: v }),
+          'start',
         ),
       },
       {
@@ -761,13 +866,14 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         label: 'End Date & Time',
         showDropdown: true,
         active: Boolean(currentFilters.end_date),
-        activeLabel: currentFilters.end_date ? moment(currentFilters.end_date).format('MMM DD, YYYY') : undefined,
+        activeLabel: recordingsDateTimePillLabel(currentFilters.end_date, 'end'),
         activeLabelOnly: true,
         onClear: () => applyFilters({ ...currentFilters, end_date: '' }),
         dropdownContent: createDateDropdownContent(
           currentFilters.end_date ?? '',
           (v) => setCurrentFilters({ ...currentFilters, end_date: v }),
           (v) => applyFilters({ ...currentFilters, end_date: v }),
+          'end',
         ),
       },
     ],
@@ -802,7 +908,8 @@ const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => Rea
         )}
       </div>
     ),
-  }), [
+  };
+  }, [
     searchValue,
     paginationInfo.perPage,
     fetchCallLogsOriginal,
