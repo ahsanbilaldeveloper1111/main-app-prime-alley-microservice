@@ -1572,6 +1572,60 @@ function linkedRecordsFromListTasksForSidebar(
     }));
 }
 
+function resolveLinkedRecordsForSidebarDisplay(
+  linkedRecordsFromApi: LinkedRecord[],
+  linkedRecordIds: number[],
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+): LinkedRecord[] {
+  const fallbackParent =
+    isEdit && editTask ? resolveParentTaskLinkFromEditTask(editTask) : null;
+  const extras: LinkedRecord[] = [];
+  for (const sid of linkedRecordIds) {
+    if (linkedRecordsFromApi.some((r) => r.id === sid)) {
+      continue;
+    }
+    if (fallbackParent?.id === sid) {
+      extras.push(fallbackParent);
+      continue;
+    }
+    extras.push({
+      id: sid,
+      type: "task",
+      title: `Task #${sid}`,
+      reference: `#${sid}`,
+    });
+  }
+  const extraIds = new Set(extras.map((e) => e.id));
+  const rest = linkedRecordsFromApi.filter((r) => !extraIds.has(r.id));
+  return [...extras, ...rest];
+}
+
+function resolveSelectedLinkedRecordsForSidebar(
+  linkedRecordsForDisplay: LinkedRecord[],
+  linkedRecordIds: number[],
+): LinkedRecord[] {
+  const byId = new Map(linkedRecordsForDisplay.map((r) => [r.id, r]));
+  const out: LinkedRecord[] = [];
+  for (const id of linkedRecordIds) {
+    const row = byId.get(id);
+    if (row) {
+      out.push(row);
+    }
+  }
+  return out;
+}
+
+function resolveSidebarEditTaskId(
+  isEdit: boolean,
+  editTask: PlannerEditTask | undefined,
+): PlannerApiId | null {
+  if (!isEdit || !editTask) {
+    return null;
+  }
+  return editTask.id ?? editTask.rawData?.id ?? null;
+}
+
 function shouldDeferPlannerSidebarOpenUntilProjectsLoaded(
   editMode: boolean,
   task: PlannerEditTask | undefined,
@@ -2270,40 +2324,25 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     formData.labelIds.includes(l.id)
   );
 
-  const linkedRecordsForDisplay = useMemo(() => {
-    const api = linkedRecordsFromApi;
-    const fallbackParent =
-      isEdit && editTask ? resolveParentTaskLinkFromEditTask(editTask) : null;
-    const extras: LinkedRecord[] = [];
-    for (const sid of formData.linkedRecordIds) {
-      if (api.some((r) => r.id === sid)) {
-        continue;
-      }
-      if (fallbackParent?.id === sid) {
-        extras.push(fallbackParent);
-      } else {
-        extras.push({
-          id: sid,
-          type: "task",
-          title: `Task #${sid}`,
-          reference: `#${sid}`,
-        });
-      }
-    }
-    const extraIds = new Set(extras.map((e) => e.id));
-    const rest = api.filter((r) => !extraIds.has(r.id));
-    return [...extras, ...rest];
-  }, [linkedRecordsFromApi, formData.linkedRecordIds, isEdit, editTask]);
+  const linkedRecordsForDisplay = useMemo(
+    () =>
+      resolveLinkedRecordsForSidebarDisplay(
+        linkedRecordsFromApi,
+        formData.linkedRecordIds,
+        isEdit,
+        editTask,
+      ),
+    [linkedRecordsFromApi, formData.linkedRecordIds, isEdit, editTask],
+  );
 
-  const selectedLinkedRecords = useMemo((): LinkedRecord[] => {
-    const byId = new Map(linkedRecordsForDisplay.map((r) => [r.id, r]));
-    const out: LinkedRecord[] = [];
-    for (const id of formData.linkedRecordIds) {
-      const row = byId.get(id);
-      if (row) out.push(row);
-    }
-    return out;
-  }, [linkedRecordsForDisplay, formData.linkedRecordIds]);
+  const selectedLinkedRecords = useMemo(
+    () =>
+      resolveSelectedLinkedRecordsForSidebar(
+        linkedRecordsForDisplay,
+        formData.linkedRecordIds,
+      ),
+    [linkedRecordsForDisplay, formData.linkedRecordIds],
+  );
 
   if (!isOpen) return null;
 
@@ -2329,10 +2368,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
     fetchLinkRecordsForSearch(searchQuery, newProjectId).catch(() => undefined);
   };
 
-  const sidebarEditTaskId =
-    isEdit && editTask
-      ? (editTask.id ?? editTask.rawData?.id ?? null)
-      : null;
+  const sidebarEditTaskId = resolveSidebarEditTaskId(isEdit, editTask);
 
   const labelStyle = {
     fontSize: "14px",
