@@ -169,7 +169,7 @@ function formatDateForInput(dateString: string | null | undefined): string {
   if (!dateString) return '';
   try {
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) return '';
+    if (Number.isNaN(date.getTime())) return '';
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -435,7 +435,7 @@ function useCreateTaskModalReferenceLists(show: boolean) {
       try {
         setLoadingProjects(true);
         const response = await listProjects({ page: 1, limit: 100 });
-        if (response && response.success === true && response.data && Array.isArray(response.data)) {
+        if (response?.success === true && Array.isArray(response.data)) {
           const projectsList = response.data.map((project: any) => ({
             id: project.id,
             name: project.name,
@@ -729,6 +729,113 @@ function createTaskModalTitleText(
     return isEdit ? "Edit Recurring" : "Create Recurring";
   }
   return isEdit ? "Edit Task" : "Create Task";
+}
+
+function createTaskModalCreateAndOpenLabel(
+  isSubmitting: boolean,
+  isEdit: boolean,
+): string {
+  if (isSubmitting) {
+    return 'Processing...';
+  }
+  if (isEdit) {
+    return 'Update and open';
+  }
+  return 'Create and open';
+}
+
+function createTaskModalPrimaryLabel(
+  isSubmitting: boolean,
+  isEdit: boolean,
+): string {
+  if (isSubmitting) {
+    return 'Processing...';
+  }
+  if (isEdit) {
+    return 'Update';
+  }
+  return 'Create';
+}
+
+function createTaskModalProjectSelectChildren(
+  loadingProjects: boolean,
+  projects: Project[],
+): React.ReactNode {
+  if (loadingProjects) {
+    return <option value="">Loading projects...</option>;
+  }
+  if (projects.length === 0) {
+    return <option value="">No projects available</option>;
+  }
+  return (
+    <>
+      <option value="">Select project</option>
+      {projects.map((project) => (
+        <option key={project.id} value={project.id}>
+          {project.name}
+        </option>
+      ))}
+    </>
+  );
+}
+
+type CreateTaskModalStatusOptionsArgs = Readonly<{
+  projectId: number | null;
+  loadingProjects: boolean;
+  loadingGenericStatuses: boolean;
+  statuses: Status[];
+  isEdit: boolean;
+  statusId: number | null;
+  editTask: any;
+}>;
+
+function createTaskModalStatusSelectOptions(
+  args: CreateTaskModalStatusOptionsArgs,
+): React.ReactNode {
+  const {
+    projectId,
+    loadingProjects,
+    loadingGenericStatuses,
+    statuses,
+    isEdit,
+    statusId,
+    editTask,
+  } = args;
+  const isLoadingStatuses =
+    (Boolean(projectId) && loadingProjects) ||
+    (!projectId && loadingGenericStatuses);
+  if (isLoadingStatuses) {
+    return <option value="">Loading statuses...</option>;
+  }
+  if (statuses.length === 0) {
+    if (isEdit && statusId != null) {
+      return (
+        <option value={statusId}>
+          {editTask?.status?.name || editTask?.status_name || `Status #${statusId}`}
+        </option>
+      );
+    }
+    return <option value="">No statuses available</option>;
+  }
+  const missingFromList =
+    isEdit &&
+    statusId != null &&
+    !statuses.some((status) => String(status.id) === String(statusId));
+  return (
+    <>
+      <option value="">Select status</option>
+      {missingFromList && (
+        <option value={statusId}>
+          {editTask?.status?.name || editTask?.status_name || `Status #${statusId}`}
+        </option>
+      )}
+      {statuses.map((status) => (
+        <option key={status.id} value={status.id}>
+          {status.name}
+        </option>
+      ))}
+    </>
+  );
 }
 
 function useCreateTaskModalAutoPickStatus(
@@ -1031,20 +1138,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 style={{ fontSize: '14px' }}
                 disabled={loadingProjects || projects.length === 0}
               >
-                {loadingProjects ? (
-                  <option value="">Loading projects...</option>
-                ) : projects.length === 0 ? (
-                  <option value="">No projects available</option>
-                ) : (
-                  <>
-                    <option value="">Select project</option>
-                    {projects.map(project => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </>
-                )}
+                {createTaskModalProjectSelectChildren(loadingProjects, projects)}
               </Form.Select>
             </Form.Group>
           </Col>
@@ -1078,33 +1172,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   statuses.length === 0
                 }
               >
-                {(formData.projectId && loadingProjects) || (!formData.projectId && loadingGenericStatuses) ? (
-                  <option value="">Loading statuses...</option>
-                ) : statuses.length === 0 ? (
-                  isEdit && formData.statusId ? (
-                    <option value={formData.statusId}>
-                      {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
-                    </option>
-                  ) : (
-                    <option value="">No statuses available</option>
-                  )
-                ) : (
-                  <>
-                    <option value="">Select status</option>
-                    {isEdit &&
-                      formData.statusId &&
-                      !statuses.some(s => String(s.id) === String(formData.statusId)) && (
-                        <option value={formData.statusId}>
-                          {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
-                        </option>
-                      )}
-                    {statuses.map(status => (
-                      <option key={status.id} value={status.id}>
-                        {status.name}
-                      </option>
-                    ))}
-                  </>
-                )}
+                {createTaskModalStatusSelectOptions({
+                  projectId: formData.projectId,
+                  loadingProjects,
+                  loadingGenericStatuses,
+                  statuses,
+                  isEdit,
+                  statusId: formData.statusId,
+                  editTask,
+                })}
               </Form.Select>
             </Form.Group>
           </Col>
@@ -1738,7 +1814,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
               fontWeight: '600',
             }}
           >
-            {isSubmitting ? 'Processing...' : (isEdit ? 'Update and open' : 'Create and open')}
+            {createTaskModalCreateAndOpenLabel(isSubmitting, isEdit)}
           </Button>
         )}
         
@@ -1755,7 +1831,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             borderColor: '#4e6fa5'
           }}
         >
-          {isSubmitting ? 'Processing...' : (isEdit ? 'Update' : 'Create')}
+          {createTaskModalPrimaryLabel(isSubmitting, isEdit)}
         </Button>
       </Modal.Footer>
 

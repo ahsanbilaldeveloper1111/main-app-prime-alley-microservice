@@ -1386,6 +1386,35 @@ function validatePlannerSidebarRecurringSubmit(formData: CreateTaskFormData): bo
   return true;
 }
 
+function validatePlannerSidebarDueTimeRequiresDueDate(
+  formData: CreateTaskFormData,
+  taskTypeEff: PlannerTaskType,
+): boolean {
+  const requiresDueDateForDueTime =
+    (taskTypeEff === "regular" || taskTypeEff === "todo") &&
+    formData.dueTime.trim() !== "" &&
+    formData.dueDate.trim() === "";
+  if (!requiresDueDateForDueTime) {
+    return true;
+  }
+  toast.error("Please set a due date when adding a due time");
+  return false;
+}
+
+function validatePlannerSidebarDueDateMinBoundary(
+  formData: CreateTaskFormData,
+): boolean {
+  if (!formData.dueDate.trim()) {
+    return true;
+  }
+  const minDue = minDueDateFromTodayAndStart(formData.startDate);
+  if (formData.dueDate < minDue) {
+    toast.error("Due date cannot be before today or before the start date");
+    return false;
+  }
+  return true;
+}
+
 function validatePlannerSidebarFormForSubmit(
   formData: CreateTaskFormData,
   isEdit: boolean,
@@ -1410,20 +1439,11 @@ function validatePlannerSidebarFormForSubmit(
   if (taskTypeEff === "recurring" && !validatePlannerSidebarRecurringSubmit(formData)) {
     return false;
   }
-  if (
-    (taskTypeEff === "regular" || taskTypeEff === "todo") &&
-    formData.dueTime.trim() !== "" &&
-    formData.dueDate.trim() === ""
-  ) {
-    toast.error("Please set a due date when adding a due time");
+  if (!validatePlannerSidebarDueTimeRequiresDueDate(formData, taskTypeEff)) {
     return false;
   }
-  if (formData.dueDate.trim()) {
-    const minDue = minDueDateFromTodayAndStart(formData.startDate);
-    if (formData.dueDate < minDue) {
-      toast.error("Due date cannot be before today or before the start date");
-      return false;
-    }
+  if (!validatePlannerSidebarDueDateMinBoundary(formData)) {
+    return false;
   }
   return true;
 }
