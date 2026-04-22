@@ -110,6 +110,98 @@ const CALL_STATUS_OPTIONS = [
   { label: "Dropped", value: "dropped" },
 ];
 
+interface ConversationListFilters {
+  company_id: string;
+  bot_id: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  limit: number;
+}
+
+type FiltersSetter = React.Dispatch<React.SetStateAction<ConversationListFilters>>;
+
+function applyCompanyFilterIds(setFilters: FiltersSetter, companyId: string) {
+  setFilters((prev) => ({ ...prev, company_id: companyId, bot_id: "" }));
+}
+
+function companyToCompanyDropdownOption(c: CompanyOption, setFilters: FiltersSetter) {
+  return {
+    label: c.name,
+    value: c.id,
+    onClick: () => applyCompanyFilterIds(setFilters, c.id),
+  };
+}
+
+function buildCompanyDropdownOptions(
+  companies: CompanyOption[],
+  setFilters: FiltersSetter,
+) {
+  return [
+    {
+      label: "All",
+      value: "",
+      onClick: () => applyCompanyFilterIds(setFilters, ""),
+    },
+    ...companies.map((company) => companyToCompanyDropdownOption(company, setFilters)),
+  ];
+}
+
+function applyBotFilterId(setFilters: FiltersSetter, botId: string) {
+  setFilters((prev) => ({ ...prev, bot_id: botId }));
+}
+
+function botToBotDropdownOption(
+  b: { id: string; name: string },
+  setFilters: FiltersSetter,
+) {
+  return {
+    label: b.name,
+    value: b.id,
+    onClick: () => applyBotFilterId(setFilters, b.id),
+  };
+}
+
+function buildBotDropdownOptions(
+  bots: { id: string; name: string }[],
+  setFilters: FiltersSetter,
+) {
+  return [
+    {
+      label: "All",
+      value: "",
+      onClick: () => applyBotFilterId(setFilters, ""),
+    },
+    ...bots.map((bot) => botToBotDropdownOption(bot, setFilters)),
+  ];
+}
+
+function applyStatusValue(setFilters: FiltersSetter, status: string) {
+  setFilters((prev) => ({ ...prev, status }));
+}
+
+function callStatusToDropdownOption(
+  o: { label: string; value: string },
+  setFilters: FiltersSetter,
+) {
+  return {
+    label: o.label,
+    value: o.value,
+    onClick: () => applyStatusValue(setFilters, o.value),
+  };
+}
+
+function buildStatusDropdownOptions(setFilters: FiltersSetter) {
+  return [
+    {
+      label: "All",
+      value: "",
+      onClick: () => applyStatusValue(setFilters, ""),
+    },
+    ...CALL_STATUS_OPTIONS.map((opt) => callStatusToDropdownOption(opt, setFilters)),
+  ];
+}
+
 interface ConversationDateFilterDropdownProps {
   value: string;
   onChange: (value: string) => void;
@@ -202,7 +294,7 @@ const CallsPage = () => {
     total_cost?: number;
   } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<ConversationListFilters>({
     company_id: "",
     bot_id: "",
     status: "",
@@ -574,62 +666,23 @@ const CallsPage = () => {
   );
 
   const companyDropdownOptions = useMemo(
-    () => [
-      {
-        label: "All",
-        value: "",
-        onClick: () =>
-          setFilters((prev) => ({ ...prev, company_id: "", bot_id: "" })),
-      },
-      ...companies.map((c) => ({
-        label: c.name,
-        value: c.id,
-        onClick: () =>
-          setFilters((prev) => ({
-            ...prev,
-            company_id: c.id,
-            bot_id: "",
-          })),
-      })),
-    ],
-    [companies],
+    () => buildCompanyDropdownOptions(companies, setFilters),
+    [companies, setFilters],
   );
 
   const botDropdownOptions = useMemo(
-    () => [
-      {
-        label: "All",
-        value: "",
-        onClick: () => setFilters((prev) => ({ ...prev, bot_id: "" })),
-      },
-      ...bots.map((b) => ({
-        label: b.name,
-        value: b.id,
-        onClick: () => setFilters((prev) => ({ ...prev, bot_id: b.id })),
-      })),
-    ],
-    [bots],
+    () => buildBotDropdownOptions(bots, setFilters),
+    [bots, setFilters],
   );
 
   const statusDropdownOptions = useMemo(
-    () => [
-      {
-        label: "All",
-        value: "",
-        onClick: () => setFilters((prev) => ({ ...prev, status: "" })),
-      },
-      ...CALL_STATUS_OPTIONS.map((o) => ({
-        label: o.label,
-        value: o.value,
-        onClick: () => setFilters((prev) => ({ ...prev, status: o.value })),
-      })),
-    ],
-    [],
+    () => buildStatusDropdownOptions(setFilters),
+    [setFilters],
   );
 
   const applyFilters = useCallback(() => {
-    void fetchCalls();
-    void fetchStats();
+    fetchCalls().catch(() => undefined);
+    fetchStats().catch(() => undefined);
   }, [fetchCalls, fetchStats]);
 
   const statsCards = useMemo(

@@ -110,7 +110,7 @@ const TrunksPage = () => {
       toast.success("Trunk deleted");
       setShowDeleteModal(false);
       setSelectedRow(null);
-      void fetchTrunks();
+      await fetchTrunks();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       toast.error(e?.response?.data?.detail || String(e?.message ?? "Delete failed"));
@@ -303,7 +303,7 @@ const TrunksPage = () => {
         isOpen={createOpen}
         onClose={() => setCreateOpen(false)}
         onCreated={() => {
-          void fetchTrunks();
+          fetchTrunks().catch(() => undefined);
         }}
       />
 

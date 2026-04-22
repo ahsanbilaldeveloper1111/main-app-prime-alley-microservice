@@ -141,7 +141,7 @@ const TrunkCreateSidebar: React.FC<TrunkCreateSidebarProps> = ({ isOpen, onClose
 
   useEffect(() => {
     if (isOpen) {
-      void fetchCompanies();
+      fetchCompanies().catch(() => undefined);
     }
   }, [isOpen, fetchCompanies]);
 
