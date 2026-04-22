@@ -17,6 +17,14 @@ import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserD
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { isExactPhoneMatch, normalizePhoneValue } from '@utils/phoneMatch';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import {
+    buildExtensionMultiSelectPillOption,
+    createDateTimeDropdownContent,
+    formatDateTimePillLabel,
+    formatEndDateValueForApi,
+    formatStartDateValueForApi,
+    isExtensionFilterAllSelected,
+} from '@pages/communications/shared/communicationsDateExtensionFilters';
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -123,65 +131,6 @@ const NumberFilterMenu: React.FC<NumberFilterMenuProps> = ({ value, onChange, on
     </div>
 );
 
-interface DateFilterMenuProps {
-    value: string;
-    onChange: (value: string) => void;
-    onApply: (value: string) => void;
-    closeMenu: () => void;
-    /** 'start' = date-only maps to 00:00, 'end' = date-only maps to 23:59 (legacy). */
-    variant: 'start' | 'end';
-}
-
-/**
- * `datetime-local` needs `YYYY-MM-DDTHH:mm` (or with seconds, trimmed to minutes for the control).
- * Accepts date-only, ISO strings, and existing local values from filter state.
- */
-function toDateTimeLocalInputValue(raw: string | undefined, variant: 'start' | 'end'): string {
-    if (raw == null || String(raw).trim() === '') return '';
-    const t = String(raw).trim();
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(t)) {
-        return t;
-    }
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(t)) {
-        return t.slice(0, 16);
-    }
-    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) {
-        return variant === 'end' ? `${t}T23:59` : `${t}T00:00`;
-    }
-    const m = moment(t);
-    return m.isValid() ? m.format('YYYY-MM-DDTHH:mm') : '';
-}
-
-const DateFilterMenu: React.FC<DateFilterMenuProps> = ({ value, onChange, onApply, closeMenu, variant }) => {
-    const inputValue = toDateTimeLocalInputValue(value, variant);
-    return (
-        <div className="d-flex flex-column gap-2" style={{ minWidth: 280 }}>
-            <Form.Control
-                size="sm"
-                type="datetime-local"
-                step={60}
-                value={inputValue}
-                onChange={(e) => onChange(e.target.value)}
-            />
-            <div className="d-flex justify-content-end gap-2">
-                <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-                    Cancel
-                </Button>
-                <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                        onApply(inputValue);
-                        closeMenu();
-                    }}
-                >
-                    Apply
-                </Button>
-            </div>
-        </div>
-    );
-};
-
 function createNumberDropdownContent(
     value: string,
     onChange: (value: string) => void,
@@ -192,68 +141,6 @@ function createNumberDropdownContent(
             <NumberFilterMenu value={value} onChange={onChange} onApply={onApply} closeMenu={closeMenu} />
         );
     };
-}
-
-function createDateDropdownContent(
-    value: string,
-    onChange: (value: string) => void,
-    onApply: (value: string) => void,
-    variant: 'start' | 'end',
-) {
-    return function DateDropdownRender({ closeMenu }: { closeMenu: () => void }) {
-        return (
-            <DateFilterMenu
-                value={value}
-                onChange={onChange}
-                onApply={onApply}
-                closeMenu={closeMenu}
-                variant={variant}
-            />
-        );
-    };
-}
-
-function callLogsDateTimePillLabel(raw: string | undefined, variant: 'start' | 'end'): string | undefined {
-    if (raw == null || String(raw).trim() === '') return undefined;
-    const local = toDateTimeLocalInputValue(raw, variant);
-    if (!local) {
-        const m = moment(String(raw).trim());
-        return m.isValid() ? m.format('MMM D, YYYY h:mm A') : undefined;
-    }
-    return moment(local, 'YYYY-MM-DDTHH:mm').format('MMM D, YYYY h:mm A');
-}
-
-function callLogsExtensionPillOption(
-    ext: { id: unknown; name?: unknown },
-    currentFilters: Record<string, unknown>,
-    applyFilters: (f: Record<string, unknown>) => void,
-) {
-    const idStr = String(ext.id);
-    const selectedIds = Array.isArray(currentFilters.extension_number)
-        ? (currentFilters.extension_number as string[]).map(String)
-        : [];
-    const isSelected = selectedIds.includes(idStr);
-    return {
-        label: String(ext.name ?? ext.id),
-        value: idStr,
-        selected: isSelected,
-        onClick: () => {
-            const next = isSelected
-                ? selectedIds.filter((x) => x !== idStr)
-                : [...selectedIds, idStr];
-            applyFilters({ ...currentFilters, extension_number: next });
-        },
-    };
-}
-
-/** True when `extensionFilter` contains exactly every id in `allIds` (set equality). */
-function callLogsExtensionAllSelected(allIds: string[], extensionFilter: unknown): boolean {
-    if (allIds.length === 0) return false;
-    if (!Array.isArray(extensionFilter) || extensionFilter.length !== allIds.length) {
-        return false;
-    }
-    const selected = new Set((extensionFilter as string[]).map(String));
-    return allIds.every((id) => selected.has(id));
 }
 
 const CallLogs = () => {
@@ -493,40 +380,15 @@ const CallLogs = () => {
         }
         
         if (formattedFilters.start_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-            let startMoment = moment(formattedFilters.start_datetime);
-            
-            if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-                startMoment = moment(formattedFilters.start_datetime + ':00');
-            } else if (!formattedFilters.start_datetime.includes('T')) {
-                // If only date, set to 00:00:00
-                startMoment = moment(formattedFilters.start_datetime).startOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+            formattedFilters.start_datetime = formatStartDateValueForApi(
+                String(formattedFilters.start_datetime),
+            );
         }
-        
+
         if (formattedFilters.end_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-            let endMoment = moment(formattedFilters.end_datetime);
-            
-            if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-                const timePart = formattedFilters.end_datetime.split('T')[1];
-                if (timePart === '23:59') {
-                    endMoment = moment(formattedFilters.end_datetime + ':59');
-                } else {
-                    endMoment = moment(formattedFilters.end_datetime + ':00');
-                }
-            } else if (!formattedFilters.end_datetime.includes('T')) {
-                // If only date, set to 23:59:59
-                endMoment = moment(formattedFilters.end_datetime).endOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+            formattedFilters.end_datetime = formatEndDateValueForApi(
+                String(formattedFilters.end_datetime),
+            );
         }
         
         // Remove timezone key from payload (timezone is now included in datetime values)
@@ -667,7 +529,7 @@ const CallLogs = () => {
                 searchable: true,
                 multiSelect: true,
                 onSelectAll: () => {
-                    const allSelected = callLogsExtensionAllSelected(
+                    const allSelected = isExtensionFilterAllSelected(
                         extensionAllIds,
                         currentFilters.extension_number,
                     );
@@ -676,7 +538,7 @@ const CallLogs = () => {
                         extension_number: allSelected ? [] : extensionAllIds,
                     });
                 },
-                selectAllLabel: callLogsExtensionAllSelected(
+                selectAllLabel: isExtensionFilterAllSelected(
                     extensionAllIds,
                     currentFilters.extension_number,
                 )
@@ -688,7 +550,7 @@ const CallLogs = () => {
                     : undefined,
                 onClear: () => applyFilters({ ...currentFilters, extension_number: [] }),
                 dropdownOptions: hierarchyDataExtensions.map((ext: any) =>
-                    callLogsExtensionPillOption(ext, currentFilters, applyFilters),
+                    buildExtensionMultiSelectPillOption(ext, currentFilters, applyFilters),
                 ),
             },
             {
@@ -728,10 +590,10 @@ const CallLogs = () => {
                 label: 'Start Date & Time',
                 showDropdown: true,
                 active: Boolean(currentFilters.start_datetime),
-                activeLabel: callLogsDateTimePillLabel(currentFilters.start_datetime, 'start'),
+                activeLabel: formatDateTimePillLabel(currentFilters.start_datetime, 'start'),
                 activeLabelOnly: true,
                 onClear: () => applyFilters({ ...currentFilters, start_datetime: '' }),
-                dropdownContent: createDateDropdownContent(
+                dropdownContent: createDateTimeDropdownContent(
                     currentFilters.start_datetime ?? '',
                     (value) => setCurrentFilters({ ...currentFilters, start_datetime: value }),
                     (value) => applyFilters({ ...currentFilters, start_datetime: value }),
@@ -743,10 +605,10 @@ const CallLogs = () => {
                 label: 'End Date & Time',
                 showDropdown: true,
                 active: Boolean(currentFilters.end_datetime),
-                activeLabel: callLogsDateTimePillLabel(currentFilters.end_datetime, 'end'),
+                activeLabel: formatDateTimePillLabel(currentFilters.end_datetime, 'end'),
                 activeLabelOnly: true,
                 onClear: () => applyFilters({ ...currentFilters, end_datetime: '' }),
-                dropdownContent: createDateDropdownContent(
+                dropdownContent: createDateTimeDropdownContent(
                     currentFilters.end_datetime ?? '',
                     (value) => setCurrentFilters({ ...currentFilters, end_datetime: value }),
                     (value) => applyFilters({ ...currentFilters, end_datetime: value }),
