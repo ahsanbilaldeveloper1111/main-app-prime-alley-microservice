@@ -16,10 +16,10 @@ import {
   type CompanyOption,
 } from "@utils/companyOptions";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
-import { Button, Form, Modal, Nav } from "react-bootstrap";
+import { Button, Col, Form, Modal, Nav, Row } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
-import { Activity, Bot, Clock3, DollarSign, Eye, PhoneCall } from "lucide-react";
+import { Activity, Bot, Clock3, DollarSign, Eye, Filter, PhoneCall } from "lucide-react";
 import "@assets/scss/common.scss";
 import moment from "moment";
 
@@ -557,6 +557,80 @@ const CallsPage = () => {
     });
     setShowFilters(false);
   };
+
+  const selectedCompany = useMemo(
+    () => companies.find((c) => c.id === filters.company_id),
+    [companies, filters.company_id],
+  );
+
+  const selectedBot = useMemo(
+    () => bots.find((b) => b.id === filters.bot_id),
+    [bots, filters.bot_id],
+  );
+
+  const selectedStatus = useMemo(
+    () => CALL_STATUS_OPTIONS.find((o) => o.value === filters.status),
+    [filters.status],
+  );
+
+  const companyDropdownOptions = useMemo(
+    () => [
+      {
+        label: "All",
+        value: "",
+        onClick: () =>
+          setFilters((prev) => ({ ...prev, company_id: "", bot_id: "" })),
+      },
+      ...companies.map((c) => ({
+        label: c.name,
+        value: c.id,
+        onClick: () =>
+          setFilters((prev) => ({
+            ...prev,
+            company_id: c.id,
+            bot_id: "",
+          })),
+      })),
+    ],
+    [companies],
+  );
+
+  const botDropdownOptions = useMemo(
+    () => [
+      {
+        label: "All",
+        value: "",
+        onClick: () => setFilters((prev) => ({ ...prev, bot_id: "" })),
+      },
+      ...bots.map((b) => ({
+        label: b.name,
+        value: b.id,
+        onClick: () => setFilters((prev) => ({ ...prev, bot_id: b.id })),
+      })),
+    ],
+    [bots],
+  );
+
+  const statusDropdownOptions = useMemo(
+    () => [
+      {
+        label: "All",
+        value: "",
+        onClick: () => setFilters((prev) => ({ ...prev, status: "" })),
+      },
+      ...CALL_STATUS_OPTIONS.map((o) => ({
+        label: o.label,
+        value: o.value,
+        onClick: () => setFilters((prev) => ({ ...prev, status: o.value })),
+      })),
+    ],
+    [],
+  );
+
+  const applyFilters = useCallback(() => {
+    void fetchCalls();
+    void fetchStats();
+  }, [fetchCalls, fetchStats]);
 
   const statsCards = useMemo(
     () => [

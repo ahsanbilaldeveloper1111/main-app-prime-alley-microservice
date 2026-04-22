@@ -1,6 +1,6 @@
 import axiosInstance from "@utils/axios";
 
-const PREFIX_TRUCKS = "trunks";
+const PREFIX_TRUNKS = "trunks";
 const PREFIX_VOICEBOTS = "voicebots";
 const PREFIX_CAMPAIGNS = "campaigns";
 const PREFIX_REPORTS = "reports";
@@ -13,28 +13,29 @@ const PREFIX_AGENT = "agent";
 // 1) Trunks Management
 // ---------------------------------------------------------------------------
 
-/** Request body for Create Trunk (POST /trunks/) */
+/** Request body for Create Trunk (POST /trunks) */
 export interface CreateTrunkPayload {
+  company_id: string;
   name: string;
   address: string;
   caller_ids: string[];
 }
 
-/** GET /trunks/ - List all trunks */
+/** GET /trunks - List trunks. Response: { status, data: Trunk[] } */
 export const getTrunks = async (params?: Record<string, unknown>) => {
-  const response = await axiosInstance.get(`${PREFIX_TRUCKS}`, { params });
+  const response = await axiosInstance.get(PREFIX_TRUNKS, { params });
   return response.data;
 };
 
-/** POST /trunks/ - Create trunk */
+/** POST /trunks - Create trunk */
 export const postTrunks = async (payload: CreateTrunkPayload) => {
-  const response = await axiosInstance.post(`${PREFIX_TRUCKS}`, payload);
+  const response = await axiosInstance.post(PREFIX_TRUNKS, payload);
   return response.data;
 };
 
-/** DELETE /trunks/:trunk_id/ - Delete trunk */
+/** DELETE /trunks/:trunk_id - Delete trunk */
 export const deleteTrunk = async (trunkId: string) => {
-  const response = await axiosInstance.delete(`${PREFIX_TRUCKS}/${trunkId}`);
+  const response = await axiosInstance.delete(`${PREFIX_TRUNKS}/${trunkId}`);
   return response.data;
 };
 
@@ -226,6 +227,12 @@ export const postCampaignResume = async (campaignId: string, payload?: Record<st
 /** POST /campaigns/{campaignId}/stop - Stop campaign */
 export const postCampaignStop = async (campaignId: string, payload?: Record<string, unknown>) => {
   const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}/${campaignId}/stop`, payload ?? {});
+  return response.data;
+};
+
+/** POST /campaigns/{campaignId}/redispatch - Reset campaign and call all numbers from scratch (stopped or completed) */
+export const postCampaignRedispatch = async (campaignId: string, payload?: Record<string, unknown>) => {
+  const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}/${campaignId}/redispatch`, payload ?? {});
   return response.data;
 };
 
