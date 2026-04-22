@@ -1983,7 +1983,6 @@ const GenericTable = <T extends Record<string, any>>({
             <td
               className="generic-table-td"
               style={{ width: "52px" }}
-              aria-hidden
             />
           )}
           {actionsColumnVisible && (
