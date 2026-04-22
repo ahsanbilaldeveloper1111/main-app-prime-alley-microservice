@@ -186,7 +186,7 @@ export function useProjectTabsContentData(
           limit,
         };
         if (filters) {
-          applyListTabFiltersToParams(params, filters, statuses);
+          applyListTabFiltersToParams(params, filters);
         }
         const response = await listTasks(params);
 
@@ -202,7 +202,7 @@ export function useProjectTabsContentData(
         setLoadingListTasks(false);
       }
     },
-    [selectedProjectId, listFilters, listPage, listLimit, statuses],
+    [selectedProjectId, listFilters, listPage, listLimit],
   );
 
   const fetchProjectDataRef = useRef(fetchProjectData);

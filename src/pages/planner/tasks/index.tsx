@@ -707,7 +707,7 @@ const TasksListingPage = ({
 
     useEffect(() => {
       if (fForm.status === ALL_STATUS_VALUE) return;
-      const stillValid = workflowStatuses.some((s) => String(s.id) === fForm.status);
+      const stillValid = workflowStatuses.some((s) => s.name === fForm.status);
       if (stillValid) return;
       setFForm((prev) => ({ ...prev, status: ALL_STATUS_VALUE }));
       setFilters((prev) => {
@@ -1145,7 +1145,7 @@ const TasksListingPage = ({
     const statusFilterOptions = useMemo(
       () => [
         { value: ALL_STATUS_VALUE, label: ALL_STATUS_VALUE },
-        ...workflowStatuses.map((s) => ({ value: String(s.id), label: s.name })),
+        ...workflowStatuses.map((s) => ({ value: s.name, label: s.name })),
       ],
       [workflowStatuses],
     );
