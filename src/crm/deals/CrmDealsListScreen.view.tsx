@@ -2452,6 +2452,7 @@ export function CrmDealsListScreenView({
   const [showDealSidebar, setShowDealSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
+  const [dealSidebarRefreshKey, setDealSidebarRefreshKey] = useState(0);
 
   const sidebarDealRecordId = useMemo(() => {
     const rawId = selectedDeal?.id ?? selectedDeal?.rawData?.id;
@@ -2473,6 +2474,9 @@ export function CrmDealsListScreenView({
       selectedDeal?.rawData?.email ??
       selectedDeal?.main_decision_maker?.email ??
       "",
+    onLogged: () => {
+      setDealSidebarRefreshKey((prev) => prev + 1);
+    },
   });
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -4126,6 +4130,7 @@ export function CrmDealsListScreenView({
         {/* Deal Sidebar */}
         {showDealSidebar && (
           <GenericSidebar
+            key={`deal-sidebar-${selectedDeal?.id ?? selectedDeal?.rawData?.id ?? "unknown"}-${dealSidebarRefreshKey}`}
             isOpen={showDealSidebar}
             onClose={handleCloseDealSidebar}
             title={selectedDeal?.name || "Deal Details"}

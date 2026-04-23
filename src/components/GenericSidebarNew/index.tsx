@@ -72,6 +72,7 @@ import {
   followUpTaskFieldsToApiPayload,
   resolveFollowUpDueDateYmd,
 } from "@utils/crmFollowUpTaskDue";
+import { buildCrmAuditLinesForEntry } from "@utils/crmAuditTrail";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
@@ -6960,113 +6961,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     };
   };
 
-  const isValidChangeValue = (
-    val: unknown,
-  ): val is { old?: unknown; new?: unknown } =>
-    !!val &&
-    typeof val === "object" &&
-    !Array.isArray(val) &&
-    (("old" in (val as Record<string, unknown>)) ||
-      ("new" in (val as Record<string, unknown>)));
-
-  const buildDataChangeLines = (
-    rawOld: unknown,
-    rawNew: unknown,
-    resolveFieldVal: (field: string, val: unknown) => string,
-    humanizeKey: (key: string) => string,
-  ): string[] => {
-    const oldObj =
-      rawOld &&
-      typeof rawOld === "object" &&
-      !Array.isArray(rawOld)
-        ? (rawOld as Record<string, unknown>)
-        : {};
-
-    let newObj: Record<string, unknown> = {};
-    if (typeof rawNew === "string") {
-      try {
-        newObj = JSON.parse(rawNew) as Record<string, unknown>;
-      } catch {
-        newObj = {};
-      }
-    } else if (
-      rawNew &&
-      typeof rawNew === "object" &&
-      !Array.isArray(rawNew)
-    ) {
-      newObj = rawNew as Record<string, unknown>;
-    }
-
-    const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
-    const lines: string[] = [];
-
-    allKeys.forEach((key) => {
-      const o = resolveFieldVal(key, oldObj[key]);
-      const n = resolveFieldVal(key, newObj[key]);
-      if (o !== n) {
-        lines.push(`${humanizeKey(key)}: ${o} → ${n}`);
-      }
-    });
-
-    return lines;
-  };
-
-  const buildAuditLinesForEntry = (
-    entry: AuditTrailEntry,
-    resolveFieldVal: (field: string, val: unknown) => string,
-    humanizeKey: (key: string) => string,
-  ): string => {
-    const event = entry.event === "created" ? "created" : "updated";
-    if (event === "created")
-      return entry.description?.trim() || "Record created";
-
-    const changes =
-      entry.changes &&
-      typeof entry.changes === "object" &&
-      !Array.isArray(entry.changes)
-        ? entry.changes
-        : null;
-
-    if (!changes) return entry.description?.trim() || "Record updated";
-
-    const isLeadConvertedToLost =
-      isValidChangeValue(changes.status) &&
-      isValidChangeValue(changes.is_lost) &&
-      isValidChangeValue(changes.stage_id) &&
-      isValidChangeValue(changes.lost_feedback) &&
-      changes.is_lost.old === false &&
-      changes.is_lost.new === true &&
-      changes.status.old === "new" &&
-      changes.status.new === "lost";
-
-    if (isLeadConvertedToLost) {
-      const convertedStatus = resolveFieldVal("status", changes.status.new);
-      return `Lead converted to ${convertedStatus}`;
-    }
-
-    const lines: string[] = [];
-    Object.entries(changes).forEach(([field, val]) => {
-      if (!isValidChangeValue(val)) return;
-      const rawOld = val.old;
-      const rawNew = val.new;
-
-      if (field === "data") {
-        lines.push(
-          ...buildDataChangeLines(rawOld, rawNew, resolveFieldVal, humanizeKey),
-        );
-        return;
-      }
-
-      const o = resolveFieldVal(field, rawOld);
-      const n = resolveFieldVal(field, rawNew);
-      if (o !== n) lines.push(`${humanizeKey(field)}: ${o} → ${n}`);
-    });
-
-    return lines.length > 0
-      ? lines.join("\n")
-      : entry.description?.trim() || "Record updated";
-  };
-
   const recentActivitiesState = getRecentActivitiesState({
     recordType,
     prospectLoading,
@@ -7841,7 +7735,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
                       router={router}
                       getAuditTrailFromRecord={getAuditTrailFromRecord}
                       createResolveFieldVal={createResolveFieldVal}
-                      buildAuditLinesForEntry={buildAuditLinesForEntry}
+                      buildAuditLinesForEntry={buildCrmAuditLinesForEntry}
                     />
                   );
                 }
