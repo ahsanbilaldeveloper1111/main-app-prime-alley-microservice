@@ -4,7 +4,6 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
 import { ListCallLogs, DownloadCallsExport } from '@utils/calls';
-import { Form, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { Phone, Hash, PhoneIncoming, PhoneOutgoing, Calendar } from 'lucide-react';
@@ -17,10 +16,10 @@ import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserD
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { isExactPhoneMatch, normalizePhoneValue } from '@utils/phoneMatch';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import {
-    formatEndDateValueForApi,
-    formatStartDateValueForApi,
-} from '@pages/communications/shared/communicationsDateExtensionFilters';
+import { createCommunicationsTextFilterDropdownContent } from '@utils/communications/communicationsDateExtensionFilters';
+import { formatCallLogsFiltersForApi } from '@utils/communications/communicationsAppliedFiltersFormat';
+import { getDefaultCommunicationsDateFilterPair } from '@utils/communications/communicationsFilterDefaults';
+import { shouldSkipCommunicationsListFetch } from '@utils/communications/communicationsListFetchDedup';
 import {
     buildCallDirectionFilterPill,
     buildCallStatusFilterPill,
@@ -28,7 +27,7 @@ import {
     buildEndDateTimeFilterPill,
     buildExtensionNumberMultiSelectFilterPill,
     buildStartDateTimeFilterPill,
-} from '@pages/communications/shared/communicationsFilterPillFactories';
+} from '@utils/communications/communicationsFilterPillFactories';
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -101,52 +100,6 @@ interface Summary {
     outbound: number;
 }
 
-interface NumberFilterMenuProps {
-    value: string;
-    onChange: (value: string) => void;
-    onApply: (value: string) => void;
-    closeMenu: () => void;
-}
-
-const NumberFilterMenu: React.FC<NumberFilterMenuProps> = ({ value, onChange, onApply, closeMenu }) => (
-    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-        <Form.Control
-            size="sm"
-            type="text"
-            placeholder="Enter number"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-        />
-        <div className="d-flex justify-content-end gap-2">
-            <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-                Cancel
-            </Button>
-            <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                    onApply(value.trim());
-                    closeMenu();
-                }}
-            >
-                Apply
-            </Button>
-        </div>
-    </div>
-);
-
-function createNumberDropdownContent(
-    value: string,
-    onChange: (value: string) => void,
-    onApply: (value: string) => void,
-) {
-    return function NumberDropdownRender({ closeMenu }: { closeMenu: () => void }) {
-        return (
-            <NumberFilterMenu value={value} onChange={onChange} onApply={onApply} closeMenu={closeMenu} />
-        );
-    };
-}
-
 const CallLogs = () => {
     const { data:session } = useSession();
     const [showPageLoader, setShowPageLoader] = useState(false);
@@ -204,28 +157,10 @@ const CallLogs = () => {
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     
-    // Initialize filters with default values immediately to prevent first API call without dates
-    const getDefaultFilters = () => {
-        const now = moment();
-        const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        // UI filter state must include the same default date range as `applied`; otherwise any
-        // pill change via `applyFilters({ ...currentFilters, ... })` drops start/end and breaks the API query.
-        const startDateUi = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
-        const endDateUi = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
-        return {
-            current: {
-                start_datetime: startDateUi,
-                end_datetime: endDateUi,
-            },
-            applied: {
-                start_datetime: startDateApi,
-                end_datetime: endDateApi,
-            },
-        };
-    };
-    
-    const defaultFilters = getDefaultFilters();
+    const defaultFilters = getDefaultCommunicationsDateFilterPair(
+        'start_datetime',
+        'end_datetime',
+    );
     const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
     const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>(defaultFilters.applied);
     const [searchValue, setSearchValue] = useState<string>('');
@@ -294,10 +229,15 @@ const CallLogs = () => {
         const now = Date.now();
         const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(appliedFiltersRef.current)}`;
 
-        if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
-            return;
-        }
-        if (lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
+        if (
+            shouldSkipCommunicationsListFetch(
+                isFetchingRef.current,
+                paramsKey,
+                lastFetchParamsRef.current,
+                lastFetchTimeRef.current,
+                now,
+            )
+        ) {
             return;
         }
 
@@ -371,39 +311,10 @@ const CallLogs = () => {
     }, [refreshKey, fetchCallLogs]);
 
     const handleFiltersChange = useCallback((filters: any) => {
-        // Format datetime values to include seconds and timezone offset (remove timezone key)
-        const formattedFilters: any = { ...filters };
-
-        const normalizedPhoneNumber = normalizePhoneValue(formattedFilters.phone_number);
-        formattedFilters.phone_number = normalizedPhoneNumber;
-        if (normalizedPhoneNumber) {
-            // Keep existing key and also pass explicit exact-match key when backend supports it.
-            formattedFilters.phone_number_exact = normalizedPhoneNumber;
-        } else {
-            delete formattedFilters.phone_number_exact;
-        }
-        
-        if (formattedFilters.start_datetime) {
-            formattedFilters.start_datetime = formatStartDateValueForApi(
-                String(formattedFilters.start_datetime),
-            );
-        }
-
-        if (formattedFilters.end_datetime) {
-            formattedFilters.end_datetime = formatEndDateValueForApi(
-                String(formattedFilters.end_datetime),
-            );
-        }
-        
-        // Remove timezone key from payload (timezone is now included in datetime values)
-        delete formattedFilters.timezone;
-        
-        // Update both state and ref immediately
+        const formattedFilters = formatCallLogsFiltersForApi(filters);
         setCurrentFilters(filters);
         setAppliedFilters(formattedFilters);
         appliedFiltersRef.current = formattedFilters;
-        
-        // Trigger refresh for GenericListPage to fetch new data
         setRefreshKey((prev) => prev + 1);
     }, []);
 
@@ -506,10 +417,11 @@ const CallLogs = () => {
                 active: Boolean(currentFilters.phone_number),
                 activeLabel: currentFilters.phone_number ? String(currentFilters.phone_number) : undefined,
                 onClear: () => applyFilters({ ...currentFilters, phone_number: '' }),
-                dropdownContent: createNumberDropdownContent(
+                dropdownContent: createCommunicationsTextFilterDropdownContent(
                     currentFilters.phone_number ?? '',
                     (value) => setCurrentFilters({ ...currentFilters, phone_number: value }),
                     (value) => applyFilters({ ...currentFilters, phone_number: value }),
+                    'Enter number',
                 ),
             },
             buildStartDateTimeFilterPill('start_datetime', currentFilters, setCurrentFilters, applyFilters),
