@@ -772,6 +772,7 @@ const CrmDashboard = () => {
                 icon: TrendingUp,
                 iconColor: '#0EA5E9',
                 iconBgColor: '#E0F2FE',
+                subtitle: DASHBOARD_TIMEFRAME_LABEL,
               },
               {
                 title: 'Deals to Orders Conversion',
@@ -779,6 +780,7 @@ const CrmDashboard = () => {
                 icon: TrendingUp,
                 iconColor: '#10B981',
                 iconBgColor: '#D1FAE5',
+                subtitle: DASHBOARD_TIMEFRAME_LABEL,
               },
             ]}
           />
@@ -1155,10 +1157,10 @@ const CrmDashboard = () => {
 
           {/* Right Column */}
           <Col xxl={4} xl={12} lg={12} md={12}>
-            {/* Campaign Performance */}
+            {/* CRM Pipeline */}
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '16px' }}>
               <Card.Body style={{ padding: '20px' }}>
-                <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: '#1E293B' }}>Campaign Performance</h5>
+                <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: '#1E293B' }}>CRM Pipeline</h5>
                 
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={campaignData}>
