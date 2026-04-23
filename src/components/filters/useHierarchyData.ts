@@ -6,10 +6,11 @@ export const useHierarchyData = (
   /** When false, skips GetHierarchyData (e.g. parent already loaded extensions). */
   fetchEnabled: boolean = true,
 ) => {
-  const [hierarchyDataUsers, setHierarchyDataUsers] = useState<string[]>([]);
-  const [hierarchyDataDepartments, setHierarchyDataDepartments] = useState<string[]>([]);
-  const [hierarchyDataCompanies, setHierarchyDataCompanies] = useState<string[]>([]);
-  const [hierarchyDataExtensions, setHierarchyDataExtensions] = useState<string[]>([]);
+  /** API returns object rows; was incorrectly typed as `string[]` in several consumers. */
+  const [hierarchyDataUsers, setHierarchyDataUsers] = useState<unknown[]>([]);
+  const [hierarchyDataDepartments, setHierarchyDataDepartments] = useState<unknown[]>([]);
+  const [hierarchyDataCompanies, setHierarchyDataCompanies] = useState<unknown[]>([]);
+  const [hierarchyDataExtensions, setHierarchyDataExtensions] = useState<unknown[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
 

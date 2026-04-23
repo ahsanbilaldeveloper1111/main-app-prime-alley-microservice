@@ -37,31 +37,27 @@ import {
 import "@assets/scss/common.scss";
 
 // Utils
-import {
-  ListCallLogs,
-  DownloadCallRecording,
-  DownloadStreamingExport,
-} from "@utils/calls";
-import axiosInstance from "@utils/axios";
-import { toast } from "react-toastify";
-import {
-  ModuleSlug,
-  formatDuration,
-  GlobalDateFormat,
-  GlobalTimeFormat,
-  GlobalDateTimeFormat,
-  encodeAnalysisData,
-  convertDateTimeWithOffsetToLocal,
-  formatDateTimeToLocal,
-} from "@utils/Helper";
-import { isExactPhoneMatch, normalizePhoneValue } from "@utils/phoneMatch";
-import CircularProgressCircle from "@components/CircularProgressCircle";
+import { ListCallLogs, DownloadCallRecording, DownloadStreamingExport } from '@utils/calls';
+import axiosInstance from '@utils/axios';
+import { toast } from 'react-toastify';
+import { ModuleSlug, formatDuration, GlobalDateFormat, GlobalTimeFormat, GlobalDateTimeFormat, encodeAnalysisData, convertDateTimeWithOffsetToLocal, formatDateTimeToLocal } from '@utils/Helper';
+import { isExactPhoneMatch, normalizePhoneValue } from '@utils/phoneMatch';
+import CircularProgressCircle from '@components/CircularProgressCircle';
 
-const ReactApexChart = dynamic(() => import("react-apexcharts"), {
-  ssr: false,
-});
+const ReactApexChart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
-import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import {
+    formatEndDateValueForApi,
+    formatStartDateValueForApi,
+} from '@pages/communications/shared/communicationsDateExtensionFilters';
+import {
+    buildCallDirectionFilterPill,
+    buildDepartmentFilterPill,
+    buildEndDateTimeFilterPill,
+    buildExtensionNumberMultiSelectFilterPill,
+    buildStartDateTimeFilterPill,
+} from '@pages/communications/shared/communicationsFilterPillFactories';
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
 // Interfaces
@@ -199,6 +195,7 @@ function createPhoneDropdownContent(
   };
 }
 
+const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactNode } = () => {
 function createDateDropdownContent(
   value: string,
   onChange: (v: string) => void,
@@ -240,8 +237,8 @@ const CallRecordings: NextPage & {
     const endDateApi =
       now.clone().endOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
     // Match default range in `current` so `applyFilters({ ...currentFilters, ... })` does not drop dates.
-    const startDateUi = now.clone().startOf("day").format("YYYY-MM-DD");
-    const endDateUi = now.clone().endOf("day").format("YYYY-MM-DD");
+    const startDateUi = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
+    const endDateUi = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
     return {
       current: {
         start_date: startDateUi,
@@ -790,271 +787,132 @@ const CallRecordings: NextPage & {
     [handleFiltersChange],
   );
 
-  const callDirectionLabel = (value: string): string => {
-    if (value === "OUTGOING") return "Outgoing";
-    if (value === "INCOMING") return "Incoming";
-    if (value === "Both") return "Both";
-    return "";
-  };
+  const selectedStartDateTime = String(appliedFilters?.start_date || startDateTime || '');
+  const selectedEndDateTime = String(appliedFilters?.end_date || endDateTime || '');
 
-  const selectedStartDateTime = String(
-    appliedFilters?.start_date || startDateTime || "",
-  );
-  const selectedEndDateTime = String(
-    appliedFilters?.end_date || endDateTime || "",
-  );
-
-  const tableToolbar = useMemo(
-    () => ({
-      showTabs: true,
-      tabs: [
-        {
-          id: "call-recordings-title",
-          label: "Call Recordings",
-          removable: false,
-        },
-      ],
-      activeTab: "call-recordings-title",
-      onTabChange: () => {},
-      showSearch: true,
-      searchValue,
-      searchPlaceholder: "Search by username, extension, phone...",
-      onSearchChange: (value: string) => setSearchValue(value),
-      onSearch: () => {
-        setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
-        fetchCallLogsOriginal(1, paginationInfo.perPage, searchValue.trim());
+  const tableToolbar = useMemo(() => {
+    const extensionAllIds = hierarchyDataExtensions.map((ext: any) => String(ext.id));
+    return {
+    showTabs: true,
+    tabs: [
+      {
+        id: 'call-recordings-title',
+        label: 'Call Recordings',
+        removable: false,
       },
-      showFiltersButton: session?.user?.permissions?.includes(
-        PERMISSIONS.VIEW_CALL_RECORDINGS_FILTERS,
-      ),
-      showExportButton: session?.user?.permissions?.includes(
-        "export-call-recordings",
-      ),
-      onExportClick: () => handleExport("excel", appliedFilters),
-      showFilterPills: true,
-      showMoreFiltersButton: false,
-      filterPills: [
-        {
-          id: "call_direction",
-          label: "Call Direction",
-          showDropdown: true,
-          active: Boolean(currentFilters.call_direction),
-          activeLabel: callDirectionLabel(currentFilters.call_direction ?? ""),
-          onClear: () =>
-            applyFilters({ ...currentFilters, call_direction: "" }),
-          dropdownOptions: [
-            {
-              label: "Outgoing",
-              value: "OUTGOING",
-              onClick: () =>
-                applyFilters({ ...currentFilters, call_direction: "OUTGOING" }),
-            },
-            {
-              label: "Incoming",
-              value: "INCOMING",
-              onClick: () =>
-                applyFilters({ ...currentFilters, call_direction: "INCOMING" }),
-            },
-            {
-              label: "Both",
-              value: "Both",
-              onClick: () =>
-                applyFilters({ ...currentFilters, call_direction: "Both" }),
-            },
-          ],
-        },
-        {
-          id: "extension_number",
-          label: "Extension",
-          showDropdown: true,
-          searchable: true,
-          active:
-            Array.isArray(currentFilters.extension_number) &&
-            currentFilters.extension_number.length > 0,
-          activeLabel:
-            Array.isArray(currentFilters.extension_number) &&
-            currentFilters.extension_number.length > 0
-              ? `${currentFilters.extension_number.length} selected`
-              : undefined,
-          onClear: () =>
-            applyFilters({ ...currentFilters, extension_number: [] }),
-          dropdownOptions: hierarchyDataExtensions.map((ext: any) => ({
-            label: String(ext.name ?? ext.id),
-            value: String(ext.id),
-            onClick: () =>
-              applyFilters({
-                ...currentFilters,
-                extension_number: [String(ext.id)],
-              }),
-          })),
-        },
-        {
-          id: "department",
-          label: "Department",
-          showDropdown: true,
-          searchable: true,
-          active:
-            Array.isArray(currentFilters.department) &&
-            currentFilters.department.length > 0,
-          activeLabel:
-            Array.isArray(currentFilters.department) &&
-            currentFilters.department.length > 0
-              ? `${currentFilters.department.length} selected`
-              : undefined,
-          onClear: () => applyFilters({ ...currentFilters, department: [] }),
-          dropdownOptions: hierarchyDataDepartments.map((dept: any) => ({
-            label: String(dept.name ?? dept.id),
-            value: String(dept.id),
-            onClick: () =>
-              applyFilters({
-                ...currentFilters,
-                department: [String(dept.id)],
-              }),
-          })),
-        },
-        {
-          id: "username",
-          label: "Username",
-          showDropdown: true,
-          searchable: true,
-          active: Boolean(currentFilters.username),
-          activeLabel: currentFilters.username
-            ? (() => {
-                const user = hierarchyDataUsers.find(
-                  (u: any) => String(u.id) === String(currentFilters.username),
-                );
-                return user
-                  ? String((user as any).name ?? (user as any).id)
-                  : String(currentFilters.username);
-              })()
-            : undefined,
-          onClear: () => applyFilters({ ...currentFilters, username: "" }),
-          dropdownOptions: hierarchyDataUsers.map((u: any) => ({
-            label: String(u.name ?? u.id),
-            value: String(u.id),
-            onClick: () =>
-              applyFilters({ ...currentFilters, username: String(u.id) }),
-          })),
-        },
-        {
-          id: "remote_party_number",
-          label: "Remote Party Number",
-          showDropdown: true,
-          active: Boolean(currentFilters.remote_party_number),
-          activeLabel: currentFilters.remote_party_number
-            ? String(currentFilters.remote_party_number)
-            : undefined,
-          onClear: () =>
-            applyFilters({ ...currentFilters, remote_party_number: "" }),
-          dropdownContent: createPhoneDropdownContent(
-            currentFilters.remote_party_number ?? "",
-            (v) =>
-              setCurrentFilters({ ...currentFilters, remote_party_number: v }),
-            (v) => applyFilters({ ...currentFilters, remote_party_number: v }),
-          ),
-        },
-        {
-          id: "start_date",
-          label: "Start Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.start_date),
-          activeLabel: currentFilters.start_date
-            ? moment(currentFilters.start_date).format("MMM DD, YYYY")
-            : undefined,
-          activeLabelOnly: true,
-          onClear: () => applyFilters({ ...currentFilters, start_date: "" }),
-          dropdownContent: createDateDropdownContent(
-            currentFilters.start_date ?? "",
-            (v) => setCurrentFilters({ ...currentFilters, start_date: v }),
-            (v) => applyFilters({ ...currentFilters, start_date: v }),
-          ),
-        },
-        {
-          id: "end_date",
-          label: "End Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.end_date),
-          activeLabel: currentFilters.end_date
-            ? moment(currentFilters.end_date).format("MMM DD, YYYY")
-            : undefined,
-          activeLabelOnly: true,
-          onClear: () => applyFilters({ ...currentFilters, end_date: "" }),
-          dropdownContent: createDateDropdownContent(
-            currentFilters.end_date ?? "",
-            (v) => setCurrentFilters({ ...currentFilters, end_date: v }),
-            (v) => applyFilters({ ...currentFilters, end_date: v }),
-          ),
-        },
-      ],
-      rightActions: (
-        <div className="d-flex align-items-center gap-2 call-recordings-date-range-wrap">
-          {showDateRange &&
-            selectedStartDateTime &&
-            selectedEndDateTime &&
-            moment.utc(selectedStartDateTime).isValid() &&
-            moment.utc(selectedEndDateTime).isValid() && (
-              <div
-                className="d-flex align-items-center gap-2 call-recordings-date-chip"
-                style={{
-                  background: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: "10px",
-                  padding: "6px 10px",
-                }}
-              >
-                <span
-                  className="d-inline-flex align-items-center justify-content-center"
-                  style={{
-                    width: "24px",
-                    height: "24px",
-                    borderRadius: "6px",
-                    background: "#eef2ff",
-                    color: "#4f46e5",
-                  }}
-                >
-                  <Calendar size={14} />
-                </span>
-                <span
-                  className="call-recordings-date-text"
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#0f172a",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {formatDateTimeToLocal(
-                    selectedStartDateTime,
-                    GlobalDateTimeFormat,
-                  )}{" "}
-                  -{" "}
-                  {formatDateTimeToLocal(
-                    selectedEndDateTime,
-                    GlobalDateTimeFormat,
-                  )}
-                </span>
-              </div>
-            )}
-        </div>
-      ),
-    }),
-    [
-      searchValue,
-      paginationInfo.perPage,
-      fetchCallLogsOriginal,
-      currentFilters,
-      hierarchyDataExtensions,
-      hierarchyDataDepartments,
-      hierarchyDataUsers,
-      session?.user?.permissions,
-      showPageLoader,
-      appliedFilters,
-      showDateRange,
-      selectedStartDateTime,
-      selectedEndDateTime,
-      applyFilters,
     ],
-  );
+    activeTab: 'call-recordings-title',
+    onTabChange: () => {},
+    showSearch: true,
+    searchValue,
+    searchPlaceholder: 'Search by username, extension, phone...',
+    onSearchChange: (value: string) => setSearchValue(value),
+    onSearch: () => {
+      setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
+      fetchCallLogsOriginal(1, paginationInfo.perPage, searchValue.trim());
+    },
+    showFiltersButton: session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_RECORDINGS_FILTERS),
+    showExportButton: session?.user?.permissions?.includes('export-call-recordings'),
+    onExportClick: () => handleExport('excel', appliedFilters),
+    showFilterPills: true,
+    showMoreFiltersButton: false,
+    filterPills: [
+      buildCallDirectionFilterPill(currentFilters, applyFilters),
+      buildExtensionNumberMultiSelectFilterPill(
+        extensionAllIds,
+        hierarchyDataExtensions,
+        currentFilters,
+        applyFilters,
+      ),
+      buildDepartmentFilterPill(
+        hierarchyDataDepartments,
+        currentFilters,
+        applyFilters,
+      ),
+      {
+        id: 'username',
+        label: 'Username',
+        showDropdown: true,
+        searchable: true,
+        active: Boolean(currentFilters.username),
+        activeLabel: currentFilters.username
+          ? (() => {
+              const user = hierarchyDataUsers.find((u: any) => String(u.id) === String(currentFilters.username));
+              return user ? String((user as any).name ?? (user as any).id) : String(currentFilters.username);
+            })()
+          : undefined,
+        onClear: () => applyFilters({ ...currentFilters, username: '' }),
+        dropdownOptions: hierarchyDataUsers.map((u: any) => ({
+          label: String(u.name ?? u.id),
+          value: String(u.id),
+          onClick: () => applyFilters({ ...currentFilters, username: String(u.id) }),
+        })),
+      },
+      {
+        id: 'remote_party_number',
+        label: 'Remote Party Number',
+        showDropdown: true,
+        active: Boolean(currentFilters.remote_party_number),
+        activeLabel: currentFilters.remote_party_number ? String(currentFilters.remote_party_number) : undefined,
+        onClear: () => applyFilters({ ...currentFilters, remote_party_number: '' }),
+        dropdownContent: createPhoneDropdownContent(
+          currentFilters.remote_party_number ?? '',
+          (v) => setCurrentFilters({ ...currentFilters, remote_party_number: v }),
+          (v) => applyFilters({ ...currentFilters, remote_party_number: v }),
+        ),
+      },
+      buildStartDateTimeFilterPill('start_date', currentFilters, setCurrentFilters, applyFilters),
+      buildEndDateTimeFilterPill('end_date', currentFilters, setCurrentFilters, applyFilters),
+    ],
+    rightActions: (
+      <div className="d-flex align-items-center gap-2 call-recordings-date-range-wrap">
+        {showDateRange && selectedStartDateTime && selectedEndDateTime && moment.utc(selectedStartDateTime).isValid() && moment.utc(selectedEndDateTime).isValid() && (
+          <div
+            className="d-flex align-items-center gap-2 call-recordings-date-chip"
+            style={{
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '10px',
+              padding: '6px 10px',
+            }}
+          >
+            <span
+              className="d-inline-flex align-items-center justify-content-center"
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '6px',
+                background: '#eef2ff',
+                color: '#4f46e5',
+              }}
+            >
+              <Calendar size={14} />
+            </span>
+            <span className="call-recordings-date-text" style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap' }}>
+              {formatDateTimeToLocal(selectedStartDateTime, GlobalDateTimeFormat)} - {formatDateTimeToLocal(selectedEndDateTime, GlobalDateTimeFormat)}
+            </span>
+          </div>
+        )}
+      </div>
+    ),
+  };
+  }, [
+    searchValue,
+    paginationInfo.perPage,
+    fetchCallLogsOriginal,
+    currentFilters,
+    setCurrentFilters,
+    hierarchyDataExtensions,
+    hierarchyDataDepartments,
+    hierarchyDataUsers,
+    session?.user?.permissions,
+    showPageLoader,
+    appliedFilters,
+    showDateRange,
+    selectedStartDateTime,
+    selectedEndDateTime,
+    applyFilters,
+  ]);
 
   const handleDownload = async (props: any) => {
     const { Id, AgentExtension } = props;
