@@ -13,6 +13,7 @@ import {
   getCallsStats,
   getAnalyticsSummary,
   getCompanies,
+  type GetCallsStatsParams,
 } from "@utils/voicebot/inbound";
 import {
   parseAnalyticsSummaryPayload,
@@ -265,9 +266,18 @@ const AnalyticsPage = () => {
   const fetchStats = useCallback(async () => {
     setSummaryLoading(true);
     try {
+      const params: GetCallsStatsParams = {};
+      const companyIdentifier = (session?.user as { company_identifier?: string })
+        ?.company_identifier;
+      if (!isAdmin && companyIdentifier) params.company_id = companyIdentifier;
+      else if (companyFilter) params.company_id = companyFilter;
+      const { start_date, end_date } = getDateRange(timePeriod);
+      if (start_date) params.start_date = start_date;
+      if (end_date) params.end_date = end_date;
+
       const [summaryRes, callsStatsRes] = await Promise.all([
         getAnalyticsSummary(),
-        getCallsStats(),
+        getCallsStats(params),
       ]);
       setAnalyticsSummaryRaw(summaryRes);
       setCallsStatsRaw(callsStatsRes);
@@ -277,7 +287,7 @@ const AnalyticsPage = () => {
     } finally {
       setSummaryLoading(false);
     }
-  }, []);
+  }, [isAdmin, session?.user, companyFilter, timePeriod]);
 
   useEffect(() => {
     fetchCompanies();
@@ -328,7 +338,11 @@ const AnalyticsPage = () => {
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Inbound - Analytics" />
+      <BreadcrumbItem
+        mainTitle=""
+        mainLink=""
+        subTitle="Voicebot Inbound - Analytics"
+      />
       <AnalyticsFilters
         isAdmin={isAdmin}
         companyFilter={companyFilter}

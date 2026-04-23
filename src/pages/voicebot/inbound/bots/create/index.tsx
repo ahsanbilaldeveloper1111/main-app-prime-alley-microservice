@@ -3,7 +3,6 @@ import React, { ReactElement, useState, useEffect, useRef } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
-  getCompanies,
   getBot,
   postBots,
   putBot,
@@ -11,6 +10,8 @@ import {
   type BotConfiguration,
   type UpdateBotPayload,
 } from "@utils/voicebot/inbound";
+import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse } from "@utils/companyOptions";
 import { companyIdFromBotApi, toFormString } from "@utils/voicebot/formDisplay";
 import { Form, Spinner, Tab } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -119,9 +120,6 @@ const BasicInfoPane = ({
   isAdmin,
   companies,
   loadingCompanies,
-  isEditMode,
-  userCompanyIdentifier,
-  userCompanyName,
   labelStyle,
   inputStyle,
 }: {
@@ -130,9 +128,6 @@ const BasicInfoPane = ({
   isAdmin: boolean;
   companies: CompanyOption[];
   loadingCompanies: boolean;
-  isEditMode: boolean;
-  userCompanyIdentifier: string;
-  userCompanyName: string;
   labelStyle: React.CSSProperties;
   inputStyle: React.CSSProperties;
 }) => (
@@ -185,17 +180,6 @@ const BasicInfoPane = ({
         </Form.Group>
       )}
     </div>
-    {!isAdmin && (
-      <Form.Group className="mb-3">
-        <Form.Label style={labelStyle}>Company</Form.Label>
-        <Form.Control
-          readOnly
-          disabled
-          value={userCompanyName || userCompanyIdentifier || ""}
-          style={inputStyle}
-        />
-      </Form.Group>
-    )}
     <Form.Group className="mb-3">
       <Form.Label style={labelStyle}>Description *</Form.Label>
       <Form.Control
@@ -342,7 +326,12 @@ function getFirstValidationError(form: CreateBotPayload): string | null {
   if (!c?.instructions?.trim()) return "Instructions are required";
   if (!c?.knowledge_base?.trim()) return "Knowledge Base is required";
   if (!c?.voice_instructions?.trim()) return "Voice Instructions are required";
-  if (!c?.transfer_number?.trim()) return "Transfer Number is required";
+  if (
+    c?.transfer_enabled &&
+    !c?.transfer_number?.trim()
+  ) {
+    return "Transfer Number is required when transfer is enabled";
+  }
   if (!c?.sip_trunk_id?.trim()) return "SIP Trunk ID is required";
   if (!c?.phone_number?.trim()) return "Phone Number is required";
   return null;
@@ -408,21 +397,13 @@ function buildCreateBotPayload(form: CreateBotPayload): CreateBotPayload {
 }
 
 async function loadCompanyOptions(): Promise<CompanyOption[]> {
-  const res = await getCompanies({ show_inactive: false });
-  const list = Array.isArray(res)
-    ? res
-    : ((res as { results?: unknown[] })?.results ??
-      (res as { data?: unknown[] })?.data ??
-      []);
-  const arr = Array.isArray(list) ? list : [];
-  return arr.map((c: { company_id?: string; id?: string; name?: string }) => {
-    const canonicalId = String(c.id ?? c.company_id ?? "").trim();
-    return {
-      id: canonicalId,
-      company_id: c.id ?? c.company_id,
-      name: c.name ?? "",
-    };
-  });
+  const res = await GetCompanies();
+  if (res === false) return [];
+  return normalizeCompaniesResponse(res, { prefer: "company_id" }).map((c) => ({
+    id: c.id,
+    company_id: c.company_id ?? c.identifier ?? c.id,
+    name: c.name,
+  }));
 }
 
 function validationItem(
@@ -488,13 +469,16 @@ function getLlmValidationItem(cfg: BotConfiguration): ValidationItemType {
 }
 
 function getBehaviorValidationItem(cfg: BotConfiguration): ValidationItemType {
-  const ok = !!cfg.transfer_number?.trim();
+  const ok =
+    !cfg.transfer_enabled || !!cfg.transfer_number?.trim();
   return validationItem(
     "behavior",
     "Behavior",
     ok,
-    "Transfer number configured",
-    "Transfer number is required",
+    cfg.transfer_enabled
+      ? "Transfer number configured"
+      : "Transfer disabled",
+    "Set transfer number or turn off Enable Transfer",
   );
 }
 
@@ -695,8 +679,7 @@ const VoicebotInboundBotsCreate = () => {
     typeof router.query.id === "string" ? router.query.id : undefined;
   const isEditMode = Boolean(botId);
   const pageCopy = getPageCopy(isEditMode);
-  const { isAdmin, userCompanyId, userCompanyIdentifier, userCompanyName } =
-    useSessionCompany();
+  const { isAdmin, userCompanyId, userCompanyIdentifier } = useSessionCompany();
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [form, setForm] = useState<CreateBotPayload>({
     company_id: "",
@@ -827,12 +810,9 @@ const VoicebotInboundBotsCreate = () => {
                     <BasicInfoPane
                       form={form}
                       setForm={setForm}
-                      isAdmin={!isAdmin}
+                      isAdmin={isAdmin}
                       companies={companies}
                       loadingCompanies={loadingCompanies}
-                      isEditMode={isEditMode}
-                      userCompanyIdentifier={userCompanyIdentifier}
-                      userCompanyName={userCompanyName}
                       labelStyle={labelStyle}
                       inputStyle={inputStyle}
                     />
@@ -1159,7 +1139,8 @@ const VoicebotInboundBotsCreate = () => {
                           </Form.Group>
                           <Form.Group className="mb-3">
                             <Form.Label style={labelStyle}>
-                              Transfer Number *
+                              Transfer Number
+                              {cfg.transfer_enabled ? " *" : ""}
                             </Form.Label>
                             <Form.Control
                               value={cfg.transfer_number ?? ""}
@@ -1167,7 +1148,7 @@ const VoicebotInboundBotsCreate = () => {
                                 updateConfig("transfer_number", e.target.value)
                               }
                               placeholder="Transfer number"
-                              required
+                              required={!!cfg.transfer_enabled}
                               style={inputStyle}
                             />
                           </Form.Group>
