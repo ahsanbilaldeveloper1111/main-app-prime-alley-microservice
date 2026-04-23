@@ -2,12 +2,10 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useCallback, useEffect, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Col, Form, Row, Spinner } from "react-bootstrap";
-import { useSession } from "next-auth/react";
+import { Spinner } from "react-bootstrap";
 import { getAnalyticsDashboard } from "@utils/voicebot/outbound";
+import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID } from "@utils/voicebot/outboundVoicebotForm";
 import { formatDurationSeconds, formatFixed } from "@utils/voicebot/outbound/formatters";
-import { getCompanies } from "@utils/voicebot/inbound";
-import { normalizeCompaniesResponse } from "@utils/companyOptions";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -41,28 +39,13 @@ const METRIC_CARDS = [
 ] as const;
 
 const OutboundDashboardPage = () => {
-  const { data: session } = useSession();
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
-
-  const rawIsAdmin = (session?.user as { is_admin?: unknown })?.is_admin;
-  const isAdmin =
-    (typeof rawIsAdmin === "string" || typeof rawIsAdmin === "number") &&
-    String(rawIsAdmin) === "1";
-  const sessionCompanyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier ?? "";
-  const effectiveCompanyId = isAdmin ? selectedCompanyId : sessionCompanyIdentifier;
 
   const fetchDashboard = useCallback(async () => {
-    if (!effectiveCompanyId) {
-      setDashboard(null);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
-      const params: Record<string, unknown> = { company_id: effectiveCompanyId };
+      const params: Record<string, unknown> = { company_id: OUTBOUND_VOICEBOT_CREATE_COMPANY_ID };
       const res = (await getAnalyticsDashboard(params)) as DashboardResponse;
       const data = res?.data;
       setDashboard(data && typeof data === "object" ? data : null);
@@ -71,32 +54,7 @@ const OutboundDashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [effectiveCompanyId]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    let cancelled = false;
-    async function fetchCompanies() {
-      try {
-        const res = await getCompanies({ show_inactive: false });
-        const normalizedCompanies = normalizeCompaniesResponse(res, { prefer: "company_id" }) as Array<{
-          company_id?: string;
-          identifier?: string;
-          id?: string;
-          name: string;
-        }>;
-        const opts = normalizedCompanies.map((c) => ({
-          id: c.company_id ?? c.identifier ?? c.id,
-          name: c.name,
-        })).filter((c): c is { id: string; name: string } => Boolean(c.id));
-        if (!cancelled) setCompanies(opts);
-      } catch {
-        if (!cancelled) setCompanies([]);
-      }
-    }
-    fetchCompanies();
-    return () => { cancelled = true; };
-  }, [isAdmin]);
+  }, []);
 
   useEffect(() => {
     fetchDashboard();
@@ -148,44 +106,14 @@ const OutboundDashboardPage = () => {
         }
       `}</style>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Outbound Dashboard" />
-      <PageHeader title="Outbound Dashboard" showSearch={false}
-        buttons={
-          <>
-           {isAdmin && (
-        <Row className="mb-3 justify-content-end">
-          <Col xs="auto">
-            <Form.Group className="mb-0">
-              <Form.Label className="small mb-1">Company</Form.Label>
-              <Form.Select
-                style={{ width: "220px" }}
-                value={selectedCompanyId}
-                onChange={(e) => setSelectedCompanyId(e.target.value)}
-              >
-                <option value="">Select company</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-          </Col>
-        </Row>
-      )}
-          </>
-        }
-      
-      />
-
-     
+      <PageHeader title="Outbound Dashboard" showSearch={false} />
 
       {loading && (
         <div className="d-flex justify-content-center py-5">
           <Spinner animation="border" role="status" />
         </div>
       )}
-      {!loading && !effectiveCompanyId && (
-        <p className="text-muted">Select a company to view dashboard.</p>
-      )}
-      {!loading && effectiveCompanyId && (
+      {!loading && (
         <div className="outbound-dashboard-stats">
           <StatsCards data={statsCardsData} valueFontSize="28px" />
         </div>

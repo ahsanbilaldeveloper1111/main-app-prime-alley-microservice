@@ -14,7 +14,7 @@ import {
   getCampaignStatus,
   type ListCampaignsParams,
 } from "@utils/voicebot/outbound";
-import { safeDisplayString } from "@utils/voicebot/formDisplay";
+import { safeDisplayString, toFormString } from "@utils/voicebot/formDisplay";
 import { GetCompanies } from "@utils/users";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
@@ -42,6 +42,36 @@ interface CampaignRow {
   retry_interval_minutes?: number;
   status?: string;
   [key: string]: unknown;
+}
+
+function firstNumber(...values: unknown[]): number | undefined {
+  for (const v of values) {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+  }
+  return undefined;
+}
+
+/** Normalizes GET /api/campaigns body: raw array or paginated object (results, data, items, campaigns; count, total, …). */
+function parseCampaignsListResponse(res: unknown): { rows: CampaignRow[]; total: number } {
+  if (Array.isArray(res)) {
+    return { rows: res as CampaignRow[], total: res.length };
+  }
+  if (res == null || typeof res !== "object") {
+    return { rows: [], total: 0 };
+  }
+  const r = res as Record<string, unknown>;
+  const listCandidates = [r.results, r.data, r.items, r.campaigns];
+  let rows: CampaignRow[] = [];
+  for (const c of listCandidates) {
+    if (Array.isArray(c)) {
+      rows = c as CampaignRow[];
+      break;
+    }
+  }
+  const meta = r.meta as Record<string, unknown> | undefined;
+  const total =
+    firstNumber(r.count, r.total, r.total_count, meta?.count, meta?.total) ?? rows.length;
+  return { rows, total };
 }
 
 function getDispatchStatusVariant(status: string): "warning" | "success" | "secondary" {
@@ -249,11 +279,8 @@ const CampaignsPage = () => {
       if (effectiveCompanyId) params.company_id = effectiveCompanyId;
       if (statusFilter) params.status = statusFilter;
       const res = await getCampaigns(params);
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: CampaignRow[] })?.results ?? (res as { data?: CampaignRow[] })?.data ?? [];
-      const rawList = Array.isArray(list) ? list : [];
-      setTotalRows((res as { count?: number })?.count ?? rawList.length);
+      const { rows: rawList, total } = parseCampaignsListResponse(res);
+      setTotalRows(total);
       const rows = rawList.map((r, i) => ({
         ...r,
         id: r.campaign_id ?? r.id ?? `campaign-${i}`,
@@ -357,7 +384,7 @@ const CampaignsPage = () => {
         setStatusLoading(false);
       }
     },
-    [companyFilter]
+    [effectiveCompanyId]
   );
 
   const columns: TableColumn<CampaignRow>[] = [
@@ -655,11 +682,11 @@ const CampaignsPage = () => {
                     <Megaphone size={18} />
                     Campaign Details
                   </h6>
-                  <p className="mb-1"><strong>Name:</strong> {String(dispatchSummaryData.name ?? "—")}</p>
+                  <p className="mb-1"><strong>Name:</strong> {safeDisplayString(dispatchSummaryData.name)}</p>
                   <p className="mb-1">
                     <strong>Status:</strong>{" "}
-                    <Badge bg={getDispatchStatusVariant(String(dispatchSummaryData.status ?? ""))}>
-                      {String(dispatchSummaryData.status ?? "—")}
+                    <Badge bg={getDispatchStatusVariant(safeDisplayString(dispatchSummaryData.status, ""))}>
+                      {safeDisplayString(dispatchSummaryData.status)}
                     </Badge>
                   </p>
                   <p className="mb-1">
@@ -668,8 +695,8 @@ const CampaignsPage = () => {
                       {Array.isArray(dispatchSummaryData.target_numbers) ? dispatchSummaryData.target_numbers.length : Number(dispatchSummaryData.total_numbers ?? 0)}
                     </span>
                   </p>
-                  {String(dispatchSummaryData.description ?? "").trim() ? (
-                    <p className="mb-2 mt-2"><strong>Description:</strong> {String(dispatchSummaryData.description)}</p>
+                  {toFormString(dispatchSummaryData.description).trim() ? (
+                    <p className="mb-2 mt-2"><strong>Description:</strong> {toFormString(dispatchSummaryData.description)}</p>
                   ) : null}
                 </Col>
                 <Col md={6}>
@@ -747,7 +774,7 @@ const CampaignsPage = () => {
                   {(() => {
                     const vb = dispatchSummaryData.voicebot as Record<string, unknown> | undefined;
                     const targetCount = Array.isArray(dispatchSummaryData.target_numbers) ? dispatchSummaryData.target_numbers.length : Number(dispatchSummaryData.total_numbers ?? 0);
-                    const scriptOk = String(dispatchSummaryData.campaign_script ?? "").trim().length > 0;
+                    const scriptOk = toFormString(dispatchSummaryData.campaign_script).trim().length > 0;
                     const items = [
                       { ok: safeDisplayString(vb?.status, "") === "active", label: "VoiceBot is active" },
                       { ok: !!vb?.trunk_id, label: "Trunk is configured" },

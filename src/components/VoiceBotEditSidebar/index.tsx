@@ -9,42 +9,20 @@ import {
   Phone,
   ChevronDown,
 } from "lucide-react";
+import { getTrunks, getVoicebot, postVoicebots, putVoicebot } from "@utils/voicebot/outbound";
 import {
-  getTrunks,
-  getVoicebot,
-  postVoicebots,
-  putVoicebot,
-  type CreateVoicebotPayload,
-  type UpdateVoicebotPayload,
-} from "@utils/voicebot/outbound";
-import { toFormString, firstString } from "@utils/voicebot/formDisplay";
+  defaultOutboundVoicebotForm,
+  mapVoicebotDetailToForm,
+  buildCreatePayload,
+  buildUpdatePayload,
+  getOutboundVoicebotSubmitError,
+  type OutboundVoicebotFormState,
+} from "@utils/voicebot/outboundVoicebotForm";
 import { GetCompanies } from "@utils/users";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { useSession } from "next-auth/react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-
-interface OutboundVoicebotFormState {
-  company_id: string;
-  name: string;
-  trunk_id: string;
-  description: string;
-  system_prompt: string;
-  first_message: string;
-  llm_model: string;
-  tts_model: string;
-  stt_model: string;
-  voice: string;
-  temperature: number;
-  max_tokens: number;
-  transfer_number: string;
-  enable_transfer: boolean;
-  idle_timeout_seconds: number;
-  max_call_duration_seconds: number;
-  status: string;
-  language?: string;
-  concurrency_limit?: number;
-}
 
 export interface VoicebotEditSidebarProps {
   isOpen: boolean;
@@ -65,76 +43,8 @@ const SECTION_KEYS = {
 
 type SectionKey = (typeof SECTION_KEYS)[keyof typeof SECTION_KEYS];
 
-const defaultForm: OutboundVoicebotFormState = {
-  company_id: "",
-  name: "",
-  trunk_id: "",
-  description: "",
-  system_prompt: "",
-  first_message: "",
-  llm_model: "gpt-4o-mini",
-  tts_model: "gpt-4o-mini-tts",
-  stt_model: "nova-3",
-  voice: "onyx",
-  temperature: 0.7,
-  max_tokens: 150,
-  transfer_number: "",
-  enable_transfer: false,
-  idle_timeout_seconds: 300,
-  max_call_duration_seconds: 1800,
-  status: "inactive",
-  language: "en-US",
-  concurrency_limit: 10,
-};
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 function getVoicebotDetail(res: Record<string, unknown>): Record<string, unknown> {
   return ((res as { data?: unknown }).data ?? res) as Record<string, unknown>;
-}
-
-function buildUpdatePayload(form: OutboundVoicebotFormState): UpdateVoicebotPayload {
-  return {
-    company_id: form.company_id || undefined,
-    name: form.name,
-    trunk_id: form.trunk_id || undefined,
-    default_greeting: form.first_message?.trim() ?? "",
-    default_system_prompt: form.system_prompt?.trim() ?? "",
-    description: form.description || undefined,
-    system_prompt: form.system_prompt || undefined,
-    first_message: form.first_message || undefined,
-    llm_model: form.llm_model || undefined,
-    tts_model: form.tts_model || undefined,
-    stt_model: form.stt_model || undefined,
-    voice: form.voice || undefined,
-    temperature: form.temperature,
-    max_tokens: form.max_tokens,
-    transfer_number: form.transfer_number || undefined,
-    enable_transfer: form.enable_transfer,
-    idle_timeout_seconds: form.idle_timeout_seconds,
-    max_call_duration_seconds: form.max_call_duration_seconds,
-    status: form.status || undefined,
-  };
-}
-
-function buildCreatePayload(form: OutboundVoicebotFormState): CreateVoicebotPayload {
-  const base = buildUpdatePayload(form);
-  return {
-    ...base,
-    company_id: form.company_id,
-    name: form.name.trim(),
-    trunk_id: form.trunk_id?.trim() ?? "",
-    default_greeting: form.first_message?.trim() ?? "",
-    default_system_prompt: form.system_prompt?.trim() ?? "",
-  };
-}
-
-function getSubmitError(form: OutboundVoicebotFormState): string | null {
-  if (!form.company_id || !form.name?.trim()) return "Company and Bot Name are required";
-  if (!form.trunk_id?.trim()) return "Select Trunk is required";
-  if (!form.first_message?.trim()) return "Default Greeting is required";
-  if (!form.system_prompt?.trim()) return "Default System Prompt is required";
-  return null;
 }
 
 // ─── Styles (matching GenericSidebarNew) ─────────────────────────────────────
@@ -275,7 +185,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
     (session?.user as { company_name?: string })?.company_name ?? userCompanyIdentifier;
   const isEditMode = Boolean(botId);
 
-  const [form, setForm] = useState<OutboundVoicebotFormState>({ ...defaultForm });
+  const [form, setForm] = useState<OutboundVoicebotFormState>(() => defaultOutboundVoicebotForm());
   const [loadingBot, setLoadingBot] = useState(false);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -344,35 +254,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
     getVoicebot(botId, companyId ? { company_id: companyId } : undefined)
       .then((res: Record<string, unknown>) => {
         const d = getVoicebotDetail(res);
-        setForm({
-          company_id: toFormString(d.company_id),
-          name: toFormString(d.name),
-          description: toFormString(d.description),
-          system_prompt:
-            firstString(d.default_system_prompt, d.system_prompt) || defaultForm.system_prompt,
-          first_message:
-            firstString(d.default_greeting, d.first_message) || defaultForm.first_message,
-          llm_model: typeof d.llm_model === "string" ? d.llm_model : defaultForm.llm_model,
-          tts_model: typeof d.tts_model === "string" ? d.tts_model : defaultForm.tts_model,
-          stt_model: typeof d.stt_model === "string" ? d.stt_model : defaultForm.stt_model,
-          voice: firstString(d.voice, d.voice_model) || defaultForm.voice,
-          temperature: Number(d.temperature ?? defaultForm.temperature),
-          max_tokens: Number(d.max_tokens ?? defaultForm.max_tokens),
-          transfer_number: toFormString(d.transfer_number),
-          enable_transfer: Boolean(d.enable_transfer ?? false),
-          idle_timeout_seconds: Number(
-            d.idle_timeout_seconds ?? d.idle_timeout ?? defaultForm.idle_timeout_seconds,
-          ),
-          max_call_duration_seconds: Number(
-            d.max_call_duration_seconds ??
-              d.max_call_duration ??
-              defaultForm.max_call_duration_seconds,
-          ),
-          status: typeof d.status === "string" ? d.status : defaultForm.status,
-          trunk_id: typeof d.trunk_id === "string" ? d.trunk_id : "",
-          language: typeof d.language === "string" ? d.language : defaultForm.language,
-          concurrency_limit: Number(d.concurrency_limit ?? defaultForm.concurrency_limit),
-        });
+        setForm(mapVoicebotDetailToForm(d, defaultOutboundVoicebotForm()));
       })
       .catch(() => {
         toast.error("Failed to load voice bot");
@@ -386,7 +268,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
     if (!isOpen || isEditMode) return;
 
     setForm({
-      ...defaultForm,
+      ...defaultOutboundVoicebotForm(),
       company_id: companyId || (isAdmin ? "" : userCompanyIdentifier),
     });
     setLoadingBot(false);
@@ -409,7 +291,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
   ]);
 
   const handleSave = () => {
-    const err = getSubmitError(form);
+    const err = getOutboundVoicebotSubmitError(form);
     if (err) { toast.error(err); return; }
     setSubmitting(true);
     (isEditMode
@@ -623,17 +505,6 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
                       </Form.Select>
                   </Form.Group>
 
-                  <Form.Group className="mb-0" controlId="vb-status">
-                      <Form.Label style={sidebarStyles.label}>Status</Form.Label>
-                      <Form.Select
-                        value={form.status ?? "inactive"}
-                        onChange={set("status")}
-                        style={sidebarStyles.input}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </Form.Select>
-                  </Form.Group>
                 </>,
               )}
 
@@ -644,18 +515,23 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
                 <>
                   <Form.Group className="mb-3" controlId="vb-tts-provider">
                       <Form.Label style={sidebarStyles.label}>TTS Provider</Form.Label>
-                      <Form.Select value="openai" disabled style={sidebarStyles.input}>
+                      <Form.Select
+                        value={form.tts_provider}
+                        onChange={set("tts_provider")}
+                        style={sidebarStyles.input}
+                      >
                         <option value="openai">openai</option>
                       </Form.Select>
                   </Form.Group>
 
                   <Row>
                     <Col xs={6}>
-                      <Form.Group className="mb-3" controlId="vb-voice">
+                      <Form.Group className="mb-3" controlId="vb-voice-model">
                           <Form.Label style={sidebarStyles.label}>Voice Model</Form.Label>
                           <Form.Control
-                            value={form.voice ?? "onyx"}
-                            disabled
+                            value={form.voice_model}
+                            onChange={set("voice_model")}
+                            placeholder="onyx"
                             style={sidebarStyles.input}
                           />
                       </Form.Group>
@@ -664,31 +540,9 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
                       <Form.Group className="mb-3" controlId="vb-language">
                           <Form.Label style={sidebarStyles.label}>Language</Form.Label>
                           <Form.Control
-                            value={form.language ?? "en-US"}
-                            disabled
-                            style={sidebarStyles.input}
-                          />
-                      </Form.Group>
-                    </Col>
-                  </Row>
-
-                  <Row>
-                    <Col xs={6}>
-                      <Form.Group className="mb-3" controlId="vb-llm-model">
-                          <Form.Label style={sidebarStyles.label}>LLM Model</Form.Label>
-                          <Form.Control
-                            value={form.llm_model ?? ""}
-                            disabled
-                            style={sidebarStyles.input}
-                          />
-                      </Form.Group>
-                    </Col>
-                    <Col xs={6}>
-                      <Form.Group className="mb-0" controlId="vb-tts-model">
-                          <Form.Label style={sidebarStyles.label}>TTS Model</Form.Label>
-                          <Form.Control
-                            value={form.tts_model ?? ""}
-                            disabled
+                            value={form.language}
+                            onChange={set("language")}
+                            placeholder="en-US"
                             style={sidebarStyles.input}
                           />
                       </Form.Group>
@@ -702,30 +556,30 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
                 "Prompts",
                 MessageSquare,
                 <>
-                  <Form.Group className="mb-3" controlId="vb-first-message">
+                  <Form.Group className="mb-3" controlId="vb-default-greeting">
                       <Form.Label style={sidebarStyles.label}>
                         Default Greeting <span style={{ color: "#ef4444" }}>*</span>
                       </Form.Label>
                       <Form.Control
                         as="textarea"
                         rows={4}
-                        value={form.first_message ?? ""}
-                        onChange={set("first_message")}
-                        placeholder="Hello, this is an AI assistant..."
+                        value={form.default_greeting}
+                        onChange={set("default_greeting")}
+                        placeholder="Hi, I am calling from Acme Corp."
                         style={{ ...sidebarStyles.input, resize: "vertical" }}
                       />
                   </Form.Group>
 
-                  <Form.Group className="mb-0" controlId="vb-system-prompt">
+                  <Form.Group className="mb-0" controlId="vb-default-system-prompt">
                       <Form.Label style={sidebarStyles.label}>
-                        System Prompt <span style={{ color: "#ef4444" }}>*</span>
+                        Default System Prompt <span style={{ color: "#ef4444" }}>*</span>
                       </Form.Label>
                       <Form.Control
                         as="textarea"
                         rows={8}
-                        value={form.system_prompt ?? ""}
-                        onChange={set("system_prompt")}
-                        placeholder="You are a professional AI assistant."
+                        value={form.default_system_prompt}
+                        onChange={set("default_system_prompt")}
+                        placeholder="You are a professional sales agent..."
                         style={{ ...sidebarStyles.input, resize: "vertical" }}
                       />
                   </Form.Group>
@@ -740,11 +594,27 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
                   <Form.Group className="mb-3" controlId="vb-transfer-number">
                       <Form.Label style={sidebarStyles.label}>Transfer Number</Form.Label>
                       <Form.Control
-                        value={form.transfer_number ?? ""}
+                        value={form.transfer_number}
                         onChange={set("transfer_number")}
-                        placeholder="+1234567890"
+                        placeholder="+15551234567"
                         style={sidebarStyles.input}
                       />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3" controlId="vb-transfer-trunk">
+                      <Form.Label style={sidebarStyles.label}>Transfer Trunk</Form.Label>
+                      <Form.Select
+                        value={form.transfer_trunk_id}
+                        onChange={set("transfer_trunk_id")}
+                        style={sidebarStyles.input}
+                      >
+                        <option value="">Optional</option>
+                        {trunks.map((t) => (
+                          <option key={`xfer-${t.id}`} value={t.id}>
+                            {t.name || t.id}
+                          </option>
+                        ))}
+                      </Form.Select>
                   </Form.Group>
 
                   <Row>
@@ -754,20 +624,20 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
                           <Form.Control
                             type="number"
                             min={1}
-                            value={form.concurrency_limit ?? 10}
-                            onChange={setNum("concurrency_limit", 10)}
+                            value={form.concurrency_limit}
+                            onChange={setNum("concurrency_limit", form.concurrency_limit)}
                             style={sidebarStyles.input}
                           />
                       </Form.Group>
                     </Col>
                     <Col xs={6}>
                       <Form.Group className="mb-3" controlId="vb-max-duration">
-                          <Form.Label style={sidebarStyles.label}>Max Duration (s)</Form.Label>
+                          <Form.Label style={sidebarStyles.label}>Max Call Duration (s)</Form.Label>
                           <Form.Control
                             type="number"
-                            min={60}
-                            value={form.max_call_duration_seconds ?? 1800}
-                            onChange={setNum("max_call_duration_seconds", 1800)}
+                            min={1}
+                            value={form.max_call_duration}
+                            onChange={setNum("max_call_duration", form.max_call_duration)}
                             style={sidebarStyles.input}
                           />
                       </Form.Group>
@@ -778,9 +648,9 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
                       <Form.Label style={sidebarStyles.label}>Idle Timeout (s)</Form.Label>
                       <Form.Control
                         type="number"
-                        min={30}
-                        value={form.idle_timeout_seconds ?? 300}
-                        onChange={setNum("idle_timeout_seconds", 300)}
+                        min={1}
+                        value={form.idle_timeout}
+                        onChange={setNum("idle_timeout", form.idle_timeout)}
                         style={sidebarStyles.input}
                       />
                   </Form.Group>
@@ -813,8 +683,8 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
               !form.company_id ||
               !form.name?.trim() ||
               !form.trunk_id?.trim() ||
-              !form.first_message?.trim() ||
-              !form.system_prompt?.trim()
+              !form.default_greeting?.trim() ||
+              !form.default_system_prompt?.trim()
             }
             style={{
               fontSize: "13px",

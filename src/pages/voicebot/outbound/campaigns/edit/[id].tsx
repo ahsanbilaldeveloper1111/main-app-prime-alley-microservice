@@ -4,16 +4,11 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useSession } from "next-auth/react";
 import CampaignCreatePage from "../create";
 
 const CampaignEditPage = () => {
   const router = useRouter();
   const { id } = router.query;
-  const { data: session } = useSession();
-  const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier ?? "";
-  const companyIdFromQuery = typeof router.query.company_id === "string" ? router.query.company_id : "";
-  const effectiveCompanyId = companyIdFromQuery || companyIdentifier;
 
   let campaignId = "";
   if (typeof id === "string") campaignId = id;
@@ -32,7 +27,7 @@ const CampaignEditPage = () => {
 
   return (
     <Layout>
-      <CampaignCreatePage editCampaignId={campaignId} editCompanyId={effectiveCompanyId} />
+      <CampaignCreatePage editCampaignId={campaignId} />
     </Layout>
   );
 };

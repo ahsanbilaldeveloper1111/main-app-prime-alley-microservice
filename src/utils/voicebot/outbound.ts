@@ -7,7 +7,8 @@ const PREFIX_REPORTS = "reports";
 const PREFIX_ANALYTICS = "analytics";
 const PREFIX_AGENT = "agent";
 
-
+/** Fixed `company_id` for outbound list/report requests that require it (callers cannot override). */
+const DEFAULT_COMPANY_ID = "default";
 
 // ---------------------------------------------------------------------------
 // 1) Trunks Management
@@ -50,55 +51,32 @@ export interface ListVoicebotsParams {
   page_size?: number;
 }
 
-/** Request body for Create VoiceBot (POST /voicebots/) */
+/** Request body for Create / Update VoiceBot (POST /voicebots/, PUT /voicebots/:bot_id/) */
 export interface CreateVoicebotPayload {
   company_id: string;
   name: string;
+  description?: string;
   trunk_id: string;
+  tts_provider: string;
+  voice_model: string;
+  language: string;
   default_greeting: string;
   default_system_prompt: string;
-  description?: string;
-  system_prompt?: string;
-  first_message?: string;
-  llm_model?: string;
-  tts_model?: string;
-  stt_model?: string;
-  voice?: string;
-  temperature?: number;
-  max_tokens?: number;
   transfer_number?: string;
-  enable_transfer?: boolean;
-  idle_timeout_seconds?: number;
-  max_call_duration_seconds?: number;
-  status?: string;
+  transfer_trunk_id?: string;
+  concurrency_limit: number;
+  max_call_duration: number;
+  idle_timeout: number;
 }
 
-/** Request body for Update VoiceBot (PUT /voicebots/:bot_id/) */
-export interface UpdateVoicebotPayload {
-  company_id?: string;
-  name?: string;
-  trunk_id?: string;
-  default_greeting?: string;
-  default_system_prompt?: string;
-  description?: string;
-  system_prompt?: string;
-  first_message?: string;
-  llm_model?: string;
-  tts_model?: string;
-  stt_model?: string;
-  voice?: string;
-  temperature?: number;
-  max_tokens?: number;
-  transfer_number?: string;
-  enable_transfer?: boolean;
-  idle_timeout_seconds?: number;
-  max_call_duration_seconds?: number;
-  status?: string;
-}
+/** Request body for Update VoiceBot (PUT /voicebots/:bot_id/) — same fields as create */
+export type UpdateVoicebotPayload = CreateVoicebotPayload;
 
-/** GET /voicebots/ - List voicebots (company_id, status, page, page_size) */
+/** GET /api/voicebots — list voicebots; `company_id` is always `"default"`. */
 export const getVoicebots = async (params?: ListVoicebotsParams) => {
-  const response = await axiosInstance.get(`${PREFIX_VOICEBOTS}`, { params });
+  const { company_id: _ignored, ...rest } = params ?? {};
+  const merged: ListVoicebotsParams = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const response = await axiosInstance.get(`${PREFIX_VOICEBOTS}`, { params: merged });
   return response.data;
 };
 
@@ -120,9 +98,11 @@ export const putVoicebot = async (botId: string, payload: UpdateVoicebotPayload)
   return response.data;
 };
 
-/** DELETE /voicebots/:bot_id/ - Delete voicebot */
+/** DELETE /api/voicebots/:bot_id — query always includes `company_id=default`. */
 export const deleteVoicebot = async (botId: string, params?: { company_id?: string }) => {
-  const response = await axiosInstance.delete(`${PREFIX_VOICEBOTS}/${botId}`, { params });
+  const { company_id: _ignored, ...rest } = params ?? {};
+  const merged = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const response = await axiosInstance.delete(`${PREFIX_VOICEBOTS}/${botId}`, { params: merged });
   return response.data;
 };
 
@@ -138,60 +118,53 @@ export interface ListCampaignsParams {
   page_size?: number;
 }
 
-/** Create campaign payload (POST /campaigns/) */
+/** Create / update campaign body (POST /campaigns/, PUT /campaigns/:id/) */
 export interface CreateCampaignPayload {
   company_id: string;
+  voicebot_id: number;
   name: string;
   description?: string;
-  voicebot_id?: number;
-  trunk_id?: string;
-  caller_id?: string;
-  target_list?: string[];
-  schedule_start?: string;
-  schedule_end?: string;
-  retry_attempts?: number;
-  retry_interval_minutes?: number;
-  status?: string;
-}
-
-/** Update campaign payload (PUT /campaigns/:campaign_id/) */
-export interface UpdateCampaignPayload {
-  company_id?: string;
-  name?: string;
-  description?: string;
-  retry_attempts?: number;
-  voicebot_id?: number;
-  target_numbers?: string[];
-  schedule_start?: string;
-  schedule_end?: string;
-  retry_interval_minutes?: number;
-  status?: string;
   campaign_script?: string;
   custom_greeting?: string;
-  input_method?: string;
+  target_numbers: string[];
+  schedule_time: string;
+  failure_threshold: number;
 }
 
-/** GET /campaigns - Get campaigns */
+/** Same shape as create (full replace on PUT). */
+export type UpdateCampaignPayload = CreateCampaignPayload;
+
+/** GET /api/campaigns — list campaigns; `company_id` is always `"default"`. */
 export const getCampaigns = async (params?: ListCampaignsParams) => {
-  const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}`, { params });
+  const { company_id: _ignored, ...rest } = params ?? {};
+  const merged: ListCampaignsParams = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}`, { params: merged });
   return response.data;
 };
 
-/** POST /campaigns - Create campaign */
+/** POST /api/campaigns — body always includes `company_id` (`"default"`). */
 export const postCampaigns = async (payload: CreateCampaignPayload | Record<string, unknown>) => {
-  const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}`, payload);
+  const p = payload as Record<string, unknown>;
+  const { company_id: _c, ...rest } = p;
+  const merged = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const response = await axiosInstance.post(`${PREFIX_CAMPAIGNS}`, merged);
   return response.data;
 };
 
-/** GET /campaigns/{campaignId} - Get campaign by id */
+/** GET /campaigns/{campaignId} — query `company_id` is always `"default"`. */
 export const getCampaign = async (campaignId: string, params?: Record<string, unknown>) => {
-  const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}/${campaignId}`, { params });
+  const { company_id: _i, ...rest } = params ?? {};
+  const merged = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const response = await axiosInstance.get(`${PREFIX_CAMPAIGNS}/${campaignId}`, { params: merged });
   return response.data;
 };
 
-/** PUT /campaigns/{campaignId} - Update campaign */
+/** PUT /api/campaigns/{id} — body always includes `company_id` (`"default"`). */
 export const putCampaign = async (campaignId: string, payload: UpdateCampaignPayload | Record<string, unknown>) => {
-  const response = await axiosInstance.put(`${PREFIX_CAMPAIGNS}/${campaignId}`, payload);
+  const p = payload as Record<string, unknown>;
+  const { company_id: _c, ...rest } = p;
+  const merged = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const response = await axiosInstance.put(`${PREFIX_CAMPAIGNS}/${campaignId}`, merged);
   return response.data;
 };
 
@@ -239,9 +212,73 @@ export const getCampaignStatus = async (campaignId: string, params?: Record<stri
 // 5) Reports & Call Logs
 // ---------------------------------------------------------------------------
 
-/** POST /reports/calls - Create/report calls */
-export const postReportsCalls = async (payload: Record<string, unknown>) => {
-  const response = await axiosInstance.post(`${PREFIX_REPORTS}/calls`, payload);
+/** POST /api/reports/calls — server expects numeric ids where applicable; `company_id` is always `"default"` (callers cannot override). */
+export interface PostReportsCallsPayload {
+  company_id?: string;
+  campaign_id?: number;
+  voicebot_id?: number;
+  call_status?: string;
+  date_from?: string;
+  date_to?: string;
+  duration_min?: number;
+  duration_max?: number;
+  page?: number;
+  page_size?: number;
+  /** Optional; included when supported by the API */
+  search?: string;
+}
+
+function firstArrayFromRecord(obj: Record<string, unknown>, keys: readonly string[]): unknown[] | undefined {
+  for (const k of keys) {
+    const v = obj[k];
+    if (Array.isArray(v)) return v;
+  }
+  return undefined;
+}
+
+const LIST_KEYS = ["results", "data", "items", "voicebots"] as const;
+
+/** Extract list rows from paginated or wrapped API bodies (GET /voicebots, etc.). */
+export function extractListFromApiResponse(res: unknown): unknown[] {
+  if (Array.isArray(res)) return res;
+  if (res == null || typeof res !== "object") return [];
+  const r = res as Record<string, unknown>;
+  const top = firstArrayFromRecord(r, LIST_KEYS);
+  if (top) return top;
+  const nested = r.data;
+  if (nested != null && typeof nested === "object") {
+    const inner = firstArrayFromRecord(nested as Record<string, unknown>, LIST_KEYS);
+    if (inner) return inner;
+  }
+  return [];
+}
+
+/** Normalize voicebots list responses from GET /voicebots into `{ id, name }` rows. */
+export function normalizeVoicebotsListResponse(res: unknown): Array<{ id: number | string; name: string }> {
+  const arr = extractListFromApiResponse(res);
+  return arr
+    .map((v) => {
+      const row = v as {
+        id?: number | string;
+        bot_id?: number | string;
+        voicebot_id?: number | string;
+        voice_bot_id?: number | string;
+        name?: string;
+      };
+      const rawId = row.id ?? row.bot_id ?? row.voicebot_id ?? row.voice_bot_id;
+      if (rawId === undefined || rawId === null || rawId === "") {
+        return { id: "", name: "" };
+      }
+      const nameTrim = typeof row.name === "string" ? row.name.trim() : "";
+      return { id: rawId, name: nameTrim || String(rawId) };
+    })
+    .filter((v) => v.id !== "" && v.id != null);
+}
+
+export const postReportsCalls = async (payload: PostReportsCallsPayload) => {
+  const { company_id: _ignored, ...rest } = payload;
+  const merged: PostReportsCallsPayload = { ...rest, company_id: DEFAULT_COMPANY_ID };
+  const response = await axiosInstance.post(`${PREFIX_REPORTS}/calls`, merged);
   return response.data;
 };
 
@@ -273,15 +310,64 @@ export const getAnalyticsVoicebot = async (voiceBotId: string, params?: Record<s
   return response.data;
 };
 
-/** GET /analytics/costs - Get analytics costs */
-export const getAnalyticsCosts = async (params?: Record<string, unknown>) => {
-  const response = await axiosInstance.get(`${PREFIX_ANALYTICS}/costs`, { params });
+/** GET /analytics/costs — query params: `company_id` (always `"default"`), `date_from`, `date_to` (YYYY-MM-DD). */
+export interface AnalyticsCostsParams {
+  company_id?: string;
+  date_from?: string;
+  date_to?: string;
+}
+
+export const getAnalyticsCosts = async (params?: AnalyticsCostsParams) => {
+  const { company_id: _ignored, date_from, date_to } = params ?? {};
+  const query: Record<string, unknown> = { company_id: DEFAULT_COMPANY_ID };
+  if (date_from) query.date_from = date_from;
+  if (date_to) query.date_to = date_to;
+  const response = await axiosInstance.get(`${PREFIX_ANALYTICS}/costs`, { params: query });
   return response.data;
 };
 
-/** GET /analytics/trends - Get analytics trends */
-export const getAnalyticsTrends = async (params?: Record<string, unknown>) => {
-  const response = await axiosInstance.get(`${PREFIX_ANALYTICS}/trends`, { params });
+/** GET /analytics/costs response body (`data` matches API contract). */
+export interface AnalyticsCostsByCampaignItem {
+  campaign_id?: number;
+  campaign_name?: string;
+  is_deleted?: boolean;
+  total?: number;
+  count?: number;
+}
+
+export interface AnalyticsCostsTrendItem {
+  date?: string;
+  total?: number;
+}
+
+export interface AnalyticsCostsData {
+  total_cost?: number;
+  llm_cost?: number;
+  tts_cost?: number;
+  stt_cost?: number;
+  cost_by_campaign?: AnalyticsCostsByCampaignItem[];
+  cost_trend?: AnalyticsCostsTrendItem[];
+}
+
+export interface AnalyticsCostsApiResponse {
+  status?: boolean;
+  data?: AnalyticsCostsData;
+  message?: string;
+  detail?: string;
+}
+
+/** GET /analytics/trends — query params: `company_id` (always `"default"`) and `period` (`7d` | `14d` | `30d`). */
+export type AnalyticsTrendsPeriod = "7d" | "14d" | "30d";
+
+export interface AnalyticsTrendsParams {
+  company_id?: string;
+  period?: AnalyticsTrendsPeriod;
+}
+
+export const getAnalyticsTrends = async (params?: AnalyticsTrendsParams) => {
+  const period = params?.period ?? "7d";
+  const query: Record<string, unknown> = { company_id: DEFAULT_COMPANY_ID, period };
+  const response = await axiosInstance.get(`${PREFIX_ANALYTICS}/trends`, { params: query });
   return response.data;
 };
 
