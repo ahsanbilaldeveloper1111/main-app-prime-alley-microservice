@@ -419,6 +419,9 @@ transition: var(--transition-speed);
     }
   }
  
+  .auth-form .btn-primary {
+        background: linear-gradient(135deg, #2583f2, #4facfe) !important;
+    }
 .btn-outline-primary{
     border-color: #2583f2;
     &:hover{

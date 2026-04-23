@@ -118,6 +118,60 @@ const getProductSubmitButtonLabel = (
   return "Add Product";
 };
 
+const PRODUCT_SIDEBAR_LABEL_STYLE = {
+  display: "block",
+  fontSize: "14px",
+  fontWeight: 600,
+  color: "#141414",
+  marginBottom: "8px",
+};
+
+const PRODUCT_SIDEBAR_FIELD_STYLE = {
+  marginBottom: "20px",
+};
+
+const PRODUCT_SIDEBAR_INPUT_STYLE = {
+  width: "100%",
+  minHeight: "40px",
+  padding: "10px 12px",
+  border: "1px solid #8a8a8a",
+  borderRadius: "4px",
+  fontSize: "14px",
+  outline: "none",
+};
+
+const PRODUCT_SIDEBAR_TEXTAREA_STYLE = {
+  ...PRODUCT_SIDEBAR_INPUT_STYLE,
+  minHeight: "96px",
+  resize: "vertical" as const,
+};
+
+const PRODUCT_SIDEBAR_SELECT_STYLES = {
+  control: (base: any) => ({
+    ...base,
+    minHeight: 40,
+    border: "1px solid #8a8a8a",
+    borderRadius: "4px",
+    fontSize: "14px",
+    boxShadow: "none",
+    "&:hover": {
+      borderColor: "#0091ae",
+    },
+  }),
+};
+
+const handleProductSidebarFieldFocus = (
+  e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+) => {
+  e.currentTarget.style.borderColor = "#0091ae";
+};
+
+const handleProductSidebarFieldBlur = (
+  e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+) => {
+  e.currentTarget.style.borderColor = "#8a8a8a";
+};
+
 interface ProductDetailCardProps {
   label: string;
   children: React.ReactNode;
@@ -1112,16 +1166,10 @@ const ProductsPage = () => {
                 >
                   <Row>
                     <Col md={12}>
-                      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
                         <label
                           htmlFor="product-name-input"
-                          style={{
-                            display: "block",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            color: "#141414",
-                            marginBottom: "8px",
-                          }}
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
                         >
                           Product Name <span style={{ color: "#f2545b" }}>*</span>
                         </label>
@@ -1137,35 +1185,17 @@ const ProductsPage = () => {
                           }
                           placeholder="Enter product name"
                           required
-                          style={{
-                            width: "100%",
-                            minHeight: "40px",
-                            padding: "10px 12px",
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            outline: "none",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = "#0091ae";
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "#8a8a8a";
-                          }}
+                          style={PRODUCT_SIDEBAR_INPUT_STYLE}
+                          onFocus={handleProductSidebarFieldFocus}
+                          onBlur={handleProductSidebarFieldBlur}
                         />
                       </div>
                     </Col>
                     <Col md={12}>
-                      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
                         <label
                           htmlFor="product-sku-input"
-                          style={{
-                            display: "block",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            color: "#141414",
-                            marginBottom: "8px",
-                          }}
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
                         >
                           SKU <span style={{ color: "#f2545b" }}>*</span>
                         </label>
@@ -1183,24 +1213,16 @@ const ProductsPage = () => {
                           required
                           disabled={Boolean(editingProduct) || submittingProduct}
                           style={{
-                            width: "100%",
-                            minHeight: "40px",
-                            padding: "10px 12px",
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            outline: "none",
+                            ...PRODUCT_SIDEBAR_INPUT_STYLE,
                             backgroundColor: editingProduct ? "#f7fafc" : "#ffffff",
                             cursor: editingProduct ? "not-allowed" : "text",
                           }}
                           onFocus={(e) => {
                             if (!editingProduct && !submittingProduct) {
-                              e.currentTarget.style.borderColor = "#0091ae";
+                              handleProductSidebarFieldFocus(e);
                             }
                           }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "#8a8a8a";
-                          }}
+                          onBlur={handleProductSidebarFieldBlur}
                         />
                       </div>
                     </Col>
@@ -1208,16 +1230,10 @@ const ProductsPage = () => {
 
                   <Row>
                     <Col md={12}>
-                      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
                         <label
                           htmlFor="product-price-input"
-                          style={{
-                            display: "block",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            color: "#141414",
-                            marginBottom: "8px",
-                          }}
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
                         >
                           Price <span style={{ color: "#f2545b" }}>*</span>
                         </label>
@@ -1234,35 +1250,17 @@ const ProductsPage = () => {
                           }
                           placeholder="0.00"
                           required
-                          style={{
-                            width: "100%",
-                            minHeight: "40px",
-                            padding: "10px 12px",
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            outline: "none",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = "#0091ae";
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "#8a8a8a";
-                          }}
+                          style={PRODUCT_SIDEBAR_INPUT_STYLE}
+                          onFocus={handleProductSidebarFieldFocus}
+                          onBlur={handleProductSidebarFieldBlur}
                         />
                       </div>
                     </Col>
                     <Col md={12}>
-                      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
                         <label
                           htmlFor="product-currency-select"
-                          style={{
-                            display: "block",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            color: "#141414",
-                            marginBottom: "8px",
-                          }}
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
                         >
                           Currency
                         </label>
@@ -1275,21 +1273,9 @@ const ProductsPage = () => {
                               currency: e.target.value,
                             })
                           }
-                          style={{
-                            width: "100%",
-                            minHeight: "40px",
-                            padding: "10px 12px",
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            outline: "none",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = "#0091ae";
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "#8a8a8a";
-                          }}
+                          style={PRODUCT_SIDEBAR_INPUT_STYLE}
+                          onFocus={handleProductSidebarFieldFocus}
+                          onBlur={handleProductSidebarFieldBlur}
                         >
                           <option value="AED">AED</option>
                         </select>
@@ -1299,16 +1285,10 @@ const ProductsPage = () => {
 
                   <Row>
                     <Col md={12}>
-                      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
                         <label
                           htmlFor="product-industry-select"
-                          style={{
-                            display: "block",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            color: "#141414",
-                            marginBottom: "8px",
-                          }}
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
                         >
                           Product Group <span style={{ color: "#f2545b" }}>*</span>
                         </label>
@@ -1351,15 +1331,7 @@ const ProductsPage = () => {
                             })
                           }
                           placeholder="Select product group..."
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              minHeight: 40,
-                              border: "1px solid #8a8a8a",
-                              borderRadius: "4px",
-                              fontSize: "14px",
-                            }),
-                          }}
+                          styles={PRODUCT_SIDEBAR_SELECT_STYLES}
                           isLoading={loadingIndustries}
                           isDisabled={loadingIndustries || submittingProduct}
                           isClearable
@@ -1368,16 +1340,10 @@ const ProductsPage = () => {
                       </div>
                     </Col>
                     <Col md={12}>
-                      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
                         <label
                           htmlFor="product-category-select"
-                          style={{
-                            display: "block",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            color: "#141414",
-                            marginBottom: "8px",
-                          }}
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
                         >
                           Category
                         </label>
@@ -1402,31 +1368,17 @@ const ProductsPage = () => {
                             })
                           }
                           placeholder="Select or create category..."
-                          styles={{
-                            control: (base) => ({
-                              ...base,
-                              minHeight: 40,
-                              border: "1px solid #8a8a8a",
-                              borderRadius: "4px",
-                              fontSize: "14px",
-                            }),
-                          }}
+                          styles={PRODUCT_SIDEBAR_SELECT_STYLES}
                           isDisabled={submittingProduct}
                           isClearable
                         />
                       </div>
                     </Col>
                     <Col md={12}>
-                      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
                         <label
                           htmlFor="product-brand-input"
-                          style={{
-                            display: "block",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            color: "#141414",
-                            marginBottom: "8px",
-                          }}
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
                         >
                           Brand
                         </label>
@@ -1441,36 +1393,18 @@ const ProductsPage = () => {
                             })
                           }
                           placeholder="Enter brand name"
-                          style={{
-                            width: "100%",
-                            minHeight: "40px",
-                            padding: "10px 12px",
-                            border: "1px solid #8a8a8a",
-                            borderRadius: "4px",
-                            fontSize: "14px",
-                            outline: "none",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.style.borderColor = "#0091ae";
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.style.borderColor = "#8a8a8a";
-                          }}
+                          style={PRODUCT_SIDEBAR_INPUT_STYLE}
+                          onFocus={handleProductSidebarFieldFocus}
+                          onBlur={handleProductSidebarFieldBlur}
                         />
                       </div>
                     </Col>
                   </Row>
 
-                  <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                  <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
                     <label
                       htmlFor="product-description-input"
-                      style={{
-                        display: "block",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        color: "#141414",
-                        marginBottom: "8px",
-                      }}
+                      style={PRODUCT_SIDEBAR_LABEL_STYLE}
                     >
                       Description
                     </label>
@@ -1485,22 +1419,9 @@ const ProductsPage = () => {
                         })
                       }
                       placeholder="Enter product description"
-                      style={{
-                        width: "100%",
-                        minHeight: "96px",
-                        padding: "10px 12px",
-                        border: "1px solid #8a8a8a",
-                        borderRadius: "4px",
-                        fontSize: "14px",
-                        outline: "none",
-                        resize: "vertical",
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = "#0091ae";
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = "#8a8a8a";
-                      }}
+                      style={PRODUCT_SIDEBAR_TEXTAREA_STYLE}
+                      onFocus={handleProductSidebarFieldFocus}
+                      onBlur={handleProductSidebarFieldBlur}
                     />
                   </div>
 
