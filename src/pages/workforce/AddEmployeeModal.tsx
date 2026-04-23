@@ -367,7 +367,7 @@ const AddEmployeeModal: React.FC<AddEmployeeModalProps> = ({
         contract_type: form.contract_type?.toString().trim() || null,
         phone: form.phone?.toString().trim() || null,
         status: form.status?.toString().trim() || null,
-        ...(addressesPayload ? { addresses: addressesPayload } : {}),
+        addresses: addressesPayload,
       });
       toast.success("Employee created");
       resetFormState();

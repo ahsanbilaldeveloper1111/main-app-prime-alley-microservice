@@ -9,6 +9,8 @@ type WorkforceSidebarShellProps = {
   onClose: () => void;
   onSubmit: (event: React.FormEvent) => void;
   submitLabel: string;
+  /** Shown on the primary button while `submitting` is true (e.g. "Saving…" for edit flows). */
+  submittingLabel?: string;
   submitting: boolean;
   primaryDisabled: boolean;
   children: React.ReactNode;
@@ -103,6 +105,7 @@ const WorkforceSidebarShell: React.FC<WorkforceSidebarShellProps> = ({
   onClose,
   onSubmit,
   submitLabel,
+  submittingLabel = "Creating…",
   submitting,
   primaryDisabled,
   children,
@@ -137,7 +140,7 @@ const WorkforceSidebarShell: React.FC<WorkforceSidebarShellProps> = ({
 
           <div style={sidebarFooterStyle}>
             <button type="submit" disabled={primaryDisabled} style={getPrimaryButtonStyle(primaryDisabled)}>
-              {submitting ? "Creating…" : submitLabel}
+              {submitting ? submittingLabel : submitLabel}
             </button>
             <button
               type="button"

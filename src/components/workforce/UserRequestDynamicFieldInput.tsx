@@ -1,6 +1,7 @@
 import React from "react";
 import { Form } from "react-bootstrap";
 import type { UserRequestCategoryField } from "@utils/staffManagement";
+import SelectBox from "@components/SelectBox";
 
 type FieldOption = { value: string; label: string };
 
@@ -57,6 +58,154 @@ function withPrefix(prefix: string, key: string, value: string): string {
   return prefix === "" ? `${key}-${value}` : `${prefix}-${key}-${value}`;
 }
 
+function noOptionsMessage(fieldType: string): string {
+  return `No ${fieldType} options available`;
+}
+
+function renderSelectField(
+  options: FieldOption[],
+  value: string,
+  onChange: (next: string) => void,
+): React.ReactNode {
+  if (options.length === 0) {
+    return (
+      <Form.Select className="new-request-fieldControl" disabled value="">
+        <option value="">{noOptionsMessage("select")}</option>
+      </Form.Select>
+    );
+  }
+  return (
+    <Form.Select className="new-request-fieldControl" value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Select...</option>
+      {options.map((opt: FieldOption) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </Form.Select>
+  );
+}
+
+function renderMultiSelectField(
+  options: FieldOption[],
+  selectedValues: string[],
+  onChange: (nextValues: string[]) => void,
+): React.ReactNode {
+  return (
+    <>
+      <SelectBox
+        options={options}
+        value={selectedValues}
+        isMulti
+        className="new-request-selectbox"
+        classNamePrefix="new-request-selectbox"
+        placeholder="Select..."
+        isClearable
+        isSearchable
+        closeMenuOnSelect={false}
+        hideSelectedOptions={false}
+        onChange={(next) => {
+          const normalized = Array.isArray(next)
+            ? next.map(String)
+            : [];
+          onChange(normalized);
+        }}
+      />
+      {options.length === 0 && (
+        <Form.Text className="text-muted">{noOptionsMessage("multi-select")}</Form.Text>
+      )}
+    </>
+  );
+}
+
+function renderRadioField(
+  options: FieldOption[],
+  key: string,
+  idPrefix: string,
+  value: string,
+  onChange: (next: string) => void,
+): React.ReactNode {
+  if (options.length === 0) {
+    return <Form.Text className="text-muted">{noOptionsMessage("radio")}</Form.Text>;
+  }
+  return (
+    <div className="urdf-radioGroup">
+      {options.map((opt: FieldOption) => {
+        const checked = value === opt.value;
+        const id = withPrefix(idPrefix, key, opt.value);
+        return (
+          <label
+            key={opt.value}
+            htmlFor={id}
+            className={`urdf-radioOption${checked ? " urdf-radioOption--selected" : ""}`}
+          >
+            <input
+              id={id}
+              className="urdf-radioInput"
+              type="radio"
+              name={key}
+              value={opt.value}
+              checked={checked}
+              onChange={() => onChange(opt.value)}
+            />
+            <span
+              aria-hidden
+              className={`urdf-radioMark${checked ? " urdf-radioMark--selected" : ""}`}
+            >
+              {checked && <span className="urdf-radioDot" />}
+            </span>
+            <span>{opt.label}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+function renderCheckboxField(
+  options: FieldOption[],
+  key: string,
+  idPrefix: string,
+  selectedValues: string[],
+  onChange: (nextValues: string[]) => void,
+): React.ReactNode {
+  if (options.length === 0) {
+    return <Form.Text className="text-muted">{noOptionsMessage("checkbox")}</Form.Text>;
+  }
+  return (
+    <div className="urdf-checkboxGroup">
+      {options.map((opt: FieldOption) => {
+        const checked = selectedValues.includes(opt.value);
+        const id = withPrefix(idPrefix, key, opt.value);
+        return (
+          <label
+            key={opt.value}
+            htmlFor={id}
+            className={`urdf-checkboxOption${checked ? " urdf-checkboxOption--selected" : ""}`}
+          >
+            <input
+              id={id}
+              className="urdf-checkboxInput"
+              type="checkbox"
+              checked={checked}
+              onChange={() => {
+                const nextValues = checked
+                  ? selectedValues.filter((value) => value !== opt.value)
+                  : [...selectedValues, opt.value];
+                onChange(nextValues);
+              }}
+            />
+            <span aria-hidden className={`urdf-checkboxMark${checked ? " urdf-checkboxMark--selected" : ""}`}>
+              {checked && <span className="urdf-checkboxTick">✓</span>}
+            </span>
+            <span>{opt.label}</span>
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
 const UserRequestDynamicFieldInput: React.FC<UserRequestDynamicFieldInputProps> = ({
   field,
   values,
@@ -70,6 +219,7 @@ const UserRequestDynamicFieldInput: React.FC<UserRequestDynamicFieldInputProps> 
   if (field.type === "textarea") {
     return (
       <Form.Control
+        className="new-request-fieldControl"
         as="textarea"
         rows={2}
         value={stringValue(values, key)}
@@ -82,6 +232,7 @@ const UserRequestDynamicFieldInput: React.FC<UserRequestDynamicFieldInputProps> 
   if (isAttachmentType(field.type)) {
     return (
       <Form.Control
+        className="new-request-fieldControl"
         type="file"
         onChange={(e) => {
           const file = (e.target as HTMLInputElement).files?.[0] ?? null;
@@ -92,83 +243,32 @@ const UserRequestDynamicFieldInput: React.FC<UserRequestDynamicFieldInputProps> 
   }
 
   if (field.type === "select") {
-    const options = fieldOptions(field);
-    return (
-      <Form.Select value={stringValue(values, key)} onChange={(e) => onValueChange(key, e.target.value)}>
-        <option value="">Select...</option>
-        {options.map((opt: FieldOption) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </Form.Select>
-    );
+    return renderSelectField(fieldOptions(field), stringValue(values, key), (next) => onValueChange(key, next));
   }
 
   if (field.type === "multiselect") {
-    const options = fieldOptions(field);
-    return (
-      <Form.Select
-        multiple
-        value={stringArrayValue(values, key)}
-        onChange={(e) => {
-          const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, (option) => option.value);
-          onValueChange(key, selected);
-        }}
-      >
-        {options.map((opt: FieldOption) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </Form.Select>
+    return renderMultiSelectField(fieldOptions(field), stringArrayValue(values, key), (next) =>
+      onValueChange(key, next),
     );
   }
 
   if (field.type === "radio") {
-    const options = fieldOptions(field);
-    return (
-      <div className="d-flex flex-wrap gap-2">
-        {options.map((opt: FieldOption) => (
-          <Form.Check
-            key={opt.value}
-            type="radio"
-            id={withPrefix(idPrefix, key, opt.value)}
-            name={key}
-            label={opt.label}
-            value={opt.value}
-            checked={stringValue(values, key) === opt.value}
-            onChange={() => onValueChange(key, opt.value)}
-          />
-        ))}
-      </div>
+    return renderRadioField(
+      fieldOptions(field),
+      key,
+      idPrefix,
+      stringValue(values, key),
+      (next) => onValueChange(key, next),
     );
   }
 
   if (field.type === "checkbox") {
-    const selectedValues = stringArrayValue(values, key);
-    const options = fieldOptions(field);
-    return (
-      <div className="d-flex flex-wrap gap-2">
-        {options.map((opt: FieldOption) => {
-          const checked = selectedValues.includes(opt.value);
-          return (
-            <Form.Check
-              key={opt.value}
-              type="checkbox"
-              id={withPrefix(idPrefix, key, opt.value)}
-              label={opt.label}
-              checked={checked}
-              onChange={() => {
-                const nextValues = checked
-                  ? selectedValues.filter((value) => value !== opt.value)
-                  : [...selectedValues, opt.value];
-                onValueChange(key, nextValues);
-              }}
-            />
-          );
-        })}
-      </div>
+    return renderCheckboxField(
+      fieldOptions(field),
+      key,
+      idPrefix,
+      stringArrayValue(values, key),
+      (next) => onValueChange(key, next),
     );
   }
 
@@ -176,6 +276,7 @@ const UserRequestDynamicFieldInput: React.FC<UserRequestDynamicFieldInputProps> 
     return (
       <Form.Check
         type="checkbox"
+        className="new-request-booleanControl"
         id={withPrefix(idPrefix, key, "boolean")}
         label={field.config?.help_text ?? "Yes / No"}
         checked={booleanValue(values, key)}
@@ -188,6 +289,7 @@ const UserRequestDynamicFieldInput: React.FC<UserRequestDynamicFieldInputProps> 
     return (
       <Form.Check
         type="switch"
+        className="new-request-switchControl"
         id={withPrefix(idPrefix, key, "toggle")}
         label={field.config?.help_text ?? "Enable"}
         checked={booleanValue(values, key)}
@@ -198,6 +300,7 @@ const UserRequestDynamicFieldInput: React.FC<UserRequestDynamicFieldInputProps> 
 
   return (
     <Form.Control
+      className="new-request-fieldControl"
       type={inputType(field.type)}
       value={stringValue(values, key)}
       onChange={(e) => onValueChange(key, e.target.value)}

@@ -3,6 +3,7 @@ import { Modal, Button, Form, Row, Col, Badge } from 'react-bootstrap';
 import { 
   X, 
   Calendar, 
+  Clock,
   User, 
   FileText, 
   Tag,
@@ -25,6 +26,10 @@ import { toast } from 'react-toastify';
 import { listProjects, createTask, updateTask, listTasks } from '@utils/tasks';
 import { listStatuses } from '@utils/work-planner';
 import { getAutoTimezone } from '@utils/Helper';
+import {
+  formatPlannerDueTimeAsUtcIso,
+  parseApiDueTimeToTimeInput,
+} from '@utils/plannerTaskDueTime';
 import RichTextEditor from '../../../pages/help-center/partials/RichTextEditor';
 
 interface Extension {
@@ -45,7 +50,8 @@ interface CreateTaskModalProps {
   task?: any; // Task data for edit mode
   isEdit?: boolean; // Whether this is edit mode
   selectedStatusForTask?: number | null; // Pre-selected status ID when opening from board column
-  taskType?: 'regular' | 'recurring' | 'todo'; // Task type: regular, recurring, or todo
+  /** Task type: regular, recurring, or to-do */
+  taskType?: 'regular' | 'recurring' | 'todo';
 }
 
 interface UserType {
@@ -122,8 +128,763 @@ interface CreateTaskFormData {
   watcherIds: number[];
   dueDate: string;
   startDate: string;
+  /** Local HH:mm for API `due_time` (regular and to-do tasks only). */
+  dueTime: string;
   labelIds: number[];
   linkedRecordIds: number[];
+}
+
+function applyDueTimeToPayloadForRegularOrTodo(
+  taskType: 'regular' | 'recurring' | 'todo',
+  payload: Record<string, unknown>,
+  dueDate: string,
+  dueTime: string,
+  isEditMode: boolean,
+): void {
+  if (taskType !== 'regular' && taskType !== 'todo') {
+    return;
+  }
+  const utc = formatPlannerDueTimeAsUtcIso(dueDate, dueTime);
+  if (utc) {
+    payload.due_time = utc;
+  } else if (isEditMode) {
+    payload.due_time = null;
+  }
+}
+
+type CreateTaskModalTaskType = 'regular' | 'recurring' | 'todo';
+
+function mapPriorityStringToId(priority: string | null | undefined): number {
+  const priorityMap: Record<string, number> = {
+    low: 1,
+    normal: 2,
+    medium: 2,
+    high: 3,
+    urgent: 4,
+  };
+  return priorityMap[priority?.toLowerCase() || 'normal'] || 2;
+}
+
+function formatDateForInput(dateString: string | null | undefined): string {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch {
+    return '';
+  }
+}
+
+function mapEditTaskPeopleIds(
+  editTask: any,
+  extensions: Extension[],
+  peopleKey: "assignees" | "watchers",
+  fallbackExtNumsKey: "extension_numbers" | "watcher_numbers",
+): number[] {
+  const fromPeople =
+    editTask[peopleKey]?.map((person: { extension_number?: string }) => {
+      const extension = extensions.find(
+        (ext: any) =>
+          ext.id === person.extension_number ||
+          ext.extension_number === person.extension_number,
+      );
+      return extension
+        ? Number(extension.id)
+        : Number(person.extension_number);
+    }) ?? [];
+  if (fromPeople.length > 0) {
+    return fromPeople;
+  }
+  return (
+    editTask[fallbackExtNumsKey]?.map((extNum: string) => {
+      const extension = extensions.find(
+        (ext: any) => ext.id === extNum || ext.extension_number === extNum,
+      );
+      return extension ? Number(extension.id) : Number(extNum);
+    }) ?? []
+  );
+}
+
+function buildCreateTaskModalInitialFormFromEdit(
+  editTask: any,
+  extensions: Extension[],
+): CreateTaskFormData {
+  const projectIdRaw = editTask.project_id ?? editTask.project?.id;
+  const statusIdRaw = editTask.status_id ?? editTask.status?.id;
+  const dueTimeRaw = editTask.due_time;
+  return {
+    title: editTask.title || '',
+    description: editTask.description || '',
+    projectId: projectIdRaw ? Number(projectIdRaw) : null,
+    statusId: statusIdRaw ? Number(statusIdRaw) : null,
+    priorityId: mapPriorityStringToId(editTask.priority),
+    assigneeIds: mapEditTaskPeopleIds(
+      editTask,
+      extensions,
+      "assignees",
+      "extension_numbers",
+    ),
+    watcherIds: mapEditTaskPeopleIds(
+      editTask,
+      extensions,
+      "watchers",
+      "watcher_numbers",
+    ),
+    dueDate: formatDateForInput(editTask.due_date),
+    startDate: formatDateForInput(editTask.start_date),
+    dueTime:
+      typeof dueTimeRaw === 'string'
+        ? parseApiDueTimeToTimeInput(dueTimeRaw)
+        : '',
+    labelIds: editTask.label_ids || editTask.labels?.map((l: any) => l.id) || [],
+    linkedRecordIds: [],
+  };
+}
+
+function validateCreateTaskModalBeforeSubmit(
+  formData: CreateTaskFormData,
+  taskType: CreateTaskModalTaskType,
+): boolean {
+  if (!formData.title.trim()) {
+    toast.error('Please enter a task title');
+    return false;
+  }
+  if (
+    (taskType === 'regular' || taskType === 'todo') &&
+    formData.dueTime.trim() !== '' &&
+    formData.dueDate.trim() === ''
+  ) {
+    toast.error('Please set a due date when adding a due time');
+    return false;
+  }
+  return true;
+}
+
+function createTaskModalBlankCreateForm(
+  propProject: Project | undefined,
+  propStatuses: Status[],
+  selectedStatusForTask: number | null,
+): CreateTaskFormData {
+  return {
+    title: "",
+    description: "",
+    projectId: propProject?.id || null,
+    statusId:
+      selectedStatusForTask ||
+      (propStatuses.length > 0 ? propStatuses[0].id : null),
+    priorityId: 0,
+    assigneeIds: [],
+    watcherIds: [],
+    dueDate: "",
+    startDate: "",
+    dueTime: "",
+    labelIds: [],
+    linkedRecordIds: [],
+  };
+}
+
+function mapNumericUserIdsToExtensionPayloadIds(
+  extensions: Extension[],
+  ids: number[] | undefined,
+): string[] {
+  return (
+    ids?.map((id: number) => {
+      const extension = extensions.find((ext: any) => Number(ext.id) === id);
+      return extension ? extension.id : String(id);
+    }) ?? []
+  );
+}
+
+function buildCreateTaskModalApiPayload(
+  formData: CreateTaskFormData,
+  extensions: Extension[],
+  taskType: CreateTaskModalTaskType,
+  priorityToApi: (priorityId: number | null) => string | undefined,
+  isEdit: boolean,
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    title: formData.title,
+    description: formData.description || '',
+    priority: priorityToApi(formData.priorityId) || undefined,
+    due_date: formData.dueDate || '',
+    start_date: formData.startDate || '',
+    extension_numbers: mapNumericUserIdsToExtensionPayloadIds(
+      extensions,
+      formData.assigneeIds,
+    ),
+    watchers: mapNumericUserIdsToExtensionPayloadIds(
+      extensions,
+      formData.watcherIds,
+    ),
+    type: taskType,
+  };
+  if (formData.projectId) {
+    payload.project_id = formData.projectId;
+    payload.label_ids = formData.labelIds || [];
+  }
+  if (formData.statusId) {
+    payload.status_id = formData.statusId;
+  }
+  if (formData.linkedRecordIds && formData.linkedRecordIds.length > 0) {
+    payload.parent_task_id = formData.linkedRecordIds[0];
+  }
+  applyDueTimeToPayloadForRegularOrTodo(
+    taskType,
+    payload,
+    formData.dueDate,
+    formData.dueTime,
+    isEdit,
+  );
+  return payload;
+}
+
+async function persistCreateTaskModalResult(
+  isEdit: boolean,
+  editTask: { id?: number } | undefined,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  if (isEdit && editTask?.id) {
+    return Boolean(await updateTask(editTask.id, payload));
+  }
+  const withTz = { ...payload, timezone: getAutoTimezone() };
+  return Boolean(await createTask(withTz as Parameters<typeof createTask>[0]));
+}
+
+type CreateTaskModalSubmitContext = Readonly<{
+  isSubmitting: boolean;
+  setIsSubmitting: React.Dispatch<React.SetStateAction<boolean>>;
+  formData: CreateTaskFormData;
+  extensions: Extension[];
+  taskType: CreateTaskModalTaskType;
+  isEdit: boolean;
+  editTask: any;
+  onSuccess: ((data: CreateTaskFormData) => void) | undefined;
+  onHide: () => void;
+}>;
+
+type CreateTaskModalIdArrayKey = "labelIds" | "assigneeIds" | "watcherIds";
+
+function toggleCreateTaskModalIdInArrayField(
+  setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>,
+  field: CreateTaskModalIdArrayKey,
+  id: number,
+): void {
+  setFormData((prev) => {
+    const current = prev[field];
+    return {
+      ...prev,
+      [field]: current.includes(id)
+        ? current.filter((x) => x !== id)
+        : [...current, id],
+    };
+  });
+}
+
+async function runCreateTaskModalSubmit(
+  e: React.MouseEvent | undefined,
+  ctx: CreateTaskModalSubmitContext,
+): Promise<void> {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (ctx.isSubmitting) {
+    return;
+  }
+  if (!validateCreateTaskModalBeforeSubmit(ctx.formData, ctx.taskType)) {
+    return;
+  }
+  ctx.setIsSubmitting(true);
+  try {
+    const payload = buildCreateTaskModalApiPayload(
+      ctx.formData,
+      ctx.extensions,
+      ctx.taskType,
+      mapPriorityIdToStringCreateModal,
+      ctx.isEdit,
+    );
+    const result = await persistCreateTaskModalResult(ctx.isEdit, ctx.editTask, payload);
+    if (result) {
+      ctx.onSuccess?.(ctx.formData);
+      ctx.onHide();
+    }
+  } catch (error) {
+    console.error(
+      `Error ${ctx.isEdit ? "updating" : "creating"} task:`,
+      error,
+    );
+  } finally {
+    ctx.setIsSubmitting(false);
+  }
+}
+
+function useCreateTaskModalReferenceLists(show: boolean) {
+  const [fetchedProjects, setFetchedProjects] = useState<Project[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [genericStatuses, setGenericStatuses] = useState<Status[]>([]);
+  const [loadingGenericStatuses, setLoadingGenericStatuses] = useState(false);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!show) return;
+
+      try {
+        setLoadingProjects(true);
+        const response = await listProjects({ page: 1, limit: 100 });
+        if (response?.success === true && Array.isArray(response.data)) {
+          const projectsList = response.data.map((project: any) => ({
+            id: project.id,
+            name: project.name,
+            icon: '',
+            color: project.color || '#3b82f6',
+            statuses: project.statuses || [],
+            labels: project.labels || [],
+          }));
+          setFetchedProjects(projectsList);
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        setFetchedProjects([]);
+      } finally {
+        setLoadingProjects(false);
+      }
+    };
+
+    fetchProjects();
+  }, [show]);
+
+  useEffect(() => {
+    const fetchGenericStatuses = async () => {
+      if (!show) return;
+
+      try {
+        setLoadingGenericStatuses(true);
+        const response = await listStatuses();
+        const rawList = Array.isArray(response)
+          ? response
+          : response?.data;
+        if (Array.isArray(rawList)) {
+          setGenericStatuses(
+            rawList.map((status: any) =>
+              normalizeListStatusRowToModalStatus(status),
+            ),
+          );
+        } else {
+          setGenericStatuses([]);
+        }
+      } catch (error) {
+        console.error('Error fetching generic statuses:', error);
+        setGenericStatuses([]);
+      } finally {
+        setLoadingGenericStatuses(false);
+      }
+    };
+
+    fetchGenericStatuses();
+  }, [show]);
+
+  return {
+    fetchedProjects,
+    loadingProjects,
+    genericStatuses,
+    loadingGenericStatuses,
+  };
+}
+
+function mapExtensionsToCreateTaskModalUsers(extensions: Extension[]): UserType[] {
+  return extensions.map((ext) => ({
+    id: Number(ext.id),
+    name: ext.name,
+    avatar: "",
+    initials: ext.name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase(),
+  }));
+}
+
+function mapPriorityIdToStringCreateModal(
+  priorityId: number | null,
+): string | undefined {
+  if (!priorityId || priorityId === 0) {
+    return "";
+  }
+  const priorityMap: Record<number, string> = {
+    1: "low",
+    2: "normal",
+    3: "high",
+    4: "urgent",
+  };
+  return priorityMap[priorityId] || undefined;
+}
+
+function normalizeListStatusRowToModalStatus(status: {
+  id: number;
+  name: string;
+  color?: string;
+}): Status {
+  return {
+    id: status.id,
+    name: status.name,
+    icon: "",
+    color: status.color || "#3b82f6",
+  };
+}
+
+function resolveCreateTaskModalStatusesForProject(
+  projectId: number | null,
+  fetchedProjects: Project[],
+  genericStatuses: Status[],
+  propStatuses: Status[],
+): Status[] {
+  if (projectId) {
+    const selectedProject = fetchedProjects.find((p) => p.id === projectId);
+    if (selectedProject?.statuses && Array.isArray(selectedProject.statuses)) {
+      return selectedProject.statuses.map((status: any) =>
+        normalizeListStatusRowToModalStatus(status),
+      );
+    }
+    return [];
+  }
+  if (genericStatuses.length > 0) {
+    return genericStatuses;
+  }
+  return propStatuses;
+}
+
+function resolveCreateTaskModalProjects(
+  fetchedProjects: Project[],
+  propProject: Project | undefined,
+): Project[] {
+  if (fetchedProjects.length > 0) {
+    return fetchedProjects;
+  }
+  return propProject ? [propProject] : [];
+}
+
+function resolveCreateTaskModalLabelsForProject(
+  projectId: number | null,
+  fetchedProjects: Project[],
+  propLabels: Label[],
+): Label[] {
+  if (!projectId) {
+    return propLabels;
+  }
+  const selectedProject = fetchedProjects.find((p) => p.id === projectId);
+  if (selectedProject?.labels && Array.isArray(selectedProject.labels)) {
+    return selectedProject.labels.map((label: any) => ({
+      id: label.id,
+      name: label.name,
+      color: label.color || "#3b82f6",
+      description: label.description || "",
+    }));
+  }
+  return propLabels;
+}
+
+function useCreateTaskModalLinkedRecords(
+  isEdit: boolean,
+  editTask: any,
+): {
+  linkedRecordsFromApi: LinkedRecord[];
+  loadingLinkedRecords: boolean;
+  fetchLinkRecordsForSearch: (
+    query: string,
+    currentProjectId?: number | null,
+  ) => Promise<void>;
+} {
+  const [linkedRecordsFromApi, setLinkedRecordsFromApi] = useState<LinkedRecord[]>(
+    [],
+  );
+  const [loadingLinkedRecords, setLoadingLinkedRecords] = useState(false);
+
+  const fetchLinkRecordsForSearch = useCallback(
+    async (query: string, currentProjectId?: number | null) => {
+      const trimmed = query.trim();
+      setLoadingLinkedRecords(true);
+      try {
+        const projectId =
+          currentProjectId ??
+          (isEdit ? editTask?.project_id ?? editTask?.project?.id : null);
+        const response = await listTasks({
+          page: 1,
+          limit: 30,
+          type: "regular",
+          search: trimmed || undefined,
+          ...(projectId != null && projectId > 0 ? { project_id: projectId } : {}),
+        });
+        if (response?.data && Array.isArray(response.data)) {
+          const currentTaskId =
+            isEdit && editTask?.rawData?.id != null
+              ? Number(editTask.rawData.id)
+              : null;
+          const records: LinkedRecord[] = response.data
+            .filter(
+              (t: any) =>
+                currentTaskId == null || Number(t.id) !== currentTaskId,
+            )
+            .map((t: any) => ({
+              id: Number(t.id),
+              type: "task" as const,
+              title: t.title || "",
+              reference: t.reference || `#${t.id}`,
+            }));
+          setLinkedRecordsFromApi(records);
+        } else {
+          setLinkedRecordsFromApi([]);
+        }
+      } catch (error) {
+        console.error("Error fetching link records:", error);
+        setLinkedRecordsFromApi([]);
+      } finally {
+        setLoadingLinkedRecords(false);
+      }
+    },
+    [isEdit, editTask?.rawData?.id, editTask?.project_id, editTask?.project?.id],
+  );
+
+  return {
+    linkedRecordsFromApi,
+    loadingLinkedRecords,
+    fetchLinkRecordsForSearch,
+  };
+}
+
+type CreateTaskModalFormSyncParams = Readonly<{
+  show: boolean;
+  isEdit: boolean;
+  editTask: any;
+  fetchedProjects: Project[];
+  loadingProjects: boolean;
+  selectedStatusForTask: number | null;
+  propProject: Project | undefined;
+  propStatuses: Status[];
+  getInitialFormData: () => CreateTaskFormData;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
+}>;
+
+function useCreateTaskModalSyncFormOnShow(params: CreateTaskModalFormSyncParams): void {
+  useEffect(() => {
+    const {
+      show,
+      isEdit,
+      editTask,
+      fetchedProjects,
+      loadingProjects,
+      getInitialFormData,
+      selectedStatusForTask,
+      propProject,
+      propStatuses,
+      setSearchQuery,
+      setFormData,
+    } = params;
+    if (show) {
+      setSearchQuery("");
+      if (isEdit && editTask && fetchedProjects.length === 0 && loadingProjects) {
+        return;
+      }
+      setFormData(getInitialFormData());
+    } else {
+      setSearchQuery("");
+      setFormData(
+        createTaskModalBlankCreateForm(
+          propProject,
+          propStatuses,
+          selectedStatusForTask,
+        ),
+      );
+    }
+  }, [
+    params.show,
+    params.editTask,
+    params.isEdit,
+    params.fetchedProjects,
+    params.loadingProjects,
+    params.selectedStatusForTask,
+  ]);
+}
+
+type CreateTaskModalAutoStatusParams = Readonly<{
+  isEdit: boolean;
+  projectId: number | null;
+  statusId: number | null;
+  fetchedProjects: Project[];
+  genericStatuses: Status[];
+  loadingGenericStatuses: boolean;
+  selectedStatusForTask: number | null;
+  propStatuses: Status[];
+  setFormData: React.Dispatch<React.SetStateAction<CreateTaskFormData>>;
+}>;
+
+function createTaskModalTitleText(
+  taskType: CreateTaskModalTaskType,
+  isEdit: boolean,
+): string {
+  if (taskType === "todo") {
+    return isEdit ? "Edit Todo" : "Create Todo";
+  }
+  if (taskType === "recurring") {
+    return isEdit ? "Edit Recurring" : "Create Recurring";
+  }
+  return isEdit ? "Edit Task" : "Create Task";
+}
+
+function createTaskModalCreateAndOpenLabel(
+  isSubmitting: boolean,
+  isEdit: boolean,
+): string {
+  if (isSubmitting) {
+    return 'Processing...';
+  }
+  if (isEdit) {
+    return 'Update and open';
+  }
+  return 'Create and open';
+}
+
+function createTaskModalPrimaryLabel(
+  isSubmitting: boolean,
+  isEdit: boolean,
+): string {
+  if (isSubmitting) {
+    return 'Processing...';
+  }
+  if (isEdit) {
+    return 'Update';
+  }
+  return 'Create';
+}
+
+function createTaskModalProjectSelectChildren(
+  loadingProjects: boolean,
+  projects: Project[],
+): React.ReactNode {
+  if (loadingProjects) {
+    return <option value="">Loading projects...</option>;
+  }
+  if (projects.length === 0) {
+    return <option value="">No projects available</option>;
+  }
+  return (
+    <>
+      <option value="">Select project</option>
+      {projects.map((project) => (
+        <option key={project.id} value={project.id}>
+          {project.name}
+        </option>
+      ))}
+    </>
+  );
+}
+
+type CreateTaskModalStatusOptionsArgs = Readonly<{
+  projectId: number | null;
+  loadingProjects: boolean;
+  loadingGenericStatuses: boolean;
+  statuses: Status[];
+  isEdit: boolean;
+  statusId: number | null;
+  editTask: any;
+}>;
+
+function createTaskModalStatusSelectOptions(
+  args: CreateTaskModalStatusOptionsArgs,
+): React.ReactNode {
+  const {
+    projectId,
+    loadingProjects,
+    loadingGenericStatuses,
+    statuses,
+    isEdit,
+    statusId,
+    editTask,
+  } = args;
+  const isLoadingStatuses =
+    (Boolean(projectId) && loadingProjects) ||
+    (!projectId && loadingGenericStatuses);
+  if (isLoadingStatuses) {
+    return <option value="">Loading statuses...</option>;
+  }
+  if (statuses.length === 0) {
+    if (isEdit && statusId != null) {
+      return (
+        <option value={statusId}>
+          {editTask?.status?.name || editTask?.status_name || `Status #${statusId}`}
+        </option>
+      );
+    }
+    return <option value="">No statuses available</option>;
+  }
+  const missingFromList =
+    isEdit &&
+    statusId != null &&
+    !statuses.some((status) => String(status.id) === String(statusId));
+  return (
+    <>
+      <option value="">Select status</option>
+      {missingFromList && (
+        <option value={statusId}>
+          {editTask?.status?.name || editTask?.status_name || `Status #${statusId}`}
+        </option>
+      )}
+      {statuses.map((status) => (
+        <option key={status.id} value={status.id}>
+          {status.name}
+        </option>
+      ))}
+    </>
+  );
+}
+
+function useCreateTaskModalAutoPickStatus(
+  params: CreateTaskModalAutoStatusParams,
+): void {
+  useEffect(() => {
+    const {
+      isEdit,
+      projectId,
+      statusId,
+      fetchedProjects,
+      genericStatuses,
+      loadingGenericStatuses,
+      selectedStatusForTask,
+      propStatuses,
+      setFormData,
+    } = params;
+    if (isEdit) {
+      return;
+    }
+    if (projectId && fetchedProjects.length === 0) {
+      return;
+    }
+    if (!projectId && loadingGenericStatuses) {
+      return;
+    }
+    const availableStatuses = resolveCreateTaskModalStatusesForProject(
+      projectId,
+      fetchedProjects,
+      genericStatuses,
+      propStatuses,
+    );
+    if (!statusId && availableStatuses.length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        statusId: selectedStatusForTask || availableStatuses[0].id,
+      }));
+    }
+  }, [
+    params.isEdit,
+    params.projectId,
+    params.statusId,
+    params.fetchedProjects,
+    params.genericStatuses,
+    params.loadingGenericStatuses,
+    params.selectedStatusForTask,
+    params.propStatuses,
+    params.setFormData,
+  ]);
 }
 
 const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
@@ -141,90 +902,17 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   selectedStatusForTask = null,
   taskType = 'regular'
 }) => {
-  // Map priority string to priority ID
-  const mapPriorityStringToId = (priority: string | null | undefined): number => {
-    const priorityMap: Record<string, number> = {
-      'low': 1,
-      'normal': 2,
-      'medium': 2,
-      'high': 3,
-      'urgent': 4
-    };
-    return priorityMap[priority?.toLowerCase() || 'normal'] || 2;
-  };
-
-  // Format date for HTML date input (YYYY-MM-DD)
-  const formatDateForInput = (dateString: string | null | undefined): string => {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return '';
-      // Format as YYYY-MM-DD for HTML date input
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    } catch {
-      return '';
-    }
-  };
-
   // Initialize form data - populate from editTask if in edit mode
   const getInitialFormData = (): CreateTaskFormData => {
     if (isEdit && editTask) {
-      const projectIdRaw = editTask.project_id ?? editTask.project?.id;
-      const statusIdRaw = editTask.status_id ?? editTask.status?.id;
-
-      // Map assignees from extension_numbers to assigneeIds
-      const assigneeIds = editTask.assignees?.map((assignee: any) => {
-        const extension = extensions.find((ext: any) => 
-          ext.id === assignee.extension_number || 
-          ext.extension_number === assignee.extension_number
-        );
-        return extension ? Number(extension.id) : Number(assignee.extension_number);
-      }) || editTask.extension_numbers?.map((extNum: string) => {
-        const extension = extensions.find((ext: any) => ext.id === extNum || ext.extension_number === extNum);
-        return extension ? Number(extension.id) : Number(extNum);
-      }) || [];
-
-      const watcherIds = editTask.watchers?.map((watcher: any) => {
-        const extension = extensions.find((ext: any) =>
-          ext.id === watcher.extension_number || ext.extension_number === watcher.extension_number
-        );
-        return extension ? Number(extension.id) : Number(watcher.extension_number);
-      }) || editTask.watcher_numbers?.map((extNum: string) => {
-        const extension = extensions.find((ext: any) => ext.id === extNum || ext.extension_number === extNum);
-        return extension ? Number(extension.id) : Number(extNum);
-      }) || [];
-
-      return {
-        title: editTask.title || '',
-        description: editTask.description || '',
-        projectId: projectIdRaw ? Number(projectIdRaw) : null,
-        statusId: statusIdRaw ? Number(statusIdRaw) : null,
-        priorityId: mapPriorityStringToId(editTask.priority),
-        assigneeIds: assigneeIds,
-        watcherIds: watcherIds,
-        dueDate: formatDateForInput(editTask.due_date),
-        startDate: formatDateForInput(editTask.start_date),
-        labelIds: editTask.label_ids || editTask.labels?.map((l: any) => l.id) || [],
-        linkedRecordIds: []
-      };
+      return buildCreateTaskModalInitialFormFromEdit(editTask, extensions);
     }
     
-    return {
-      title: '',
-      description: '',
-      projectId: propProject?.id || null,
-      statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-      priorityId: 0, // Default to "Select Priority" (empty value)
-      assigneeIds: [],
-      watcherIds: [],
-      dueDate: '',
-      startDate: '',
-      labelIds: [],
-      linkedRecordIds: []
-    };
+    return createTaskModalBlankCreateForm(
+      propProject,
+      propStatuses,
+      selectedStatusForTask,
+    );
   };
 
   const [formData, setFormData] = useState<CreateTaskFormData>(getInitialFormData());
@@ -233,222 +921,63 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const [watcherSearchQuery, setWatcherSearchQuery] = useState('');
   const [showWatcherDropdown, setShowWatcherDropdown] = useState(false);
-  const [fetchedProjects, setFetchedProjects] = useState<Project[]>([]);
-  const [loadingProjects, setLoadingProjects] = useState(false);
-  const [genericStatuses, setGenericStatuses] = useState<Status[]>([]);
-  const [loadingGenericStatuses, setLoadingGenericStatuses] = useState(false);
+  const {
+    fetchedProjects,
+    loadingProjects,
+    genericStatuses,
+    loadingGenericStatuses,
+  } = useCreateTaskModalReferenceLists(show);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [linkedRecordsFromApi, setLinkedRecordsFromApi] = useState<LinkedRecord[]>([]);
-  const [loadingLinkedRecords, setLoadingLinkedRecords] = useState(false);
-
-  // Fetch projects from API
-  useEffect(() => {
-    const fetchProjects = async () => {
-      if (!show) return; // Only fetch when modal is open
-      
-      try {
-        setLoadingProjects(true);
-        const response = await listProjects({ page: 1, limit: 100 });
-        if (response && response.success === true && response.data && Array.isArray(response.data)) {
-          const projectsList = response.data.map((project: any) => ({
-            id: project.id,
-            name: project.name,
-            icon: '',
-            color: project.color || '#3b82f6',
-            statuses: project.statuses || [], // Store statuses from API response
-            labels: project.labels || [] // Store labels from API response
-          }));
-          setFetchedProjects(projectsList);
-        }
-      } catch (error) {
-        console.error('Error fetching projects:', error);
-        setFetchedProjects([]);
-      } finally {
-        setLoadingProjects(false);
-      }
-    };
-
-    fetchProjects();
-  }, [show]);
-
-  // Fetch generic statuses from API
-  useEffect(() => {
-    const fetchGenericStatuses = async () => {
-      if (!show) return; // Only fetch when modal is open
-      
-      try {
-        setLoadingGenericStatuses(true);
-        const response = await listStatuses();
-        if (response && Array.isArray(response)) {
-          const statusesList = response.map((status: any) => ({
-            id: status.id,
-            name: status.name,
-            icon: '',
-            color: status.color || '#3b82f6'
-          }));
-          setGenericStatuses(statusesList);
-        } else if (response?.data && Array.isArray(response.data)) {
-          const statusesList = response.data.map((status: any) => ({
-            id: status.id,
-            name: status.name,
-            icon: '',
-            color: status.color || '#3b82f6'
-          }));
-          setGenericStatuses(statusesList);
-        } else {
-          setGenericStatuses([]);
-        }
-      } catch (error) {
-        console.error('Error fetching generic statuses:', error);
-        setGenericStatuses([]);
-      } finally {
-        setLoadingGenericStatuses(false);
-      }
-    };
-
-    fetchGenericStatuses();
-  }, [show]);
-
-  // Fetch link records via listTasks (no relations); call with any search string (including single character)
-  const fetchLinkRecordsForSearch = useCallback(async (query: string, currentProjectId?: number | null) => {
-    const trimmed = query.trim();
-    setLoadingLinkedRecords(true);
-    try {
-      const projectId = currentProjectId ?? (isEdit ? (editTask?.project_id ?? editTask?.project?.id) : null);
-      const response = await listTasks({
-        page: 1,
-        limit: 30,
-        type: 'regular',
-        search: trimmed || undefined,
-        ...(projectId != null && projectId > 0 ? { project_id: projectId } : {}),
-      });
-      if (response?.data && Array.isArray(response.data)) {
-        const currentTaskId = isEdit && editTask?.rawData?.id != null ? Number(editTask.rawData.id) : null;
-        const records: LinkedRecord[] = response.data
-          .filter((t: any) => currentTaskId == null || Number(t.id) !== currentTaskId)
-          .map((t: any) => ({
-            id: Number(t.id),
-            type: 'task' as const,
-            title: t.title || '',
-            reference: t.reference || `#${t.id}`,
-          }));
-        setLinkedRecordsFromApi(records);
-      } else {
-        setLinkedRecordsFromApi([]);
-      }
-    } catch (error) {
-      console.error('Error fetching link records:', error);
-      setLinkedRecordsFromApi([]);
-    } finally {
-      setLoadingLinkedRecords(false);
-    }
-  }, [isEdit, editTask?.rawData?.id, editTask?.project_id, editTask?.project?.id]);
+  const {
+    linkedRecordsFromApi,
+    loadingLinkedRecords,
+    fetchLinkRecordsForSearch,
+  } = useCreateTaskModalLinkedRecords(isEdit, editTask);
 
   useEffect(() => {
     if (!show) return;
-    void fetchLinkRecordsForSearch(searchQuery, formData.projectId);
+    fetchLinkRecordsForSearch(searchQuery, formData.projectId).catch(() => undefined);
   }, [show, fetchLinkRecordsForSearch]);
 
-  // Reset form data when modal opens/closes or editTask changes (after projects are loaded)
-  useEffect(() => {
-    if (show) {
-      setSearchQuery(''); // Clear Link Records search when modal opens
-      // Recalculate initial form data when modal opens or editTask changes
-      // Wait for projects to be fetched if in edit mode (needed for statuses/labels)
-      if (isEdit && editTask && fetchedProjects.length === 0 && loadingProjects) {
-        // Projects are still loading, wait for them
-        return;
-      }
-      const initialData = getInitialFormData();
-      setFormData(initialData);
-    } else {
-      // Reset form when modal closes
-      setSearchQuery('');
-      setFormData({
-        title: '',
-        description: '',
-        projectId: propProject?.id || null,
-        statusId: selectedStatusForTask || (propStatuses.length > 0 ? propStatuses[0].id : null),
-        priorityId: 0,
-        assigneeIds: [],
-        watcherIds: [],
-        dueDate: '',
-        startDate: '',
-        labelIds: [],
-        linkedRecordIds: []
-      });
-    }
-  }, [show, editTask, isEdit, fetchedProjects, loadingProjects, selectedStatusForTask]);
+  useCreateTaskModalSyncFormOnShow({
+    show,
+    isEdit,
+    editTask,
+    fetchedProjects,
+    loadingProjects,
+    selectedStatusForTask,
+    propProject,
+    propStatuses,
+    getInitialFormData,
+    setSearchQuery,
+    setFormData,
+  });
 
-  // Convert extensions to users format for assignees
-  const users: UserType[] = extensions.map((ext) => ({
-    id: Number(ext.id),
-    name: ext.name,
-    avatar: "",
-    initials: ext.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-  }));
+  const users: UserType[] = mapExtensionsToCreateTaskModalUsers(extensions);
 
-  // Use API-fetched projects, or fallback to propProject if provided
-  const projects: Project[] = fetchedProjects.length > 0 
-    ? fetchedProjects 
-    : (propProject ? [propProject] : []);
+  const projects: Project[] = resolveCreateTaskModalProjects(
+    fetchedProjects,
+    propProject,
+  );
 
-  // Get statuses: if project is selected, use project statuses; otherwise use generic statuses
-  const getStatusesForSelectedProject = (): Status[] => {
-    // If project is selected, use project statuses
-    if (formData.projectId) {
-      const selectedProject = fetchedProjects.find(p => p.id === formData.projectId);
-      if (selectedProject && selectedProject.statuses && Array.isArray(selectedProject.statuses)) {
-        return selectedProject.statuses.map((status: any) => ({
-          id: status.id,
-          name: status.name,
-          icon: '',
-          color: status.color || '#3b82f6'
-        }));
-      }
-      // If project selected but no statuses found, return empty array
-      return [];
-    }
-    
-    // If no project selected, use generic statuses from API
-    if (genericStatuses.length > 0) {
-      return genericStatuses;
-    }
-    
-    // Fallback to propStatuses if provided
-    return propStatuses;
-  };
+  const statuses: Status[] = resolveCreateTaskModalStatusesForProject(
+    formData.projectId,
+    fetchedProjects,
+    genericStatuses,
+    propStatuses,
+  );
 
-  const statuses: Status[] = getStatusesForSelectedProject();
-
-  // Auto-select first status when project changes or generic statuses load
-  useEffect(() => {
-    // Only auto-select in create mode, not edit mode
-    if (isEdit) {
-      return;
-    }
-
-    // If project is selected, wait for projects to load
-    if (formData.projectId && fetchedProjects.length === 0) {
-      return;
-    }
-
-    // If no project selected, wait for generic statuses to load
-    if (!formData.projectId && loadingGenericStatuses) {
-      return;
-    }
-
-    // Get available statuses
-    const availableStatuses = getStatusesForSelectedProject();
-    
-    // Auto-select first status if none selected and statuses are available
-    if (!formData.statusId && availableStatuses.length > 0) {
-      setFormData(prev => ({ 
-        ...prev, 
-        statusId: selectedStatusForTask || availableStatuses[0].id 
-      }));
-    }
-  }, [formData.projectId, fetchedProjects, genericStatuses, loadingGenericStatuses, isEdit, selectedStatusForTask]);
+  useCreateTaskModalAutoPickStatus({
+    isEdit,
+    projectId: formData.projectId,
+    statusId: formData.statusId,
+    fetchedProjects,
+    genericStatuses,
+    loadingGenericStatuses,
+    selectedStatusForTask,
+    propStatuses,
+    setFormData,
+  });
 
   const priorities: Priority[] = [
     { id: 0, name: "Select Priority", icon: "", color: "#6c757d" },
@@ -458,240 +987,47 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
     { id: 4, name: "Urgent", icon: "🔴", color: "#ef4444" }
   ];
 
-  // Get labels from selected project (from fetchedProjects), otherwise use propLabels
-  const getLabelsForSelectedProject = (): Label[] => {
-    if (!formData.projectId) {
-      return propLabels;
-    }
-    
-    const selectedProject = fetchedProjects.find(p => p.id === formData.projectId);
-    if (selectedProject && selectedProject.labels && Array.isArray(selectedProject.labels)) {
-      return selectedProject.labels.map((label: any) => ({
-        id: label.id,
-        name: label.name,
-        color: label.color || '#3b82f6',
-        description: label.description || ''
-      }));
-    }
-    
-    return propLabels;
-  };
+  const labels: Label[] = resolveCreateTaskModalLabelsForProject(
+    formData.projectId,
+    fetchedProjects,
+    propLabels,
+  );
 
-  const labels: Label[] = getLabelsForSelectedProject();
+  const handleCreate = (e?: React.MouseEvent) =>
+    runCreateTaskModalSubmit(e, {
+      isSubmitting,
+      setIsSubmitting,
+      formData,
+      extensions,
+      taskType,
+      isEdit,
+      editTask,
+      onSuccess: onCreate,
+      onHide,
+    });
 
-  // Link records are fetched via listTasks (see useEffect) with empty relations
+  const handleCreateAndOpen = (e?: React.MouseEvent) =>
+    runCreateTaskModalSubmit(e, {
+      isSubmitting,
+      setIsSubmitting,
+      formData,
+      extensions,
+      taskType,
+      isEdit,
+      editTask,
+      onSuccess: onCreateAndOpen,
+      onHide,
+    });
 
-  // Map priority ID to priority string
-  const mapPriorityIdToString = (priorityId: number | null): string | undefined => {
-    if (!priorityId || priorityId === 0) {
-      return ''; // Return empty for "Select Priority" (id: 0)
-    }
-    const priorityMap: Record<number, string> = {
-      1: 'low',
-      2: 'normal',
-      3: 'high',
-      4: 'urgent'
-    };
-    return priorityMap[priorityId] || undefined;
-  };
+  const toggleLabel = (labelId: number) =>
+    toggleCreateTaskModalIdInArrayField(setFormData, "labelIds", labelId);
 
-  const handleCreate = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
-    if (isSubmitting) {
-      return;
-    }
+  const toggleAssignee = (userId: number) =>
+    toggleCreateTaskModalIdInArrayField(setFormData, "assigneeIds", userId);
 
-    if (!formData.title.trim()) {
-      toast.error('Please enter a task title');
-      return;
-    }
+  const toggleWatcher = (userId: number) =>
+    toggleCreateTaskModalIdInArrayField(setFormData, "watcherIds", userId);
 
-    setIsSubmitting(true);
-    try {
-      // Map form data to API payload
-      const payload: any = {
-        title: formData.title,
-        description: formData.description || '',
-        priority: mapPriorityIdToString(formData.priorityId) || undefined,
-        due_date: formData.dueDate || '',
-        start_date: formData.startDate || '',
-        extension_numbers: formData.assigneeIds?.map((id: number) => {
-          // Find the extension by id from extensions prop
-          const extension = extensions.find((ext: any) => Number(ext.id) === id);
-          return extension ? extension.id : String(id);
-        }) || [],
-        watchers: formData.watcherIds?.map((id: number) => {
-          const extension = extensions.find((ext: any) => Number(ext.id) === id);
-          return extension ? extension.id : String(id);
-        }) || [],
-        type: taskType // Add task type (regular, recurring, or todo)
-      };
-
-      // Add project_id if available (optional)
-      if (formData.projectId) {
-        payload.project_id = formData.projectId;
-        payload.label_ids = formData.labelIds || [];
-      }
-
-      // Add status_id if available (works for both project-based and generic statuses)
-      if (formData.statusId) {
-        payload.status_id = formData.statusId;
-      }
-
-      // Add parent_task_id if records are linked (use first linked record as parent)
-      if (formData.linkedRecordIds && formData.linkedRecordIds.length > 0) {
-        payload.parent_task_id = formData.linkedRecordIds[0];
-      }
-
-      // If edit mode, use updateTask API
-      if (isEdit && editTask?.id) {
-        const result = await updateTask(editTask.id, payload);
-        if (result) {
-          // Call the callback if provided
-          if (onCreate) {
-            onCreate(formData);
-          }
-          onHide();
-        }
-      } else {
-        // Create mode
-        const autoTimezone = getAutoTimezone();
-        payload.timezone = autoTimezone;
-        
-        const result = await createTask(payload);
-        if (result) {
-          // Call the callback if provided
-          if (onCreate) {
-            onCreate(formData);
-          }
-          onHide();
-        }
-      }
-    } catch (error) {
-      console.error(`Error ${isEdit ? 'updating' : 'creating'} task:`, error);
-      // Error is already handled by API (toast notification)
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCreateAndOpen = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
-    if (isSubmitting) {
-      return;
-    }
-
-    if (!formData.title.trim()) {
-      toast.error('Please enter a task title');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      // Map form data to API payload
-      const payload: any = {
-        title: formData.title,
-        description: formData.description || '',
-        priority: mapPriorityIdToString(formData.priorityId) || undefined,
-        due_date: formData.dueDate || '',
-        start_date: formData.startDate || '',
-        extension_numbers: formData.assigneeIds?.map((id: number) => {
-          const extension = extensions.find((ext: any) => Number(ext.id) === id);
-          return extension ? extension.id : String(id);
-        }) || [],
-        watchers: formData.watcherIds?.map((id: number) => {
-          const extension = extensions.find((ext: any) => Number(ext.id) === id);
-          return extension ? extension.id : String(id);
-        }) || [],
-        type: taskType // Add task type (regular, recurring, or todo)
-      };
-
-      // Add project_id if available (optional)
-      if (formData.projectId) {
-        payload.project_id = formData.projectId;
-        payload.label_ids = formData.labelIds || [];
-      }
-
-      // Add status_id if available (works for both project-based and generic statuses)
-      if (formData.statusId) {
-        payload.status_id = formData.statusId;
-      }
-
-      // Add parent_task_id if records are linked (use first linked record as parent)
-      if (formData.linkedRecordIds && formData.linkedRecordIds.length > 0) {
-        payload.parent_task_id = formData.linkedRecordIds[0];
-      }
-
-      // If edit mode, use updateTask API
-      if (isEdit && editTask?.id) {
-        const result = await updateTask(editTask.id, payload);
-        if (result) {
-          // Call the callback if provided
-          if (onCreateAndOpen) {
-            onCreateAndOpen(formData);
-          }
-          onHide();
-        }
-      } else {
-        // Create mode
-        const autoTimezone = getAutoTimezone();
-        payload.timezone = autoTimezone;
-        
-        const result = await createTask(payload);
-        if (result) {
-          // Call the callback if provided
-          if (onCreateAndOpen) {
-            onCreateAndOpen(formData);
-          }
-          onHide();
-        }
-      }
-    } catch (error) {
-      console.error(`Error ${isEdit ? 'updating' : 'creating'} task:`, error);
-      // Error is already handled by API (toast notification)
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const toggleLabel = (labelId: number) => {
-    setFormData(prev => ({
-      ...prev,
-      labelIds: prev.labelIds.includes(labelId)
-        ? prev.labelIds.filter(id => id !== labelId)
-        : [...prev.labelIds, labelId]
-    }));
-  };
-
-  const toggleAssignee = (userId: number) => {
-    setFormData(prev => ({
-      ...prev,
-      assigneeIds: prev.assigneeIds.includes(userId)
-        ? prev.assigneeIds.filter(id => id !== userId)
-        : [...prev.assigneeIds, userId]
-    }));
-  };
-
-  const toggleWatcher = (userId: number) => {
-    setFormData(prev => ({
-      ...prev,
-      watcherIds: prev.watcherIds.includes(userId)
-        ? prev.watcherIds.filter(id => id !== userId)
-        : [...prev.watcherIds, userId]
-    }));
-  };
-
-  const selectedProject = projects.find(p => p.id === formData.projectId) || null;
-  const selectedStatus = statuses.find(s => s.id === formData.statusId) || null;
-  const selectedPriority = priorities.find(p => p.id === formData.priorityId) || null;
   const selectedAssignees = users.filter(u => formData.assigneeIds.includes(u.id));
   const selectedWatchers = users.filter(u => formData.watcherIds.includes(u.id));
   const selectedLabels = labels.filter(l => formData.labelIds.includes(l.id));
@@ -720,11 +1056,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           gap: '8px'
         }}>
           <ListTodo size={20} color="#4e6fa5" />
-          {taskType === 'todo' 
-            ? (isEdit ? 'Edit Todo' : 'Create Todo')
-            : taskType === 'recurring'
-            ? (isEdit ? 'Edit Recurring' : 'Create Recurring')
-            : (isEdit ? 'Edit Task' : 'Create Task')}
+          {createTaskModalTitleText(taskType, isEdit)}
         </Modal.Title>
         <Button
           variant="link"
@@ -806,20 +1138,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 style={{ fontSize: '14px' }}
                 disabled={loadingProjects || projects.length === 0}
               >
-                {loadingProjects ? (
-                  <option value="">Loading projects...</option>
-                ) : projects.length === 0 ? (
-                  <option value="">No projects available</option>
-                ) : (
-                  <>
-                    <option value="">Select project</option>
-                    {projects.map(project => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </>
-                )}
+                {createTaskModalProjectSelectChildren(loadingProjects, projects)}
               </Form.Select>
             </Form.Group>
           </Col>
@@ -853,33 +1172,15 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                   statuses.length === 0
                 }
               >
-                {(formData.projectId && loadingProjects) || (!formData.projectId && loadingGenericStatuses) ? (
-                  <option value="">Loading statuses...</option>
-                ) : statuses.length === 0 ? (
-                  isEdit && formData.statusId ? (
-                    <option value={formData.statusId}>
-                      {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
-                    </option>
-                  ) : (
-                    <option value="">No statuses available</option>
-                  )
-                ) : (
-                  <>
-                    <option value="">Select status</option>
-                    {isEdit &&
-                      formData.statusId &&
-                      !statuses.some(s => String(s.id) === String(formData.statusId)) && (
-                        <option value={formData.statusId}>
-                          {editTask?.status?.name || editTask?.status_name || `Status #${formData.statusId}`}
-                        </option>
-                      )}
-                    {statuses.map(status => (
-                      <option key={status.id} value={status.id}>
-                        {status.name}
-                      </option>
-                    ))}
-                  </>
-                )}
+                {createTaskModalStatusSelectOptions({
+                  projectId: formData.projectId,
+                  loadingProjects,
+                  loadingGenericStatuses,
+                  statuses,
+                  isEdit,
+                  statusId: formData.statusId,
+                  editTask,
+                })}
               </Form.Select>
             </Form.Group>
           </Col>
@@ -915,7 +1216,17 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                 type="date"
                 placeholder="Select date"
                 value={formData.dueDate}
-                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setFormData((prev) => ({
+                    ...prev,
+                    dueDate: v,
+                    dueTime:
+                      (taskType === 'regular' || taskType === 'todo') && v.trim() === ''
+                        ? ''
+                        : prev.dueTime,
+                  }));
+                }}
                 min={new Date().toISOString().split('T')[0]}
                 className="py-2"
                 style={{ fontSize: '14px' }}
@@ -944,6 +1255,45 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             </Form.Group>
           </Col>
         </Row>
+
+        {(taskType === 'regular' || taskType === 'todo') && (
+          <Row className="mb-3">
+            <Col xs={12} md={6} className="d-flex">
+              <Form.Group className="d-flex flex-column flex-fill mb-0">
+                <Form.Label
+                  className="fw-semibold mb-2"
+                  style={{
+                    fontSize: "14px",
+                    color: "#2d3748",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    minHeight: 44,
+                    whiteSpace: "nowrap",
+                  }}
+                  title="Optional — leave empty for no specific time"
+                >
+                  <Clock size={16} style={{ flexShrink: 0 }} aria-hidden />
+                  <span>
+                    Due time{" "}
+                    <span style={{ fontWeight: 500, color: "#64748b", fontSize: "12px" }}>
+                      (optional)
+                    </span>
+                  </span>
+                </Form.Label>
+                <Form.Control
+                  type="time"
+                  value={formData.dueTime}
+                  onChange={(e) =>
+                    setFormData({ ...formData, dueTime: e.target.value })
+                  }
+                  className="py-2 mt-auto"
+                  style={{ fontSize: "14px" }}
+                />
+              </Form.Group>
+            </Col>
+          </Row>
+        )}
 
         {/* Assignees Field */}
         {taskType !== 'todo' && (
@@ -1451,6 +1801,22 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
         >
           Cancel
         </Button>
+
+        {onCreateAndOpen && (
+          <Button
+            variant="outline-primary"
+            type="button"
+            onClick={handleCreateAndOpen}
+            disabled={isSubmitting}
+            style={{
+              padding: '8px 20px',
+              fontSize: '14px',
+              fontWeight: '600',
+            }}
+          >
+            {createTaskModalCreateAndOpenLabel(isSubmitting, isEdit)}
+          </Button>
+        )}
         
         <Button 
           variant="primary" 
@@ -1465,7 +1831,7 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
             borderColor: '#4e6fa5'
           }}
         >
-          {isSubmitting ? 'Processing...' : (isEdit ? 'Update' : 'Create')}
+          {createTaskModalPrimaryLabel(isSubmitting, isEdit)}
         </Button>
       </Modal.Footer>
 
