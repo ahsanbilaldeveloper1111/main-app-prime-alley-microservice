@@ -195,7 +195,6 @@ function createPhoneDropdownContent(
   };
 }
 
-const CallRecordings: NextPage & { getLayout?: (page: React.ReactElement) => React.ReactNode } = () => {
 function createDateDropdownContent(
   value: string,
   onChange: (v: string) => void,
