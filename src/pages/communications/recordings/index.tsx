@@ -50,14 +50,14 @@ import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import {
     formatEndDateValueForApi,
     formatStartDateValueForApi,
-} from '@pages/communications/shared/communicationsDateExtensionFilters';
+} from '@utils/communications/communicationsDateExtensionFilters';
 import {
     buildCallDirectionFilterPill,
     buildDepartmentFilterPill,
     buildEndDateTimeFilterPill,
     buildExtensionNumberMultiSelectFilterPill,
     buildStartDateTimeFilterPill,
-} from '@pages/communications/shared/communicationsFilterPillFactories';
+} from '@utils/communications/communicationsFilterPillFactories';
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
 // Interfaces
