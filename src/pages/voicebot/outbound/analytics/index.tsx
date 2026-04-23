@@ -1005,7 +1005,7 @@ const OutboundAnalytics = () => {
     let cancelled = false;
     async function fetchCampaigns() {
       try {
-        const res = await getCampaigns({ page: 1, page_size: 500 });
+        const res = await getCampaigns({ company_id: companyIdForCampaigns, page: 1, page_size: 200 });
         const list =
           Array.isArray(res)
             ? res

@@ -126,10 +126,34 @@ function toSessionId(row: CallReportRow): string | null {
 }
 
 function formatDateTime(value: unknown): string {
-  const s = typeof value === "string" ? value : "";
-  if (!s) return "—";
-  const m = moment(s);
-  return m.isValid() ? m.format(GlobalDateTimeFormat) : "—";
+  if (value == null || value === "") return "—";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const m = value < 1e12 ? moment.unix(value) : moment(value);
+    return m.isValid() ? m.format(GlobalDateTimeFormat) : "—";
+  }
+  if (typeof value === "string") {
+    const m = moment(value);
+    return m.isValid() ? m.format(GlobalDateTimeFormat) : "—";
+  }
+  if (value instanceof Date) {
+    const m = moment(value);
+    return m.isValid() ? m.format(GlobalDateTimeFormat) : "—";
+  }
+  return "—";
+}
+
+/** e.g. "participant_disconnected" → "participant disconnected"; plain text without underscores is unchanged. */
+function humanizeSnakeCase(value: unknown, fallback = "—"): string {
+  if (value == null) return fallback;
+  if (typeof value !== "string") return fallback;
+  const s = value.trim();
+  if (!s) return fallback;
+  if (!s.includes("_")) return s;
+  return s
+    .replaceAll("_", " ")
+    .replaceAll(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function formatBool(value: unknown): string {
@@ -374,7 +398,7 @@ const OutboundReportsPage = () => {
     }
 
     return Object.entries(sidebarData.usage).map(([key, value]) => ({
-      label: key,
+      label: humanizeSnakeCase(key),
       value: displayText(value),
     }));
   }, [sidebarData]);
@@ -385,10 +409,10 @@ const OutboundReportsPage = () => {
     }
 
     return [
-      { label: "llm_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.llm_cost ?? 0))}` },
-      { label: "tts_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.tts_cost ?? 0))}` },
-      { label: "stt_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.stt_cost ?? 0))}` },
-      { label: "total_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.total_cost ?? 0))}` },
+      { label: humanizeSnakeCase("llm_cost"), value: `$${formatCost(Number(sidebarData.cost_breakdown.llm_cost ?? 0))}` },
+      { label: humanizeSnakeCase("tts_cost"), value: `$${formatCost(Number(sidebarData.cost_breakdown.tts_cost ?? 0))}` },
+      { label: humanizeSnakeCase("stt_cost"), value: `$${formatCost(Number(sidebarData.cost_breakdown.stt_cost ?? 0))}` },
+      { label: humanizeSnakeCase("total_cost"), value: `$${formatCost(Number(sidebarData.cost_breakdown.total_cost ?? 0))}` },
     ];
   }, [sidebarData]);
 
@@ -404,7 +428,6 @@ const OutboundReportsPage = () => {
         defaultExpanded: true,
         isLoading: sidebarLoading,
         fields: [
-          { label: "Session ID", value: dataForView?.session_id ?? selectedRow?.session_id ?? "—", copyable: true },
           { label: "Campaign", value: dataForView?.campaign_name ?? selectedRow?.campaign_name ?? "—" },
           { label: "Phone", value: dataForView?.phone_number ?? selectedRow?.phone_number ?? "—", type: "phone" },
           { label: "Status", value: dataForView?.call_status ?? selectedRow?.call_status ?? "—", type: "badge" },
@@ -423,9 +446,9 @@ const OutboundReportsPage = () => {
         defaultExpanded: true,
         isLoading: sidebarLoading,
         fields: [
-          { label: "Start", value: dataForView?.session_start_time, type: "datetime" },
-          { label: "End", value: dataForView?.session_end_time, type: "datetime" },
-          { label: "Disconnect", value: dataForView?.disconnect_reason ?? "—" },
+          { label: "Start", value: formatDateTime(dataForView?.session_start_time) },
+          { label: "End", value: formatDateTime(dataForView?.session_end_time) },
+          { label: "Disconnect", value: humanizeSnakeCase(dataForView?.disconnect_reason) },
           { label: "Transfer attempted", value: formatBool(dataForView?.transfer_attempted) },
           { label: "Transfer successful", value: formatBool(dataForView?.transfer_successful) },
           { label: "Transfer to", value: dataForView?.transfer_to ?? "—" },

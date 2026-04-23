@@ -11,6 +11,7 @@ import {
   postCampaignPause,
   postCampaignResume,
   postCampaignStop,
+  postCampaignRedispatch,
   getCampaignStatus,
   type ListCampaignsParams,
 } from "@utils/voicebot/outbound";
@@ -21,7 +22,7 @@ import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { Plus, Pencil, Trash2, Play, Pause, RotateCw, Square, Activity, ClipboardList, Megaphone, Bot, Phone, Timer, Layers, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Play, Pause, RotateCw, Square, Activity, ClipboardList, Megaphone, Bot, Phone, Timer, Layers, Check, RefreshCw } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { formatDateForTable } from "@utils/Helper";
 import "@assets/scss/common.scss";
@@ -84,6 +85,8 @@ function getCampaignStatusBadgeVariant(status: string): "success" | "warning" | 
   if (status === "active") return "success";
   if (status === "paused") return "warning";
   if (status === "running") return "primary";
+  if (status === "completed") return "success";
+  if (status === "stopped") return "secondary";
   return "secondary";
 }
 
@@ -98,6 +101,7 @@ interface CampaignRowActionsCellProps {
   onResume: (row: CampaignRow) => void;
   onStop: (row: CampaignRow) => void;
   onLoadStatus: (row: CampaignRow) => void;
+  onOpenRedispatch: (row: CampaignRow) => void;
   onDelete: (row: CampaignRow) => void;
 }
 
@@ -165,6 +169,31 @@ function campaignPausedResumeControl(
   );
 }
 
+/** Redispatch is only available for stopped or completed campaigns (API). */
+function campaignRedispatchButton(
+  row: CampaignRow,
+  id: string,
+  status: string,
+  loadingKey: string | null,
+  onOpenRedispatch: (r: CampaignRow) => void,
+): React.ReactElement | null {
+  if (status !== "stopped" && status !== "completed") {
+    return null;
+  }
+  return (
+    <Button
+      size="sm"
+      title="Redispatch: reset campaign and call all numbers from scratch"
+      variant="outline-primary"
+      className="icon-action-btn icon-redispatch-btn"
+      onClick={() => onOpenRedispatch(row)}
+      disabled={!!loadingKey}
+    >
+      {loadingKey === `redispatch-${id}` ? <Spinner animation="border" size="sm" /> : <RefreshCw size={12} />}
+    </Button>
+  );
+}
+
 type CampaignLifecycleContext = Readonly<{
   isCompleted: boolean;
   row: CampaignRow;
@@ -203,6 +232,7 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
     onResume,
     onStop,
     onLoadStatus,
+    onOpenRedispatch,
     onDelete,
   } = props;
   const isCompleted = status === "completed";
@@ -226,6 +256,7 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
         onResume,
         onStop,
       })}
+      {campaignRedispatchButton(row, id, status, loadingKey, onOpenRedispatch)}
       <Button size="sm" variant="outline-secondary" className="icon-action-btn icon-status-btn" onClick={() => onLoadStatus(row)} title="Campaign status">
         <Activity size={12} />
       </Button>
@@ -258,6 +289,8 @@ const CampaignsPage = () => {
   const [dispatchSummaryData, setDispatchSummaryData] = useState<Record<string, unknown> | null>(null);
   const [dispatchSummaryLoading, setDispatchSummaryLoading] = useState(false);
   const [rowToDispatch, setRowToDispatch] = useState<CampaignRow | null>(null);
+  const [showRedispatchModal, setShowRedispatchModal] = useState(false);
+  const [rowToRedispatch, setRowToRedispatch] = useState<CampaignRow | null>(null);
 
   const fetchCompanies = useCallback(async () => {
     try {
@@ -311,6 +344,30 @@ const CampaignsPage = () => {
 
   const campaignId = (row: CampaignRow) => String(row.campaign_id ?? row.id ?? "");
   const selectedCompanyId = selectedRow?.company_id ?? effectiveCompanyId;
+
+  const handleRedispatchConfirm = async () => {
+    if (!rowToRedispatch) return;
+    const id = campaignId(rowToRedispatch);
+    const companyId = String(rowToRedispatch.company_id ?? effectiveCompanyId ?? "");
+    if (!id) {
+      toast.error("Missing campaign id");
+      return;
+    }
+    setOpLoading(`redispatch-${id}`);
+    try {
+      const payload = companyId ? { company_id: companyId } : undefined;
+      await postCampaignRedispatch(id, payload);
+      toast.success("Campaign redispatched");
+      setShowRedispatchModal(false);
+      setRowToRedispatch(null);
+      fetchCampaigns();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Redispatch failed"));
+    } finally {
+      setOpLoading(null);
+    }
+  };
 
   const handleOp = async (
     op: "dispatch" | "pause" | "resume" | "stop",
@@ -434,6 +491,10 @@ const CampaignsPage = () => {
           onResume={(r) => handleOp("resume", r)}
           onStop={(r) => handleOp("stop", r)}
           onLoadStatus={loadStatus}
+          onOpenRedispatch={(r) => {
+            setRowToRedispatch(r);
+            setShowRedispatchModal(true);
+          }}
           onDelete={(r) => {
             setSelectedRow(r);
             setShowDeleteModal(true);
@@ -515,7 +576,8 @@ const CampaignsPage = () => {
         }
 
         .voicebot-campaign-page .icon-dispatch-btn,
-        .voicebot-campaign-page .icon-resume-btn {
+        .voicebot-campaign-page .icon-resume-btn,
+        .voicebot-campaign-page .icon-redispatch-btn {
           color: #047857 !important;
         }
 
@@ -545,9 +607,9 @@ const CampaignsPage = () => {
 
         .voicebot-campaign-page .generic-table thead th:last-child,
         .voicebot-campaign-page .generic-table tbody td:last-child {
-          width: 164px !important;
-          min-width: 164px !important;
-          max-width: 164px !important;
+          width: 196px !important;
+          min-width: 196px !important;
+          max-width: 196px !important;
           white-space: nowrap;
         }
 
@@ -621,6 +683,7 @@ const CampaignsPage = () => {
                     <option value="draft">Draft</option>
                     <option value="paused">Paused</option>
                     <option value="running">Running</option>
+                    <option value="stopped">Stopped</option>
                     <option value="completed">Completed</option>
                   </Form.Select>
                   <Link href="/voicebot/outbound/campaigns/create">
@@ -824,6 +887,48 @@ const CampaignsPage = () => {
             </Button>
           </Modal.Footer>
         )}
+      </Modal>
+
+      <Modal
+        show={showRedispatchModal}
+        onHide={() => {
+          if (opLoading?.startsWith("redispatch-")) return;
+          setShowRedispatchModal(false);
+          setRowToRedispatch(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Redispatch campaign</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            This resets <strong>{rowToRedispatch?.name ?? "this campaign"}</strong> and calls all numbers again from scratch. Only use this for
+            campaigns in <strong>stopped</strong> or <strong>completed</strong> state.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            disabled={!!opLoading && rowToRedispatch ? opLoading === `redispatch-${campaignId(rowToRedispatch)}` : false}
+            onClick={() => {
+              setShowRedispatchModal(false);
+              setRowToRedispatch(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="success" onClick={() => void handleRedispatchConfirm()} disabled={!rowToRedispatch || !!opLoading}>
+            {rowToRedispatch && opLoading === `redispatch-${campaignId(rowToRedispatch)}` ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-1" />
+                Redispatching…
+              </>
+            ) : (
+              "Confirm redispatch"
+            )}
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <DeleteConfirmationModal

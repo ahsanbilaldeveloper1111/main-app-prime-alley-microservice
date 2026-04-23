@@ -680,6 +680,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
 
         {
+          id: 'voicebot-outbound-trunks',
+          title: 'Trunks',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
+          url: '/voicebot/outbound/trunks'
+        },
+
+        {
           id: 'voicebot-outbound-voicebots',
           title: 'Bots',
           icon: <LayoutDashboard size={16} />,

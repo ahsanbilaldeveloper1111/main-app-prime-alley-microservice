@@ -16,10 +16,10 @@ import {
   type CompanyOption,
 } from "@utils/companyOptions";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
-import { Button, Form, Modal, Nav } from "react-bootstrap";
+import { Button, Col, Form, Modal, Nav, Row } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
-import { Activity, Bot, Clock3, DollarSign, Eye, PhoneCall } from "lucide-react";
+import { Activity, Bot, Clock3, DollarSign, Eye, Filter, PhoneCall } from "lucide-react";
 import "@assets/scss/common.scss";
 import moment from "moment";
 
@@ -109,6 +109,98 @@ const CALL_STATUS_OPTIONS = [
   { label: "Timeout", value: "timeout" },
   { label: "Dropped", value: "dropped" },
 ];
+
+interface ConversationListFilters {
+  company_id: string;
+  bot_id: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  limit: number;
+}
+
+type FiltersSetter = React.Dispatch<React.SetStateAction<ConversationListFilters>>;
+
+function applyCompanyFilterIds(setFilters: FiltersSetter, companyId: string) {
+  setFilters((prev) => ({ ...prev, company_id: companyId, bot_id: "" }));
+}
+
+function companyToCompanyDropdownOption(c: CompanyOption, setFilters: FiltersSetter) {
+  return {
+    label: c.name,
+    value: c.id,
+    onClick: () => applyCompanyFilterIds(setFilters, c.id),
+  };
+}
+
+function buildCompanyDropdownOptions(
+  companies: CompanyOption[],
+  setFilters: FiltersSetter,
+) {
+  return [
+    {
+      label: "All",
+      value: "",
+      onClick: () => applyCompanyFilterIds(setFilters, ""),
+    },
+    ...companies.map((company) => companyToCompanyDropdownOption(company, setFilters)),
+  ];
+}
+
+function applyBotFilterId(setFilters: FiltersSetter, botId: string) {
+  setFilters((prev) => ({ ...prev, bot_id: botId }));
+}
+
+function botToBotDropdownOption(
+  b: { id: string; name: string },
+  setFilters: FiltersSetter,
+) {
+  return {
+    label: b.name,
+    value: b.id,
+    onClick: () => applyBotFilterId(setFilters, b.id),
+  };
+}
+
+function buildBotDropdownOptions(
+  bots: { id: string; name: string }[],
+  setFilters: FiltersSetter,
+) {
+  return [
+    {
+      label: "All",
+      value: "",
+      onClick: () => applyBotFilterId(setFilters, ""),
+    },
+    ...bots.map((bot) => botToBotDropdownOption(bot, setFilters)),
+  ];
+}
+
+function applyStatusValue(setFilters: FiltersSetter, status: string) {
+  setFilters((prev) => ({ ...prev, status }));
+}
+
+function callStatusToDropdownOption(
+  o: { label: string; value: string },
+  setFilters: FiltersSetter,
+) {
+  return {
+    label: o.label,
+    value: o.value,
+    onClick: () => applyStatusValue(setFilters, o.value),
+  };
+}
+
+function buildStatusDropdownOptions(setFilters: FiltersSetter) {
+  return [
+    {
+      label: "All",
+      value: "",
+      onClick: () => applyStatusValue(setFilters, ""),
+    },
+    ...CALL_STATUS_OPTIONS.map((opt) => callStatusToDropdownOption(opt, setFilters)),
+  ];
+}
 
 interface ConversationDateFilterDropdownProps {
   value: string;
@@ -202,7 +294,7 @@ const CallsPage = () => {
     total_cost?: number;
   } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<ConversationListFilters>({
     company_id: "",
     bot_id: "",
     status: "",
@@ -557,6 +649,41 @@ const CallsPage = () => {
     });
     setShowFilters(false);
   };
+
+  const selectedCompany = useMemo(
+    () => companies.find((c) => c.id === filters.company_id),
+    [companies, filters.company_id],
+  );
+
+  const selectedBot = useMemo(
+    () => bots.find((b) => b.id === filters.bot_id),
+    [bots, filters.bot_id],
+  );
+
+  const selectedStatus = useMemo(
+    () => CALL_STATUS_OPTIONS.find((o) => o.value === filters.status),
+    [filters.status],
+  );
+
+  const companyDropdownOptions = useMemo(
+    () => buildCompanyDropdownOptions(companies, setFilters),
+    [companies, setFilters],
+  );
+
+  const botDropdownOptions = useMemo(
+    () => buildBotDropdownOptions(bots, setFilters),
+    [bots, setFilters],
+  );
+
+  const statusDropdownOptions = useMemo(
+    () => buildStatusDropdownOptions(setFilters),
+    [setFilters],
+  );
+
+  const applyFilters = useCallback(() => {
+    fetchCalls().catch(() => undefined);
+    fetchStats().catch(() => undefined);
+  }, [fetchCalls, fetchStats]);
 
   const statsCards = useMemo(
     () => [
