@@ -133,7 +133,7 @@ const UsersList: React.FC<UsersListProps> = ({
   }, [fetchData, pagination.currentPage, pagination.rowsPerPage, currentFilters]);
 
   useEffect(() => {
-    void fetchAndSetData();
+    fetchAndSetData();
   }, [fetchAndSetData]);
 
   const applyFilterField = useCallback(
@@ -227,7 +227,7 @@ const UsersList: React.FC<UsersListProps> = ({
         <button
           type="button"
           onClick={handleResetFilters}
-          className="gt-toolbar-btn btn btn-outline-secondary btn-sm"
+          className="btn btn-outline-secondary btn-sm"
         >
           Reset
         </button>
