@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Form, Modal } from "react-bootstrap";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Form } from "react-bootstrap";
+import { X } from "lucide-react";
 import Select from "@components/AppSelect";
 import { Country } from "country-state-city";
 import { toast } from "react-toastify";
@@ -19,6 +20,7 @@ import EmployeeModalAddressSection, {
 } from "@components/workforce/EmployeeModalAddressSection";
 import EmployeeModalProfileFields from "@components/workforce/EmployeeModalProfileFields";
 import {
+  createEmployeeModalAddressUiId,
   employeeModalReactSelectStyles,
   fetchDepartmentUserRowsForModal,
   validateEmployeeModalAddressRows,
@@ -26,9 +28,23 @@ import {
   type DepartmentUserRow,
 } from "@utils/workforce/employeeModalShared";
 
-export type AddressFormItem = EmployeeModalAddressBase & { localId: string };
+export type AddressFormItem = EmployeeModalAddressBase;
+type AddressFieldKey = EmployeeModalAddressFieldKey;
+type AddressFormItemWithId = AddressFormItem & { uiId: string };
 
-const defaultAddressTemplate: Omit<AddressFormItem, "localId"> = {
+export interface EditEmployeeModalProps {
+  show: boolean;
+  onHide: () => void;
+  /** The profile being edited; when null the sidebar content is not shown */
+  profile: UserProfile | null;
+  /** Called after save succeeds (e.g. refetch list); receives the updated profile id */
+  onSuccess?: (profileId: number) => void;
+  /** Optional sidebar title */
+  title?: string;
+}
+
+const createDefaultAddress = (): AddressFormItemWithId => ({
+  uiId: createEmployeeModalAddressUiId(),
   name: "",
   zip_code: "",
   city: "",
@@ -37,28 +53,49 @@ const defaultAddressTemplate: Omit<AddressFormItem, "localId"> = {
   state: "",
   countryCode: "",
   stateCode: "",
-};
+});
 
+/** Validates if form is ready for submission */
 function isEditEmployeeReadyToSubmit(
   form: Partial<UserProfilePayload>,
-  addresses: AddressFormItem[],
+  addresses: AddressFormItemWithId[],
   phoneFieldValid: boolean,
 ): boolean {
   if (!phoneFieldValid) return false;
-  if (!validateEmployeeModalCoreRequiredFields(form).ok) return false;
-  return validateEmployeeModalAddressRows(addresses).ok;
+  const coreValidation = validateEmployeeModalCoreRequiredFields(form);
+  if (!coreValidation.ok) return false;
+  const addressValidation = validateEmployeeModalAddressRows(addresses);
+  return addressValidation.ok;
 }
 
-export interface EditEmployeeModalProps {
-  show: boolean;
-  onHide: () => void;
-  /** The profile being edited; when null the modal content is not shown */
-  profile: UserProfile | null;
-  /** Called after save succeeds (e.g. refetch list); receives the updated profile id */
-  onSuccess?: (profileId: number) => void;
-  /** Optional modal title */
-  title?: string;
+/** Maps profile address to form item */
+function mapProfileAddressToFormItem(address: UserProfileAddress): AddressFormItemWithId {
+  return {
+    ...mapUserProfileAddressToModalFields(address),
+    uiId: createEmployeeModalAddressUiId(),
+  };
 }
+
+/** Converts profile addresses or returns a single default */
+function initializeAddressesFromProfile(
+  addressList: UserProfileAddress[] | undefined
+): AddressFormItemWithId[] {
+  if (Array.isArray(addressList) && addressList.length > 0) {
+    return addressList.map(mapProfileAddressToFormItem);
+  }
+  return [createDefaultAddress()];
+}
+
+/** Determines user select placeholder text based on loading/selection state */
+function getEditEmployeeUserSelectPlaceholder(
+  userOptionsLoading: boolean,
+  hasDepartmentSelected: boolean,
+): string {
+  if (userOptionsLoading) return "Loading users…";
+  if (hasDepartmentSelected) return "Select user";
+  return "Select department first";
+}
+
 
 const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   show,
@@ -69,45 +106,71 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
 }) => {
   const { companyIdentifier, mainAppDepartments } = useMainAppLookups();
   const [form, setForm] = useState<Partial<UserProfilePayload>>({});
-  const [addresses, setAddresses] = useState<AddressFormItem[]>([]);
+  const [addresses, setAddresses] = useState<AddressFormItemWithId[]>([]);
   const [addressCountries, setAddressCountries] = useState<{ isoCode: string; name: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [departments, setDepartments] = useState<{ id: number; name?: string }[]>([]);
   const [departmentUsers, setDepartmentUsers] = useState<DepartmentUserRow[]>([]);
   const [loadingDepartmentUsers, setLoadingDepartmentUsers] = useState(false);
-  const addressIdRef = useRef(0);
 
   const companyUuid =
     (profile && (profile as UserProfile & { tenant_id?: string }).tenant_id) ||
     companyIdentifier ||
     null;
 
-  const toAddressFormItem = useCallback((address: UserProfileAddress): AddressFormItem => {
-    addressIdRef.current += 1;
-    return {
-      ...mapUserProfileAddressToModalFields(address),
-      localId: `addr-${addressIdRef.current}`,
-    };
+  // Initialize sidebar if profile changes
+  useEffect(() => {
+    try {
+      setAddressCountries(Country.getAllCountries());
+    } catch {
+      setAddressCountries([]);
+    }
   }, []);
 
-  const createDefaultAddress = useCallback((): AddressFormItem => {
-    addressIdRef.current += 1;
-    return {
-      ...defaultAddressTemplate,
-      localId: `addr-${addressIdRef.current}`,
-    };
-  }, []);
+  // Load profile data when modal opens
+  useEffect(() => {
+    if (!show || !profile) return;
 
-  const fetchDepartments = useCallback(
-    (tenantId: string) => {
-      if (!tenantId?.trim()) {
-        setDepartments([]);
-        return;
-      }
-      setDepartments(Array.isArray(mainAppDepartments) ? (mainAppDepartments as { id: number; name?: string }[]) : []);
-    },
-    [mainAppDepartments]
-  );
+    setForm({
+      user_id: profile.user_id ?? "",
+      employee_code: profile.employee_code ?? "",
+      identification_number: profile.identification_number ?? "",
+      job_title: profile.job_title ?? "",
+      designation: profile.designation ?? "",
+      department_id: profile.department_id ?? null,
+      location_id: profile.location_id ?? null,
+      employment_type: profile.employment_type ?? "",
+      contract_type: profile.contract_type ?? "",
+      phone: profile.phone ?? "",
+      status: profile.status ?? "active",
+    });
+
+    const addrs = (profile as UserProfile & { address_locations?: UserProfileAddress[] }).address_locations;
+    setAddresses(initializeAddressesFromProfile(addrs));
+
+    const tenantId = (profile as UserProfile & { tenant_id?: string }).tenant_id ?? "";
+    if (tenantId.trim()) {
+      setDepartments(
+        Array.isArray(mainAppDepartments)
+          ? (mainAppDepartments as { id: number; name?: string }[])
+          : []
+      );
+    }
+
+    if (profile.department_id == null) {
+      setDepartmentUsers([]);
+    }
+
+    // Fetch full profile to ensure we have fresh address data
+    getUserProfile(profile.id)
+      .then((full: UserProfile) => {
+        const fullAddrs = (full as UserProfile & { address_locations?: UserProfileAddress[] }).address_locations;
+        setAddresses(initializeAddressesFromProfile(fullAddrs));
+      })
+      .catch((error: unknown) => {
+        console.error("Failed to refresh employee profile details", error);
+      });
+  }, [profile, show, mainAppDepartments]);
 
   const fetchUsersByDepartment = useCallback(
     async (departmentId: number) => {
@@ -126,100 +189,99 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
     [companyUuid],
   );
 
-  useEffect(() => {
-    try {
-      setAddressCountries(Country.getAllCountries());
-    } catch {
-      setAddressCountries([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!show || !profile) return;
-    setForm({
-      user_id: profile.user_id ?? "",
-      employee_code: profile.employee_code ?? "",
-      identification_number: profile.identification_number ?? "",
-      job_title: profile.job_title ?? "",
-      designation: profile.designation ?? "",
-      department_id: profile.department_id ?? null,
-      location_id: profile.location_id ?? null,
-      employment_type: profile.employment_type ?? "",
-      contract_type: profile.contract_type ?? "",
-      phone: profile.phone ?? "",
-      status: profile.status ?? "active",
-    });
-    const addrs = (profile as UserProfile & { address_locations?: UserProfileAddress[] }).address_locations;
-    setAddresses(
-      Array.isArray(addrs) && addrs.length > 0
-        ? addrs.map((a) => toAddressFormItem(a))
-        : [createDefaultAddress()]
-    );
-    const tenantId = (profile as UserProfile & { tenant_id?: string }).tenant_id ?? "";
-    fetchDepartments(tenantId);
-    if (profile.department_id == null) setDepartmentUsers([]);
-    getUserProfile(profile.id)
-      .then((full) => {
-        const fullAddrs = (full as UserProfile & { address_locations?: UserProfileAddress[] }).address_locations;
-        if (Array.isArray(fullAddrs) && fullAddrs.length > 0) {
-          setAddresses(fullAddrs.map((a) => toAddressFormItem(a)));
-        }
-      })
-      .catch((error: unknown) => {
-        console.error("Failed to refresh employee profile details", error);
-      });
-  }, [createDefaultAddress, fetchDepartments, profile, show, toAddressFormItem]);
-
+  // Fetch users when department changes
   useEffect(() => {
     if (show && profile && form.department_id != null) {
       fetchUsersByDepartment(form.department_id);
     }
   }, [fetchUsersByDepartment, form.department_id, profile, show]);
 
-  const userOptions = useMemo(
+  const hasDepartmentSelected = form.department_id !== null && form.department_id !== undefined;
+
+  const userOptions = useMemo(() => {
+    if (!hasDepartmentSelected) {
+      return [];
+    }
+    return departmentUsers.map((u: DepartmentUserRow) => ({
+      value: u.phone,
+      label: `${u.name} (${u.phone})`,
+    }));
+  }, [hasDepartmentSelected, departmentUsers]);
+
+  const departmentOptions = useMemo(
     () =>
-      form.department_id == null
-        ? []
-        : departmentUsers.map((u) => ({ value: u.phone, label: `${u.name} (${u.phone})` })),
-    [form.department_id, departmentUsers]
+      (departments ?? []).map((d: { id: number; name?: string }) => ({
+        value: String(d.id),
+        label: String(d.name ?? "—"),
+      })),
+    [departments]
   );
 
-  /** Match option by phone (form.user_id) or legacy numeric user id from API */
   const selectedUserOption = useMemo(() => {
     const raw = (form.user_id ?? "").toString().trim();
     if (raw === "" || userOptions.length === 0) return null;
+
     const byPhone = userOptions.find((o) => o.value === raw);
     if (byPhone) return byPhone;
-    const userById = departmentUsers.find((u) => String(u.id) === raw);
+
+    const userById = departmentUsers.find((u: DepartmentUserRow) => String(u.id) === raw);
     if (userById?.phone) {
       return userOptions.find((o) => o.value === userById.phone) ?? null;
     }
     return null;
   }, [departmentUsers, form.user_id, userOptions]);
 
-  const userOptionsLoading = form.department_id == null ? false : loadingDepartmentUsers;
+  const userOptionsLoading = hasDepartmentSelected ? loadingDepartmentUsers : false;
 
-  const removeAddressById = useCallback((localId: string) => {
-    setAddresses((prev) => prev.filter((a) => a.localId !== localId));
+  const userSelectPlaceholder = getEditEmployeeUserSelectPlaceholder(
+    userOptionsLoading,
+    hasDepartmentSelected,
+  );
+
+  const removeAddressById = useCallback((addressId: string) => {
+    setAddresses((prev) => prev.filter((a: AddressFormItemWithId) => a.uiId !== addressId));
   }, []);
 
-  const updateAddressField = useCallback((localId: string, key: EmployeeModalAddressFieldKey, value: string) => {
-    setAddresses((prev) => prev.map((a) => (a.localId === localId ? { ...a, [key]: value } : a)));
-  }, []);
+  const updateAddressField = useCallback(
+    (addressId: string, field: AddressFieldKey, value: string) => {
+      setAddresses((prev) =>
+        prev.map((a: AddressFormItemWithId) =>
+          a.uiId === addressId ? { ...a, [field]: value } : a
+        )
+      );
+    },
+    []
+  );
 
-  const updateAddressCountry = useCallback((localId: string, opt: { value: string; label: string } | null) => {
+  const updateAddressCountry = useCallback((addressId: string, opt: { value: string; label: string } | null) => {
     setAddresses((prev) =>
-      prev.map((a) =>
-        a.localId === localId
-          ? { ...a, country: opt?.label ?? "", countryCode: opt?.value ?? "", state: "", stateCode: "", city: "" }
+      prev.map((a: AddressFormItemWithId) =>
+        a.uiId === addressId
+          ? {
+              ...a,
+              country: opt?.label ?? "",
+              countryCode: opt?.value ?? "",
+              state: "",
+              stateCode: "",
+              city: "",
+            }
           : a
       )
     );
   }, []);
 
-  const updateAddressState = useCallback((localId: string, opt: { value: string; label: string } | null) => {
+  const updateAddressState = useCallback((addressId: string, opt: { value: string; label: string } | null) => {
     setAddresses((prev) =>
-      prev.map((a) => (a.localId === localId ? { ...a, state: opt?.label ?? "", stateCode: opt?.value ?? "", city: "" } : a))
+      prev.map((a: AddressFormItemWithId) =>
+        a.uiId === addressId
+          ? {
+              ...a,
+              state: opt?.label ?? "",
+              stateCode: opt?.value ?? "",
+              city: "",
+            }
+          : a
+      )
     );
   }, []);
 
@@ -230,9 +292,14 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
     [form, addresses, phoneFieldValid],
   );
 
+  const handleCancelClick = useCallback(() => {
+    onHide();
+  }, [onHide]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
+
     const coreValidation = validateEmployeeModalCoreRequiredFields(form);
     if (!coreValidation.ok) {
       toast.error(coreValidation.message);
@@ -276,81 +343,232 @@ const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
     }
   };
 
-  if (!profile) return null;
+  if (!show || !profile) return null;
 
   return (
-    <Modal size="lg" show={show} onHide={onHide} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>{title}</Modal.Title>
-      </Modal.Header>
-      <Form onSubmit={handleSubmit}>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>
-              {"Department "}
-              <span className="text-danger">*</span>
-            </Form.Label>
-            <Form.Select value={form.department_id ?? ""} disabled>
-              <option value="">Select department</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name ?? "—"}
-                </option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>
-              {"User "}
-              <span className="text-danger">*</span>
-            </Form.Label>
-            <Select<{ value: string; label: string }>
-              className="basic-single"
-              classNamePrefix="select"
-              placeholder="User"
-              isClearable={false}
-              isSearchable={false}
-              isDisabled
-              isLoading={false}
-              options={userOptions}
-              value={selectedUserOption}
-              resetSearchOnValueChange={show}
-              onChange={(opt) => setForm((f) => ({ ...f, user_id: opt?.value ?? "" }))}
-              styles={employeeModalReactSelectStyles}
-            />
-            {!userOptionsLoading && form.department_id != null && userOptions.length === 0 && (
-              <Form.Text className="text-muted">No users available for this department.</Form.Text>
-            )}
-          </Form.Group>
-          <EmployeeModalProfileFields
-            form={form}
-            setForm={setForm}
-            phoneShowInvalid={phoneShowInvalid}
-            phoneDefaultCountry="PK"
-            phoneHelpText="Select country then enter a complete phone number."
-            employmentSelectRequired={false}
-          />
+    <>
+      <style>
+        {`
+          .edit-employee-sidebar {
+            font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+            color: #141414;
+          }
+          .edit-employee-sidebar .form-control,
+          .edit-employee-sidebar .form-select,
+          .edit-employee-sidebar input,
+          .edit-employee-sidebar select,
+          .edit-employee-sidebar textarea {
+            font-size: 14px;
+            color: #141414;
+          }
+          .edit-employee-sidebar .form-control,
+          .edit-employee-sidebar .form-select,
+          .edit-employee-sidebar input,
+          .edit-employee-sidebar select {
+            min-height: 40px;
+          }
+          .edit-employee-sidebar .select__control {
+            min-height: 40px;
+            border-color: #8a8a8a;
+            border-radius: 4px;
+          }
+          .edit-employee-sidebar .select__value-container,
+          .edit-employee-sidebar .select__indicators {
+            min-height: 40px;
+          }
+        `}
+      </style>
 
-          <EmployeeModalAddressSection
-            addresses={addresses}
-            addressCountries={addressCountries}
-            getRowId={(a) => a.localId}
-            onAddAddress={() => setAddresses((prev) => [...prev, createDefaultAddress()])}
-            onRemoveRow={removeAddressById}
-            onUpdateField={updateAddressField}
-            onCountryChange={(rowId, opt) => updateAddressCountry(rowId, opt)}
-            onStateChange={(rowId, opt) => updateAddressState(rowId, opt)}
-            allowAdHocCityOption
-          />
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onHide} type="button">Cancel</Button>
-          <Button variant="primary" type="submit" disabled={submitting || !editSubmitReady}>
-            {submitting ? "Saving…" : "Save"}
-          </Button>
-        </Modal.Footer>
-      </Form>
-    </Modal>
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1000,
+          background: "transparent",
+        }}
+        aria-hidden="true"
+      />
+
+      <div
+        className="edit-employee-sidebar"
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          width: "600px",
+          height: "100vh",
+          backgroundColor: "#ffffff",
+          boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+          zIndex: 999999,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            padding: "20px 24px",
+            borderBottom: "1px solid #eaf0f6",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: "20px",
+              fontWeight: 600,
+              color: "#141414",
+              margin: 0,
+            }}
+          >
+            {title}
+          </h2>
+          <button
+            type="button"
+            onClick={handleCancelClick}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "4px",
+              cursor: "pointer",
+              color: "#718096",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <Form
+          onSubmit={handleSubmit}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "40px",
+            }}
+          >
+            <Form.Group className="mb-3">
+              <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+                Department <span className="text-danger">*</span>
+              </Form.Label>
+              <Form.Select value={form.department_id ?? ""} disabled>
+                <option value="">Select department</option>
+                {departmentOptions.map((d: { value: string; label: string }) => (
+                  <option key={d.value} value={d.value}>
+                    {d.label}
+                  </option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+
+            <Form.Group className="mb-3">
+              <Form.Label style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>
+                User <span className="text-danger">*</span>
+              </Form.Label>
+              <Select<{ value: string; label: string }>
+                className="basic-single"
+                classNamePrefix="select"
+                placeholder={userSelectPlaceholder}
+                isClearable={false}
+                isSearchable={false}
+                isDisabled
+                isLoading={false}
+                options={userOptions}
+                value={selectedUserOption}
+                resetSearchOnValueChange={show}
+                onChange={(opt: { value: string; label: string } | null) =>
+                  setForm((f: Partial<UserProfilePayload>) => ({
+                    ...f,
+                    user_id: opt?.value ?? "",
+                  }))
+                }
+                styles={employeeModalReactSelectStyles}
+              />
+              {!userOptionsLoading && hasDepartmentSelected && userOptions.length === 0 && (
+                <Form.Text className="text-muted">No users available for this department.</Form.Text>
+              )}
+            </Form.Group>
+
+            <EmployeeModalProfileFields
+              form={form}
+              setForm={setForm}
+              phoneShowInvalid={phoneShowInvalid}
+              phoneDefaultCountry="PK"
+              phoneHelpText="Select country then enter a complete phone number."
+              employmentSelectRequired={false}
+            />
+
+            <EmployeeModalAddressSection
+              addresses={addresses}
+              addressCountries={addressCountries}
+              getRowId={(a: AddressFormItemWithId) => a.uiId}
+              onAddAddress={() => setAddresses((prev) => [...prev, createDefaultAddress()])}
+              onRemoveRow={removeAddressById}
+              onUpdateField={updateAddressField}
+              onCountryChange={updateAddressCountry}
+              onStateChange={updateAddressState}
+              allowAdHocCityOption
+            />
+          </div>
+
+          <div
+            style={{
+              padding: "16px 24px",
+              borderTop: "1px solid #eaf0f6",
+              display: "flex",
+              gap: "12px",
+              justifyContent: "flex-start",
+            }}
+          >
+            <button
+              type="submit"
+              disabled={submitting || !editSubmitReady}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: submitting || !editSubmitReady ? "#cbd5e0" : "#0091ae",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor: submitting || !editSubmitReady ? "not-allowed" : "pointer",
+              }}
+            >
+              {submitting ? "Saving…" : "Save"}
+            </button>
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={handleCancelClick}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: "transparent",
+                color: "#141414",
+                border: "1px solid #8a8a8a",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor: submitting ? "not-allowed" : "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </Form>
+      </div>
+    </>
   );
 };
 

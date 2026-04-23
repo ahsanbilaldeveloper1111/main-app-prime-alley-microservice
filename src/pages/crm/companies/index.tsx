@@ -4448,7 +4448,7 @@ const CrmCompanyManagement = () => {
                           company_domain:
                             company.data?.company_domain || undefined,
                           company_name: company.data?.company_name || undefined,
-                          source_file:
+                          source:
                             company.data?.source_file ||
                             company.data?.source ||
                             undefined,
@@ -5719,6 +5719,7 @@ const CrmCompanyManagement = () => {
                 }}
                 recordType="company"
                 recordId={selectedCompany?.id || selectedCompany?.rawData?.id}
+                onPlayCallRecording={handlePlayCallRecording}
                 recordLink={{
                   label: "View record",
                   onClick: () => {

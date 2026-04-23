@@ -89,7 +89,7 @@ export function FullScreenModalShell({
   onToggleActive,
   hideActiveToggle = false,
   hideSubBar = false,
-  activeInfoTitle = "When active, this product is available for use in quotes",
+  activeInfoTitle = "When active, this will available for use.",
   children,
 }: Readonly<{
   title: string;
@@ -158,7 +158,7 @@ export function SubBarButton({
   return (
     <button
       type="button"
-      style={{ ...BASE_BUTTON }}
+      style={{ ...BASE_BUTTON,cursor: "auto" }}
       onClick={onClick}
       onMouseEnter={onSubBarBtnEnter}
       onMouseLeave={onSubBarBtnLeave}

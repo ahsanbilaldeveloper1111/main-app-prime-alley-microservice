@@ -19,7 +19,8 @@ import GenericTable, {
   TableColumn,
   ToolbarConfig,
 } from "@components/GenericTable";
-import GenericSidebar from "@components/GenericSidebarNew";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
+import GenericSidebar from "@components/GenericSidebar";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { StatsCardData } from "@components/GenericStatsCards";
@@ -37,6 +38,7 @@ import {
   PostInvoiceStripePaymentLink,
 } from "@utils/accounting";
 import { getMinifiedCompanies } from "@utils/crm";
+import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
 import { formatNumber } from "@utils/Helper";
 import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 
@@ -112,6 +114,24 @@ function parseStoredInvoiceColumnKeys(
   } catch {
     return null;
   }
+}
+
+function invoiceDownloadActionIcon(
+  row: InvoiceData,
+  downloadingInvoicePdfId: number | null,
+): React.ReactElement {
+  if (downloadingInvoicePdfId === row.id) {
+    return (
+      <Spinner
+        animation="border"
+        role="status"
+        size="sm"
+        style={{ width: "1rem", height: "1rem", verticalAlign: "middle" }}
+        aria-label="Downloading PDF"
+      />
+    );
+  }
+  return <Download size={16} aria-hidden />;
 }
 
 function loadInvoiceTableColumnsFromStorage(): string[] {
@@ -386,15 +406,11 @@ async function fetchInvoiceListPage(
 
 const INVOICE_STATUS_FILTER_CHOICES: { value: string; label: string }[] = [
   { value: "", label: "All Status" },
-  { value: STATUS_DRAFT, label: "Draft" },
-  { value: STATUS_SENT, label: "Sent" },
   { value: STATUS_PAID, label: "Paid" },
   { value: STATUS_PENDING, label: "Pending" },
   { value: STATUS_OVERDUE, label: "Overdue" },
   { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
-  { value: STATUS_CANCELLED, label: "Cancelled" },
   { value: STATUS_FAILED, label: "Failed" },
-  { value: STATUS_REFUNDED, label: "Refunded" },
 ];
 
 const invoiceFilterPillButtonStyle: React.CSSProperties = {
@@ -710,6 +726,16 @@ const InvoiceList = () => {
 
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
+
+  const onAccountingCustomerCreated = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(selectedCompanyId, {
+    onCreated: onAccountingCustomerCreated,
+    errorToastId: "billing_invoices_ensure_customer_failed",
+  });
+
   const { openInvoicePayment: handlePayInvoice, invoicePaymentModal } = useInvoicePaymentModal({
     companyOptions,
     onPaymentSuccess: () => setRefreshKey((prev) => prev + 1),
@@ -964,11 +990,16 @@ const InvoiceList = () => {
     []
   );
 
+  const [downloadingInvoicePdfId, setDownloadingInvoicePdfId] = useState<number | null>(null);
+
   const handleDownloadPDF = useCallback(async (invoice: InvoiceData) => {
+    setDownloadingInvoicePdfId(invoice.id);
     try {
       await downloadInvoicePdf(invoice.id);
     } catch (error) {
       toast.error(`Failed to download invoice PDF: ${getErrorMessage(error)}`);
+    } finally {
+      setDownloadingInvoicePdfId(null);
     }
   }, []);
 
@@ -1041,7 +1072,9 @@ const InvoiceList = () => {
       },
       {
         label: "Download",
-        icon: <Download size={16} />,
+        icon: (row: InvoiceData) =>
+          invoiceDownloadActionIcon(row, downloadingInvoicePdfId),
+        disabled: (row: InvoiceData) => downloadingInvoicePdfId === row.id,
         onClick: (row: InvoiceData) => handleDownloadPDF(row),
       },
     ],
@@ -1050,6 +1083,7 @@ const InvoiceList = () => {
       handleViewInvoice,
       handlePayInvoice,
       handleDownloadPDF,
+      downloadingInvoicePdfId,
       openDeleteInvoiceModal,
       openGeneratePaymentLinkModal,
     ],
@@ -1081,15 +1115,11 @@ const InvoiceList = () => {
           setPendingFilters((prev) => ({ ...prev, status: value || undefined })),
         options: [
           { value: "", label: "All Status" },
-          { value: STATUS_DRAFT, label: "Draft" },
-          { value: STATUS_SENT, label: "Sent" },
           { value: STATUS_PAID, label: "Paid" },
           { value: STATUS_PENDING, label: "Pending" },
           { value: STATUS_OVERDUE, label: "Overdue" },
           { value: STATUS_PARTIALLY_PAID, label: "Partially Paid" },
-          { value: STATUS_CANCELLED, label: "Cancelled" },
           { value: STATUS_FAILED, label: "Failed" },
-          { value: STATUS_REFUNDED, label: "Refunded" },
         ],
       },
       
@@ -1437,43 +1467,42 @@ const InvoiceList = () => {
               </Form.Select>
             </div>
 
-            <GenericTable<InvoiceData>
-              data={invoiceList}
-              columns={tableColumns}
-              actions={invoiceTableActions}
-              showActions={true}
-              showToolbarActions={false}
-              actionsLabel="Actions"
-              customizableColumns={true}
-              defaultSelectedColumns={DEFAULT_INVOICE_TABLE_COLUMN_KEYS}
-              columnStorageKey={BILLING_INVOICES_COLUMN_STORAGE_KEY}
-              selectedColumns={selectedInvoiceTableColumns}
-              onColumnChange={setSelectedInvoiceTableColumns}
-              pagination={{
-                currentPage: pagination.currentPage,
-                rowsPerPage: pagination.rowsPerPage,
-                totalRows: totalRecords,
-                pageSizeOptions: [10, 15, 25, 50],
-              }}
-              onPaginationChange={(page, rowsPerPage) => {
-                setPagination((prev) => ({ ...prev, currentPage: page, rowsPerPage }));
-              }}
-              sortable={true}
-              loading={invoiceLoading}
-              emptyMessage="No invoices found"
-              loadingMessage="Loading invoices..."
-              hover={true}
-              uniqueKey="id"
-              onRowClick={(row) => openInvoiceSidebar(row)}
-              onPreviewClick={(row) => handlePreviewClick(row)}
-              showToolbar={true}
-              toolbar={invoicesToolbarConfig}
-              statsCards={invoiceStatsCards}
-              fixedHeight={true}
-              maxHeight="calc(100vh - 345px)"
-            />
+      <GenericTable<InvoiceData>
+        data={invoiceList}
+        columns={tableColumns}
+        actions={invoiceTableActions}
+        showActions={true}
+        actionsLabel="Actions"
+        customizableColumns={true}
+        defaultSelectedColumns={DEFAULT_INVOICE_TABLE_COLUMN_KEYS}
+        columnStorageKey={BILLING_INVOICES_COLUMN_STORAGE_KEY}
+        selectedColumns={selectedInvoiceTableColumns}
+        onColumnChange={setSelectedInvoiceTableColumns}
+        pagination={{
+          currentPage: pagination.currentPage,
+          rowsPerPage: pagination.rowsPerPage,
+          totalRows: totalRecords,
+          pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
+        }}
+        onPaginationChange={(page, rowsPerPage) => {
+          setPagination((prev) => ({ ...prev, currentPage: page, rowsPerPage }));
+        }}
+        sortable={true}
+        loading={invoiceLoading}
+        emptyMessage="No invoices found"
+        loadingMessage="Loading invoices..."
+        hover={true}
+        uniqueKey="id"
+        onRowClick={(row) => openInvoiceSidebar(row)}
+        onPreviewClick={(row) => handlePreviewClick(row)}
+        showToolbar={true}
+        toolbar={invoicesToolbarConfig}
+        statsCards={invoiceStatsCards}
+        fixedHeight={true}
+        maxHeight="calc(100vh - 345px)"
+      />
           </div>
-        </div>
+      </div>
 
         {/* Invoice Detail Sidebar — rendered alongside the table */}
         {showInvoiceSidebar && (

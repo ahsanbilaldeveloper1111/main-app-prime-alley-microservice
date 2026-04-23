@@ -290,8 +290,7 @@ function VendorHeader({
             <img
               src={issuingPartyLogoSrc(issuingProfile)}
               alt="Logo"
-              className="img-fluid"
-              style={{ maxWidth: "60%", float: "right" }}
+              className="float-end invoice-detail-logo"
             />
           )}
         </div>

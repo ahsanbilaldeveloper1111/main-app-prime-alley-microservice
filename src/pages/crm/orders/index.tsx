@@ -16,6 +16,7 @@ import GenericTable, {
   TabConfig,
 } from "@components/GenericTable";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
@@ -238,6 +239,29 @@ const CrmOrders = () => { // NOSONAR
   const [showOrderSidebar, setShowOrderSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+
+  const sidebarOrderRecordId = useMemo(() => {
+    const rawId = selectedOrder?.id ?? selectedOrder?.rawData?.id;
+    const numericId = Number(rawId);
+    return Number.isFinite(numericId) && numericId > 0 ? numericId : 0;
+  }, [selectedOrder]);
+
+  const sidebarOrderRecordName = useMemo(() => {
+    const orderNumber = selectedOrder?.order_number;
+    if (orderNumber != null && orderNumber !== "") {
+      return String(orderNumber);
+    }
+    const customerName = selectedOrder?.customer_name;
+    return typeof customerName === "string" ? customerName : "";
+  }, [selectedOrder]);
+
+  const sidebarLogActivityModals = useCrmLogActivityModals({
+    recordType: "order",
+    recordId: sidebarOrderRecordId,
+    recordName: sidebarOrderRecordName,
+    recordPhone: selectedOrder?.customer_phone ?? "",
+    recordEmail: selectedOrder?.customer_email ?? "",
+  });
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [ordersViewMode, setOrdersViewMode] = useState<"table" | "board">("table");
@@ -2637,6 +2661,13 @@ const CrmOrders = () => { // NOSONAR
             recordId={
               selectedOrder?.id ?? selectedOrder?.rawData?.id ?? undefined
             }
+            senderName={session?.user?.name || ""}
+            senderEmail={session?.user?.email || ""}
+            onLogCall={sidebarLogActivityModals.openLogCall}
+            onLogEmail={sidebarLogActivityModals.openLogEmail}
+            onLogSms={sidebarLogActivityModals.openLogSms}
+            onLogWhatsApp={sidebarLogActivityModals.openLogWhatsApp}
+            onLogMeeting={sidebarLogActivityModals.openLogMeeting}
             crmSummary={selectedOrder?.rawData?.crm_summary ?? selectedOrder?.crm_summary ?? undefined}
             record={{
               id: selectedOrder?.id || selectedOrder?.rawData?.id,
@@ -2694,6 +2725,7 @@ const CrmOrders = () => { // NOSONAR
                     const orderId =
                       selectedOrder?.id || selectedOrder?.rawData?.id;
                     if (orderId) {
+                      setShowOrderSidebar(false);
                       handleDeleteOrder(orderId, selectedOrder?.order_number);
                     }
                   },
@@ -2907,7 +2939,7 @@ const CrmOrders = () => { // NOSONAR
                   },
                 },
               },
-              {
+                {
                 id: "notes",
                 title: "Notes",
                 icon: FileText,
@@ -2926,6 +2958,7 @@ const CrmOrders = () => { // NOSONAR
             ]}
           />
         )}
+        {sidebarLogActivityModals.modals}
       </div>
 
       {/* Delete Order Modal */}

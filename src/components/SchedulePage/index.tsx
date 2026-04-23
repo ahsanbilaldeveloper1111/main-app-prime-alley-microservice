@@ -461,7 +461,7 @@ function TaskPopover({ task, anchorRect, onClose }: Readonly<TaskPopoverProps>) 
   const totalTasks = task.todos.length + task.emails.length + task.calls.length + task.linkedin.length;
 
   // Flip above if near bottom
-  const top = anchorRect.bottom + 6 > window.innerHeight - 200
+  const top = anchorRect.bottom + 6 > globalThis.innerHeight - 200
     ? anchorRect.top - 6 - 280
     : anchorRect.bottom + 6;
 
@@ -471,7 +471,7 @@ function TaskPopover({ task, anchorRect, onClose }: Readonly<TaskPopoverProps>) 
       style={{
         position: "fixed",
         top,
-        left: Math.min(anchorRect.left, window.innerWidth - 316),
+        left: Math.min(anchorRect.left, globalThis.innerWidth - 316),
         zIndex: 1000,
         backgroundColor: "#fff",
         border: "1px solid #e0e0e0",
@@ -943,7 +943,10 @@ interface SchedulePageProps {
 
 export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePageProps> = {}) {
   const today = new Date();
-  const [sidebarOpen,    setSidebarOpen]    = useState(true);
+  const [sidebarOpen,    setSidebarOpen]    = useState(() => {
+    if (globalThis.window === undefined) return true;
+    return globalThis.innerWidth >= 1200;
+  });
   const [weekStart,      setWeekStart]      = useState<Date>(getWeekStart(new Date()));
   const [hideWeekends,   setHideWeekends]   = useState(true);
   const [allDayExpanded, setAllDayExpanded] = useState(false); // false = collapsed (shows event counts)
@@ -967,11 +970,30 @@ export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePag
     const ws = getWeekStart(new Date());
     return toDateInputValue(addDays(ws, 6));
   });
+  const sidebarToggledByUser = useRef(false);
 
   const { hierarchyDataExtensions } = useHierarchyData(ModuleSlug.USER_DIRECTORY);
 
   const fetchRef = useRef(fetchCalendarData);
   fetchRef.current = fetchCalendarData;
+
+  useEffect(() => {
+    const mediaQuery = globalThis.matchMedia("(max-width: 1199px)");
+
+    const syncSidebarWithViewport = (isSmallScreen: boolean) => {
+      if (sidebarToggledByUser.current) return;
+      setSidebarOpen(!isSmallScreen);
+    };
+
+    syncSidebarWithViewport(mediaQuery.matches);
+
+    const handleViewportChange = (event: MediaQueryListEvent) => {
+      syncSidebarWithViewport(event.matches);
+    };
+
+    mediaQuery.addEventListener("change", handleViewportChange);
+    return () => mediaQuery.removeEventListener("change", handleViewportChange);
+  }, []);
 
   const { fetchStart, fetchEnd, days, headerTitle } = useMemo(
     () =>
@@ -1124,6 +1146,11 @@ export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePag
     setActivePopover((prev) => prev && sameDay(prev.task.date, task.date) ? null : { task, rect });
   };
 
+  const handleSidebarToggle = () => {
+    sidebarToggledByUser.current = true;
+    setSidebarOpen((v) => !v);
+  };
+
   const handleGridEventOpenTask = useCallback(async (ev: CalendarEvent) => {
     const taskId = ev.taskId;
     if (taskId == null) return;
@@ -1168,7 +1195,7 @@ export default function SchedulePage({ fetchCalendarData }: Readonly<SchedulePag
 
       {/* Toggle button for sidebar */}
       <button
-        onClick={() => setSidebarOpen((v) => !v)}
+        onClick={handleSidebarToggle}
         style={{
           position: "absolute",
           top: "12px",

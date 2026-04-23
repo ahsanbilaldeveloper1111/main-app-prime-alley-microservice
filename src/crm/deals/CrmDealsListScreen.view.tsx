@@ -18,6 +18,7 @@ import GenericTable, {
 } from "@components/GenericTable";
 import KanbanBoard, { type KanbanCardData } from "@components/KanbanBoard";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
@@ -74,6 +75,9 @@ import {
   checkRequiredFields,
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
+  formatMeetingDateLocal,
+  convertLocalMeetingToUtc,
+  convertUtcMeetingToLocal,
   RECORD_TYPES,
 } from "@utils/Helper";
 import {
@@ -2190,7 +2194,10 @@ function CrmDealsListScreenDealViewModal({
                                         }}
                                       >
                                         {meeting.meeting_date
-                                          ? moment(meeting.meeting_date).format(
+                                          ? formatMeetingDateLocal(
+                                              meeting.meeting_date,
+                                              meeting.meeting_time,
+                                            ) || moment(meeting.meeting_date).format(
                                               "MMM DD, YYYY",
                                             )
                                           : "N/A"}
@@ -2445,6 +2452,28 @@ export function CrmDealsListScreenView({
   const [showDealSidebar, setShowDealSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
+
+  const sidebarDealRecordId = useMemo(() => {
+    const rawId = selectedDeal?.id ?? selectedDeal?.rawData?.id;
+    const numericId = Number(rawId);
+    return Number.isFinite(numericId) && numericId > 0 ? numericId : 0;
+  }, [selectedDeal]);
+
+  const sidebarLogActivityModals = useCrmLogActivityModals({
+    recordType: "deal",
+    recordId: sidebarDealRecordId,
+    recordName: selectedDeal?.name ?? "",
+    recordPhone:
+      selectedDeal?.phone ??
+      selectedDeal?.rawData?.phone ??
+      selectedDeal?.decision_maker_phone ??
+      "",
+    recordEmail:
+      selectedDeal?.email ??
+      selectedDeal?.rawData?.email ??
+      selectedDeal?.main_decision_maker?.email ??
+      "",
+  });
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">(() =>
@@ -3236,11 +3265,16 @@ export function CrmDealsListScreenView({
 
     setLoadingMeeting(true);
     try {
+      const utcMeeting = convertLocalMeetingToUtc(
+        String(meetingData.meetingDate || "").slice(0, 10),
+        String(meetingData.meetingTime || "").slice(0, 5),
+      );
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
+        meeting_date: utcMeeting.utcDate || meetingData.meetingDate,
+        meeting_time: utcMeeting.utcTime || meetingData.meetingTime,
+        ...(utcMeeting.utcIso && { start_date_time: utcMeeting.utcIso }),
         deal_id: String(meetingData.dealId),
         meeting_outcome: "Scheduled", // Default to "Scheduled" when creating
         extensions:
@@ -3281,11 +3315,16 @@ export function CrmDealsListScreenView({
 
     setLoadingMeeting(true);
     try {
+      const utcMeeting = convertLocalMeetingToUtc(
+        String(meetingData.meetingDate || "").slice(0, 10),
+        String(meetingData.meetingTime || "").slice(0, 5),
+      );
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
+        meeting_date: utcMeeting.utcDate || meetingData.meetingDate,
+        meeting_time: utcMeeting.utcTime || meetingData.meetingTime,
+        ...(utcMeeting.utcIso && { start_date_time: utcMeeting.utcIso }),
         extensions:
           meetingAttendees.length > 0
             ? meetingAttendees.map((user: any) => user.value)
@@ -3325,13 +3364,16 @@ export function CrmDealsListScreenView({
   // Handle edit meeting click
   const handleEditMeeting = useCallback(
     (meeting: any) => {
-      // Format date for input (YYYY-MM-DD)
-      const meetingDate = meeting.meeting_date
+      const utcDateRaw = meeting.meeting_date
         ? new Date(meeting.meeting_date).toISOString().split("T")[0]
         : "";
-
-      // Format time for input (HH:MM)
-      const meetingTime = meeting.meeting_time || "";
+      const utcTimeRaw = meeting.meeting_time || "";
+      const localized = convertUtcMeetingToLocal(
+        utcDateRaw,
+        String(utcTimeRaw || "").slice(0, 5),
+      );
+      const meetingDate = localized.localDate || utcDateRaw;
+      const meetingTime = localized.localTime || utcTimeRaw;
 
       // Set attendees from meeting extensions
       // meeting.extensions is an array of objects with 'extension' property (e.g., { extension: "511", ... })
@@ -4118,7 +4160,15 @@ export function CrmDealsListScreenView({
             recordId={
               selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined
             }
+            senderName={session?.user?.name || ""}
+            senderEmail={session?.user?.email || ""}
+            resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
+            onLogCall={sidebarLogActivityModals.openLogCall}
+            onLogEmail={sidebarLogActivityModals.openLogEmail}
+            onLogSms={sidebarLogActivityModals.openLogSms}
+            onLogWhatsApp={sidebarLogActivityModals.openLogWhatsApp}
+            onLogMeeting={sidebarLogActivityModals.openLogMeeting}
             crmSummary={selectedDeal?.rawData?.crm_summary ?? selectedDeal?.crm_summary ?? undefined}
             recordLink={{
               label: "View record",
@@ -4183,6 +4233,7 @@ export function CrmDealsListScreenView({
                     const dealId =
                       selectedDeal?.id || selectedDeal?.rawData?.id;
                     if (dealId) {
+                      setShowDealSidebar(false);
                       handleDeleteDeal(dealId, selectedDeal?.name);
                     }
                   },
@@ -4609,6 +4660,7 @@ export function CrmDealsListScreenView({
             ]}
           />
         )}
+        {sidebarLogActivityModals.modals}
       </div>
 
       {/* Delete Deal Modal */}

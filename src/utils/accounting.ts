@@ -253,6 +253,33 @@ export const GetCompanyDetails = async (params: { crm_company_id?: string | numb
     throw error;
   }
 };
+
+/** Normalizes API currency codes for product pricing (supported: AED, USD). */
+export function normalizeBillingProductCurrency(code: unknown): "AED" | "USD" {
+  const s = typeof code === "string" ? code.trim().toUpperCase() : "";
+  if (s === "USD") {
+    return "USD";
+  }
+  return "AED";
+}
+
+/**
+ * Reads `profile.currency` from {@link GetCompanyDetails} response body
+ * (`success` envelope’s `data` after extract).
+ */
+export function getProfileCurrencyFromCompanyDetails(
+  companyDetails: unknown,
+): "AED" | "USD" {
+  if (companyDetails == null || typeof companyDetails !== "object") {
+    return "AED";
+  }
+  const profile = (companyDetails as { profile?: { currency?: unknown } | null })
+    .profile;
+  if (profile == null || typeof profile !== "object") {
+    return "AED";
+  }
+  return normalizeBillingProductCurrency(profile.currency);
+}
 export const GetInvoices = async (params: PaginationParams = {}) => {
   try {
     const response = await axiosInstance.get('accounting/get-invoices', { params });

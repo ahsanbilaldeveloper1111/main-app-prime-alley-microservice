@@ -7,12 +7,27 @@ import {
   Phone as PhoneIcon,
   Mail,
   Tags,
+  CheckCircle2,
+  PhoneOff,
+  PhoneMissed,
+  RotateCcw,
 } from "lucide-react";
 import type { TableAction } from "@components/GenericTable";
 import {
   CRM_PERSON_DISPOSITION_OPTIONS,
   getCrmPersonRowDispositionRaw,
 } from "@utils/crmPersonDisposition";
+
+/**
+ * Outcome a user can record for a previously-scheduled call. Each outcome is
+ * written to the prospect's history via `POST /crm/audit-logs` and (except for
+ * `rescheduled`) automatically unschedules the call.
+ */
+export type ScheduledCallOutcome =
+  | "completed"
+  | "no_answer"
+  | "missed"
+  | "rescheduled";
 
 export type BuildCrmProspectsContactsTableActionsParams = {
   session: { user?: { permissions?: string[] } } | null;
@@ -30,6 +45,14 @@ export type BuildCrmProspectsContactsTableActionsParams = {
   setShowDeleteModal: (open: boolean) => void;
   /** Right-click / row menu: quick-set disposition (same permission as Edit). */
   onDispositionChange?: (row: any, dispositionValue: string) => void | Promise<void>;
+  /**
+   * Record an outcome on a scheduled call. Should write a history entry and
+   * unschedule the call (handled by `useCrmListSharedCallbacks`).
+   */
+  onScheduledCallStatusChange?: (
+    row: any,
+    outcome: ScheduledCallOutcome,
+  ) => void | Promise<void>;
 };
 
 export function buildCrmProspectsContactsTableActions({
@@ -47,6 +70,7 @@ export function buildCrmProspectsContactsTableActions({
   setItemToDelete,
   setShowDeleteModal,
   onDispositionChange,
+  onScheduledCallStatusChange,
 }: BuildCrmProspectsContactsTableActionsParams): TableAction<any>[] {
   return [
     ...(session?.user?.permissions?.includes("view-crm-data-management")
@@ -135,6 +159,39 @@ export function buildCrmProspectsContactsTableActions({
                         onClick: (row: any) => handleScheduleCall(row),
                         show: (row: any) => !!row.scheduled_call_at,
                       },
+                      ...(onScheduledCallStatusChange
+                        ? [
+                            {
+                              label: "Mark as Completed",
+                              icon: <CheckCircle2 size={14} />,
+                              onClick: (row: any) =>
+                                void onScheduledCallStatusChange(row, "completed"),
+                              className: "text-success",
+                              show: (row: any) => !!row.scheduled_call_at,
+                            },
+                            {
+                              label: "Mark as No Answer",
+                              icon: <PhoneOff size={14} />,
+                              onClick: (row: any) =>
+                                void onScheduledCallStatusChange(row, "no_answer"),
+                              show: (row: any) => !!row.scheduled_call_at,
+                            },
+                            {
+                              label: "Mark as Missed",
+                              icon: <PhoneMissed size={14} />,
+                              onClick: (row: any) =>
+                                void onScheduledCallStatusChange(row, "missed"),
+                              show: (row: any) => !!row.scheduled_call_at,
+                            },
+                            {
+                              label: "Mark as Rescheduled",
+                              icon: <RotateCcw size={14} />,
+                              onClick: (row: any) =>
+                                void onScheduledCallStatusChange(row, "rescheduled"),
+                              show: (row: any) => !!row.scheduled_call_at,
+                            },
+                          ]
+                        : []),
                       {
                         label: "Unschedule Call",
                         icon: <FiX size={14} />,

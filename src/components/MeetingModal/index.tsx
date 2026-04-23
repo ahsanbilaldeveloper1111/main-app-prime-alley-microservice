@@ -39,6 +39,64 @@ interface MeetingModalProps {
   }) => void | Promise<void>;
 }
 
+type CalendarMeeting = {
+  id?: number;
+  name?: string;
+  meeting_date?: string;
+  meeting_time?: string;
+};
+
+const findMeetingsAtHour = (
+  meetings: ReadonlyArray<CalendarMeeting>,
+  dateKey: string,
+  hour: number,
+): CalendarMeeting[] => {
+  const isMatch = (m: CalendarMeeting) => {
+    const d = (m.meeting_date || '').slice(0, 10);
+    if (d !== dateKey) return false;
+    const t = (m.meeting_time || '').slice(0, 2);
+    const h = Number(t);
+    return !Number.isNaN(h) && h === hour;
+  };
+  return meetings.filter(isMatch);
+};
+
+const MEETING_BADGE_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  top: 4,
+  left: 4,
+  right: 4,
+  backgroundColor: '#e3f2fd',
+  border: '1px solid #2196f3',
+  borderRadius: '4px',
+  padding: '4px 8px',
+  fontSize: '12px',
+  color: '#141414',
+  fontWeight: '500',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+
+const WeekCellMeetingBadge: React.FC<{
+  meetings: ReadonlyArray<CalendarMeeting>;
+  cellDate: Date;
+  hour: number;
+}> = ({ meetings, cellDate, hour }) => {
+  const dateKey = cellDate.toISOString().slice(0, 10);
+  const matches = findMeetingsAtHour(meetings, dateKey, hour);
+  if (matches.length === 0) return null;
+  const first = matches[0];
+  const extra = matches.length - 1;
+  const label = first.name || 'Meeting';
+  return (
+    <div style={MEETING_BADGE_STYLE} title={label}>
+      {label}
+      {extra > 0 ? ` (+${extra})` : ''}
+    </div>
+  );
+};
+
 const MeetingModal: React.FC<MeetingModalProps> = ({ 
   isOpen, 
   onClose, 
@@ -144,8 +202,25 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
     return `${year}-${month}-${day}`;
   };
 
+  const todayDateString = useMemo(() => formatDateForInput(new Date()), []);
+
+  const isSameCalendarDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const isDateTimeInPast = (date: Date, hhmm: string): boolean => {
+    const [hStr, mStr] = (hhmm || '').split(':');
+    const h = Number(hStr);
+    const m = Number(mStr);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
+    const candidate = new Date(date);
+    candidate.setHours(h, m, 0, 0);
+    return candidate.getTime() < Date.now();
+  };
+
   const [meetingsForCalendar, setMeetingsForCalendar] = useState<
-    Array<{ id?: number; name?: string; meeting_date?: string; meeting_time?: string }>
+    CalendarMeeting[]
   >([]);
 
   useEffect(() => {
@@ -367,6 +442,14 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
     }
     if (!location.trim()) {
       alert('Please select a location');
+      return;
+    }
+    if (isDateTimeInPast(startDate, startTime)) {
+      alert('Meetings cannot be scheduled in the past. Please pick a future date and time.');
+      return;
+    }
+    if (endTime <= startTime) {
+      alert('End time must be after start time.');
       return;
     }
     const cleanAttendees = normalizeEmailList(attendees);
@@ -622,10 +705,12 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     <input
                       ref={startDateInputRef}
                       type="date"
+                      min={todayDateString}
                       value={formatDateForInput(startDate)}
                       onChange={(e) => {
                         const v = e.target.value;
                         if (!v) return;
+                        if (v < todayDateString) return;
                         handleDateSelect(new Date(`${v}T00:00:00`));
                       }}
                       style={{
@@ -675,9 +760,16 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         width: '100%',
                       }}
                     >
-                      {timeSlots.map(time => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
+                      {timeSlots.map(time => {
+                        const isPast =
+                          isSameCalendarDay(startDate, new Date()) &&
+                          isDateTimeInPast(startDate, time);
+                        return (
+                          <option key={time} value={time} disabled={isPast}>
+                            {time}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
@@ -717,9 +809,21 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         width: '100%',
                       }}
                     >
-                      {timeSlots.map(time => (
-                        <option key={time} value={time}>{time}</option>
-                      ))}
+                      {timeSlots.map(time => {
+                        const isPast =
+                          isSameCalendarDay(startDate, new Date()) &&
+                          isDateTimeInPast(startDate, time);
+                        const isBeforeStart = time <= startTime;
+                        return (
+                          <option
+                            key={time}
+                            value={time}
+                            disabled={isPast || isBeforeStart}
+                          >
+                            {time}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>
@@ -1289,24 +1393,32 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                 const isCurrentDay = isToday(currentDayDate);
                 const isSelectedDay = isSelected(currentDayDate);
                 
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dayAtMidnight = new Date(currentDayDate);
+                dayAtMidnight.setHours(0, 0, 0, 0);
+                const isPastDay = dayAtMidnight.getTime() < today.getTime();
                 return (
-                  <div
+                  <button
                     key={day}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleDateSelect(currentDayDate)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleDateSelect(currentDayDate);
-                      }
+                    type="button"
+                    disabled={isPastDay}
+                    onClick={() => {
+                      if (isPastDay) return;
+                      handleDateSelect(currentDayDate);
                     }}
                     style={{
                       padding: '12px',
                       textAlign: 'center',
                       borderRight: index < weekDays.length - 1 ? '1px solid #e2e8f0' : 'none',
+                      borderTop: 'none',
+                      borderBottom: 'none',
+                      borderLeft: 'none',
                       backgroundColor: isSelectedDay ? '#f7fafc' : '#ffffff',
-                      cursor: 'pointer',
+                      cursor: isPastDay ? 'not-allowed' : 'pointer',
+                      opacity: isPastDay ? 0.45 : 1,
+                      font: 'inherit',
+                      color: 'inherit',
                     }}
                   >
                     <div style={{
@@ -1332,7 +1444,7 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                     }}>
                       {currentDayDate.getDate()}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -1363,22 +1475,38 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                   </div>
 
                   {/* Day Cells */}
-                  {weekDays.map((_, dayIndex) => (
-                    <div
+                  {weekDays.map((_, dayIndex) => {
+                    const selectWeekCellSlot = () => {
+                      const d = getWeekDayDate(dayIndex);
+                      const startHourStr = hour.toString().padStart(2, '0');
+                      const nextStart = `${startHourStr}:00`;
+                      const nextEnd = `${startHourStr}:30`;
+                      if (isDateTimeInPast(d, nextStart)) {
+                        return;
+                      }
+                      handleDateSelect(d);
+                      setStartTime(nextStart);
+                      setEndTime(nextEnd);
+                    };
+                    return (
+                    <button
                       key={dayIndex}
+                      type="button"
+                      aria-label={`Schedule meeting at ${hour.toString().padStart(2, '0')}:00`}
                       style={{
                         borderRight: dayIndex < weekDays.length - 1 ? '1px solid #e2e8f0' : 'none',
+                        borderTop: 'none',
+                        borderBottom: 'none',
+                        borderLeft: 'none',
                         backgroundColor: '#fafafa',
                         cursor: 'pointer',
                         position: 'relative',
+                        padding: 0,
+                        font: 'inherit',
+                        color: 'inherit',
+                        textAlign: 'left',
                       }}
-                      onClick={() => {
-                        const d = getWeekDayDate(dayIndex);
-                        handleDateSelect(d);
-                        const startHourStr = hour.toString().padStart(2, '0');
-                        setStartTime(`${startHourStr}:00`);
-                        setEndTime(`${startHourStr}:30`);
-                      }}
+                      onClick={selectWeekCellSlot}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = '#f0f4f8';
                       }}
@@ -1386,46 +1514,14 @@ const MeetingModal: React.FC<MeetingModalProps> = ({
                         e.currentTarget.style.backgroundColor = '#fafafa';
                       }}
                     >
-                      {(() => {
-                        const cellDate = getWeekDayDate(dayIndex);
-                        const dateKey = cellDate.toISOString().slice(0, 10);
-                        const matches = meetingsForCalendar.filter((m) => {
-                          const d = (m.meeting_date || '').slice(0, 10);
-                          if (d !== dateKey) return false;
-                          const t = (m.meeting_time || '').slice(0, 2);
-                          const h = Number(t);
-                          return !Number.isNaN(h) && h === hour;
-                        });
-                        if (matches.length === 0) return null;
-                        const first = matches[0];
-                        const extra = matches.length - 1;
-                        return (
-                          <div
-                            style={{
-                              position: 'absolute',
-                              top: 4,
-                              left: 4,
-                              right: 4,
-                              backgroundColor: '#e3f2fd',
-                              border: '1px solid #2196f3',
-                              borderRadius: '4px',
-                              padding: '4px 8px',
-                              fontSize: '12px',
-                              color: '#141414',
-                              fontWeight: '500',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                            title={first.name || 'Meeting'}
-                          >
-                            {first.name || 'Meeting'}
-                            {extra > 0 ? ` (+${extra})` : ''}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  ))}
+                      <WeekCellMeetingBadge
+                        meetings={meetingsForCalendar}
+                        cellDate={getWeekDayDate(dayIndex)}
+                        hour={hour}
+                      />
+                    </button>
+                    );
+                  })}
                 </div>
               ))}
             </div>

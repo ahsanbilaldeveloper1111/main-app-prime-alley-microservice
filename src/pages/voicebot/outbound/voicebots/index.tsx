@@ -9,6 +9,7 @@ import {
   deleteVoicebot,
   type ListVoicebotsParams,
 } from "@utils/voicebot/outbound";
+import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID, OUTBOUND_VOICEBOT_LIST_PAGE_SIZE } from "@utils/voicebot/outboundVoicebotForm";
 import { GetCompanies } from "@utils/users";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Form } from "react-bootstrap";
@@ -54,11 +55,10 @@ const VoicebotsPage = () => {
   const [data, setData] = useState<VoicebotRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [search] = useState<string>("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(OUTBOUND_VOICEBOT_LIST_PAGE_SIZE);
   const [totalRows, setTotalRows] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -97,8 +97,6 @@ const VoicebotsPage = () => {
     setLoading(true);
     try {
       const params: ListVoicebotsParams = { page, page_size: pageSize };
-      if (companyFilter) params.company_id = companyFilter;
-      if (!companyFilter && session?.user?.company_identifier) params.company_id = session?.user?.company_identifier;
       if (statusFilter) params.status = statusFilter;
       if (search?.trim()) params.search = search.trim();
       const res = await getVoicebots(params);
@@ -116,18 +114,11 @@ const VoicebotsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyFilter, statusFilter, search, page, pageSize]);
+  }, [statusFilter, search, page, pageSize]);
 
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
-
-  useEffect(() => {
-    const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier;
-    if (companyIdentifier) {
-      setCompanyFilter(companyIdentifier);
-    }
-  }, [session?.user]);
 
   useEffect(() => {
     if (!trunksFetched) {
@@ -142,7 +133,6 @@ const VoicebotsPage = () => {
   }, [trunksFetched, fetchVoicebots]);
 
   const botId = (row: VoicebotRow) => String(row.bot_id ?? row.id ?? "");
-  const selectedCompanyId = selectedRow?.company_id ?? companyFilter;
 
   const columns: TableColumn<VoicebotRow>[] = [
     { key: "name", label: "Name", sortable: true },
@@ -201,7 +191,7 @@ const VoicebotsPage = () => {
     }
     setDeleteLoading(true);
     try {
-      await deleteVoicebot(id,  { company_id: selectedCompanyId } );
+      await deleteVoicebot(id, { company_id: OUTBOUND_VOICEBOT_CREATE_COMPANY_ID });
       toast.success("Voicebot deleted");
       setShowDeleteModal(false);
       setSelectedRow(null);
@@ -324,17 +314,6 @@ const VoicebotsPage = () => {
                   Voice Bots
                 </h1>
                 <div className="d-flex align-items-center gap-2 flex-wrap">
-                  {isAdmin && (
-                    <Form.Select
-                      className="filter-select"
-                      style={{ width: "220px" }}
-                      value={companyFilter}
-                      onChange={(e) => setCompanyFilter(e.target.value)}
-                    >
-                      <option value="">All companies</option>
-                      {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </Form.Select>
-                  )}
                   <Form.Select
                     className="filter-select"
                     style={{ width: "150px" }}
@@ -371,7 +350,7 @@ const VoicebotsPage = () => {
               currentPage: page,
               rowsPerPage: pageSize,
               totalRows: totalRows || data.length,
-              pageSizeOptions: [10, 25, 50],
+              pageSizeOptions: [10, 25, 50, 100, OUTBOUND_VOICEBOT_LIST_PAGE_SIZE],
             }}
             onPaginationChange={(newPage, newRowsPerPage) => {
               setPage(newPage);

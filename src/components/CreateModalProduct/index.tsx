@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createProduct,
+  getAccountsAxiosErrorMessage,
   getProduct,
   getProductCategoriesList,
   type ProductCategoryData,
@@ -20,7 +21,10 @@ import {
 } from "@components/shared/modalUiHelpers";
 import { FullScreenModalShell, SubBarButton } from "@components/shared/FullScreenModalShell";
 import { ProductInformationCard } from "@components/shared/ProductInformationCard";
-import { PricingConfigurationCard } from "@components/shared/PricingConfigurationCard";
+import {
+  getProductBasePriceAedError,
+  PricingConfigurationCard,
+} from "@components/shared/PricingConfigurationCard";
 
 function isCreateProductFailureResponse(
   result: unknown,
@@ -68,7 +72,8 @@ export default function CreateProductModal({
   onUpdated,
 }: Readonly<CreateProductModalProps>) {
   const [pricingTab, setPricingTab] = useState("flat");
-  const [productType, setProductType] = useState("");
+  /** `null` until user picks; mirrors request/response `is_service`. */
+  const [isService, setIsService] = useState<boolean | null>(null);
   const [additionalOpen, setAdditionalOpen] = useState(false);
   const [isActive, setIsActive] = useState(true);
   const [priceAED, setPriceAED] = useState("");
@@ -96,10 +101,10 @@ export default function CreateProductModal({
   useEffect(() => {
     let cancelled = false;
     setLoadingCategories(true);
-    getProductCategoriesList()
+    getProductCategoriesList({ page: 1, limit: 100,is_active: true })
       .then((list) => {
         if (cancelled) return;
-        setCategories(Array.isArray(list) ? list : []);
+        setCategories(Array.isArray(list.data) ? list.data : []);
       })
       .catch((e) => {
         if (cancelled) return;
@@ -135,7 +140,9 @@ export default function CreateProductModal({
         setLogoFile(null);
         const logoUrl = typeof p?.logo_url === "string" ? p.logo_url.trim() : "";
         setExistingLogoUrl(logoUrl || null);
-        setProductType(p?.is_service ? "service" : "");
+        setIsService(
+          typeof p?.is_service === "boolean" ? p.is_service : false,
+        );
         const maybeRecord = p as unknown as Record<string, unknown>;
         const maybeIsActive = maybeRecord["is_active"];
         if (typeof maybeIsActive === "boolean") setIsActive(maybeIsActive);
@@ -160,9 +167,20 @@ export default function CreateProductModal({
       setAdditionalOpen(true);
       return "Category is mandatory";
     }
-    if (!String(priceAED ?? "").trim()) return "Base price is mandatory";
-    return null;
+    return getProductBasePriceAedError(priceAED);
   }, [categoryId, priceAED, productName, setAdditionalOpen]);
+
+  const priceAedFieldError = useMemo(() => {
+    const msg = getProductBasePriceAedError(priceAED);
+    if (!msg) {
+      return null;
+    }
+    const raw = String(priceAED ?? "").trim();
+    if (!raw) {
+      return submitError?.startsWith("Base price") ? msg : null;
+    }
+    return msg;
+  }, [priceAED, submitError]);
 
   const submitProduct = useCallback(
     async (mode: "create" | "create_and_add_another") => {
@@ -175,6 +193,7 @@ export default function CreateProductModal({
       setSubmitting(true);
       setSubmitError(null);
       try {
+        
         const payload: ProductCreateUpdatePayload = {
           name: productName.trim(),
           sku: productSku.trim() ? productSku.trim() : undefined,
@@ -182,7 +201,7 @@ export default function CreateProductModal({
           category_id: categoryId,
           base_price: Number(priceAED),
           is_active: isActive,
-          is_service: productType === "service",
+          is_service: isService ?? false,
           currency,
           ...(logoFile ? { logo_file: logoFile } : {}),
         };
@@ -205,10 +224,10 @@ export default function CreateProductModal({
 
         applyCreateProductSuccess(mode, onCreateAndAddAnother, onCreate);
       } catch (e) {
-        const msg = getErrorMessage(
-          e,
-          isEditMode ? "Failed to update product" : "Failed to create product",
-        );
+        const fallback = isEditMode
+          ? "Failed to update product"
+          : "Failed to create product";
+        const msg = getAccountsAxiosErrorMessage(e, fallback);
         setSubmitError(msg);
       } finally {
         setSubmitting(false);
@@ -219,6 +238,7 @@ export default function CreateProductModal({
       currency,
       isActive,
       isEditMode,
+      isService,
       onCreate,
       onCreateAndAddAnother,
       onUpdated,
@@ -228,17 +248,33 @@ export default function CreateProductModal({
       productName,
       productSku,
       productId,
-      productType,
       validatePayload,
     ],
+  );
+
+  const runSubmitAfterValidation = useCallback(
+    (mode: "create" | "create_and_add_another") => {
+      if (submitting) {
+        return;
+      }
+      const validationError = validatePayload();
+      if (validationError) {
+        setSubmitError(validationError);
+        toast.error(validationError);
+        return;
+      }
+      submitProduct(mode).then(() => undefined);
+    },
+    [submitProduct, submitting, validatePayload],
   );
 
   const topBarActions = (
     <>
       {isEditMode ? (
         <button
+          type="button"
           onClick={() => {
-            submitProduct("create").then(() => undefined);
+            runSubmitAfterValidation("create");
           }}
           style={{
             ...BASE_BUTTON,
@@ -246,6 +282,7 @@ export default function CreateProductModal({
             color: "#141414",
             fontWeight: 400,
             paddingInline: "20px",
+            ...(submitting ? { cursor: "not-allowed", opacity: 0.85 } : {}),
           }}
           onMouseEnter={onLightBgEnter}
           onMouseLeave={onLightBgLeave}
@@ -256,14 +293,16 @@ export default function CreateProductModal({
       ) : (
         <>
           <button
+            type="button"
             onClick={() => {
-              submitProduct("create_and_add_another").then(() => undefined);
+              runSubmitAfterValidation("create_and_add_another");
             }}
             style={{
               ...BASE_BUTTON,
               backgroundColor: "transparent",
               borderColor: "rgba(255,255,255,0.35)",
               color: "#fff",
+              ...(submitting ? { cursor: "not-allowed", opacity: 0.85 } : {}),
             }}
             onMouseEnter={onDarkBorderEnter}
             onMouseLeave={onDarkBorderLeave}
@@ -273,8 +312,9 @@ export default function CreateProductModal({
           </button>
           <div style={{ position: "relative" }}>
             <button
+              type="button"
               onClick={() => {
-                submitProduct("create").then(() => undefined);
+                runSubmitAfterValidation("create");
               }}
               style={{
                 ...BASE_BUTTON,
@@ -282,6 +322,7 @@ export default function CreateProductModal({
                 color: "#141414",
                 fontWeight: 400,
                 paddingInline: "20px",
+                ...(submitting ? { cursor: "not-allowed", opacity: 0.85 } : {}),
               }}
               onMouseEnter={onLightBgEnter}
               onMouseLeave={onLightBgLeave}
@@ -298,7 +339,7 @@ export default function CreateProductModal({
   const subBarLeft = isEditMode ? (
     <SubBarButton>Edit product</SubBarButton>
   ) : (
-    <SubBarButton>Create new product</SubBarButton>
+    <SubBarButton>Creating new product</SubBarButton>
   );
 
   return (
@@ -323,8 +364,8 @@ export default function CreateProductModal({
         categories={categories}
         loadingCategories={loadingCategories}
         submitting={submitting}
-        productType={productType}
-        onProductTypeChange={setProductType}
+        isService={isService}
+        onIsServiceChange={setIsService}
         additionalOpen={additionalOpen}
         onAdditionalOpenChange={setAdditionalOpen}
         idPrefix="cmp"
@@ -332,6 +373,7 @@ export default function CreateProductModal({
         existingLogoUrl={existingLogoUrl}
         logoFile={logoFile}
         onLogoFileChange={setLogoFile}
+        onExistingLogoClear={() => setExistingLogoUrl(null)}
       />
 
       <PricingConfigurationCard
@@ -342,7 +384,9 @@ export default function CreateProductModal({
         priceAed={priceAED}
         onPriceAedChange={setPriceAED}
         submitting={submitting}
+        syncCurrencyFromCompanyProfile={!isEditMode}
         idPrefix="cmp"
+        priceAedError={priceAedFieldError}
       />
 
         {/* Bottom spacing */}

@@ -13,9 +13,8 @@ import { Button, Modal, Form, Dropdown } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
 import moment from "moment";
-import { Plus, ChevronDown, Filter, MoreVertical, Settings, Trash2 } from "lucide-react";
-import GenericTable, { TableColumn, TableAction, FilterPill } from "@components/GenericTable";
-import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
+import { Plus, ChevronDown, MoreVertical, Settings, Trash2 } from "lucide-react";
+import GenericTable, { TableColumn, TableAction } from "@components/GenericTable";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
 import {
@@ -586,7 +585,6 @@ const TasksListingPage = ({
     const { pager, setPager } = useTasksListingPager();
   
     // ── Filter sidebar ────────────────────────────────────────────────────────────
-    const [showSidebar, setShowSidebar]   = useState(false);
     const [allProjects, setAllProjects]  = useState<Array<{ id: number; name: string }>>([]);
     const [fForm, setFForm] = useState(INITIAL_FILTER_FORM);
     const [workflowStatuses, setWorkflowStatuses] = useState<PlannerWorkflowStatusRow[]>([]);
@@ -709,7 +707,7 @@ const TasksListingPage = ({
 
     useEffect(() => {
       if (fForm.status === ALL_STATUS_VALUE) return;
-      const stillValid = workflowStatuses.some((s) => String(s.id) === fForm.status);
+      const stillValid = workflowStatuses.some((s) => s.name === fForm.status);
       if (stillValid) return;
       setFForm((prev) => ({ ...prev, status: ALL_STATUS_VALUE }));
       setFilters((prev) => {
@@ -1147,7 +1145,7 @@ const TasksListingPage = ({
     const statusFilterOptions = useMemo(
       () => [
         { value: ALL_STATUS_VALUE, label: ALL_STATUS_VALUE },
-        ...workflowStatuses.map((s) => ({ value: String(s.id), label: s.name })),
+        ...workflowStatuses.map((s) => ({ value: s.name, label: s.name })),
       ],
       [workflowStatuses],
     );
@@ -1156,6 +1154,46 @@ const TasksListingPage = ({
       if (fForm.status === ALL_STATUS_VALUE) return ALL_STATUS_VALUE;
       return statusFilterOptions.find((o) => o.value === fForm.status)?.label ?? fForm.status;
     }, [fForm.status, statusFilterOptions]);
+
+    const priorityFilterPillLabel = useMemo(() => {
+      if (!fForm.priority?.value) return "Priority";
+      return PRIORITY_OPTIONS.find((o) => o.value === fForm.priority?.value)?.label || "Priority";
+    }, [fForm.priority]);
+
+    const dueDateFilterPillLabel = useMemo(() => {
+      if (fForm.due_date_from && fForm.due_date_to) {
+        return `${fForm.due_date_from} to ${fForm.due_date_to}`;
+      }
+      if (fForm.due_date_from) return `From ${fForm.due_date_from}`;
+      if (fForm.due_date_to) return `Until ${fForm.due_date_to}`;
+      return "Due date";
+    }, [fForm.due_date_from, fForm.due_date_to]);
+
+    const applyCurrentFilters = useCallback(() => {
+      const f: Record<string, any> = {};
+      if (fForm.project && fForm.project !== "All Projects") f.project = fForm.project;
+      if (fForm.assignee?.length) f.assignee = fForm.assignee;
+      if (fForm.status && fForm.status !== ALL_STATUS_VALUE) f.status = fForm.status;
+      if (fForm.task_type) f.task_type = fForm.task_type.value;
+      if (fForm.priority) f.priority = fForm.priority.value;
+      if (fForm.due_date_from) f.due_date_from = fForm.due_date_from;
+      if (fForm.due_date_to) f.due_date_to = fForm.due_date_to;
+      if (search) f.search = search;
+      setFilters(f);
+      setPager({ ...pager, page: 1 });
+      setOpenQuickFilter(null);
+    }, [fForm, pager, search, setPager]);
+
+    const resetCurrentFilters = useCallback(() => {
+      setFForm({
+        ...INITIAL_FILTER_FORM,
+        assignee: [],
+      });
+      setFilters({});
+      setSearch("");
+      setPager({ ...pager, page: 1 });
+      setOpenQuickFilter(null);
+    }, [pager, setPager]);
 
     useEffect(() => {
       const onDocClick = (event: MouseEvent) => {
@@ -1169,31 +1207,7 @@ const TasksListingPage = ({
       return () => document.removeEventListener("mousedown", onDocClick);
     }, []);
 
-    // ── Filter sidebar fields ─────────────────────────────────────────────────────
-    const filterFields: FilterField[] = [
-      { id: "project", label: "Project", type: "dropdown", value: fForm.project,
-        onChange: v => setFForm(p => ({ ...p, project: v ?? "All Projects" })),
-        options: projectOptions },
-      { id: "assignee", label: "Assignee", type: "multi-select",
-        value: fForm.assignee.map(ext => ({ value: ext, label: assigneeOptions.find(o => o.value === ext)?.label ?? ext })),
-        onChange: (opts: Array<{ value: string; label: string }>) => setFForm(p => ({ ...p, assignee: opts?.length ? opts.map(o => o.value) : [] })),
-        options: assigneeOptions, placeholder: "Select assignees...", isClearable: true },
-      { id: "status", label: "Status", type: "dropdown", value: fForm.status,
-        onChange: v => setFForm(p => ({ ...p, status: v ?? ALL_STATUS_VALUE })),
-        options: statusFilterOptions },
-      { id: "task_type", label: "Task Type", type: "select", value: fForm.task_type,
-        onChange: v => setFForm(p => ({ ...p, task_type: v })),
-        options: taskTypeFilterOptions, placeholder: "Select task type...", isClearable: true },
-      { id: "priority", label: "Priority", type: "select", value: fForm.priority,
-        onChange: v => setFForm(p => ({ ...p, priority: v })),
-        options: PRIORITY_OPTIONS, placeholder: "Select priority...", isClearable: true },
-      { id: "due_date_from", label: "Due Date From", type: "date", value: fForm.due_date_from,
-        onChange: v => setFForm(p => ({ ...p, due_date_from: v })) },
-      { id: "due_date_to", label: "Due Date To", type: "date", value: fForm.due_date_to,
-        onChange: v => setFForm(p => ({ ...p, due_date_to: v })) },
-    ];
-
-    const filterPills: FilterPill[] = [
+    const filterPills = [
       {
         id: "project",
         label: fForm.project,
@@ -1225,10 +1239,17 @@ const TasksListingPage = ({
         showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "status" ? null : "status")),
       },
+      {
+        id: "priority",
+        label: priorityFilterPillLabel,
+        icon: <ChevronDown size={12} />,
+        showDropdown: true,
+        onClick: () => setOpenQuickFilter((prev) => (prev === "priority" ? null : "priority")),
+      },
       
       {
         id: "due_date",
-        label: "Due date",
+        label: dueDateFilterPillLabel,
         icon: <ChevronDown size={12} />,
         showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "due_date" ? null : "due_date")),
@@ -1240,15 +1261,7 @@ const TasksListingPage = ({
         showDropdown: true,
         onClick: () => setOpenQuickFilter((prev) => (prev === "queue" ? null : "queue")),
       },
-      {
-        id: "clear_all",
-        label: "Clear all",
-        showDropdown: false,
-        onClick: () => {
-          setFilters({});
-          setFForm(INITIAL_FILTER_FORM);
-        },
-      },
+      
     ];
   
     // ── Render ─────────────────────────────────────────────────────────────────────
@@ -1470,7 +1483,7 @@ const TasksListingPage = ({
 
           {/* ══════════════════════════════════════════════════════
               ROW 3 — Filter controls row
-              LEFT:  Assigned to (1) ✕ | Task type ▼ | Due date ▼ | Queue ▼ | Clear all | Advanced filters
+              LEFT:  Assigned to (1) ✕ | Task type ▼ | Due date ▼ | Queue ▼ | Clear all
               RIGHT: Save view | Start N tasks
           ══════════════════════════════════════════════════════ */}
           <div style={{
@@ -1515,15 +1528,7 @@ const TasksListingPage = ({
                           <button
                             key={option.value}
                             onClick={() => {
-                              // Use current state values to avoid deeply nested callback functions.
                               setFForm({ ...fForm, project: option.value });
-
-                              const nextFilters = { ...filters };
-                              if (option.value === "All Projects") delete nextFilters.project;
-                              else nextFilters.project = option.value;
-                              setFilters(nextFilters);
-
-                              setPager({ ...pager, page: 1 });
                               setOpenQuickFilter(null);
                             }}
                             style={{
@@ -1560,12 +1565,6 @@ const TasksListingPage = ({
                         <button
                           onClick={() => {
                             setFForm((prev) => ({ ...prev, assignee: [] }));
-                            setFilters((prev) => {
-                              const next = { ...prev };
-                              delete next.assignee;
-                              return next;
-                            });
-                            setPager((prev) => ({ ...prev, page: 1 }));
                             setOpenQuickFilter(null);
                           }}
                           style={{
@@ -1598,13 +1597,6 @@ const TasksListingPage = ({
                                   nextAssignees = [...fForm.assignee, option.value];
                                 }
                                 setFForm({ ...fForm, assignee: nextAssignees });
-
-                                const nextFilters = { ...filters };
-                                if (nextAssignees.length > 0) nextFilters.assignee = nextAssignees;
-                                else delete nextFilters.assignee;
-                                setFilters(nextFilters);
-
-                                setPager({ ...pager, page: 1 });
                               }}
                               style={{
                                 width: "100%",
@@ -1641,12 +1633,6 @@ const TasksListingPage = ({
                         <button
                           onClick={() => {
                             setFForm((prev) => ({ ...prev, task_type: null }));
-                            setFilters((prev) => {
-                              const next = { ...prev };
-                              delete next.task_type;
-                              return next;
-                            });
-                            setPager((prev) => ({ ...prev, page: 1 }));
                             setOpenQuickFilter(null);
                           }}
                           style={{
@@ -1670,8 +1656,6 @@ const TasksListingPage = ({
                               onClick={() => {
                                 const selectedType = { value: option.value, label: option.label };
                                 setFForm({ ...fForm, task_type: selectedType });
-                                setFilters({ ...filters, task_type: option.value });
-                                setPager({ ...pager, page: 1 });
                                 setOpenQuickFilter(null);
                               }}
                               style={{
@@ -1711,13 +1695,6 @@ const TasksListingPage = ({
                             key={option.value}
                             onClick={() => {
                               setFForm({ ...fForm, status: option.value });
-
-                              const nextFilters = { ...filters };
-                              if (option.value === ALL_STATUS_VALUE) delete nextFilters.status;
-                              else nextFilters.status = option.value;
-                              setFilters(nextFilters);
-
-                              setPager({ ...pager, page: 1 });
                               setOpenQuickFilter(null);
                             }}
                             style={{
@@ -1734,6 +1711,68 @@ const TasksListingPage = ({
                             {option.label}
                           </button>
                         ))}
+                      </div>
+                    )}
+                    {pill.id === "priority" && openQuickFilter === "priority" && (
+                      <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        zIndex: 30,
+                        minWidth: 220,
+                        maxHeight: 260,
+                        overflowY: "auto",
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        boxShadow: "0 10px 24px rgba(0,0,0,0.12)",
+                        padding: 6,
+                      }}>
+                        <button
+                          onClick={() => {
+                            setFForm((prev) => ({ ...prev, priority: null }));
+                            setOpenQuickFilter(null);
+                          }}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            border: "none",
+                            background: fForm.priority ? "transparent" : "#f3f4f6",
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                          }}
+                        >
+                          All priorities
+                        </button>
+                        {PRIORITY_OPTIONS.map((option) => {
+                          const selected = fForm.priority?.value === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              onClick={() => {
+                                setFForm({
+                                  ...fForm,
+                                  priority: { value: option.value, label: option.label },
+                                });
+                                setOpenQuickFilter(null);
+                              }}
+                              style={{
+                                width: "100%",
+                                textAlign: "left",
+                                border: "none",
+                                background: selected ? "#f3f4f6" : "transparent",
+                                borderRadius: 6,
+                                padding: "8px 10px",
+                                fontSize: 12,
+                                fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                     {pill.id === "due_date" && openQuickFilter === "due_date" && (
@@ -1753,8 +1792,6 @@ const TasksListingPage = ({
                           onClick={() => {
                             const today = moment().format("YYYY-MM-DD");
                             setFForm((prev) => ({ ...prev, due_date_from: today, due_date_to: today }));
-                            setFilters((prev) => ({ ...prev, due_date_from: today, due_date_to: today }));
-                            setPager((prev) => ({ ...prev, page: 1 }));
                             setOpenQuickFilter(null);
                           }}
                           style={{
@@ -1775,8 +1812,6 @@ const TasksListingPage = ({
                             const from = moment().format("YYYY-MM-DD");
                             const to = moment().add(7, "days").format("YYYY-MM-DD");
                             setFForm((prev) => ({ ...prev, due_date_from: from, due_date_to: to }));
-                            setFilters((prev) => ({ ...prev, due_date_from: from, due_date_to: to }));
-                            setPager((prev) => ({ ...prev, page: 1 }));
                             setOpenQuickFilter(null);
                           }}
                           style={{
@@ -1795,13 +1830,6 @@ const TasksListingPage = ({
                         <button
                           onClick={() => {
                             setFForm((prev) => ({ ...prev, due_date_from: "", due_date_to: "" }));
-                            setFilters((prev) => {
-                              const next = { ...prev };
-                              delete next.due_date_from;
-                              delete next.due_date_to;
-                              return next;
-                            });
-                            setPager((prev) => ({ ...prev, page: 1 }));
                             setOpenQuickFilter(null);
                           }}
                           style={{
@@ -1817,6 +1845,62 @@ const TasksListingPage = ({
                         >
                           Clear due date
                         </button>
+                        <div style={{ borderTop: "1px solid #e5e7eb", margin: "6px 0" }} />
+                        <div style={{ padding: "6px 10px" }}>
+                          <label
+                            htmlFor="quick-due-date-from"
+                            style={{
+                              display: "block",
+                              fontSize: 11,
+                              color: "#6b7280",
+                              marginBottom: 4,
+                            }}
+                          >
+                            Due date from
+                          </label>
+                          <input
+                            id="quick-due-date-from"
+                            type="date"
+                            value={fForm.due_date_from || ""}
+                            onChange={(e) =>
+                              setFForm((prev) => ({ ...prev, due_date_from: e.target.value || "" }))
+                            }
+                            style={{
+                              width: "100%",
+                              border: "1px solid #d1d5db",
+                              borderRadius: 6,
+                              padding: "6px 8px",
+                              fontSize: 12,
+                              marginBottom: 8,
+                            }}
+                          />
+                          <label
+                            htmlFor="quick-due-date-to"
+                            style={{
+                              display: "block",
+                              fontSize: 11,
+                              color: "#6b7280",
+                              marginBottom: 4,
+                            }}
+                          >
+                            Due date to
+                          </label>
+                          <input
+                            id="quick-due-date-to"
+                            type="date"
+                            value={fForm.due_date_to || ""}
+                            onChange={(e) =>
+                              setFForm((prev) => ({ ...prev, due_date_to: e.target.value || "" }))
+                            }
+                            style={{
+                              width: "100%",
+                              border: "1px solid #d1d5db",
+                              borderRadius: 6,
+                              padding: "6px 8px",
+                              fontSize: 12,
+                            }}
+                          />
+                        </div>
                       </div>
                     )}
                     {pill.id === "queue" && openQuickFilter === "queue" && (
@@ -1840,21 +1924,56 @@ const TasksListingPage = ({
                     )}
                   </div>
                 ))}
-                <button className="gt-filter-pill-add">
-                  <Plus size={14} className="me-1" />
-                  <span>More</span>
-                </button>
-                <button
-                  className="gt-filter-pill-add"
-                  onClick={() => setShowSidebar(true)}
-                >
-                  <Filter size={14} className="me-1" />
-                  <span>Advanced filters</span>
-                </button>
               </div>
             </div>
   
             {/* RIGHT */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
+              <button
+                type="button"
+                onClick={applyCurrentFilters}
+                style={{
+                  ...TASK_LIST_BTN_OUTLINE,
+                  backgroundColor: "#000",
+                  background: "#000",
+                  borderColor: "#000",
+                  color: "#fff",
+                  fontWeight: 600,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = "#333";
+                  e.currentTarget.style.background = "#333";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = "#000";
+                  e.currentTarget.style.background = "#000";
+                }}
+              >
+                Apply filters
+              </button>
+              <button
+                type="button"
+                onClick={resetCurrentFilters}
+                style={{
+                  ...TASK_LIST_BTN_OUTLINE,
+                  backgroundColor: "#000",
+                  background: "#000",
+                  borderColor: "#000",
+                  color: "#fff",
+                  fontWeight: 600,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = "#333";
+                  e.currentTarget.style.background = "#333";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = "#000";
+                  e.currentTarget.style.background = "#000";
+                }}
+              >
+                Reset filters
+              </button>
+            </div>
           </div>
   
           {/* ══════════════════════════════════════════════════════
@@ -1952,36 +2071,6 @@ const TasksListingPage = ({
           </div>
   
         </div>
-  
-        {/* ── Filter sidebar ── */}
-        <GenericFilterSidebar
-          isOpen={showSidebar}
-          onClose={() => setShowSidebar(false)}
-          title="Filters"
-          subtitle="Filter tasks by various criteria"
-          width="380px"
-          filters={filterFields}
-          onApply={() => {
-            const f: Record<string, any> = {};
-            if (fForm.project && fForm.project !== "All Projects") f.project = fForm.project;
-            if (fForm.assignee?.length) f.assignee = fForm.assignee;
-            if (fForm.status && fForm.status !== ALL_STATUS_VALUE) f.status = fForm.status;
-            if (fForm.task_type)    f.task_type    = fForm.task_type.value;
-            if (fForm.priority)     f.priority     = fForm.priority.value;
-            if (fForm.due_date_from) f.due_date_from = fForm.due_date_from;
-            if (fForm.due_date_to)   f.due_date_to   = fForm.due_date_to;
-            if (search) f.search = search;
-            setFilters(f);
-            setPager(p => ({ ...p, page: 1 }));
-            setShowSidebar(false);
-          }}
-          onReset={() => {
-            setFForm(INITIAL_FILTER_FORM);
-            setFilters({});
-            setSearch("");
-            setPager(p => ({ ...p, page: 1 }));
-          }}
-        />
   
         {/* ── Create / Edit task (CreateTaskSidebar – same logic as createtask-modal) ── */}
         <CreateTaskSidebar

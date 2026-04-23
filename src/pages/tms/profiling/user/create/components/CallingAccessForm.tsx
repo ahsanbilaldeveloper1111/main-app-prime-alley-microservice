@@ -179,8 +179,8 @@ const CallingAccessForm = forwardRef<HTMLDivElement, CallingAccessFormProps>(({
                                         className={touched.device_type && errors.device_type ? "is-invalid" : ""}
                                         menuPortalTarget={document.body}
                                         styles={{
-                                            menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
-                                            menu: (base: any) => ({ ...base, zIndex: 9999 })
+                                            menuPortal: (base: any) => ({ ...base, zIndex: 1000001 }),
+                                            menu: (base: any) => ({ ...base, zIndex: 1000001 })
                                         }}
                                     />
                                     {errors.device_type && touched.device_type && (
@@ -204,8 +204,8 @@ const CallingAccessForm = forwardRef<HTMLDivElement, CallingAccessFormProps>(({
                                         className={touched.iccid_number && errors.iccid_number ? "is-invalid" : ""}
                                         menuPortalTarget={document.body}
                                         styles={{
-                                            menuPortal: (base: any) => ({ ...base, zIndex: 9999 }),
-                                            menu: (base: any) => ({ ...base, zIndex: 9999 })
+                                            menuPortal: (base: any) => ({ ...base, zIndex: 1000001 }),
+                                            menu: (base: any) => ({ ...base, zIndex: 1000001 })
                                         }}
                                     />
                                     {errors.iccid_number && touched.iccid_number && (
@@ -333,14 +333,13 @@ const CallingAccessForm = forwardRef<HTMLDivElement, CallingAccessFormProps>(({
                             }
                         >
                             {getCurrentLoadingState(2) ? (
-                                <>
+                                <output>
                                     <span
                                         className="spinner-border spinner-border-sm me-2"
-                                        role="status"
                                         aria-hidden="true"
                                     ></span>
-                                    Submitting...
-                                </>
+                                    {" "}Submitting...
+                                </output>
                             ) : (
                                 "Continue to Create User Profile"
                             )}

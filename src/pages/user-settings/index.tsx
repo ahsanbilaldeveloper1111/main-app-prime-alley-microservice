@@ -264,6 +264,7 @@ const APP_PERMISSION_MODULES: AppPermissionModule[] = [
       { id: "text-messages-communications", label: "Text Messages" },
       { id: "live-calls-campaign-manager", label: "Campaigns Manager" },
       { id: "live-calls-campaign-console", label: "Campaign Console" },
+      { id: "live-calls-campaign-agent", label: "Campaign Agent" },
     ],
   },
   {

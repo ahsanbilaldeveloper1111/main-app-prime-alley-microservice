@@ -497,19 +497,16 @@ export default function DocumentsPage() {
     if (docId == null) return;
     setDeletingDocument(true);
     try {
-     const response = await  DeleteCompanyDocument(companyId, docId);
-     console.log("DeleteCompanyDocument response:", response);
-     if ((response as any)?.success === true) {
-      toast.success((response as any)?.message ?? "Document deleted.");
+      const response = await DeleteCompanyDocument(companyId, docId);
+      const payload = response as { message?: string } | null | undefined;
+      const apiMessage =
+        payload && typeof payload.message === "string" ? payload.message.trim() : "";
+      toast.success(apiMessage || "Document deleted successfully.");
       setShowDeleteDocumentModal(false);
       setDocumentPendingDelete(null);
-      await loadDocuments();
-    } else {
-      toast.error((response as any)?.message ?? "Failed to delete document.");
-    }
-    } catch (error) {
+      await loadDocuments();    
+    } catch (error: unknown) {
       console.error("DocumentsPage DeleteCompanyDocument error:", error);
-     
     } finally {
       setDeletingDocument(false);
     }

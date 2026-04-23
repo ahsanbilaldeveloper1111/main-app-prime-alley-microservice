@@ -209,6 +209,10 @@ export const routePermissions: RoutePermission[] = [
                 path: '/campaign-console',
                 permissions: [PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT]
             },
+            {
+                path: '/campaign-agent',
+                permissions: [PERMISSIONS.VIEW_CAMPAIGN_AGENT],
+            },
         ]
     },
     //communications services end
@@ -354,7 +358,25 @@ export const routePermissions: RoutePermission[] = [
         permissions: [PERMISSIONS.REPORTS_SERVICES],
         children: [
             { path: '/crm-insights',permissions: [PERMISSIONS.VIEW_CRM_REPORTS]},
-            { path: '/call-analytics',permissions: [PERMISSIONS.VIEW_CALL_REPORTS]},
+            {
+                path: '/call-analytics',
+                permissions: [PERMISSIONS.VIEW_CALL_REPORTS],
+                children: [
+                    { path: '/stats/country', permissions: [PERMISSIONS.CALL_STATS_BY_COUNTRY_REPORTS] },
+                    {
+                        path: '/stats/department',
+                        permissions: [PERMISSIONS.CALL_STATS_BY_DEPARTMENT_REPORTS],
+                        children: [
+                            { path: '/extension', permissions: [PERMISSIONS.CALL_STATS_BY_DEPARTMENT_EXTENSION_REPORTS] }
+                        ]
+                    },
+                    { path: '/stats/extension', permissions: [PERMISSIONS.CALL_STATS_BY_EXTENSION_REPORTS] },
+                    { path: '/stats/general', permissions: [PERMISSIONS.GENERAL_CALL_STATISTICS_REPORTS] },
+                    { path: '/incoming/country', permissions: [PERMISSIONS.CALL_INCOMING_BY_COUNTRY_REPORTS] },
+                    { path: '/incoming/department', permissions: [PERMISSIONS.CALL_INCOMING_BY_DEPARTMENT_REPORTS] },
+                    { path: '/incoming/extension', permissions: [PERMISSIONS.CALL_INCOMING_BY_EXTENSION_REPORTS] },
+                ]
+            },
             { path: '/chat-usage', permissions: [PERMISSIONS.CHAT_USAGE_REPORTS] },
         ]
     },

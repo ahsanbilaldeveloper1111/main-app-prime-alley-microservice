@@ -14,50 +14,9 @@ import moment from "moment";
 import { GlobalDateFormat } from "@utils/Helper";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
-import ColumnEditorModal from "@components/ColumnEditorModal";
-
-const BILLING_TRANSACTIONS_COLUMN_STORAGE_KEY = "billing-transactions-columns";
-const DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS: string[] = [
-  "date_issued",
-  "details",
-  "transaction_number",
-  "subscriptions",
-  "payment_method",
-  "amount",
-  "status",
-];
-
-function parseStoredTransactionColumnKeys(raw: string | null): string[] | null {
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return null;
-    }
-    const allowed = new Set(DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS);
-    const keys = parsed.filter(
-      (k): k is string => typeof k === "string" && allowed.has(k),
-    );
-    return keys.length > 0 ? keys : null;
-  } catch {
-    return null;
-  }
-}
-
-function loadTransactionTableColumnsFromStorage(): string[] {
-  const win = (globalThis as unknown as { window?: Window & { localStorage: Storage } }).window;
-  if (win === undefined) {
-    return [...DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS];
-  }
-  const stored = parseStoredTransactionColumnKeys(
-    win.localStorage.getItem(BILLING_TRANSACTIONS_COLUMN_STORAGE_KEY),
-  );
-  return stored ?? [...DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS];
-}
 
 const ProductDetails = () => {
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
@@ -86,6 +45,16 @@ const ProductDetails = () => {
 
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const onAccountingCustomerCreated = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(selectedCompanyId, {
+    onCreated: onAccountingCustomerCreated,
+    errorToastId: "billing_transactions_ensure_customer_failed",
+  });
+
   const [currentFilters, setCurrentFilters] = useState<{
     search?: string;
     status?: string;
@@ -448,7 +417,7 @@ const ProductDetails = () => {
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
           totalRows: totalRecords,
-          pageSizeOptions: [10, 15, 25, 50],
+          pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
         }}
         onPaginationChange={(page, rowsPerPage) => {
           setPagination((prev) => ({

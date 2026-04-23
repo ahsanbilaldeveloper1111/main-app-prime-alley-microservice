@@ -60,6 +60,7 @@ import {
   type CrmActivitiesPanelRef,
 } from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import {
@@ -320,7 +321,7 @@ export function CrmProspectsContactsListPage({
     validFilters: ["all", "scheduled", "has_leads"],
     defaultColumnIds: [
       "name", "phone", "source_file", "user_extension", "campaign",
-      "last_called_at", "last_call_end_reason", "disposition",
+      "disposition",
       "scheduled_call_at", "tags",
     ],
     selectedColumnsStorageKey: config.selectedColumnsStorageKey,
@@ -367,7 +368,7 @@ export function CrmProspectsContactsListPage({
     handleDataAssignmentSubmit, handleDataAssignmentModalClose,
     handleAfterCallSubmit,
     handleScheduleCall, handleUnscheduleCallClick, confirmUnscheduleCall,
-    handleScheduleModalClose, handleScheduleSubmit,
+    handleScheduleModalClose, handleScheduleSubmit, handleScheduledCallStatusChange,
     handleCallClick, handleBulkDelete, handleDeleteData,
     openSidebar: openProspectSidebar, handleViewData,
     handlePlayCallRecording, handleDownloadCallRecording,
@@ -411,6 +412,24 @@ export function CrmProspectsContactsListPage({
     onEmailSent: () => sidebarActivitiesPanelRef.current?.refetchEmails?.(),
     onMeetingScheduled: () =>
       sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
+  });
+
+  // "Log a Call / Email / SMS / WhatsApp / Meeting" — manual history entries
+  // (no actual send). These are wired into the GenericSidebar "more actions"
+  // overflow so each click opens a dedicated dialog where the user picks the
+  // time and subject; on submit we POST to /crm/audit-logs.
+  const sidebarLogActivityModals = useCrmLogActivityModals({
+    recordType: "prospect",
+    recordId: sidebarRecordId,
+    recordName: sidebarRecordName,
+    recordPhone: sidebarRecordPhone,
+    recordEmail: sidebarRecordEmail,
+    onLogged: () => {
+      // The audit log feeds the record's history / activity audit trail —
+      // refetch whatever the activities panel surfaces so the new entry
+      // shows up immediately without needing a manual reload.
+      sidebarActivitiesPanelRef.current?.refetchNotes?.();
+    },
   });
 
   const buildCrmDataParams = useCallback(
@@ -754,6 +773,7 @@ export function CrmProspectsContactsListPage({
         setItemToDelete,
         setShowDeleteModal,
         onDispositionChange: handleDispositionQuickUpdate,
+        onScheduledCallStatusChange: handleScheduledCallStatusChange,
       }),
     [
       session,
@@ -770,6 +790,7 @@ export function CrmProspectsContactsListPage({
       setItemToDelete,
       setShowDeleteModal,
       handleDispositionQuickUpdate,
+      handleScheduledCallStatusChange,
     ],
   );
 
@@ -1219,6 +1240,12 @@ export function CrmProspectsContactsListPage({
             recordId={resolveNumericProspectId(selectedProspect) || undefined}
             resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
+            onPlayCallRecording={handlePlayCallRecording}
+            onLogCall={sidebarLogActivityModals.openLogCall}
+            onLogEmail={sidebarLogActivityModals.openLogEmail}
+            onLogSms={sidebarLogActivityModals.openLogSms}
+            onLogWhatsApp={sidebarLogActivityModals.openLogWhatsApp}
+            onLogMeeting={sidebarLogActivityModals.openLogMeeting}
             crmSummary={
               selectedProspect?.crm_summary ?? selectedProspect?.data?.crm_summary ?? undefined
             }
@@ -1261,7 +1288,11 @@ export function CrmProspectsContactsListPage({
                 // },
                 {
                   label: "Delete",
-                  onClick: () => handleDeleteData(selectedProspect),
+                  onClick: () => {
+                    const prospectToDelete = selectedProspect;
+                    setShowProspectSidebar(false);
+                    handleDeleteData(prospectToDelete);
+                  },
                 },
               ],
             }}
@@ -1400,6 +1431,7 @@ export function CrmProspectsContactsListPage({
           />
         )}
         {sidebarActivityModals.modals}
+        {sidebarLogActivityModals.modals}
         {/* Filters Sidebar */}
         <GenericFilterSidebar
           isOpen={showFiltersSidebar}
