@@ -4,9 +4,23 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Card, Col, Form, Row, Spinner } from "react-bootstrap";
 import { useSession } from "next-auth/react";
-import { getAnalyticsCosts, getAnalyticsDashboard, getAnalyticsTrends, getCampaigns, postReportsCalls } from "@utils/voicebot/outbound";
+import {
+  getAnalyticsCosts,
+  getAnalyticsDashboard,
+  getAnalyticsTrends,
+  getCampaigns,
+  getVoicebots,
+  normalizeVoicebotsListResponse,
+  postReportsCalls,
+  type AnalyticsCostsApiResponse,
+  type AnalyticsCostsByCampaignItem,
+  type AnalyticsCostsData,
+  type AnalyticsTrendsPeriod,
+  type PostReportsCallsPayload,
+} from "@utils/voicebot/outbound";
+import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID, OUTBOUND_VOICEBOT_LIST_PAGE_SIZE } from "@utils/voicebot/outboundVoicebotForm";
 import moment from "moment";
-import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { BarChart3 } from "lucide-react";
 import { GetCompanies } from "@utils/users";
 import { formatFixed, formatPercent, toYmd } from "@utils/voicebot/outbound/formatters";
@@ -14,6 +28,7 @@ import { formatFixed, formatPercent, toYmd } from "@utils/voicebot/outbound/form
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
+import { useDebouncedValue } from "@hooks/useDebouncedValue";
 
 type TimePeriodOption = { value: "7" | "14" | "30" | "60" | "90"; label: string };
 
@@ -24,6 +39,74 @@ const TIME_PERIOD_OPTIONS: TimePeriodOption[] = [
   { value: "60", label: "Last 60 days" },
   { value: "90", label: "Last 90 days" },
 ];
+
+const REPORTS_CALL_STATUS_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: "completed", label: "Completed" },
+  { value: "timeout", label: "Timeout" },
+];
+
+const TRENDS_PERIOD_OPTIONS: Array<{ value: AnalyticsTrendsPeriod; label: string }> = [
+  { value: "7d", label: "Last 7 days" },
+  { value: "14d", label: "Last 14 days" },
+  { value: "30d", label: "Last 30 days" },
+];
+
+type OutboundReportsCallsChartFilters = {
+  companyIdentifier: string;
+  campaignId: string;
+  voicebotId: string;
+  callStatus: string;
+  durationMin: number;
+  durationMax: number;
+  fromDate: string;
+  toDate: string;
+};
+
+function buildAnalyticsReportsCallsPayload(args: {
+  companyIdentifier: string;
+  campaignId: string;
+  voicebotId: string;
+  callStatus: string;
+  durationMin: number;
+  durationMax: number;
+  fromDate: string;
+  toDate: string;
+  page: number;
+  pageSize: number;
+}): PostReportsCallsPayload {
+  const {
+    companyIdentifier,
+    campaignId,
+    voicebotId,
+    callStatus,
+    durationMin,
+    durationMax,
+    fromDate,
+    toDate,
+    page,
+    pageSize,
+  } = args;
+  const payload: PostReportsCallsPayload = {
+    company_id: companyIdentifier,
+    page,
+    page_size: pageSize,
+    date_from: fromDate,
+    date_to: toDate,
+    duration_min: durationMin,
+    duration_max: durationMax,
+  };
+  if (campaignId) {
+    const n = Number(campaignId);
+    if (Number.isFinite(n)) payload.campaign_id = n;
+  }
+  if (voicebotId) {
+    const n = Number(voicebotId);
+    if (Number.isFinite(n)) payload.voicebot_id = n;
+  }
+  if (callStatus) payload.call_status = callStatus;
+  return payload;
+}
 
 type DashboardToday = {
   calls?: number;
@@ -83,35 +166,11 @@ function aggregateCampaignPerformance(list: CampaignPerformanceRow[]) {
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
-type CostsByCampaignItem = {
-  campaign_id?: number | string;
-  total?: number;
-  count?: number;
-};
-
-type CostTrendItem = {
-  date?: string; // YYYY-MM-DD
-  total?: number;
-};
-
-type AnalyticsCostsData = {
-  total_cost?: number;
-  llm_cost?: number;
-  tts_cost?: number;
-  stt_cost?: number;
-  cost_by_campaign?: CostsByCampaignItem[];
-  cost_trend?: CostTrendItem[];
-};
-
-type AnalyticsCostsResponse = {
-  status?: boolean;
-  data?: AnalyticsCostsData;
-  message?: string;
-  detail?: string;
-};
-
 type CompanyOption = { id: string; name: string };
 type CampaignOption = { id: number | string; name: string };
+
+/** Campaign id from API / table rows (numeric id or string key). */
+type CampaignIdParam = number | string | undefined;
 
 type TrendItem = {
   date?: string; // YYYY-MM-DD
@@ -167,11 +226,6 @@ function useOutboundDashboard(companyIdentifier: string, campaignId: string, fro
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
 
   useEffect(() => {
-    if (!companyIdentifier) {
-      setDashboard(null);
-      return;
-    }
-
     let cancelled = false;
 
     async function fetchDashboard() {
@@ -207,13 +261,14 @@ function useOutboundDashboard(companyIdentifier: string, campaignId: string, fro
   return { loading, dashboard };
 }
 
-function useOutboundCallVolume(companyIdentifier: string, campaignId: string, fromDate: string, toDate: string) {
+function useOutboundCallVolume(filters: OutboundReportsCallsChartFilters) {
+  const { companyIdentifier, campaignId, voicebotId, callStatus, durationMin, durationMax, fromDate, toDate } = filters;
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Array<{ dateKey: string; calls: number }>>([]);
   const [truncated, setTruncated] = useState(false);
 
   useEffect(() => {
-    if (!companyIdentifier || !fromDate || !toDate) {
+    if (!fromDate || !toDate) {
       setData([]);
       setTruncated(false);
       return;
@@ -225,14 +280,18 @@ function useOutboundCallVolume(companyIdentifier: string, campaignId: string, fr
       setLoading(true);
       try {
         const PAGE_SIZE = 5000;
-        const payload: Record<string, unknown> = {
-          company_id: companyIdentifier,
+        const payload = buildAnalyticsReportsCallsPayload({
+          companyIdentifier,
+          campaignId,
+          voicebotId,
+          callStatus,
+          durationMin,
+          durationMax,
+          fromDate,
+          toDate,
           page: 1,
-          page_size: PAGE_SIZE,
-          date_from: fromDate,
-          date_to: toDate,
-        };
-        if (campaignId) payload.campaign_id = campaignId;
+          pageSize: PAGE_SIZE,
+        });
 
         const res = (await postReportsCalls(payload)) as ReportsCallsResponse;
         const list = Array.isArray(res?.results) ? res.results : [];
@@ -270,18 +329,19 @@ function useOutboundCallVolume(companyIdentifier: string, campaignId: string, fr
     return () => {
       cancelled = true;
     };
-  }, [companyIdentifier, campaignId, fromDate, toDate]);
+  }, [companyIdentifier, campaignId, voicebotId, callStatus, durationMin, durationMax, fromDate, toDate]);
 
   return { loading, data, truncated };
 }
 
-function useOutboundCosts(companyIdentifier: string, campaignId: string, fromDate: string, toDate: string) {
+function useOutboundCosts(fromDate: string, toDate: string) {
   const [loading, setLoading] = useState(false);
   const [costs, setCosts] = useState<AnalyticsCostsData | null>(null);
 
   useEffect(() => {
-    if (!companyIdentifier) {
+    if (!fromDate || !toDate) {
       setCosts(null);
+      setLoading(false);
       return;
     }
 
@@ -290,18 +350,10 @@ function useOutboundCosts(companyIdentifier: string, campaignId: string, fromDat
     async function fetchCosts() {
       setLoading(true);
       try {
-        const params: Record<string, unknown> = { company_id: companyIdentifier };
-        if (campaignId) params.campaign_id = campaignId;
-        if (fromDate) {
-          params.start_date = ymdStartIso(fromDate);
-          params.date_from = fromDate;
-        }
-        if (toDate) {
-          params.end_date = ymdEndIso(toDate);
-          params.date_to = toDate;
-        }
-
-        const res = (await getAnalyticsCosts(params)) as AnalyticsCostsResponse;
+        const res = (await getAnalyticsCosts({
+          date_from: fromDate,
+          date_to: toDate,
+        })) as AnalyticsCostsApiResponse;
         if (!cancelled) setCosts(res?.data ?? null);
       } catch (err) {
         console.error("getAnalyticsCosts error:", err);
@@ -315,64 +367,19 @@ function useOutboundCosts(companyIdentifier: string, campaignId: string, fromDat
     return () => {
       cancelled = true;
     };
-  }, [companyIdentifier, campaignId, fromDate, toDate]);
+  }, [fromDate, toDate]);
 
   return { loading, costs };
 }
 
-function useOutboundTrends(companyIdentifier: string, campaignId: string, fromDate: string, toDate: string) {
-  const [loading, setLoading] = useState(false);
-  const [trends, setTrends] = useState<TrendItem[]>([]);
-
-  useEffect(() => {
-    if (!companyIdentifier) {
-      setTrends([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function fetchTrends() {
-      setLoading(true);
-      try {
-        const params: Record<string, unknown> = { company_id: companyIdentifier };
-        if (campaignId) params.campaign_id = campaignId;
-        if (fromDate) {
-          params.start_date = ymdStartIso(fromDate);
-          params.date_from = fromDate;
-        }
-        if (toDate) {
-          params.end_date = ymdEndIso(toDate);
-          params.date_to = toDate;
-        }
-
-        const res = (await getAnalyticsTrends(params)) as AnalyticsTrendsResponse;
-        const list = Array.isArray(res?.data) ? res.data : [];
-        if (!cancelled) setTrends(list);
-      } catch (err) {
-        console.error("getAnalyticsTrends error:", err);
-        if (!cancelled) setTrends([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    fetchTrends();
-    return () => {
-      cancelled = true;
-    };
-  }, [companyIdentifier, campaignId, fromDate, toDate]);
-
-  return { loading, trends };
-}
-
-function useOutboundCampaignPerformance(companyIdentifier: string, campaignId: string, fromDate: string, toDate: string) {
+function useOutboundCampaignPerformance(filters: OutboundReportsCallsChartFilters) {
+  const { companyIdentifier, campaignId, voicebotId, callStatus, durationMin, durationMax, fromDate, toDate } = filters;
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Array<{ campaignLabel: string; completed: number; failed: number; total: number }>>([]);
   const [truncated, setTruncated] = useState(false);
 
   useEffect(() => {
-    if (!companyIdentifier || !fromDate || !toDate) {
+    if (!fromDate || !toDate) {
       setRows([]);
       setTruncated(false);
       return;
@@ -384,14 +391,18 @@ function useOutboundCampaignPerformance(companyIdentifier: string, campaignId: s
       setLoading(true);
       try {
         const PAGE_SIZE = 5000;
-        const payload: Record<string, unknown> = {
-          company_id: companyIdentifier,
+        const payload = buildAnalyticsReportsCallsPayload({
+          companyIdentifier,
+          campaignId,
+          voicebotId,
+          callStatus,
+          durationMin,
+          durationMax,
+          fromDate,
+          toDate,
           page: 1,
-          page_size: PAGE_SIZE,
-          date_from: fromDate,
-          date_to: toDate,
-        };
-        if (campaignId) payload.campaign_id = campaignId;
+          pageSize: PAGE_SIZE,
+        });
 
         const res = (await postReportsCalls(payload)) as {
           status?: boolean;
@@ -418,7 +429,7 @@ function useOutboundCampaignPerformance(companyIdentifier: string, campaignId: s
     return () => {
       cancelled = true;
     };
-  }, [companyIdentifier, campaignId, fromDate, toDate]);
+  }, [companyIdentifier, campaignId, voicebotId, callStatus, durationMin, durationMax, fromDate, toDate]);
 
   return { loading, rows, truncated };
 }
@@ -502,14 +513,12 @@ function renderDashboardContent(args: {
 }
 
 function renderVolumeContent(args: {
-  companyIdentifier: string;
   fromDate: string;
   toDate: string;
   volumeLoading: boolean;
   volumeData: Array<{ dateKey: string; calls: number }>;
 }): React.ReactNode {
-  const { companyIdentifier, fromDate, toDate, volumeLoading, volumeData } = args;
-  if (!companyIdentifier) return null;
+  const { fromDate, toDate, volumeLoading, volumeData } = args;
   if (!fromDate || !toDate) {
     return (
       <div className="d-flex flex-column align-items-center justify-content-center text-muted py-5" style={{ minHeight: "280px" }}>
@@ -564,24 +573,8 @@ function renderVolumeContent(args: {
   );
 }
 
-function renderSuccessRateTrendContent(args: {
-  effectiveCompanyId: string;
-  fromDate: string;
-  toDate: string;
-  loading: boolean;
-  trends: TrendItem[];
-}): React.ReactNode {
-  const { effectiveCompanyId, fromDate, toDate, loading, trends } = args;
-  if (!effectiveCompanyId) return null;
-  if (!fromDate || !toDate) {
-    return (
-      <div className="d-flex flex-column align-items-center justify-content-center text-muted py-5" style={{ minHeight: "280px" }}>
-        <BarChart3 size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
-        <p className="mb-1 fw-medium">Select a date range</p>
-        <p className="small mb-0 opacity-75">Choose From Date and To Date (or use the time period dropdown).</p>
-      </div>
-    );
-  }
+function renderSuccessRateTrendContent(args: { loading: boolean; trends: TrendItem[] }): React.ReactNode {
+  const { loading, trends } = args;
   if (loading) {
     return (
       <div className="d-flex align-items-center justify-content-center" style={{ minHeight: "280px" }}>
@@ -594,7 +587,7 @@ function renderSuccessRateTrendContent(args: {
       <div className="d-flex flex-column align-items-center justify-content-center text-muted py-5" style={{ minHeight: "280px" }}>
         <BarChart3 size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
         <p className="mb-1 fw-medium">No trend data available</p>
-        <p className="small mb-0 opacity-75">Try a different date range.</p>
+        <p className="small mb-0 opacity-75">Try a different trends period or check back later.</p>
       </div>
     );
   }
@@ -634,14 +627,12 @@ function renderSuccessRateTrendContent(args: {
 }
 
 function renderCampaignPerformanceContent(args: {
-  effectiveCompanyId: string;
   fromDate: string;
   toDate: string;
   loading: boolean;
   rows: Array<{ campaignLabel: string; completed: number; failed: number; total: number }>;
 }): React.ReactNode {
-  const { effectiveCompanyId, fromDate, toDate, loading, rows } = args;
-  if (!effectiveCompanyId) return null;
+  const { fromDate, toDate, loading, rows } = args;
   if (!fromDate || !toDate) {
     return (
       <div className="d-flex flex-column align-items-center justify-content-center text-muted py-5" style={{ minHeight: "280px" }}>
@@ -703,10 +694,21 @@ function renderCampaignPerformanceContent(args: {
   );
 }
 
+function labelForCostCampaignRow(
+  row: AnalyticsCostsByCampaignItem,
+  fallbackName: (campaignId: CampaignIdParam) => string
+): string {
+  const name = String(row.campaign_name ?? "").trim();
+  if (name) {
+    return row.is_deleted ? `${name} (deleted)` : name;
+  }
+  return fallbackName(row.campaign_id);
+}
+
 function renderCostContent(
   costLoading: boolean,
   costs: AnalyticsCostsData | null,
-  getCampaignLabel: (campaignId: number | string | undefined) => string
+  getCampaignLabel: (campaignId: CampaignIdParam) => string
 ): React.ReactNode {
   if (costLoading) {
     return (
@@ -717,6 +719,13 @@ function renderCostContent(
     );
   }
   if (costs == null) return <div className="text-muted">No cost data available.</div>;
+
+  const campaignCostChartRows = (costs.cost_by_campaign ?? []).map((c) => ({
+    campaign: labelForCostCampaignRow(c, getCampaignLabel),
+    total: Number(c?.total ?? 0),
+    count: Number(c?.count ?? 0),
+    is_deleted: Boolean(c?.is_deleted),
+  }));
 
   return (
     <React.Fragment>
@@ -810,28 +819,32 @@ function renderCostContent(
               <h6 className="mb-0">Cost by Campaign</h6>
               <span className="small text-muted">Total cost per campaign</span>
             </div>
-            {Array.isArray(costs.cost_by_campaign) && costs.cost_by_campaign.length > 0 ? (
+            {campaignCostChartRows.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={(costs.cost_by_campaign ?? []).map((c) => ({
-                    campaign: getCampaignLabel(c?.campaign_id),
-                    total: Number(c?.total ?? 0),
-                    count: Number(c?.count ?? 0),
-                  }))}
-                  margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
-                >
+                <BarChart data={campaignCostChartRows} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis dataKey="campaign" tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="campaign" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={72} />
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip
-                    formatter={(value: number, name: string) => {
-                      if (name === "total") return [formatAed(value), "Cost"];
+                    formatter={(value: number, name: string, item: { payload?: { count?: number } }) => {
+                      if (name === "total") {
+                        const calls = item?.payload?.count;
+                        const callsLabel = typeof calls === "number" ? ` · ${calls} calls` : "";
+                        return [`${formatAed(value)}${callsLabel}`, "Cost"];
+                      }
                       if (name === "count") return [value, "Calls"];
                       return [value, name];
                     }}
                     contentStyle={{ border: "none", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
                   />
-                  <Bar dataKey="total" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="total" name="total" radius={[4, 4, 0, 0]}>
+                    {campaignCostChartRows.map((row, i) => (
+                      <Cell
+                        key={`cost-campaign-${row.campaign}-${i}`}
+                        fill={row.is_deleted ? "rgba(34, 197, 94, 0.45)" : "#22c55e"}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -853,17 +866,27 @@ function renderCostContent(
 const OutboundAnalytics = () => {
   const { data: session } = useSession();
   const isAdmin = String((session?.user as { is_admin?: string | number } | undefined)?.is_admin ?? "") === "1";
-  const sessionCompanyIdentifier = (session?.user as { company_identifier?: string } | undefined)?.company_identifier ?? "";
+  /** All outbound analytics API calls use this `company_id` for now. */
+  const analyticsCompanyId = OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
 
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
+  const [voicebotOptions, setVoicebotOptions] = useState<Array<{ id: number | string; name: string }>>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
+  const [selectedVoicebotId, setSelectedVoicebotId] = useState<string>("");
+  const [callStatusFilter, setCallStatusFilter] = useState<string>("");
+  const [durationMinSec, setDurationMinSec] = useState(0);
+  const [durationMaxSec, setDurationMaxSec] = useState(3600);
+  const debouncedDurationMinSec = useDebouncedValue(durationMinSec, 400);
+  const debouncedDurationMaxSec = useDebouncedValue(durationMaxSec, 400);
 
-  const effectiveCompanyId = isAdmin ? selectedCompanyId : sessionCompanyIdentifier;
   const effectiveCampaignId = selectedCampaignId;
 
   const [timePeriod, setTimePeriod] = useState<TimePeriodOption["value"]>("7");
+  const [trendsPeriod, setTrendsPeriod] = useState<AnalyticsTrendsPeriod>("7d");
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [trends, setTrends] = useState<TrendItem[]>([]);
 
   const todayYmd = useMemo(() => toYmd(new Date()), []);
 
@@ -878,16 +901,58 @@ const OutboundAnalytics = () => {
 
   const [fromDate, setFromDate] = useState<string>(() => getDefaultDateRange("7").from);
   const [toDate, setToDate] = useState<string>(() => getDefaultDateRange("7").to);
-  const { loading: dashboardLoading, dashboard } = useOutboundDashboard(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
-  const { loading: volumeLoading, data: volumeData, truncated: volumeTruncated } = useOutboundCallVolume(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
-  const { loading: costLoading, costs } = useOutboundCosts(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
-  const { loading: trendsLoading, trends } = useOutboundTrends(effectiveCompanyId, effectiveCampaignId, fromDate, toDate);
-  const { loading: perfLoading, rows: perfRows, truncated: perfTruncated } = useOutboundCampaignPerformance(
-    effectiveCompanyId,
-    effectiveCampaignId,
-    fromDate,
-    toDate
+
+  const reportsCallsChartFilters = useMemo<OutboundReportsCallsChartFilters>(
+    () => ({
+      companyIdentifier: analyticsCompanyId,
+      campaignId: effectiveCampaignId,
+      voicebotId: selectedVoicebotId,
+      callStatus: callStatusFilter,
+      durationMin: debouncedDurationMinSec,
+      durationMax: debouncedDurationMaxSec,
+      fromDate,
+      toDate,
+    }),
+    [
+      analyticsCompanyId,
+      effectiveCampaignId,
+      selectedVoicebotId,
+      callStatusFilter,
+      debouncedDurationMinSec,
+      debouncedDurationMaxSec,
+      fromDate,
+      toDate,
+    ]
   );
+
+  const { loading: dashboardLoading, dashboard } = useOutboundDashboard(analyticsCompanyId, effectiveCampaignId, fromDate, toDate);
+  const { loading: volumeLoading, data: volumeData, truncated: volumeTruncated } = useOutboundCallVolume(reportsCallsChartFilters);
+  const { loading: costLoading, costs } = useOutboundCosts(fromDate, toDate);
+  const { loading: perfLoading, rows: perfRows, truncated: perfTruncated } = useOutboundCampaignPerformance(reportsCallsChartFilters);
+
+  useEffect(() => {
+    let cancelled = false;
+    const period = trendsPeriod;
+
+    async function fetchTrends() {
+      setTrendsLoading(true);
+      try {
+        const res = (await getAnalyticsTrends({ period })) as AnalyticsTrendsResponse;
+        const list = Array.isArray(res?.data) ? res.data : [];
+        if (!cancelled) setTrends(list);
+      } catch (err) {
+        console.error("getAnalyticsTrends error:", err);
+        if (!cancelled) setTrends([]);
+      } finally {
+        if (!cancelled) setTrendsLoading(false);
+      }
+    }
+
+    void fetchTrends();
+    return () => {
+      cancelled = true;
+    };
+  }, [trendsPeriod]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -920,11 +985,23 @@ const OutboundAnalytics = () => {
   }, [isAdmin, selectedCompanyId]);
 
   useEffect(() => {
-    const companyIdForCampaigns = selectedCompanyId || effectiveCompanyId;
-    if (!companyIdForCampaigns) {
-      setCampaigns([]);
-      return;
+    let cancelled = false;
+    async function fetchVoicebots() {
+      try {
+        const res = await getVoicebots({ page: 1, page_size: OUTBOUND_VOICEBOT_LIST_PAGE_SIZE });
+        if (!cancelled) setVoicebotOptions(normalizeVoicebotsListResponse(res));
+      } catch (err) {
+        console.error("getVoicebots (analytics) error:", err);
+        if (!cancelled) setVoicebotOptions([]);
+      }
     }
+    fetchVoicebots();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     async function fetchCampaigns() {
       try {
@@ -946,7 +1023,7 @@ const OutboundAnalytics = () => {
     }
     fetchCampaigns();
     return () => { cancelled = true; };
-  }, [selectedCompanyId, effectiveCompanyId]);
+  }, []);
 
   useEffect(() => {
     const next = getDefaultDateRange(timePeriod);
@@ -974,28 +1051,24 @@ const OutboundAnalytics = () => {
     return map;
   }, [campaigns]);
 
-  const getCampaignLabel = (campaignId: number | string | undefined) => {
+  const getCampaignLabel = (campaignId: CampaignIdParam) => {
     const key = String(campaignId ?? "");
     const name = key ? campaignNameById[key] : "";
     return name || (key ? `#${key}` : "—");
   };
 
   const dashboardContent = renderDashboardContent({
-    companyIdentifier: effectiveCompanyId,
+    companyIdentifier: analyticsCompanyId,
     isAdmin,
     dashboardLoading,
     dashboard,
   });
-  const volumeContent = renderVolumeContent({ companyIdentifier: effectiveCompanyId, fromDate, toDate, volumeLoading, volumeData });
+  const volumeContent = renderVolumeContent({ fromDate, toDate, volumeLoading, volumeData });
   const successRateTrendContent = renderSuccessRateTrendContent({
-    effectiveCompanyId,
-    fromDate,
-    toDate,
     loading: trendsLoading,
     trends,
   });
   const campaignPerformanceContent = renderCampaignPerformanceContent({
-    effectiveCompanyId,
     fromDate,
     toDate,
     loading: perfLoading,
@@ -1038,7 +1111,6 @@ const OutboundAnalytics = () => {
                     style={{ width: "220px" }}
                     value={selectedCampaignId}
                     onChange={(e) => setSelectedCampaignId(e.target.value)}
-                    disabled={!(selectedCompanyId || effectiveCompanyId)}
                   >
                     <option value="">All campaigns</option>
                     {campaigns.map((c) => (
@@ -1057,6 +1129,19 @@ const OutboundAnalytics = () => {
                 onChange={(e) => setTimePeriod(e.target.value as TimePeriodOption["value"])}
               >
                 {TIME_PERIOD_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+
+            <Form.Group className="mb-0">
+              <Form.Label className="small mb-1">Trends period</Form.Label>
+              <Form.Select
+                style={{ width: "200px" }}
+                value={trendsPeriod}
+                onChange={(e) => setTrendsPeriod(e.target.value as AnalyticsTrendsPeriod)}
+              >
+                {TRENDS_PERIOD_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </Form.Select>
@@ -1084,14 +1169,62 @@ const OutboundAnalytics = () => {
                 onChange={(e) => onToDateChange(e.target.value)}
               />
             </Form.Group>
+
+            <Form.Group className="mb-0">
+              <Form.Label className="small mb-1">Voicebot</Form.Label>
+              <Form.Select
+                style={{ width: "200px" }}
+                value={selectedVoicebotId}
+                onChange={(e) => setSelectedVoicebotId(e.target.value)}
+              >
+                <option value="">All voicebots</option>
+                {voicebotOptions.map((v) => (
+                  <option key={String(v.id)} value={String(v.id)}>{v.name}</option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+
+            <Form.Group className="mb-0">
+              <Form.Label className="small mb-1">Call status</Form.Label>
+              <Form.Select
+                style={{ width: "180px" }}
+                value={callStatusFilter}
+                onChange={(e) => setCallStatusFilter(e.target.value)}
+              >
+                {REPORTS_CALL_STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value || "all"} value={opt.value}>{opt.label}</option>
+                ))}
+              </Form.Select>
+            </Form.Group>
+
+            <Form.Group className="mb-0">
+              <Form.Label className="small mb-1">Duration min (s)</Form.Label>
+              <Form.Control
+                type="number"
+                min={0}
+                style={{ width: "120px" }}
+                value={durationMinSec}
+                onChange={(e) => setDurationMinSec(Number(e.target.value) || 0)}
+              />
+            </Form.Group>
+
+            <Form.Group className="mb-0">
+              <Form.Label className="small mb-1">Duration max (s)</Form.Label>
+              <Form.Control
+                type="number"
+                min={0}
+                style={{ width: "120px" }}
+                value={durationMaxSec}
+                onChange={(e) => setDurationMaxSec(Number(e.target.value) || 0)}
+              />
+            </Form.Group>
           </div>
         </Col>
       </Row>
 
       {dashboardContent}
 
-      {effectiveCompanyId && (
-        <React.Fragment>
+      <React.Fragment>
           <div className="mt-4 p-4 card" style={{ minHeight: "360px" }}>
             <h5 className="mb-1">Call Volume Over Time</h5>
             <div className="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
@@ -1103,7 +1236,9 @@ const OutboundAnalytics = () => {
 
           <div className="mt-4 p-4 card" style={{ minHeight: "360px" }}>
             <h5 className="mb-1">Success Rate Trend</h5>
-            <p className="small text-muted mb-3">Success rate by date</p>
+            <p className="small text-muted mb-3">
+              Success rate by date for the selected trends period ({trendsPeriod}).
+            </p>
             {successRateTrendContent}
           </div>
 
@@ -1127,8 +1262,7 @@ const OutboundAnalytics = () => {
               </Card>
             </Col>
           </Row>
-        </React.Fragment>
-      )}
+      </React.Fragment>
     </React.Fragment>
   );
 };

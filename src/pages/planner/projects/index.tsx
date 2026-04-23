@@ -19,6 +19,7 @@ import React, {
   type ComponentProps,
 } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
@@ -1523,51 +1524,63 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           <td className="generic-table-actions-cell" onClick={(e) => e.stopPropagation()}>
             <div className="generic-table-actions">
               <div>
-                {canAdministerProjectFromMembers(project, sessionUserPhoneOrExtension) ? (
-                  <Dropdown
-                    show={openProjectActionsId === project.id}
-                    onToggle={createProjectRowActionsToggleHandler(project.id, setOpenProjectActionsId)}
-                    onClick={(e) => e.stopPropagation()}
+                <Dropdown
+                  show={openProjectActionsId === project.id}
+                  onToggle={createProjectRowActionsToggleHandler(project.id, setOpenProjectActionsId)}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Dropdown.Toggle
+                    variant="link"
+                    size="sm"
+                    className="p-1 text-decoration-none shadow-none"
+                    style={{ color: "#6b7280" }}
+                    id={`project-row-actions-${project.id}`}
                   >
-                    <Dropdown.Toggle
-                      variant="link"
-                      size="sm"
-                      className="p-1 text-decoration-none shadow-none"
-                      style={{ color: "#6b7280" }}
-                      id={`project-row-actions-${project.id}`}
+                    <MoreVertical size={16} />
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu align="end" popperConfig={{ strategy: "fixed" }} renderOnMount>
+                    <Dropdown.Item
+                      as="button"
+                      type="button"
+                      onClick={() => {
+                        setOpenProjectActionsId(null);
+                        window.open(`/planner/projects/${project.id}`, "_blank");
+                      }}
                     >
-                      <MoreVertical size={16} />
-                    </Dropdown.Toggle>
-                    <Dropdown.Menu align="end" popperConfig={{ strategy: "fixed" }} renderOnMount>
-                      <Dropdown.Item
-                        as="button"
-                        type="button"
-                        onClick={() => {
-                          setOpenProjectActionsId(null);
-                          onEditProject(project);
-                        }}
-                      >
-                        <Settings size={14} className="me-2" />
-                        Edit Project
-                      </Dropdown.Item>
-                      <Dropdown.Divider />
-                      <Dropdown.Item
-                        as="button"
-                        type="button"
-                        className="text-danger"
-                        onClick={() => {
-                          setOpenProjectActionsId(null);
-                          onDeleteProject(project);
-                        }}
-                      >
-                        <Trash2 size={14} className="me-2" />
-                        Delete Project
-                      </Dropdown.Item>
-                    </Dropdown.Menu>
-                  </Dropdown>
-                ) : (
-                  <></>
-                )}
+                      <Eye size={14} className="me-2" />
+                      Project overview
+                    </Dropdown.Item>
+                    {canAdministerProjectFromMembers(project, sessionUserPhoneOrExtension) ? (
+                      <>
+                        <Dropdown.Divider />
+                        <Dropdown.Item
+                          as="button"
+                          type="button"
+                          onClick={() => {
+                            setOpenProjectActionsId(null);
+                            onEditProject(project);
+                          }}
+                        >
+                          <Settings size={14} className="me-2" />
+                          Edit Project
+                        </Dropdown.Item>
+                        <Dropdown.Divider />
+                        <Dropdown.Item
+                          as="button"
+                          type="button"
+                          className="text-danger"
+                          onClick={() => {
+                            setOpenProjectActionsId(null);
+                            onDeleteProject(project);
+                          }}
+                        >
+                          <Trash2 size={14} className="me-2" />
+                          Delete Project
+                        </Dropdown.Item>
+                      </>
+                    ) : null}
+                  </Dropdown.Menu>
+                </Dropdown>
               </div>
             </div>
           </td>
@@ -2063,35 +2076,35 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
             <span style={{ color: "#9ca3af", fontSize: "0.875rem" }}>No description</span>
           ),
         },
-        {
-          id: "project-activity",
-          title: "Activity & History",
-          icon: Clock,
-          collapsible: true,
-          defaultExpanded: true,
-          customContent: (
-            <>
-              <Nav
-                variant="tabs"
-                className="detail-tabs"
-                activeKey={detailTab}
-                onSelect={(k) => {
-                  if (k) setDetailTab(k);
-                }}
-              >
-                <Nav.Item>
-                  <Nav.Link eventKey="Activity">Activity</Nav.Link>
-                </Nav.Item>
-                <Nav.Item>
-                  <Nav.Link eventKey="History">History</Nav.Link>
-                </Nav.Item>
-              </Nav>
-              <div style={{ marginTop: "1rem" }}>
-                {detailTab === "Activity" ? recentActivityContent : historyContent}
-              </div>
-            </>
-          ),
-        },
+        // {
+        //   id: "project-activity",
+        //   title: "Activity & History",
+        //   icon: Clock,
+        //   collapsible: true,
+        //   defaultExpanded: true,
+        //   customContent: (
+        //     <>
+        //       <Nav
+        //         variant="tabs"
+        //         className="detail-tabs"
+        //         activeKey={detailTab}
+        //         onSelect={(k) => {
+        //           if (k) setDetailTab(k);
+        //         }}
+        //       >
+        //         <Nav.Item>
+        //           <Nav.Link eventKey="Activity">Activity</Nav.Link>
+        //         </Nav.Item>
+        //         <Nav.Item>
+        //           <Nav.Link eventKey="History">History</Nav.Link>
+        //         </Nav.Item>
+        //       </Nav>
+        //       <div style={{ marginTop: "1rem" }}>
+        //         {detailTab === "Activity" ? recentActivityContent : historyContent}
+        //       </div>
+        //     </>
+        //   ),
+        // },
       ]}
     />
   );
@@ -2847,6 +2860,7 @@ function projectMatchesFilters(project: Project, appliedFilters: AppliedProjectF
 }
 
 const WorkPlannerProjects = () => {
+  const router = useRouter();
   const { data: session } = useSession();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
@@ -3369,12 +3383,20 @@ const WorkPlannerProjects = () => {
       dropdown: {
         options: [
           {
+            label: "Project overview",
+            icon: <Eye size={14} />,
+            onClick: (row) => {
+              router.push(`/planner/projects/${row.id}`).catch(() => undefined);
+            },
+          },
+          {
             label: "Edit Project",
             icon: <Settings size={14} />,
             onClick: (row) => {
               if (!canAdministerProjectFromMembers(row, sessionUserPhoneOrExtension)) return;
               handleEditProject(row);
             },
+            divider: true,
           },
           {
             label: "Delete Project",
