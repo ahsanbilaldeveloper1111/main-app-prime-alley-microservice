@@ -33,6 +33,7 @@ import {
   MessageCircle,
   Folder,
   UserPlus,
+  User,
   CheckCheck,
   Layers2,
   ChevronRight,
@@ -590,6 +591,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           icon: <FileText size={16} />,
           permission: PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT,
           url: '/communications/campaign-console'
+        },
+        {
+          id: 'live-calls-campaign-agent',
+          title: 'Campaign Agent',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.VIEW_CAMPAIGN_AGENT,
+          url: '/communications/campaign-agent'
         },
 
 

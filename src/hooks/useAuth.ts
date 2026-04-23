@@ -6,6 +6,7 @@ import { sessionStore } from '../utils/sessionStore';
 import { clearSessionCookiesClient } from '../utils/cookieUtils';
 import { getLogoutCallbackUrl } from '../utils/logoutRedirect';
 import { authAPI } from '../utils/api';
+import { clearFinesseManualReconnectRequired } from '../utils/finesse';
 
 export const useAuth = () => {
   const { data: session, status } = useSession();
@@ -33,6 +34,7 @@ export const useAuth = () => {
       // Clear server-side NextAuth session payload + cookies first (best effort)
       await authAPI.logout();
       clearTokens();
+      clearFinesseManualReconnectRequired();
       clearSessionCookiesClient(true);
       const callbackUrl = getLogoutCallbackUrl();
       await signOut({ callbackUrl, redirect: false });
