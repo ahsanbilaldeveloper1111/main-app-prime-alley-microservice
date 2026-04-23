@@ -188,3 +188,72 @@ export function isExtensionFilterAllSelected(allIds: string[], extensionFilter: 
     const selected = new Set((extensionFilter as string[]).map(String));
     return allIds.every((id) => selected.has(id));
 }
+
+export interface CommunicationsTextFilterMenuProps {
+    value: string;
+    onChange: (value: string) => void;
+    onApply: (value: string) => void;
+    closeMenu: () => void;
+    placeholder: string;
+    /** Default true (phone / number style filters). */
+    trimOnApply?: boolean;
+}
+
+export const CommunicationsTextFilterMenu: React.FC<CommunicationsTextFilterMenuProps> = ({
+    value,
+    onChange,
+    onApply,
+    closeMenu,
+    placeholder,
+    trimOnApply = true,
+}) => (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+        <Form.Control
+            size="sm"
+            type="text"
+            placeholder={placeholder}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+        />
+        <div className="d-flex justify-content-end gap-2">
+            <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
+                Cancel
+            </Button>
+            <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                    onApply(trimOnApply ? value.trim() : value);
+                    closeMenu();
+                }}
+            >
+                Apply
+            </Button>
+        </div>
+    </div>
+);
+
+export function createCommunicationsTextFilterDropdownContent(
+    value: string,
+    onChange: (v: string) => void,
+    onApply: (v: string) => void,
+    placeholder: string,
+    trimOnApply = true,
+) {
+    return function CommunicationsTextFilterDropdownRender({
+        closeMenu,
+    }: {
+        closeMenu: () => void;
+    }) {
+        return (
+            <CommunicationsTextFilterMenu
+                value={value}
+                onChange={onChange}
+                onApply={onApply}
+                closeMenu={closeMenu}
+                placeholder={placeholder}
+                trimOnApply={trimOnApply}
+            />
+        );
+    };
+}
