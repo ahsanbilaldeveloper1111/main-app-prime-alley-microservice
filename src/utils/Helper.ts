@@ -8,8 +8,8 @@ import moment from "moment-timezone";
 
 type dateType = string | Date | null | undefined;
 
-/** Values accepted by {@link formatNumber} (APIs and forms may send strings). */
-type FormatNumberInput = number | string | null | undefined;
+/** Values that may be parsed to a number for display (e.g. {@link formatNumber}, table cells). */
+export type NumericAmountInput = number | string | null | undefined;
 
 // Cache for session data to avoid multiple fetches
 let sessionCache: { session: Session | null; timestamp: number } | null = null;
@@ -803,9 +803,6 @@ export const formatCurrency = (amount: number | null): string => {
   }).format(amount);
 };
 
-/** Values that may be parsed to a number for display (e.g. table cells, filters). */
-export type NumericAmountInput = number | string | null | undefined;
-
 function parseNumericAmountForDisplay(amount: NumericAmountInput): number {
   if (amount === null || amount === undefined || amount === "") {
     return Number.NaN;
@@ -822,7 +819,7 @@ function parseNumericAmountForDisplay(amount: NumericAmountInput): number {
 }
 
 export const formatNumber = (
-  amount: number | string | null | undefined,
+  amount: NumericAmountInput,
   withoutDecimals?: boolean,
 ): string => {
   const defaultZero = withoutDecimals ? "0" : "0.00";
