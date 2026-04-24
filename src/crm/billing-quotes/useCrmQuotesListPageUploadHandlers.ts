@@ -1,4 +1,7 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { toast } from "react-toastify";
 import { uploadCrmDataCsv } from "@utils/crm";
 import { handleCrmListUploadResponse } from "@crm/shared/crmListUploadResponseUtils";
@@ -86,7 +89,11 @@ export function useCrmQuotesListPageUploadHandlers({
   );
 
   const handleUpload = useCallback(async () => {
-    if (!session?.user?.permissions?.includes("add-crm-data-management")) {
+    if (
+      !session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      )
+    ) {
       toast.error("You don't have permission to upload data");
       return;
     }

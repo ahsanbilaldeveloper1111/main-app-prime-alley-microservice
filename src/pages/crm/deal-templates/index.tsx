@@ -48,8 +48,10 @@ import {
 } from "@components/crm/crmDialogActionButtonStyles";
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
-const PERMISSION_ADD_DEAL_TEMPLATES = "add-crm-deal-templates";
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
 const DEAL_TEMPLATES_TABLE_COLUMN_STORAGE_KEY =
   "dealTemplatesSelectedColumns";
 const DEAL_TEMPLATES_TABLE_SELECTABLE_KEYS = [
@@ -481,7 +483,7 @@ const DealTemplatesPage = () => {
       },
       rightActions: (
         <div className="d-flex gap-2">
-          {session?.user?.permissions?.includes(PERMISSION_ADD_DEAL_TEMPLATES) && (
+          {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_DEAL_TEMPLATES) && (
             <Button
               variant="primary"
               size="sm"
@@ -534,7 +536,7 @@ const DealTemplatesPage = () => {
             <div className="text-center p-5">
               <FileText size={48} className="text-muted mb-3" />
               <p className="text-muted">No deal templates found</p>
-              {session?.user?.permissions?.includes(PERMISSION_ADD_DEAL_TEMPLATES) && (
+              {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_DEAL_TEMPLATES) && (
                 <Button variant="primary" onClick={() => handleOpenModal()}>
                   <PlusCircle size={18} className="me-2" />
                   Add First Template

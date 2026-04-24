@@ -41,10 +41,9 @@ import {
 import { useSession } from "next-auth/react";
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
-const PERMISSION_ADD = "add-crm-business-types";
-const PERMISSION_EDIT = "edit-crm-business-types";
-const PERMISSION_DELETE = "delete-crm-business-types";
+const { PERMISSIONS } = HEADER_CONSTANTS;
 const BUSINESS_TYPES_TABLE_COLUMN_STORAGE_KEY =
   "businessTypesSelectedColumns";
 const BUSINESS_TYPES_TABLE_SELECTABLE_KEYS = [
@@ -256,7 +255,7 @@ const BusinessTypes = () => {
         width: "160px",
         render: (bt) => (
           <div className="d-flex justify-content-end gap-2">
-            {session?.user?.permissions?.includes(PERMISSION_EDIT) && (
+            {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_BUSINESS_TYPES) && (
               <Button
                 variant="outline-primary"
                 size="sm"
@@ -266,7 +265,7 @@ const BusinessTypes = () => {
                 <Edit size={14} aria-hidden />
               </Button>
             )}
-            {session?.user?.permissions?.includes(PERMISSION_DELETE) && (
+            {session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_BUSINESS_TYPES) && (
               <Button
                 variant="outline-danger"
                 size="sm"
@@ -361,8 +360,8 @@ const BusinessTypes = () => {
           <Modal.Header closeButton={!submitting}>
             <Modal.Title>{modalTitle(editingBusinessType)}</Modal.Title>
           </Modal.Header>
-          <Modal.Body>
-            <Form onSubmit={handleSubmit}>
+          <Form onSubmit={handleSubmit}>
+            <Modal.Body>
               <Form.Group className="mb-3">
                 <Form.Label>
                   Name <span className="text-danger">*</span>
@@ -375,7 +374,7 @@ const BusinessTypes = () => {
                   required
                 />
               </Form.Group>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-0">
                 <Form.Label>Description</Form.Label>
                 <Form.Control
                   as="textarea"
@@ -387,45 +386,52 @@ const BusinessTypes = () => {
                   placeholder="Enter business type description"
                 />
               </Form.Group>
-
-              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 w-100">
-                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 align-self-center">
-                  <AlertCircle size={14} />
-                  <span style={{ fontSize: "0.813rem" }}>
-                    Fields marked with <span className="text-danger fw-bold">*</span> are required
-                  </span>
-                </Form.Text>
-                <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
-                  <Button
-                    variant="primary"
-                    type="submit"
-                    disabled={submitting}
-                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
-                  >
-                    {submitting ? (
-                      <>
-                        <Spinner size="sm" className="me-2" aria-hidden />
-                        {primarySubmitLabel(true, editingBusinessType)}
-                      </>
-                    ) : (
-                      <>
-                        <Check size={16} aria-hidden />
-                        {primarySubmitLabel(false, editingBusinessType)}
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline-secondary"
-                    onClick={() => setShowModal(false)}
-                    disabled={submitting}
-                    style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
-                  >
-                    Cancel
-                  </Button>
-                </div>
+            </Modal.Body>
+            <Modal.Footer
+              className="border-top"
+              style={{ flexWrap: "wrap", gap: "12px", justifyContent: "space-between" }}
+            >
+              <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
+                <AlertCircle size={14} aria-hidden />
+                <span style={{ fontSize: "0.813rem" }}>
+                  Fields marked with <span className="text-danger fw-bold">*</span> are required
+                </span>
+              </Form.Text>
+              <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
+                <Button
+                  variant="primary"
+                  type="submit"
+                  disabled={submitting}
+                  style={{
+                    ...CRM_DIALOG_PRIMARY_BUTTON_STYLE,
+                    minWidth: "168px",
+                    justifyContent: "center",
+                  }}
+                >
+                  {submitting ? (
+                    <>
+                      <Spinner size="sm" aria-hidden />
+                      {primarySubmitLabel(true, editingBusinessType)}
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} aria-hidden />
+                      {primarySubmitLabel(false, editingBusinessType)}
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline-secondary"
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  disabled={submitting}
+                  style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                >
+                  Cancel
+                </Button>
               </div>
-            </Form>
-          </Modal.Body>
+            </Modal.Footer>
+          </Form>
         </Modal>
 
         {/* Delete Confirmation Modal */}

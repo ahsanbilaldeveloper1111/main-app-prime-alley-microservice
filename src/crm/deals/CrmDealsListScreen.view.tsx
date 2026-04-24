@@ -178,6 +178,9 @@ import {
   buildDealsListTableActions,
 } from "@crm/deals/dealsListScreenTableBuilders";
 import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 const ignoredKeys = ["stage_id"];
 
 export type CrmDealsListVariant = "deals" | "approvals";
@@ -1790,7 +1793,7 @@ function CrmDealsListScreenDealViewModal({
                         }}
                       >
                         {session?.user?.permissions?.includes(
-                          "edit-crm-deals",
+                          PERMISSIONS.EDIT_CRM_DEALS,
                         ) && (
                           <button
                             style={{
@@ -2069,7 +2072,7 @@ function CrmDealsListScreenDealViewModal({
                           Recent Meetings
                         </h6>
                         {session?.user?.permissions?.includes(
-                          "add-meeting-crm-deals",
+                          PERMISSIONS.ADD_MEETING_CRM_DEALS,
                         ) && (
                           <button
                             style={{
@@ -2270,7 +2273,7 @@ function CrmDealsListScreenDealViewModal({
                               No meetings yet
                             </div>
                             {session?.user?.permissions?.includes(
-                              "add-meeting-crm-deals",
+                              PERMISSIONS.ADD_MEETING_CRM_DEALS,
                             ) && (
                               <button
                                 style={{
@@ -2371,6 +2374,14 @@ export function CrmDealsListScreenView({
 }>) {
   const isApprovalsList = listVariant === "approvals";
   const { data: session } = useSession();
+  const canAccessDealsScreen = useMemo(() => {
+    const p = session?.user?.permissions;
+    const canViewDeals = Boolean(p?.includes(PERMISSIONS.VIEW_CRM_DEALS));
+    const canApproveDeals = Boolean(
+      p?.includes(PERMISSIONS.APPROVE_REJECT_CRM_DEALS),
+    );
+    return isApprovalsList ? canViewDeals || canApproveDeals : canViewDeals;
+  }, [session?.user?.permissions, isApprovalsList]);
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
   const [stages, setStages] = useState<any[]>([]);
@@ -3836,7 +3847,7 @@ export function CrmDealsListScreenView({
       setDealsPagination((prev) => ({ ...prev, currentPage: 1 })),
   });
 
-  if (!session?.user?.permissions?.includes("list-crm-deals")) {
+  if (!canAccessDealsScreen) {
     return null;
   }
 
@@ -4078,7 +4089,7 @@ export function CrmDealsListScreenView({
                   });
                 }}
                 onRowDoubleClick={(row) => {
-                  if (session?.user?.permissions?.includes("list-crm-deals")) {
+                  if (canAccessDealsScreen) {
                     handleViewDeal(row.rawData?.id || row.id);
                   }
                 }}
@@ -4923,7 +4934,7 @@ export function CrmDealsListScreenView({
                           {/* Actions */}
                           <div className="d-flex gap-1">
                             {session?.user?.permissions?.includes(
-                              "download-document-crm-deals",
+                              PERMISSIONS.DOWNLOAD_DOCUMENT_CRM_DEALS,
                             ) && (
                               <Button
                                 variant="link"

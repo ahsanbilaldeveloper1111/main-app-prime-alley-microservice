@@ -1,4 +1,5 @@
 import { useRouter } from "next/router";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import React, {
   useState,
   useCallback,
@@ -97,6 +98,8 @@ import {
   buildLeadsListExportCsvText,
   getContactPersonsValidationError,
 } from "./leadsPageShared";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function parseLeadsListApiEnvelope(response: unknown): {
   leadsArray: unknown[];
@@ -1100,8 +1103,6 @@ export function useCrmLeadsPageModel() {
     return () => {
       cancelled = true;
     };
-    // Intentionally empty: bootstrap runs once per mount; helpers close over latest setters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot reference-data load
   }, []);
 
   // Transform API lead data to UI format
@@ -2360,7 +2361,7 @@ export function useCrmLeadsPageModel() {
       },
     ];
 
-    if (session?.user?.permissions?.includes("edit-crm-leads")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_LEADS)) {
       actions.push({
         label: "Edit",
         icon: <Edit size={16} />,
@@ -2370,7 +2371,7 @@ export function useCrmLeadsPageModel() {
       });
     }
 
-    if (session?.user?.permissions?.includes("add-crm-deals")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_DEALS)) {
       actions.push({
         label: "Convert to Deal",
         icon: <Handshake size={16} />,
@@ -2383,7 +2384,7 @@ export function useCrmLeadsPageModel() {
       });
     }
 
-    if (session?.user?.permissions?.includes("delete-crm-leads")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_LEADS)) {
       actions.push({
         label: "Delete",
         icon: <Trash2 size={16} />,
@@ -2395,7 +2396,7 @@ export function useCrmLeadsPageModel() {
 
     // Add Change Stage and Lost actions (only when not viewing lost leads)
     if (activeFilter !== "lost") {
-      if (session?.user?.permissions?.includes("edit-crm-leads")) {
+      if (session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_LEADS)) {
         actions.push({
           label: "Change Stage",
           icon: <GitBranch size={16} />,
@@ -2403,7 +2404,9 @@ export function useCrmLeadsPageModel() {
         });
       }
 
-      if (session?.user?.permissions?.includes("mark-as-lost-crm-leads")) {
+      if (
+        session?.user?.permissions?.includes(PERMISSIONS.MARK_AS_LOST_CRM_LEADS)
+      ) {
         actions.push({
           label: "Lost",
           icon: <X size={16} />,
@@ -2462,7 +2465,7 @@ export function useCrmLeadsPageModel() {
       setLeadsPagination((prev) => ({ ...prev, currentPage: 1 })),
     stages,
     rightActions:
-      session?.user?.permissions?.includes("add-crm-leads") ? (
+      session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_LEADS) ? (
         <div
           style={{
             position: "absolute",

@@ -25,6 +25,9 @@ import PageSummaryGrid, { SummaryCard } from '@components/PageSummaryGrid';
 import DatatableActionButton from "@components/DatatableActionButton";
 import { useSession } from "next-auth/react";
 import { formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface LostReason {
   id: number;
@@ -212,7 +215,7 @@ const LostReasonsManagement = () => {
         ),
       },
 
-      ...(session?.user?.permissions?.includes('edit-crm-lost-reasons') || session?.user?.permissions?.includes('delete-crm-lost-reasons') ? [
+      ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_LOST_REASONS) || session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_LOST_REASONS) ? [
       {
         key: "actions",
         name: "Actions",
@@ -222,7 +225,7 @@ const LostReasonsManagement = () => {
           <div className="d-flex gap-1">
             <DatatableActionButton
               actions={[
-               ...(session?.user?.permissions?.includes('edit-crm-lost-reasons') ? [
+               ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_LOST_REASONS) ? [
                 {
                   label: 'Edit',
                   className: 'text-primary',
@@ -238,7 +241,7 @@ const LostReasonsManagement = () => {
                   },
                 },
                ] : []),
-               ...(session?.user?.permissions?.includes('delete-crm-lost-reasons') ? [
+               ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_LOST_REASONS) ? [
                 {
                   label: 'Delete',
                   className: 'text-danger',
@@ -275,13 +278,13 @@ const LostReasonsManagement = () => {
 
         <PageHeader
           title="Lost Reasons"
-          showSearch={session?.user?.permissions?.includes('list-crm-lost-reasons')}
+          showSearch={session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LOST_REASONS)}
           searchValue={currentFilters.search || ""}
           onSearchChange={(value) => handleFiltersChange({...currentFilters, search: value})}
         searchPlaceholder="Search lost reasons..."
         buttons={
           <>
-          {session?.user?.permissions?.includes('add-crm-lost-reasons') && (
+          {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_LOST_REASONS) && (
           <Button
             variant="primary"
             onClick={() => setShowCreateModal(true)}

@@ -54,6 +54,9 @@ import {
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
@@ -399,7 +402,7 @@ const IndustriesPage = () => {
             >
               <Eye size={14} />
             </Button>
-            {session?.user?.permissions?.includes("edit-crm-industry") && (
+            {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_INDUSTRY) && (
               <Button
                 variant="outline-primary"
                 size="sm"
@@ -408,7 +411,9 @@ const IndustriesPage = () => {
                 <Edit size={14} />
               </Button>
             )}
-            {session?.user?.permissions?.includes("delete-crm-industry") && (
+            {session?.user?.permissions?.includes(
+              PERMISSIONS.DELETE_CRM_INDUSTRY,
+            ) && (
               <Button
                 variant="outline-danger"
                 size="sm"
@@ -439,7 +444,7 @@ const IndustriesPage = () => {
       },
       rightActions: (
         <div className="d-flex gap-2">
-          {session?.user?.permissions?.includes("add-crm-industry") && (
+          {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_INDUSTRY) && (
             <Button
               variant="primary"
               size="sm"
@@ -624,7 +629,7 @@ const IndustriesPage = () => {
                     Products ({industryProducts.length})</Form.Label>
                   <div className="d-flex align-items-center gap-2">
                     
-                    {session?.user?.permissions?.includes('add-crm-products') && (
+                    {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_PRODUCTS) && (
                       <Button
                         variant="primary"
                         size="sm"
@@ -705,7 +710,7 @@ const IndustriesPage = () => {
                                 >
                                   <Eye size={16} />
                                 </Button>
-                                {session?.user?.permissions?.includes('edit-crm-products') && (
+                                {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_PRODUCTS) && (
                                   <Button
                                     variant="link"
                                     size="sm"
@@ -716,7 +721,7 @@ const IndustriesPage = () => {
                                     <Edit size={16} />
                                   </Button>
                                 )}
-                                {session?.user?.permissions?.includes('delete-crm-products') && (
+                                {session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_PRODUCTS) && (
                                   <Button
                                     variant="link"
                                     size="sm"
@@ -746,7 +751,7 @@ const IndustriesPage = () => {
                 className="w-100 d-flex justify-content-end"
                 style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                {session?.user?.permissions?.includes("edit-crm-industry") && (
+                {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_INDUSTRY) && (
                   <Button
                     variant="primary"
                     onClick={() => {
@@ -1441,7 +1446,7 @@ const IndustriesPage = () => {
                 className="w-100 d-flex justify-content-end"
                 style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                {session?.user?.permissions?.includes("edit-crm-products") && (
+                {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_PRODUCTS) && (
                   <Button
                     variant="primary"
                     onClick={() => {

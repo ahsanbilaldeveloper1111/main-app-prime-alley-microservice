@@ -62,6 +62,8 @@ export type CrmListSharedCallbacksDeps = {
   setDownloadingRecordings?: Dispatch<SetStateAction<Set<string>>>;
   setDownloadProgress?: Dispatch<SetStateAction<Record<string, number>>>;
   calculateEntryCounts: () => Promise<{ total: number; assigned: number; unassigned: number }>;
+  /** Optional: run after bulk delete succeeds (ids are the deleted record ids). */
+  onAfterBulkDelete?: (deletedIds: readonly number[]) => void;
 };
 
 const EMPTY_AFTER_CALL = { disposition: "", callStatus: "", comment: "", nextCallDate: "", nextCallTime: "", generateLead: "no" };
@@ -88,6 +90,7 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
     sidebarFetchTokenRef, setSelectedRecord, setShowSidebar,
     setSelectedRecording, setShowRecordingPlayerModal, setDownloadingRecordings, setDownloadProgress,
     calculateEntryCounts,
+    onAfterBulkDelete,
   } = deps;
 
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
@@ -371,17 +374,19 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedItems.length === 0) { toast.error("Please select items to delete"); return; }
+    const idsToDelete = [...selectedItems];
     try {
-      await bulkDeleteCrmData(selectedItems);
+      await bulkDeleteCrmData(idsToDelete);
       setShowDeleteModal(false);
       setDeleteModalMode(null);
+      onAfterBulkDelete?.(idsToDelete);
       setRefreshKey((prev) => prev + 1);
       setSelectedItems([]);
       setClearSelectedRows(!clearSelectedRows);
     } catch (error: any) {
       console.error("Bulk delete error:", error);
     }
-  }, [selectedItems, setShowDeleteModal, setDeleteModalMode, setRefreshKey, setSelectedItems, clearSelectedRows, setClearSelectedRows]);
+  }, [selectedItems, setShowDeleteModal, setDeleteModalMode, setRefreshKey, setSelectedItems, clearSelectedRows, setClearSelectedRows, onAfterBulkDelete]);
 
   const handleDeleteData = useCallback((item: CrmDataItem) => {
     setItemToDelete(item);

@@ -37,8 +37,11 @@ export function CrmListCreateContactSidebar({
 }: Readonly<CrmListCreateContactSidebarProps>) {
   if (!show) return null;
 
+  const email = contactForm.email?.trim() ?? "";
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
   const isFormValid =
-    contactForm.email?.trim() &&
+    emailOk &&
     contactForm.phoneNumber?.trim() &&
     (contactForm.firstName?.trim() || contactForm.lastName?.trim());
 

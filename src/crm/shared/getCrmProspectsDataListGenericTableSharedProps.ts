@@ -1,4 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** Matches CRM list pagination state (`useCrmListFiltersMetricsHistoryState`). */
 export type CrmProspectsDataListPagination = {
@@ -52,7 +55,7 @@ export function getCrmProspectsDataListGenericTableSharedProps<
   return {
     showActions: false,
     selectable: !!session?.user?.permissions?.includes(
-      "delete-crm-data-management",
+      PERMISSIONS.DELETE_CRM_DATA_MANAGEMENT,
     ),
     selectedRows: dataList.filter((item) => selectedItems.includes(item.id)),
     onSelectionChange: (selected: T[]) => {
