@@ -185,7 +185,14 @@ const formatProductPriceAED = (row: { base_price?: unknown; data?: { base_price?
   if (price == null || price === "") {
     return emptyFallback;
   }
-  const n = typeof price === "number" ? price : Number.parseFloat(String(price).replaceAll(",", ""));
+  let n: number;
+  if (typeof price === "number") {
+    n = price;
+  } else if (typeof price === "string") {
+    n = Number.parseFloat(price.replaceAll(",", ""));
+  } else {
+    return emptyFallback;
+  }
   if (!Number.isFinite(n)) {
     return emptyFallback;
   }

@@ -800,7 +800,10 @@ export const formatCurrency = (amount: number | null): string => {
   }).format(amount);
 };
 
-function parseNumericAmountForDisplay(amount: number | string | null | undefined): number {
+/** Values that may be parsed to a number for display (e.g. table cells, filters). */
+export type NumericAmountInput = number | string | null | undefined;
+
+function parseNumericAmountForDisplay(amount: NumericAmountInput): number {
   if (amount === null || amount === undefined || amount === "") {
     return Number.NaN;
   }
@@ -816,7 +819,7 @@ function parseNumericAmountForDisplay(amount: number | string | null | undefined
 }
 
 export const formatNumber = (
-  amount: number | string | null | undefined,
+  amount: NumericAmountInput,
   withoutDecimals?: boolean,
 ): string => {
   const defaultZero = withoutDecimals ? "0" : "0.00";
