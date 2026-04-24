@@ -5,10 +5,7 @@ import "@assets/scss/tabs.scss";
 import React, { ReactElement, useState, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { useSession } from "next-auth/react";
 import { toast } from "react-toastify";
-import FormModal from "@pages/partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 
 import { getTrunksInbound } from "@utils/ai-agent/inbound";
@@ -109,26 +106,15 @@ const columns: TableColumn<Trunk>[] = [
 ];
 
 const AIMLTrunkProfile = () => {
-  const { data: session } = useSession();
+
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [trunks, setTrunks] = useState<Trunk[]>([]);
-  const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [refreshKey] = useState<number>(0);
 
-  // Modal states
-  const [showAddTrunkModal, setShowAddTrunkModal] = useState<boolean>(false);
-  const [showEditTrunkModal, setShowEditTrunkModal] = useState<boolean>(false);
-  const [showDeleteTrunkModal, setShowDeleteTrunkModal] = useState<boolean>(false);
-  const [selectedTrunk, setSelectedTrunk] = useState<Trunk | null>(null);
-
-  // Form states
-  const [newTrunkName, setNewTrunkName] = useState<string>("");
-  const [newTrunkAddress, setNewTrunkAddress] = useState<string>("");
-  const [newTrunkNumbers, setNewTrunkNumbers] = useState<string>("");
 
   // Fetch trunks
   const fetchTrunks = useCallback(async () => {
     try {
-      // const response = await axiosInstance.get('aiml/list-trunks');
       const response = await getTrunksInbound();
       console.log("getTrunksInbound response:", response?.data);
       const received = normalizeTrunkList(response?.data?.trunks ?? []);
