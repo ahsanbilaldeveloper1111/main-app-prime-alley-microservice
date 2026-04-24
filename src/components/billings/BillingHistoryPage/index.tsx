@@ -7,7 +7,7 @@ import {
   getInvoices,
 } from "@utils/accounts";
 import type { InvoiceData } from "@utils/accounts";
-import { GlobalDateTimeFormat } from "@utils/Helper";
+import { formatNumber, GlobalDateTimeFormat } from "@utils/Helper";
 import moment from "moment";
 import { useSession } from "next-auth/react";
 import InvoiceViewModal, { type InvoiceViewData } from "@components/billings/InvoiceViewModal";
@@ -1287,8 +1287,8 @@ export default function BillingHistoryPage({
                     .filter(Boolean)
                     .join(", ") || ""
                 }
-                amount={`${invoice.currency_code || "AED"} ${invoice.total_amount ?? 0}`}
-                balance={`${invoice.currency_code || "AED"} ${invoice.amount_due ?? 0}`}
+                amount={`${invoice.currency_code || "AED"} ${formatNumber(invoice.total_amount ?? 0)}`}
+                balance={`${invoice.currency_code || "AED"} ${formatNumber(invoice.amount_due ?? 0)}`}
                 status={String(invoice.status ?? "")}
                 onView={() => handleViewInvoice(Number(invoice.id))}
                 onDownload={() => handleDownloadInvoice(Number(invoice.id))}
@@ -1304,7 +1304,7 @@ export default function BillingHistoryPage({
                     invoiceRef={String(invoice.invoice_number ?? "")}
                     cardLast4={payment?.card_last4 ?? ""}
                     cardHolder={payment?.card_holder ?? ""}
-                    amount={`${payment?.currency_code || "AED"} ${payment?.amount ?? 0}`}
+                    amount={`${payment?.currency_code || "AED"} ${formatNumber(payment?.amount ?? 0)}`}
                   />
                 ))}
 
