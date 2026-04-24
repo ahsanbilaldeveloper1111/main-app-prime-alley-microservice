@@ -5,15 +5,25 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { FilterPill, TableColumn, ToolbarConfig } from "@components/GenericTable";
 import { StatsCardData } from "@components/GenericStatsCards";
 import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
-import { postReportsCalls, getCampaigns, getReportsCallsBySession } from "@utils/voicebot/outbound";
+import {
+  getCampaigns,
+  getReportsCallsBySession,
+  getVoicebots,
+  normalizeVoicebotsListResponse,
+  parsePostReportsCallsResponse,
+  postReportsCalls,
+  type PostReportsCallsPayload,
+} from "@utils/voicebot/outbound";
 import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Form, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
-import { formatDuration, GlobalDateTimeFormat } from "@utils/Helper";
+import { formatDuration, GlobalDateTimeFormat, humanizeSnakeCase } from "@utils/Helper";
 import "@assets/scss/common.scss";
 import moment from "moment";
 import { formatFixed, formatPercent } from "@utils/voicebot/outbound/formatters";
+import { OUTBOUND_VOICEBOT_LIST_PAGE_SIZE } from "@utils/voicebot/outboundVoicebotForm";
 import { Activity, DollarSign, MessageSquareText, PieChart, PhoneCall } from "lucide-react";
 
 function formatCost(value: number): string {
@@ -28,12 +38,6 @@ function displayText(value: unknown, fallback = "—"): string {
   if (typeof value === "number") return Number.isFinite(value) ? String(value) : fallback;
   if (typeof value === "bigint") return String(value);
   return fallback;
-}
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
 }
 
 interface CampaignOption {
@@ -118,10 +122,20 @@ function toSessionId(row: CallReportRow): string | null {
 }
 
 function formatDateTime(value: unknown): string {
-  const s = typeof value === "string" ? value : "";
-  if (!s) return "—";
-  const m = moment(s);
-  return m.isValid() ? m.format(GlobalDateTimeFormat) : "—";
+  if (value == null || value === "") return "—";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const m = value < 1e12 ? moment.unix(value) : moment(value);
+    return m.isValid() ? m.format(GlobalDateTimeFormat) : "—";
+  }
+  if (typeof value === "string") {
+    const m = moment(value);
+    return m.isValid() ? m.format(GlobalDateTimeFormat) : "—";
+  }
+  if (value instanceof Date) {
+    const m = moment(value);
+    return m.isValid() ? m.format(GlobalDateTimeFormat) : "—";
+  }
+  return "—";
 }
 
 function formatBool(value: unknown): string {
@@ -145,17 +159,30 @@ function formatUsd4(value: unknown): string {
   return `$${formatCost(Number(value ?? 0))}`;
 }
 
-const defaultFilters = {
-  company_id: "",
-  campaign_id: "",
-  call_status: "",
-  date_from: "",
-  date_to: "",
-  duration_min: 0,
-  duration_max: 3600,
-  page: 1,
-  page_size: 50,
-};
+function todayForDateInput(): string {
+  return moment().format("YYYY-MM-DD");
+}
+
+const DEFAULT_DURATION_MIN = 0;
+const DEFAULT_DURATION_MAX = 3600;
+
+function createDefaultFilters() {
+  const today = todayForDateInput();
+  return {
+    company_id: "",
+    campaign_id: "",
+    voicebot_id: "",
+    call_status: "",
+    date_from: today,
+    date_to: today,
+    duration_min_enabled: false,
+    duration_max_enabled: false,
+    duration_min: DEFAULT_DURATION_MIN,
+    duration_max: DEFAULT_DURATION_MAX,
+    page: 1,
+    page_size: 50,
+  };
+}
 
 const CALL_STATUS_OPTIONS = [
   { value: "", label: "All" },
@@ -168,11 +195,13 @@ const CALL_STATUS_OPTIONS = [
 const OutboundReportsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
-  const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier ?? "";
+  const sessionUser = session?.user as { company_identifier?: string; company_id?: string | number } | undefined;
+  const companyIdentifier = String(sessionUser?.company_identifier ?? sessionUser?.company_id ?? "").trim();
 
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
-  const [filters, setFilters] = useState(defaultFilters);
+  const [voicebots, setVoicebots] = useState<Array<{ id: number | string; name: string }>>([]);
+  const [filters, setFilters] = useState(createDefaultFilters);
   const [data, setData] = useState<CallReportRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalRows, setTotalRows] = useState(0);
@@ -190,16 +219,7 @@ const OutboundReportsPage = () => {
   const fetchCompanies = useCallback(async () => {
     try {
       const res = await GetCompanies();
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ??
-          (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ??
-          [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => {
-        const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
-        return { id: item.company_id ?? item.identifier ?? item.id ?? "", company_id: item.company_id ?? item.identifier ?? item.id, name: item.name ?? "" };
-      });
-      setCompanies(opts);
+      setCompanies(normalizeCompaniesResponse(res));
     } catch (err) {
       console.error("GetCompanies error:", err);
       setCompanies([]);
@@ -212,7 +232,12 @@ const OutboundReportsPage = () => {
       return;
     }
     try {
-      const res = await getCampaigns({ company_id: companyId, page: 1, page_size: 500 });
+      const res = await getCampaigns({
+        company_id: companyId,
+        page: 1,
+        page_size: 200,
+        include_deleted: true,
+      });
       const list = Array.isArray(res) ? res : (res as { results?: { campaign_id?: number; id?: number; name?: string }[] })?.results ?? (res as { data?: { campaign_id?: number; id?: number; name?: string }[] })?.data ?? [];
       const raw = Array.isArray(list) ? list : [];
       setCampaigns(
@@ -230,6 +255,22 @@ const OutboundReportsPage = () => {
   useEffect(() => {
     fetchCompanies();
   }, [fetchCompanies]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadVoicebots() {
+      try {
+        const res = await getVoicebots({ page: 1, page_size: OUTBOUND_VOICEBOT_LIST_PAGE_SIZE });
+        if (!cancelled) setVoicebots(normalizeVoicebotsListResponse(res));
+      } catch {
+        if (!cancelled) setVoicebots([]);
+      }
+    }
+    loadVoicebots();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (effectiveCompanyId) fetchCampaigns(effectiveCompanyId);
@@ -348,7 +389,7 @@ const OutboundReportsPage = () => {
     }
 
     return Object.entries(sidebarData.usage).map(([key, value]) => ({
-      label: key,
+      label: humanizeSnakeCase(key),
       value: displayText(value),
     }));
   }, [sidebarData]);
@@ -359,10 +400,10 @@ const OutboundReportsPage = () => {
     }
 
     return [
-      { label: "llm_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.llm_cost ?? 0))}` },
-      { label: "tts_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.tts_cost ?? 0))}` },
-      { label: "stt_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.stt_cost ?? 0))}` },
-      { label: "total_cost", value: `$${formatCost(Number(sidebarData.cost_breakdown.total_cost ?? 0))}` },
+      { label: humanizeSnakeCase("llm_cost"), value: `$${formatCost(Number(sidebarData.cost_breakdown.llm_cost ?? 0))}` },
+      { label: humanizeSnakeCase("tts_cost"), value: `$${formatCost(Number(sidebarData.cost_breakdown.tts_cost ?? 0))}` },
+      { label: humanizeSnakeCase("stt_cost"), value: `$${formatCost(Number(sidebarData.cost_breakdown.stt_cost ?? 0))}` },
+      { label: humanizeSnakeCase("total_cost"), value: `$${formatCost(Number(sidebarData.cost_breakdown.total_cost ?? 0))}` },
     ];
   }, [sidebarData]);
 
@@ -378,10 +419,9 @@ const OutboundReportsPage = () => {
         defaultExpanded: true,
         isLoading: sidebarLoading,
         fields: [
-          { label: "Session ID", value: dataForView?.session_id ?? selectedRow?.session_id ?? "—", copyable: true },
           { label: "Campaign", value: dataForView?.campaign_name ?? selectedRow?.campaign_name ?? "—" },
           { label: "Phone", value: dataForView?.phone_number ?? selectedRow?.phone_number ?? "—", type: "phone" },
-          { label: "Status", value: dataForView?.call_status ?? selectedRow?.call_status ?? "—", type: "badge" },
+          { label: "Status", value: humanizeSnakeCase(dataForView?.call_status ?? selectedRow?.call_status), type: "badge" },
           {
             label: "Duration",
             value: formatDuration(Number(dataForView?.call_duration_seconds ?? selectedRow?.call_duration_seconds ?? 0)),
@@ -397,9 +437,9 @@ const OutboundReportsPage = () => {
         defaultExpanded: true,
         isLoading: sidebarLoading,
         fields: [
-          { label: "Start", value: dataForView?.session_start_time, type: "datetime" },
-          { label: "End", value: dataForView?.session_end_time, type: "datetime" },
-          { label: "Disconnect", value: dataForView?.disconnect_reason ?? "—" },
+          { label: "Start", value: formatDateTime(dataForView?.session_start_time) },
+          { label: "End", value: formatDateTime(dataForView?.session_end_time) },
+          { label: "Disconnect", value: humanizeSnakeCase(dataForView?.disconnect_reason) },
           { label: "Transfer attempted", value: formatBool(dataForView?.transfer_attempted) },
           { label: "Transfer successful", value: formatBool(dataForView?.transfer_successful) },
           { label: "Transfer to", value: dataForView?.transfer_to ?? "—" },
@@ -442,34 +482,48 @@ const OutboundReportsPage = () => {
     setHasSearched(true);
     try {
       const activeSearch = (searchTerm ?? searchValue).trim();
-      const payload: Record<string, unknown> = {
+      const payload: PostReportsCallsPayload = {
         page_size: filters.page_size,
         page: filters.page,
       };
-      payload.company_id = effectiveCompanyId;
       if (activeSearch) payload.search = activeSearch;
       if (filters.campaign_id) {
-        payload.campaign_id = filters.campaign_id;
+        const n = Number(filters.campaign_id);
+        if (Number.isFinite(n)) payload.campaign_id = n;
+      }
+      if (filters.voicebot_id) {
+        const n = Number(filters.voicebot_id);
+        if (Number.isFinite(n)) payload.voicebot_id = n;
       }
       if (filters.call_status) payload.call_status = filters.call_status;
-      if (filters.date_from) payload.date_from = filters.date_from;
-      if (filters.date_to) payload.date_to = filters.date_to;
-      if (filters.duration_min != null) payload.duration_min = filters.duration_min;
-      if (filters.duration_max != null) payload.duration_max = filters.duration_max;
+      payload.date_from = filters.date_from || todayForDateInput();
+      payload.date_to = filters.date_to || todayForDateInput();
+      if (filters.duration_min_enabled) payload.duration_min = filters.duration_min;
+      if (filters.duration_max_enabled) payload.duration_max = filters.duration_max;
 
-      const res = await postReportsCalls(payload) as {
-        status?: boolean;
-        count?: number;
-        next?: string | null;
-        previous?: string | null;
-        results?: CallReportRow[];
-        summary?: ReportsSummary;
-      };
-      const list = Array.isArray(res?.results) ? res.results : [];
-      const rows = list.map((r, i) => ({ ...r, id: r.id ?? `row-${i}` }));
+      const companyScope = effectiveCompanyId.trim();
+      if (companyScope) payload.company_id = companyScope;
+
+      const res = await postReportsCalls(payload);
+      if (res && typeof res === "object" && (res as { status?: boolean }).status === false) {
+        const msg =
+          (res as { detail?: string }).detail ??
+          (res as { message?: string }).message ??
+          "Failed to load reports";
+        toast.error(msg);
+        setData([]);
+        setTotalRows(0);
+        setSummary(null);
+        return;
+      }
+      const parsed = parsePostReportsCallsResponse(res);
+      const rows = parsed.results.map((row, i) => {
+        const r = row as CallReportRow;
+        return { ...r, id: r.id ?? `row-${i}` };
+      });
       setData(rows);
-      setTotalRows(res?.count ?? rows.length);
-      setSummary(res?.summary ?? null);
+      setTotalRows(parsed.count > 0 ? parsed.count : rows.length);
+      setSummary((parsed.summary as ReportsSummary | null) ?? null);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       toast.error(e?.response?.data?.detail ?? String(e?.message ?? "Failed to load reports"));
@@ -479,7 +533,7 @@ const OutboundReportsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, effectiveCompanyId, searchValue]);
+  }, [filters, searchValue, effectiveCompanyId]);
 
   useEffect(() => {
     if (hasSearched) return;
@@ -514,8 +568,8 @@ const OutboundReportsPage = () => {
       key: "call_status",
       label: "Status",
       render: (r) => {
-        const s = displayText(r.call_status);
-        return <span className=" text-capitalize">{s}</span>;
+        const s = humanizeSnakeCase(r.call_status, "");
+        return <span className=" text-capitalize">{s || "—"}</span>;
       },
     },
     { key: "call_duration_seconds", label: "Duration", render: (r) => formatDuration(Number(r.call_duration_seconds ?? 0)) },
@@ -531,7 +585,11 @@ const OutboundReportsPage = () => {
     },
     {
       title: "Success Rate",
-      value: formatPercent1(summary?.success_rate),
+      value:
+        summary?.success_rate != null &&
+        Number.isFinite(Number(summary.success_rate))
+          ? formatPercent1(summary.success_rate)
+          : "—",
       subtitle: "Completed calls percentage",
     },
     {
@@ -550,7 +608,12 @@ const OutboundReportsPage = () => {
 
   const companyActiveLabel = (() => {
     if (!filters.company_id) return undefined;
-    const selectedCompany = companies.find((company) => company.id === filters.company_id);
+    const selectedCompany = companies.find(
+      (company) =>
+        company.id === filters.company_id ||
+        company.company_id === filters.company_id ||
+        company.identifier === filters.company_id,
+    );
     return selectedCompany?.name ?? filters.company_id;
   })();
 
@@ -560,19 +623,25 @@ const OutboundReportsPage = () => {
     return selectedCampaign?.name ?? String(filters.campaign_id);
   })();
 
+  const voicebotActiveLabel = (() => {
+    if (!filters.voicebot_id) return undefined;
+    const selected = voicebots.find((v) => String(v.id) === String(filters.voicebot_id));
+    return selected?.name ?? String(filters.voicebot_id);
+  })();
+
   const callStatusActiveLabel = (() => {
     if (!filters.call_status) return undefined;
     return CALL_STATUS_OPTIONS.find((option) => option.value === filters.call_status)?.label ?? filters.call_status;
   })();
 
-  const dateRangeActiveLabel = filters.date_from || filters.date_to
-    ? `${filters.date_from || "Any"} - ${filters.date_to || "Any"}`
-    : undefined;
+  const dateRangeActiveLabel = `${filters.date_from} – ${filters.date_to}`;
 
-  const durationActiveLabel =
-    filters.duration_min !== defaultFilters.duration_min || filters.duration_max !== defaultFilters.duration_max
-      ? `${filters.duration_min}s - ${filters.duration_max}s`
-      : undefined;
+  const durationActiveLabel = (() => {
+    const parts: string[] = [];
+    if (filters.duration_min_enabled) parts.push(`min ${filters.duration_min}s`);
+    if (filters.duration_max_enabled) parts.push(`max ${filters.duration_max}s`);
+    return parts.length ? parts.join(", ") : undefined;
+  })();
 
   const filterPills: FilterPill[] = [
     ...(isAdmin
@@ -584,17 +653,17 @@ const OutboundReportsPage = () => {
             searchable: true,
             active: Boolean(filters.company_id),
             activeLabel: companyActiveLabel,
-            onClear: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", page: 1 })),
+            onClear: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", voicebot_id: "", page: 1 })),
             dropdownOptions: [
               {
                 label: "All companies",
                 value: "",
-                onClick: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", page: 1 })),
+                onClick: () => setFilters((prev) => ({ ...prev, company_id: "", campaign_id: "", voicebot_id: "", page: 1 })),
               },
               ...companies.map((company) => ({
                 label: company.name,
                 value: company.id,
-                onClick: () => setFilters((prev) => ({ ...prev, company_id: company.id, campaign_id: "", page: 1 })),
+                onClick: () => setFilters((prev) => ({ ...prev, company_id: company.id, campaign_id: "", voicebot_id: "", page: 1 })),
               })),
             ],
           } satisfies FilterPill,
@@ -622,6 +691,27 @@ const OutboundReportsPage = () => {
       ],
     },
     {
+      id: "voicebot_id",
+      label: "Voicebot",
+      showDropdown: true,
+      searchable: true,
+      active: Boolean(filters.voicebot_id),
+      activeLabel: voicebotActiveLabel,
+      onClear: () => setFilters((prev) => ({ ...prev, voicebot_id: "", page: 1 })),
+      dropdownOptions: [
+        {
+          label: "All voicebots",
+          value: "",
+          onClick: () => setFilters((prev) => ({ ...prev, voicebot_id: "", page: 1 })),
+        },
+        ...voicebots.map((v) => ({
+          label: v.name,
+          value: String(v.id),
+          onClick: () => setFilters((prev) => ({ ...prev, voicebot_id: String(v.id), page: 1 })),
+        })),
+      ],
+    },
+    {
       id: "call_status",
       label: "Call Status",
       showDropdown: true,
@@ -638,17 +728,28 @@ const OutboundReportsPage = () => {
       id: "date_range",
       label: "Date Range",
       showDropdown: true,
-      active: Boolean(dateRangeActiveLabel),
+      active: true,
       activeLabel: dateRangeActiveLabel,
-      onClear: () => setFilters((prev) => ({ ...prev, date_from: "", date_to: "", page: 1 })),
       dropdownContent: (
         <div className="d-flex flex-column gap-2" style={{ minWidth: "240px" }}>
+          <div className="small text-muted">
+            Start and end dates are required. Clearing a field resets it to today.
+          </div>
           <div>
             <Form.Label className="small mb-1">Date From</Form.Label>
             <Form.Control
               type="date"
               value={filters.date_from}
-              onChange={(e) => setFilters((prev) => ({ ...prev, date_from: e.target.value, page: 1 }))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const v = raw || todayForDateInput();
+                setFilters((prev) => {
+                  let date_from = v;
+                  let date_to = prev.date_to || todayForDateInput();
+                  if (date_from > date_to) date_to = date_from;
+                  return { ...prev, date_from, date_to, page: 1 };
+                });
+              }}
             />
           </div>
           <div>
@@ -656,7 +757,16 @@ const OutboundReportsPage = () => {
             <Form.Control
               type="date"
               value={filters.date_to}
-              onChange={(e) => setFilters((prev) => ({ ...prev, date_to: e.target.value, page: 1 }))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const v = raw || todayForDateInput();
+                setFilters((prev) => {
+                  let date_from = prev.date_from || todayForDateInput();
+                  let date_to = v;
+                  if (date_to < date_from) date_from = date_to;
+                  return { ...prev, date_from, date_to, page: 1 };
+                });
+              }}
             />
           </div>
         </div>
@@ -671,17 +781,30 @@ const OutboundReportsPage = () => {
       onClear: () =>
         setFilters((prev) => ({
           ...prev,
-          duration_min: defaultFilters.duration_min,
-          duration_max: defaultFilters.duration_max,
+          duration_min_enabled: false,
+          duration_max_enabled: false,
+          duration_min: DEFAULT_DURATION_MIN,
+          duration_max: DEFAULT_DURATION_MAX,
           page: 1,
         })),
       dropdownContent: (
-        <div className="d-flex flex-column gap-2" style={{ minWidth: "240px" }}>
+        <div className="d-flex flex-column gap-2" style={{ minWidth: "260px" }}>
           <div>
-            <Form.Label className="small mb-1">Duration Min (s)</Form.Label>
+            <Form.Check
+              type="checkbox"
+              id="outbound-reports-duration-min"
+              className="small mb-1"
+              label="Filter by minimum duration"
+              checked={filters.duration_min_enabled}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, duration_min_enabled: e.target.checked, page: 1 }))
+              }
+            />
+            <Form.Label className="small mb-1 text-muted">Duration Min (s)</Form.Label>
             <Form.Control
               type="number"
               min={0}
+              disabled={!filters.duration_min_enabled}
               value={filters.duration_min}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, duration_min: Number(e.target.value) || 0, page: 1 }))
@@ -689,10 +812,21 @@ const OutboundReportsPage = () => {
             />
           </div>
           <div>
-            <Form.Label className="small mb-1">Duration Max (s)</Form.Label>
+            <Form.Check
+              type="checkbox"
+              id="outbound-reports-duration-max"
+              className="small mb-1"
+              label="Filter by maximum duration"
+              checked={filters.duration_max_enabled}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, duration_max_enabled: e.target.checked, page: 1 }))
+              }
+            />
+            <Form.Label className="small mb-1 text-muted">Duration Max (s)</Form.Label>
             <Form.Control
               type="number"
               min={0}
+              disabled={!filters.duration_max_enabled}
               value={filters.duration_max}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, duration_max: Number(e.target.value) || 3600, page: 1 }))

@@ -22,6 +22,7 @@ import {
   Filter,
   MoreVertical,
   Menu,
+  Check,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
@@ -388,10 +389,21 @@ export interface FilterPill {
   activeLabelOnly?: boolean;
   /** When filter is active, called when the clear (X) icon is clicked to remove the filter */
   onClear?: () => void;
+  /** When true, option clicks do not close the menu (set `autoClose` to outside on the Dropdown). */
+  multiSelect?: boolean;
+  /**
+   * When set with `multiSelect`, shows an action above the list (e.g. select every option).
+   * Use as a **toggle** if the parent clears selection on second click; set `selectAllLabel` to match.
+   */
+  onSelectAll?: () => void;
+  /** Label for the select-all row (default: "Select all"; use e.g. "Deselect all" when the action toggles). */
+  selectAllLabel?: string;
   dropdownOptions?: Array<{
     label: string;
     value: string;
     onClick?: () => void;
+    /** Shown when `multiSelect` is true (e.g. checkmark for selected options). */
+    selected?: boolean;
   }>;
   /** Override the default `Dropdown.Menu` inline styles (e.g. remove maxHeight/overflow for portalled selects). */
   dropdownMenuStyle?: React.CSSProperties;
@@ -816,17 +828,48 @@ function GenericTableFilterPillMenuBody({
           />
         </div>
       )}
+      {pill.multiSelect && pill.onSelectAll && hasOptions && (
+        <>
+          <Dropdown.Item
+            key={`${pill.id}:__select_all__`}
+            className="fw-semibold"
+            onClick={() => {
+              pill.onSelectAll?.();
+            }}
+          >
+            {pill.selectAllLabel ?? "Select all"}
+          </Dropdown.Item>
+          <Dropdown.Divider className="my-0" />
+        </>
+      )}
       {hasOptions ? (
         optionsToShow.map((option) => (
           <Dropdown.Item
             key={`${pill.id}:${option.value}:${option.label}`}
             onClick={() => {
               (option.onClick || pill.onClick)?.();
-              clearPillQuery();
-              closeMenu();
+              if (!pill.multiSelect) {
+                clearPillQuery();
+                closeMenu();
+              }
             }}
           >
-            {option.label}
+            {pill.multiSelect ? (
+              <span className="d-inline-flex align-items-center gap-2">
+                <span
+                  className="d-inline-flex align-items-center justify-content-center"
+                  style={{ width: 24, minHeight: 24, flexShrink: 0 }}
+                  aria-hidden
+                >
+                  {option.selected ? (
+                    <Check size={20} className="text-primary" strokeWidth={2.75} />
+                  ) : null}
+                </span>
+                <span>{option.label}</span>
+              </span>
+            ) : (
+              option.label
+            )}
           </Dropdown.Item>
         ))
       ) : (
@@ -1188,8 +1231,8 @@ const GenericTable = <T extends Record<string, any>>({
     toolbar?.showFilterPills ?? false,
   );
 
-  // Metrics visibility state (hidden by default)
-  const [showMetrics, setShowMetrics] = useState(false);
+  // Metrics visibility: show by default when stats cards exist (toolbar "Metrics" toggles collapse).
+  const [showMetrics, setShowMetrics] = useState(true);
   const [openFilterPillId, setOpenFilterPillId] = useState<string | null>(null);
   const [filterPillSearch, setFilterPillSearch] = useState<
     Record<string, string>
@@ -1799,6 +1842,7 @@ const GenericTable = <T extends Record<string, any>>({
                     <Dropdown
                       key={pill.id}
                       show={openFilterPillId === pill.id}
+                      autoClose={pill.multiSelect ? "outside" : true}
                       onToggle={(nextShow) =>
                         setOpenFilterPillId(nextShow ? pill.id : null)
                       }

@@ -33,6 +33,7 @@ import {
   MessageCircle,
   Folder,
   UserPlus,
+  User,
   CheckCheck,
   Layers2,
   ChevronRight,
@@ -591,6 +592,13 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           permission: PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT,
           url: '/communications/campaign-console'
         },
+        {
+          id: 'live-calls-campaign-agent',
+          title: 'Campaign Agent',
+          icon: <User size={16} />,
+          permission: PERMISSIONS.VIEW_CAMPAIGN_AGENT,
+          url: '/communications/campaign-agent'
+        },
 
 
       ].filter(item => !item.permission || hasPermission(item.permission))
@@ -672,6 +680,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
         },
 
         {
+          id: 'voicebot-outbound-trunks',
+          title: 'Trunks',
+          icon: <LayoutDashboard size={16} />,
+          permission: PERMISSIONS.VIEW_OUTBOUND_CALLS_AIML,
+          url: '/voicebot/outbound/trunks'
+        },
+
+        {
           id: 'voicebot-outbound-voicebots',
           title: 'Bots',
           icon: <LayoutDashboard size={16} />,
@@ -718,18 +734,18 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/voicebot/inbound/dashboard'
         },
         {
-          id: 'voicebot-inbound-companies',
-          title: 'Companies',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/companies'
-        },
-        {
           id: 'voicebot-inbound-bots',
           title: 'Bots',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
           url: '/voicebot/inbound/bots'
+        },
+        {
+          id: 'voicebot-inbound-sip-trunks',
+          title: 'SIP trunks',
+          icon: <Server size={16} />,
+          permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
+          url: '/voicebot/inbound/sip-trunks'
         },
         
         {

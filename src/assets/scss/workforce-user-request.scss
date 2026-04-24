@@ -275,7 +275,8 @@
 .new-request-sidebar :is(.form-select, .form-control):disabled {
   background-color: #f1f5f9;
   opacity: 1;
-  color: #64748b;
+  /* Darker than slate-500 for sufficient contrast on #f1f5f9 (WCAG) */
+  color: #334155;
   box-shadow: none;
 }
 

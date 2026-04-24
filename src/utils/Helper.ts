@@ -8,6 +8,9 @@ import moment from "moment-timezone";
 
 type dateType = string | Date | null | undefined;
 
+/** Values accepted by {@link formatNumber} (APIs and forms may send strings). */
+type FormatNumberInput = number | string | null | undefined;
+
 // Cache for session data to avoid multiple fetches
 let sessionCache: { session: Session | null; timestamp: number } | null = null;
 const SESSION_CACHE_TTL = 5000; // 5 seconds cache TTL
@@ -819,7 +822,7 @@ function parseNumericAmountForDisplay(amount: NumericAmountInput): number {
 }
 
 export const formatNumber = (
-  amount: NumericAmountInput,
+  amount: number | string | null | undefined,
   withoutDecimals?: boolean,
 ): string => {
   const defaultZero = withoutDecimals ? "0" : "0.00";
@@ -1341,6 +1344,29 @@ export function sanitizeSearchInputLive(value: string | null | undefined): strin
   return String(value).replaceAll(/[\u200B-\u200D\uFEFF\u2060]/g, "");
 }
 
+/**
+ * Convert a snake_case (or already plain) string into a human-readable
+ * lower-case phrase. Returns the provided fallback when the value is
+ * missing / not a string / empty.
+ *
+ * @example
+ *   humanizeSnakeCase("participant_disconnected"); // "participant disconnected"
+ *   humanizeSnakeCase("completed");                 // "completed"
+ *   humanizeSnakeCase(null);                        // "—"
+ */
+export function humanizeSnakeCase(value: unknown, fallback = "—"): string {
+  if (value == null) return fallback;
+  if (typeof value !== "string") return fallback;
+  const s = value.trim();
+  if (!s) return fallback;
+  if (!s.includes("_")) return s;
+  return s
+    .replaceAll("_", " ")
+    .replaceAll(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
 export const getGlobalExcludedPaths = () => ["/auth/signin"];
 
 export enum RECORD_TYPES {
@@ -1375,23 +1401,91 @@ export const FORMAT_CLOCK = (clock: string) => {
   return `${day} ${month} ${year} ${hourStr}:${minutes}:${seconds} ${ampm}`;
 };
 
+/** Minimal shape for company list lookups (CRM + voicebot inbound). */
+type CompanyIdListItem = {
+  id?: string | number;
+  name?: string;
+  company_id?: string | number;
+  company_name?: string;
+  identifier?: string | number;
+};
+
+function companyListIdMatches(
+  c: CompanyIdListItem,
+  idStr: string,
+  idNum: number,
+): boolean {
+  const candidates = [c.id, c.company_id, c.identifier].filter(
+    (v) => v != null && v !== "",
+  );
+  return candidates.some(
+    (v) => String(v) === idStr || (!Number.isNaN(idNum) && Number(v) === idNum),
+  );
+}
+
 /**
  * Find company name by id from a list of { id, name } objects.
+ * Also supports voicebot inbound rows (`company_id`, `identifier`, `company_name`)
+ * and camelCase-style ids when present on list items.
  * @param id - Company id (e.g. 1)
  * @param companiesObject - Array of objects with at least { id, name }
  * @returns The matching company name or undefined
  */
 export function getCompanyByCrmId(
   id: string | number | null | undefined,
-  companiesObject: { id?: string | number; name?: string }[] | null | undefined
+  companiesObject: CompanyIdListItem[] | null | undefined,
 ): string | undefined {
-  if (id == null || id === '' || !Array.isArray(companiesObject) || companiesObject.length === 0) {
+  if (
+    id == null ||
+    id === "" ||
+    !Array.isArray(companiesObject) ||
+    companiesObject.length === 0
+  ) {
     return undefined;
   }
-  const idStr = String(id);
-  const idNum = Number(id);
-  const found = companiesObject.find(
-    (c) => String(c.id) === idStr || Number(c.id) === idNum
-  );
-  return found?.name;
+  const idStr = String(id).trim();
+  if (!idStr) return undefined;
+  const idNum = Number(idStr);
+  const found = companiesObject.find((c) => companyListIdMatches(c, idStr, idNum));
+  const rawName = found?.name ?? found?.company_name;
+  if (typeof rawName !== "string") return undefined;
+  const trimmed = rawName.trim();
+  return trimmed || undefined;
+}
+
+/** Minimal shape for inbound bot list lookups (snake_case + camelCase ids). */
+type InboundBotListItem = {
+  id?: string | number;
+  bot_id?: string | number;
+  name?: string;
+  bot_name?: string;
+};
+
+/**
+ * Resolve a display name for an inbound voicebot from GET /bots/ list items.
+ * Matches `id` or `bot_id` (string compare, case-insensitive for UUID-like ids).
+ */
+export function getBotNameByInboundId(
+  id: string | number | null | undefined,
+  bots: InboundBotListItem[] | null | undefined,
+): string | undefined {
+  if (id == null || id === "" || !Array.isArray(bots) || bots.length === 0) {
+    return undefined;
+  }
+  const idStr = String(id).trim();
+  if (!idStr) return undefined;
+  const idLower = idStr.toLowerCase();
+  const found = bots.find((b) => {
+    const candidates = [b.id, b.bot_id].filter(
+      (v) => v != null && v !== "",
+    );
+    return candidates.some((v) => {
+      const s = String(v).trim();
+      return s === idStr || s.toLowerCase() === idLower;
+    });
+  });
+  const rawName = found?.name ?? found?.bot_name;
+  if (typeof rawName !== "string") return undefined;
+  const trimmed = rawName.trim();
+  return trimmed || undefined;
 }

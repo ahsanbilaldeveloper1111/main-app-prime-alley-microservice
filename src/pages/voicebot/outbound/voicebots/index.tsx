@@ -1,5 +1,5 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
@@ -9,6 +9,7 @@ import {
   deleteVoicebot,
   type ListVoicebotsParams,
 } from "@utils/voicebot/outbound";
+import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID, OUTBOUND_VOICEBOT_LIST_PAGE_SIZE } from "@utils/voicebot/outboundVoicebotForm";
 import { GetCompanies } from "@utils/users";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Form } from "react-bootstrap";
@@ -51,14 +52,21 @@ function listFromResponse<T>(res: unknown): T[] {
 const VoicebotsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const sessionUser = session?.user as
+    | { company_id?: string | null; company_identifier?: string | null }
+    | undefined;
+  const userCompanyId = String(sessionUser?.company_id ?? "").trim();
+  const userCompanyIdentifier = String(sessionUser?.company_identifier ?? "").trim();
+  const sessionCompanyScope = userCompanyId || userCompanyIdentifier;
+
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [data, setData] = useState<VoicebotRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [search] = useState<string>("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(OUTBOUND_VOICEBOT_LIST_PAGE_SIZE);
   const [totalRows, setTotalRows] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -67,11 +75,17 @@ const VoicebotsPage = () => {
   const [editBotId, setEditBotId] = useState("");
   const [editCompanyId, setEditCompanyId] = useState("");
   const [trunks, setTrunks] = useState<Array<{ id: string; trunk_id?: string; name?: string }>>([]);
-  const [trunksFetched, setTrunksFetched] = useState(false);
+
+  const effectiveCompanyId = useMemo(() => {
+    if (isAdmin) {
+      return selectedCompanyId.trim() || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+    }
+    return userCompanyId || userCompanyIdentifier || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+  }, [isAdmin, selectedCompanyId, userCompanyId, userCompanyIdentifier]);
 
   const fetchTrunks = useCallback(async () => {
     try {
-      const res = await getTrunks();
+      const res = await getTrunks({ company_id: effectiveCompanyId });
       const list = listFromResponse<{ trunk_id?: string; id?: string; name?: string }>(res);
       const rows = list.map((r, i) => ({
         id: r.trunk_id ?? r.id ?? `trunk-${i}`,
@@ -82,23 +96,16 @@ const VoicebotsPage = () => {
     } catch {
       setTrunks([]);
     }
-  }, []);
-
-  const fetchCompanies = useCallback(async () => {
-    try {
-      const res = await GetCompanies();
-      setCompanies(normalizeCompaniesResponse(res));
-    } catch {
-      setCompanies([]);
-    }
-  }, []);
+  }, [effectiveCompanyId]);
 
   const fetchVoicebots = useCallback(async () => {
     setLoading(true);
     try {
-      const params: ListVoicebotsParams = { page, page_size: pageSize };
-      if (companyFilter) params.company_id = companyFilter;
-      if (!companyFilter && session?.user?.company_identifier) params.company_id = session?.user?.company_identifier;
+      const params: ListVoicebotsParams = {
+        page,
+        page_size: pageSize,
+        company_id: effectiveCompanyId,
+      };
       if (statusFilter) params.status = statusFilter;
       if (search?.trim()) params.search = search.trim();
       const res = await getVoicebots(params);
@@ -116,33 +123,43 @@ const VoicebotsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyFilter, statusFilter, search, page, pageSize]);
+  }, [effectiveCompanyId, statusFilter, search, page, pageSize]);
 
   useEffect(() => {
-    fetchCompanies();
-  }, [fetchCompanies]);
+    if (!isAdmin) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await GetCompanies();
+        if (res === false) {
+          if (!cancelled) setCompanies([]);
+          return;
+        }
+        if (!cancelled) {
+          const list = normalizeCompaniesResponse(res);
+          setCompanies(list);
+          if (list.length > 0) {
+            setSelectedCompanyId((prev) => (prev.trim() ? prev : list[0].id));
+          }
+        }
+      } catch {
+        if (!cancelled) setCompanies([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
 
   useEffect(() => {
-    const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier;
-    if (companyIdentifier) {
-      setCompanyFilter(companyIdentifier);
-    }
-  }, [session?.user]);
+    fetchTrunks().catch(() => undefined);
+  }, [fetchTrunks]);
 
   useEffect(() => {
-    if (!trunksFetched) {
-      fetchTrunks().then(() => setTrunksFetched(true));
-    }
-  }, [trunksFetched, fetchTrunks]);
-
-  useEffect(() => {
-    if (trunksFetched) {
-      fetchVoicebots();
-    }
-  }, [trunksFetched, fetchVoicebots]);
+    fetchVoicebots();
+  }, [fetchVoicebots]);
 
   const botId = (row: VoicebotRow) => String(row.bot_id ?? row.id ?? "");
-  const selectedCompanyId = selectedRow?.company_id ?? companyFilter;
 
   const columns: TableColumn<VoicebotRow>[] = [
     { key: "name", label: "Name", sortable: true },
@@ -158,7 +175,7 @@ const VoicebotsPage = () => {
           <span className="status-badge secondary">{r.status || "—"}</span>
         ),
     },
-    ...(isAdmin ? [{ key: "company_id" as const, label: "Company", render: (r: VoicebotRow) => (companies.find((c) => c.id === r.company_id || c.company_id === r.company_id)?.name) ?? String(r.company_id ?? "—") }] : []),
+    ...(isAdmin ? [{ key: "company_id" as const, label: "Company", render: (r: VoicebotRow) => (companies.find((c) => c.id === r.company_id || c.company_id === r.company_id || c.identifier === r.company_id)?.name) ?? String(r.company_id ?? "—") }] : []),
     {
       key: "actions",
       label: "Actions",
@@ -170,7 +187,9 @@ const VoicebotsPage = () => {
             className="icon-action-btn"
             onClick={() => {
               setEditBotId(botId(row));
-              setEditCompanyId(String(row.company_id ?? ""));
+              setEditCompanyId(
+                isAdmin ? String(row.company_id ?? "") : sessionCompanyScope,
+              );
               setEditSidebarOpen(true);
             }}
           >
@@ -201,7 +220,7 @@ const VoicebotsPage = () => {
     }
     setDeleteLoading(true);
     try {
-      await deleteVoicebot(id,  { company_id: selectedCompanyId } );
+      await deleteVoicebot(id, { company_id: effectiveCompanyId });
       toast.success("Voicebot deleted");
       setShowDeleteModal(false);
       setSelectedRow(null);
@@ -240,6 +259,12 @@ const VoicebotsPage = () => {
           font-size: 12px !important;
           font-weight: 500 !important;
           padding-top: 10px;
+        }
+
+        .voicebot-page .company-filter-select {
+          width: 220px !important;
+          min-width: 220px !important;
+          max-width: 220px !important;
         }
 
         .voicebot-page .icon-action-btn {
@@ -323,34 +348,43 @@ const VoicebotsPage = () => {
                 <h1 style={{ fontWeight: 300, color: "#141414", fontSize: "24px", margin: 0 }}>
                   Voice Bots
                 </h1>
-                <div className="d-flex align-items-center gap-2 flex-wrap">
+                <div className="d-flex align-items-center gap-2 flex-nowrap overflow-x-auto">
                   {isAdmin && (
                     <Form.Select
-                      className="filter-select"
-                      style={{ width: "220px" }}
-                      value={companyFilter}
-                      onChange={(e) => setCompanyFilter(e.target.value)}
+                      className="filter-select company-filter-select flex-shrink-0"
+                      value={selectedCompanyId}
+                      onChange={(e) => {
+                        setSelectedCompanyId(e.target.value);
+                        setPage(1);
+                      }}
+                      aria-label="Filter voice bots by company"
                     >
-                      <option value="">All companies</option>
-                      {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {companies.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
                     </Form.Select>
                   )}
                   <Form.Select
-                    className="filter-select"
+                    className="filter-select flex-shrink-0"
                     style={{ width: "150px" }}
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    onChange={(e) => {
+                      setStatusFilter(e.target.value);
+                      setPage(1);
+                    }}
                   >
                     <option value="">All statuses</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </Form.Select>
                   <button
-                   
-                    className="add-voicebot-btn"
+                    type="button"
+                    className="add-voicebot-btn flex-shrink-0"
                     onClick={() => {
                       setEditBotId("");
-                      setEditCompanyId("");
+                      setEditCompanyId(effectiveCompanyId);
                       setEditSidebarOpen(true);
                     }}
                   >
@@ -371,7 +405,7 @@ const VoicebotsPage = () => {
               currentPage: page,
               rowsPerPage: pageSize,
               totalRows: totalRows || data.length,
-              pageSizeOptions: [10, 25, 50],
+              pageSizeOptions: [10, 25, 50, 100, OUTBOUND_VOICEBOT_LIST_PAGE_SIZE],
             }}
             onPaginationChange={(newPage, newRowsPerPage) => {
               setPage(newPage);
