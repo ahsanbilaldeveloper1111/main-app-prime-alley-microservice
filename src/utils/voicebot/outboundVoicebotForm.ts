@@ -1,7 +1,7 @@
 import type { CreateVoicebotPayload, UpdateVoicebotPayload } from "@utils/voicebot/outbound";
 import { firstString, toFormString } from "@utils/voicebot/formDisplay";
 
-/** Fixed company for outbound voicebot create (POST); updates use `form.company_id` from the API. */
+/** Legacy fallback for outbound voicebot update payload when `company_id` is missing. */
 export const OUTBOUND_VOICEBOT_CREATE_COMPANY_ID = "default";
 
 /** Page size for outbound voicebot list API calls (table pagination and filter dropdowns). */
@@ -62,7 +62,7 @@ If customer asks pricing:
 Always end call politely.`;
 
 export const defaultOutboundVoicebotForm = (): OutboundVoicebotFormState => ({
-  company_id: OUTBOUND_VOICEBOT_CREATE_COMPANY_ID,
+  company_id: "",
   name: "",
   description: "",
   trunk_id: "",
@@ -127,7 +127,7 @@ function buildVoicebotPayload(
 }
 
 export function buildCreatePayload(form: OutboundVoicebotFormState): CreateVoicebotPayload {
-  return buildVoicebotPayload(form, OUTBOUND_VOICEBOT_CREATE_COMPANY_ID);
+  return buildVoicebotPayload(form, form.company_id.trim());
 }
 
 export function buildUpdatePayload(form: OutboundVoicebotFormState): UpdateVoicebotPayload {
@@ -136,7 +136,8 @@ export function buildUpdatePayload(form: OutboundVoicebotFormState): UpdateVoice
 }
 
 export function getOutboundVoicebotSubmitError(form: OutboundVoicebotFormState): string | null {
-  if (!form.company_id?.trim() || !form.name?.trim()) return "Company and Bot Name are required";
+  if (!form.company_id?.trim()) return "Company is required";
+  if (!form.name?.trim()) return "Bot Name is required";
   if (!form.trunk_id?.trim()) return "Select Trunk is required";
   if (!form.default_greeting?.trim()) return "Default Greeting is required";
   if (!form.default_system_prompt?.trim()) return "Default System Prompt is required";

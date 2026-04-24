@@ -4,7 +4,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import { Row, Col, Card } from "react-bootstrap";
 import { useRouter } from "next/router";
-import { Building2, Bot, Phone } from "lucide-react";
+import { Building2, Bot, Phone, Server } from "lucide-react";
 import "@assets/scss/common.scss";
 
 const VoicebotInbound = () => {
@@ -24,6 +24,13 @@ const VoicebotInbound = () => {
       icon: Bot,
       path: "/voicebot/inbound/bots",
       color: "#8B5CF6",
+    },
+    {
+      title: "SIP trunks",
+      description: "List SIP trunks for inbound calling",
+      icon: Server,
+      path: "/voicebot/inbound/sip-trunks",
+      color: "#6366F1",
     },
     {
       title: "Calls",

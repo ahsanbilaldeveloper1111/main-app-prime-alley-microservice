@@ -2,7 +2,7 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useEffect, useMemo, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { Card, Col, Form, Row, Spinner } from "react-bootstrap";
+import { Button, Card, Col, Collapse, Form, OverlayTrigger, Row, Spinner, Tooltip as BsTooltip } from "react-bootstrap";
 import { useSession } from "next-auth/react";
 import {
   getAnalyticsCosts,
@@ -11,6 +11,7 @@ import {
   getCampaigns,
   getVoicebots,
   normalizeVoicebotsListResponse,
+  parsePostReportsCallsResponse,
   postReportsCalls,
   type AnalyticsCostsApiResponse,
   type AnalyticsCostsByCampaignItem,
@@ -18,11 +19,12 @@ import {
   type AnalyticsTrendsPeriod,
   type PostReportsCallsPayload,
 } from "@utils/voicebot/outbound";
-import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID, OUTBOUND_VOICEBOT_LIST_PAGE_SIZE } from "@utils/voicebot/outboundVoicebotForm";
+import { OUTBOUND_VOICEBOT_LIST_PAGE_SIZE } from "@utils/voicebot/outboundVoicebotForm";
 import moment from "moment";
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { BarChart3 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from "recharts";
+import { BarChart3, ChevronDown, CircleHelp, Filter } from "lucide-react";
 import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { formatFixed, formatPercent, toYmd } from "@utils/voicebot/outbound/formatters";
 
 import "@assets/scss/common.scss";
@@ -40,19 +42,46 @@ const TIME_PERIOD_OPTIONS: TimePeriodOption[] = [
   { value: "90", label: "Last 90 days" },
 ];
 
+/** Maps day presets to `/analytics/trends` (API only supports 7d, 14d, 30d; 30/60/90 → 30d). */
+function trendsPeriodFromTimePeriod(days: TimePeriodOption["value"]): AnalyticsTrendsPeriod {
+  if (days === "7") return "7d";
+  if (days === "14") return "14d";
+  return "30d";
+}
+
 const REPORTS_CALL_STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
   { value: "completed", label: "Completed" },
   { value: "timeout", label: "Timeout" },
 ];
 
-const TRENDS_PERIOD_OPTIONS: Array<{ value: AnalyticsTrendsPeriod; label: string }> = [
-  { value: "7d", label: "Last 7 days" },
-  { value: "14d", label: "Last 14 days" },
-  { value: "30d", label: "Last 30 days" },
-];
+/** When a key is false, that dimension is omitted from outbound analytics API requests. */
+type AnalyticsFilterMask = {
+  company: boolean;
+  campaign: boolean;
+  voicebot: boolean;
+  callStatus: boolean;
+  durationMin: boolean;
+  durationMax: boolean;
+  fromDate: boolean;
+  toDate: boolean;
+  timePeriod: boolean;
+};
+
+const DEFAULT_ANALYTICS_FILTER_MASK: AnalyticsFilterMask = {
+  company: true,
+  campaign: true,
+  voicebot: true,
+  callStatus: true,
+  durationMin: true,
+  durationMax: true,
+  fromDate: true,
+  toDate: true,
+  timePeriod: true,
+};
 
 type OutboundReportsCallsChartFilters = {
+  mask: AnalyticsFilterMask;
   companyIdentifier: string;
   campaignId: string;
   voicebotId: string;
@@ -64,6 +93,7 @@ type OutboundReportsCallsChartFilters = {
 };
 
 function buildAnalyticsReportsCallsPayload(args: {
+  mask: AnalyticsFilterMask;
   companyIdentifier: string;
   campaignId: string;
   voicebotId: string;
@@ -76,6 +106,7 @@ function buildAnalyticsReportsCallsPayload(args: {
   pageSize: number;
 }): PostReportsCallsPayload {
   const {
+    mask,
     companyIdentifier,
     campaignId,
     voicebotId,
@@ -88,23 +119,26 @@ function buildAnalyticsReportsCallsPayload(args: {
     pageSize,
   } = args;
   const payload: PostReportsCallsPayload = {
-    company_id: companyIdentifier,
     page,
     page_size: pageSize,
-    date_from: fromDate,
-    date_to: toDate,
-    duration_min: durationMin,
-    duration_max: durationMax,
   };
-  if (campaignId) {
+  if (mask.durationMin) payload.duration_min = durationMin;
+  if (mask.durationMax) payload.duration_max = durationMax;
+  if (mask.company) {
+    const companyTrim = companyIdentifier.trim();
+    if (companyTrim) payload.company_id = companyTrim;
+  }
+  if (mask.fromDate && fromDate.trim()) payload.date_from = fromDate.trim();
+  if (mask.toDate && toDate.trim()) payload.date_to = toDate.trim();
+  if (mask.campaign && campaignId) {
     const n = Number(campaignId);
     if (Number.isFinite(n)) payload.campaign_id = n;
   }
-  if (voicebotId) {
+  if (mask.voicebot && voicebotId) {
     const n = Number(voicebotId);
     if (Number.isFinite(n)) payload.voicebot_id = n;
   }
-  if (callStatus) payload.call_status = callStatus;
+  if (mask.callStatus && callStatus) payload.call_status = callStatus;
   return payload;
 }
 
@@ -131,30 +165,42 @@ type DashboardResponse = {
   detail?: string;
 };
 
-type ReportsCallsResponse = {
-  status?: boolean;
-  count?: number;
-  results?: Array<{ session_start_time?: string; created_at?: string }>;
-  detail?: string;
-  message?: string;
-};
-
 type CampaignPerformanceRow = {
   campaign_id?: number | string;
   campaign_name?: string;
   call_status?: string;
+  /** When true, campaign is soft-deleted (or equivalent API flag). */
+  is_deleted?: boolean;
+  campaign_is_deleted?: boolean;
 };
 
-function campaignLabelFromRow(r: CampaignPerformanceRow): string {
-  const idKey = String(r?.campaign_id ?? "");
-  const name = String(r?.campaign_name ?? "").trim();
-  return name || (idKey ? `#${idKey}` : "—");
+/** API may already suffix names with "(deleted)"; avoid doubling when we add the marker. */
+const CAMPAIGN_NAME_DELETED_SUFFIX = /\s*\(deleted\)\s*$/i;
+
+function campaignRowIndicatesDeleted(r: CampaignPerformanceRow): boolean {
+  const o = r as Record<string, unknown>;
+  const candidates: unknown[] = [r.is_deleted, r.campaign_is_deleted, o.campaign_deleted, o.is_campaign_deleted];
+  return candidates.some((v) => v === true || v === 1 || v === "1" || String(v).toLowerCase() === "true");
 }
 
-function aggregateCampaignPerformance(list: CampaignPerformanceRow[]) {
+function campaignLabelFromRow(r: CampaignPerformanceRow, deletedCampaignIdsFromCosts?: ReadonlySet<string>): string {
+  const idKey = String(r?.campaign_id ?? "").trim();
+  const rawName = String(r?.campaign_name ?? "").trim();
+  const base = rawName || (idKey ? `#${idKey}` : "—");
+  const fromRow = campaignRowIndicatesDeleted(r);
+  const fromCosts = Boolean(idKey && deletedCampaignIdsFromCosts?.has(idKey));
+  const isDeleted = fromRow || fromCosts;
+  if (!isDeleted) return base;
+  return CAMPAIGN_NAME_DELETED_SUFFIX.test(base) ? base : `${base} (deleted)`;
+}
+
+function aggregateCampaignPerformance(
+  list: CampaignPerformanceRow[],
+  deletedCampaignIdsFromCosts?: ReadonlySet<string>
+) {
   const map = new Map<string, { campaignLabel: string; completed: number; failed: number; total: number }>();
   for (const r of list) {
-    const label = campaignLabelFromRow(r);
+    const label = campaignLabelFromRow(r, deletedCampaignIdsFromCosts);
     const current = map.get(label) ?? { campaignLabel: label, completed: 0, failed: 0, total: 0 };
     const status = String(r?.call_status ?? "").toLowerCase();
     const isCompleted = status === "completed";
@@ -166,7 +212,6 @@ function aggregateCampaignPerformance(list: CampaignPerformanceRow[]) {
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
-type CompanyOption = { id: string; name: string };
 type CampaignOption = { id: number | string; name: string };
 
 /** Campaign id from API / table rows (numeric id or string key). */
@@ -221,7 +266,15 @@ function safeToYmd(value: unknown): string | null {
   return d.toISOString().slice(0, 10);
 }
 
-function useOutboundDashboard(companyIdentifier: string, campaignId: string, fromDate: string, toDate: string) {
+type DashboardQueryArgs = {
+  mask: AnalyticsFilterMask;
+  companyIdentifier: string;
+  campaignId: string;
+  fromDate: string;
+  toDate: string;
+};
+
+function useOutboundDashboard({ mask, companyIdentifier, campaignId, fromDate, toDate }: DashboardQueryArgs) {
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
 
@@ -231,15 +284,19 @@ function useOutboundDashboard(companyIdentifier: string, campaignId: string, fro
     async function fetchDashboard() {
       setLoading(true);
       try {
-        const params: Record<string, unknown> = { company_id: companyIdentifier };
-        if (campaignId) params.campaign_id = campaignId;
-        if (fromDate) {
-          params.start_date = ymdStartIso(fromDate);
-          params.date_from = fromDate;
+        const params: Record<string, unknown> = {};
+        if (mask.company) {
+          const companyTrim = companyIdentifier.trim();
+          if (companyTrim) params.company_id = companyTrim;
         }
-        if (toDate) {
+        if (mask.campaign && campaignId) params.campaign_id = campaignId;
+        if (mask.fromDate && fromDate.trim()) {
+          params.start_date = ymdStartIso(fromDate);
+          params.date_from = fromDate.trim();
+        }
+        if (mask.toDate && toDate.trim()) {
           params.end_date = ymdEndIso(toDate);
-          params.date_to = toDate;
+          params.date_to = toDate.trim();
         }
         const res = (await getAnalyticsDashboard(params)) as DashboardResponse;
         const data = res?.data ?? null;
@@ -256,24 +313,54 @@ function useOutboundDashboard(companyIdentifier: string, campaignId: string, fro
     return () => {
       cancelled = true;
     };
-  }, [companyIdentifier, campaignId, fromDate, toDate]);
+  }, [mask, companyIdentifier, campaignId, fromDate, toDate]);
 
   return { loading, dashboard };
 }
 
+function buildVolumeChartSeries(
+  list: Array<{ session_start_time?: string; created_at?: string }>,
+  fromDate: string,
+  toDate: string,
+  mask: Pick<AnalyticsFilterMask, "fromDate" | "toDate">,
+): Array<{ dateKey: string; calls: number }> {
+  const map: Record<string, number> = {};
+  for (const row of list) {
+    const dayKey = safeToYmd(row?.session_start_time ?? row?.created_at);
+    if (!dayKey) continue;
+    map[dayKey] = (map[dayKey] ?? 0) + 1;
+  }
+  let keys: string[];
+  const from = mask.fromDate ? fromDate.trim() : "";
+  const to = mask.toDate ? toDate.trim() : "";
+  if (from && to) {
+    keys = getDateKeysBetween(from, to);
+    for (const k of keys) {
+      map[k] ??= 0;
+    }
+  } else {
+    keys = Object.keys(map).sort((a, b) => a.localeCompare(b));
+  }
+  return keys.map((k) => ({ dateKey: k, calls: map[k] ?? 0 }));
+}
+
 function useOutboundCallVolume(filters: OutboundReportsCallsChartFilters) {
-  const { companyIdentifier, campaignId, voicebotId, callStatus, durationMin, durationMax, fromDate, toDate } = filters;
+  const {
+    mask,
+    companyIdentifier,
+    campaignId,
+    voicebotId,
+    callStatus,
+    durationMin,
+    durationMax,
+    fromDate,
+    toDate,
+  } = filters;
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Array<{ dateKey: string; calls: number }>>([]);
   const [truncated, setTruncated] = useState(false);
 
   useEffect(() => {
-    if (!fromDate || !toDate) {
-      setData([]);
-      setTruncated(false);
-      return;
-    }
-
     let cancelled = false;
 
     async function fetchVolume() {
@@ -281,6 +368,7 @@ function useOutboundCallVolume(filters: OutboundReportsCallsChartFilters) {
       try {
         const PAGE_SIZE = 5000;
         const payload = buildAnalyticsReportsCallsPayload({
+          mask,
           companyIdentifier,
           campaignId,
           voicebotId,
@@ -293,27 +381,13 @@ function useOutboundCallVolume(filters: OutboundReportsCallsChartFilters) {
           pageSize: PAGE_SIZE,
         });
 
-        const res = (await postReportsCalls(payload)) as ReportsCallsResponse;
-        const list = Array.isArray(res?.results) ? res.results : [];
-        const count = Number(res?.count ?? list.length);
+        const res = await postReportsCalls(payload);
+        const parsed = parsePostReportsCallsResponse(res);
+        const list = parsed.results as Array<{ session_start_time?: string; created_at?: string }>;
+        const count = Number(parsed.count ?? list.length);
         if (!cancelled) setTruncated(Number.isFinite(count) && count > PAGE_SIZE);
 
-        const keys = getDateKeysBetween(fromDate, toDate);
-        const map: Record<string, number> = {};
-        keys.forEach((k) => {
-          map[k] = 0;
-        });
-
-        for (const row of list) {
-          const dayKey = safeToYmd(row?.session_start_time ?? row?.created_at);
-          if (!dayKey) continue;
-          if (map[dayKey] == null) continue;
-          map[dayKey] += 1;
-        }
-
-        if (!cancelled) {
-          setData(keys.map((k) => ({ dateKey: k, calls: map[k] ?? 0 })));
-        }
+        if (!cancelled) setData(buildVolumeChartSeries(list, fromDate, toDate, mask));
       } catch (err) {
         console.error("postReportsCalls error:", err);
         if (!cancelled) {
@@ -329,30 +403,28 @@ function useOutboundCallVolume(filters: OutboundReportsCallsChartFilters) {
     return () => {
       cancelled = true;
     };
-  }, [companyIdentifier, campaignId, voicebotId, callStatus, durationMin, durationMax, fromDate, toDate]);
+  }, [mask, companyIdentifier, campaignId, voicebotId, callStatus, durationMin, durationMax, fromDate, toDate]);
 
   return { loading, data, truncated };
 }
 
-function useOutboundCosts(fromDate: string, toDate: string) {
+function useOutboundCosts(
+  fromDate: string,
+  toDate: string,
+  mask: Pick<AnalyticsFilterMask, "fromDate" | "toDate">,
+) {
   const [loading, setLoading] = useState(false);
   const [costs, setCosts] = useState<AnalyticsCostsData | null>(null);
 
   useEffect(() => {
-    if (!fromDate || !toDate) {
-      setCosts(null);
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
     async function fetchCosts() {
       setLoading(true);
       try {
         const res = (await getAnalyticsCosts({
-          date_from: fromDate,
-          date_to: toDate,
+          date_from: mask.fromDate && fromDate.trim() ? fromDate.trim() : undefined,
+          date_to: mask.toDate && toDate.trim() ? toDate.trim() : undefined,
         })) as AnalyticsCostsApiResponse;
         if (!cancelled) setCosts(res?.data ?? null);
       } catch (err) {
@@ -367,24 +439,31 @@ function useOutboundCosts(fromDate: string, toDate: string) {
     return () => {
       cancelled = true;
     };
-  }, [fromDate, toDate]);
+  }, [fromDate, toDate, mask.fromDate, mask.toDate]);
 
   return { loading, costs };
 }
 
-function useOutboundCampaignPerformance(filters: OutboundReportsCallsChartFilters) {
-  const { companyIdentifier, campaignId, voicebotId, callStatus, durationMin, durationMax, fromDate, toDate } = filters;
+function useOutboundCampaignPerformance(
+  filters: OutboundReportsCallsChartFilters,
+  deletedCampaignIdsFromCosts?: ReadonlySet<string>
+) {
+  const {
+    mask,
+    companyIdentifier,
+    campaignId,
+    voicebotId,
+    callStatus,
+    durationMin,
+    durationMax,
+    fromDate,
+    toDate,
+  } = filters;
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Array<{ campaignLabel: string; completed: number; failed: number; total: number }>>([]);
   const [truncated, setTruncated] = useState(false);
 
   useEffect(() => {
-    if (!fromDate || !toDate) {
-      setRows([]);
-      setTruncated(false);
-      return;
-    }
-
     let cancelled = false;
 
     async function fetchPerformance() {
@@ -392,6 +471,7 @@ function useOutboundCampaignPerformance(filters: OutboundReportsCallsChartFilter
       try {
         const PAGE_SIZE = 5000;
         const payload = buildAnalyticsReportsCallsPayload({
+          mask,
           companyIdentifier,
           campaignId,
           voicebotId,
@@ -404,16 +484,12 @@ function useOutboundCampaignPerformance(filters: OutboundReportsCallsChartFilter
           pageSize: PAGE_SIZE,
         });
 
-        const res = (await postReportsCalls(payload)) as {
-          status?: boolean;
-          count?: number;
-          results?: CampaignPerformanceRow[];
-        };
-
-        const list = Array.isArray(res?.results) ? res.results : [];
-        const count = Number(res?.count ?? list.length);
+        const res = await postReportsCalls(payload);
+        const parsed = parsePostReportsCallsResponse(res);
+        const list = parsed.results as CampaignPerformanceRow[];
+        const count = Number(parsed.count ?? list.length);
         if (!cancelled) setTruncated(Number.isFinite(count) && count > PAGE_SIZE);
-        if (!cancelled) setRows(aggregateCampaignPerformance(list));
+        if (!cancelled) setRows(aggregateCampaignPerformance(list, deletedCampaignIdsFromCosts));
       } catch (err) {
         console.error("postReportsCalls (campaign performance) error:", err);
         if (!cancelled) {
@@ -429,7 +505,18 @@ function useOutboundCampaignPerformance(filters: OutboundReportsCallsChartFilter
     return () => {
       cancelled = true;
     };
-  }, [companyIdentifier, campaignId, voicebotId, callStatus, durationMin, durationMax, fromDate, toDate]);
+  }, [
+    mask,
+    companyIdentifier,
+    campaignId,
+    voicebotId,
+    callStatus,
+    durationMin,
+    durationMax,
+    fromDate,
+    toDate,
+    deletedCampaignIdsFromCosts,
+  ]);
 
   return { loading, rows, truncated };
 }
@@ -450,13 +537,31 @@ function renderCompanyEmptyState(args: { isAdmin: boolean }): React.ReactNode {
 }
 
 function renderDashboardContent(args: {
+  requireCompanyFilter: boolean;
   companyIdentifier: string;
   isAdmin: boolean;
   dashboardLoading: boolean;
   dashboard: DashboardData | null;
 }): React.ReactNode {
-  const { companyIdentifier, isAdmin, dashboardLoading, dashboard } = args;
-  if (!companyIdentifier) return renderCompanyEmptyState({ isAdmin });
+  const { requireCompanyFilter, companyIdentifier, isAdmin, dashboardLoading, dashboard } = args;
+  if (requireCompanyFilter && !companyIdentifier.trim() && !isAdmin) {
+    return renderCompanyEmptyState({ isAdmin });
+  }
+  if (requireCompanyFilter && isAdmin && !companyIdentifier.trim()) {
+    return (
+      <div
+        className="d-flex flex-column align-items-center justify-content-center text-muted py-5"
+        style={{ minHeight: "180px" }}
+      >
+        <BarChart3 size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
+        <p className="mb-1 fw-medium">Select a company</p>
+        <p className="small mb-0 text-center px-3 opacity-75">
+          With the Company filter enabled, choose a company above. Disable the Company filter to load aggregate dashboard
+          metrics.
+        </p>
+      </div>
+    );
+  }
   if (dashboardLoading) {
     return (
       <div className="d-flex align-items-center gap-2">
@@ -513,21 +618,10 @@ function renderDashboardContent(args: {
 }
 
 function renderVolumeContent(args: {
-  fromDate: string;
-  toDate: string;
   volumeLoading: boolean;
   volumeData: Array<{ dateKey: string; calls: number }>;
 }): React.ReactNode {
-  const { fromDate, toDate, volumeLoading, volumeData } = args;
-  if (!fromDate || !toDate) {
-    return (
-      <div className="d-flex flex-column align-items-center justify-content-center text-muted py-5" style={{ minHeight: "280px" }}>
-        <BarChart3 size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
-        <p className="mb-1 fw-medium">Select a date range</p>
-        <p className="small mb-0 opacity-75">Choose From Date and To Date (or use the time period dropdown).</p>
-      </div>
-    );
-  }
+  const { volumeLoading, volumeData } = args;
   if (volumeLoading) {
     return (
       <div className="d-flex align-items-center justify-content-center" style={{ minHeight: "280px" }}>
@@ -562,7 +656,7 @@ function renderVolumeContent(args: {
           tickLine={{ stroke: "#e5e7eb" }}
           label={{ value: "Number of calls", angle: -90, position: "insideLeft", style: { fontSize: 12 } }}
         />
-        <Tooltip
+        <RechartsTooltip
           formatter={(value: number) => [value, "Calls"]}
           contentStyle={{ border: "none", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
           labelFormatter={(label) => `Date: ${moment(label).format("MMM D, YYYY")}`}
@@ -587,7 +681,7 @@ function renderSuccessRateTrendContent(args: { loading: boolean; trends: TrendIt
       <div className="d-flex flex-column align-items-center justify-content-center text-muted py-5" style={{ minHeight: "280px" }}>
         <BarChart3 size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
         <p className="mb-1 fw-medium">No trend data available</p>
-        <p className="small mb-0 opacity-75">Try a different trends period or check back later.</p>
+        <p className="small mb-0 opacity-75">Try a different time period or check back later.</p>
       </div>
     );
   }
@@ -615,7 +709,7 @@ function renderSuccessRateTrendContent(args: { loading: boolean; trends: TrendIt
           domain={[0, maxY]}
           tickFormatter={(v) => `${v}%`}
         />
-        <Tooltip
+        <RechartsTooltip
           formatter={(value: number) => [`${Number(value).toFixed(2)}%`, "Success rate"]}
           contentStyle={{ border: "none", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
           labelFormatter={(label) => `Date: ${moment(label).format("MMM D, YYYY")}`}
@@ -627,21 +721,10 @@ function renderSuccessRateTrendContent(args: { loading: boolean; trends: TrendIt
 }
 
 function renderCampaignPerformanceContent(args: {
-  fromDate: string;
-  toDate: string;
   loading: boolean;
   rows: Array<{ campaignLabel: string; completed: number; failed: number; total: number }>;
 }): React.ReactNode {
-  const { fromDate, toDate, loading, rows } = args;
-  if (!fromDate || !toDate) {
-    return (
-      <div className="d-flex flex-column align-items-center justify-content-center text-muted py-5" style={{ minHeight: "280px" }}>
-        <BarChart3 size={48} className="mb-3 opacity-50" strokeWidth={1.5} />
-        <p className="mb-1 fw-medium">Select a date range</p>
-        <p className="small mb-0 opacity-75">Choose From Date and To Date (or use the time period dropdown).</p>
-      </div>
-    );
-  }
+  const { loading, rows } = args;
   if (loading) {
     return (
       <div className="d-flex align-items-center justify-content-center" style={{ minHeight: "280px" }}>
@@ -678,7 +761,7 @@ function renderCampaignPerformanceContent(args: {
           tickLine={{ stroke: "#e5e7eb" }}
           label={{ value: "Number of calls", angle: -90, position: "insideLeft", style: { fontSize: 12 } }}
         />
-        <Tooltip
+        <RechartsTooltip
           formatter={(value: number, name: string) => {
             if (name === "completed") return [value, "Completed"];
             if (name === "failed") return [value, "Failed"];
@@ -700,7 +783,8 @@ function labelForCostCampaignRow(
 ): string {
   const name = String(row.campaign_name ?? "").trim();
   if (name) {
-    return row.is_deleted ? `${name} (deleted)` : name;
+    if (!row.is_deleted) return name;
+    return CAMPAIGN_NAME_DELETED_SUFFIX.test(name) ? name : `${name} (deleted)`;
   }
   return fallbackName(row.campaign_id);
 }
@@ -767,7 +851,7 @@ function renderCostContent(
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip
+                <RechartsTooltip
                   formatter={(value: number) => [formatAed(value), "Cost"]}
                   contentStyle={{ border: "none", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
                 />
@@ -795,7 +879,7 @@ function renderCostContent(
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                   <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={(v) => (v ? moment(v).format("MMM D") : "")} />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip
+                  <RechartsTooltip
                     formatter={(value: number) => [formatAed(value), "Cost"]}
                     contentStyle={{ border: "none", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}
                     labelFormatter={(label) => `Date: ${moment(label).format("MMM D, YYYY")}`}
@@ -825,7 +909,7 @@ function renderCostContent(
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                   <XAxis dataKey="campaign" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={72} />
                   <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip
+                  <RechartsTooltip
                     formatter={(value: number, name: string, item: { payload?: { count?: number } }) => {
                       if (name === "total") {
                         const calls = item?.payload?.count;
@@ -861,13 +945,60 @@ function renderCostContent(
   );
 }
 
+const OUTBOUND_FIELD_TOOLTIPS = {
+  company:
+    "Scopes summary cards, the campaign list, Call volume, and Campaign performance to the selected organization. Cost analysis and Success rate trend use From / To dates only.",
+  campaign:
+    "Limits summary cards, Call volume, and Campaign performance to the selected campaign.",
+  fromDate:
+    "When on, sets the start of the range for the dashboard, call volume, campaign performance, and cost analysis.",
+  toDate:
+    "When on, sets the end of the range for the dashboard, call volume, campaign performance, and cost analysis.",
+  voicebot:
+    "When on, limits Call volume and Campaign performance to the selected voicebot.",
+  callStatus:
+    "When on, limits Call volume and Campaign performance to calls in that status.",
+  durationMin:
+    "When on, Call volume and Campaign performance only include sessions at least this long (seconds).",
+  durationMax:
+    "When on, Call volume and Campaign performance only include sessions up to this length (seconds).",
+} as const;
 
+function OutboundFilterFieldHint({ id, text }: Readonly<{ id: string; text: string }>) {
+  return (
+    <OverlayTrigger placement="top" overlay={<BsTooltip id={`outbound-flt-tip-${id}`}>{text}</BsTooltip>}>
+      <button
+        type="button"
+        className="btn btn-link p-0 ms-1 text-muted align-baseline shadow-none border-0 d-inline-flex"
+        aria-label="More information"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        <CircleHelp size={14} strokeWidth={1.75} aria-hidden />
+      </button>
+    </OverlayTrigger>
+  );
+}
+
+function outboundCheckLabel(id: string, labelText: string, tooltip: string): React.ReactNode {
+  return (
+    <span className="d-inline-flex align-items-center">
+      {labelText}
+      <OutboundFilterFieldHint id={id} text={tooltip} />
+    </span>
+  );
+}
 
 const OutboundAnalytics = () => {
   const { data: session } = useSession();
   const isAdmin = String((session?.user as { is_admin?: string | number } | undefined)?.is_admin ?? "") === "1";
-  /** All outbound analytics API calls use this `company_id` for now. */
-  const analyticsCompanyId = OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+  const sessionUser = session?.user as
+    | { company_id?: string | null; company_identifier?: string | null }
+    | undefined;
+  const userCompanyId = String(sessionUser?.company_id ?? "").trim();
+  const userCompanyIdentifier = String(sessionUser?.company_identifier ?? "").trim();
 
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
@@ -875,6 +1006,26 @@ const OutboundAnalytics = () => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
   const [selectedVoicebotId, setSelectedVoicebotId] = useState<string>("");
+  const [filterMask, setFilterMask] = useState<AnalyticsFilterMask>(() => ({ ...DEFAULT_ANALYTICS_FILTER_MASK }));
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  /** Admin: optional company from dropdown when filter is on. Tenant: always session company. */
+  const scopeCompanyId = useMemo(() => {
+    if (!isAdmin) return userCompanyId || userCompanyIdentifier;
+    if (!filterMask.company) return "";
+    return selectedCompanyId.trim();
+  }, [isAdmin, filterMask.company, selectedCompanyId, userCompanyId, userCompanyIdentifier]);
+
+  /** Mask sent to analytics APIs; tenants always apply company scope (no company checkbox). */
+  const analyticsApiMask = useMemo(
+    (): AnalyticsFilterMask => ({
+      ...filterMask,
+      company: isAdmin ? filterMask.company : true,
+    }),
+    [filterMask, isAdmin],
+  );
+
+  const companyIdForCampaigns = scopeCompanyId;
   const [callStatusFilter, setCallStatusFilter] = useState<string>("");
   const [durationMinSec, setDurationMinSec] = useState(0);
   const [durationMaxSec, setDurationMaxSec] = useState(3600);
@@ -884,9 +1035,32 @@ const OutboundAnalytics = () => {
   const effectiveCampaignId = selectedCampaignId;
 
   const [timePeriod, setTimePeriod] = useState<TimePeriodOption["value"]>("7");
-  const [trendsPeriod, setTrendsPeriod] = useState<AnalyticsTrendsPeriod>("7d");
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [trends, setTrends] = useState<TrendItem[]>([]);
+
+  const trendsApiPeriod = useMemo(() => trendsPeriodFromTimePeriod(timePeriod), [timePeriod]);
+
+  const successRateTrendDescriptionSuffix = useMemo(() => {
+    if (!filterMask.timePeriod) {
+      return " — enable the Time period filter to load this chart.";
+    }
+    const cap =
+      timePeriod === "60" || timePeriod === "90"
+        ? "; success-rate chart covers at most 30 days while from/to use 60 or 90 days"
+        : "";
+    return ` for ${trendsApiPeriod} (from the Time period control${cap}).`;
+  }, [filterMask.timePeriod, trendsApiPeriod, timePeriod]);
+
+  const timePeriodFilterTooltip = useMemo(() => {
+    const cap =
+      timePeriod === "60" || timePeriod === "90"
+        ? " For 60- or 90-day presets, the success-rate chart shows at most 30 days while From/To cover the full range."
+        : "";
+    if (isAdmin) {
+      return `When on, presets From and To dates and sets the success-rate trend window (${trendsApiPeriod} from this control).${cap}`;
+    }
+    return `When on, presets From and To dates and the window for Success rate trend below (${trendsApiPeriod}).${cap}`;
+  }, [isAdmin, timePeriod, trendsApiPeriod]);
 
   const todayYmd = useMemo(() => toYmd(new Date()), []);
 
@@ -904,17 +1078,22 @@ const OutboundAnalytics = () => {
 
   const reportsCallsChartFilters = useMemo<OutboundReportsCallsChartFilters>(
     () => ({
-      companyIdentifier: analyticsCompanyId,
-      campaignId: effectiveCampaignId,
-      voicebotId: selectedVoicebotId,
-      callStatus: callStatusFilter,
+      mask: analyticsApiMask,
+      companyIdentifier: scopeCompanyId,
+      campaignId: filterMask.campaign ? effectiveCampaignId : "",
+      voicebotId: filterMask.voicebot ? selectedVoicebotId : "",
+      callStatus: filterMask.callStatus ? callStatusFilter : "",
       durationMin: debouncedDurationMinSec,
       durationMax: debouncedDurationMaxSec,
       fromDate,
       toDate,
     }),
     [
-      analyticsCompanyId,
+      analyticsApiMask,
+      scopeCompanyId,
+      filterMask.campaign,
+      filterMask.voicebot,
+      filterMask.callStatus,
       effectiveCampaignId,
       selectedVoicebotId,
       callStatusFilter,
@@ -925,14 +1104,43 @@ const OutboundAnalytics = () => {
     ]
   );
 
-  const { loading: dashboardLoading, dashboard } = useOutboundDashboard(analyticsCompanyId, effectiveCampaignId, fromDate, toDate);
+  const { loading: dashboardLoading, dashboard } = useOutboundDashboard({
+    mask: analyticsApiMask,
+    companyIdentifier: scopeCompanyId,
+    campaignId: filterMask.campaign ? effectiveCampaignId : "",
+    fromDate,
+    toDate,
+  });
   const { loading: volumeLoading, data: volumeData, truncated: volumeTruncated } = useOutboundCallVolume(reportsCallsChartFilters);
-  const { loading: costLoading, costs } = useOutboundCosts(fromDate, toDate);
-  const { loading: perfLoading, rows: perfRows, truncated: perfTruncated } = useOutboundCampaignPerformance(reportsCallsChartFilters);
+  const { loading: costLoading, costs } = useOutboundCosts(fromDate, toDate, {
+    fromDate: filterMask.fromDate,
+    toDate: filterMask.toDate,
+  });
+
+  const deletedCampaignIdsFromCosts = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of costs?.cost_by_campaign ?? []) {
+      if (!c?.is_deleted) continue;
+      const id = c.campaign_id;
+      if (id != null && String(id).trim() !== "") ids.add(String(id));
+    }
+    return ids;
+  }, [costs]);
+
+  const { loading: perfLoading, rows: perfRows, truncated: perfTruncated } = useOutboundCampaignPerformance(
+    reportsCallsChartFilters,
+    deletedCampaignIdsFromCosts
+  );
 
   useEffect(() => {
+    if (!filterMask.timePeriod) {
+      setTrends([]);
+      setTrendsLoading(false);
+      return;
+    }
+
     let cancelled = false;
-    const period = trendsPeriod;
+    const period = trendsApiPeriod;
 
     async function fetchTrends() {
       setTrendsLoading(true);
@@ -952,7 +1160,7 @@ const OutboundAnalytics = () => {
     return () => {
       cancelled = true;
     };
-  }, [trendsPeriod]);
+  }, [trendsApiPeriod, filterMask.timePeriod]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -960,16 +1168,7 @@ const OutboundAnalytics = () => {
     async function fetchCompanies() {
       try {
         const res = await GetCompanies();
-        const list =
-          Array.isArray(res)
-            ? res
-            : (res as { results?: unknown[] })?.results ?? (res as { data?: unknown[] })?.data ?? [];
-        const opts = (Array.isArray(list) ? list : []).map((c) => {
-          const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
-          const id = item.company_id ?? item.identifier ?? item.id ?? "";
-          return { id, name: item.name ?? id };
-        }).filter((c) => Boolean(c.id));
-        if (!cancelled) setCompanies(opts);
+        if (!cancelled) setCompanies(normalizeCompaniesResponse(res));
       } catch (err) {
         console.error("GetCompanies error:", err);
         if (!cancelled) setCompanies([]);
@@ -1004,6 +1203,10 @@ const OutboundAnalytics = () => {
   useEffect(() => {
     let cancelled = false;
     async function fetchCampaigns() {
+      if (!companyIdForCampaigns) {
+        if (!cancelled) setCampaigns([]);
+        return;
+      }
       try {
         const res = await getCampaigns({ company_id: companyIdForCampaigns, page: 1, page_size: 200 });
         const list =
@@ -1023,14 +1226,15 @@ const OutboundAnalytics = () => {
     }
     fetchCampaigns();
     return () => { cancelled = true; };
-  }, []);
+  }, [companyIdForCampaigns]);
 
   useEffect(() => {
+    if (!filterMask.timePeriod) return;
     const next = getDefaultDateRange(timePeriod);
     if (!next.from || !next.to) return;
     setFromDate(next.from);
     setToDate(next.to);
-  }, [timePeriod]);
+  }, [timePeriod, filterMask.timePeriod]);
 
   const onFromDateChange = (value: string) => {
     setFromDate(value);
@@ -1058,19 +1262,18 @@ const OutboundAnalytics = () => {
   };
 
   const dashboardContent = renderDashboardContent({
-    companyIdentifier: analyticsCompanyId,
+    requireCompanyFilter: isAdmin ? filterMask.company : true,
+    companyIdentifier: scopeCompanyId,
     isAdmin,
     dashboardLoading,
     dashboard,
   });
-  const volumeContent = renderVolumeContent({ fromDate, toDate, volumeLoading, volumeData });
+  const volumeContent = renderVolumeContent({ volumeLoading, volumeData });
   const successRateTrendContent = renderSuccessRateTrendContent({
     loading: trendsLoading,
     trends,
   });
   const campaignPerformanceContent = renderCampaignPerformanceContent({
-    fromDate,
-    toDate,
     loading: perfLoading,
     rows: perfRows,
   });
@@ -1084,31 +1287,74 @@ const OutboundAnalytics = () => {
       <PageHeader
         title="Outbound Analytics"
         showSearch={false}
+        filters={
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            className="d-inline-flex align-items-center gap-1"
+            type="button"
+            aria-expanded={filtersOpen}
+            aria-controls="outbound-analytics-filters"
+            aria-label={filtersOpen ? "Hide filters" : "Show filters"}
+            onClick={() => setFiltersOpen((v) => !v)}
+          >
+            <Filter size={16} strokeWidth={1.75} aria-hidden />
+            Filters
+            <ChevronDown
+              size={16}
+              strokeWidth={1.75}
+              aria-hidden
+              className="text-muted"
+              style={{
+                transform: filtersOpen ? "rotate(180deg)" : undefined,
+                transition: "transform 0.15s ease",
+              }}
+            />
+          </Button>
+        }
       />
 
       <Row className="mb-3">
-        <Col md={12}>
-          <div className="d-flex justify-content-end flex-wrap gap-3">
+        <Col md={12} className="d-flex flex-column align-items-start">
+          <Collapse in={filtersOpen}>
+            <div id="outbound-analytics-filters" className="w-100">
+              <div className="d-flex justify-content-start flex-wrap gap-3 align-items-end">
             {isAdmin && (
               <React.Fragment>
                 <Form.Group className="mb-0">
-                  <Form.Label className="small mb-1">Company</Form.Label>
+                  <Form.Check
+                    id="out-analytics-flt-company"
+                    type="checkbox"
+                    className="small mb-1"
+                    checked={filterMask.company}
+                    onChange={(e) => setFilterMask((m) => ({ ...m, company: e.target.checked }))}
+                    label={outboundCheckLabel("company", "Company", OUTBOUND_FIELD_TOOLTIPS.company)}
+                  />
                   <Form.Select
                     style={{ width: "220px" }}
+                    disabled={!filterMask.company}
                     value={selectedCompanyId}
                     onChange={(e) => setSelectedCompanyId(e.target.value)}
                   >
-                    <option value="">Select company</option>
+                    <option value="">All companies</option>
                     {companies.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.identifier ?? c.id}>{c.name}</option>
                     ))}
                   </Form.Select>
                 </Form.Group>
 
                 <Form.Group className="mb-0">
-                  <Form.Label className="small mb-1">Campaign</Form.Label>
+                  <Form.Check
+                    id="out-analytics-flt-campaign"
+                    type="checkbox"
+                    className="small mb-1"
+                    checked={filterMask.campaign}
+                    onChange={(e) => setFilterMask((m) => ({ ...m, campaign: e.target.checked }))}
+                    label={outboundCheckLabel("campaign", "Campaign", OUTBOUND_FIELD_TOOLTIPS.campaign)}
+                  />
                   <Form.Select
                     style={{ width: "220px" }}
+                    disabled={!filterMask.campaign}
                     value={selectedCampaignId}
                     onChange={(e) => setSelectedCampaignId(e.target.value)}
                   >
@@ -1122,9 +1368,17 @@ const OutboundAnalytics = () => {
             )}
 
             <Form.Group className="mb-0">
-              <Form.Label className="small mb-1">Time period</Form.Label>
+              <Form.Check
+                id="out-analytics-flt-time-period"
+                type="checkbox"
+                className="small mb-1"
+                checked={filterMask.timePeriod}
+                onChange={(e) => setFilterMask((m) => ({ ...m, timePeriod: e.target.checked }))}
+                label={outboundCheckLabel("time-period", "Time period", timePeriodFilterTooltip)}
+              />
               <Form.Select
-                style={{ width: "200px" }}
+                style={{ width: "220px" }}
+                disabled={!filterMask.timePeriod}
                 value={timePeriod}
                 onChange={(e) => setTimePeriod(e.target.value as TimePeriodOption["value"])}
               >
@@ -1135,23 +1389,18 @@ const OutboundAnalytics = () => {
             </Form.Group>
 
             <Form.Group className="mb-0">
-              <Form.Label className="small mb-1">Trends period</Form.Label>
-              <Form.Select
-                style={{ width: "200px" }}
-                value={trendsPeriod}
-                onChange={(e) => setTrendsPeriod(e.target.value as AnalyticsTrendsPeriod)}
-              >
-                {TRENDS_PERIOD_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </Form.Select>
-            </Form.Group>
-
-            <Form.Group className="mb-0">
-              <Form.Label className="small mb-1">From Date</Form.Label>
+              <Form.Check
+                id="out-analytics-flt-from-date"
+                type="checkbox"
+                className="small mb-1"
+                checked={filterMask.fromDate}
+                onChange={(e) => setFilterMask((m) => ({ ...m, fromDate: e.target.checked }))}
+                label={outboundCheckLabel("from-date", "From date", OUTBOUND_FIELD_TOOLTIPS.fromDate)}
+              />
               <Form.Control
                 type="date"
                 style={{ width: "180px" }}
+                disabled={!filterMask.fromDate}
                 value={fromDate}
                 max={toDate || todayYmd}
                 onChange={(e) => onFromDateChange(e.target.value)}
@@ -1159,10 +1408,18 @@ const OutboundAnalytics = () => {
             </Form.Group>
 
             <Form.Group className="mb-0">
-              <Form.Label className="small mb-1">To Date</Form.Label>
+              <Form.Check
+                id="out-analytics-flt-to-date"
+                type="checkbox"
+                className="small mb-1"
+                checked={filterMask.toDate}
+                onChange={(e) => setFilterMask((m) => ({ ...m, toDate: e.target.checked }))}
+                label={outboundCheckLabel("to-date", "To date", OUTBOUND_FIELD_TOOLTIPS.toDate)}
+              />
               <Form.Control
                 type="date"
                 style={{ width: "180px" }}
+                disabled={!filterMask.toDate}
                 value={toDate}
                 min={fromDate || undefined}
                 max={todayYmd}
@@ -1171,9 +1428,17 @@ const OutboundAnalytics = () => {
             </Form.Group>
 
             <Form.Group className="mb-0">
-              <Form.Label className="small mb-1">Voicebot</Form.Label>
+              <Form.Check
+                id="out-analytics-flt-voicebot"
+                type="checkbox"
+                className="small mb-1"
+                checked={filterMask.voicebot}
+                onChange={(e) => setFilterMask((m) => ({ ...m, voicebot: e.target.checked }))}
+                label={outboundCheckLabel("voicebot", "Voicebot", OUTBOUND_FIELD_TOOLTIPS.voicebot)}
+              />
               <Form.Select
                 style={{ width: "200px" }}
+                disabled={!filterMask.voicebot}
                 value={selectedVoicebotId}
                 onChange={(e) => setSelectedVoicebotId(e.target.value)}
               >
@@ -1185,9 +1450,17 @@ const OutboundAnalytics = () => {
             </Form.Group>
 
             <Form.Group className="mb-0">
-              <Form.Label className="small mb-1">Call status</Form.Label>
+              <Form.Check
+                id="out-analytics-flt-call-status"
+                type="checkbox"
+                className="small mb-1"
+                checked={filterMask.callStatus}
+                onChange={(e) => setFilterMask((m) => ({ ...m, callStatus: e.target.checked }))}
+                label={outboundCheckLabel("call-status", "Call status", OUTBOUND_FIELD_TOOLTIPS.callStatus)}
+              />
               <Form.Select
                 style={{ width: "180px" }}
+                disabled={!filterMask.callStatus}
                 value={callStatusFilter}
                 onChange={(e) => setCallStatusFilter(e.target.value)}
               >
@@ -1198,27 +1471,45 @@ const OutboundAnalytics = () => {
             </Form.Group>
 
             <Form.Group className="mb-0">
-              <Form.Label className="small mb-1">Duration min (s)</Form.Label>
+              <Form.Check
+                id="out-analytics-flt-duration-min"
+                type="checkbox"
+                className="small mb-1"
+                checked={filterMask.durationMin}
+                onChange={(e) => setFilterMask((m) => ({ ...m, durationMin: e.target.checked }))}
+                label={outboundCheckLabel("duration-min", "Duration min (s)", OUTBOUND_FIELD_TOOLTIPS.durationMin)}
+              />
               <Form.Control
                 type="number"
                 min={0}
                 style={{ width: "120px" }}
+                disabled={!filterMask.durationMin}
                 value={durationMinSec}
                 onChange={(e) => setDurationMinSec(Number(e.target.value) || 0)}
               />
             </Form.Group>
 
             <Form.Group className="mb-0">
-              <Form.Label className="small mb-1">Duration max (s)</Form.Label>
+              <Form.Check
+                id="out-analytics-flt-duration-max"
+                type="checkbox"
+                className="small mb-1"
+                checked={filterMask.durationMax}
+                onChange={(e) => setFilterMask((m) => ({ ...m, durationMax: e.target.checked }))}
+                label={outboundCheckLabel("duration-max", "Duration max (s)", OUTBOUND_FIELD_TOOLTIPS.durationMax)}
+              />
               <Form.Control
                 type="number"
                 min={0}
                 style={{ width: "120px" }}
+                disabled={!filterMask.durationMax}
                 value={durationMaxSec}
                 onChange={(e) => setDurationMaxSec(Number(e.target.value) || 0)}
               />
             </Form.Group>
-          </div>
+              </div>
+            </div>
+          </Collapse>
         </Col>
       </Row>
 
@@ -1237,7 +1528,8 @@ const OutboundAnalytics = () => {
           <div className="mt-4 p-4 card" style={{ minHeight: "360px" }}>
             <h5 className="mb-1">Success Rate Trend</h5>
             <p className="small text-muted mb-3">
-              Success rate by date for the selected trends period ({trendsPeriod}).
+              Success rate by date
+              {successRateTrendDescriptionSuffix}
             </p>
             {successRateTrendContent}
           </div>

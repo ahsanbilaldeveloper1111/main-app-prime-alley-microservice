@@ -1,11 +1,48 @@
 import React from "react";
 import { Check } from "lucide-react";
 import GenericTable, { type TableColumn } from "@components/GenericTable";
+import { humanizeSnakeCase } from "@utils/Helper";
 import { formatStartTime, formatDuration, type CallRow } from "./types";
 
 export interface RecentCallsTableProps {
   loading: boolean;
   calls: CallRow[];
+}
+
+/** Normalize API status for comparisons (handles snake_case, spaces, casing). */
+function normalizedCallStatus(status: unknown): string {
+  if (status == null) return "";
+  if (typeof status === "string") {
+    return status.trim().toLowerCase().replaceAll(/[\s-]+/g, "_");
+  }
+  if (typeof status === "number" || typeof status === "boolean" || typeof status === "bigint") {
+    return String(status).trim().toLowerCase().replaceAll(/[\s-]+/g, "_");
+  }
+  return "";
+}
+
+function renderCallStatusCell(call: CallRow) {
+  const norm = normalizedCallStatus(call.status);
+  const raw = call.status;
+  const label = humanizeSnakeCase(
+    typeof raw === "string" ? raw.replaceAll("-", "_") : raw,
+    "—",
+  );
+
+  if (norm === "completed") {
+    return (
+      <span className="text-success d-inline-flex align-items-center gap-1">
+        <Check size={16} /> Completed
+      </span>
+    );
+  }
+  if (norm === "failed" || norm === "timeout" || norm === "transfer_failed") {
+    return <span className="status-badge danger text-capitalize">{label}</span>;
+  }
+  if (norm === "transferred") {
+    return <span className="status-badge info text-capitalize">{label}</span>;
+  }
+  return <span className="status-badge secondary text-capitalize">{label}</span>;
 }
 
 const RecentCallsTable = ({ loading, calls }: RecentCallsTableProps) => (
@@ -19,13 +56,27 @@ const RecentCallsTable = ({ loading, calls }: RecentCallsTableProps) => (
             key: "bot",
             label: "Bot",
             type: "custom",
-            render: (call) => String(call.bot_name ?? call.bot ?? "—"),
+            render: (call) => {
+              const label =
+                (typeof call.bot_name === "string" && call.bot_name.trim()) ||
+                (typeof call.botName === "string" && call.botName.trim()) ||
+                (typeof call.bot === "string" && call.bot.trim()) ||
+                "—";
+              return label;
+            },
           } as TableColumn<CallRow>,
           {
             key: "company",
             label: "Company",
             type: "custom",
-            render: (call) => String(call.company_name ?? call.company ?? "—"),
+            render: (call) => {
+              const label =
+                (typeof call.company_name === "string" && call.company_name.trim()) ||
+                (typeof call.companyName === "string" && call.companyName.trim()) ||
+                (typeof call.company === "string" && call.company.trim()) ||
+                "—";
+              return label;
+            },
           } as TableColumn<CallRow>,
           {
             key: "call_duration_seconds",
@@ -37,14 +88,7 @@ const RecentCallsTable = ({ loading, calls }: RecentCallsTableProps) => (
             key: "status",
             label: "Status",
             type: "custom",
-            render: (call) =>
-              String(call.status ?? "") === "completed" ? (
-                <span className="text-success d-inline-flex align-items-center gap-1">
-                  <Check size={16} /> Completed
-                </span>
-              ) : (
-                String(call.status ?? "—")
-              ),
+            render: (call) => renderCallStatusCell(call),
           } as TableColumn<CallRow>,
           {
             key: "session_start_time",

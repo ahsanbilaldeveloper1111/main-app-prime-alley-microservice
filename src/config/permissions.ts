@@ -759,6 +759,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/companies', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/bots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/bots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/sip-trunks', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/sip-trunks/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/conversations', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
         ]

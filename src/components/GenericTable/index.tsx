@@ -1188,8 +1188,8 @@ const GenericTable = <T extends Record<string, any>>({
     toolbar?.showFilterPills ?? false,
   );
 
-  // Metrics visibility state (hidden by default)
-  const [showMetrics, setShowMetrics] = useState(false);
+  // Metrics visibility: show by default when stats cards exist (toolbar "Metrics" toggles collapse).
+  const [showMetrics, setShowMetrics] = useState(true);
   const [openFilterPillId, setOpenFilterPillId] = useState<string | null>(null);
   const [filterPillSearch, setFilterPillSearch] = useState<
     Record<string, string>

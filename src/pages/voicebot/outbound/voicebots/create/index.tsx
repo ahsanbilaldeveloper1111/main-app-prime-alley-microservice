@@ -1,5 +1,12 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
@@ -83,8 +90,6 @@ async function submitOutboundVoicebot(
   return "created";
 }
 
-// company options rendering extracted to `CompanyOptions`
-
 const LoadingVoicebotPlaceholder = ({
   pageCopy,
 }: {
@@ -103,7 +108,7 @@ const LoadingVoicebotPlaceholder = ({
   </React.Fragment>
 );
 
-// local versions of TabsNavigation/ValidationChecklist/CompanyOption were extracted to shared components
+// local versions of TabsNavigation/ValidationChecklist were extracted to shared components
 
 const BottomActionBar = ({
   isFirstTab,
@@ -173,27 +178,63 @@ const VoicebotOutboundCreate = () => {
   const router = useRouter();
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
-  const userCompanyIdentifier =
-    (session?.user as { company_identifier?: string })?.company_identifier ??
-    "";
+  const sessionUser = session?.user as
+    | {
+        company_id?: string | null;
+        company_identifier?: string | null;
+        company_name?: string | null;
+      }
+    | undefined;
+  const userCompanyId = String(sessionUser?.company_id ?? "").trim();
+  const userCompanyIdentifier = String(
+    sessionUser?.company_identifier ?? "",
+  ).trim();
   const userCompanyName =
-    (session?.user as { company_name?: string })?.company_name ??
-    userCompanyIdentifier;
+    String(sessionUser?.company_name ?? "").trim() || userCompanyIdentifier;
   const botId =
     typeof router.query.id === "string" ? router.query.id : undefined;
   const isEditMode = Boolean(botId);
   const pageCopy = getPageCopy(isEditMode);
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [trunks, setTrunks] = useState<
     Array<{ id: string; trunk_id?: string; name?: string }>
   >([]);
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [loadingBot, setLoadingBot] = useState(isEditMode);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState<OutboundVoicebotFormState>(() =>
     defaultOutboundVoicebotForm(),
   );
+  const formRef = useRef(form);
+  formRef.current = form;
+
+  const trunksFetchCompanyId = useMemo(() => {
+    const fromQuery =
+      isEditMode && typeof router.query.company_id === "string"
+        ? router.query.company_id.trim()
+        : "";
+    if (isAdmin) {
+      const fromForm = String(form.company_id ?? "").trim();
+      return (
+        fromForm ||
+        fromQuery ||
+        OUTBOUND_VOICEBOT_CREATE_COMPANY_ID
+      );
+    }
+    return (
+      userCompanyId ||
+      userCompanyIdentifier ||
+      OUTBOUND_VOICEBOT_CREATE_COMPANY_ID
+    );
+  }, [
+    isAdmin,
+    isEditMode,
+    form.company_id,
+    router.query.company_id,
+    userCompanyId,
+    userCompanyIdentifier,
+  ]);
 
   const fetchCompanies = useCallback(async () => {
     setLoadingCompanies(true);
@@ -203,14 +244,7 @@ const VoicebotOutboundCreate = () => {
         setCompanies([]);
         return;
       }
-      const opts = normalizeCompaniesResponse(res, {
-        prefer: "company_id",
-      }).map((c) => ({
-        id: c.id,
-        company_id: c.company_id ?? c.identifier ?? c.id,
-        name: c.name,
-      }));
-      setCompanies(opts);
+      setCompanies(normalizeCompaniesResponse(res));
     } catch {
       setCompanies([]);
     } finally {
@@ -220,7 +254,7 @@ const VoicebotOutboundCreate = () => {
 
   const fetchTrunksList = useCallback(async () => {
     try {
-      const res = await getTrunks();
+      const res = await getTrunks({ company_id: trunksFetchCompanyId });
       const list = Array.isArray(res)
         ? res
         : ((
@@ -243,13 +277,19 @@ const VoicebotOutboundCreate = () => {
     } catch {
       setTrunks([]);
     }
-  }, []);
+  }, [trunksFetchCompanyId]);
 
   useEffect(() => {
-    if (isEditMode) {
+    if (isAdmin) {
       fetchCompanies();
     }
-  }, [isEditMode, fetchCompanies]);
+  }, [isAdmin, fetchCompanies]);
+
+  useEffect(() => {
+    if (isAdmin || isEditMode) return;
+    const cid = userCompanyId || userCompanyIdentifier;
+    if (cid) setForm((f) => ({ ...f, company_id: cid }));
+  }, [isAdmin, isEditMode, userCompanyId, userCompanyIdentifier]);
 
   useEffect(() => {
     fetchTrunksList();
@@ -275,13 +315,14 @@ const VoicebotOutboundCreate = () => {
   }, [isEditMode, botId, router]);
 
   const handleSubmit = () => {
-    const err = getOutboundVoicebotSubmitError(form);
+    const snapshot = formRef.current;
+    const err = getOutboundVoicebotSubmitError(snapshot);
     if (err) {
       toast.error(err);
       return;
     }
     setSubmitting(true);
-    submitOutboundVoicebot(form, isEditMode, botId)
+    submitOutboundVoicebot(snapshot, isEditMode, botId)
       .then((result) => {
         toast.success(
           result === "updated" ? "Voice bot updated" : "Voice bot created",
@@ -463,48 +504,35 @@ const VoicebotOutboundCreate = () => {
                           </Form.Group>
                         </Col>
                         <Col md={6}>
-                          <Form.Group className="mb-3">
-                            <Form.Label style={labelStyle}>
-                              Company <span className="text-danger">*</span>
-                            </Form.Label>
-                            {isEditMode ? (
-                            <Form.Select
-                              value={
-                                isAdmin
-                                  ? form.company_id
-                                  : userCompanyIdentifier
-                              }
-                              onChange={(e) => {
-                                if (isAdmin)
+                          {isAdmin ? (
+                            <Form.Group className="mb-3">
+                              <Form.Label style={labelStyle}>
+                                Company <span className="text-danger">*</span>
+                              </Form.Label>
+                              <Form.Select
+                                value={form.company_id}
+                                onChange={(e) =>
                                   setForm((f) => ({
                                     ...f,
                                     company_id: e.target.value,
-                                  }));
-                              }}
-                              required
-                              disabled={
-                                loadingCompanies || !isAdmin
-                              }
-                              style={inputStyle}
-                            >
-                              <option value="">Select company</option>
-                              <CompanyOptions
-                                isAdmin={isAdmin}
-                                companies={companies}
-                                userCompanyIdentifier={userCompanyIdentifier}
-                                userCompanyName={userCompanyName}
-                              />
-                            </Form.Select>
-                            ) : (
-                              <Form.Control
-                                readOnly
-                                disabled
-                                value={OUTBOUND_VOICEBOT_CREATE_COMPANY_ID}
+                                    trunk_id: "",
+                                    transfer_trunk_id: "",
+                                  }))
+                                }
+                                required
+                                disabled={loadingCompanies}
                                 style={inputStyle}
-                                aria-label="Company ID for new voice bot"
-                              />
-                            )}
-                          </Form.Group>
+                              >
+                                <option value="">Select company</option>
+                                <CompanyOptions
+                                  isAdmin={isAdmin}
+                                  companies={companies}
+                                  userCompanyIdentifier={userCompanyIdentifier}
+                                  userCompanyName={userCompanyName}
+                                />
+                              </Form.Select>
+                            </Form.Group>
+                          ) : null}
                           <Form.Group className="mb-3">
                             <Form.Label style={labelStyle}>
                               Select Trunk{" "}

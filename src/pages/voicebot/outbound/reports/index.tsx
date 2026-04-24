@@ -10,14 +10,16 @@ import {
   getReportsCallsBySession,
   getVoicebots,
   normalizeVoicebotsListResponse,
+  parsePostReportsCallsResponse,
   postReportsCalls,
   type PostReportsCallsPayload,
 } from "@utils/voicebot/outbound";
 import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Form, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
-import { formatDuration, GlobalDateTimeFormat } from "@utils/Helper";
+import { formatDuration, GlobalDateTimeFormat, humanizeSnakeCase } from "@utils/Helper";
 import "@assets/scss/common.scss";
 import moment from "moment";
 import { formatFixed, formatPercent } from "@utils/voicebot/outbound/formatters";
@@ -36,12 +38,6 @@ function displayText(value: unknown, fallback = "—"): string {
   if (typeof value === "number") return Number.isFinite(value) ? String(value) : fallback;
   if (typeof value === "bigint") return String(value);
   return fallback;
-}
-
-interface CompanyOption {
-  id: string;
-  company_id?: string;
-  name: string;
 }
 
 interface CampaignOption {
@@ -142,20 +138,6 @@ function formatDateTime(value: unknown): string {
   return "—";
 }
 
-/** e.g. "participant_disconnected" → "participant disconnected"; plain text without underscores is unchanged. */
-function humanizeSnakeCase(value: unknown, fallback = "—"): string {
-  if (value == null) return fallback;
-  if (typeof value !== "string") return fallback;
-  const s = value.trim();
-  if (!s) return fallback;
-  if (!s.includes("_")) return s;
-  return s
-    .replaceAll("_", " ")
-    .replaceAll(/\s+/g, " ")
-    .trim()
-    .toLowerCase();
-}
-
 function formatBool(value: unknown): string {
   if (value === true) return "Yes";
   if (value === false) return "No";
@@ -177,18 +159,30 @@ function formatUsd4(value: unknown): string {
   return `$${formatCost(Number(value ?? 0))}`;
 }
 
-const defaultFilters = {
-  company_id: "",
-  campaign_id: "",
-  voicebot_id: "",
-  call_status: "",
-  date_from: "",
-  date_to: "",
-  duration_min: 0,
-  duration_max: 3600,
-  page: 1,
-  page_size: 50,
-};
+function todayForDateInput(): string {
+  return moment().format("YYYY-MM-DD");
+}
+
+const DEFAULT_DURATION_MIN = 0;
+const DEFAULT_DURATION_MAX = 3600;
+
+function createDefaultFilters() {
+  const today = todayForDateInput();
+  return {
+    company_id: "",
+    campaign_id: "",
+    voicebot_id: "",
+    call_status: "",
+    date_from: today,
+    date_to: today,
+    duration_min_enabled: false,
+    duration_max_enabled: false,
+    duration_min: DEFAULT_DURATION_MIN,
+    duration_max: DEFAULT_DURATION_MAX,
+    page: 1,
+    page_size: 50,
+  };
+}
 
 const CALL_STATUS_OPTIONS = [
   { value: "", label: "All" },
@@ -201,12 +195,13 @@ const CALL_STATUS_OPTIONS = [
 const OutboundReportsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
-  const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier ?? "";
+  const sessionUser = session?.user as { company_identifier?: string; company_id?: string | number } | undefined;
+  const companyIdentifier = String(sessionUser?.company_identifier ?? sessionUser?.company_id ?? "").trim();
 
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [voicebots, setVoicebots] = useState<Array<{ id: number | string; name: string }>>([]);
-  const [filters, setFilters] = useState(defaultFilters);
+  const [filters, setFilters] = useState(createDefaultFilters);
   const [data, setData] = useState<CallReportRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalRows, setTotalRows] = useState(0);
@@ -224,16 +219,7 @@ const OutboundReportsPage = () => {
   const fetchCompanies = useCallback(async () => {
     try {
       const res = await GetCompanies();
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.results ??
-          (res as { data?: { company_id?: string; id?: string; identifier?: string; name?: string }[] })?.data ??
-          [];
-      const opts = (Array.isArray(list) ? list : []).map((c) => {
-        const item = c as { company_id?: string; id?: string; identifier?: string; name?: string };
-        return { id: item.company_id ?? item.identifier ?? item.id ?? "", company_id: item.company_id ?? item.identifier ?? item.id, name: item.name ?? "" };
-      });
-      setCompanies(opts);
+      setCompanies(normalizeCompaniesResponse(res));
     } catch (err) {
       console.error("GetCompanies error:", err);
       setCompanies([]);
@@ -246,7 +232,12 @@ const OutboundReportsPage = () => {
       return;
     }
     try {
-      const res = await getCampaigns({ company_id: companyId, page: 1, page_size: 500 });
+      const res = await getCampaigns({
+        company_id: companyId,
+        page: 1,
+        page_size: 200,
+        include_deleted: true,
+      });
       const list = Array.isArray(res) ? res : (res as { results?: { campaign_id?: number; id?: number; name?: string }[] })?.results ?? (res as { data?: { campaign_id?: number; id?: number; name?: string }[] })?.data ?? [];
       const raw = Array.isArray(list) ? list : [];
       setCampaigns(
@@ -430,7 +421,7 @@ const OutboundReportsPage = () => {
         fields: [
           { label: "Campaign", value: dataForView?.campaign_name ?? selectedRow?.campaign_name ?? "—" },
           { label: "Phone", value: dataForView?.phone_number ?? selectedRow?.phone_number ?? "—", type: "phone" },
-          { label: "Status", value: dataForView?.call_status ?? selectedRow?.call_status ?? "—", type: "badge" },
+          { label: "Status", value: humanizeSnakeCase(dataForView?.call_status ?? selectedRow?.call_status), type: "badge" },
           {
             label: "Duration",
             value: formatDuration(Number(dataForView?.call_duration_seconds ?? selectedRow?.call_duration_seconds ?? 0)),
@@ -505,24 +496,34 @@ const OutboundReportsPage = () => {
         if (Number.isFinite(n)) payload.voicebot_id = n;
       }
       if (filters.call_status) payload.call_status = filters.call_status;
-      if (filters.date_from) payload.date_from = filters.date_from;
-      if (filters.date_to) payload.date_to = filters.date_to;
-      if (filters.duration_min != null) payload.duration_min = filters.duration_min;
-      if (filters.duration_max != null) payload.duration_max = filters.duration_max;
+      payload.date_from = filters.date_from || todayForDateInput();
+      payload.date_to = filters.date_to || todayForDateInput();
+      if (filters.duration_min_enabled) payload.duration_min = filters.duration_min;
+      if (filters.duration_max_enabled) payload.duration_max = filters.duration_max;
 
-      const res = await postReportsCalls(payload) as {
-        status?: boolean;
-        count?: number;
-        next?: string | null;
-        previous?: string | null;
-        results?: CallReportRow[];
-        summary?: ReportsSummary;
-      };
-      const list = Array.isArray(res?.results) ? res.results : [];
-      const rows = list.map((r, i) => ({ ...r, id: r.id ?? `row-${i}` }));
+      const companyScope = effectiveCompanyId.trim();
+      if (companyScope) payload.company_id = companyScope;
+
+      const res = await postReportsCalls(payload);
+      if (res && typeof res === "object" && (res as { status?: boolean }).status === false) {
+        const msg =
+          (res as { detail?: string }).detail ??
+          (res as { message?: string }).message ??
+          "Failed to load reports";
+        toast.error(msg);
+        setData([]);
+        setTotalRows(0);
+        setSummary(null);
+        return;
+      }
+      const parsed = parsePostReportsCallsResponse(res);
+      const rows = parsed.results.map((row, i) => {
+        const r = row as CallReportRow;
+        return { ...r, id: r.id ?? `row-${i}` };
+      });
       setData(rows);
-      setTotalRows(res?.count ?? rows.length);
-      setSummary(res?.summary ?? null);
+      setTotalRows(parsed.count > 0 ? parsed.count : rows.length);
+      setSummary((parsed.summary as ReportsSummary | null) ?? null);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
       toast.error(e?.response?.data?.detail ?? String(e?.message ?? "Failed to load reports"));
@@ -532,7 +533,7 @@ const OutboundReportsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters, searchValue]);
+  }, [filters, searchValue, effectiveCompanyId]);
 
   useEffect(() => {
     if (hasSearched) return;
@@ -567,8 +568,8 @@ const OutboundReportsPage = () => {
       key: "call_status",
       label: "Status",
       render: (r) => {
-        const s = displayText(r.call_status);
-        return <span className=" text-capitalize">{s}</span>;
+        const s = humanizeSnakeCase(r.call_status, "");
+        return <span className=" text-capitalize">{s || "—"}</span>;
       },
     },
     { key: "call_duration_seconds", label: "Duration", render: (r) => formatDuration(Number(r.call_duration_seconds ?? 0)) },
@@ -584,7 +585,12 @@ const OutboundReportsPage = () => {
     },
     {
       title: "Success Rate",
-      value: formatPercent1(summary?.success_rate),
+      value:
+        summary != null &&
+        summary.success_rate != null &&
+        Number.isFinite(Number(summary.success_rate))
+          ? formatPercent1(summary.success_rate)
+          : "—",
       subtitle: "Completed calls percentage",
     },
     {
@@ -603,7 +609,12 @@ const OutboundReportsPage = () => {
 
   const companyActiveLabel = (() => {
     if (!filters.company_id) return undefined;
-    const selectedCompany = companies.find((company) => company.id === filters.company_id);
+    const selectedCompany = companies.find(
+      (company) =>
+        company.id === filters.company_id ||
+        company.company_id === filters.company_id ||
+        company.identifier === filters.company_id,
+    );
     return selectedCompany?.name ?? filters.company_id;
   })();
 
@@ -624,14 +635,14 @@ const OutboundReportsPage = () => {
     return CALL_STATUS_OPTIONS.find((option) => option.value === filters.call_status)?.label ?? filters.call_status;
   })();
 
-  const dateRangeActiveLabel = filters.date_from || filters.date_to
-    ? `${filters.date_from || "Any"} - ${filters.date_to || "Any"}`
-    : undefined;
+  const dateRangeActiveLabel = `${filters.date_from} – ${filters.date_to}`;
 
-  const durationActiveLabel =
-    filters.duration_min !== defaultFilters.duration_min || filters.duration_max !== defaultFilters.duration_max
-      ? `${filters.duration_min}s - ${filters.duration_max}s`
-      : undefined;
+  const durationActiveLabel = (() => {
+    const parts: string[] = [];
+    if (filters.duration_min_enabled) parts.push(`min ${filters.duration_min}s`);
+    if (filters.duration_max_enabled) parts.push(`max ${filters.duration_max}s`);
+    return parts.length ? parts.join(", ") : undefined;
+  })();
 
   const filterPills: FilterPill[] = [
     ...(isAdmin
@@ -718,17 +729,28 @@ const OutboundReportsPage = () => {
       id: "date_range",
       label: "Date Range",
       showDropdown: true,
-      active: Boolean(dateRangeActiveLabel),
+      active: true,
       activeLabel: dateRangeActiveLabel,
-      onClear: () => setFilters((prev) => ({ ...prev, date_from: "", date_to: "", page: 1 })),
       dropdownContent: (
         <div className="d-flex flex-column gap-2" style={{ minWidth: "240px" }}>
+          <div className="small text-muted">
+            Start and end dates are required. Clearing a field resets it to today.
+          </div>
           <div>
             <Form.Label className="small mb-1">Date From</Form.Label>
             <Form.Control
               type="date"
               value={filters.date_from}
-              onChange={(e) => setFilters((prev) => ({ ...prev, date_from: e.target.value, page: 1 }))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const v = raw || todayForDateInput();
+                setFilters((prev) => {
+                  let date_from = v;
+                  let date_to = prev.date_to || todayForDateInput();
+                  if (date_from > date_to) date_to = date_from;
+                  return { ...prev, date_from, date_to, page: 1 };
+                });
+              }}
             />
           </div>
           <div>
@@ -736,7 +758,16 @@ const OutboundReportsPage = () => {
             <Form.Control
               type="date"
               value={filters.date_to}
-              onChange={(e) => setFilters((prev) => ({ ...prev, date_to: e.target.value, page: 1 }))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const v = raw || todayForDateInput();
+                setFilters((prev) => {
+                  let date_from = prev.date_from || todayForDateInput();
+                  let date_to = v;
+                  if (date_to < date_from) date_from = date_to;
+                  return { ...prev, date_from, date_to, page: 1 };
+                });
+              }}
             />
           </div>
         </div>
@@ -751,17 +782,30 @@ const OutboundReportsPage = () => {
       onClear: () =>
         setFilters((prev) => ({
           ...prev,
-          duration_min: defaultFilters.duration_min,
-          duration_max: defaultFilters.duration_max,
+          duration_min_enabled: false,
+          duration_max_enabled: false,
+          duration_min: DEFAULT_DURATION_MIN,
+          duration_max: DEFAULT_DURATION_MAX,
           page: 1,
         })),
       dropdownContent: (
-        <div className="d-flex flex-column gap-2" style={{ minWidth: "240px" }}>
+        <div className="d-flex flex-column gap-2" style={{ minWidth: "260px" }}>
           <div>
-            <Form.Label className="small mb-1">Duration Min (s)</Form.Label>
+            <Form.Check
+              type="checkbox"
+              id="outbound-reports-duration-min"
+              className="small mb-1"
+              label="Filter by minimum duration"
+              checked={filters.duration_min_enabled}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, duration_min_enabled: e.target.checked, page: 1 }))
+              }
+            />
+            <Form.Label className="small mb-1 text-muted">Duration Min (s)</Form.Label>
             <Form.Control
               type="number"
               min={0}
+              disabled={!filters.duration_min_enabled}
               value={filters.duration_min}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, duration_min: Number(e.target.value) || 0, page: 1 }))
@@ -769,10 +813,21 @@ const OutboundReportsPage = () => {
             />
           </div>
           <div>
-            <Form.Label className="small mb-1">Duration Max (s)</Form.Label>
+            <Form.Check
+              type="checkbox"
+              id="outbound-reports-duration-max"
+              className="small mb-1"
+              label="Filter by maximum duration"
+              checked={filters.duration_max_enabled}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, duration_max_enabled: e.target.checked, page: 1 }))
+              }
+            />
+            <Form.Label className="small mb-1 text-muted">Duration Max (s)</Form.Label>
             <Form.Control
               type="number"
               min={0}
+              disabled={!filters.duration_max_enabled}
               value={filters.duration_max}
               onChange={(e) =>
                 setFilters((prev) => ({ ...prev, duration_max: Number(e.target.value) || 3600, page: 1 }))

@@ -734,18 +734,18 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           url: '/voicebot/inbound/dashboard'
         },
         {
-          id: 'voicebot-inbound-companies',
-          title: 'Companies',
-          icon: <LayoutDashboard size={16} />,
-          permission: PERMISSIONS.AI_ML_SERVICES,
-          url: '/voicebot/inbound/companies'
-        },
-        {
           id: 'voicebot-inbound-bots',
           title: 'Bots',
           icon: <LayoutDashboard size={16} />,
           permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
           url: '/voicebot/inbound/bots'
+        },
+        {
+          id: 'voicebot-inbound-sip-trunks',
+          title: 'SIP trunks',
+          icon: <Server size={16} />,
+          permission: PERMISSIONS.VIEW_INBOUND_CALLS_AIML,
+          url: '/voicebot/inbound/sip-trunks'
         },
         
         {

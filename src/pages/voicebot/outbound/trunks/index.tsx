@@ -1,14 +1,18 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback } from "react";
+import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import TrunkCreateSidebar from "@components/TrunkCreateSidebar";
 import { getTrunks, deleteTrunk } from "@utils/voicebot/outbound";
+import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID } from "@utils/voicebot/outboundVoicebotForm";
+import { GetCompanies } from "@utils/users";
+import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
-import { Row, Col, Button } from "react-bootstrap";
+import { Row, Col, Button, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { Plus, Trash2 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import "@assets/scss/common.scss";
 
 interface TrunkRow {
@@ -45,6 +49,16 @@ function formatTransport(v: unknown): string {
 }
 
 const TrunksPage = () => {
+  const { data: session } = useSession();
+  const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const sessionUser = session?.user as
+    | { company_id?: string | null; company_identifier?: string | null }
+    | undefined;
+  const userCompanyId = String(sessionUser?.company_id ?? "").trim();
+  const userCompanyIdentifier = String(sessionUser?.company_identifier ?? "").trim();
+
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [data, setData] = useState<TrunkRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -55,10 +69,43 @@ const TrunksPage = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [selectedRow, setSelectedRow] = useState<TrunkRow | null>(null);
 
+  const effectiveCompanyId = useMemo(() => {
+    if (isAdmin) {
+      return selectedCompanyId.trim() || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+    }
+    return userCompanyId || userCompanyIdentifier || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+  }, [isAdmin, selectedCompanyId, userCompanyId, userCompanyIdentifier]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await GetCompanies();
+        if (res === false) {
+          if (!cancelled) setCompanies([]);
+          return;
+        }
+        if (!cancelled) {
+          const list = normalizeCompaniesResponse(res);
+          setCompanies(list);
+          if (list.length > 0) {
+            setSelectedCompanyId((prev) => (prev.trim() ? prev : list[0].id));
+          }
+        }
+      } catch {
+        if (!cancelled) setCompanies([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin]);
+
   const fetchTrunks = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getTrunks();
+      const res = await getTrunks({ company_id: effectiveCompanyId });
       const raw = listFromResponse<TrunkRow>(res);
       if (
         res &&
@@ -89,7 +136,7 @@ const TrunksPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [effectiveCompanyId]);
 
   useEffect(() => {
     fetchTrunks();
@@ -106,7 +153,7 @@ const TrunksPage = () => {
     }
     setDeleteLoading(true);
     try {
-      await deleteTrunk(id);
+      await deleteTrunk(id, { company_id: effectiveCompanyId });
       toast.success("Trunk deleted");
       setShowDeleteModal(false);
       setSelectedRow(null);
@@ -220,6 +267,16 @@ const TrunksPage = () => {
           color: #b91c1c !important;
           box-shadow: none !important;
         }
+
+        .voicebot-page .company-filter-select {
+          width: 220px !important;
+          min-width: 220px !important;
+          max-width: 220px !important;
+          height: 38px !important;
+          border-radius: 4px !important;
+          font-size: 12px !important;
+          font-weight: 500 !important;
+        }
         .voicebot-page .action-icons-wrap {
           display: inline-flex;
           align-items: center;
@@ -264,14 +321,36 @@ const TrunksPage = () => {
                 <h1 style={{ fontWeight: 300, color: "#141414", fontSize: "24px", margin: 0 }}>
                   Trunks
                 </h1>
-                <button
-                  type="button"
-                  className="add-trunk-btn"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  <Plus size={18} />
-                  Add Trunk
-                </button>
+                <div className="d-flex align-items-end gap-2 flex-wrap">
+                  {isAdmin && (
+                    <Form.Group className="mb-0">
+                      <Form.Label className="small text-muted mb-1">Company</Form.Label>
+                      <Form.Select
+                        className="company-filter-select"
+                        value={selectedCompanyId}
+                        onChange={(e) => {
+                          setSelectedCompanyId(e.target.value);
+                          setPage(1);
+                        }}
+                        aria-label="Filter trunks by company"
+                      >
+                        {companies.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  )}
+                  <button
+                    type="button"
+                    className="add-trunk-btn"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <Plus size={18} />
+                    Add Trunk
+                  </button>
+                </div>
               </div>
             </Col>
           </Row>

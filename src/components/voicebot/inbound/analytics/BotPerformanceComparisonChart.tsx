@@ -38,7 +38,14 @@ const BotPerformanceComparisonChart = ({ loading, rows }: BotPerformanceComparis
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={rows} margin={{ top: 8, right: 8, left: 8, bottom: 8 }} barCategoryGap="20%">
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+          <XAxis
+            dataKey="name"
+            tick={{ fontSize: 11 }}
+            interval={0}
+            angle={-22}
+            textAnchor="end"
+            height={56}
+          />
           <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
           <Tooltip
             contentStyle={{ border: "none", borderRadius: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}

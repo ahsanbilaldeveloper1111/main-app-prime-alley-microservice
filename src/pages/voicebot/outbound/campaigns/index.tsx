@@ -276,7 +276,7 @@ const CampaignsPage = () => {
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(200);
   const [totalRows, setTotalRows] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -295,7 +295,7 @@ const CampaignsPage = () => {
   const fetchCompanies = useCallback(async () => {
     try {
       const res = await GetCompanies();
-      setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
+      setCompanies(normalizeCompaniesResponse(res));
     } catch {
       setCompanies([]);
     }
@@ -467,7 +467,9 @@ const CampaignsPage = () => {
       render: (r) => {
         const cid = r.company_id;
         if (cid) {
-          const company = companies.find((c) => c.id === cid || c.company_id === cid);
+          const company = companies.find(
+            (c) => c.id === cid || c.company_id === cid || c.identifier === cid,
+          );
           return company?.name ?? cid;
         }
         return "—";
@@ -665,11 +667,14 @@ const CampaignsPage = () => {
                       onChange={(e) => setCompanyFilter(e.target.value)}
                     >
                       <option value="">All companies</option>
-                      {companies.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
+                      {companies.map((c) => {
+                        const companyScopeId = String(c.identifier ?? c.company_id ?? c.id ?? "");
+                        return (
+                          <option key={String(c.id ?? companyScopeId)} value={companyScopeId}>
+                            {c.name}
+                          </option>
+                        );
+                      })}
                     </Form.Select>
                   )}
                   <Form.Select
@@ -706,7 +711,7 @@ const CampaignsPage = () => {
               currentPage: page,
               rowsPerPage: pageSize,
               totalRows: totalRows || data.length,
-              pageSizeOptions: [10, 25, 50],
+              pageSizeOptions: [10, 25, 50, 100, 200],
             }}
             onPaginationChange={(newPage, newRowsPerPage) => {
               setPage(newPage);

@@ -60,6 +60,64 @@ function getCallsStatsPayloadNested(
   return top;
 }
 
+/** Shared scalar extraction for GET /calls/stats/ and analytics summary payloads. */
+function extractInboundStatsScalars(
+  nested: Record<string, unknown>,
+): InboundAnalyticsStats | null {
+  const total_calls = toFiniteNumber(
+    nested.total_calls ?? nested.total_calls_count ?? nested.totalCalls,
+  );
+  const completedPrimary = toFiniteNumber(
+    nested.completed ??
+      nested.completed_calls ??
+      nested.completed_count ??
+      nested.calls_completed ??
+      nested.completedCalls,
+  );
+  const completedFromAnswered = toFiniteNumber(
+    nested.answered_calls ??
+      nested.calls_answered ??
+      nested.answered ??
+      nested.successful_calls,
+  );
+  const completed =
+    completedPrimary !== undefined ? completedPrimary : completedFromAnswered;
+
+  const avg_duration_seconds = toFiniteNumber(
+    nested.avg_duration_seconds ??
+      nested.average_duration_seconds ??
+      nested.avg_duration,
+  );
+  const total_cost = toFiniteNumber(nested.total_cost ?? nested.total_cost_usd);
+  const failed = toFiniteNumber(
+    nested.failed ?? nested.failed_calls ?? nested.failed_count,
+  );
+  const transferred = toFiniteNumber(
+    nested.transferred ??
+      nested.transferred_calls ??
+      nested.transfer_count,
+  );
+
+  const out: InboundAnalyticsStats = {};
+  if (total_calls !== undefined) out.total_calls = total_calls;
+  if (completed !== undefined) out.completed = completed;
+  if (failed !== undefined) out.failed = failed;
+  if (transferred !== undefined) out.transferred = transferred;
+  if (avg_duration_seconds !== undefined) {
+    out.avg_duration_seconds = avg_duration_seconds;
+  }
+  if (total_cost !== undefined) out.total_cost = total_cost;
+
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/** Parse GET /voicebot-platform/calls/stats/ (and similar) into key metrics scalars. */
+export function parseCallsStatsPayload(raw: unknown): InboundAnalyticsStats | null {
+  const nested = getCallsStatsPayloadNested(raw);
+  if (!nested) return null;
+  return extractInboundStatsScalars(nested);
+}
+
 function sortStatusDistributionEntries(
   entries: { name: string; value: number }[],
 ): { name: string; value: number }[] {
@@ -81,7 +139,13 @@ function entriesFromStatusRecord(
 function statusLabelFromDistributionRow(
   row: Record<string, unknown>,
 ): string | null {
-  const nameRaw = row.status ?? row.name ?? row.label ?? row.key ?? row.state;
+  const nameRaw =
+    row.status ??
+    row.call_status ??
+    row.name ??
+    row.label ??
+    row.key ??
+    row.state;
   if (typeof nameRaw === "string") return nameRaw.toLowerCase();
   if (typeof nameRaw === "number" && Number.isFinite(nameRaw)) {
     return String(nameRaw);
@@ -140,13 +204,21 @@ function tryParseStatusDistributionFromArrays(
 function buildStatusDistributionFromScalars(
   nested: Record<string, unknown>,
 ): { name: string; value: number }[] | null {
-  const completed = toFiniteNumber(
+  const completedPrimary = toFiniteNumber(
     nested.completed ??
       nested.completed_calls ??
       nested.completed_count ??
       nested.calls_completed ??
       nested.completedCalls,
   );
+  const completedFromAnswered = toFiniteNumber(
+    nested.answered_calls ??
+      nested.calls_answered ??
+      nested.answered ??
+      nested.successful_calls,
+  );
+  const completed =
+    completedPrimary !== undefined ? completedPrimary : completedFromAnswered;
   const failed = toFiniteNumber(
     nested.failed ?? nested.failed_calls ?? nested.failed_count,
   );
@@ -189,7 +261,8 @@ function buildStatusDistributionFromScalars(
 export function parseCallStatusDistribution(
   raw: unknown,
 ): { name: string; value: number }[] | null {
-  const nested = getAnalyticsSummaryNested(raw);
+  const nested =
+    getCallsStatsPayloadNested(raw) ?? getAnalyticsSummaryNested(raw);
   if (!nested) return null;
 
   const fromDict = tryParseStatusDistributionFromDicts(nested);
@@ -207,41 +280,7 @@ export function parseAnalyticsSummaryPayload(
 ): InboundAnalyticsStats | null {
   const nested = getAnalyticsSummaryNested(raw);
   if (!nested) return null;
-
-  const total_calls = toFiniteNumber(
-    nested.total_calls ?? nested.total_calls_count ?? nested.totalCalls,
-  );
-  const completed = toFiniteNumber(
-    nested.completed ??
-      nested.completed_calls ??
-      nested.completed_count ??
-      nested.calls_completed ??
-      nested.completedCalls,
-  );
-  const avg_duration_seconds = toFiniteNumber(
-    nested.avg_duration_seconds ??
-      nested.average_duration_seconds ??
-      nested.avg_duration,
-  );
-  const total_cost = toFiniteNumber(nested.total_cost ?? nested.total_cost_usd);
-  const failed = toFiniteNumber(
-    nested.failed ?? nested.failed_calls ?? nested.failed_count,
-  );
-  const transferred = toFiniteNumber(
-    nested.transferred ?? nested.transferred_calls ?? nested.transfer_count,
-  );
-
-  const out: InboundAnalyticsStats = {};
-  if (total_calls !== undefined) out.total_calls = total_calls;
-  if (completed !== undefined) out.completed = completed;
-  if (failed !== undefined) out.failed = failed;
-  if (transferred !== undefined) out.transferred = transferred;
-  if (avg_duration_seconds !== undefined) {
-    out.avg_duration_seconds = avg_duration_seconds;
-  }
-  if (total_cost !== undefined) out.total_cost = total_cost;
-
-  return Object.keys(out).length > 0 ? out : null;
+  return extractInboundStatsScalars(nested);
 }
 
 function matchDurationBucketKey(apiKey: string): string | null {
@@ -499,22 +538,75 @@ export function parseVolumeDataFromSummary(
   return volumeFromArrayNested(nested, timePeriod);
 }
 
+function pickScalarId(v: unknown): string {
+  if (v == null || typeof v === "object") return "";
+  const s = String(v).trim();
+  return s && s !== "[object Object]" ? s : "";
+}
+
+/** Prefer bot_id / uuid fields over display name for cross-API lookups. */
+function resolveBotIdFromPerformanceRow(row: Record<string, unknown>): string {
+  return (
+    pickScalarId(row.bot_id) ||
+    pickScalarId(row.bot_uuid) ||
+    pickScalarId(row.botId) ||
+    pickScalarId(row.uuid) ||
+    pickScalarId(row.voicebot_id) ||
+    pickScalarId(row.voice_bot_id) ||
+    pickScalarId(row.id) ||
+    ""
+  );
+}
+
+function coerceBotDisplayName(row: Record<string, unknown>): string {
+  const tryStr = (v: unknown): string => {
+    if (v == null) return "";
+    if (typeof v === "string") return v.trim();
+    if (typeof v === "number" || typeof v === "boolean") return String(v).trim();
+    return "";
+  };
+  const fromNestedBot = (): string => {
+    const b = row.bot;
+    if (b && typeof b === "object" && !Array.isArray(b)) {
+      const o = b as Record<string, unknown>;
+      return (
+        tryStr(o.name) ||
+        tryStr(o.bot_name) ||
+        tryStr(o.id) ||
+        tryStr(o.bot_id)
+      );
+    }
+    return "";
+  };
+  return (
+    tryStr(row.bot_name) ||
+    tryStr(row.name) ||
+    (typeof row.bot === "string" ? tryStr(row.bot) : "") ||
+    fromNestedBot() ||
+    tryStr(row.bot_id) ||
+    tryStr(row.id)
+  );
+}
+
 function parseBotPerformanceRow(
   row: Record<string, unknown>,
 ): BotPerformanceRow | null {
-  const nameRaw =
-    row.bot_name ?? row.name ?? row.bot ?? row.bot_id ?? row.id;
+  const name = coerceBotDisplayName(row);
   const total = toFiniteNumber(
     row.total_calls ?? row.total ?? row.calls ?? row.count,
   );
   const completed = toFiniteNumber(
-    row.completed ?? row.completed_calls ?? row.successful,
+    row.completed ??
+      row.completed_calls ??
+      row.successful ??
+      row.answered_calls ??
+      row.answered,
   );
   const transferred = toFiniteNumber(
     row.transferred ?? row.transferred_calls,
   );
   const failed = toFiniteNumber(row.failed ?? row.failed_calls);
-  if (typeof nameRaw !== "string" || !nameRaw.trim()) {
+  if (!name) {
     return null;
   }
   if (total === undefined || total <= 0) {
@@ -525,8 +617,10 @@ function parseBotPerformanceRow(
   const f = failed ?? 0;
   const successRate =
     total > 0 ? ((c / total) * 100).toFixed(1) : "0.0";
+  const botLookupId = resolveBotIdFromPerformanceRow(row) || name;
   return {
-    name: nameRaw.trim(),
+    name,
+    botLookupId,
     total,
     completed: c,
     transferred: t,
