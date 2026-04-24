@@ -151,10 +151,15 @@ function getListFromResponse(res: unknown): unknown[] {
 function getCompanyOptions(list: unknown[]): CompanyOption[] {
   return list.map((c) => {
     const item = c as Record<string, unknown>;
+    const identifierVal = item.company_identifier ?? item.identifier;
     const idVal = item.id ?? item.company_id;
-    let idStr = "";
-    if (typeof idVal === "string") idStr = idVal;
-    else if (typeof idVal === "number") idStr = String(idVal);
+    let primary = "";
+    if (typeof identifierVal === "string") primary = identifierVal.trim();
+    else if (typeof identifierVal === "number") primary = String(identifierVal).trim();
+    let fallback = "";
+    if (typeof idVal === "string") fallback = idVal;
+    else if (typeof idVal === "number") fallback = String(idVal);
+    const idStr = primary || fallback;
     const option: CompanyOption = {
       id: idStr,
       name: typeof item.name === "string" ? item.name : "",
@@ -986,7 +991,7 @@ const BotsPage = () => {
       <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
         {isAdmin && (
           <Form.Select
-            style={{ width: "200px", padding: "7px", marginRight: "3px", borderRadius: "3px" }}
+            style={{ width: "200px", padding: "7px", borderRadius: "3px" }}
             value={companyFilter}
             onChange={(e) => setCompanyFilter(e.target.value)}
           >
@@ -996,6 +1001,17 @@ const BotsPage = () => {
             ))}
           </Form.Select>
         )}
+        <Form.Select
+          style={{ width: "140px", padding: "7px", borderRadius: "3px" }}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Filter by status"
+        >
+          <option value="">All Bots</option>
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
+          <option value="archived">Archived</option>
+        </Form.Select>
         <Button
           onClick={() => {
             router.push("/voicebot/inbound/bots/create");
@@ -1008,7 +1024,7 @@ const BotsPage = () => {
         </Button>
       </div>
     ),
-    [isAdmin, companyFilter, companies, router],
+    [isAdmin, companyFilter, companies, router, statusFilter],
   );
 
   const tableToolbar = useMemo(
@@ -1218,45 +1234,8 @@ const BotsPage = () => {
       />
       <Row className="mb-3">
         <Col md={12}>
-          <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div className="d-flex align-items-center gap-2">
-              <h2 className="mb-0">Bots</h2>
-            </div>
-            <div className="d-flex align-items-center gap-2">
-              {isAdmin && (
-                <Form.Select
-                  style={{ width: "200px" }}
-                  value={companyFilter}
-                  onChange={(e) => setCompanyFilter(e.target.value)}
-                >
-                  <option value="">All companies</option>
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Form.Select>
-              )}
-              <Form.Select
-                style={{ width: "140px" }}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All Bots</option>
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-                <option value="archived">Archived</option>
-              </Form.Select>
-
-              <Button
-                variant="primary"
-                onClick={() => {
-                  router.push("/voicebot/inbound/bots/create");
-                }}
-              >
-                <Plus size={18} className="me-1" /> Add Bot
-              </Button>
-            </div>
+          <div className="page-header-title style-2 d-flex align-items-center flex-wrap gap-2">
+            <h2 className="mb-0">Bots</h2>
           </div>
         </Col>
       </Row>
