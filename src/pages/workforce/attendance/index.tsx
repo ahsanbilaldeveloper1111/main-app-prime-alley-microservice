@@ -163,6 +163,253 @@ function AttendanceSessionLiveBlock({ elapsed }: Readonly<AttendanceSessionLiveB
   );
 }
 
+function AttendanceStatusLoading(): ReactElement {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+      <Clock size={20} style={{ color: "#9ca3af" }} />
+      <span style={{ fontSize: "14px", color: "#6b7280" }}>Loading status…</span>
+    </div>
+  );
+}
+
+function AttendanceStatusUnavailable(): ReactElement {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        fontSize: "14px",
+        color: "#6b7280",
+      }}
+    >
+      <Clock size={18} />
+      Status unavailable
+    </div>
+  );
+}
+
+type AttendanceStatusPillBodyProps = {
+  isCheckedIn: boolean;
+  hasCheckInAt: boolean;
+  liveSessionElapsed: string;
+};
+
+function AttendanceStatusPillBody({
+  isCheckedIn,
+  hasCheckInAt,
+  liveSessionElapsed,
+}: Readonly<AttendanceStatusPillBodyProps>): ReactElement {
+  const showLiveTimer = isCheckedIn && hasCheckInAt && liveSessionElapsed.length > 0;
+
+  if (showLiveTimer) {
+    return (
+      <>
+        <span
+          className="att-status-pill__seg att-status-pill__seg--time"
+          title="Session duration since check-in (updates every second)"
+        >
+          <span className="att-status-pill__live-dot" aria-hidden />
+          <Clock className="att-status-pill__seg-ico" size={16} strokeWidth={2} aria-hidden />
+          <span className="att-status-pill__run tabular-nums">{liveSessionElapsed}</span>
+        </span>
+        <span className="att-status-pill__seg att-status-pill__seg--label">Checked in</span>
+      </>
+    );
+  }
+
+  if (isCheckedIn) {
+    return (
+      <>
+        <Clock
+          className="att-status-pill__ico att-status-pill__ico--pulse"
+          size={18}
+          strokeWidth={2}
+          aria-hidden
+        />
+        <span className="att-status-pill__text">Checked in</span>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Clock className="att-status-pill__ico" size={18} strokeWidth={2} aria-hidden />
+      <span className="att-status-pill__text">Checked out</span>
+    </>
+  );
+}
+
+type AttendanceToolbarStatusStripProps = {
+  status: AttendanceStatusData;
+  isCheckedIn: boolean;
+  liveSessionElapsed: string;
+  dateLine: string | null;
+  statusLoading: boolean;
+  checkInOutLoading: boolean;
+  onCheckIn: () => void;
+  onCheckOut: () => void;
+};
+
+function AttendanceToolbarStatusStrip({
+  status,
+  isCheckedIn,
+  liveSessionElapsed,
+  dateLine,
+  statusLoading,
+  checkInOutLoading,
+  onCheckIn,
+  onCheckOut,
+}: Readonly<AttendanceToolbarStatusStripProps>): ReactElement {
+  const hasCheckInAt = Boolean(status.attendance?.check_in_at);
+  const showLivePill = isCheckedIn && hasCheckInAt && liveSessionElapsed.length > 0;
+
+  const pillClassName = [
+    "att-status-pill",
+    isCheckedIn ? "att-status-pill--in" : "att-status-pill--out",
+    showLivePill ? "att-status-pill--live" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const checkInOutDisabled = statusLoading || checkInOutLoading;
+  const checkInOutButtonLabel = checkInOutLoading ? "…" : undefined;
+
+  return (
+    <div className="att-toolbar-strip">
+      <div className={pillClassName} role="status" aria-live="polite">
+        <AttendanceStatusPillBody
+          isCheckedIn={isCheckedIn}
+          hasCheckInAt={hasCheckInAt}
+          liveSessionElapsed={liveSessionElapsed}
+        />
+      </div>
+      {dateLine ? (
+        <div className="att-toolbar-strip__date">
+          <Calendar size={14} className="flex-shrink-0" />
+          <span>{dateLine}</span>
+        </div>
+      ) : null}
+      {isCheckedIn ? (
+        <Button
+          type="button"
+          variant="warning"
+          size="sm"
+          className="att-action-btn att-action-btn--out"
+          disabled={checkInOutDisabled}
+          onClick={onCheckOut}
+        >
+          <LogOut size={18} />
+          {checkInOutButtonLabel ?? "Check Out"}
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant="success"
+          size="sm"
+          className="att-action-btn"
+          disabled={checkInOutDisabled}
+          onClick={onCheckIn}
+        >
+          <LogIn size={18} />
+          {checkInOutButtonLabel ?? "Check In"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+type AttendanceReadonlyStatusPanelProps = {
+  status: AttendanceStatusData;
+  isCheckedIn: boolean;
+  statusLabel: string;
+  liveSessionElapsed: string;
+};
+
+function AttendanceReadonlyStatusPanel({
+  status,
+  isCheckedIn,
+  statusLabel,
+  liveSessionElapsed,
+}: Readonly<AttendanceReadonlyStatusPanelProps>): ReactElement {
+  return (
+    <div className="att-status-panel">
+      {status.work_date ? (
+        <div className="att-status-panel__meta">
+          <Calendar size={14} className="att-meta-icon flex-shrink-0" />
+          <span>{moment(status.work_date).format("dddd, DD MMM YYYY")}</span>
+        </div>
+      ) : null}
+      <div
+        className={`att-status-chip ${isCheckedIn ? "att-status-chip--in" : "att-status-chip--out"}`}
+      >
+        <Clock size={16} />
+        {statusLabel}
+      </div>
+      {isCheckedIn && status.attendance?.check_in_at ? (
+        <AttendanceSessionLiveBlock elapsed={liveSessionElapsed} />
+      ) : null}
+    </div>
+  );
+}
+
+type AttendanceStatusDisplayProps = {
+  statusLoading: boolean;
+  status: AttendanceStatusData | null;
+  isCheckedIn: boolean;
+  canCheckInOut: boolean;
+  liveSessionElapsed: string;
+  checkInOutLoading: boolean;
+  onCheckIn: () => void;
+  onCheckOut: () => void;
+};
+
+function AttendanceStatusDisplay({
+  statusLoading,
+  status,
+  isCheckedIn,
+  canCheckInOut,
+  liveSessionElapsed,
+  checkInOutLoading,
+  onCheckIn,
+  onCheckOut,
+}: Readonly<AttendanceStatusDisplayProps>): ReactElement {
+  if (statusLoading) {
+    return <AttendanceStatusLoading />;
+  }
+
+  if (!status) {
+    return <AttendanceStatusUnavailable />;
+  }
+
+  const dateLine = formatAttendanceToolbarDateLine(status, isCheckedIn);
+  const statusLabel = isCheckedIn ? "Checked in" : "Checked out";
+
+  if (canCheckInOut) {
+    return (
+      <AttendanceToolbarStatusStrip
+        status={status}
+        isCheckedIn={isCheckedIn}
+        liveSessionElapsed={liveSessionElapsed}
+        dateLine={dateLine}
+        statusLoading={statusLoading}
+        checkInOutLoading={checkInOutLoading}
+        onCheckIn={onCheckIn}
+        onCheckOut={onCheckOut}
+      />
+    );
+  }
+
+  return (
+    <AttendanceReadonlyStatusPanel
+      status={status}
+      isCheckedIn={isCheckedIn}
+      statusLabel={statusLabel}
+      liveSessionElapsed={liveSessionElapsed}
+    />
+  );
+}
+
 const AttendancePage = () => {
   const { data: session } = useSession();
   const { mainAppUsers } = useMainAppLookups();
@@ -443,140 +690,22 @@ const AttendancePage = () => {
       : null;
   const liveSessionElapsed = useLiveSessionElapsed(sessionCheckInAt);
 
-  const statusContent = (() => {
-    if (statusLoading) {
-      return (
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <Clock size={20} style={{ color: "#9ca3af" }} />
-          <span style={{ fontSize: "14px", color: "#6b7280" }}>Loading status…</span>
-        </div>
-      );
-    }
-
-    if (!status) {
-      return (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", color: "#6b7280" }}>
-          <Clock size={18} />
-          Status unavailable
-        </div>
-      );
-    }
-
-    const dateLine = formatAttendanceToolbarDateLine(status, isCheckedIn);
-
-    const statusLabel = isCheckedIn ? "Checked in" : "Checked out";
-
-    if (canCheckInOut) {
-      return (
-        <div className="att-toolbar-strip">
-          <div
-            className={[
-              "att-status-pill",
-              isCheckedIn ? "att-status-pill--in" : "att-status-pill--out",
-              isCheckedIn && status?.attendance?.check_in_at && liveSessionElapsed
-                ? "att-status-pill--live"
-                : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            role="status"
-            aria-live="polite"
-          >
-            {isCheckedIn && status.attendance?.check_in_at && liveSessionElapsed ? (
-              <>
-                <span
-                  className="att-status-pill__seg att-status-pill__seg--time"
-                  title="Session duration since check-in (updates every second)"
-                >
-                  <span className="att-status-pill__live-dot" aria-hidden />
-                  <Clock
-                    className="att-status-pill__seg-ico"
-                    size={16}
-                    strokeWidth={2}
-                    aria-hidden
-                  />
-                  <span className="att-status-pill__run tabular-nums">
-                    {liveSessionElapsed}
-                  </span>
-                </span>
-                <span className="att-status-pill__seg att-status-pill__seg--label">Checked in</span>
-              </>
-            ) : isCheckedIn ? (
-              <>
-                <Clock
-                  className="att-status-pill__ico att-status-pill__ico--pulse"
-                  size={18}
-                  strokeWidth={2}
-                  aria-hidden
-                />
-                <span className="att-status-pill__text">Checked in</span>
-              </>
-            ) : (
-              <>
-                <Clock className="att-status-pill__ico" size={18} strokeWidth={2} aria-hidden />
-                <span className="att-status-pill__text">Checked out</span>
-              </>
-            )}
-          </div>
-          {dateLine ? (
-            <div className="att-toolbar-strip__date">
-              <Calendar size={14} className="flex-shrink-0" />
-              <span>{dateLine}</span>
-            </div>
-          ) : null}
-          {!isCheckedIn ? (
-            <Button
-              type="button"
-              variant="success"
-              size="sm"
-              className="att-action-btn"
-              disabled={statusLoading || checkInOutLoading}
-              onClick={() => {
-                void handleCheckIn();
-              }}
-            >
-              <LogIn size={18} />
-              {checkInOutLoading ? "…" : "Check In"}
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              variant="warning"
-              size="sm"
-              className="att-action-btn att-action-btn--out"
-              disabled={statusLoading || checkInOutLoading}
-              onClick={() => {
-                void handleCheckOut();
-              }}
-            >
-              <LogOut size={18} />
-              {checkInOutLoading ? "…" : "Check Out"}
-            </Button>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div className="att-status-panel">
-        {status.work_date ? (
-          <div className="att-status-panel__meta">
-            <Calendar size={14} className="att-meta-icon flex-shrink-0" />
-            <span>{moment(status.work_date).format("dddd, DD MMM YYYY")}</span>
-          </div>
-        ) : null}
-        <div
-          className={`att-status-chip ${isCheckedIn ? "att-status-chip--in" : "att-status-chip--out"}`}
-        >
-          <Clock size={16} />
-          {statusLabel}
-        </div>
-        {isCheckedIn && status.attendance?.check_in_at ? (
-          <AttendanceSessionLiveBlock elapsed={liveSessionElapsed} />
-        ) : null}
-      </div>
-    );
-  })();
+  const statusContent = (
+    <AttendanceStatusDisplay
+      statusLoading={statusLoading}
+      status={status}
+      isCheckedIn={isCheckedIn}
+      canCheckInOut={canCheckInOut}
+      liveSessionElapsed={liveSessionElapsed}
+      checkInOutLoading={checkInOutLoading}
+      onCheckIn={() => {
+        void handleCheckIn();
+      }}
+      onCheckOut={() => {
+        void handleCheckOut();
+      }}
+    />
+  );
 
   const attendanceToolbar = useMemo<ToolbarConfig>(
     () => ({

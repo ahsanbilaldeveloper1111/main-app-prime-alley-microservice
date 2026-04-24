@@ -11,17 +11,18 @@ import {
   postCampaignPause,
   postCampaignResume,
   postCampaignStop,
+  postCampaignRedispatch,
   getCampaignStatus,
   type ListCampaignsParams,
 } from "@utils/voicebot/outbound";
-import { safeDisplayString } from "@utils/voicebot/formDisplay";
+import { safeDisplayString, toFormString } from "@utils/voicebot/formDisplay";
 import { GetCompanies } from "@utils/users";
 import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
 import { Row, Col, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { toast } from "react-toastify";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { Plus, Pencil, Trash2, Play, Pause, RotateCw, Square, Activity, ClipboardList, Megaphone, Bot, Phone, Timer, Layers, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, Play, Pause, RotateCw, Square, Activity, ClipboardList, Megaphone, Bot, Phone, Timer, Layers, Check, RefreshCw } from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { formatDateForTable } from "@utils/Helper";
 import "@assets/scss/common.scss";
@@ -44,6 +45,36 @@ interface CampaignRow {
   [key: string]: unknown;
 }
 
+function firstNumber(...values: unknown[]): number | undefined {
+  for (const v of values) {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+  }
+  return undefined;
+}
+
+/** Normalizes GET /api/campaigns body: raw array or paginated object (results, data, items, campaigns; count, total, …). */
+function parseCampaignsListResponse(res: unknown): { rows: CampaignRow[]; total: number } {
+  if (Array.isArray(res)) {
+    return { rows: res as CampaignRow[], total: res.length };
+  }
+  if (res == null || typeof res !== "object") {
+    return { rows: [], total: 0 };
+  }
+  const r = res as Record<string, unknown>;
+  const listCandidates = [r.results, r.data, r.items, r.campaigns];
+  let rows: CampaignRow[] = [];
+  for (const c of listCandidates) {
+    if (Array.isArray(c)) {
+      rows = c as CampaignRow[];
+      break;
+    }
+  }
+  const meta = r.meta as Record<string, unknown> | undefined;
+  const total =
+    firstNumber(r.count, r.total, r.total_count, meta?.count, meta?.total) ?? rows.length;
+  return { rows, total };
+}
+
 function getDispatchStatusVariant(status: string): "warning" | "success" | "secondary" {
   if (status === "draft") return "warning";
   if (status === "active" || status === "running") return "success";
@@ -54,6 +85,8 @@ function getCampaignStatusBadgeVariant(status: string): "success" | "warning" | 
   if (status === "active") return "success";
   if (status === "paused") return "warning";
   if (status === "running") return "primary";
+  if (status === "completed") return "success";
+  if (status === "stopped") return "secondary";
   return "secondary";
 }
 
@@ -68,6 +101,7 @@ interface CampaignRowActionsCellProps {
   onResume: (row: CampaignRow) => void;
   onStop: (row: CampaignRow) => void;
   onLoadStatus: (row: CampaignRow) => void;
+  onOpenRedispatch: (row: CampaignRow) => void;
   onDelete: (row: CampaignRow) => void;
 }
 
@@ -135,6 +169,31 @@ function campaignPausedResumeControl(
   );
 }
 
+/** Redispatch is only available for stopped or completed campaigns (API). */
+function campaignRedispatchButton(
+  row: CampaignRow,
+  id: string,
+  status: string,
+  loadingKey: string | null,
+  onOpenRedispatch: (r: CampaignRow) => void,
+): React.ReactElement | null {
+  if (status !== "stopped" && status !== "completed") {
+    return null;
+  }
+  return (
+    <Button
+      size="sm"
+      title="Redispatch: reset campaign and call all numbers from scratch"
+      variant="outline-primary"
+      className="icon-action-btn icon-redispatch-btn"
+      onClick={() => onOpenRedispatch(row)}
+      disabled={!!loadingKey}
+    >
+      {loadingKey === `redispatch-${id}` ? <Spinner animation="border" size="sm" /> : <RefreshCw size={12} />}
+    </Button>
+  );
+}
+
 type CampaignLifecycleContext = Readonly<{
   isCompleted: boolean;
   row: CampaignRow;
@@ -173,6 +232,7 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
     onResume,
     onStop,
     onLoadStatus,
+    onOpenRedispatch,
     onDelete,
   } = props;
   const isCompleted = status === "completed";
@@ -196,6 +256,7 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
         onResume,
         onStop,
       })}
+      {campaignRedispatchButton(row, id, status, loadingKey, onOpenRedispatch)}
       <Button size="sm" variant="outline-secondary" className="icon-action-btn icon-status-btn" onClick={() => onLoadStatus(row)} title="Campaign status">
         <Activity size={12} />
       </Button>
@@ -215,7 +276,7 @@ const CampaignsPage = () => {
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(200);
   const [totalRows, setTotalRows] = useState(0);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
@@ -228,11 +289,13 @@ const CampaignsPage = () => {
   const [dispatchSummaryData, setDispatchSummaryData] = useState<Record<string, unknown> | null>(null);
   const [dispatchSummaryLoading, setDispatchSummaryLoading] = useState(false);
   const [rowToDispatch, setRowToDispatch] = useState<CampaignRow | null>(null);
+  const [showRedispatchModal, setShowRedispatchModal] = useState(false);
+  const [rowToRedispatch, setRowToRedispatch] = useState<CampaignRow | null>(null);
 
   const fetchCompanies = useCallback(async () => {
     try {
       const res = await GetCompanies();
-      setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
+      setCompanies(normalizeCompaniesResponse(res));
     } catch {
       setCompanies([]);
     }
@@ -249,11 +312,8 @@ const CampaignsPage = () => {
       if (effectiveCompanyId) params.company_id = effectiveCompanyId;
       if (statusFilter) params.status = statusFilter;
       const res = await getCampaigns(params);
-      const list = Array.isArray(res)
-        ? res
-        : (res as { results?: CampaignRow[] })?.results ?? (res as { data?: CampaignRow[] })?.data ?? [];
-      const rawList = Array.isArray(list) ? list : [];
-      setTotalRows((res as { count?: number })?.count ?? rawList.length);
+      const { rows: rawList, total } = parseCampaignsListResponse(res);
+      setTotalRows(total);
       const rows = rawList.map((r, i) => ({
         ...r,
         id: r.campaign_id ?? r.id ?? `campaign-${i}`,
@@ -284,6 +344,30 @@ const CampaignsPage = () => {
 
   const campaignId = (row: CampaignRow) => String(row.campaign_id ?? row.id ?? "");
   const selectedCompanyId = selectedRow?.company_id ?? effectiveCompanyId;
+
+  const handleRedispatchConfirm = async () => {
+    if (!rowToRedispatch) return;
+    const id = campaignId(rowToRedispatch);
+    const companyId = String(rowToRedispatch.company_id ?? effectiveCompanyId ?? "");
+    if (!id) {
+      toast.error("Missing campaign id");
+      return;
+    }
+    setOpLoading(`redispatch-${id}`);
+    try {
+      const payload = companyId ? { company_id: companyId } : undefined;
+      await postCampaignRedispatch(id, payload);
+      toast.success("Campaign redispatched");
+      setShowRedispatchModal(false);
+      setRowToRedispatch(null);
+      fetchCampaigns();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string };
+      toast.error(e?.response?.data?.detail || String(e?.message ?? "Redispatch failed"));
+    } finally {
+      setOpLoading(null);
+    }
+  };
 
   const handleOp = async (
     op: "dispatch" | "pause" | "resume" | "stop",
@@ -357,7 +441,7 @@ const CampaignsPage = () => {
         setStatusLoading(false);
       }
     },
-    [companyFilter]
+    [effectiveCompanyId]
   );
 
   const columns: TableColumn<CampaignRow>[] = [
@@ -383,7 +467,9 @@ const CampaignsPage = () => {
       render: (r) => {
         const cid = r.company_id;
         if (cid) {
-          const company = companies.find((c) => c.id === cid || c.company_id === cid);
+          const company = companies.find(
+            (c) => c.id === cid || c.company_id === cid || c.identifier === cid,
+          );
           return company?.name ?? cid;
         }
         return "—";
@@ -407,6 +493,10 @@ const CampaignsPage = () => {
           onResume={(r) => handleOp("resume", r)}
           onStop={(r) => handleOp("stop", r)}
           onLoadStatus={loadStatus}
+          onOpenRedispatch={(r) => {
+            setRowToRedispatch(r);
+            setShowRedispatchModal(true);
+          }}
           onDelete={(r) => {
             setSelectedRow(r);
             setShowDeleteModal(true);
@@ -488,7 +578,8 @@ const CampaignsPage = () => {
         }
 
         .voicebot-campaign-page .icon-dispatch-btn,
-        .voicebot-campaign-page .icon-resume-btn {
+        .voicebot-campaign-page .icon-resume-btn,
+        .voicebot-campaign-page .icon-redispatch-btn {
           color: #047857 !important;
         }
 
@@ -518,9 +609,9 @@ const CampaignsPage = () => {
 
         .voicebot-campaign-page .generic-table thead th:last-child,
         .voicebot-campaign-page .generic-table tbody td:last-child {
-          width: 164px !important;
-          min-width: 164px !important;
-          max-width: 164px !important;
+          width: 196px !important;
+          min-width: 196px !important;
+          max-width: 196px !important;
           white-space: nowrap;
         }
 
@@ -576,11 +667,14 @@ const CampaignsPage = () => {
                       onChange={(e) => setCompanyFilter(e.target.value)}
                     >
                       <option value="">All companies</option>
-                      {companies.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
+                      {companies.map((c) => {
+                        const companyScopeId = String(c.identifier ?? c.company_id ?? c.id ?? "");
+                        return (
+                          <option key={String(c.id ?? companyScopeId)} value={companyScopeId}>
+                            {c.name}
+                          </option>
+                        );
+                      })}
                     </Form.Select>
                   )}
                   <Form.Select
@@ -594,6 +688,7 @@ const CampaignsPage = () => {
                     <option value="draft">Draft</option>
                     <option value="paused">Paused</option>
                     <option value="running">Running</option>
+                    <option value="stopped">Stopped</option>
                     <option value="completed">Completed</option>
                   </Form.Select>
                   <Link href="/voicebot/outbound/campaigns/create">
@@ -616,7 +711,7 @@ const CampaignsPage = () => {
               currentPage: page,
               rowsPerPage: pageSize,
               totalRows: totalRows || data.length,
-              pageSizeOptions: [10, 25, 50],
+              pageSizeOptions: [10, 25, 50, 100, 200],
             }}
             onPaginationChange={(newPage, newRowsPerPage) => {
               setPage(newPage);
@@ -655,11 +750,11 @@ const CampaignsPage = () => {
                     <Megaphone size={18} />
                     Campaign Details
                   </h6>
-                  <p className="mb-1"><strong>Name:</strong> {String(dispatchSummaryData.name ?? "—")}</p>
+                  <p className="mb-1"><strong>Name:</strong> {safeDisplayString(dispatchSummaryData.name)}</p>
                   <p className="mb-1">
                     <strong>Status:</strong>{" "}
-                    <Badge bg={getDispatchStatusVariant(String(dispatchSummaryData.status ?? ""))}>
-                      {String(dispatchSummaryData.status ?? "—")}
+                    <Badge bg={getDispatchStatusVariant(safeDisplayString(dispatchSummaryData.status, ""))}>
+                      {safeDisplayString(dispatchSummaryData.status)}
                     </Badge>
                   </p>
                   <p className="mb-1">
@@ -668,8 +763,8 @@ const CampaignsPage = () => {
                       {Array.isArray(dispatchSummaryData.target_numbers) ? dispatchSummaryData.target_numbers.length : Number(dispatchSummaryData.total_numbers ?? 0)}
                     </span>
                   </p>
-                  {String(dispatchSummaryData.description ?? "").trim() ? (
-                    <p className="mb-2 mt-2"><strong>Description:</strong> {String(dispatchSummaryData.description)}</p>
+                  {toFormString(dispatchSummaryData.description).trim() ? (
+                    <p className="mb-2 mt-2"><strong>Description:</strong> {toFormString(dispatchSummaryData.description)}</p>
                   ) : null}
                 </Col>
                 <Col md={6}>
@@ -747,7 +842,7 @@ const CampaignsPage = () => {
                   {(() => {
                     const vb = dispatchSummaryData.voicebot as Record<string, unknown> | undefined;
                     const targetCount = Array.isArray(dispatchSummaryData.target_numbers) ? dispatchSummaryData.target_numbers.length : Number(dispatchSummaryData.total_numbers ?? 0);
-                    const scriptOk = String(dispatchSummaryData.campaign_script ?? "").trim().length > 0;
+                    const scriptOk = toFormString(dispatchSummaryData.campaign_script).trim().length > 0;
                     const items = [
                       { ok: safeDisplayString(vb?.status, "") === "active", label: "VoiceBot is active" },
                       { ok: !!vb?.trunk_id, label: "Trunk is configured" },
@@ -797,6 +892,48 @@ const CampaignsPage = () => {
             </Button>
           </Modal.Footer>
         )}
+      </Modal>
+
+      <Modal
+        show={showRedispatchModal}
+        onHide={() => {
+          if (opLoading?.startsWith("redispatch-")) return;
+          setShowRedispatchModal(false);
+          setRowToRedispatch(null);
+        }}
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Redispatch campaign</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            This resets <strong>{rowToRedispatch?.name ?? "this campaign"}</strong> and calls all numbers again from scratch. Only use this for
+            campaigns in <strong>stopped</strong> or <strong>completed</strong> state.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            disabled={!!opLoading && rowToRedispatch ? opLoading === `redispatch-${campaignId(rowToRedispatch)}` : false}
+            onClick={() => {
+              setShowRedispatchModal(false);
+              setRowToRedispatch(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="success" onClick={() => void handleRedispatchConfirm()} disabled={!rowToRedispatch || !!opLoading}>
+            {rowToRedispatch && opLoading === `redispatch-${campaignId(rowToRedispatch)}` ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-1" />
+                Redispatching…
+              </>
+            ) : (
+              "Confirm redispatch"
+            )}
+          </Button>
+        </Modal.Footer>
       </Modal>
 
       <DeleteConfirmationModal

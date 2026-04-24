@@ -209,6 +209,10 @@ export const routePermissions: RoutePermission[] = [
                 path: '/campaign-console',
                 permissions: [PERMISSIONS.VIEW_LIVE_CALLS_AGENT_MANAGEMENT]
             },
+            {
+                path: '/campaign-agent',
+                permissions: [PERMISSIONS.VIEW_CAMPAIGN_AGENT],
+            },
         ]
     },
     //communications services end
@@ -755,6 +759,8 @@ export const routePermissions: RoutePermission[] = [
             { path: '/companies', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/bots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/bots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/sip-trunks', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/sip-trunks/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/conversations', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
             { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
         ]
