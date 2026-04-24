@@ -1,8 +1,12 @@
 import moment from "moment";
+import {
+  isStoredAsUtcMidnightCalendarDue,
+  parseApiDueTimeToTimeInput,
+  shouldSuppressDueTimeInListCell,
+} from "@utils/plannerTaskDueTime";
 import React from "react";
 import { Button } from "react-bootstrap";
 import { FiSearch } from "react-icons/fi";
-import { parseApiDueTimeToTimeInput } from "@utils/plannerTaskDueTime";
 
 /** Lexend-based outline button used across CRM + Planner task listing toolbars. */
 export const TASK_LIST_BTN_OUTLINE: React.CSSProperties = {
@@ -107,11 +111,37 @@ export function TaskCompleteCircleButton({
   );
 }
 
-/** True when `due_time` from the API / form should be shown in list cells (non-empty after parse). */
+/** True when `due_time` from the API should affect the list cell (non-empty after parse). */
 export function isTaskDueTimePrefilled(dueTimeRaw: string | null | undefined): boolean {
   return parseApiDueTimeToTimeInput(dueTimeRaw).length > 0;
 }
 
+function formatHhMmTo12Hour(hhMm: string): string {
+  const parsed = moment(hhMm, "HH:mm", true);
+  return parsed.isValid() ? parsed.format("h:mm A") : hhMm;
+}
+
+function taskDueDateListTimeClock12h(
+  dueDateIso: string,
+  dueTimeRaw: string | null | undefined,
+  m: moment.Moment,
+): string {
+  const useExplicitDueTime =
+    isTaskDueTimePrefilled(dueTimeRaw) &&
+    !shouldSuppressDueTimeInListCell(dueDateIso, dueTimeRaw);
+  if (useExplicitDueTime) {
+    const hhMm = parseApiDueTimeToTimeInput(dueTimeRaw);
+    if (hhMm === "") return "";
+    return formatHhMmTo12Hour(hhMm);
+  }
+  const dueHasClockInIso = /T\d{2}:\d{2}/.test(String(dueDateIso).trim());
+  if (dueHasClockInIso && !isStoredAsUtcMidnightCalendarDue(dueDateIso)) {
+    return m.format("h:mm A");
+  }
+  return "";
+}
+
+/** Date + optional time in 12-hour form; omits clock for UTC-midnight “date-only” dues unless a real `due_time` is present. */
 export function formatTaskDueDateCellParts(
   dueDateIso: string | null | undefined,
   rowStatus: "pending" | "completed" | "overdue",
@@ -124,14 +154,16 @@ export function formatTaskDueDateCellParts(
   const overdue = m.isBefore(moment()) && rowStatus !== "completed";
   const isToday = m.isSame(moment(), "day");
   const isTomorrow = m.isSame(moment().add(1, "day"), "day");
-  const showTime = isTaskDueTimePrefilled(dueTimeRaw);
+  const timeClock = taskDueDateListTimeClock12h(dueDateIso, dueTimeRaw, m);
   let label: string;
   if (isToday) {
-    label = showTime ? `Today at ${m.format("HH:mm")}` : "Today";
+    label = timeClock ? `Today at ${timeClock}` : "Today";
   } else if (isTomorrow) {
-    label = showTime ? `Tomorrow at ${m.format("HH:mm")}` : "Tomorrow";
+    label = timeClock ? `Tomorrow at ${timeClock}` : "Tomorrow";
   } else {
-    label = showTime ? m.format("D MMMM YYYY HH:mm") : m.format("D MMMM YYYY");
+    label = timeClock
+      ? `${m.format("D MMMM YYYY")} at ${timeClock}`
+      : m.format("D MMMM YYYY");
   }
   return {
     label,

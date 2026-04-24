@@ -48,6 +48,11 @@ import {
   plannerTaskListTodayTriple,
 } from "@utils/taskListing/plannerTasksQueryParams";
 import {
+  isStoredAsUtcMidnightCalendarDue,
+  parseApiDueTimeToTimeInput,
+  shouldSuppressDueTimeInListCell,
+} from "@utils/plannerTaskDueTime";
+import {
   buildTaskListingPageStyleTag,
   formatTaskDueDateCellParts,
   TaskCompleteCircleButton,
@@ -100,6 +105,35 @@ interface ApiTask {
   extension_numbers?: string[];
   is_completed?: boolean;
   type?: string;
+}
+
+function apiDueTimeFromPlannerTaskRow(row: Task): string | undefined {
+  const raw = row.rawData;
+  if (raw == null || typeof raw !== "object") return undefined;
+  const o = raw as Record<string, unknown>;
+  const t = o.due_time ?? o.dueTime;
+  if (typeof t === "string" && t.trim() !== "") return t;
+  return undefined;
+}
+
+function resolvePlannerListTaskDueDate(apiTask: ApiTask): string | null {
+  if (!apiTask.due_date) return null;
+  const raw = apiTask.due_date;
+  const timePart = apiTask.due_time?.trim();
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+  if (timePart && isDateOnly) {
+    return `${raw}T${timePart}`;
+  }
+  if (
+    timePart &&
+    isStoredAsUtcMidnightCalendarDue(raw) &&
+    !shouldSuppressDueTimeInListCell(raw, timePart)
+  ) {
+    const ymd = moment.utc(raw).format("YYYY-MM-DD");
+    const wall = parseApiDueTimeToTimeInput(timePart);
+    return wall ? `${ymd}T${wall}:00` : raw;
+  }
+  return raw;
 }
 
 type HierarchyExtension = {
@@ -263,13 +297,20 @@ function parseStoredTaskTableColumns(
   }
 }
 
+/** Keep column order aligned with the table definition (not “last toggled on at the end”). */
+function orderTaskColumnKeysByDefault(keys: string[]): string[] {
+  const order = new Map(DEFAULT_TASK_TABLE_COLUMN_KEYS.map((k, i) => [k, i]));
+  return [...keys].sort((a, b) => (order.get(a) ?? 9999) - (order.get(b) ?? 9999));
+}
+
 function readVisibleTaskColumnKeysFromStorage(): string[] {
   if (globalThis.window === undefined) return [...DEFAULT_TASK_TABLE_COLUMN_KEYS];
   const stored = parseStoredTaskTableColumns(
     globalThis.localStorage.getItem(TASKS_TABLE_COLUMN_STORAGE_KEY),
     DEFAULT_TASK_TABLE_COLUMN_KEYS,
   );
-  return stored ?? [...DEFAULT_TASK_TABLE_COLUMN_KEYS];
+  const base = stored ?? [...DEFAULT_TASK_TABLE_COLUMN_KEYS];
+  return orderTaskColumnKeysByDefault(base);
 }
 
 function persistVisibleTaskColumnKeys(keys: string[]) {
@@ -461,14 +502,7 @@ const TasksListingPage = ({
         ? lookupHierarchyExtensionDisplayName(firstExt, hierarchyDataExtensions)
         : undefined;
 
-      let dueDate: string | null = null;
-      if (apiTask.due_date) {
-        const raw = apiTask.due_date;
-        const timePart = apiTask.due_time?.trim();
-        // Only append due_time when due_date is date-only; full ISO + due_time would produce invalid strings like "...ZT12:00:00".
-        const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
-        dueDate = timePart && isDateOnly ? `${raw}T${timePart}` : raw;
-      }
+      const dueDate = resolvePlannerListTaskDueDate(apiTask);
 
       const isCompleted = apiTask.is_completed === true;
       const dueMoment = dueDate ? moment(dueDate) : null;
@@ -575,7 +609,6 @@ const TasksListingPage = ({
   
     // ── Data ──────────────────────────────────────────────────────────────────────
     const [tasks, setTasks]           = useState<Task[]>([]);
-    const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
     const [total, setTotal]           = useState(0);
     const [loading, setLoading]       = useState(false);
     const [filters, setFilters]       = useState<Record<string, any>>({});
@@ -747,18 +780,13 @@ const TasksListingPage = ({
         if (res?.data) {
           const mapped = (res.data as ApiTask[]).map((task) => mapApiTaskToTask(task));
           setTasks(mapped);
-          // Precompute IDs to avoid nested callbacks in the selection filter.
-          const mappedTaskIds = new Set(mapped.map((task) => task.id));
-          setSelectedTasks((prev) => prev.filter((selected) => mappedTaskIds.has(selected.id)));
           setTotal(res.pagination?.total ?? 0);
         } else {
           setTasks([]);
-          setSelectedTasks([]);
           setTotal(0);
         }
       } catch {
         setTasks([]);
-        setSelectedTasks([]);
         setTotal(0);
         toast.error("Failed to load tasks");
       } finally {
@@ -988,7 +1016,7 @@ const TasksListingPage = ({
           const parts = formatTaskDueDateCellParts(
             row.due_date,
             row.status,
-            (row.rawData as ApiTask | undefined)?.due_time,
+            apiDueTimeFromPlannerTaskRow(row),
           );
           return (
             <span
@@ -1114,13 +1142,14 @@ const TasksListingPage = ({
 
     const toggleTaskColumnVisibility = useCallback((columnKey: string) => {
       setVisibleTaskColumnKeys((prev) => {
-        const next = prev.includes(columnKey)
+        const toggled = prev.includes(columnKey)
           ? prev.filter((k) => k !== columnKey)
           : [...prev, columnKey];
-        if (next.length === 0) {
+        if (toggled.length === 0) {
           toast.error("Keep at least one column visible");
           return prev;
         }
+        const next = orderTaskColumnKeysByDefault(toggled);
         persistVisibleTaskColumnKeys(next);
         return next;
       });
@@ -2046,9 +2075,6 @@ const TasksListingPage = ({
               columns={tableColumnsForGrid}
               actions={actions}
               showActions={false}
-              selectable
-              selectedRows={selectedTasks}
-              onSelectionChange={setSelectedTasks}
               pagination={{
                 currentPage: pager.page,
                 rowsPerPage: pager.perPage,

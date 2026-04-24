@@ -9,12 +9,12 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import { Container, Row, Col, Card, Button, Form, Modal, Badge, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Button, Form, Modal, Badge } from 'react-bootstrap';
 import { Plus, Edit, Trash2, AlertCircle, MoreVertical } from 'lucide-react';
 import { listStatuses, createStatus, updateStatus, deleteStatus } from '@utils/work-planner';
 import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
+import { PlannerColorTableCell } from '@planner/PlannerColorTableCell';
 import { toast } from 'react-toastify';
 
 interface Status {
@@ -187,11 +187,17 @@ const WorkPlannerStatuses = () => {
 
   const statusColumns: TableColumn<Status>[] = [
     { key: 'name', label: 'Name', sortable: true, accessor: (row) => row.name, render: (row) => <span className="fw-semibold">{row.name}</span> },
-    { key: 'color', label: 'Color', sortable: true, accessor: (row) => row.color, render: (row) => (
-      <Badge style={{ backgroundColor: row.color, color: '#fff', padding: '6px 12px', borderRadius: '4px' }}>
-        {row.color}
-      </Badge>
-    ) },
+    {
+      key: 'color',
+      label: 'Color',
+      sortable: true,
+      accessor: (row) => row.color,
+      render: (row) => (
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <PlannerColorTableCell color={row.color} variant="barWide" />
+        </div>
+      ),
+    },
     { key: 'order', label: 'Order', sortable: true, accessor: (row) => row.order ?? 0 },
     { key: 'is_default', label: 'Default', sortable: true, accessor: (row) => row.is_default, render: (row) => (
       row.is_default ? <Badge bg="success">Yes</Badge> : <Badge bg="secondary">No</Badge>

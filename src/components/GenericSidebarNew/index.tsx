@@ -99,7 +99,9 @@ export interface SidebarField {
     | "tags"
     | "link"
     | "email"
-    | "phone";
+    | "phone"
+    /** Hex/CSS color string — renders a swatch (no raw hex text). */
+    | "color";
   badgeVariant?: string;
   show?: boolean;
   hasDetails?: boolean;
@@ -7343,6 +7345,85 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
           >
             {field.value}
           </Badge>
+        </div>
+      );
+    }
+
+    if (field.type === "color") {
+      const raw = field.value;
+      const hex =
+        typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : "#4680FF";
+      return (
+        <div key={index} style={{ marginBottom: "16px" }}>
+          <div
+            style={{
+              fontSize: "13px",
+              fontWeight: "400",
+              color: "#666",
+              marginBottom: "4px",
+            }}
+          >
+            {field.label}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "8px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span
+                title={hex}
+                aria-label={`Color ${hex}`}
+                style={{
+                  display: "inline-block",
+                  width: 32,
+                  height: 32,
+                  borderRadius: 6,
+                  backgroundColor: hex,
+                  border: "1px solid rgba(0,0,0,0.12)",
+                  flexShrink: 0,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                flexShrink: 0,
+              }}
+            >
+              {field.copyable ? (
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(hex)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px",
+                    cursor: "pointer",
+                    color: "#141414",
+                    display: "flex",
+                    alignItems: "center",
+                    borderRadius: "3px",
+                  }}
+                  title="Copy color"
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f5f8fa";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  <Copy size={14} />
+                </button>
+              ) : null}
+            </div>
+          </div>
         </div>
       );
     }
