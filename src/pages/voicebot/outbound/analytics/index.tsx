@@ -212,8 +212,12 @@ type CampaignPerformanceRow = {
   campaign_is_deleted?: boolean;
 };
 
-/** API may already suffix names with "(deleted)"; avoid doubling when we add the marker. */
-const CAMPAIGN_NAME_DELETED_SUFFIX = /\s*\(deleted\)\s*$/i;
+const CAMPAIGN_DELETED_MARKER = "(deleted)";
+
+/** API may already suffix names with "(deleted)"; avoid doubling when we add the marker. Linear-time (no regex backtracking). */
+function campaignNameAlreadyHasDeletedSuffix(name: string): boolean {
+  return name.trimEnd().toLowerCase().endsWith(CAMPAIGN_DELETED_MARKER);
+}
 
 function campaignRowIndicatesDeleted(r: CampaignPerformanceRow): boolean {
   const o = r as Record<string, unknown>;
@@ -229,7 +233,7 @@ function campaignLabelFromRow(r: CampaignPerformanceRow, deletedCampaignIdsFromC
   const fromCosts = Boolean(idKey && deletedCampaignIdsFromCosts?.has(idKey));
   const isDeleted = fromRow || fromCosts;
   if (!isDeleted) return base;
-  return CAMPAIGN_NAME_DELETED_SUFFIX.test(base) ? base : `${base} (deleted)`;
+  return campaignNameAlreadyHasDeletedSuffix(base) ? base : `${base} (deleted)`;
 }
 
 function aggregateCampaignPerformance(
@@ -844,7 +848,7 @@ function labelForCostCampaignRow(
   const name = String(row.campaign_name ?? "").trim();
   if (name) {
     if (!row.is_deleted) return name;
-    return CAMPAIGN_NAME_DELETED_SUFFIX.test(name) ? name : `${name} (deleted)`;
+    return campaignNameAlreadyHasDeletedSuffix(name) ? name : `${name} (deleted)`;
   }
   return fallbackName(row.campaign_id);
 }
