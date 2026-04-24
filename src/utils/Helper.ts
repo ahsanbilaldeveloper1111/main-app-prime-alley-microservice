@@ -800,6 +800,21 @@ export const formatCurrency = (amount: number | null): string => {
   }).format(amount);
 };
 
+function parseNumericAmountForDisplay(amount: number | string | null | undefined): number {
+  if (amount === null || amount === undefined || amount === "") {
+    return Number.NaN;
+  }
+  if (typeof amount === "number") {
+    return Number.isFinite(amount) ? amount : Number.NaN;
+  }
+  const cleaned = String(amount).replaceAll(",", "").trim();
+  if (cleaned === "") {
+    return Number.NaN;
+  }
+  const n = Number.parseFloat(cleaned);
+  return Number.isFinite(n) ? n : Number.NaN;
+}
+
 export const formatNumber = (
   amount: number | string | null | undefined,
   withoutDecimals?: boolean,
@@ -811,9 +826,7 @@ export const formatNumber = (
     return defaultZero;
   }
 
-  // Convert string to number if needed
-  const numAmount =
-    typeof amount === "string" ? Number.parseFloat(amount) : amount;
+  const numAmount = parseNumericAmountForDisplay(amount);
 
   // Check if the conversion resulted in a valid number
   if (Number.isNaN(numAmount) || !Number.isFinite(numAmount)) {
@@ -828,6 +841,7 @@ export const formatNumber = (
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: withoutDecimals ? 0 : 2,
     maximumFractionDigits: withoutDecimals ? 0 : 2,
+    useGrouping: "always",
   }).format(numAmount);
 };
 

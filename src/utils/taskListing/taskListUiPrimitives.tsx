@@ -2,6 +2,7 @@ import moment from "moment";
 import React from "react";
 import { Button } from "react-bootstrap";
 import { FiSearch } from "react-icons/fi";
+import { parseApiDueTimeToTimeInput } from "@utils/plannerTaskDueTime";
 
 /** Lexend-based outline button used across CRM + Planner task listing toolbars. */
 export const TASK_LIST_BTN_OUTLINE: React.CSSProperties = {
@@ -106,9 +107,15 @@ export function TaskCompleteCircleButton({
   );
 }
 
+/** True when `due_time` from the API / form should be shown in list cells (non-empty after parse). */
+export function isTaskDueTimePrefilled(dueTimeRaw: string | null | undefined): boolean {
+  return parseApiDueTimeToTimeInput(dueTimeRaw).length > 0;
+}
+
 export function formatTaskDueDateCellParts(
   dueDateIso: string | null | undefined,
   rowStatus: "pending" | "completed" | "overdue",
+  dueTimeRaw?: string | null,
 ): { label: string; color: string; fontWeight: number } {
   if (!dueDateIso) {
     return { label: "—", color: "#9ca3af", fontWeight: 300 };
@@ -117,13 +124,14 @@ export function formatTaskDueDateCellParts(
   const overdue = m.isBefore(moment()) && rowStatus !== "completed";
   const isToday = m.isSame(moment(), "day");
   const isTomorrow = m.isSame(moment().add(1, "day"), "day");
+  const showTime = isTaskDueTimePrefilled(dueTimeRaw);
   let label: string;
   if (isToday) {
-    label = `Today at ${m.format("HH:mm")}`;
+    label = showTime ? `Today at ${m.format("HH:mm")}` : "Today";
   } else if (isTomorrow) {
-    label = `Tomorrow at ${m.format("HH:mm")}`;
+    label = showTime ? `Tomorrow at ${m.format("HH:mm")}` : "Tomorrow";
   } else {
-    label = m.format("D MMMM YYYY HH:mm");
+    label = showTime ? m.format("D MMMM YYYY HH:mm") : m.format("D MMMM YYYY");
   }
   return {
     label,

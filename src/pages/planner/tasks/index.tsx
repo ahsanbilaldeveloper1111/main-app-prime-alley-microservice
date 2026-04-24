@@ -985,7 +985,11 @@ const TasksListingPage = ({
       {
         key: "due_date", label: "Due date", sortable: true, type: "custom",
         render: (row) => {
-          const parts = formatTaskDueDateCellParts(row.due_date, row.status);
+          const parts = formatTaskDueDateCellParts(
+            row.due_date,
+            row.status,
+            (row.rawData as ApiTask | undefined)?.due_time,
+          );
           return (
             <span
               style={{

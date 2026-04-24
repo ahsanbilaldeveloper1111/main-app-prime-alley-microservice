@@ -182,7 +182,17 @@ function getProductCategoryDisplayName(
 }
 const formatProductPriceAED = (row: { base_price?: unknown; data?: { base_price?: unknown } } | null, emptyFallback = "--"): string => {
   const price = row?.base_price ?? row?.data?.base_price;
-  return price == null ? emptyFallback : `AED ${Number(price).toLocaleString()}`;
+  if (price == null || price === "") {
+    return emptyFallback;
+  }
+  const n = typeof price === "number" ? price : Number.parseFloat(String(price).replaceAll(",", ""));
+  if (!Number.isFinite(n)) {
+    return emptyFallback;
+  }
+  return `AED ${n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 };
 
 /** Billing products toolbar (same UX as billing subscriptions filter pills). */
