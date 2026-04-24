@@ -92,6 +92,55 @@ type OutboundReportsCallsChartFilters = {
   toDate: string;
 };
 
+function appendReportsPayloadDurations(
+  payload: PostReportsCallsPayload,
+  mask: AnalyticsFilterMask,
+  durationMin: number,
+  durationMax: number,
+): void {
+  if (mask.durationMin) payload.duration_min = durationMin;
+  if (mask.durationMax) payload.duration_max = durationMax;
+}
+
+function appendReportsPayloadCompany(
+  payload: PostReportsCallsPayload,
+  mask: AnalyticsFilterMask,
+  companyIdentifier: string,
+): void {
+  if (!mask.company) return;
+  const companyTrim = companyIdentifier.trim();
+  if (companyTrim) payload.company_id = companyTrim;
+}
+
+function appendReportsPayloadDateRange(
+  payload: PostReportsCallsPayload,
+  mask: AnalyticsFilterMask,
+  fromDate: string,
+  toDate: string,
+): void {
+  if (mask.fromDate && fromDate.trim()) payload.date_from = fromDate.trim();
+  if (mask.toDate && toDate.trim()) payload.date_to = toDate.trim();
+}
+
+function appendReportsPayloadNumericId(
+  payload: PostReportsCallsPayload,
+  maskOn: boolean,
+  rawId: string,
+  key: "campaign_id" | "voicebot_id",
+): void {
+  if (!maskOn || !rawId) return;
+  const n = Number(rawId);
+  if (Number.isFinite(n)) payload[key] = n;
+}
+
+function appendReportsPayloadCallStatus(
+  payload: PostReportsCallsPayload,
+  mask: AnalyticsFilterMask,
+  callStatus: string,
+): void {
+  if (mask.callStatus && callStatus) payload.call_status = callStatus;
+}
+
 function buildAnalyticsReportsCallsPayload(args: {
   mask: AnalyticsFilterMask;
   companyIdentifier: string;
@@ -122,23 +171,12 @@ function buildAnalyticsReportsCallsPayload(args: {
     page,
     page_size: pageSize,
   };
-  if (mask.durationMin) payload.duration_min = durationMin;
-  if (mask.durationMax) payload.duration_max = durationMax;
-  if (mask.company) {
-    const companyTrim = companyIdentifier.trim();
-    if (companyTrim) payload.company_id = companyTrim;
-  }
-  if (mask.fromDate && fromDate.trim()) payload.date_from = fromDate.trim();
-  if (mask.toDate && toDate.trim()) payload.date_to = toDate.trim();
-  if (mask.campaign && campaignId) {
-    const n = Number(campaignId);
-    if (Number.isFinite(n)) payload.campaign_id = n;
-  }
-  if (mask.voicebot && voicebotId) {
-    const n = Number(voicebotId);
-    if (Number.isFinite(n)) payload.voicebot_id = n;
-  }
-  if (mask.callStatus && callStatus) payload.call_status = callStatus;
+  appendReportsPayloadDurations(payload, mask, durationMin, durationMax);
+  appendReportsPayloadCompany(payload, mask, companyIdentifier);
+  appendReportsPayloadDateRange(payload, mask, fromDate, toDate);
+  appendReportsPayloadNumericId(payload, mask.campaign, campaignId, "campaign_id");
+  appendReportsPayloadNumericId(payload, mask.voicebot, voicebotId, "voicebot_id");
+  appendReportsPayloadCallStatus(payload, mask, callStatus);
   return payload;
 }
 
@@ -266,6 +304,36 @@ function safeToYmd(value: unknown): string | null {
   return d.toISOString().slice(0, 10);
 }
 
+function buildAnalyticsDashboardParams(args: {
+  mask: AnalyticsFilterMask;
+  companyIdentifier: string;
+  campaignId: string;
+  fromDate: string;
+  toDate: string;
+}): Record<string, unknown> {
+  const { mask, companyIdentifier, campaignId, fromDate, toDate } = args;
+  const params: Record<string, unknown> = {};
+  if (mask.company) {
+    const companyTrim = companyIdentifier.trim();
+    if (companyTrim) params.company_id = companyTrim;
+  }
+  if (mask.campaign && campaignId) params.campaign_id = campaignId;
+  if (mask.fromDate && fromDate.trim()) {
+    params.start_date = ymdStartIso(fromDate);
+    params.date_from = fromDate.trim();
+  }
+  if (mask.toDate && toDate.trim()) {
+    params.end_date = ymdEndIso(toDate);
+    params.date_to = toDate.trim();
+  }
+  return params;
+}
+
+function dashboardDataFromResponse(res: DashboardResponse): DashboardData | null {
+  const data = res?.data ?? null;
+  return data && typeof data === "object" ? data : null;
+}
+
 type DashboardQueryArgs = {
   mask: AnalyticsFilterMask;
   companyIdentifier: string;
@@ -284,23 +352,15 @@ function useOutboundDashboard({ mask, companyIdentifier, campaignId, fromDate, t
     async function fetchDashboard() {
       setLoading(true);
       try {
-        const params: Record<string, unknown> = {};
-        if (mask.company) {
-          const companyTrim = companyIdentifier.trim();
-          if (companyTrim) params.company_id = companyTrim;
-        }
-        if (mask.campaign && campaignId) params.campaign_id = campaignId;
-        if (mask.fromDate && fromDate.trim()) {
-          params.start_date = ymdStartIso(fromDate);
-          params.date_from = fromDate.trim();
-        }
-        if (mask.toDate && toDate.trim()) {
-          params.end_date = ymdEndIso(toDate);
-          params.date_to = toDate.trim();
-        }
+        const params = buildAnalyticsDashboardParams({
+          mask,
+          companyIdentifier,
+          campaignId,
+          fromDate,
+          toDate,
+        });
         const res = (await getAnalyticsDashboard(params)) as DashboardResponse;
-        const data = res?.data ?? null;
-        if (!cancelled) setDashboard(data && typeof data === "object" ? data : null);
+        if (!cancelled) setDashboard(dashboardDataFromResponse(res));
       } catch (err) {
         console.error("getAnalyticsDashboard error:", err);
         if (!cancelled) setDashboard(null);

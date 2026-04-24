@@ -621,13 +621,32 @@ function callerIdsFromSipTrunkItem(item: Record<string, unknown>): string[] {
   return [];
 }
 
+/** First usable trunk id field; avoids String() on objects (e.g. nested id payloads). */
+function sipTrunkRowIdFromItem(item: Record<string, unknown>): string {
+  const candidates = [item.sip_trunk_id, item.id, item.trunk_id];
+  for (const value of candidates) {
+    if (value == null || typeof value === "object") continue;
+    if (typeof value === "string") {
+      const t = value.trim();
+      if (t) return t;
+    }
+    if (
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ) {
+      const s = String(value).trim();
+      if (s) return s;
+    }
+  }
+  return "";
+}
+
 function normalizeSipTrunkRows(list: unknown[]): SipTrunkOption[] {
   const out: SipTrunkOption[] = [];
   for (const raw of list) {
     const item = raw as Record<string, unknown>;
-    const id = String(
-      item.sip_trunk_id ?? item.id ?? item.trunk_id ?? "",
-    ).trim();
+    const id = sipTrunkRowIdFromItem(item);
     if (!id) continue;
     const name = typeof item.name === "string" ? item.name : id;
     out.push({ sip_trunk_id: id, name, caller_ids: callerIdsFromSipTrunkItem(item) });
@@ -652,6 +671,25 @@ function companyIdentifierParamForSipTrunks(
   return t;
 }
 
+/** If the selected trunk id is not in the freshly loaded list, clear trunk + phone. */
+function clearStaleSipTrunkFormSelection(
+  prev: CreateBotPayload,
+  rows: SipTrunkOption[],
+): CreateBotPayload {
+  const current = prev.configuration?.sip_trunk_id?.trim() ?? "";
+  if (!current) return prev;
+  const stillValid = rows.some((row) => row.sip_trunk_id === current);
+  if (stillValid) return prev;
+  return {
+    ...prev,
+    configuration: {
+      ...prev.configuration,
+      sip_trunk_id: "",
+      phone_number: "",
+    },
+  };
+}
+
 /** Loads SIP trunks for the current company; `companyIdForSipTrunks` must be the API identifier. */
 function useSipTrunksForCompany(
   companyIdForSipTrunks: string,
@@ -673,19 +711,7 @@ function useSipTrunksForCompany(
         if (cancelled) return;
         const rows = normalizeSipTrunkRows(listFromSipTrunksResponse(res));
         setSipTrunks(rows);
-        setForm((prev) => {
-          const current = prev.configuration?.sip_trunk_id?.trim() ?? "";
-          if (!current) return prev;
-          if (rows.some((r) => r.sip_trunk_id === current)) return prev;
-          return {
-            ...prev,
-            configuration: {
-              ...prev.configuration,
-              sip_trunk_id: "",
-              phone_number: "",
-            },
-          };
-        });
+        setForm((prev) => clearStaleSipTrunkFormSelection(prev, rows));
       })
       .catch(() => {
         if (!cancelled) {
@@ -955,6 +981,24 @@ const VoicebotInboundBotsCreate = () => {
     color: "#6b7280",
     marginBottom: "6px",
   };
+
+  const hasCompanyForSip = Boolean(form.company_id?.trim());
+  let sipTrunkDefaultOptionLabel = "Select SIP trunk";
+  if (!hasCompanyForSip) {
+    sipTrunkDefaultOptionLabel =
+      "Select a company in Basic Information first";
+  } else if (loadingSipTrunks) {
+    sipTrunkDefaultOptionLabel = "Loading…";
+  }
+
+  const hasSipTrunkSelected = Boolean(cfg.sip_trunk_id?.trim());
+  let phoneNumberFreeTextPlaceholder = "Select a SIP trunk first";
+  if (hasSipTrunkSelected) {
+    phoneNumberFreeTextPlaceholder =
+      "No caller_ids on this trunk; enter a number";
+  }
+  const sipTrunkSelectDisabled = hasCompanyForSip ? loadingSipTrunks : true;
+  const phoneNumberFreeTextDisabled = !hasSipTrunkSelected;
 
   if (loadingBot) return <LoadingBotPlaceholder />;
 
@@ -1487,18 +1531,10 @@ const VoicebotInboundBotsCreate = () => {
                             value={cfg.sip_trunk_id ?? ""}
                             onChange={handleSipTrunkChange}
                             required
-                            disabled={
-                              loadingSipTrunks || !form.company_id?.trim()
-                            }
+                            disabled={sipTrunkSelectDisabled}
                             style={inputStyle}
                           >
-                            <option value="">
-                              {!form.company_id?.trim()
-                                ? "Select a company in Basic Information first"
-                                : loadingSipTrunks
-                                  ? "Loading…"
-                                  : "Select SIP trunk"}
-                            </option>
+                            <option value="">{sipTrunkDefaultOptionLabel}</option>
                             {sipTrunks.map((t) => (
                               <option
                                 key={t.sip_trunk_id}
@@ -1535,14 +1571,10 @@ const VoicebotInboundBotsCreate = () => {
                               onChange={(e) =>
                                 updateConfig("phone_number", e.target.value)
                               }
-                              placeholder={
-                                cfg.sip_trunk_id?.trim()
-                                  ? "No caller_ids on this trunk; enter a number"
-                                  : "Select a SIP trunk first"
-                              }
+                              placeholder={phoneNumberFreeTextPlaceholder}
                               required
                               style={inputStyle}
-                              disabled={!cfg.sip_trunk_id?.trim()}
+                              disabled={phoneNumberFreeTextDisabled}
                             />
                           )}
                         </Form.Group>

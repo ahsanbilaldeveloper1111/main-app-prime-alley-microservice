@@ -55,6 +55,24 @@ function statusCount(
   return row?.value;
 }
 
+/** Safe id string for primitives only; avoids implicit object stringification. */
+function primitiveToTrimmedString(value: unknown): string {
+  if (value == null || typeof value === "object") return "";
+  if (typeof value === "string") {
+    const t = value.trim();
+    return t && t !== "[object Object]" ? t : "";
+  }
+  if (
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    const s = String(value).trim();
+    return s && s !== "[object Object]" ? s : "";
+  }
+  return "";
+}
+
 /** Unwrap common voicebot list envelopes: results, data, items, nested data.{…}. */
 function coerceListFromVoicebot(res: unknown): unknown[] {
   if (Array.isArray(res)) return res;
@@ -89,9 +107,8 @@ function addBotIdAlias(
   displayName: string,
 ) {
   const name = displayName.trim();
-  if (!name || rawId == null || typeof rawId === "object") return;
-  const s = String(rawId).trim();
-  if (!s || s === "[object Object]") return;
+  const s = primitiveToTrimmedString(rawId);
+  if (!name || !s) return;
   out[s] = name;
   out[s.toLowerCase()] = name;
 }
@@ -131,29 +148,24 @@ function mergeBotLookups(...maps: Record<string, string>[]): Record<string, stri
 
 /** Prefer stable bot id from call row (avoid using human name as grouping key). */
 function resolveBotIdFromCallRow(c: Record<string, unknown>): string {
-  const pick = (v: unknown): string => {
-    if (v == null || typeof v === "object") return "";
-    const s = String(v).trim();
-    return s && s !== "[object Object]" ? s : "";
-  };
   const direct =
-    pick(c.bot_id) ||
-    pick(c.bot_uuid) ||
-    pick(c.botId) ||
-    pick(c.bot_pk) ||
-    pick(c.voicebot_id) ||
-    pick(c.voice_bot_id);
+    primitiveToTrimmedString(c.bot_id) ||
+    primitiveToTrimmedString(c.bot_uuid) ||
+    primitiveToTrimmedString(c.botId) ||
+    primitiveToTrimmedString(c.bot_pk) ||
+    primitiveToTrimmedString(c.voicebot_id) ||
+    primitiveToTrimmedString(c.voice_bot_id);
   if (direct) return direct;
   const bot = c.bot;
   if (typeof bot === "string" && bot.trim()) return bot.trim();
   if (bot && typeof bot === "object") {
     const o = bot as Record<string, unknown>;
     return (
-      pick(o.id) ||
-      pick(o.bot_id) ||
-      pick(o.uuid) ||
-      pick(o.voicebot_id) ||
-      pick(o.voice_bot_id)
+      primitiveToTrimmedString(o.id) ||
+      primitiveToTrimmedString(o.bot_id) ||
+      primitiveToTrimmedString(o.uuid) ||
+      primitiveToTrimmedString(o.voicebot_id) ||
+      primitiveToTrimmedString(o.voice_bot_id)
     );
   }
   return "";
@@ -176,6 +188,224 @@ function enrichBotRowNames(
     if (mapped) return { ...row, name: mapped };
     return row;
   });
+}
+
+type InboundCallAggItem = {
+  status?: string;
+  call_duration_seconds?: number;
+  session_start_time?: string;
+  bot?: string | Record<string, unknown>;
+  bot_id?: string | number;
+  bot_name?: string;
+};
+
+type InboundBotAggRow = {
+  name: string;
+  total: number;
+  completed: number;
+  transferred: number;
+  failed: number;
+};
+
+function inboundBotLabelFromCall(c: InboundCallAggItem, botId: string): string {
+  const row = c as Record<string, unknown>;
+  const n = c.bot_name ?? row.bot_name;
+  if (typeof n === "string" && n.trim()) return n.trim();
+  const b = c.bot;
+  if (typeof b === "string" && b.trim()) return b.trim();
+  if (b && typeof b === "object") {
+    const o = b as { name?: unknown };
+    if (typeof o.name === "string" && o.name.trim()) return o.name.trim();
+  }
+  return botId || "—";
+}
+
+function extractInboundCallsList(callsRes: unknown): InboundCallAggItem[] {
+  const list = Array.isArray(callsRes)
+    ? callsRes
+    : (callsRes as { results?: unknown[] })?.results ??
+      (callsRes as { data?: unknown[] })?.data ??
+      [];
+  return Array.isArray(list) ? (list as InboundCallAggItem[]) : [];
+}
+
+function addToDurationHistogram(
+  byDuration: Record<string, number>,
+  seconds: number,
+): void {
+  const validSec = Number.isFinite(seconds) && seconds >= 0 ? seconds : 0;
+  const bucket = DURATION_BUCKETS.find(
+    (b) => validSec >= b.min && validSec <= b.max,
+  );
+  if (bucket) byDuration[bucket.key]++;
+}
+
+function addToDailyVolume(byDate: Record<string, number>, startTime?: string): void {
+  if (!startTime) return;
+  try {
+    const d = new Date(startTime);
+    const key = d.toISOString().slice(0, 10);
+    byDate[key] = (byDate[key] ?? 0) + 1;
+  } catch {
+    // skip invalid date
+  }
+}
+
+function incrementBotStatusCounts(row: InboundBotAggRow, status: string): void {
+  row.total += 1;
+  if (status === "completed" || status === "answered") row.completed += 1;
+  else if (status === "transferred") row.transferred += 1;
+  else if (status === "failed" || status === "timeout" || status === "dropped") {
+    row.failed += 1;
+  }
+}
+
+function aggregateInboundCallsFromList(
+  rawList: InboundCallAggItem[],
+  botLookup: Record<string, string>,
+): {
+  byStatus: Record<string, number>;
+  byDuration: Record<string, number>;
+  byDate: Record<string, number>;
+  byBot: Record<string, InboundBotAggRow>;
+} {
+  const byStatus: Record<string, number> = {};
+  const byDuration: Record<string, number> = {};
+  const byDate: Record<string, number> = {};
+  const byBot: Record<string, InboundBotAggRow> = {};
+
+  DURATION_BUCKETS.forEach((b) => {
+    byDuration[b.key] = 0;
+  });
+
+  for (const c of rawList) {
+    const s = inboundCallListStatus(c as Record<string, unknown>) || "unknown";
+    byStatus[s] = (byStatus[s] ?? 0) + 1;
+    addToDurationHistogram(byDuration, Number(c.call_duration_seconds));
+    addToDailyVolume(byDate, c.session_start_time);
+    const botId = resolveBotIdFromCallRow(c as Record<string, unknown>);
+    if (!botId) continue;
+    if (!byBot[botId]) {
+      const fromLookup = botNameFromLookup(botLookup, botId);
+      byBot[botId] = {
+        name: fromLookup || inboundBotLabelFromCall(c, botId),
+        total: 0,
+        completed: 0,
+        transferred: 0,
+        failed: 0,
+      };
+    }
+    incrementBotStatusCounts(byBot[botId], s);
+  }
+
+  return { byStatus, byDuration, byDate, byBot };
+}
+
+function buildInboundVolumeSeries(
+  byDate: Record<string, number>,
+  timePeriod: string,
+): { date: string; dateKey: string; calls: number }[] {
+  const formatDateLabel = (dateKey: string) =>
+    new Date(dateKey + "Z").toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  const dateKeysInRange = getDateKeysInRange(timePeriod);
+  if (dateKeysInRange.length > 0) {
+    return dateKeysInRange.map((dateKey) => ({
+      dateKey,
+      date: formatDateLabel(dateKey),
+      calls: byDate[dateKey] ?? 0,
+    }));
+  }
+  return Object.entries(byDate)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateKey, calls]) => ({
+      dateKey,
+      date: formatDateLabel(dateKey),
+      calls,
+    }));
+}
+
+type InboundCallsFetchParams = {
+  params: Record<string, string | number | undefined>;
+  botsParams: ListBotsParams;
+  needSessionBots: boolean;
+  sessionCompanyId: string;
+};
+
+function buildInboundCallsFetchParams(args: {
+  isAdmin: boolean;
+  companyFilter: string;
+  timePeriod: string;
+  sessionUser: unknown;
+}): InboundCallsFetchParams {
+  const companyIdentifier = (args.sessionUser as { company_identifier?: string })
+    ?.company_identifier;
+  const params: Record<string, string | number | undefined> = { limit: 100 };
+  if (!args.isAdmin && companyIdentifier) params.company_id = companyIdentifier;
+  else if (args.companyFilter) params.company_id = args.companyFilter;
+  const { start_date, end_date } = getDateRange(args.timePeriod);
+  if (start_date) params.date_from = start_date;
+  if (end_date) params.date_to = end_date;
+
+  const botsParams: ListBotsParams = { limit: 100 };
+  if (!args.isAdmin && companyIdentifier) botsParams.company_id = companyIdentifier;
+  else if (args.companyFilter) botsParams.company_id = args.companyFilter;
+
+  const sessionCompanyId = String(
+    (args.sessionUser as { company_id?: string })?.company_id ?? "",
+  ).trim();
+  const needSessionBots =
+    !args.isAdmin &&
+    sessionCompanyId.length > 0 &&
+    sessionCompanyId !== String(botsParams.company_id ?? "").trim();
+
+  return { params, botsParams, needSessionBots, sessionCompanyId };
+}
+
+function applyBotLookupNamesToAgg(
+  byBot: Record<string, InboundBotAggRow>,
+  botLookup: Record<string, string>,
+): void {
+  for (const bid of Object.keys(byBot)) {
+    const mapped = botNameFromLookup(botLookup, bid);
+    if (mapped) byBot[bid].name = mapped;
+  }
+}
+
+function clientDistributionStateFromAggregation(args: {
+  byStatus: Record<string, number>;
+  byDuration: Record<string, number>;
+  byDate: Record<string, number>;
+  byBot: Record<string, InboundBotAggRow>;
+  timePeriod: string;
+}): {
+  statusRows: { name: string; value: number }[];
+  botRows: BotPerformanceRow[];
+  durationRows: { name: string; count: number }[];
+  volumeRows: { date: string; dateKey: string; calls: number }[];
+} {
+  const { byStatus, byDuration, byDate, byBot, timePeriod } = args;
+  return {
+    statusRows: Object.entries(byStatus).map(([name, value]) => ({ name, value })),
+    botRows: Object.entries(byBot).map(([bid, agg]) => ({
+      name: agg.name,
+      botLookupId: bid,
+      total: agg.total,
+      completed: agg.completed,
+      transferred: agg.transferred,
+      failed: agg.failed,
+      successRate:
+        agg.total > 0 ? ((agg.completed / agg.total) * 100).toFixed(1) : "0.0",
+    })),
+    durationRows: DURATION_BUCKETS.map((b) => ({
+      name: b.label,
+      count: byDuration[b.key] ?? 0,
+    })),
+    volumeRows: buildInboundVolumeSeries(byDate, timePeriod),
+  };
 }
 
 const AnalyticsPage = () => {
@@ -259,7 +489,7 @@ const AnalyticsPage = () => {
     () =>
       statusData
         .map((d) => `${String(d.name).toLowerCase()}:${d.value}`)
-        .sort()
+        .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
         .join("|"),
     [statusData],
   );
@@ -301,26 +531,13 @@ const AnalyticsPage = () => {
     setClientBotRows([]);
     setBotNameById({});
     try {
-      const params: Record<string, string | number | undefined> = { limit: 100 };
-      const companyIdentifier = (session?.user as { company_identifier?: string })
-        ?.company_identifier;
-      if (!isAdmin && companyIdentifier) params.company_id = companyIdentifier;
-      else if (companyFilter) params.company_id = companyFilter;
-      const { start_date, end_date } = getDateRange(timePeriod);
-      if (start_date) params.date_from = start_date;
-      if (end_date) params.date_to = end_date;
-
-      const botsParams: ListBotsParams = { limit: 100 };
-      if (!isAdmin && companyIdentifier) botsParams.company_id = companyIdentifier;
-      else if (companyFilter) botsParams.company_id = companyFilter;
-
-      const sessionCompanyId = String(
-        (session?.user as { company_id?: string })?.company_id ?? "",
-      ).trim();
-      const needSessionBots =
-        !isAdmin &&
-        sessionCompanyId.length > 0 &&
-        sessionCompanyId !== String(botsParams.company_id ?? "").trim();
+      const { params, botsParams, needSessionBots, sessionCompanyId } =
+        buildInboundCallsFetchParams({
+          isAdmin,
+          companyFilter,
+          timePeriod,
+          sessionUser: session?.user,
+        });
 
       const [callsRes, botsScoped, botsSessionCo, botsAllAdmin] = await Promise.all([
         getCalls(params),
@@ -339,141 +556,18 @@ const AnalyticsPage = () => {
       );
       setBotNameById(botLookup);
 
-      const list = Array.isArray(callsRes)
-        ? callsRes
-        : (callsRes as { results?: { status?: string; call_duration_seconds?: number; session_start_time?: string }[] })?.results ??
-          (callsRes as { data?: { status?: string; call_duration_seconds?: number; session_start_time?: string }[] })?.data ??
-          [];
-      const rawList = Array.isArray(list) ? list : [];
-
-      type CallItem = {
-        status?: string;
-        call_duration_seconds?: number;
-        session_start_time?: string;
-        bot?: string | Record<string, unknown>;
-        bot_id?: string | number;
-        bot_name?: string;
-      };
-
-      const botLabelForCall = (c: CallItem, botId: string): string => {
-        const row = c as Record<string, unknown>;
-        const n = c.bot_name ?? row.bot_name;
-        if (typeof n === "string" && n.trim()) return n.trim();
-        const b = c.bot;
-        if (typeof b === "string" && b.trim()) return b.trim();
-        if (b && typeof b === "object") {
-          const o = b as { name?: unknown; id?: unknown };
-          if (typeof o.name === "string" && o.name.trim()) return o.name.trim();
-        }
-        return botId || "—";
-      };
-
-      const byStatus: Record<string, number> = {};
-      const byDuration: Record<string, number> = {};
-      const byDate: Record<string, number> = {};
-      const byBot: Record<
-        string,
-        {
-          name: string;
-          total: number;
-          completed: number;
-          transferred: number;
-          failed: number;
-        }
-      > = {};
-      DURATION_BUCKETS.forEach((b) => {
-        byDuration[b.key] = 0;
+      const rawList = extractInboundCallsList(callsRes);
+      const aggregated = aggregateInboundCallsFromList(rawList, botLookup);
+      applyBotLookupNamesToAgg(aggregated.byBot, botLookup);
+      const next = clientDistributionStateFromAggregation({
+        ...aggregated,
+        timePeriod,
       });
 
-      rawList.forEach((c: CallItem) => {
-        const s = inboundCallListStatus(c as Record<string, unknown>) || "unknown";
-        byStatus[s] = (byStatus[s] ?? 0) + 1;
-        const sec = Number(c.call_duration_seconds);
-        const validSec = Number.isFinite(sec) && sec >= 0 ? sec : 0;
-        const bucket = DURATION_BUCKETS.find(
-          (b) => validSec >= b.min && validSec <= b.max,
-        );
-        if (bucket) byDuration[bucket.key]++;
-        const startTime = c.session_start_time;
-        if (startTime) {
-          try {
-            const d = new Date(startTime);
-            const key = d.toISOString().slice(0, 10);
-            byDate[key] = (byDate[key] ?? 0) + 1;
-          } catch {
-            // skip invalid date
-          }
-        }
-        const botId = resolveBotIdFromCallRow(c as Record<string, unknown>);
-        if (botId) {
-          if (!byBot[botId]) {
-            const fromLookup = botNameFromLookup(botLookup, botId);
-            byBot[botId] = {
-              name: fromLookup || botLabelForCall(c, botId),
-              total: 0,
-              completed: 0,
-              transferred: 0,
-              failed: 0,
-            };
-          }
-          byBot[botId].total += 1;
-          if (s === "completed" || s === "answered") byBot[botId].completed += 1;
-          else if (s === "transferred") byBot[botId].transferred += 1;
-          else if (s === "failed" || s === "timeout" || s === "dropped") {
-            byBot[botId].failed += 1;
-          }
-        }
-      });
-
-      for (const bid of Object.keys(byBot)) {
-        const mapped = botNameFromLookup(botLookup, bid);
-        if (mapped) byBot[bid].name = mapped;
-      }
-
-      setClientStatusData(
-        Object.entries(byStatus).map(([name, value]) => ({ name, value })),
-      );
-      setClientBotRows(
-        Object.entries(byBot).map(([bid, v]) => ({
-          name: v.name,
-          botLookupId: bid,
-          total: v.total,
-          completed: v.completed,
-          transferred: v.transferred,
-          failed: v.failed,
-          successRate:
-            v.total > 0 ? ((v.completed / v.total) * 100).toFixed(1) : "0.0",
-        })),
-      );
-      setClientDurationData(
-        DURATION_BUCKETS.map((b) => ({
-          name: b.label,
-          count: byDuration[b.key] ?? 0,
-        })),
-      );
-
-      const formatDateLabel = (dateKey: string) =>
-        new Date(dateKey + "Z").toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        });
-      const dateKeysInRange = getDateKeysInRange(timePeriod);
-      const volumeSorted =
-        dateKeysInRange.length > 0
-          ? dateKeysInRange.map((dateKey) => ({
-              dateKey,
-              date: formatDateLabel(dateKey),
-              calls: byDate[dateKey] ?? 0,
-            }))
-          : Object.entries(byDate)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([dateKey, calls]) => ({
-                dateKey,
-                date: formatDateLabel(dateKey),
-                calls,
-              }));
-      setClientVolumeData(volumeSorted);
+      setClientStatusData(next.statusRows);
+      setClientBotRows(next.botRows);
+      setClientDurationData(next.durationRows);
+      setClientVolumeData(next.volumeRows);
     } catch {
       if (fetchId !== callsListFetchIdRef.current) return;
       setClientStatusData([]);

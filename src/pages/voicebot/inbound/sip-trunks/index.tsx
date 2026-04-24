@@ -59,19 +59,19 @@ function listFromSipTrunksResponse(res: unknown): unknown[] {
 }
 
 function callerIdsFromRow(row: TrunkRow): string {
-  const raw = row.caller_ids;
+  const raw: unknown = row.caller_ids;
   if (raw == null) return "";
   if (Array.isArray(raw)) {
     return raw
       .map((x) => (typeof x === "string" || typeof x === "number" ? String(x) : ""))
-      .map((s) => s.trim())
+      .map((s: string) => s.trim())
       .filter((s) => s.length > 0)
       .join(", ");
   }
   if (typeof raw === "string" && raw.trim()) {
     return raw
       .split(/[,\n]/)
-      .map((s) => s.trim())
+      .map((s: string) => s.trim())
       .filter((s) => s.length > 0)
       .join(", ");
   }
@@ -317,7 +317,7 @@ const SipTrunksPage = () => {
       key: "name",
       label: "Name",
       sortable: true,
-      render: (r) => safeDisplayString(r.name as string | undefined),
+      render: (r) => safeDisplayString(r.name),
     },
     {
       key: "caller_ids",

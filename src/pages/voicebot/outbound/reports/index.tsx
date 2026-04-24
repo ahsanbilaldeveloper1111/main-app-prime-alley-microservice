@@ -586,8 +586,7 @@ const OutboundReportsPage = () => {
     {
       title: "Success Rate",
       value:
-        summary != null &&
-        summary.success_rate != null &&
+        summary?.success_rate != null &&
         Number.isFinite(Number(summary.success_rate))
           ? formatPercent1(summary.success_rate)
           : "—",

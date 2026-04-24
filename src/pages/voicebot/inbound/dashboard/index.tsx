@@ -163,9 +163,8 @@ function primaryCallCompanyKey(call: CallRow): string | null {
     typeof r.company === "string" ? r.company : null,
   ];
   for (const v of candidates) {
-    if (v == null || v === "") continue;
-    const s = String(v).trim();
-    if (s) return s;
+    const id = asLookupId(v);
+    if (id) return id;
   }
   return null;
 }
@@ -236,6 +235,16 @@ function companyRowApiId(c: CompanyRow): string {
 /** Value for admin company `<select>` — API tenant scope uses `identifier`. */
 function inboundCompanySelectValue(c: CompanyRow): string {
   return String(c.identifier ?? "").trim();
+}
+
+/** First selectable company when admin has not chosen one yet. */
+function defaultAdminSelectedCompanyId(
+  prev: string,
+  list: CompanyRow[],
+): string {
+  if (prev) return prev;
+  const first = list.find((c) => Boolean(inboundCompanySelectValue(c)));
+  return first ? inboundCompanySelectValue(first) : "";
 }
 
 async function loadInboundDashboardData(
@@ -319,11 +328,9 @@ const InboundDashboardPage = () => {
         if (cancelled) return;
         const list = parseList<CompanyRow>(res);
         setAdminCompanyOptions(list);
-        setAdminSelectedCompanyId((prev) => {
-          if (prev) return prev;
-          const first = list.find((c) => inboundCompanySelectValue(c));
-          return first ? inboundCompanySelectValue(first) : "";
-        });
+        setAdminSelectedCompanyId((prev) =>
+          defaultAdminSelectedCompanyId(prev, list),
+        );
       } catch {
         if (!cancelled) {
           setAdminCompanyOptions([]);
@@ -344,29 +351,42 @@ const InboundDashboardPage = () => {
     let cancelled = false;
     const isCancelled = () => cancelled;
 
+    const resetDashboardToEmpty = () => {
+      setCompanies([]);
+      setBots([]);
+      setRecentCalls([]);
+      setStats(null);
+      setCompanyRows([]);
+      setLoading(false);
+    };
+
+    const clearDashboardLists = () => {
+      setCompanies([]);
+      setBots([]);
+      setRecentCalls([]);
+      setStats(null);
+      setCompanyRows([]);
+    };
+
+    const applyLoadedDashboard = (
+      data: Awaited<ReturnType<typeof loadInboundDashboardData>>,
+    ) => {
+      setCompanies(data.companyList);
+      setBots(data.botList);
+      setRecentCalls(
+        enrichRecentCalls(data.callList, data.companyList, data.botList),
+      );
+      setStats(data.mergedStats);
+      setCompanyRows(data.companyTableRows);
+    };
+
     const load = async () => {
-      if (isAdmin) {
-        if (adminCompanyListLoading) return;
-        if (!adminSelectedCompanyId) {
-          if (!isCancelled()) {
-            setCompanies([]);
-            setBots([]);
-            setRecentCalls([]);
-            setStats(null);
-            setCompanyRows([]);
-            setLoading(false);
-          }
-          return;
-        }
-      } else if (!companyIdentifier) {
-        if (!isCancelled()) {
-          setCompanies([]);
-          setBots([]);
-          setRecentCalls([]);
-          setStats(null);
-          setCompanyRows([]);
-          setLoading(false);
-        }
+      if (isAdmin && adminCompanyListLoading) return;
+      const scopeMissing =
+        (isAdmin && !adminSelectedCompanyId) ||
+        (!isAdmin && !companyIdentifier);
+      if (scopeMissing) {
+        if (!isCancelled()) resetDashboardToEmpty();
         return;
       }
 
@@ -375,22 +395,9 @@ const InboundDashboardPage = () => {
         const scope = isAdmin ? adminSelectedCompanyId : companyIdentifier;
         const data = await loadInboundDashboardData(scope);
         if (isCancelled()) return;
-
-        setCompanies(data.companyList);
-        setBots(data.botList);
-        setRecentCalls(
-          enrichRecentCalls(data.callList, data.companyList, data.botList),
-        );
-        setStats(data.mergedStats);
-        setCompanyRows(data.companyTableRows);
+        applyLoadedDashboard(data);
       } catch {
-        if (!isCancelled()) {
-          setCompanies([]);
-          setBots([]);
-          setRecentCalls([]);
-          setStats(null);
-          setCompanyRows([]);
-        }
+        if (!isCancelled()) clearDashboardLists();
       } finally {
         if (!isCancelled()) setLoading(false);
       }

@@ -8,6 +8,9 @@ import moment from "moment-timezone";
 
 type dateType = string | Date | null | undefined;
 
+/** Values accepted by {@link formatNumber} (APIs and forms may send strings). */
+type FormatNumberInput = number | string | null | undefined;
+
 // Cache for session data to avoid multiple fetches
 let sessionCache: { session: Session | null; timestamp: number } | null = null;
 const SESSION_CACHE_TTL = 5000; // 5 seconds cache TTL
@@ -801,7 +804,7 @@ export const formatCurrency = (amount: number | null): string => {
 };
 
 export const formatNumber = (
-  amount: number | string | null | undefined,
+  amount: FormatNumberInput,
   withoutDecimals?: boolean,
 ): string => {
   const defaultZero = withoutDecimals ? "0" : "0.00";

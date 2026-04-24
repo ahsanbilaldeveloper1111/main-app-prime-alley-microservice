@@ -80,8 +80,7 @@ function extractInboundStatsScalars(
       nested.answered ??
       nested.successful_calls,
   );
-  const completed =
-    completedPrimary !== undefined ? completedPrimary : completedFromAnswered;
+  const completed = completedPrimary ?? completedFromAnswered;
 
   const avg_duration_seconds = toFiniteNumber(
     nested.avg_duration_seconds ??
@@ -217,8 +216,7 @@ function buildStatusDistributionFromScalars(
       nested.answered ??
       nested.successful_calls,
   );
-  const completed =
-    completedPrimary !== undefined ? completedPrimary : completedFromAnswered;
+  const completed = completedPrimary ?? completedFromAnswered;
   const failed = toFiniteNumber(
     nested.failed ?? nested.failed_calls ?? nested.failed_count,
   );
@@ -540,8 +538,19 @@ export function parseVolumeDataFromSummary(
 
 function pickScalarId(v: unknown): string {
   if (v == null || typeof v === "object") return "";
-  const s = String(v).trim();
-  return s && s !== "[object Object]" ? s : "";
+  if (typeof v === "string") {
+    const t = v.trim();
+    return t && t !== "[object Object]" ? t : "";
+  }
+  if (
+    typeof v === "number" ||
+    typeof v === "boolean" ||
+    typeof v === "bigint"
+  ) {
+    const s = String(v).trim();
+    return s && s !== "[object Object]" ? s : "";
+  }
+  return "";
 }
 
 /** Prefer bot_id / uuid fields over display name for cross-API lookups. */
