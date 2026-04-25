@@ -171,6 +171,9 @@ import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import { getDatetimeLocalMinNow } from "@utils/datetimeLocalInput";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 type CompanyAssignedToSelectOption = {
   value: string | number;
@@ -1110,7 +1113,11 @@ const CrmCompanyManagement = () => {
 
   // Upload CSV file
   const handleUpload = async () => {
-    if (!session?.user?.permissions?.includes("add-crm-data-management")) {
+    if (
+      !session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      )
+    ) {
       toast.error("You don't have permission to upload data");
       return;
     }
@@ -1969,7 +1976,7 @@ const CrmCompanyManagement = () => {
   // Define table actions
   const companyActions: TableAction<any>[] = useMemo(
     () => [
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
+      ...(session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)
         ? [
             {
               label: "View",
@@ -1979,7 +1986,7 @@ const CrmCompanyManagement = () => {
             },
           ]
         : []),
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
+      ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_DATA_MANAGEMENT)
         ? [
             {
               label: "Edit",
@@ -1993,7 +2000,7 @@ const CrmCompanyManagement = () => {
           ]
         : []),
       ...(session?.user?.permissions?.includes(
-        "call-service-crm-data-management",
+        PERMISSIONS.CALL_SERVICE_CRM_DATA_MANAGEMENT,
       )
         ? [
             {
@@ -2015,7 +2022,7 @@ const CrmCompanyManagement = () => {
                 align: "end" as const,
                 options: [
                   ...(session?.user?.permissions?.includes(
-                    "call-service-crm-data-management",
+                    PERMISSIONS.CALL_SERVICE_CRM_DATA_MANAGEMENT,
                   )
                     ? [
                         {
@@ -2282,7 +2289,7 @@ const CrmCompanyManagement = () => {
         },
       },
 
-      ...(session?.user?.permissions?.includes("view-crm-data-management")
+      ...(session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)
         ? [
             {
               key: "view_action",
@@ -2312,7 +2319,7 @@ const CrmCompanyManagement = () => {
         cell: (props: any) => (
           <div className="d-flex gap-1">
             {session?.user?.permissions?.includes(
-              "call-service-crm-data-management",
+              PERMISSIONS.CALL_SERVICE_CRM_DATA_MANAGEMENT,
             ) && (
               <Button
                 variant="success"
@@ -2393,7 +2400,9 @@ const CrmCompanyManagement = () => {
       }}
       ref={addContactsRef}
     >
-      {session?.user?.permissions?.includes("delete-crm-data-management") &&
+      {session?.user?.permissions?.includes(
+        PERMISSIONS.DELETE_CRM_DATA_MANAGEMENT,
+      ) &&
         selectedItems.length > 0 && (
           <button
             type="button"
@@ -3588,7 +3597,9 @@ const CrmCompanyManagement = () => {
     );
   };
 
-  if (!session?.user?.permissions?.includes("list-crm-data-management")) {
+  if (
+    !session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)
+  ) {
     return null;
   }
 
@@ -3637,7 +3648,9 @@ const CrmCompanyManagement = () => {
         <div className="d-flex flex-wrap gap-2">
          
 
-{session?.user?.permissions?.includes("add-crm-data-management") && (
+{session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      ) && (
   <Button
     variant="outline-secondary"
     className=""
@@ -3784,7 +3797,7 @@ const CrmCompanyManagement = () => {
             {/* Filter Bar */}
             {showFilterBar &&
               session?.user?.permissions?.includes(
-                "list-crm-data-management",
+                PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
               ) && (
                 <FilterBar
                   quickFilters={[
@@ -3843,7 +3856,7 @@ const CrmCompanyManagement = () => {
             {/* Advanced Filters */}
             {showAdvancedFilters &&
               session?.user?.permissions?.includes(
-                "list-crm-data-management",
+                PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
               ) && (
                 <Card className="border-0 shadow-sm mb-4">
                   <Card.Body>
@@ -4279,7 +4292,7 @@ const CrmCompanyManagement = () => {
                 showActions={false}
                 // Selection
                 selectable={session?.user?.permissions?.includes(
-                  "delete-crm-data-management",
+                  PERMISSIONS.DELETE_CRM_DATA_MANAGEMENT,
                 )}
                 selectedRows={dataList.filter((item) =>
                   selectedItems.includes(item.id),
@@ -4324,7 +4337,7 @@ const CrmCompanyManagement = () => {
                 onRowDoubleClick={(row) => {
                   if (
                     session?.user?.permissions?.includes(
-                      "view-crm-data-management",
+                      PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
                     )
                   ) {
                     handleViewData(row);
@@ -4463,7 +4476,9 @@ const CrmCompanyManagement = () => {
           </div>
 
           {/* Upload Modal */}
-          {session?.user?.permissions?.includes("add-crm-data-management") && (
+          {session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      ) && (
             <Modal
               show={showUploadModal}
               onHide={() => setShowUploadModal(false)}

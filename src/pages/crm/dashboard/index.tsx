@@ -11,6 +11,9 @@ import {
   ListGroup,
 } from "react-bootstrap";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import {
   getCrmDashboard,
   getCrmDashboardOverview,
@@ -1109,7 +1112,7 @@ const CrmDashboard = () => {
               <Card.Body>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h5 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: '#1E293B' }}>Upcoming Tasks</h5>
-                  {session?.user?.permissions?.includes('view-crm-tasks') && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_TASKS) && (
                   <Link href="/crm/tasks" style={{ fontSize: '14px', color: '#3B82F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     View All <ChevronRight size={16} />
                   </Link>

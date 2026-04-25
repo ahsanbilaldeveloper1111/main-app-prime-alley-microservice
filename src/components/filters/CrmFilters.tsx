@@ -9,6 +9,9 @@ import {
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
 import { ModuleSlug } from "@utils/Helper";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface CrmFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
@@ -74,7 +77,7 @@ export default function CrmFilters({ onFiltersChange, onExport, type }: CrmFilte
   useEffect(() => {
     if (status === 'authenticated') {
       // Only show export if onExport prop is provided and user has permission
-      if (onExport && session?.user?.permissions?.includes('export-crm')) {
+      if (onExport && session?.user?.permissions?.includes(PERMISSIONS.EXPORT_CRM)) {
         setShowExport(true);
       }
       // if (session?.user?.permissions?.includes('filters-crm')) {

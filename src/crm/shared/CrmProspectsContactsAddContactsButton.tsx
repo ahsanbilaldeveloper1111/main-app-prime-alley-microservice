@@ -7,6 +7,9 @@ import {
   type CrmListContactFormState,
 } from "@utils/crmContactFormFromCrmItem";
 import type { CrmProspectsContactsListPageConfig } from "@crm/shared/crmProspectsContactsListPageConfig";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 export type CrmProspectsContactsAddContactsButtonProps = Readonly<{
   addContactsRef: RefObject<HTMLDivElement | null>;
@@ -57,7 +60,9 @@ export function CrmProspectsContactsAddContactsButton({
       }}
       ref={addContactsRef}
     >
-      {session?.user?.permissions?.includes("delete-crm-data-management") &&
+      {session?.user?.permissions?.includes(
+        PERMISSIONS.DELETE_CRM_DATA_MANAGEMENT,
+      ) &&
         selectedItems.length > 0 && (
           <button
             type="button"

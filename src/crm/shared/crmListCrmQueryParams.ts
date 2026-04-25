@@ -129,7 +129,10 @@ export function buildCrmListTableCrmDataParams(
   };
   applySharedCrmListGetCrmDataFilters(params, memoizedFilters);
   if (pagination.sortBy) {
-    params.sort_by = pagination.sortBy;
+    const sortAliases: Record<string, string> = {
+      campaign: "campaign_id",
+    };
+    params.sort_by = sortAliases[pagination.sortBy] ?? pagination.sortBy;
     params.sort_order = pagination.sortOrder;
   }
   params.module_slug = ModuleSlug.CRM_DATA_MANAGEMENT;

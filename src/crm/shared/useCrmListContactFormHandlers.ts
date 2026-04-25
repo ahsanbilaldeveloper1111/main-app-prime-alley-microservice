@@ -13,6 +13,8 @@ import {
   type CrmExtensionLikeForOwnerDefault,
   type CrmListContactFormState,
 } from "@utils/crmContactFormFromCrmItem";
+import { datetimeLocalToIsoUtc } from "@utils/datetimeLocalInput";
+import { isValidEmail } from "@utils/Helper";
 export type CrmListContactFormHandlersDeps = {
   session: any;
   contactForm: CrmListContactFormState;
@@ -125,6 +127,10 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
         toast.error("Name, email and phone are required");
         return;
       }
+      if (!isValidEmail(contactForm.email)) {
+        toast.error("Please enter a valid email address");
+        return;
+      }
       const userExtension = String(session?.user?.phone ?? "");
 
       const dataPayload = buildDataPayload(contactForm, customFieldsForPayload, {
@@ -139,19 +145,24 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
           phone: phoneForPayload,
           user_extension: userExtension,
           campaign_id: contactForm.campaign_id ?? null,
-          scheduled_call_at: contactForm.scheduled_call_at || undefined,
+          scheduled_call_at: datetimeLocalToIsoUtc(contactForm.scheduled_call_at),
           company_domain: contactForm.company_domain?.trim() || undefined,
           source_file: getSourceValue(contactForm),
           data: dataPayload,
         });
         fetchCrmData();
+        const ownerDefault = resolveDefaultContactOwnerExtension(
+          session?.user,
+          extensions,
+        );
         setContactForm(
-          createEmptyCrmListContactFormState(sourceField, {
-            defaultContactOwner: resolveDefaultContactOwnerExtension(
-              session?.user,
-              extensions,
-            ),
-          }),
+          sourceField === "source_file"
+            ? createEmptyCrmListContactFormState("source_file", {
+                defaultContactOwner: ownerDefault,
+              })
+            : createEmptyCrmListContactFormState("source", {
+                defaultContactOwner: ownerDefault,
+              }),
         );
         if (!addAnother) {
           setShowCreateContactSidebar(false);
@@ -182,6 +193,10 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
       toast.error("Name, email and phone are required");
       return;
     }
+    if (!isValidEmail(contactForm.email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
 
     const dataPayload = buildDataPayload(contactForm, customFieldsForPayload);
 
@@ -193,7 +208,7 @@ export function useCrmListContactFormHandlers(deps: CrmListContactFormHandlersDe
         campaign_id: contactForm.campaign_id ?? null,
         company_domain: contactForm.company_domain?.trim() || undefined,
         source_file: getSourceValue(contactForm),
-        scheduled_call_at: contactForm.scheduled_call_at || undefined,
+        scheduled_call_at: datetimeLocalToIsoUtc(contactForm.scheduled_call_at),
         data: dataPayload,
       });
       fetchCrmData();

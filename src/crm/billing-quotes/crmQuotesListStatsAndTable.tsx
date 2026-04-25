@@ -16,6 +16,9 @@ import type { TableAction, TableColumn } from "@components/GenericTable";
 import type { StatsCardData } from "@components/GenericStatsCards";
 import type { NextRouter } from "next/router";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** Quote list metrics used by the shared stats strip (billing + CRM quotes pages). */
 export type CrmQuotesListStatsMetrics = {
@@ -239,7 +242,7 @@ export function buildCrmQuotesListTableActions(
   } = params;
 
   return [
-    ...(permissions?.includes("view-crm-data-management")
+    ...(permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)
       ? [
           {
             label: "View",
@@ -249,7 +252,7 @@ export function buildCrmQuotesListTableActions(
           },
         ]
       : []),
-    ...(permissions?.includes("edit-crm-data-management")
+    ...(permissions?.includes(PERMISSIONS.EDIT_CRM_DATA_MANAGEMENT)
       ? [
           {
             label: "Edit",
@@ -276,7 +279,7 @@ export function buildCrmQuotesListTableActions(
             icon: <Mail size={14} />,
             onClick: (row: any) => handleSendToContact(row),
           },
-          ...(permissions?.includes("delete-crm-data-management")
+          ...(permissions?.includes(PERMISSIONS.DELETE_CRM_DATA_MANAGEMENT)
             ? [
                 {
                   label: "Delete",

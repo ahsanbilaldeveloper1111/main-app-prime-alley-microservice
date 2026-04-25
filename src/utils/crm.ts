@@ -1001,6 +1001,8 @@ export const createCrmData = async (payload: {
   company_domain?: string;
   company_name?: string;
   source?: string;
+  /** When creating from a prospects list keyed by upload file name. */
+  source_file?: string;
   tag_ids?: number[];
   directory?: string;
 }): Promise<any> => {
@@ -1064,6 +1066,7 @@ export const updateCrmData = async (
     company_domain?: string;
     company_name?: string;
     source?: string;
+    source_file?: string;
     tag_ids?: number[];
   },
 ): Promise<any> => {

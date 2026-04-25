@@ -61,6 +61,9 @@ import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import { formatCrmPreviewDate, normalizeSearchQuery } from "@utils/Helper";
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 type StageType = "lead" | "deal" | "order" | "lost_reason";
 
@@ -82,10 +85,6 @@ const DEFAULT_STAGES_SELECTED_COLUMNS = [
   "actions",
 ];
 
-const PERMISSION_LIST_STAGES = "list-crm-stages";
-const PERMISSION_ADD_STAGES = "add-crm-stages";
-const PERMISSION_EDIT_STAGES = "edit-crm-stages";
-const PERMISSION_DELETE_STAGES = "delete-crm-stages";
 
 const TYPE_DISPLAY_NAMES: Record<StageType, string> = {
   lead: "Lead",
@@ -823,7 +822,7 @@ const StagesManagement = () => {
               >
                 <Eye size={16} aria-hidden />
               </Button>
-              {session?.user?.permissions?.includes(PERMISSION_EDIT_STAGES) && (
+              {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_STAGES) && (
                 <Button
                   variant="link"
                   size="sm"
@@ -835,7 +834,7 @@ const StagesManagement = () => {
                   <Edit size={16} aria-hidden />
                 </Button>
               )}
-              {session?.user?.permissions?.includes(PERMISSION_DELETE_STAGES) && (
+              {session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_STAGES) && (
                 <Button
                   variant="link"
                   size="sm"
@@ -1014,7 +1013,7 @@ const StagesManagement = () => {
             <BarChart3 size={15} aria-hidden />
             Analytics
           </Button>
-          {session?.user?.permissions?.includes(PERMISSION_ADD_STAGES) && (
+          {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_STAGES) && (
             <Button
               onClick={openCreateStageModal}
               style={{
@@ -1051,7 +1050,7 @@ const StagesManagement = () => {
     ],
   );
 
-  if (!session?.user?.permissions?.includes(PERMISSION_LIST_STAGES)) {
+  if (!session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_STAGES)) {
     return null;
   }
 
@@ -1768,7 +1767,7 @@ const StagesManagement = () => {
                 borderTop: "1px solid #e5e7eb",
               }}
             >
-              {session?.user?.permissions?.includes(PERMISSION_EDIT_STAGES) && (
+              {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_STAGES) && (
                 <Button
                   variant="primary"
                   style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}

@@ -1,8 +1,11 @@
 import React from "react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import {
   TableColumn,
   TableAction,
 } from "@components/GenericTable";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { StatsCardData } from "@components/GenericStatsCards";
 import {
   Target,
@@ -476,7 +479,7 @@ export function buildDealsListTableActions(
       onClick: (row: any) => handlePreviewClick(row),
       variant: "link" as const,
     },
-    ...(session?.user?.permissions?.includes("edit-crm-deals")
+    ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_DEALS)
       ? [
           {
             label: "Edit",
@@ -502,7 +505,9 @@ export function buildDealsListTableActions(
       className: "text-info",
     },
     ...(!isApprovalsList &&
-    session?.user?.permissions?.includes("download-document-crm-deals")
+    session?.user?.permissions?.includes(
+      PERMISSIONS.DOWNLOAD_DOCUMENT_CRM_DEALS,
+    )
       ? [
           {
             label: "Download",
@@ -518,7 +523,7 @@ export function buildDealsListTableActions(
           },
         ]
       : []),
-    ...(session?.user?.permissions?.includes("add-crm-orders")
+    ...(session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_ORDERS)
       ? [
           {
             label: "Convert to Order",
@@ -537,7 +542,7 @@ export function buildDealsListTableActions(
           },
         ]
       : []),
-    ...(session?.user?.permissions?.includes("delete-crm-deals")
+    ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_DEALS)
       ? [
           {
             label: "Delete",
@@ -566,7 +571,9 @@ export function buildDealsListTableActions(
                   className: "text-danger",
                 },
                 ...(isApprovalsList &&
-                session?.user?.permissions?.includes("approve-reject-crm-deals")
+                session?.user?.permissions?.includes(
+                  PERMISSIONS.APPROVE_REJECT_CRM_DEALS,
+                )
                   ? [
                       {
                         label: "Approve",

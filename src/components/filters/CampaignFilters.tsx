@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import GenericFilter from './GenericFilter';
 import { createCampaignFiltersConfig } from './filterConfigs';
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface CampaignFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
@@ -16,7 +19,7 @@ export default function CampaignFilters({ onFiltersChange, onExport }: CampaignF
   useEffect(() => {
     if (status === 'authenticated') {
       // Only show export if onExport prop is provided and user has permission
-      if (onExport && session?.user?.permissions?.includes('export-crm')) {
+      if (onExport && session?.user?.permissions?.includes(PERMISSIONS.EXPORT_CRM)) {
         setShowExport(true);
       }
       setShowFilters(true);

@@ -955,7 +955,14 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
       style={{
         textAlign: col.align || "left",
         position: colIdx === 0 ? "relative" : undefined,
-        ...(col.width ? { width: col.width, maxWidth: col.width } : {}),
+        ...(col.width
+          ? {
+              width: col.width,
+              maxWidth: col.width,
+              minWidth: 0,
+              overflow: "hidden",
+            }
+          : {}),
       }}
     >
       {firstColumnClickable ? (

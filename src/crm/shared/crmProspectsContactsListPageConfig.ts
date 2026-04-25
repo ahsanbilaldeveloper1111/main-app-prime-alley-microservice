@@ -1,12 +1,19 @@
 import type { CrmDataItem, CrmDataMetrics } from "@utils/crm";
 import type { CrmListPageScopedLayoutStylesConfig } from "@crm/shared/CrmListPageScopedLayoutStyles";
 import type { TableColumn } from "@components/GenericTable";
+import type { CrmQuotesSidebarProspectLike } from "@crm/billing-quotes/crmQuotesListPageShared";
 import {
   selectCrmQuotesSidebarRecordEmail,
   selectCrmQuotesSidebarRecordId,
   selectCrmQuotesSidebarRecordName,
   selectCrmQuotesSidebarRecordPhone,
 } from "@crm/billing-quotes/crmQuotesListPageShared";
+
+function asQuotesSidebarRecord(
+  record: unknown,
+): CrmQuotesSidebarProspectLike | null | undefined {
+  return record as CrmQuotesSidebarProspectLike | null | undefined;
+}
 import {
   selectCrmContactsSidebarRecordEmail,
   selectCrmContactsSidebarRecordId,
@@ -204,10 +211,14 @@ const CRM_PROSPECTS_LIST_INTEGRATIONS: PersonListIntegrationsSlice = {
   buildCsvContent: buildProspectsCsvContent,
   validateUploadCsvFile: validateProspectsUploadCsvFile,
   buildSourceFileSelectOptions: buildProspectsSourceFileSelectOptions,
-  selectSidebarRecordId: selectCrmQuotesSidebarRecordId,
-  selectSidebarRecordName: selectCrmQuotesSidebarRecordName,
-  selectSidebarRecordPhone: selectCrmQuotesSidebarRecordPhone,
-  selectSidebarRecordEmail: selectCrmQuotesSidebarRecordEmail,
+  selectSidebarRecordId: (record) =>
+    selectCrmQuotesSidebarRecordId(asQuotesSidebarRecord(record)),
+  selectSidebarRecordName: (record) =>
+    selectCrmQuotesSidebarRecordName(asQuotesSidebarRecord(record)),
+  selectSidebarRecordPhone: (record) =>
+    selectCrmQuotesSidebarRecordPhone(asQuotesSidebarRecord(record)),
+  selectSidebarRecordEmail: (record) =>
+    selectCrmQuotesSidebarRecordEmail(asQuotesSidebarRecord(record)),
   augmentTableColumns: augmentProspectsSourceFileColumn,
   navigationDetailPath: (row) =>
     `/crm/detailspage?type=prospect&id=${(row as { id?: number })?.id ?? ""}`,
@@ -222,10 +233,14 @@ const CRM_CONTACTS_LIST_INTEGRATIONS: PersonListIntegrationsSlice = {
   buildCsvContent: buildContactsCsvContent,
   validateUploadCsvFile: validateContactsUploadCsvFile,
   buildSourceFileSelectOptions: buildContactsSourceFileSelectOptions,
-  selectSidebarRecordId: selectCrmContactsSidebarRecordId,
-  selectSidebarRecordName: selectCrmContactsSidebarRecordName,
-  selectSidebarRecordPhone: selectCrmContactsSidebarRecordPhone,
-  selectSidebarRecordEmail: selectCrmContactsSidebarRecordEmail,
+  selectSidebarRecordId: (record) =>
+    selectCrmContactsSidebarRecordId(asQuotesSidebarRecord(record)),
+  selectSidebarRecordName: (record) =>
+    selectCrmContactsSidebarRecordName(asQuotesSidebarRecord(record)),
+  selectSidebarRecordPhone: (record) =>
+    selectCrmContactsSidebarRecordPhone(asQuotesSidebarRecord(record)),
+  selectSidebarRecordEmail: (record) =>
+    selectCrmContactsSidebarRecordEmail(asQuotesSidebarRecord(record)),
   augmentTableColumns: identityColumns,
   navigationDetailPath: (row) =>
     `/crm/contacts/contacts-detailpage?id=${(row as { id?: number })?.id ?? ""}`,
@@ -293,8 +308,7 @@ const CRM_PROSPECTS_LIST_UI_VARIANT: CrmPersonListVariantUi = {
   },
   stats: {
     allCardTitle: "All Prospects",
-    subtitleAssignedUnassigned: (m) =>
-      `${m.assigned_records || 0} Assigned / ${m.unassigned_records || 0} Unassigned`,
+    subtitleAssignedUnassigned: () => "",
     convertedCardTitle: "Converted Prospects",
   },
   callRecordingExtras: {
@@ -412,7 +426,7 @@ function buildCrmPersonListPageConfig(
 export const CRM_PROSPECTS_LIST_PAGE_CONFIG = buildCrmPersonListPageConfig(
   CRM_PROSPECTS_LIST_UI_VARIANT,
   CRM_PROSPECTS_LIST_INTEGRATIONS,
-  { enableBoardView: false },
+  { enableBoardView: true },
 );
 
 export const CRM_CONTACTS_LIST_PAGE_CONFIG = buildCrmPersonListPageConfig(

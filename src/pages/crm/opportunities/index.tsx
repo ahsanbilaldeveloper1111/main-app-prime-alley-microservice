@@ -31,6 +31,9 @@ import {
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { ModuleSlug, formatDateForTable } from "@utils/Helper";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const CrmOpportunities = () => {
 
@@ -223,7 +226,7 @@ const CrmOpportunities = () => {
         cell: (props: any) => (
 
           <>
-          {session?.user?.permissions?.includes('view-crm-opportunities') || session?.user?.permissions?.includes('edit-crm-opportunities') || session?.user?.permissions?.includes('mark-as-lost-crm-opportunities') || session?.user?.permissions?.includes('delete-crm-opportunities') ? (
+          {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_OPPORTUNITIES) || session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_OPPORTUNITIES) || session?.user?.permissions?.includes(PERMISSIONS.MARK_AS_LOST_CRM_OPPORTUNITIES) || session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_OPPORTUNITIES) ? (
           <DatatableActionButton
             actions={[
               {
@@ -231,19 +234,19 @@ const CrmOpportunities = () => {
                 icon: <FiEye className="me-2" />,
                 onClick: () => window.location.href = `/crm/leads/${props.id}`,
               },
-              ...(session?.user?.permissions?.includes('edit-crm-opportunities') ? [{
+              ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_OPPORTUNITIES) ? [{
                 label: 'Edit',
                 icon: <FiEdit className="me-2" />,
                 onClick: () => window.location.href = `/crm/leads/${props.id}/edit`,
               }] : []),
               
-              ...(session?.user?.permissions?.includes('mark-as-lost-crm-opportunities') ? [{
+              ...(session?.user?.permissions?.includes(PERMISSIONS.MARK_AS_LOST_CRM_OPPORTUNITIES) ? [{
                 label: 'Mark Lost Reason',
                 icon: <FiXCircle className="me-2" />,
                 onClick: () => handleMarkLost(props),
               }] : []),
 
-              ...(session?.user?.permissions?.includes('delete-crm-opportunities') ? [{
+              ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_OPPORTUNITIES) ? [{
                 label: 'Delete',
                 icon: <FiTrash2 className="me-2" />,
                 onClick: () => handleDeleteOpportunity(props),
@@ -318,19 +321,19 @@ const CrmOpportunities = () => {
        <PageHeader
          title="Opportunities"
          filters={
-          session?.user?.permissions?.includes('list-crm-opportunities') ? (
+          session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_OPPORTUNITIES) ? (
             <CrmFilters onFiltersChange={setCurrentFilters} type="opportunity" />
           ) : (
             <></>
           )
          }
-         showSearch={session?.user?.permissions?.includes('list-crm-opportunities')}
+         showSearch={session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_OPPORTUNITIES)}
          searchPlaceholder="Search opportunities..."
          searchValue={currentFilters?.search || ""}
          onSearchChange={(value) => setCurrentFilters({...currentFilters, search: value})}
          buttons={
           <>
-          {session?.user?.permissions?.includes('add-crm-opportunities') ? (
+          {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_OPPORTUNITIES) ? (
            <Link href="/crm/leads/create?type=opportunity" className="btn btn-primary">
              <FiPlus className="me-2" />
              New Opportunity
@@ -344,7 +347,7 @@ const CrmOpportunities = () => {
          rightGrid={9}
        />
 
-         {session?.user?.permissions?.includes('list-crm-opportunities') ? (
+         {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_OPPORTUNITIES) ? (
       <GenericListPage
         columns={columns}
         fetchData={fetchOpportunities}
