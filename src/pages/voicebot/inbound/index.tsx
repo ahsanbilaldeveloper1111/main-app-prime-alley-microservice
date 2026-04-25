@@ -6,9 +6,14 @@ import { Row, Col, Card } from "react-bootstrap";
 import { useRouter } from "next/router";
 import { Building2, Bot, Phone, Server } from "lucide-react";
 import "@assets/scss/common.scss";
+import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const VoicebotInbound = () => {
   const router = useRouter();
+  const { data: session } = useSession();
+  const permissions = session?.user?.permissions ?? [];
+  const { PERMISSIONS } = HEADER_CONSTANTS;
 
   const sections = [
     {
@@ -17,6 +22,7 @@ const VoicebotInbound = () => {
       icon: Building2,
       path: "/voicebot/inbound/companies",
       color: "#3B82F6",
+      permission: PERMISSIONS.VIEW_INBOUND_DASHBOARD_INBOUND,
     },
     {
       title: "Bots",
@@ -24,6 +30,7 @@ const VoicebotInbound = () => {
       icon: Bot,
       path: "/voicebot/inbound/bots",
       color: "#8B5CF6",
+      permission: PERMISSIONS.VIEW_INBOUND_BOTS_INBOUND,
     },
     {
       title: "SIP trunks",
@@ -31,6 +38,7 @@ const VoicebotInbound = () => {
       icon: Server,
       path: "/voicebot/inbound/sip-trunks",
       color: "#6366F1",
+      permission: PERMISSIONS.VIEW_INBOUND_TRUNK_INBOUND,
     },
     {
       title: "Calls",
@@ -38,8 +46,9 @@ const VoicebotInbound = () => {
       icon: Phone,
       path: "/voicebot/inbound/calls",
       color: "#10B981",
+      permission: PERMISSIONS.VIEW_INBOUND_CAMPAIGNS_INBOUND,
     },
-  ];
+  ].filter((section) => permissions.includes(section.permission));
 
   return (
     <React.Fragment>

@@ -6,9 +6,14 @@ import { Row, Col, Card } from "react-bootstrap";
 import { useRouter } from "next/router";
 import { Phone, Bot, Megaphone } from "lucide-react";
 import "@assets/scss/common.scss";
+import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const VoicebotOutbound = () => {
   const router = useRouter();
+  const { data: session } = useSession();
+  const permissions = session?.user?.permissions ?? [];
+  const { PERMISSIONS } = HEADER_CONSTANTS;
 
   const sections = [
     {
@@ -17,6 +22,7 @@ const VoicebotOutbound = () => {
       icon: Phone,
       path: "/voicebot/outbound/trunks",
       color: "#3B82F6",
+      permission: PERMISSIONS.VIEW_OUTBOUND_SIP_TRUNCK_OUTBOUND,
     },
     {
       title: "Voice Bots",
@@ -24,6 +30,7 @@ const VoicebotOutbound = () => {
       icon: Bot,
       path: "/voicebot/outbound/voicebots",
       color: "#8B5CF6",
+      permission: PERMISSIONS.VIEW_OUTBOUND_BOTS_OUTBOUND,
     },
     {
       title: "Campaigns",
@@ -31,8 +38,9 @@ const VoicebotOutbound = () => {
       icon: Megaphone,
       path: "/voicebot/outbound/campaigns",
       color: "#10B981",
+      permission: PERMISSIONS.VIEW_OUTBOUND_CONVERSATIONS_OUTBOUND,
     },
-  ];
+  ].filter((section) => permissions.includes(section.permission));
 
   return (
     <React.Fragment>
