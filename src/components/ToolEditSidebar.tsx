@@ -22,7 +22,6 @@ export interface ToolEditSidebarProps {
     next: ToolFormState | ((prev: ToolFormState) => ToolFormState),
   ) => void;
   submitLoading: boolean;
-  isFormValid: boolean;
   onClose: () => void;
   onSubmit: () => void;
 }
