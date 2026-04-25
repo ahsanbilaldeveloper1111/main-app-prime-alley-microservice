@@ -278,6 +278,29 @@ const DetailField = ({
     <div style={detailFieldValueStyle}>{value}</div>
   </div>
 );
+
+function getDealAttachmentIconBackground(
+  mimeType: string | undefined,
+): string {
+  if (!mimeType) {
+    return "#6c757d";
+  }
+  if (mimeType.includes("pdf")) {
+    return "#dc3545";
+  }
+  if (
+    mimeType.includes("csv") ||
+    mimeType.includes("excel") ||
+    mimeType.includes("spreadsheet")
+  ) {
+    return "#198754";
+  }
+  if (mimeType.includes("image")) {
+    return "#0d6efd";
+  }
+  return "#6c757d";
+}
+
 function CrmDealsListScreenDealHistoryModal({
   viewingDeal,
   showDealHistoryModal,
@@ -4868,108 +4891,112 @@ export function CrmDealsListScreenView({
                 Attached Files ({attachments.length})
               </h6>
 
-              {loadingAttachments ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                </div>
-              ) : attachments.length === 0 ? (
-                <div className="text-center py-5 text-muted">
-                  <Paperclip size={48} className="mb-3 opacity-25" />
-                  <div>No attachments yet</div>
-                  <small>Upload files using the form above</small>
-                </div>
-              ) : (
-                <div className="d-flex flex-column gap-2">
-                  {attachments.map((attachment: any) => (
-                    <Card key={attachment.id} className="border shadow-sm">
-                      <Card.Body className="p-3">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <div className="d-flex align-items-center gap-3 flex-grow-1">
-                            {/* File Icon */}
-                            <div
-                              className="rounded d-flex align-items-center justify-content-center"
-                              style={{
-                                width: "45px",
-                                height: "45px",
-                                background: attachment.mime_type?.includes(
-                                  "pdf",
-                                )
-                                  ? "#dc3545"
-                                  : attachment.mime_type?.includes("csv") ||
-                                      attachment.mime_type?.includes("excel") ||
-                                      attachment.mime_type?.includes(
-                                        "spreadsheet",
-                                      )
-                                    ? "#198754"
-                                    : attachment.mime_type?.includes("image")
-                                      ? "#0d6efd"
-                                      : "#6c757d",
-                                color: "white",
-                              }}
-                            >
-                              <FileText size={22} />
+              {(() => {
+                if (loadingAttachments) {
+                  return (
+                    <div className="text-center py-5">
+                      <output
+                        className="spinner-border text-primary d-inline-block"
+                        aria-live="polite"
+                      >
+                        <span className="visually-hidden">Loading...</span>
+                      </output>
+                    </div>
+                  );
+                }
+                if (attachments.length === 0) {
+                  return (
+                    <div className="text-center py-5 text-muted">
+                      <Paperclip size={48} className="mb-3 opacity-25" />
+                      <div>No attachments yet</div>
+                      <small>Upload files using the form above</small>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="d-flex flex-column gap-2">
+                    {attachments.map((attachment: any) => (
+                      <Card key={attachment.id} className="border shadow-sm">
+                        <Card.Body className="p-3">
+                          <div className="d-flex align-items-center justify-content-between">
+                            <div className="d-flex align-items-center gap-3 flex-grow-1">
+                              {/* File Icon */}
+                              <div
+                                className="rounded d-flex align-items-center justify-content-center"
+                                style={{
+                                  width: "45px",
+                                  height: "45px",
+                                  background: getDealAttachmentIconBackground(
+                                    attachment.mime_type,
+                                  ),
+                                  color: "white",
+                                }}
+                              >
+                                <FileText size={22} />
+                              </div>
+
+                              {/* File Info */}
+                              <div className="flex-grow-1">
+                                <div
+                                  className="fw-semibold"
+                                  style={{ fontSize: "14px" }}
+                                >
+                                  {attachment.name}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#6c757d",
+                                  }}
+                                >
+                                  {formatFileSize(attachment.file_size)} •{" "}
+                                  {attachment.created_at
+                                    ? formatDateForTable(attachment.created_at)
+                                    : "N/A"}
+                                </div>
+                              </div>
                             </div>
 
-                            {/* File Info */}
-                            <div className="flex-grow-1">
-                              <div
-                                className="fw-semibold"
-                                style={{ fontSize: "14px" }}
-                              >
-                                {attachment.name}
-                              </div>
-                              <div
-                                style={{ fontSize: "12px", color: "#6c757d" }}
-                              >
-                                {formatFileSize(attachment.file_size)} •{" "}
-                                {attachment.created_at
-                                  ? formatDateForTable(attachment.created_at)
-                                  : "N/A"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="d-flex gap-1">
-                            {session?.user?.permissions?.includes(
-                              PERMISSIONS.DOWNLOAD_DOCUMENT_CRM_DEALS,
-                            ) && (
+                            {/* Actions */}
+                            <div className="d-flex gap-1">
+                              {session?.user?.permissions?.includes(
+                                PERMISSIONS.DOWNLOAD_DOCUMENT_CRM_DEALS,
+                              ) && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-2 text-primary"
+                                  title="Download"
+                                  onClick={() =>
+                                    handleDownloadAttachment(attachment.id)
+                                  }
+                                >
+                                  <DownloadIcon size={18} />
+                                </Button>
+                              )}
                               <Button
                                 variant="link"
                                 size="sm"
-                                className="p-2 text-primary"
-                                title="Download"
-                                onClick={() =>
-                                  handleDownloadAttachment(attachment.id)
-                                }
+                                className="p-2 text-danger"
+                                title="Delete"
+                                onClick={() => {
+                                  setAttachmentToDelete({
+                                    id: attachment.id,
+                                    name: attachment.name,
+                                  });
+                                  setShowDeleteAttachmentModal(true);
+                                }}
                               >
-                                <DownloadIcon size={18} />
+                                <Trash2 size={18} />
                               </Button>
-                            )}
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-danger"
-                              title="Delete"
-                              onClick={() => {
-                                setAttachmentToDelete({
-                                  id: attachment.id,
-                                  name: attachment.name,
-                                });
-                                setShowDeleteAttachmentModal(true);
-                              }}
-                            >
-                              <Trash2 size={18} />
-                            </Button>
+                            </div>
                           </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                        </Card.Body>
+                      </Card>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </Modal.Body>
 

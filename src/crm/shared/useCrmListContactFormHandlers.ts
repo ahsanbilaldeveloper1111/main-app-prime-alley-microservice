@@ -14,14 +14,7 @@ import {
   type CrmListContactFormState,
 } from "@utils/crmContactFormFromCrmItem";
 import { datetimeLocalToIsoUtc } from "@utils/datetimeLocalInput";
-
-function isValidEmail(email: string): boolean {
-  const s = email.trim();
-  if (!s) {
-    return false;
-  }
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
-}
+import { isValidEmail } from "@utils/Helper";
 export type CrmListContactFormHandlersDeps = {
   session: any;
   contactForm: CrmListContactFormState;

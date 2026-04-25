@@ -1,6 +1,7 @@
 import React from "react";
 import { parsePhoneNumber as parsePhoneNumberInput } from "react-phone-number-input";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
+import { isValidEmail } from "@utils/Helper";
 
 export type CrmListCreateContactSidebarProps = Readonly<{
   show: boolean;
@@ -38,7 +39,7 @@ export function CrmListCreateContactSidebar({
   if (!show) return null;
 
   const email = contactForm.email?.trim() ?? "";
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const emailOk = isValidEmail(email);
 
   const isFormValid =
     emailOk &&
@@ -71,6 +72,7 @@ export function CrmListCreateContactSidebar({
       onCreateAndAddAnother={
         editingContactId ? undefined : () => onCreateSubmit(true)
       }
+      showScheduledCallField={entityLabel !== "Prospect"}
     />
   );
 }

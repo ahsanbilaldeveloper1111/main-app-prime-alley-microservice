@@ -1991,8 +1991,12 @@ const CrmCampaigns = () => { // NOSONAR
             maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            display: "block",
+            whiteSpace: "normal",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
           }}
         >
           {campaign.name || "Unnamed Campaign"}

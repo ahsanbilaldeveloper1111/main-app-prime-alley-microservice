@@ -408,17 +408,14 @@ const BusinessTypes = () => {
                     justifyContent: "center",
                   }}
                 >
-                  {submitting ? (
-                    <>
+                  <span style={{ width: 16, display: "inline-flex", justifyContent: "center" }}>
+                    {submitting ? (
                       <Spinner size="sm" aria-hidden />
-                      {primarySubmitLabel(true, editingBusinessType)}
-                    </>
-                  ) : (
-                    <>
+                    ) : (
                       <Check size={16} aria-hidden />
-                      {primarySubmitLabel(false, editingBusinessType)}
-                    </>
-                  )}
+                    )}
+                  </span>
+                  {primarySubmitLabel(submitting, editingBusinessType)}
                 </Button>
                 <Button
                   variant="outline-secondary"

@@ -1801,7 +1801,7 @@ export function CrmProspectsContactsListPage({
         customTabs={customTabs}
         setCustomTabs={setCustomTabs}
         scheduledRecordsCount={metrics.scheduled_records}
-        hasLeadsTabLabel="Converted Leads"
+        hasLeadsTabLabel="Converted Prospects"
       />
       {/* Create Contact Sidebar */}
       <CrmListCreateContactSidebar

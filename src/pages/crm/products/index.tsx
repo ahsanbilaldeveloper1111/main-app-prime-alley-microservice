@@ -319,6 +319,7 @@ const ProductsPage = () => {
     defaultSelectedColumns: DEFAULT_PRODUCT_TABLE_COLUMNS,
     selectableColumnKeys: productTableSelectableKeys,
     columnStorageKey: PRODUCTS_TABLE_COLUMN_STORAGE_KEY,
+    initialPagination: { rowsPerPage: 15 },
   });
   const [productFormData, setProductFormData] = useState({
     productName: "",
