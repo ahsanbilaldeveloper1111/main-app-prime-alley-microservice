@@ -52,6 +52,8 @@ import {
       assigned_to_name?: string;
       priority: "low" | "medium" | "high" | null;
       due_date: string | null;
+      /** When set, due-date column includes clock time (matches planner `due_time`). */
+      due_time?: string | null;
       notes: string | null;
       repeat_status: string | null;
       status: "pending" | "completed" | "overdue";
@@ -651,7 +653,7 @@ import {
         {
           key: "due_date", label: "Due date", sortable: true, type: "custom",
           render: (row) => {
-            const parts = formatTaskDueDateCellParts(row.due_date, row.status);
+            const parts = formatTaskDueDateCellParts(row.due_date, row.status, row.due_time);
             return (
               <span
                 style={{

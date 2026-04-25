@@ -43,6 +43,7 @@ import {
   GlobalDateFormat,
   ModuleSlug,
   formatDateForTable,
+  formatNumber,
 } from "@utils/Helper";
 import {
   CheckCircle,
@@ -881,7 +882,7 @@ const CrmOrders = () => {
         type: "custom",
         render: (row) => (
           <span className="fw-semibold">
-            {row.currency} {Number.parseFloat(String(row.value)).toLocaleString()}
+            {row.currency} {formatNumber(row.value)}
           </span>
         ),
       },

@@ -2,6 +2,37 @@
  * Planner task `due_time` API helpers (UTC ISO from local calendar date + time).
  */
 
+/** Backend "date-only" due often stored as midnight UTC (`…T00:00:00.000Z`). */
+export function isStoredAsUtcMidnightCalendarDue(iso: string): boolean {
+  const t = iso.trim();
+  if (!t) return false;
+  const endsUtc =
+    /Z$/i.test(t) || /\+00:00$/i.test(t) || /-00:00$/i.test(t);
+  if (!endsUtc) return false;
+  const d = new Date(t);
+  if (Number.isNaN(d.getTime())) return false;
+  return (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  );
+}
+
+/**
+ * When `due_date` is UTC-midnight sentinel, some APIs echo the same instant in `due_time`;
+ * parsing that as a wall clock yields a bogus offset time (e.g. 05:00).
+ */
+export function shouldSuppressDueTimeInListCell(
+  dueDateIso: string,
+  dueTimeRaw: string | null | undefined,
+): boolean {
+  if (!isStoredAsUtcMidnightCalendarDue(dueDateIso)) return false;
+  const t = String(dueTimeRaw ?? "").trim();
+  if (t === "") return false;
+  return isStoredAsUtcMidnightCalendarDue(t);
+}
+
 export function formatPlannerDueTimeAsUtcIso(
   calendarDateYmd: string | null | undefined,
   timeHhMm: string | null | undefined,
