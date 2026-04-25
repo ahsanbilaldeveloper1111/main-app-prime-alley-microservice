@@ -239,6 +239,7 @@ const CrmOrders = () => { // NOSONAR
   const [showOrderSidebar, setShowOrderSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [orderSidebarRefreshKey, setOrderSidebarRefreshKey] = useState(0);
 
   const sidebarOrderRecordId = useMemo(() => {
     const rawId = selectedOrder?.id ?? selectedOrder?.rawData?.id;
@@ -261,6 +262,9 @@ const CrmOrders = () => { // NOSONAR
     recordName: sidebarOrderRecordName,
     recordPhone: selectedOrder?.customer_phone ?? "",
     recordEmail: selectedOrder?.customer_email ?? "",
+    onLogged: () => {
+      setOrderSidebarRefreshKey((prev) => prev + 1);
+    },
   });
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -2205,7 +2209,7 @@ const CrmOrders = () => { // NOSONAR
                               })()
                             : null
                         }
-                        onChange={(selected) => {
+                        onChange={(selected: any) => {
                           const assignedToValue = selected
                             ? selected.value
                             : null;
@@ -2243,7 +2247,7 @@ const CrmOrders = () => { // NOSONAR
                               })()
                             : null
                         }
-                        onChange={(selected) => {
+                        onChange={(selected: any) => {
                           const stageValue = selected ? selected.value : null;
                           setOrdersFilters((prev) => ({
                             ...prev,
@@ -2638,6 +2642,7 @@ const CrmOrders = () => { // NOSONAR
         {/* Order Details Sidebar */}
         {showOrderSidebar && (
           <GenericSidebar
+            key={`order-sidebar-${selectedOrder?.id ?? selectedOrder?.rawData?.id ?? "unknown"}-${orderSidebarRefreshKey}`}
             isOpen={showOrderSidebar}
             onClose={handleCloseOrderSidebar}
             title={

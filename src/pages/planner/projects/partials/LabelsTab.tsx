@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useProjectSettingsTabListState, paginatedSlice } from '@planner/projectTabTableShared';
+import { PlannerColorTableCell } from '@planner/PlannerColorTableCell';
 import { ProjectSettingsPresetColorPicker } from '@planner/ProjectSettingsPresetColorPicker';
 import { Spinner, Button, Modal, Form } from 'react-bootstrap';
 import { Plus, Trash2, Edit, Tag } from 'lucide-react';
@@ -167,23 +168,8 @@ const LabelsTab: React.FC<LabelsTabProps> = ({
       label: 'Color',
       sortable: true,
       render: (row: any) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px',
-            backgroundColor: row.color || '#4680FF',
-            border: '2px solid #E5E9F2',
-            flexShrink: 0,
-          }}></div>
-          <span style={{ 
-            color: '#6B7280', 
-            fontFamily: 'monospace', 
-            fontSize: '0.8rem',
-            textTransform: 'uppercase',
-          }}>
-            {row.color || '#4680FF'}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+          <PlannerColorTableCell color={row.color} variant="squareMd" />
         </div>
       ),
     },

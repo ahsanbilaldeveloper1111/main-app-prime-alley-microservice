@@ -134,6 +134,31 @@ function formatJourneyStepStatusForDisplay(status: string): string {
     .join(" ");
 }
 
+/** Step is complete when API set completed_at or status is completed (matches journey detail payload). */
+function isJourneyStepRecordCompleted(step: JourneyStepRecord): boolean {
+  const at = step.completed_at;
+  if (at != null && String(at).trim() !== "") {
+    return true;
+  }
+  const st = String(step.status ?? "")
+    .trim()
+    .toLowerCase();
+  return st === "completed";
+}
+
+/** Progress bar + counts from live journey steps (detail API), not stale list aggregates. */
+function deriveJourneyProgressFromSteps(steps: JourneyStepRecord[]): {
+  total: number;
+  completed: number;
+  progress: number;
+} {
+  const total = steps.length;
+  const completed = steps.filter(isJourneyStepRecordCompleted).length;
+  const progress =
+    total === 0 ? 0 : Math.min(100, Math.round((completed / total) * 100));
+  return { total, completed, progress };
+}
+
 function journeyStartDateToInputMin(iso: string | null | undefined): string | undefined {
   if (iso == null || String(iso).trim() === "") return undefined;
   const trimmed = String(iso).trim();
@@ -655,11 +680,11 @@ function AddJourneyStepModal({
           </Form.Group>
           <Form.Group className="mb-3">
             <Form.Label>
-              Task <span className="text-danger">*</span>
+             Title <span className="text-danger">*</span>
             </Form.Label>
             <Form.Control
               type="text"
-              placeholder="Type the task"
+              placeholder="Type the title"
               value={form.title}
               onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
             />
@@ -961,6 +986,28 @@ const EmployeesOnboarding = () => {
     journeyId,
     canUpdateJourney,
   );
+
+  /** Keep list row / sidebar counts aligned with detail steps after add/edit/delete (list API aggregates can lag). */
+  useEffect(() => {
+    if (!canUpdateJourney || stepsLoading) return;
+    setSelectedEmployee((prev) => {
+      if (!prev || Number(prev.id) !== journeyId) return prev;
+      const { total, completed, progress } = deriveJourneyProgressFromSteps(journeySteps);
+      if (
+        Number(prev.total_steps_count ?? 0) === total &&
+        Number(prev.completed_steps_count ?? 0) === completed &&
+        prev.progress === progress
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        total_steps_count: total,
+        completed_steps_count: completed,
+        progress,
+      };
+    });
+  }, [journeySteps, stepsLoading, canUpdateJourney, journeyId]);
 
   const journeyDueDateMin = useMemo(
     () => journeyStartDateToInputMin(journeyStartDateIso),
@@ -1311,8 +1358,17 @@ const EmployeesOnboarding = () => {
 
   const journeySidebarSections = useMemo<SidebarSection[]>(() => {
     if (!selectedEmployee) return [];
-    const totalSteps = Number(selectedEmployee.total_steps_count ?? 0);
-    const completedSteps = Number(selectedEmployee.completed_steps_count ?? 0);
+    const useLiveStepsProgress = canUpdateJourney && !stepsLoading;
+    const liveProgress = useLiveStepsProgress
+      ? deriveJourneyProgressFromSteps(journeySteps)
+      : null;
+    const totalSteps = liveProgress
+      ? liveProgress.total
+      : Math.max(1, Number(selectedEmployee.total_steps_count ?? 0));
+    const completedSteps = liveProgress
+      ? liveProgress.completed
+      : Number(selectedEmployee.completed_steps_count ?? 0);
+    const progressPercent = liveProgress ? liveProgress.progress : selectedEmployee.progress;
     const statusColors = getStatusColor(selectedEmployee.status);
 
     return [
@@ -1361,7 +1417,7 @@ const EmployeesOnboarding = () => {
                 {completedSteps} of {totalSteps} steps completed
               </span>
               <span style={{ fontSize: "13px", fontWeight: "600", color: "#1f2937" }}>
-                {selectedEmployee.progress}%
+                {progressPercent}%
               </span>
             </div>
             <div
@@ -1376,7 +1432,7 @@ const EmployeesOnboarding = () => {
             >
               <div
                 style={{
-                  width: `${selectedEmployee.progress}%`,
+                  width: `${progressPercent}%`,
                   height: "100%",
                   backgroundColor: "#8b5cf6",
                   borderRadius: "4px",

@@ -4,7 +4,6 @@ import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericTable, { TableColumn } from '@components/GenericTable';
 import { ListCallLogs, DownloadCallsExport } from '@utils/calls';
-import { Form, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { useSession } from 'next-auth/react';
 import { Phone, Hash, PhoneIncoming, PhoneOutgoing, Calendar } from 'lucide-react';
@@ -17,6 +16,18 @@ import { convertUTCSeparateDateTimeToUserTime, convertUTCSeparateDateTimeToUserD
 import { useHierarchyData } from '@components/filters/useHierarchyData';
 import { isExactPhoneMatch, normalizePhoneValue } from '@utils/phoneMatch';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import { createCommunicationsTextFilterDropdownContent } from '@utils/communications/communicationsDateExtensionFilters';
+import { formatCallLogsFiltersForApi } from '@utils/communications/communicationsAppliedFiltersFormat';
+import { getDefaultCommunicationsDateFilterPair } from '@utils/communications/communicationsFilterDefaults';
+import { shouldSkipCommunicationsListFetch } from '@utils/communications/communicationsListFetchDedup';
+import {
+    buildCallDirectionFilterPill,
+    buildCallStatusFilterPill,
+    buildDepartmentFilterPill,
+    buildEndDateTimeFilterPill,
+    buildExtensionNumberMultiSelectFilterPill,
+    buildStartDateTimeFilterPill,
+} from '@utils/communications/communicationsFilterPillFactories';
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -89,97 +100,6 @@ interface Summary {
     outbound: number;
 }
 
-interface NumberFilterMenuProps {
-    value: string;
-    onChange: (value: string) => void;
-    onApply: (value: string) => void;
-    closeMenu: () => void;
-}
-
-const NumberFilterMenu: React.FC<NumberFilterMenuProps> = ({ value, onChange, onApply, closeMenu }) => (
-    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-        <Form.Control
-            size="sm"
-            type="text"
-            placeholder="Enter number"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-        />
-        <div className="d-flex justify-content-end gap-2">
-            <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-                Cancel
-            </Button>
-            <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                    onApply(value.trim());
-                    closeMenu();
-                }}
-            >
-                Apply
-            </Button>
-        </div>
-    </div>
-);
-
-interface DateFilterMenuProps {
-    value: string;
-    onChange: (value: string) => void;
-    onApply: (value: string) => void;
-    closeMenu: () => void;
-}
-
-const DateFilterMenu: React.FC<DateFilterMenuProps> = ({ value, onChange, onApply, closeMenu }) => (
-    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-        <Form.Control
-            size="sm"
-            type="date"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-        />
-        <div className="d-flex justify-content-end gap-2">
-            <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-                Cancel
-            </Button>
-            <Button
-                variant="primary"
-                size="sm"
-                onClick={() => {
-                    onApply(value);
-                    closeMenu();
-                }}
-            >
-                Apply
-            </Button>
-        </div>
-    </div>
-);
-
-function createNumberDropdownContent(
-    value: string,
-    onChange: (value: string) => void,
-    onApply: (value: string) => void,
-) {
-    return function NumberDropdownRender({ closeMenu }: { closeMenu: () => void }) {
-        return (
-            <NumberFilterMenu value={value} onChange={onChange} onApply={onApply} closeMenu={closeMenu} />
-        );
-    };
-}
-
-function createDateDropdownContent(
-    value: string,
-    onChange: (value: string) => void,
-    onApply: (value: string) => void,
-) {
-    return function DateDropdownRender({ closeMenu }: { closeMenu: () => void }) {
-        return (
-            <DateFilterMenu value={value} onChange={onChange} onApply={onApply} closeMenu={closeMenu} />
-        );
-    };
-}
-
 const CallLogs = () => {
     const { data:session } = useSession();
     const [showPageLoader, setShowPageLoader] = useState(false);
@@ -237,28 +157,10 @@ const CallLogs = () => {
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     
-    // Initialize filters with default values immediately to prevent first API call without dates
-    const getDefaultFilters = () => {
-        const now = moment();
-        const startDateApi = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        const endDateApi = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        // UI filter state must include the same default date range as `applied`; otherwise any
-        // pill change via `applyFilters({ ...currentFilters, ... })` drops start/end and breaks the API query.
-        const startDateUi = now.clone().startOf('day').format('YYYY-MM-DD');
-        const endDateUi = now.clone().endOf('day').format('YYYY-MM-DD');
-        return {
-            current: {
-                start_datetime: startDateUi,
-                end_datetime: endDateUi,
-            },
-            applied: {
-                start_datetime: startDateApi,
-                end_datetime: endDateApi,
-            },
-        };
-    };
-    
-    const defaultFilters = getDefaultFilters();
+    const defaultFilters = getDefaultCommunicationsDateFilterPair(
+        'start_datetime',
+        'end_datetime',
+    );
     const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
     const [appliedFilters, setAppliedFilters] = useState<Record<string, any>>(defaultFilters.applied);
     const [searchValue, setSearchValue] = useState<string>('');
@@ -327,10 +229,15 @@ const CallLogs = () => {
         const now = Date.now();
         const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(appliedFiltersRef.current)}`;
 
-        if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
-            return;
-        }
-        if (lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
+        if (
+            shouldSkipCommunicationsListFetch(
+                isFetchingRef.current,
+                paramsKey,
+                lastFetchParamsRef.current,
+                lastFetchTimeRef.current,
+                now,
+            )
+        ) {
             return;
         }
 
@@ -404,64 +311,10 @@ const CallLogs = () => {
     }, [refreshKey, fetchCallLogs]);
 
     const handleFiltersChange = useCallback((filters: any) => {
-        // Format datetime values to include seconds and timezone offset (remove timezone key)
-        const formattedFilters: any = { ...filters };
-
-        const normalizedPhoneNumber = normalizePhoneValue(formattedFilters.phone_number);
-        formattedFilters.phone_number = normalizedPhoneNumber;
-        if (normalizedPhoneNumber) {
-            // Keep existing key and also pass explicit exact-match key when backend supports it.
-            formattedFilters.phone_number_exact = normalizedPhoneNumber;
-        } else {
-            delete formattedFilters.phone_number_exact;
-        }
-        
-        if (formattedFilters.start_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-            let startMoment = moment(formattedFilters.start_datetime);
-            
-            if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-                startMoment = moment(formattedFilters.start_datetime + ':00');
-            } else if (!formattedFilters.start_datetime.includes('T')) {
-                // If only date, set to 00:00:00
-                startMoment = moment(formattedFilters.start_datetime).startOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        }
-        
-        if (formattedFilters.end_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-            let endMoment = moment(formattedFilters.end_datetime);
-            
-            if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-                const timePart = formattedFilters.end_datetime.split('T')[1];
-                if (timePart === '23:59') {
-                    endMoment = moment(formattedFilters.end_datetime + ':59');
-                } else {
-                    endMoment = moment(formattedFilters.end_datetime + ':00');
-                }
-            } else if (!formattedFilters.end_datetime.includes('T')) {
-                // If only date, set to 23:59:59
-                endMoment = moment(formattedFilters.end_datetime).endOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        }
-        
-        // Remove timezone key from payload (timezone is now included in datetime values)
-        delete formattedFilters.timezone;
-        
-        // Update both state and ref immediately
+        const formattedFilters = formatCallLogsFiltersForApi(filters);
         setCurrentFilters(filters);
         setAppliedFilters(formattedFilters);
         appliedFiltersRef.current = formattedFilters;
-        
-        // Trigger refresh for GenericListPage to fetch new data
         setRefreshKey((prev) => prev + 1);
     }, []);
 
@@ -490,21 +343,9 @@ const CallLogs = () => {
         [handleFiltersChange],
     );
 
-    const callDirectionLabel = (value: string): string => {
-        if (value === 'OUTGOING') return 'Outgoing';
-        if (value === 'INCOMING') return 'Incoming';
-        if (value === 'Both') return 'Both';
-        return '';
-    };
-
-    const callStatusLabel = (value: string): string => {
-        if (value === 'Answered') return 'Answered';
-        if (value === 'Not Answered') return 'Not Answered';
-        if (value === 'Both') return 'Both';
-        return '';
-    };
-
-    const tableToolbar = useMemo<any>(() => ({
+    const tableToolbar = useMemo<any>(() => {
+        const extensionAllIds = hierarchyDataExtensions.map((ext: any) => String(ext.id));
+        return {
         showTabs: true,
         tabs: [
             {
@@ -529,32 +370,8 @@ const CallLogs = () => {
         showFilterPills: true,
         showMoreFiltersButton: false,
         filterPills: [
-            {
-                id: 'call_direction',
-                label: 'Call Direction',
-                showDropdown: true,
-                active: Boolean(currentFilters.call_direction),
-                activeLabel: callDirectionLabel(currentFilters.call_direction ?? ''),
-                onClear: () => applyFilters({ ...currentFilters, call_direction: '' }),
-                dropdownOptions: [
-                    { label: 'Outgoing', value: 'OUTGOING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'OUTGOING' }) },
-                    { label: 'Incoming', value: 'INCOMING', onClick: () => applyFilters({ ...currentFilters, call_direction: 'INCOMING' }) },
-                    { label: 'Both', value: 'Both', onClick: () => applyFilters({ ...currentFilters, call_direction: 'Both' }) },
-                ],
-            },
-            {
-                id: 'call_status',
-                label: 'Call Status',
-                showDropdown: true,
-                active: Boolean(currentFilters.call_status),
-                activeLabel: callStatusLabel(currentFilters.call_status ?? ''),
-                onClear: () => applyFilters({ ...currentFilters, call_status: '' }),
-                dropdownOptions: [
-                    { label: 'Answered', value: 'Answered', onClick: () => applyFilters({ ...currentFilters, call_status: 'Answered' }) },
-                    { label: 'Not Answered', value: 'Not Answered', onClick: () => applyFilters({ ...currentFilters, call_status: 'Not Answered' }) },
-                    { label: 'Both', value: 'Both', onClick: () => applyFilters({ ...currentFilters, call_status: 'Both' }) },
-                ],
-            },
+            buildCallDirectionFilterPill(currentFilters, applyFilters),
+            buildCallStatusFilterPill(currentFilters, applyFilters),
             {
                 id: 'traffic_type',
                 label: 'Traffic Type',
@@ -582,44 +399,17 @@ const CallLogs = () => {
                     { label: 'All', value: '', onClick: () => applyFilters({ ...currentFilters, destination_type: '' }) },
                 ],
             },
-            {
-                id: 'extension_number',
-                label: 'Extension',
-                showDropdown: true,
-                searchable: true,
-                active: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0,
-                activeLabel: Array.isArray(currentFilters.extension_number) && currentFilters.extension_number.length > 0
-                    ? `${currentFilters.extension_number.length} selected`
-                    : undefined,
-                onClear: () => applyFilters({ ...currentFilters, extension_number: [] }),
-                dropdownOptions: hierarchyDataExtensions.map((ext: any) => ({
-                    label: String(ext.name ?? ext.id),
-                    value: String(ext.id),
-                    onClick: () => applyFilters({
-                        ...currentFilters,
-                        extension_number: [String(ext.id)],
-                    }),
-                })),
-            },
-            {
-                id: 'department',
-                label: 'Department',
-                showDropdown: true,
-                searchable: true,
-                active: Array.isArray(currentFilters.department) && currentFilters.department.length > 0,
-                activeLabel: Array.isArray(currentFilters.department) && currentFilters.department.length > 0
-                    ? `${currentFilters.department.length} selected`
-                    : undefined,
-                onClear: () => applyFilters({ ...currentFilters, department: [] }),
-                dropdownOptions: hierarchyDataDepartments.map((dept: any) => ({
-                    label: String(dept.name ?? dept.id),
-                    value: String(dept.id),
-                    onClick: () => applyFilters({
-                        ...currentFilters,
-                        department: [String(dept.id)],
-                    }),
-                })),
-            },
+            buildExtensionNumberMultiSelectFilterPill(
+                extensionAllIds,
+                hierarchyDataExtensions,
+                currentFilters,
+                applyFilters,
+            ),
+            buildDepartmentFilterPill(
+                hierarchyDataDepartments,
+                currentFilters,
+                applyFilters,
+            ),
             {
                 id: 'phone_number',
                 label: 'Numbers',
@@ -627,46 +417,23 @@ const CallLogs = () => {
                 active: Boolean(currentFilters.phone_number),
                 activeLabel: currentFilters.phone_number ? String(currentFilters.phone_number) : undefined,
                 onClear: () => applyFilters({ ...currentFilters, phone_number: '' }),
-                dropdownContent: createNumberDropdownContent(
+                dropdownContent: createCommunicationsTextFilterDropdownContent(
                     currentFilters.phone_number ?? '',
                     (value) => setCurrentFilters({ ...currentFilters, phone_number: value }),
                     (value) => applyFilters({ ...currentFilters, phone_number: value }),
+                    'Enter number',
                 ),
             },
-            {
-                id: 'start_datetime',
-                label: 'Start Date & Time',
-                showDropdown: true,
-                active: Boolean(currentFilters.start_datetime),
-                activeLabel: currentFilters.start_datetime ? moment(currentFilters.start_datetime).format('MMM DD, YYYY') : undefined,
-                activeLabelOnly: true,
-                onClear: () => applyFilters({ ...currentFilters, start_datetime: '' }),
-                dropdownContent: createDateDropdownContent(
-                    currentFilters.start_datetime ?? '',
-                    (value) => setCurrentFilters({ ...currentFilters, start_datetime: value }),
-                    (value) => applyFilters({ ...currentFilters, start_datetime: value }),
-                ),
-            },
-            {
-                id: 'end_datetime',
-                label: 'End Date & Time',
-                showDropdown: true,
-                active: Boolean(currentFilters.end_datetime),
-                activeLabel: currentFilters.end_datetime ? moment(currentFilters.end_datetime).format('MMM DD, YYYY') : undefined,
-                activeLabelOnly: true,
-                onClear: () => applyFilters({ ...currentFilters, end_datetime: '' }),
-                dropdownContent: createDateDropdownContent(
-                    currentFilters.end_datetime ?? '',
-                    (value) => setCurrentFilters({ ...currentFilters, end_datetime: value }),
-                    (value) => applyFilters({ ...currentFilters, end_datetime: value }),
-                ),
-            },
+            buildStartDateTimeFilterPill('start_datetime', currentFilters, setCurrentFilters, applyFilters),
+            buildEndDateTimeFilterPill('end_datetime', currentFilters, setCurrentFilters, applyFilters),
         ],
-    }), [
+    };
+    }, [
         searchValue,
         tablePagination.rowsPerPage,
         fetchCallLogs,
         currentFilters,
+        setCurrentFilters,
         hierarchyDataExtensions,
         hierarchyDataDepartments,
         session?.user?.permissions,

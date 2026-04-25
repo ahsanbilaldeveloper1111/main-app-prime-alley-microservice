@@ -7,11 +7,11 @@ export type AddressRowForPayload = Pick<
 
 /**
  * Drops rows where every field is blank after trim.
- * Returns `undefined` when nothing remains so callers can omit `addresses` from the API body.
+ * Returns an empty array when nothing remains (callers should still send `addresses: []` to the API).
  */
 export function buildAddressesForUserProfilePayload(
   rows: readonly AddressRowForPayload[]
-): UserProfileAddress[] | undefined {
+): UserProfileAddress[] {
   const mapped = rows.map(({ name, zip_code, city, country, address }) => ({
     name: (name ?? "").toString().trim(),
     zip_code: (zip_code ?? "").toString().trim(),
@@ -19,6 +19,5 @@ export function buildAddressesForUserProfilePayload(
     country: (country ?? "").toString().trim(),
     address: (address ?? "").toString().trim(),
   }));
-  const nonEmpty = mapped.filter((row) => Object.values(row).some((value) => value.length > 0));
-  return nonEmpty.length > 0 ? nonEmpty : undefined;
+  return mapped.filter((row) => Object.values(row).some((value) => value.length > 0));
 }
