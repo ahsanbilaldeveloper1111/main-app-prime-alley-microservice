@@ -1,5 +1,12 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
@@ -156,7 +163,8 @@ function getCompanyOptions(list: unknown[]): CompanyOption[] {
     const idVal = item.id ?? item.company_id;
     let primary = "";
     if (typeof identifierVal === "string") primary = identifierVal.trim();
-    else if (typeof identifierVal === "number") primary = String(identifierVal).trim();
+    else if (typeof identifierVal === "number")
+      primary = String(identifierVal).trim();
     let fallback = "";
     if (typeof idVal === "string") fallback = idVal;
     else if (typeof idVal === "number") fallback = String(idVal);
@@ -174,7 +182,11 @@ function removeIdFromList(prev: string[], idToRemove: string): string[] {
   return prev.filter((id) => id !== idToRemove);
 }
 
-function toggleTabDraftSelection(prev: string[], tabId: string, isChecked: boolean): string[] {
+function toggleTabDraftSelection(
+  prev: string[],
+  tabId: string,
+  isChecked: boolean,
+): string[] {
   if (isChecked) {
     return prev.includes(tabId) ? prev : [...prev, tabId];
   }
@@ -753,17 +765,28 @@ const BotsPage = () => {
   const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const permissions = session?.user?.permissions ?? [];
-  const canCreateBots = permissions.includes(PERMISSIONS.CREATE_INBOUND_BOTS_INBOUND);
-  const canEditBots = permissions.includes(PERMISSIONS.EDIT_INBOUND_BOTS_INBOUND);
-  const canDeleteBots = permissions.includes(PERMISSIONS.DELETE_INBOUND_BOTS_INBOUND);
+  const canCreateBots = permissions.includes(
+    PERMISSIONS.CREATE_INBOUND_BOTS_INBOUND,
+  );
+  const canEditBots = permissions.includes(
+    PERMISSIONS.EDIT_INBOUND_BOTS_INBOUND,
+  );
+  const canDeleteBots = permissions.includes(
+    PERMISSIONS.DELETE_INBOUND_BOTS_INBOUND,
+  );
   const [data, setData] = useState<BotRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [showTabSelectorModal, setShowTabSelectorModal] = useState(false);
-  const [visibleTabIds, setVisibleTabIds] = useState<string[]>(["all", "published"]);
-  const [tabSelectionDraft, setTabSelectionDraft] = useState<string[]>(["published"]);
+  const [visibleTabIds, setVisibleTabIds] = useState<string[]>([
+    "all",
+    "published",
+  ]);
+  const [tabSelectionDraft, setTabSelectionDraft] = useState<string[]>([
+    "published",
+  ]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -957,9 +980,14 @@ const BotsPage = () => {
     [statusFilter],
   );
 
-  const applyTabDraftChange = useCallback((tabId: string, isChecked: boolean) => {
-    setTabSelectionDraft((prev) => toggleTabDraftSelection(prev, tabId, isChecked));
-  }, []);
+  const applyTabDraftChange = useCallback(
+    (tabId: string, isChecked: boolean) => {
+      setTabSelectionDraft((prev) =>
+        toggleTabDraftSelection(prev, tabId, isChecked),
+      );
+    },
+    [],
+  );
 
   const handleApplyTabSelector = useCallback(() => {
     const nextVisible = ["all", ...tabSelectionDraft];
@@ -1011,7 +1039,9 @@ const BotsPage = () => {
           >
             <option value="">All companies</option>
             {companies.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </Form.Select>
         )}
@@ -1047,7 +1077,12 @@ const BotsPage = () => {
     () => ({
       showTabs: true,
       tabs: [
-        { id: "all", label: "All Bots", count: botTabCounts.all, removable: false },
+        {
+          id: "all",
+          label: "All Bots",
+          count: botTabCounts.all,
+          removable: false,
+        },
         ...mapVisibleStatusTabsForToolbar(visibleTabIds, botTabCounts),
       ],
       activeTab: statusFilter || "all",
@@ -1062,7 +1097,13 @@ const BotsPage = () => {
       onTabRemove: handleTabRemove,
       rightActions: toolbarRightActions,
     }),
-    [botTabCounts, visibleTabIds, statusFilter, toolbarRightActions, handleTabRemove],
+    [
+      botTabCounts,
+      visibleTabIds,
+      statusFilter,
+      toolbarRightActions,
+      handleTabRemove,
+    ],
   );
 
   const columns: TableColumn<BotRow>[] = [
@@ -1212,7 +1253,15 @@ const BotsPage = () => {
           as="textarea"
           rows={2}
           value={form.configuration?.instructions ?? ""}
-          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, instructions: e.target.value } })}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              configuration: {
+                ...form.configuration,
+                instructions: e.target.value,
+              },
+            })
+          }
           placeholder="Bot system instructions"
         />
       </Form.Group>
@@ -1220,7 +1269,15 @@ const BotsPage = () => {
         <Form.Label>Greeting message</Form.Label>
         <Form.Control
           value={form.configuration?.greeting_message ?? ""}
-          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, greeting_message: e.target.value } })}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              configuration: {
+                ...form.configuration,
+                greeting_message: e.target.value,
+              },
+            })
+          }
           placeholder="Hello! How can I help?"
         />
       </Form.Group>
@@ -1228,7 +1285,15 @@ const BotsPage = () => {
         <Form.Label>Voice name</Form.Label>
         <Form.Control
           value={form.configuration?.voice_name ?? ""}
-          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, voice_name: e.target.value } })}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              configuration: {
+                ...form.configuration,
+                voice_name: e.target.value,
+              },
+            })
+          }
           placeholder="onyx"
         />
       </Form.Group>
@@ -1236,7 +1301,15 @@ const BotsPage = () => {
         <Form.Label>LLM model</Form.Label>
         <Form.Control
           value={form.configuration?.llm_model ?? ""}
-          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, llm_model: e.target.value } })}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              configuration: {
+                ...form.configuration,
+                llm_model: e.target.value,
+              },
+            })
+          }
           placeholder="gpt-4o-mini"
         />
       </Form.Group>
@@ -1303,7 +1376,10 @@ const BotsPage = () => {
           ))}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setShowTabSelectorModal(false)}>
+          <Button
+            variant="outline-secondary"
+            onClick={() => setShowTabSelectorModal(false)}
+          >
             Cancel
           </Button>
           <Button variant="primary" onClick={handleApplyTabSelector}>

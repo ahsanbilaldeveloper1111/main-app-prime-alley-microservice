@@ -1,5 +1,11 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
@@ -9,9 +15,15 @@ import {
   deleteVoicebot,
   type ListVoicebotsParams,
 } from "@utils/voicebot/outbound";
-import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID, OUTBOUND_VOICEBOT_LIST_PAGE_SIZE } from "@utils/voicebot/outboundVoicebotForm";
+import {
+  OUTBOUND_VOICEBOT_CREATE_COMPANY_ID,
+  OUTBOUND_VOICEBOT_LIST_PAGE_SIZE,
+} from "@utils/voicebot/outboundVoicebotForm";
 import { GetCompanies } from "@utils/users";
-import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
+import {
+  normalizeCompaniesResponse,
+  type CompanyOption,
+} from "@utils/companyOptions";
 import { Row, Col, Button, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { Plus, Pencil, Trash2 } from "lucide-react";
@@ -55,14 +67,22 @@ const VoicebotsPage = () => {
   const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const permissions = session?.user?.permissions ?? [];
-  const canCreateVoiceBots = permissions.includes(PERMISSIONS.CREATE_OUTBOUND_BOTS_OUTBOUND);
-  const canEditVoiceBots = permissions.includes(PERMISSIONS.EDIT_OUTBOUND_BOTS_OUTBOUND);
-  const canDeleteVoiceBots = permissions.includes(PERMISSIONS.DELETE_OUTBOUND_BOTS_OUTBOUND);
+  const canCreateVoiceBots = permissions.includes(
+    PERMISSIONS.CREATE_OUTBOUND_BOTS_OUTBOUND,
+  );
+  const canEditVoiceBots = permissions.includes(
+    PERMISSIONS.EDIT_OUTBOUND_BOTS_OUTBOUND,
+  );
+  const canDeleteVoiceBots = permissions.includes(
+    PERMISSIONS.DELETE_OUTBOUND_BOTS_OUTBOUND,
+  );
   const sessionUser = session?.user as
     | { company_id?: string | null; company_identifier?: string | null }
     | undefined;
   const userCompanyId = String(sessionUser?.company_id ?? "").trim();
-  const userCompanyIdentifier = String(sessionUser?.company_identifier ?? "").trim();
+  const userCompanyIdentifier = String(
+    sessionUser?.company_identifier ?? "",
+  ).trim();
   const sessionCompanyScope = userCompanyId || userCompanyIdentifier;
 
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
@@ -80,19 +100,29 @@ const VoicebotsPage = () => {
   const [editSidebarOpen, setEditSidebarOpen] = useState(false);
   const [editBotId, setEditBotId] = useState("");
   const [editCompanyId, setEditCompanyId] = useState("");
-  const [trunks, setTrunks] = useState<Array<{ id: string; trunk_id?: string; name?: string }>>([]);
+  const [trunks, setTrunks] = useState<
+    Array<{ id: string; trunk_id?: string; name?: string }>
+  >([]);
 
   const effectiveCompanyId = useMemo(() => {
     if (isAdmin) {
       return selectedCompanyId.trim() || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
     }
-    return userCompanyId || userCompanyIdentifier || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+    return (
+      userCompanyId ||
+      userCompanyIdentifier ||
+      OUTBOUND_VOICEBOT_CREATE_COMPANY_ID
+    );
   }, [isAdmin, selectedCompanyId, userCompanyId, userCompanyIdentifier]);
 
   const fetchTrunks = useCallback(async () => {
     try {
       const res = await getTrunks({ company_id: effectiveCompanyId });
-      const list = listFromResponse<{ trunk_id?: string; id?: string; name?: string }>(res);
+      const list = listFromResponse<{
+        trunk_id?: string;
+        id?: string;
+        name?: string;
+      }>(res);
       const rows = list.map((r, i) => ({
         id: r.trunk_id ?? r.id ?? `trunk-${i}`,
         trunk_id: r.trunk_id ?? r.id,
@@ -123,8 +153,14 @@ const VoicebotsPage = () => {
       }));
       setData(rows);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || String(e?.message ?? "Failed to load voicebots"));
+      const e = err as {
+        response?: { data?: { detail?: string } };
+        message?: string;
+      };
+      toast.error(
+        e?.response?.data?.detail ||
+          String(e?.message ?? "Failed to load voicebots"),
+      );
       setData([]);
     } finally {
       setLoading(false);
@@ -169,7 +205,13 @@ const VoicebotsPage = () => {
 
   const columns: TableColumn<VoicebotRow>[] = [
     { key: "name", label: "Name", sortable: true },
-    { key: "trunk_id", label: "Trunk", render: (r) => (trunks.find((t) => t.id === r.trunk_id || t.trunk_id === r.trunk_id)?.name) ?? (typeof r.trunk_id === "string" ? r.trunk_id : "—") },
+    {
+      key: "trunk_id",
+      label: "Trunk",
+      render: (r) =>
+        trunks.find((t) => t.id === r.trunk_id || t.trunk_id === r.trunk_id)
+          ?.name ?? (typeof r.trunk_id === "string" ? r.trunk_id : "—"),
+    },
     {
       key: "status",
       label: "Status",
@@ -181,7 +223,21 @@ const VoicebotsPage = () => {
           <span className="status-badge secondary">{r.status || "—"}</span>
         ),
     },
-    ...(isAdmin ? [{ key: "company_id" as const, label: "Company", render: (r: VoicebotRow) => (companies.find((c) => c.id === r.company_id || c.company_id === r.company_id || c.identifier === r.company_id)?.name) ?? String(r.company_id ?? "—") }] : []),
+    ...(isAdmin
+      ? [
+          {
+            key: "company_id" as const,
+            label: "Company",
+            render: (r: VoicebotRow) =>
+              companies.find(
+                (c) =>
+                  c.id === r.company_id ||
+                  c.company_id === r.company_id ||
+                  c.identifier === r.company_id,
+              )?.name ?? String(r.company_id ?? "—"),
+          },
+        ]
+      : []),
     {
       key: "actions",
       label: "Actions",
@@ -236,8 +292,13 @@ const VoicebotsPage = () => {
       setSelectedRow(null);
       fetchVoicebots();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || String(e?.message ?? "Delete failed"));
+      const e = err as {
+        response?: { data?: { detail?: string } };
+        message?: string;
+      };
+      toast.error(
+        e?.response?.data?.detail || String(e?.message ?? "Delete failed"),
+      );
     } finally {
       setDeleteLoading(false);
     }
@@ -323,17 +384,21 @@ const VoicebotsPage = () => {
           text-align: center;
         }
 
-          .generic-table-card {
+        .generic-table-card {
           border: none !important;
-          }
-          .generic-table-responsive {
-    width: 98% !important;
-   
-    border-radius: 0 !important;
-    margin: 0 auto !important;
-}
+        }
+        .generic-table-responsive {
+          width: 98% !important;
+
+          border-radius: 0 !important;
+          margin: 0 auto !important;
+        }
       `}</style>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Outbound - Voice Bots" />
+      <BreadcrumbItem
+        mainTitle=""
+        mainLink=""
+        subTitle="Voicebot Outbound - Voice Bots"
+      />
       <div
         className="voicebot-page"
         style={{
@@ -355,7 +420,14 @@ const VoicebotsPage = () => {
           <Row className="mb-3">
             <Col md={12}>
               <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap ps-3 pe-3 gap-2">
-                <h1 style={{ fontWeight: 300, color: "#141414", fontSize: "24px", margin: 0 }}>
+                <h1
+                  style={{
+                    fontWeight: 300,
+                    color: "#141414",
+                    fontSize: "24px",
+                    margin: 0,
+                  }}
+                >
                   Voice Bots
                 </h1>
                 <div className="d-flex align-items-center gap-2 flex-nowrap overflow-x-auto">
@@ -417,7 +489,13 @@ const VoicebotsPage = () => {
               currentPage: page,
               rowsPerPage: pageSize,
               totalRows: totalRows || data.length,
-              pageSizeOptions: [10, 25, 50, 100, OUTBOUND_VOICEBOT_LIST_PAGE_SIZE],
+              pageSizeOptions: [
+                10,
+                25,
+                50,
+                100,
+                OUTBOUND_VOICEBOT_LIST_PAGE_SIZE,
+              ],
             }}
             onPaginationChange={(newPage, newRowsPerPage) => {
               setPage(newPage);
@@ -432,7 +510,10 @@ const VoicebotsPage = () => {
 
       <DeleteConfirmationModal
         show={showDeleteModal}
-        onHide={() => { setShowDeleteModal(false); setSelectedRow(null); }}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setSelectedRow(null);
+        }}
         onConfirm={handleDeleteConfirm}
         itemName={selectedRow?.name}
         itemType="voice bot"

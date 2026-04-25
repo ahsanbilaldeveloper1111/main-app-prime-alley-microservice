@@ -1,5 +1,11 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
@@ -7,7 +13,10 @@ import TrunkCreateSidebar from "@components/TrunkCreateSidebar";
 import { getTrunks, deleteTrunk } from "@utils/voicebot/outbound";
 import { OUTBOUND_VOICEBOT_CREATE_COMPANY_ID } from "@utils/voicebot/outboundVoicebotForm";
 import { GetCompanies } from "@utils/users";
-import { normalizeCompaniesResponse, type CompanyOption } from "@utils/companyOptions";
+import {
+  normalizeCompaniesResponse,
+  type CompanyOption,
+} from "@utils/companyOptions";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { Row, Col, Button, Form } from "react-bootstrap";
 import { toast } from "react-toastify";
@@ -54,13 +63,19 @@ const TrunksPage = () => {
   const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const permissions = session?.user?.permissions ?? [];
-  const canCreateTrunks = permissions.includes(PERMISSIONS.CREATE_OUTBOUND_SIP_TRUNCK_OUTBOUND);
-  const canDeleteTrunks = permissions.includes(PERMISSIONS.DELETE_OUTBOUND_SIP_TRUNCK_OUTBOUND);
+  const canCreateTrunks = permissions.includes(
+    PERMISSIONS.CREATE_OUTBOUND_SIP_TRUNCK_OUTBOUND,
+  );
+  const canDeleteTrunks = permissions.includes(
+    PERMISSIONS.DELETE_OUTBOUND_SIP_TRUNCK_OUTBOUND,
+  );
   const sessionUser = session?.user as
     | { company_id?: string | null; company_identifier?: string | null }
     | undefined;
   const userCompanyId = String(sessionUser?.company_id ?? "").trim();
-  const userCompanyIdentifier = String(sessionUser?.company_identifier ?? "").trim();
+  const userCompanyIdentifier = String(
+    sessionUser?.company_identifier ?? "",
+  ).trim();
 
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
@@ -78,7 +93,11 @@ const TrunksPage = () => {
     if (isAdmin) {
       return selectedCompanyId.trim() || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
     }
-    return userCompanyId || userCompanyIdentifier || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+    return (
+      userCompanyId ||
+      userCompanyIdentifier ||
+      OUTBOUND_VOICEBOT_CREATE_COMPANY_ID
+    );
   }, [isAdmin, selectedCompanyId, userCompanyId, userCompanyIdentifier]);
 
   useEffect(() => {
@@ -134,8 +153,14 @@ const TrunksPage = () => {
       setData(rows);
       setTotalRows((res as { count?: number })?.count ?? rows.length);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || String(e?.message ?? "Failed to load trunks"));
+      const e = err as {
+        response?: { data?: { detail?: string } };
+        message?: string;
+      };
+      toast.error(
+        e?.response?.data?.detail ||
+          String(e?.message ?? "Failed to load trunks"),
+      );
       setData([]);
       setTotalRows(0);
     } finally {
@@ -164,8 +189,13 @@ const TrunksPage = () => {
       setSelectedRow(null);
       await fetchTrunks();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }; message?: string };
-      toast.error(e?.response?.data?.detail || String(e?.message ?? "Delete failed"));
+      const e = err as {
+        response?: { data?: { detail?: string } };
+        message?: string;
+      };
+      toast.error(
+        e?.response?.data?.detail || String(e?.message ?? "Delete failed"),
+      );
     } finally {
       setDeleteLoading(false);
     }
@@ -173,8 +203,18 @@ const TrunksPage = () => {
 
   const columns: TableColumn<TrunkRow>[] = [
     { key: "name", label: "Name", sortable: true },
-    { key: "trunk_id", label: "Trunk ID", sortable: true, render: (r) => trunkId(r) || "—" },
-    { key: "address", label: "Address", sortable: true, render: (r) => (typeof r.address === "string" ? r.address : "—") },
+    {
+      key: "trunk_id",
+      label: "Trunk ID",
+      sortable: true,
+      render: (r) => trunkId(r) || "—",
+    },
+    {
+      key: "address",
+      label: "Address",
+      sortable: true,
+      render: (r) => (typeof r.address === "string" ? r.address : "—"),
+    },
     {
       key: "transport",
       label: "Transport",
@@ -303,7 +343,11 @@ const TrunksPage = () => {
           text-align: center;
         }
       `}</style>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Outbound - Trunks" />
+      <BreadcrumbItem
+        mainTitle=""
+        mainLink=""
+        subTitle="Voicebot Outbound - Trunks"
+      />
       <div
         className="voicebot-page"
         style={{
@@ -325,13 +369,22 @@ const TrunksPage = () => {
           <Row className="mb-3">
             <Col md={12}>
               <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap ps-3 pe-3 gap-2">
-                <h1 style={{ fontWeight: 300, color: "#141414", fontSize: "24px", margin: 0 }}>
+                <h1
+                  style={{
+                    fontWeight: 300,
+                    color: "#141414",
+                    fontSize: "24px",
+                    margin: 0,
+                  }}
+                >
                   Trunks
                 </h1>
                 <div className="d-flex align-items-end gap-2 flex-wrap">
                   {isAdmin && (
                     <Form.Group className="mb-0">
-                      <Form.Label className="small text-muted mb-1">Company</Form.Label>
+                      <Form.Label className="small text-muted mb-1">
+                        Company
+                      </Form.Label>
                       <Form.Select
                         className="company-filter-select"
                         value={selectedCompanyId}

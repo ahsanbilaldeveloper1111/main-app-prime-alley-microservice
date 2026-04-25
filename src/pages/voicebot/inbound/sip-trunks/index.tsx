@@ -1,5 +1,11 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
@@ -64,7 +70,9 @@ function callerIdsFromRow(row: TrunkRow): string {
   if (raw == null) return "";
   if (Array.isArray(raw)) {
     return raw
-      .map((x) => (typeof x === "string" || typeof x === "number" ? String(x) : ""))
+      .map((x) =>
+        typeof x === "string" || typeof x === "number" ? String(x) : "",
+      )
       .map((s: string) => s.trim())
       .filter((s) => s.length > 0)
       .join(", ");
@@ -110,8 +118,7 @@ function companyLabelForTrunkRow(
   if (!raw) return "—";
 
   const opt = companyOptions.find(
-    (x) =>
-      x.id === raw || x.identifier === raw || x.company_id === raw,
+    (x) => x.id === raw || x.identifier === raw || x.company_id === raw,
   );
   if (opt?.name?.trim()) return opt.name.trim();
 
@@ -154,8 +161,12 @@ const SipTrunksPage = () => {
   const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
   const permissions = session?.user?.permissions ?? [];
-  const canCreateTrunks = permissions.includes(PERMISSIONS.CREATE_INBOUND_TRUNK_INBOUND);
-  const canDeleteTrunks = permissions.includes(PERMISSIONS.DELETE_INBOUND_TRUNK_INBOUND);
+  const canCreateTrunks = permissions.includes(
+    PERMISSIONS.CREATE_INBOUND_TRUNK_INBOUND,
+  );
+  const canDeleteTrunks = permissions.includes(
+    PERMISSIONS.DELETE_INBOUND_TRUNK_INBOUND,
+  );
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [data, setData] = useState<TrunkRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -292,7 +303,15 @@ const SipTrunksPage = () => {
         )}
       </div>
     ),
-    [canCreateTrunks, isAdmin, companyFilter, companies, fetchTrunks, loading, router],
+    [
+      canCreateTrunks,
+      isAdmin,
+      companyFilter,
+      companies,
+      fetchTrunks,
+      loading,
+      router,
+    ],
   );
 
   const tableToolbar = useMemo(
@@ -416,7 +435,12 @@ const SipTrunksPage = () => {
         striped={false}
       />
 
-      <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="lg" centered>
+      <Modal
+        show={showViewModal}
+        onHide={() => setShowViewModal(false)}
+        size="lg"
+        centered
+      >
         <Modal.Header closeButton>
           <Modal.Title>SIP trunk</Modal.Title>
         </Modal.Header>
@@ -432,10 +456,7 @@ const SipTrunksPage = () => {
                     .filter(([k]) => k !== "_rowKey")
                     .map(([k, v]) => (
                       <tr key={k}>
-                        <th
-                          className="text-muted"
-                          style={{ width: "200px" }}
-                        >
+                        <th className="text-muted" style={{ width: "200px" }}>
                           {k}
                         </th>
                         <td className="text-break">
@@ -444,7 +465,9 @@ const SipTrunksPage = () => {
                               {JSON.stringify(v, null, 2)}
                             </pre>
                           ) : (
-                            safeDisplayString(v as string | number | boolean | null | undefined)
+                            safeDisplayString(
+                              v as string | number | boolean | null | undefined,
+                            )
                           )}
                         </td>
                       </tr>

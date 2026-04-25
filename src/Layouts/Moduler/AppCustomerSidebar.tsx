@@ -668,90 +668,77 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Virtual Agents",
       url: '',
       subItems: (() => {
-        const canView = (permission?: string) => !permission || hasPermission(permission);
-
         const outboundItems: SubMenuItem[] = [
           {
             id: 'voicebot-outbound-dashboard',
             title: 'Outbound Dashboard',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_DASHBOARD_OUTBOUND,
             url: '/voicebot/outbound/dashboard'
           },
           {
             id: 'voicebot-outbound-trunks',
             title: 'Trunks',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_SIP_TRUNCK_OUTBOUND,
             url: '/voicebot/outbound/trunks'
           },
           {
             id: 'voicebot-outbound-voicebots',
             title: 'Bots',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_BOTS_OUTBOUND,
             url: '/voicebot/outbound/voicebots'
           },
           {
             id: 'voicebot-outbound-campaigns',
             title: 'Campaigns',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_CONVERSATIONS_OUTBOUND,
             url: '/voicebot/outbound/campaigns'
           },
           {
             id: 'voicebot-outbound-reports',
             title: 'Reports',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_CONVERSATIONS_OUTBOUND,
             url: '/voicebot/outbound/reports'
           },
           {
             id: 'voicebot-outbound-analytics',
             title: 'Analytics',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_ANALYTICS_OUTBOUND,
             url: '/voicebot/outbound/analytics'
           },
-        ].filter((item) => canView(item.permission));
+        ];
 
         const inboundItems: SubMenuItem[] = [
           {
             id: 'voicebot-inbound-dashboard',
             title: 'Inbound Dashboard',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_DASHBOARD_INBOUND,
             url: '/voicebot/inbound/dashboard'
           },
           {
             id: 'voicebot-inbound-bots',
             title: 'Bots',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_BOTS_INBOUND,
             url: '/voicebot/inbound/bots'
           },
           {
             id: 'voicebot-inbound-sip-trunks',
             title: 'SIP trunks',
             icon: <Server size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_TRUNK_INBOUND,
             url: '/voicebot/inbound/sip-trunks'
           },
           {
             id: 'voicebot-inbound-calls',
             title: 'Conversations',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_CAMPAIGNS_INBOUND,
             url: '/voicebot/inbound/conversations'
           },
           {
             id: 'voicebot-inbound-analytics',
             title: 'Analytics',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_ANALYTICS_INBOUND,
             url: '/voicebot/inbound/analytics'
           },
-        ].filter((item) => canView(item.permission));
+        ];
 
         const legacyItems: SubMenuItem[] = [
           {
@@ -768,7 +755,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             permission: PERMISSIONS.VIEW_ANALYTICS_AIML,
             url: '/agents/analytics'
           }
-        ].filter((item) => canView(item.permission));
+        ].filter((item) => !item.permission || hasPermission(item.permission));
 
         const grouped: SubMenuItem[] = [];
         if (outboundItems.length > 0) {

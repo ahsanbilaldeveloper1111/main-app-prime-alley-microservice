@@ -96,6 +96,8 @@ interface CampaignRowActionsCellProps {
   status: string;
   effectiveCompanyId: string;
   loadingKey: string | null;
+  canEditCampaigns: boolean;
+  canDeleteCampaigns: boolean;
   onOpenDispatch: (row: CampaignRow, campaignRowId: string) => void;
   onPause: (row: CampaignRow) => void;
   onResume: (row: CampaignRow) => void;
@@ -227,6 +229,8 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
     status,
     effectiveCompanyId,
     loadingKey,
+    canEditCampaigns,
+    canDeleteCampaigns,
     onOpenDispatch,
     onPause,
     onResume,
@@ -240,11 +244,13 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
 
   return (
     <div className="action-icons-wrap">
-      <Link href={`/voicebot/outbound/campaigns/edit/${id}?company_id=${editCompanyParam}`}>
-        <Button size="sm" variant="outline-primary" className="icon-action-btn icon-edit-btn" title="Edit campaign">
-          <Pencil size={12} />
-        </Button>
-      </Link>
+      {canEditCampaigns && (
+        <Link href={`/voicebot/outbound/campaigns/edit/${id}?company_id=${editCompanyParam}`}>
+          <Button size="sm" variant="outline-primary" className="icon-action-btn icon-edit-btn" title="Edit campaign">
+            <Pencil size={12} />
+          </Button>
+        </Link>
+      )}
       {campaignRowLifecycleActions({
         isCompleted,
         row,
@@ -260,9 +266,11 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
       <Button size="sm" variant="outline-secondary" className="icon-action-btn icon-status-btn" onClick={() => onLoadStatus(row)} title="Campaign status">
         <Activity size={12} />
       </Button>
-      <Button title="Delete campaign" size="sm" variant="outline-danger" className="icon-action-btn icon-delete-btn" onClick={() => onDelete(row)}>
-        <Trash2 size={12} />
-      </Button>
+      {canDeleteCampaigns && (
+        <Button title="Delete campaign" size="sm" variant="outline-danger" className="icon-action-btn icon-delete-btn" onClick={() => onDelete(row)}>
+          <Trash2 size={12} />
+        </Button>
+      )}
     </div>
   );
 }
@@ -270,6 +278,9 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
 const CampaignsPage = () => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const canCreateCampaigns = true;
+  const canEditCampaigns = true;
+  const canDeleteCampaigns = true;
   const [data, setData] = useState<CampaignRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -305,7 +316,6 @@ const CampaignsPage = () => {
   const effectiveCompanyId = isAdmin ? companyFilter : companyIdentifier || companyFilter;
 
   const fetchCampaigns = useCallback(async () => {
-    if (!isAdmin && !companyIdentifier) return;
     setLoading(true);
     try {
       const params: ListCampaignsParams = { page, page_size: pageSize };
@@ -326,7 +336,7 @@ const CampaignsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [effectiveCompanyId, companyIdentifier, isAdmin, statusFilter, page, pageSize]);
+  }, [effectiveCompanyId, statusFilter, page, pageSize]);
 
   useEffect(() => {
     fetchCompanies();
@@ -488,6 +498,8 @@ const CampaignsPage = () => {
           status={String(row.status ?? "")}
           effectiveCompanyId={effectiveCompanyId}
           loadingKey={opLoading}
+          canEditCampaigns={canEditCampaigns}
+          canDeleteCampaigns={canDeleteCampaigns}
           onOpenDispatch={openDispatchModal}
           onPause={(r) => handleOp("pause", r)}
           onResume={(r) => handleOp("resume", r)}
@@ -691,11 +703,13 @@ const CampaignsPage = () => {
                     <option value="stopped">Stopped</option>
                     <option value="completed">Completed</option>
                   </Form.Select>
-                  <Link href="/voicebot/outbound/campaigns/create">
-                    <button className="add-campaign-btn">
-                      <Plus size={18} /> Add Campaign
-                    </button>
-                  </Link>
+                  {canCreateCampaigns && (
+                    <Link href="/voicebot/outbound/campaigns/create">
+                      <button className="add-campaign-btn">
+                        <Plus size={18} /> Add Campaign
+                      </button>
+                    </Link>
+                  )}
                 </div>
               </div>
             </Col>
