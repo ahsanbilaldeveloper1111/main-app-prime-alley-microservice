@@ -2,7 +2,12 @@ import "@assets/scss/datatable-style.scss";
 import React, { ReactElement, useState, useEffect } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import { getCompanies, getBots, getCalls, getCallsStats } from "@utils/voicebot/inbound";
+import {
+  getCompanies,
+  getBots,
+  getCalls,
+  getCallsStats,
+} from "@utils/voicebot/inbound";
 import { useSession } from "next-auth/react";
 import { Form, Row, Col } from "react-bootstrap";
 import {
@@ -52,14 +57,15 @@ function enrichRecentCalls(
         pickInboundStr(co.companyName);
     }
     const companyKey = asLookupId(
-      r.company_id ?? r.companyId ?? (typeof r.company === "string" ? r.company : null),
+      r.company_id ??
+        r.companyId ??
+        (typeof r.company === "string" ? r.company : null),
     );
     if (!companyName && companyKey) {
       companyName = getCompanyByCrmId(companyKey, companies) ?? "";
     }
 
-    let botName =
-      pickInboundStr(r.bot_name) || pickInboundStr(r.botName);
+    let botName = pickInboundStr(r.bot_name) || pickInboundStr(r.botName);
     if (!botName && r.bot && typeof r.bot === "object") {
       const bo = r.bot as Record<string, unknown>;
       botName =
@@ -95,12 +101,18 @@ interface StatsState {
 function parseList<T>(res: unknown): T[] {
   const list = Array.isArray(res)
     ? res
-    : (res as { results?: T[] })?.results ?? (res as { data?: T[] })?.data ?? [];
+    : ((res as { results?: T[] })?.results ??
+      (res as { data?: T[] })?.data ??
+      []);
   return Array.isArray(list) ? list : [];
 }
 
-function mergeStatsState(statsRes: unknown, parsed: ReturnType<typeof parseCallsStatsPayload>): StatsState | null {
-  const raw = (statsRes as { data?: StatsState })?.data ?? (statsRes as StatsState);
+function mergeStatsState(
+  statsRes: unknown,
+  parsed: ReturnType<typeof parseCallsStatsPayload>,
+): StatsState | null {
+  const raw =
+    (statsRes as { data?: StatsState })?.data ?? (statsRes as StatsState);
   if (parsed && typeof raw === "object" && raw) {
     return { ...raw, ...parsed };
   }
@@ -122,7 +134,10 @@ function inboundSubscriptionTierLabel(c: CompanyRow): string {
   return String(c.subscription_tier ?? c.subscriptionTier ?? "Free");
 }
 
-function callsAndCostFromStatsResponse(statsRes: unknown): { calls: number; cost: number } {
+function callsAndCostFromStatsResponse(statsRes: unknown): {
+  calls: number;
+  cost: number;
+} {
   const s = mergeStatsState(statsRes, parseCallsStatsPayload(statsRes));
   return {
     calls: s?.total_calls ?? 0,
@@ -173,7 +188,9 @@ function primaryCallCompanyKey(call: CallRow): string | null {
  * Per-company calls/cost from the recent GET /calls/ sample only (avoids N× GET /calls/stats/).
  * Totals for the overview cards still come from a single stats request.
  */
-function aggregateCallsSampleByCompany(callList: CallRow[]): Map<string, { calls: number; cost: number }> {
+function aggregateCallsSampleByCompany(
+  callList: CallRow[],
+): Map<string, { calls: number; cost: number }> {
   const m = new Map<string, { calls: number; cost: number }>();
   for (const call of callList) {
     const key = primaryCallCompanyKey(call) ?? "__unscoped__";
@@ -273,13 +290,18 @@ async function loadInboundDashboardData(
     getCompanies(paramsCompanies),
     getBots(paramsBots),
     getCalls(paramsCalls),
-    getCallsStats(effectiveCompanyId ? { company_id: effectiveCompanyId } : undefined),
+    getCallsStats(
+      effectiveCompanyId ? { company_id: effectiveCompanyId } : undefined,
+    ),
   ]);
 
   const companyList = parseList<CompanyRow>(compRes);
   const botList = parseList<BotRow>(botRes);
   const callList = parseList<CallRow>(callsRes);
-  const mergedStats = mergeStatsState(statsRes, parseCallsStatsPayload(statsRes));
+  const mergedStats = mergeStatsState(
+    statsRes,
+    parseCallsStatsPayload(statsRes),
+  );
   const companyTableRows = buildCompanyTableRows(
     companyList,
     botList,
@@ -306,11 +328,15 @@ const InboundDashboardPage = () => {
   const [stats, setStats] = useState<StatsState | null>(null);
   const [companyRows, setCompanyRows] = useState<CompanyTableRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adminCompanyOptions, setAdminCompanyOptions] = useState<CompanyRow[]>([]);
+  const [adminCompanyOptions, setAdminCompanyOptions] = useState<CompanyRow[]>(
+    [],
+  );
   const [adminSelectedCompanyId, setAdminSelectedCompanyId] = useState("");
-  const [adminCompanyListLoading, setAdminCompanyListLoading] = useState(isAdmin);
+  const [adminCompanyListLoading, setAdminCompanyListLoading] =
+    useState(isAdmin);
 
-  const companyIdentifier = (session?.user as { company_identifier?: string })?.company_identifier;
+  const companyIdentifier = (session?.user as { company_identifier?: string })
+    ?.company_identifier;
 
   useEffect(() => {
     if (sessionStatus === "loading" || !isAdmin) {
@@ -414,19 +440,28 @@ const InboundDashboardPage = () => {
     adminCompanyListLoading,
   ]);
 
-  const totalCompanies = isAdmin ? adminCompanyOptions.length : companies.length;
+  const totalCompanies = isAdmin
+    ? adminCompanyOptions.length
+    : companies.length;
   const publishedBots = bots.filter((b) => b.status === "published").length;
-  const activeBots = bots.filter((b) => b.is_active === true || b.isActive === true).length;
+  const activeBots = bots.filter(
+    (b) => b.is_active === true || b.isActive === true,
+  ).length;
   const totalCalls = stats?.total_calls ?? 0;
   const completedCalls = stats?.completed ?? 0;
-  const successRate = totalCalls > 0 ? ((completedCalls / totalCalls) * 100).toFixed(1) : "0.0";
+  const successRate =
+    totalCalls > 0 ? ((completedCalls / totalCalls) * 100).toFixed(1) : "0.0";
   const totalCost = stats?.total_cost == null ? 0 : Number(stats.total_cost);
   const avgDuration = formatDuration(stats?.avg_duration_seconds);
   const transferRate = "0.0";
 
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Voicebot Inbound - Dashboard" />
+      <BreadcrumbItem
+        mainTitle=""
+        mainLink=""
+        subTitle="Voicebot Inbound - Dashboard"
+      />
       <h2 className="mb-4">Dashboard</h2>
 
       {isAdmin && (
@@ -436,7 +471,9 @@ const InboundDashboardPage = () => {
             <Form.Select
               value={adminSelectedCompanyId}
               onChange={(e) => setAdminSelectedCompanyId(e.target.value)}
-              disabled={adminCompanyListLoading || adminCompanyOptions.length === 0}
+              disabled={
+                adminCompanyListLoading || adminCompanyOptions.length === 0
+              }
               aria-label="Select company for dashboard"
             >
               {adminCompanyOptions.length === 0 && !adminCompanyListLoading ? (
@@ -476,5 +513,7 @@ const InboundDashboardPage = () => {
   );
 };
 
-InboundDashboardPage.getLayout = (page: ReactElement) => <Layout>{page}</Layout>;
+InboundDashboardPage.getLayout = (page: ReactElement) => (
+  <Layout>{page}</Layout>
+);
 export default InboundDashboardPage;

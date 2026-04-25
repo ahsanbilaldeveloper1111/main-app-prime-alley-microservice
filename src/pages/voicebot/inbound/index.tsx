@@ -44,9 +44,9 @@ const VoicebotInbound = () => {
       title: "Calls",
       description: "View call logs and statistics",
       icon: Phone,
-      path: "/voicebot/inbound/calls",
+      path: "/voicebot/inbound/conversations",
       color: "#10B981",
-      permission: PERMISSIONS.VIEW_INBOUND_CAMPAIGNS_INBOUND,
+      permission: PERMISSIONS.VIEW_INBOUND_CONVERSATIONS_INBOUND,
     },
   ].filter((section) => permissions.includes(section.permission));
 

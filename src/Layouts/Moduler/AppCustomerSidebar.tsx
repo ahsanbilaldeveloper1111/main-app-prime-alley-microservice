@@ -668,8 +668,6 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
       label: "Virtual Agents",
       url: '',
       subItems: (() => {
-        const canView = (permission?: string) => !permission || hasPermission(permission);
-
         const outboundItems: SubMenuItem[] = [
           {
             id: 'voicebot-outbound-dashboard',
@@ -696,14 +694,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             id: 'voicebot-outbound-campaigns',
             title: 'Campaigns',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_CONVERSATIONS_OUTBOUND,
+            permission: PERMISSIONS.VIEW_OUTBOUND_CAMPAIGNS_OUTBOUND,
             url: '/voicebot/outbound/campaigns'
           },
           {
             id: 'voicebot-outbound-reports',
             title: 'Reports',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_OUTBOUND_CONVERSATIONS_OUTBOUND,
+            permission: PERMISSIONS.VIEW_OUTBOUND_REPORT_OUTBOUND,
             url: '/voicebot/outbound/reports'
           },
           {
@@ -713,7 +711,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             permission: PERMISSIONS.VIEW_OUTBOUND_ANALYTICS_OUTBOUND,
             url: '/voicebot/outbound/analytics'
           },
-        ].filter((item) => canView(item.permission));
+        ].filter((item) => !item.permission || hasPermission(item.permission));
 
         const inboundItems: SubMenuItem[] = [
           {
@@ -741,7 +739,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             id: 'voicebot-inbound-calls',
             title: 'Conversations',
             icon: <LayoutDashboard size={16} />,
-            permission: PERMISSIONS.VIEW_INBOUND_CAMPAIGNS_INBOUND,
+            permission: PERMISSIONS.VIEW_INBOUND_CONVERSATIONS_INBOUND,
             url: '/voicebot/inbound/conversations'
           },
           {
@@ -751,7 +749,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             permission: PERMISSIONS.VIEW_INBOUND_ANALYTICS_INBOUND,
             url: '/voicebot/inbound/analytics'
           },
-        ].filter((item) => canView(item.permission));
+        ].filter((item) => !item.permission || hasPermission(item.permission));
 
         const legacyItems: SubMenuItem[] = [
           {
@@ -768,7 +766,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
             permission: PERMISSIONS.VIEW_ANALYTICS_AIML,
             url: '/agents/analytics'
           }
-        ].filter((item) => canView(item.permission));
+        ].filter((item) => !item.permission || hasPermission(item.permission));
 
         const grouped: SubMenuItem[] = [];
         if (outboundItems.length > 0) {

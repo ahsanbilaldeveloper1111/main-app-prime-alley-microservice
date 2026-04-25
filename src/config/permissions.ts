@@ -762,7 +762,7 @@ export const routePermissions: RoutePermission[] = [
             { path: '/bots/edit', permissions: [PERMISSIONS.EDIT_INBOUND_BOTS_INBOUND] },
             { path: '/sip-trunks', permissions: [PERMISSIONS.VIEW_INBOUND_TRUNK_INBOUND] },
             { path: '/sip-trunks/create', permissions: [PERMISSIONS.CREATE_INBOUND_TRUNK_INBOUND] },
-            { path: '/conversations', permissions: [PERMISSIONS.VIEW_INBOUND_CAMPAIGNS_INBOUND] },
+            { path: '/conversations', permissions: [PERMISSIONS.VIEW_INBOUND_CONVERSATIONS_INBOUND] },
             { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_ANALYTICS_INBOUND] },
         ]
     },
@@ -777,10 +777,10 @@ export const routePermissions: RoutePermission[] = [
             { path: '/voicebots', permissions: [PERMISSIONS.VIEW_OUTBOUND_BOTS_OUTBOUND] },
             { path: '/voicebots/create', permissions: [PERMISSIONS.CREATE_OUTBOUND_BOTS_OUTBOUND] },
             { path: '/voicebots/edit', permissions: [PERMISSIONS.EDIT_OUTBOUND_BOTS_OUTBOUND] },
-            { path: '/campaigns', permissions: [PERMISSIONS.VIEW_OUTBOUND_CONVERSATIONS_OUTBOUND] },
-            { path: '/campaigns/create', permissions: [PERMISSIONS.VIEW_OUTBOUND_CONVERSATIONS_OUTBOUND] },
-            { path: '/campaigns/edit/:id', permissions: [PERMISSIONS.VIEW_OUTBOUND_CONVERSATIONS_OUTBOUND] },
-            { path: '/reports', permissions: [PERMISSIONS.VIEW_OUTBOUND_CONVERSATIONS_OUTBOUND] },
+            { path: '/campaigns', permissions: [PERMISSIONS.VIEW_OUTBOUND_CAMPAIGNS_OUTBOUND] },
+            { path: '/campaigns/create', permissions: [PERMISSIONS.CREATE_OUTBOUND_CAMPAIGNS_OUTBOUND] },
+            { path: '/campaigns/edit/:id', permissions: [PERMISSIONS.EDIT_OUTBOUND_CAMPAIGNS_OUTBOUND] },
+            { path: '/reports', permissions: [PERMISSIONS.VIEW_OUTBOUND_REPORT_OUTBOUND] },
             { path: '/analytics', permissions: [PERMISSIONS.VIEW_OUTBOUND_ANALYTICS_OUTBOUND] },
 
 
