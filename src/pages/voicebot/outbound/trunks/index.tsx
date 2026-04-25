@@ -14,6 +14,7 @@ import { toast } from "react-toastify";
 import { Plus, Trash2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import "@assets/scss/common.scss";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 interface TrunkRow {
   id?: string;
@@ -50,7 +51,11 @@ function formatTransport(v: unknown): string {
 
 const TrunksPage = () => {
   const { data: session } = useSession();
+  const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const permissions = session?.user?.permissions ?? [];
+  const canCreateTrunks = permissions.includes(PERMISSIONS.CREATE_OUTBOUND_SIP_TRUNCK_OUTBOUND);
+  const canDeleteTrunks = permissions.includes(PERMISSIONS.DELETE_OUTBOUND_SIP_TRUNCK_OUTBOUND);
   const sessionUser = session?.user as
     | { company_id?: string | null; company_identifier?: string | null }
     | undefined;
@@ -203,19 +208,21 @@ const TrunksPage = () => {
       sortable: false,
       render: (row) => (
         <div className="action-icons-wrap">
-          <Button
-            size="sm"
-            variant="outline-danger"
-            className="icon-action-btn"
-            onClick={() => {
-              setSelectedRow(row);
-              setShowDeleteModal(true);
-            }}
-            title="Delete trunk"
-            aria-label="Delete trunk"
-          >
-            <Trash2 size={12} />
-          </Button>
+          {canDeleteTrunks && (
+            <Button
+              size="sm"
+              variant="outline-danger"
+              className="icon-action-btn"
+              onClick={() => {
+                setSelectedRow(row);
+                setShowDeleteModal(true);
+              }}
+              title="Delete trunk"
+              aria-label="Delete trunk"
+            >
+              <Trash2 size={12} />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -342,14 +349,16 @@ const TrunksPage = () => {
                       </Form.Select>
                     </Form.Group>
                   )}
-                  <button
-                    type="button"
-                    className="add-trunk-btn"
-                    onClick={() => setCreateOpen(true)}
-                  >
-                    <Plus size={18} />
-                    Add Trunk
-                  </button>
+                  {canCreateTrunks && (
+                    <button
+                      type="button"
+                      className="add-trunk-btn"
+                      onClick={() => setCreateOpen(true)}
+                    >
+                      <Plus size={18} />
+                      Add Trunk
+                    </button>
+                  )}
                 </div>
               </div>
             </Col>

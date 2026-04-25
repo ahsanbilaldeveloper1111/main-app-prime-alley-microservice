@@ -47,6 +47,7 @@ import {
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import "@assets/scss/common.scss";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 interface CompanyOption {
   id: string;
@@ -361,6 +362,9 @@ const getBotId = (row: BotRow) => row.id ?? "";
 
 interface BotTableActionsProps {
   row: BotRow;
+  canEdit: boolean;
+  canDelete: boolean;
+  onView: (id: string) => void;
   onEdit: (id: string) => void;
   onPublish: (id: string) => void;
   onUnpublish: (id: string) => void;
@@ -475,6 +479,9 @@ const BotHistoryModalBody = ({
 
 const BotTableActions = ({
   row,
+  canEdit,
+  canDelete,
+  onView,
   onEdit,
   onPublish,
   onUnpublish,
@@ -486,14 +493,26 @@ const BotTableActions = ({
   return (
     <div className="d-flex gap-1">
       <Button
-        title="Edit"
+        title="View"
         size="sm"
-        variant="outline-primary"
-        onClick={() => onEdit(id)}
+        variant="outline-secondary"
+        onClick={() => {
+          onView(id);
+        }}
       >
-        <Pencil size={14} />
+        <Eye size={14} />
       </Button>
-      {!isPublished && (
+      {canEdit && (
+        <Button
+          title="Edit"
+          size="sm"
+          variant="outline-primary"
+          onClick={() => onEdit(id)}
+        >
+          <Pencil size={14} />
+        </Button>
+      )}
+      {canEdit && !isPublished && (
         <Button
           title="Publish"
           size="sm"
@@ -503,7 +522,7 @@ const BotTableActions = ({
           <Send size={14} />
         </Button>
       )}
-      {isPublished && (
+      {canEdit && isPublished && (
         <Button
           title="Unpublish"
           size="sm"
@@ -521,14 +540,16 @@ const BotTableActions = ({
       >
         <History size={14} />
       </Button>
-      <Button
-        title="Delete"
-        size="sm"
-        variant="outline-danger"
-        onClick={() => onDelete(row)}
-      >
-        <Trash2 size={14} />
-      </Button>
+      {canDelete && (
+        <Button
+          title="Delete"
+          size="sm"
+          variant="outline-danger"
+          onClick={() => onDelete(row)}
+        >
+          <Trash2 size={14} />
+        </Button>
+      )}
     </div>
   );
 };
@@ -536,7 +557,12 @@ const BotTableActions = ({
 const BotsPage = () => {
   const router = useRouter();
   const { data: session } = useSession();
+  const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const permissions = session?.user?.permissions ?? [];
+  const canCreateBots = permissions.includes(PERMISSIONS.CREATE_INBOUND_BOTS_INBOUND);
+  const canEditBots = permissions.includes(PERMISSIONS.EDIT_INBOUND_BOTS_INBOUND);
+  const canDeleteBots = permissions.includes(PERMISSIONS.DELETE_INBOUND_BOTS_INBOUND);
   const [data, setData] = useState<BotRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -976,19 +1002,21 @@ const BotsPage = () => {
           <option value="published">Published</option>
           <option value="archived">Archived</option>
         </Form.Select>
-        <Button
-          onClick={() => {
-            router.push("/voicebot/inbound/bots/create");
-          }}
-          style={addBotButtonStyle}
-          className="bots-add-button"
-        >
-          <Plus size={16} />
-          <span>Add Bot</span>
-        </Button>
+        {canCreateBots && (
+          <Button
+            onClick={() => {
+              router.push("/voicebot/inbound/bots/create");
+            }}
+            style={addBotButtonStyle}
+            className="bots-add-button"
+          >
+            <Plus size={16} />
+            <span>Add Bot</span>
+          </Button>
+        )}
       </div>
     ),
-    [isAdmin, companyFilter, companies, router, statusFilter],
+    [canCreateBots, isAdmin, companyFilter, companies, router, statusFilter],
   );
 
   const tableToolbar = useMemo(
@@ -1073,6 +1101,12 @@ const BotsPage = () => {
       render: (row) => (
         <BotTableActions
           row={row}
+          canEdit={canEditBots}
+          canDelete={canDeleteBots}
+          onView={(id) => {
+            setViewBotId(id);
+            setShowViewModal(true);
+          }}
           onEdit={(id) =>
             router.push(
               `/voicebot/inbound/bots/edit?id=${encodeURIComponent(id)}`,

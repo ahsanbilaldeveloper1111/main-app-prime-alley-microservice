@@ -19,6 +19,7 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import VoicebotEditSidebar from "@components/VoiceBotEditSidebar";
 import "@assets/scss/common.scss";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 interface VoicebotRow {
   id?: number | string;
@@ -51,7 +52,12 @@ function listFromResponse<T>(res: unknown): T[] {
 
 const VoicebotsPage = () => {
   const { data: session } = useSession();
+  const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const permissions = session?.user?.permissions ?? [];
+  const canCreateVoiceBots = permissions.includes(PERMISSIONS.CREATE_OUTBOUND_BOTS_OUTBOUND);
+  const canEditVoiceBots = permissions.includes(PERMISSIONS.EDIT_OUTBOUND_BOTS_OUTBOUND);
+  const canDeleteVoiceBots = permissions.includes(PERMISSIONS.DELETE_OUTBOUND_BOTS_OUTBOUND);
   const sessionUser = session?.user as
     | { company_id?: string | null; company_identifier?: string | null }
     | undefined;
@@ -181,31 +187,35 @@ const VoicebotsPage = () => {
       label: "Actions",
       render: (row) => (
         <div className="action-icons-wrap">
-          <Button
-            size="sm"
-            variant="outline-primary"
-            className="icon-action-btn"
-            onClick={() => {
-              setEditBotId(botId(row));
-              setEditCompanyId(
-                isAdmin ? String(row.company_id ?? "") : sessionCompanyScope,
-              );
-              setEditSidebarOpen(true);
-            }}
-          >
-            <Pencil size={12} />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-danger"
-            className="icon-action-btn"
-            onClick={() => {
-              setSelectedRow(row);
-              setShowDeleteModal(true);
-            }}
-          >
-            <Trash2 size={12} />
-          </Button>
+          {canEditVoiceBots && (
+            <Button
+              size="sm"
+              variant="outline-primary"
+              className="icon-action-btn"
+              onClick={() => {
+                setEditBotId(botId(row));
+                setEditCompanyId(
+                  isAdmin ? String(row.company_id ?? "") : sessionCompanyScope,
+                );
+                setEditSidebarOpen(true);
+              }}
+            >
+              <Pencil size={12} />
+            </Button>
+          )}
+          {canDeleteVoiceBots && (
+            <Button
+              size="sm"
+              variant="outline-danger"
+              className="icon-action-btn"
+              onClick={() => {
+                setSelectedRow(row);
+                setShowDeleteModal(true);
+              }}
+            >
+              <Trash2 size={12} />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -379,17 +389,19 @@ const VoicebotsPage = () => {
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </Form.Select>
-                  <button
-                    type="button"
-                    className="add-voicebot-btn flex-shrink-0"
-                    onClick={() => {
-                      setEditBotId("");
-                      setEditCompanyId(effectiveCompanyId);
-                      setEditSidebarOpen(true);
-                    }}
-                  >
-                    <Plus size={18} /> Add Voice Bot
-                  </button>
+                  {canCreateVoiceBots && (
+                    <button
+                      type="button"
+                      className="add-voicebot-btn flex-shrink-0"
+                      onClick={() => {
+                        setEditBotId("");
+                        setEditCompanyId(effectiveCompanyId);
+                        setEditSidebarOpen(true);
+                      }}
+                    >
+                      <Plus size={18} /> Add Voice Bot
+                    </button>
+                  )}
                 </div>
               </div>
             </Col>

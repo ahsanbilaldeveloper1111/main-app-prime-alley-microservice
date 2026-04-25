@@ -21,6 +21,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
 import { Eye, Plus, RefreshCw, Trash2 } from "lucide-react";
 import "@assets/scss/common.scss";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 type TrunkRow = SipTrunkListItem & { _rowKey: string };
 
@@ -150,7 +151,11 @@ const addTrunkButtonStyle: React.CSSProperties = {
 const SipTrunksPage = () => {
   const router = useRouter();
   const { data: session } = useSession();
+  const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const permissions = session?.user?.permissions ?? [];
+  const canCreateTrunks = permissions.includes(PERMISSIONS.CREATE_INBOUND_TRUNK_INBOUND);
+  const canDeleteTrunks = permissions.includes(PERMISSIONS.DELETE_INBOUND_TRUNK_INBOUND);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [data, setData] = useState<TrunkRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -274,18 +279,20 @@ const SipTrunksPage = () => {
           <RefreshCw size={16} />
           Refresh
         </Button>
-        <Button
-          type="button"
-          onClick={() => router.push("/voicebot/inbound/sip-trunks/create")}
-          className="border-0"
-          style={addTrunkButtonStyle}
-        >
-          <Plus size={16} />
-          <span>Create trunk</span>
-        </Button>
+        {canCreateTrunks && (
+          <Button
+            type="button"
+            onClick={() => router.push("/voicebot/inbound/sip-trunks/create")}
+            className="border-0"
+            style={addTrunkButtonStyle}
+          >
+            <Plus size={16} />
+            <span>Create trunk</span>
+          </Button>
+        )}
       </div>
     ),
-    [isAdmin, companyFilter, companies, fetchTrunks, loading, router],
+    [canCreateTrunks, isAdmin, companyFilter, companies, fetchTrunks, loading, router],
   );
 
   const tableToolbar = useMemo(
@@ -354,18 +361,20 @@ const SipTrunksPage = () => {
             >
               <Eye size={14} />
             </Button>
-            <Button
-              title="Delete trunk"
-              size="sm"
-              variant="outline-danger"
-              disabled={!tid}
-              onClick={() => {
-                setDeleteTarget(row);
-                setShowDeleteModal(true);
-              }}
-            >
-              <Trash2 size={14} />
-            </Button>
+            {canDeleteTrunks && (
+              <Button
+                title="Delete trunk"
+                size="sm"
+                variant="outline-danger"
+                disabled={!tid}
+                onClick={() => {
+                  setDeleteTarget(row);
+                  setShowDeleteModal(true);
+                }}
+              >
+                <Trash2 size={14} />
+              </Button>
+            )}
           </div>
         );
       },
