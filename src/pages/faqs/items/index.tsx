@@ -1,613 +1,686 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import {
-  ListFAQItems,
-  createFAQItem,
-  updateFAQItem,
-  deleteFAQItem,
-  getAllFAQTopics
-} from '@utils/faqs';
+import { ListFAQItems, createFAQItem, updateFAQItem, deleteFAQItem, getAllFAQTopics } from '@utils/faqs';
 import { Column } from '@components/CustomDataTable';
-import { Button, Form, Row, Col } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import '@assets/scss/common.scss';
-import FormModal from "@pages/partial/FormModal";
-import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
-import { Edit, Info, Trash2, HelpCircle, Plus } from 'lucide-react';
+import SuccessfulModal from '@pages/partial/SuccessfulModal';
+import { Edit, Info, Trash2, HelpCircle, Plus, X } from 'lucide-react';
 import Select from 'react-select';
 import RichTextEditor from '@pages/help-center/partials/RichTextEditor';
 
-const FAQItems = () => {
-  const columns: Column[] = [
-    { key: 'question', name: 'Question', selector: (row: any) => row.question, sortable: true },
-    { 
-      key: 'topic', 
-      name: 'Topic', 
-      selector: (row: any) => row.topic?.name || 'N/A', 
-      sortable: false,
-      cell: (props: any) => (
-        <div>
-          {props.topic ? (
-            <span className="status-badge primary" title={props.topic.description || ''}>
-              {props.topic.name}
-              {props.topic.faq_module && (
-                <span className="text-muted ms-1" style={{ fontSize: '0.85em' }}>
-                  ({props.topic.faq_module.name})
-                </span>
-              )}
-            </span>
-          ) : (
-            <span className="text-muted">No topic</span>
-          )}
-        </div>
-      )
-    },
-    { 
-      key: 'type', 
-      name: 'Type', 
-      selector: (row: any) => row.type || 'N/A', 
-      sortable: true,
-      cell: (props: any) => (
-        <div>
-          {props.type ? (
-            <span className="status-badge primary">
-              {props.type}
-            </span>
-          ) : (
-            <span className="text-muted">N/A</span>
-          )}
-        </div>
-      )
-    },
-    { 
-      key: 'view_count', 
-      name: 'Views', 
-      selector: (row: any) => row.view_count || 0, 
-      sortable: true,
-      cell: (props: any) => (
-        <div>
-          <span className="status-badge primary">
-            {props.view_count || 0}
-          </span>
-        </div>
-      )
-    },
-    { 
-      key: 'created_at', 
-      name: 'Created At', 
-      selector: (row: any) => row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A', 
-      sortable: true 
-    },
-    // ...(session?.user?.permissions?.includes('edit-faq-items') || session?.user?.permissions?.includes('delete-faq-items') ? [
-      {
-        key: 'Action',
-        name: 'Actions',
-        selector: (row: any) => row.id,
-        sortable: false,
-        cell: (props: any) => (
-          <div className="d-flex gap-2">
-            {/* {session?.user?.permissions?.includes('edit-faq-items') && ( */}
-              <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => handleEditItem(props)}>
-                <Edit size={16} />
-              </Button>
-            {/* )} */}
-            {/* {session?.user?.permissions?.includes('delete-faq-items') && ( */}
-              <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => handleDeleteItem(props)}>
-                <Trash2 size={16} />
-              </Button>
-            {/* )} */}
-          </div>
-        )
-      }
-    // ] : [])
-   ];
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters] = useState({});
+interface FAQItemFormData {
+    topic_id: string;
+    question: string;
+    answer: string;
+    description: string;
+    type: string;
+}
 
-  // Memoize filters to prevent unnecessary re-renders
-  const prevFiltersStringRef = useRef<string>('');
-  const prevFiltersRef = useRef<any>({});
-  
-  const memoizedFilters = useMemo(() => {
-    const filtersString = JSON.stringify(currentFilters || {});
-    if (filtersString !== prevFiltersStringRef.current) {
-      prevFiltersStringRef.current = filtersString;
-      prevFiltersRef.current = currentFilters || {};
-      return currentFilters || {};
-    }
-    return prevFiltersRef.current;
-  }, [currentFilters]);
-
-  const fetchItems = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      return await ListFAQItems({ page, perPage, search, filters: memoizedFilters });
-    },
-    [memoizedFilters]
-  );
-
-  // Item State
-  const [showEditItemModal, setShowEditItemModal] = useState<boolean>(false);
-  const [showCreateItemModal, setShowCreateItemModal] = useState<boolean>(false);
-  const [showDeleteItemModal, setShowDeleteItemModal] = useState<boolean>(false);
-  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
-  const [successModalTitle, setSuccessModalTitle] = useState('');
-  const [successModalDescription, setSuccessModalDescription] = useState('');
-  const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [itemFormData, setItemFormData] = useState({
+const EMPTY_FORM_DATA: FAQItemFormData = {
     topic_id: '',
     question: '',
     answer: '',
     description: '',
-    type: ''
-  });
-  const [topicOptions, setTopicOptions] = useState<any[]>([]);
-  const [isLoadingTopics, setIsLoadingTopics] = useState<boolean>(false);
-  const [isCreateModalEntered, setIsCreateModalEntered] = useState<boolean>(false);
-  const [isEditModalEntered, setIsEditModalEntered] = useState<boolean>(false);
+    type: '',
+};
 
-  useEffect(() => {
-    if (showCreateItemModal || showEditItemModal) {
-      fetchTopicOptions();
-    }
-  }, [showCreateItemModal, showEditItemModal]);
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    if (!showCreateItemModal) {
-      setIsCreateModalEntered(false);
-    }
-  }, [showCreateItemModal]);
+const CREATE_ITEM_CONFIG = {
+    title: 'New FAQ',
+    questionInputId: 'newItemQuestion',
+    descInputId: 'newItemDescription',
+    typeInputId: 'newItemType',
+    submitLabel: 'Add FAQ',
+    submittingLabel: 'Adding...',
+    questionPlaceholder: 'Enter the question',
+    descPlaceholder: 'Optional description',
+    editorKey: (id: any, open: boolean) => `create-${open}`,
+} as const;
 
-  useEffect(() => {
-    if (!showEditItemModal) {
-      setIsEditModalEntered(false);
-    }
-  }, [showEditItemModal]);
+const EDIT_ITEM_CONFIG = {
+    title: 'Edit FAQ',
+    questionInputId: 'editItemQuestion',
+    descInputId: 'editItemDescription',
+    typeInputId: 'editItemType',
+    submitLabel: 'Update FAQ',
+    submittingLabel: 'Updating...',
+    questionPlaceholder: '',
+    descPlaceholder: '',
+    editorKey: (id: any, open: boolean) => `edit-${id}-${open}`,
+} as const;
 
-  const fetchTopicOptions = async () => {
-    if (topicOptions.length > 0) return;
-    setIsLoadingTopics(true);
-    try {
-      const topics = await getAllFAQTopics();
-      setTopicOptions(topics.map((t: any) => ({
-        value: t.id,
-        label: `${t.name}${t.faq_module ? ` (${t.faq_module.name})` : ''}`
-      })));
-    } catch (error) {
-      console.error('Error fetching topics:', error);
-    } finally {
-      setIsLoadingTopics(false);
-    }
-  };
+type FAQItemSidebarConfig = typeof CREATE_ITEM_CONFIG | typeof EDIT_ITEM_CONFIG;
 
-  const handleEditItem = (props: any) => {
-    setSelectedItem(props.id);
-    setItemFormData({
-      topic_id: props.topic_id?.toString() || '',
-      question: props.question || '',
-      answer: props.answer || '',
-      description: props.description || '',
-      type: props.type || ''
-    });
-    setShowEditItemModal(true);
-  };
+// ---------------------------------------------------------------------------
+// Shared field sub-components
+// ---------------------------------------------------------------------------
 
-  const handleSubmitEditItem = async () => {
-    if (!itemFormData.topic_id || !itemFormData.question || !itemFormData.answer) {
-      return;
-    }
-    const response = await updateFAQItem(selectedItem, {
-      topic_id: Number.parseInt(itemFormData.topic_id, 10),
-      question: itemFormData.question,
-      answer: itemFormData.answer,
-      description: itemFormData.description,
-      type: itemFormData.type
-    });
-    if (response) {
-      setSelectedItem(null);
-      setItemFormData({
-        topic_id: '',
-        question: '',
-        answer: '',
-        description: '',
-        type: ''
-      });
-      setShowEditItemModal(false);
-      setRefreshKey(prev => prev + 1);
-    }
-  };
+interface ItemTopicFieldProps {
+    topicOptions: { value: any; label: string }[];
+    value: string;
+    onChange: (value: string) => void;
+    isLoading: boolean;
+}
 
-  const handleDeleteItem = (props: any) => {
-    setSelectedItem(props.id);
-    setShowDeleteItemModal(true);
-  };
+const ItemTopicField: React.FC<ItemTopicFieldProps> = ({ topicOptions, value, onChange, isLoading }) => (
+    <div style={{ marginBottom: '20px' }}>
+        {(() => {
+            const topicSelectId = "faq-item-topic";
+            return (
+                <>
+                    <label
+                        htmlFor={topicSelectId}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}
+                    >
+                        FAQ Topic <span style={{ color: '#f2545b' }}>*</span>
+                        <span title="Select the FAQ topic" style={{ cursor: 'help', color: '#6c757d' }}>
+                            <Info size={14} />
+                        </span>
+                    </label>
+                    <Select
+                        inputId={topicSelectId}
+                        options={topicOptions}
+                        value={topicOptions.find((opt) => opt.value.toString() === value) ?? null}
+                        onChange={(option: any) => onChange(option?.value?.toString() ?? '')}
+                        placeholder="Select topic..."
+                        isLoading={isLoading}
+                        isClearable={false}
+                        styles={{
+                            control: (base) => ({
+                                ...base,
+                                minHeight: 40,
+                                border: '1px solid #8a8a8a',
+                                borderRadius: '4px',
+                                fontSize: '14px',
+                            }),
+                        }}
+                    />
+                    <p style={{ fontSize: '0.813rem', color: '#6c757d', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Info size={12} />
+                        Select the FAQ topic this item belongs to
+                    </p>
+                </>
+            );
+        })()}
+    </div>
+);
 
-  const handleSubmitDeleteItem = async () => {
-    const response = await deleteFAQItem(selectedItem);
-    if (response) {
-      setSelectedItem(null);
-      setShowDeleteItemModal(false);
-      setSuccessModalTitle('FAQ Deleted');
-      setSuccessModalDescription('FAQ has been deleted successfully');
-      setTimeout(() => {
-        setShowSuccessfulModal(true);
-      }, 100);
-      setRefreshKey(prev => prev + 1);
-    }
-  };
+interface ItemQuestionFieldProps {
+    id: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    placeholder: string;
+}
 
-  const handleSubmitCreateItem = async () => {
-    if (!itemFormData.topic_id || !itemFormData.question || !itemFormData.answer) {
-      return;
-    }
-    const response = await createFAQItem({
-      topic_id: Number.parseInt(itemFormData.topic_id, 10),
-      question: itemFormData.question,
-      answer: itemFormData.answer,
-      description: itemFormData.description,
-      type: itemFormData.type
-    });
-    if (response) {
-      setItemFormData({
-        topic_id: '',
-        question: '',
-        answer: '',
-        description: '',
-        type: ''
-      });
-      setShowCreateItemModal(false);
-      setRefreshKey(prev => prev + 1);
-    }
-  };
+const ItemQuestionField: React.FC<ItemQuestionFieldProps> = ({ id, value, onChange, placeholder }) => (
+    <div style={{ marginBottom: '20px' }}>
+        <label
+            htmlFor={id}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}
+        >
+            Question <span style={{ color: '#f2545b' }}>*</span>
+            <span title="Enter the question" style={{ cursor: 'help', color: '#6c757d' }}>
+                <Info size={14} />
+            </span>
+        </label>
+        <input
+            id={id}
+            type="text"
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#0091ae'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#8a8a8a'; }}
+        />
+    </div>
+);
 
-  return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="FAQs" mainLink="/faqs" subTitle="FAQ Items" />
-      
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                {/* <h2 className="mb-0">FAQ Items</h2> */}
-              </Col>
-              <Col md={8} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  {/* {session?.user?.permissions?.includes('add-faq-items') && ( */}
-                    <Button variant="primary" onClick={() => setShowCreateItemModal(true)}>
-                      <Plus size={16} className="me-1" />
-                      Add FAQ
-                    </Button>
-                  {/* )} */}
+interface ItemAnswerFieldProps {
+    value: string;
+    onChange: (html: string) => void;
+    editorKey: string;
+}
+
+const ItemAnswerField: React.FC<ItemAnswerFieldProps> = ({ value, onChange, editorKey }) => (
+    <div style={{ marginBottom: '20px' }}>
+        {(() => {
+            // RichTextEditor does not accept id prop, so we remove it to avoid type error
+            return (
+                <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
+                        Answer <span style={{ color: '#f2545b' }}>*</span>
+                        <span title="Enter the answer" style={{ cursor: 'help', color: '#6c757d' }}>
+                            <Info size={14} />
+                        </span>
+                    </div>
+                    <div style={{ border: '1px solid #8a8a8a', borderRadius: '4px' }}>
+                        <RichTextEditor
+                            key={editorKey}
+                            value={value}
+                            onChange={onChange}
+                            placeholder="Enter the answer..."
+                            minHeight="150px"
+                        />
+                    </div>
+                    <p style={{ fontSize: '0.813rem', color: '#6c757d', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Info size={12} />
+                        Use the rich text editor to format your answer with headings, lists, and more
+                    </p>
+                </>
+            );
+        })()}
+    </div>
+);
+
+interface ItemDescriptionFieldProps {
+    id: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    placeholder: string;
+}
+
+const ItemDescriptionField: React.FC<ItemDescriptionFieldProps> = ({ id, value, onChange, placeholder }) => (
+    <div style={{ marginBottom: '20px' }}>
+        <label
+            htmlFor={id}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}
+        >
+            Description{' '}
+            <span title="Enter an optional description" style={{ cursor: 'help', color: '#6c757d' }}>
+                <Info size={14} />
+            </span>
+        </label>
+        <textarea
+            id={id}
+            rows={3}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none', resize: 'vertical' }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#0091ae'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#8a8a8a'; }}
+        />
+    </div>
+);
+
+interface ItemTypeFieldProps {
+    id: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+const ItemTypeField: React.FC<ItemTypeFieldProps> = ({ id, value, onChange }) => (
+    <div style={{ marginBottom: '20px' }}>
+        <label
+            htmlFor={id}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}
+        >
+            Type{' '}
+            <span title="Enter the FAQ type" style={{ cursor: 'help', color: '#6c757d' }}>
+                <Info size={14} />
+            </span>
+        </label>
+        <input
+            id={id}
+            type="text"
+            value={value}
+            onChange={onChange}
+            placeholder="e.g., general, technical, billing"
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#0091ae'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#8a8a8a'; }}
+        />
+    </div>
+);
+
+// ---------------------------------------------------------------------------
+// FAQItemSidebar — single sidebar for both Create and Edit
+// ---------------------------------------------------------------------------
+
+interface FAQItemSidebarProps {
+    isOpen: boolean;
+    config: FAQItemSidebarConfig;
+    selectedItemId: any;
+    formData: FAQItemFormData;
+    topicOptions: { value: any; label: string }[];
+    isLoadingTopics: boolean;
+    onTopicChange: (value: string) => void;
+    onQuestionChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onAnswerChange: (html: string) => void;
+    onDescriptionChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    onTypeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onSubmit: () => void;
+    onClose: () => void;
+    isSubmitting?: boolean;
+}
+
+const FAQItemSidebar: React.FC<FAQItemSidebarProps> = ({
+    isOpen,
+    config,
+    selectedItemId,
+    formData,
+    topicOptions,
+    isLoadingTopics,
+    onTopicChange,
+    onQuestionChange,
+    onAnswerChange,
+    onDescriptionChange,
+    onTypeChange,
+    onSubmit,
+    onClose,
+    isSubmitting = false,
+}) => {
+    if (!isOpen) return null;
+
+    const canSubmit = formData.topic_id !== '' && formData.question.trim() !== '' && formData.answer.trim() !== '' && !isSubmitting;
+
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!canSubmit) return;
+        onSubmit();
+    };
+
+    return (
+        <>
+            <div aria-hidden="true" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, background: 'transparent' }} />
+
+            <div style={{ position: 'fixed', top: 0, right: 0, width: '600px', height: '100vh', backgroundColor: '#ffffff', boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+                {/* Header */}
+                <div style={{ padding: '20px 24px', borderBottom: '1px solid #eaf0f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <HelpCircle size={20} style={{ color: '#0091ae' }} />
+                        <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#141414', margin: 0 }}>
+                            {config.title}
+                        </h2>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', color: '#718096', display: 'flex', alignItems: 'center' }}
+                    >
+                        <X size={24} />
+                    </button>
                 </div>
-              </Col>
-            </Row>
-          </div>
-        </Col>
-      </Row>
 
-      <GenericListPage
-        columns={columns}
-        fetchData={fetchItems}
-        title="FAQ Items"
-        searchPlaceholder="Search FAQs..."
-        defaultPageSize={15}
-        filters={memoizedFilters}
-        refreshKey={refreshKey}
-        search={true}
-        tableStyle="table-style-2"
-      />
+                <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                    {/* Body */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '40px' }}>
+                        <ItemTopicField
+                            topicOptions={topicOptions}
+                            value={formData.topic_id}
+                            onChange={onTopicChange}
+                            isLoading={isLoadingTopics}
+                        />
+                        <ItemQuestionField
+                            id={config.questionInputId}
+                            value={formData.question}
+                            onChange={onQuestionChange}
+                            placeholder={config.questionPlaceholder}
+                        />
+                        <ItemAnswerField
+                            value={formData.answer}
+                            onChange={onAnswerChange}
+                            editorKey={config.editorKey(selectedItemId, isOpen)}
+                        />
+                        <ItemDescriptionField
+                            id={config.descInputId}
+                            value={formData.description}
+                            onChange={onDescriptionChange}
+                            placeholder={config.descPlaceholder}
+                        />
+                        <ItemTypeField
+                            id={config.typeInputId}
+                            value={formData.type}
+                            onChange={onTypeChange}
+                        />
+                    </div>
 
-      {/* Edit Item Modal */}
-      <FormModal
-        show={showEditItemModal}
-        onHide={() => {
-          setShowEditItemModal(false);
-          setSelectedItem(null);
-          setItemFormData({
-            topic_id: '',
-            question: '',
-            answer: '',
-            description: '',
-            type: ''
-          });
-        }}
-        onEntered={() => {
-          setIsEditModalEntered(true);
-        }}
-        onExited={() => {
-          setIsEditModalEntered(false);
-        }}
-        title="Edit FAQ"
-        titleIcon={<HelpCircle size={20} className="text-primary" />}
-        desc="Please fill in the details below to edit the FAQ."
-        formHtml={
-          <>
-            <div className="form-group mb-3">
-              <label htmlFor="editItemTopic" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                FAQ Topic <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Select the FAQ topic">
-                  <Info size={14} />
-                </span>
-              </label>
-              <Select
-                options={topicOptions}
-                value={topicOptions.find(opt => opt.value.toString() === itemFormData.topic_id)}
-                onChange={(option: any) => setItemFormData({ ...itemFormData, topic_id: option?.value?.toString() || '' })}
-                placeholder="Select topic..."
-                isLoading={isLoadingTopics}
-                isClearable={false}
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Select the FAQ topic this item belongs to
-                </span>
-              </Form.Text>
+                    {/* Footer */}
+                    <div style={{ padding: '16px 24px', borderTop: '1px solid #eaf0f6', display: 'flex', gap: '12px' }}>
+                        <button
+                            type="submit"
+                            disabled={!canSubmit}
+                            style={{ padding: '10px 20px', backgroundColor: canSubmit ? '#0091ae' : '#cbd5e0', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: 500, cursor: canSubmit ? 'pointer' : 'not-allowed' }}
+                            onMouseEnter={(e) => { if (canSubmit) e.currentTarget.style.backgroundColor = '#007a94'; }}
+                            onMouseLeave={(e) => { if (canSubmit) e.currentTarget.style.backgroundColor = '#0091ae'; }}
+                        >
+                            {isSubmitting ? config.submittingLabel : config.submitLabel}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            style={{ padding: '10px 20px', backgroundColor: 'transparent', color: '#141414', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f7fafc'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editItemQuestion" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Question <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Enter the question">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="editItemQuestion"
-                value={itemFormData.question} 
-                onChange={(e) => setItemFormData({ ...itemFormData, question: e.target.value })} 
-              />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editItemAnswer" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Answer <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Enter the answer">
-                  <Info size={14} />
-                </span>
-              </label>
-              <div style={{ border: '1px solid #ced4da', borderRadius: '0.375rem' }}>
-                {isEditModalEntered && (
-                  <RichTextEditor
-                    key={`edit-${selectedItem}-${showEditItemModal}`}
-                    value={itemFormData.answer}
-                    onChange={(html: string) => setItemFormData({ ...itemFormData, answer: html })}
-                    placeholder="Enter the answer..."
-                    minHeight="150px"
-                  />
+        </>
+    );
+};
+
+// ---------------------------------------------------------------------------
+// Table cell renderers
+// ---------------------------------------------------------------------------
+
+function renderTopicCell(props: any) {
+    if (!props.topic) return <span className="text-muted">No topic</span>;
+    return (
+        <div>
+            <span className="status-badge primary" title={props.topic.description || ''}>
+                {props.topic.name}
+                {props.topic.faq_module && (
+                    <span className="text-muted ms-1" style={{ fontSize: '0.85em' }}>
+                        ({props.topic.faq_module.name})
+                    </span>
                 )}
-              </div>
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Use the rich text editor to format your answer with headings, lists, and more
-                </span>
-              </Form.Text>
+            </span>
+        </div>
+    );
+}
+
+function renderTypeCell(props: any) {
+    if (!props.type) return <span className="text-muted">N/A</span>;
+    return <span className="status-badge primary">{props.type}</span>;
+}
+
+function renderViewCountCell(props: any) {
+    return <span className="status-badge primary">{props.view_count || 0}</span>;
+}
+
+function renderCreatedAtCell(props: any) {
+    return <span>{props.created_at ? new Date(props.created_at).toLocaleDateString() : 'N/A'}</span>;
+}
+
+function buildItemActionCell(onEdit: (props: any) => void, onDelete: (props: any) => void) {
+    return function ItemActionCell(props: any) {
+        return (
+            <div className="d-flex gap-2">
+                <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => onEdit(props)}>
+                    <Edit size={16} />
+                </Button>
+                <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => onDelete(props)}>
+                    <Trash2 size={16} />
+                </Button>
             </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editItemDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Description
-                <span className="text-muted ms-2" title="Enter an optional description">
-                  <Info size={14} />
-                </span>
-              </label>
-              <textarea 
-                className="form-control" 
-                id="editItemDescription"
-                rows={3}
-                value={itemFormData.description} 
-                onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })} 
-              />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editItemType" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Type
-                <span className="text-muted ms-2" title="Enter the FAQ type">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="editItemType"
-                value={itemFormData.type} 
-                onChange={(e) => setItemFormData({ ...itemFormData, type: e.target.value })} 
-                placeholder="e.g., general, technical, billing"
-              />
-            </div>
-          </>
+        );
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Main page component
+// ---------------------------------------------------------------------------
+
+const FAQItems = () => {
+    const [refreshKey, setRefreshKey] = useState<number>(0);
+
+    // Shared form data (one object for both create & edit — sidebar only shows one at a time)
+    const [formData, setFormData] = useState<FAQItemFormData>(EMPTY_FORM_DATA);
+    const [selectedItem, setSelectedItem] = useState<any>(null);
+
+    // Sidebar visibility
+    const [showCreateSidebar, setShowCreateSidebar] = useState<boolean>(false);
+    const [showEditSidebar, setShowEditSidebar] = useState<boolean>(false);
+
+    // Delete state
+    const [showDeleteItemModal, setShowDeleteItemModal] = useState<boolean>(false);
+
+    // Success modal
+    const [showSuccessfulModal, setShowSuccessfulModal] = useState<boolean>(false);
+    const [successModalTitle, setSuccessModalTitle] = useState<string>('');
+    const [successModalDescription, setSuccessModalDescription] = useState<string>('');
+
+    // Topic options
+    const [topicOptions, setTopicOptions] = useState<{ value: any; label: string }[]>([]);
+    const [isLoadingTopics, setIsLoadingTopics] = useState<boolean>(false);
+
+    const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
+
+    // ---- Topic options loader ----
+    const fetchTopicOptions = useCallback(async () => {
+        if (topicOptions.length > 0) return;
+        setIsLoadingTopics(true);
+        try {
+            const topics = await getAllFAQTopics();
+            setTopicOptions(topics.map((t: any) => {
+                let label = t.name;
+                if (t.faq_module) {
+                    label += ' (' + String(t.faq_module.name) + ')';
+                }
+                return {
+                    value: t.id,
+                    label,
+                };
+            }));
+        } catch (error) {
+            console.error('Error fetching topics:', error);
+        } finally {
+            setIsLoadingTopics(false);
         }
-        submitButtonText="Update FAQ"
-        isSubmitDisabled={!itemFormData.topic_id || !itemFormData.question || !itemFormData.answer}
-        cancelButtonText="Cancel"
-        onSubmit={handleSubmitEditItem}
-        onCancel={() => {
-          setShowEditItemModal(false);
-          setSelectedItem(null);
-          setItemFormData({
-            topic_id: '',
-            question: '',
-            answer: '',
-            description: '',
-            type: ''
-          });
-        }}
-        size="lg"
-      />
+    }, [topicOptions.length]);
 
-      {/* Create Item Modal */}
-      <FormModal
-        show={showCreateItemModal}
-        onHide={() => {
-          setShowCreateItemModal(false);
-          setItemFormData({
-            topic_id: '',
-            question: '',
-            answer: '',
-            description: '',
-            type: ''
-          });
-        }}
-        onEntered={() => {
-          setIsCreateModalEntered(true);
-        }}
-        onExited={() => {
-          setIsCreateModalEntered(false);
-        }}
-        title="New FAQ"
-        titleIcon={<HelpCircle size={20} className="text-primary" />}
-        desc="Please fill in the details below to create a new FAQ."
-        formHtml={
-          <>
-            <div className="form-group mb-3">
-              <label htmlFor="newItemTopic" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                FAQ Topic <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Select the FAQ topic">
-                  <Info size={14} />
-                </span>
-              </label>
-              <Select
-                options={topicOptions}
-                value={topicOptions.find(opt => opt.value.toString() === itemFormData.topic_id)}
-                onChange={(option: any) => setItemFormData({ ...itemFormData, topic_id: option?.value?.toString() || '' })}
-                placeholder="Select topic..."
-                isLoading={isLoadingTopics}
-                isClearable={false}
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Select the FAQ topic this item belongs to
-                </span>
-              </Form.Text>
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newItemQuestion" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Question <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Enter the question">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="newItemQuestion"
-                value={itemFormData.question} 
-                onChange={(e) => setItemFormData({ ...itemFormData, question: e.target.value })} 
-                placeholder="Enter the question"
-              />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newItemAnswer" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Answer <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Enter the answer">
-                  <Info size={14} />
-                </span>
-              </label>
-              <div style={{ border: '1px solid #ced4da', borderRadius: '0.375rem' }}>
-                {isCreateModalEntered && (
-                  <RichTextEditor
-                    key={`create-${showCreateItemModal}`}
-                    value={itemFormData.answer}
-                    onChange={(html: string) => setItemFormData({ ...itemFormData, answer: html })}
-                    placeholder="Enter the answer..."
-                    minHeight="150px"
-                  />
-                )}
-              </div>
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Use the rich text editor to format your answer with headings, lists, and more
-                </span>
-              </Form.Text>
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newItemDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Description
-                <span className="text-muted ms-2" title="Enter an optional description">
-                  <Info size={14} />
-                </span>
-              </label>
-              <textarea 
-                className="form-control" 
-                id="newItemDescription"
-                rows={3}
-                value={itemFormData.description} 
-                onChange={(e) => setItemFormData({ ...itemFormData, description: e.target.value })} 
-                placeholder="Optional description"
-              />
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newItemType" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Type
-                <span className="text-muted ms-2" title="Enter the FAQ type">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="newItemType"
-                value={itemFormData.type} 
-                onChange={(e) => setItemFormData({ ...itemFormData, type: e.target.value })} 
-                placeholder="e.g., general, technical, billing"
-              />
-            </div>
-          </>
+    useEffect(() => {
+        if (showCreateSidebar || showEditSidebar) {
+            fetchTopicOptions();
         }
-        submitButtonText="Add FAQ"
-        isSubmitDisabled={!itemFormData.topic_id || !itemFormData.question || !itemFormData.answer}
-        cancelButtonText="Cancel"
-        onSubmit={handleSubmitCreateItem}
-        onCancel={() => {
-          setShowCreateItemModal(false);
-          setItemFormData({
-            topic_id: '',
-            question: '',
-            answer: '',
-            description: '',
-            type: ''
-          });
-        }}
-        size="lg"
-      />
+    }, [showCreateSidebar, showEditSidebar, fetchTopicOptions]);
 
-      {/* Delete Item Modal */}
-      <ConfirmModal
-        show={showDeleteItemModal}
-        onHide={() => {
-          setShowDeleteItemModal(false);
-          setSelectedItem(null);
-        }}
-        title="Delete FAQ"
-        description="Are you sure you want to delete this FAQ?"
-        targetName="this FAQ"
-        onConfirm={handleSubmitDeleteItem}
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        requireTextConfirmation={true}
-        requiredConfirmationText="delete"
-      />
+    // ---- Shared form field handlers ----
+    const handleTopicChange = useCallback((value: string) => setFormData((prev) => ({ ...prev, topic_id: value })), []);
+    const handleQuestionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setFormData((prev) => ({ ...prev, question: e.target.value })), []);
+    const handleAnswerChange = useCallback((html: string) => setFormData((prev) => ({ ...prev, answer: html })), []);
+    const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData((prev) => ({ ...prev, description: e.target.value })), []);
+    const handleTypeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setFormData((prev) => ({ ...prev, type: e.target.value })), []);
 
-      {/* Success Modal */}
-      <SuccessfulModal
-        show={showSuccessfulModal}
-        onHide={() => setShowSuccessfulModal(false)}
-        title={successModalTitle}
-        description={successModalDescription}
-      />
-    </React.Fragment>
-  );
+    // ---- Create handlers ----
+    const openCreateSidebar = useCallback(() => {
+        setFormData(EMPTY_FORM_DATA);
+        setShowCreateSidebar(true);
+    }, []);
+
+    const closeCreateSidebar = useCallback(() => {
+        setShowCreateSidebar(false);
+        setFormData(EMPTY_FORM_DATA);
+    }, []);
+
+    const handleSubmitCreateItem = useCallback(async () => {
+        if (!formData.topic_id || !formData.question || !formData.answer) return;
+        const response = await createFAQItem({
+            topic_id: Number.parseInt(formData.topic_id, 10),
+            question: formData.question,
+            answer: formData.answer,
+            description: formData.description,
+            type: formData.type,
+        });
+        if (response) {
+            closeCreateSidebar();
+            triggerRefresh();
+        }
+    }, [formData, closeCreateSidebar, triggerRefresh]);
+
+    // ---- Edit handlers ----
+    const handleEditItem = useCallback((props: any) => {
+        setSelectedItem(props.id);
+        setFormData({
+            topic_id: props.topic_id?.toString() || '',
+            question: props.question || '',
+            answer: props.answer || '',
+            description: props.description || '',
+            type: props.type || '',
+        });
+        setShowEditSidebar(true);
+    }, []);
+
+    const closeEditSidebar = useCallback(() => {
+        setShowEditSidebar(false);
+        setSelectedItem(null);
+        setFormData(EMPTY_FORM_DATA);
+    }, []);
+
+    const handleSubmitEditItem = useCallback(async () => {
+        if (!formData.topic_id || !formData.question || !formData.answer) return;
+        const response = await updateFAQItem(selectedItem, {
+            topic_id: Number.parseInt(formData.topic_id, 10),
+            question: formData.question,
+            answer: formData.answer,
+            description: formData.description,
+            type: formData.type,
+        });
+        if (response) {
+            closeEditSidebar();
+            triggerRefresh();
+        }
+    }, [selectedItem, formData, closeEditSidebar, triggerRefresh]);
+
+    // ---- Delete handlers ----
+    const handleDeleteItem = useCallback((props: any) => {
+        setSelectedItem(props.id);
+        setShowDeleteItemModal(true);
+    }, []);
+
+    const closeDeleteModal = useCallback(() => {
+        setShowDeleteItemModal(false);
+        setSelectedItem(null);
+    }, []);
+
+    const handleSubmitDeleteItem = useCallback(async () => {
+        const response = await deleteFAQItem(selectedItem);
+        if (response) {
+            setSelectedItem(null);
+            setShowDeleteItemModal(false);
+            setSuccessModalTitle('FAQ Deleted');
+            setSuccessModalDescription('FAQ has been deleted successfully');
+            setTimeout(() => setShowSuccessfulModal(true), 100);
+            triggerRefresh();
+        }
+    }, [selectedItem, triggerRefresh]);
+
+    const closeSuccessModal = useCallback(() => setShowSuccessfulModal(false), []);
+
+    // ---- Data fetching ----
+    const fetchItems = useCallback(
+        async (page = 1, perPage = 15, search = '') =>
+            ListFAQItems({ page, perPage, search, filters: {} }),
+        [],
+    );
+
+    // ---- Columns ----
+    const ActionCell = useMemo(
+        () => buildItemActionCell(handleEditItem, handleDeleteItem),
+        [handleEditItem, handleDeleteItem],
+    );
+
+    const columns: Column[] = useMemo(() => [
+        { key: 'question', name: 'Question', selector: (row: any) => row.question, sortable: true },
+        { key: 'topic', name: 'Topic', selector: (row: any) => row.topic?.name || 'N/A', sortable: false, cell: renderTopicCell },
+        { key: 'type', name: 'Type', selector: (row: any) => row.type || 'N/A', sortable: true, cell: renderTypeCell },
+        { key: 'view_count', name: 'Views', selector: (row: any) => row.view_count || 0, sortable: true, cell: renderViewCountCell },
+        { key: 'created_at', name: 'Created At', selector: (row: any) => row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A', sortable: true, cell: renderCreatedAtCell },
+        { key: 'Action', name: 'Actions', selector: (row: any) => row.id, sortable: false, cell: ActionCell },
+    ], [ActionCell]);
+
+    return (
+        <React.Fragment>
+            <BreadcrumbItem mainTitle="FAQs" mainLink="/faqs" subTitle="FAQ Items" />
+
+            <div className="page-header-title style-2 mb-3">
+                <div className="d-flex justify-content-end">
+                    <Button variant="primary" onClick={openCreateSidebar}>
+                        <Plus size={16} className="me-1" />
+                        Add FAQ
+                    </Button>
+                </div>
+            </div>
+
+            <GenericListPage
+                columns={columns}
+                fetchData={fetchItems}
+                title="FAQ Items"
+                searchPlaceholder="Search FAQs..."
+                defaultPageSize={15}
+                filters={{}}
+                refreshKey={refreshKey}
+                search={true}
+                tableStyle="table-style-2"
+            />
+
+            {/* Create FAQ Sidebar */}
+            <FAQItemSidebar
+                isOpen={showCreateSidebar}
+                config={CREATE_ITEM_CONFIG}
+                selectedItemId={null}
+                formData={formData}
+                topicOptions={topicOptions}
+                isLoadingTopics={isLoadingTopics}
+                onTopicChange={handleTopicChange}
+                onQuestionChange={handleQuestionChange}
+                onAnswerChange={handleAnswerChange}
+                onDescriptionChange={handleDescriptionChange}
+                onTypeChange={handleTypeChange}
+                onSubmit={handleSubmitCreateItem}
+                onClose={closeCreateSidebar}
+            />
+
+            {/* Edit FAQ Sidebar */}
+            <FAQItemSidebar
+                isOpen={showEditSidebar}
+                config={EDIT_ITEM_CONFIG}
+                selectedItemId={selectedItem}
+                formData={formData}
+                topicOptions={topicOptions}
+                isLoadingTopics={isLoadingTopics}
+                onTopicChange={handleTopicChange}
+                onQuestionChange={handleQuestionChange}
+                onAnswerChange={handleAnswerChange}
+                onDescriptionChange={handleDescriptionChange}
+                onTypeChange={handleTypeChange}
+                onSubmit={handleSubmitEditItem}
+                onClose={closeEditSidebar}
+            />
+
+            {/* Delete FAQ Modal */}
+            <ConfirmModal
+                show={showDeleteItemModal}
+                onHide={closeDeleteModal}
+                title="Delete FAQ"
+                description="Are you sure you want to delete this FAQ?"
+                targetName="this FAQ"
+                onConfirm={handleSubmitDeleteItem}
+                confirmButtonText="Delete"
+                confirmButtonVariant="danger"
+                requireTextConfirmation={true}
+                requiredConfirmationText="delete"
+            />
+
+            {/* Success Modal */}
+            <SuccessfulModal
+                show={showSuccessfulModal}
+                onHide={closeSuccessModal}
+                title={successModalTitle}
+                description={successModalDescription}
+            />
+        </React.Fragment>
+    );
 };
 
 FAQItems.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
+    return <Layout>{page}</Layout>;
 };
 
 export default FAQItems;
-

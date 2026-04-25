@@ -1,477 +1,580 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import {
-  ListFAQTopics,
-  createFAQTopic,
-  updateFAQTopic,
-  deleteFAQTopic,
-  getAllFAQModules
-} from '@utils/faqs';
+import { ListFAQTopics, createFAQTopic, updateFAQTopic, deleteFAQTopic, getAllFAQModules } from '@utils/faqs';
 import { Column } from '@components/CustomDataTable';
-import { Button, Form, Row, Col } from 'react-bootstrap';
-import { useSession } from 'next-auth/react';
+import { Button } from 'react-bootstrap';
 import '@assets/scss/common.scss';
-import FormModal from "@pages/partial/FormModal";
-import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
-import { Edit, Info, Trash2, Tag, Plus } from 'lucide-react';
+import SuccessfulModal from '@pages/partial/SuccessfulModal';
+import { Edit, Info, Trash2, Tag, Plus, X } from 'lucide-react';
 import Select from 'react-select';
 
-const FAQTopics = () => {
-  const { data: session } = useSession();
-  
-  const columns: Column[] = [
-    { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
-    { 
-      key: 'faq_module', 
-      name: 'Module', 
-      selector: (row: any) => row.faq_module?.name || 'N/A', 
-      sortable: false,
-      cell: (props: any) => (
-        <div>
-          {props.faq_module ? (
-            <span className="status-badge primary" title={props.faq_module.description || ''}>
-              {props.faq_module.name}
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const CREATE_TOPIC_CONFIG = {
+    title: 'New FAQ Topic',
+    nameInputId: 'newTopicName',
+    descInputId: 'newTopicDescription',
+    submitLabel: 'Add Topic',
+    submittingLabel: 'Adding...',
+    nameHint: 'Enter the name of the FAQ topic you want to create',
+    namePlaceholder: 'Topic Name',
+} as const;
+
+const EDIT_TOPIC_CONFIG = {
+    title: 'Edit FAQ Topic',
+    nameInputId: 'editTopicName',
+    descInputId: 'editTopicDescription',
+    submitLabel: 'Update Topic',
+    submittingLabel: 'Updating...',
+    nameHint: 'Change the name of the FAQ topic',
+    namePlaceholder: '',
+} as const;
+
+type TopicSidebarConfig = typeof CREATE_TOPIC_CONFIG | typeof EDIT_TOPIC_CONFIG;
+
+// ---------------------------------------------------------------------------
+// Shared field sub-components
+// ---------------------------------------------------------------------------
+
+interface TopicModuleFieldProps {
+    moduleOptions: { value: any; label: string }[];
+    value: string;
+    onChange: (value: string) => void;
+    isLoading: boolean;
+}
+
+const TopicModuleField: React.FC<TopicModuleFieldProps> = ({ moduleOptions, value, onChange, isLoading }) => (
+    <div style={{ marginBottom: '20px' }}>
+        {(() => {
+            const moduleSelectId = "faq-topic-module";
+            return (
+                <>
+                    <label
+                        htmlFor={moduleSelectId}
+                        style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}
+                    >
+                        FAQ Module <span style={{ color: '#f2545b' }}>*</span>
+                        <span title="Select the FAQ module" style={{ cursor: 'help', color: '#6c757d' }}>
+                            <Info size={14} />
+                        </span>
+                    </label>
+                    <Select
+                        inputId={moduleSelectId}
+                        options={moduleOptions}
+                        value={moduleOptions.find((opt) => opt.value.toString() === value) ?? null}
+                        onChange={(option: any) => onChange(option?.value?.toString() ?? '')}
+                        placeholder="Select module..."
+                        isLoading={isLoading}
+                        isClearable={false}
+                        styles={{
+                            control: (base) => ({
+                                ...base,
+                                minHeight: 40,
+                                border: '1px solid #8a8a8a',
+                                borderRadius: '4px',
+                                fontSize: '14px',
+                            }),
+                        }}
+                    />
+                    <p style={{ fontSize: '0.813rem', color: '#6c757d', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Info size={12} />
+                        Select the FAQ module this topic belongs to
+                    </p>
+                </>
+            );
+        })()}
+    </div>
+);
+
+interface TopicNameFieldProps {
+    id: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    hint: string;
+    placeholder: string;
+}
+
+const TopicNameField: React.FC<TopicNameFieldProps> = ({ id, value, onChange, hint, placeholder }) => (
+    <div style={{ marginBottom: '20px' }}>
+        <label
+            htmlFor={id}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}
+        >
+            Topic Name <span style={{ color: '#f2545b' }}>*</span>
+            <span title="Enter the name of the FAQ topic" style={{ cursor: 'help', color: '#6c757d' }}>
+                <Info size={14} />
             </span>
-          ) : (
-            <span className="text-muted">No module</span>
-          )}
-        </div>
-      )
-    },
-    { 
-      key: 'description', 
-      name: 'Description', 
-      selector: (row: any) => row.description || 'N/A', 
-      sortable: false,
-      cell: (props: any) => (
-        <div>
-          <span className={props.description ? '' : 'text-muted'}>
-            {props.description || 'No description'}
-          </span>
-        </div>
-      )
-    },
-    { 
-      key: 'faqs_count', 
-      name: 'FAQs Count', 
-      selector: (row: any) => row.faqs_count || 0, 
-      sortable: true,
-      cell: (props: any) => (
-        <div>
-          <span className="status-badge primary">
-            {props.faqs_count || 0}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'Action',
-      name: 'Actions',
-      selector: (row: any) => row.id,
-      sortable: false,
-      cell: (props: any) => (
-        <div className="d-flex gap-2">
-          <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => handleEditTopic(props)}>
-            <Edit size={16} />
-          </Button>
-          <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => handleDeleteTopic(props)}>
-            <Trash2 size={16} />
-          </Button>
-        </div>
-      )
-    }
-  ];
+        </label>
+        <input
+            id={id}
+            type="text"
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none' }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#0091ae'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#8a8a8a'; }}
+        />
+        <p style={{ fontSize: '0.813rem', color: '#6c757d', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Info size={12} />
+            {hint}
+        </p>
+    </div>
+);
 
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters] = useState({});
+interface TopicDescriptionFieldProps {
+    id: string;
+    value: string;
+    onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+}
 
-  // Memoize filters to prevent unnecessary re-renders
-  const prevFiltersStringRef = useRef<string>('');
-  const prevFiltersRef = useRef<any>({});
-  
-  const memoizedFilters = useMemo(() => {
-    const filtersString = JSON.stringify(currentFilters || {});
-    if (filtersString !== prevFiltersStringRef.current) {
-      prevFiltersStringRef.current = filtersString;
-      prevFiltersRef.current = currentFilters || {};
-      return currentFilters || {};
-    }
-    return prevFiltersRef.current;
-  }, [currentFilters]);
+const TopicDescriptionField: React.FC<TopicDescriptionFieldProps> = ({ id, value, onChange }) => (
+    <div style={{ marginBottom: '20px' }}>
+        <label
+            htmlFor={id}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}
+        >
+            Description{' '}
+            <span title="Enter a description for the FAQ topic" style={{ cursor: 'help', color: '#6c757d' }}>
+                <Info size={14} />
+            </span>
+        </label>
+        <textarea
+            id={id}
+            rows={3}
+            value={value}
+            onChange={onChange}
+            placeholder="Topic Description"
+            style={{ width: '100%', padding: '10px 12px', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', outline: 'none', resize: 'vertical' }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = '#0091ae'; }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = '#8a8a8a'; }}
+        />
+        <p style={{ fontSize: '0.813rem', color: '#6c757d', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Info size={12} />
+            Optional description for the FAQ topic
+        </p>
+    </div>
+);
 
-  const fetchTopics = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      return await ListFAQTopics({ page, perPage, search, filters: memoizedFilters });
-    },
-    [memoizedFilters]
-  );
+// ---------------------------------------------------------------------------
+// FAQTopicSidebar — single sidebar for both Create and Edit
+// ---------------------------------------------------------------------------
 
-  // Topic State
-  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
-  const [successModalTitle, setSuccessModalTitle] = useState('');
-  const [successModalDescription, setSuccessModalDescription] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState<any>(null);
-  const [selectedTopicName, setSelectedTopicName] = useState<string>('');
-  const [selectedTopicDescription, setSelectedTopicDescription] = useState<string>('');
-  const [selectedTopicModuleId, setSelectedTopicModuleId] = useState<string>('');
-  const [showEditTopicModal, setShowEditTopicModal] = useState<boolean>(false);
-  const [showCreateTopicModal, setShowCreateTopicModal] = useState<boolean>(false);
-  const [newTopicName, setNewTopicName] = useState<string>('');
-  const [newTopicDescription, setNewTopicDescription] = useState<string>('');
-  const [newTopicModuleId, setNewTopicModuleId] = useState<string>('');
-  const [showDeleteTopicModal, setShowDeleteTopicModal] = useState<boolean>(false);
-  const [moduleOptions, setModuleOptions] = useState<any[]>([]);
-  const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
+interface FAQTopicSidebarProps {
+    isOpen: boolean;
+    config: TopicSidebarConfig;
+    name: string;
+    description: string;
+    moduleId: string;
+    moduleOptions: { value: any; label: string }[];
+    isLoadingModules: boolean;
+    onNameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onDescriptionChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+    onModuleChange: (value: string) => void;
+    onSubmit: () => void;
+    onClose: () => void;
+    isSubmitting?: boolean;
+}
 
-  useEffect(() => {
-    if (showCreateTopicModal || showEditTopicModal) {
-      fetchModuleOptions();
-    }
-  }, [showCreateTopicModal, showEditTopicModal]);
+const FAQTopicSidebar: React.FC<FAQTopicSidebarProps> = ({
+    isOpen,
+    config,
+    name,
+    description,
+    moduleId,
+    moduleOptions,
+    isLoadingModules,
+    onNameChange,
+    onDescriptionChange,
+    onModuleChange,
+    onSubmit,
+    onClose,
+    isSubmitting = false,
+}) => {
+    if (!isOpen) return null;
 
-  const fetchModuleOptions = async () => {
-    if (moduleOptions.length > 0) return;
-    setIsLoadingModules(true);
-    try {
-      const modules = await getAllFAQModules();
-      setModuleOptions(modules.map((m: any) => ({
-        value: m.id,
-        label: m.name
-      })));
-    } catch (error) {
-      console.error('Error fetching modules:', error);
-    } finally {
-      setIsLoadingModules(false);
-    }
-  };
+    const canSubmit = name.trim() !== '' && moduleId !== '' && !isSubmitting;
 
-  const handleEditTopic = (props: any) => {
-    setSelectedTopic(props.id);
-    setSelectedTopicName(props.name);
-    setSelectedTopicDescription(props.description || '');
-    setSelectedTopicModuleId(props.faq_module_id?.toString() || '');
-    setShowEditTopicModal(true);
-  };
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!canSubmit) return;
+        onSubmit();
+    };
 
-  const handleSubmitEditTopic = async () => {
-    if (!selectedTopicModuleId || !selectedTopicName) {
-      return;
-    }
-    const response = await updateFAQTopic(
-      selectedTopic,
-      Number.parseInt(selectedTopicModuleId, 10),
-      selectedTopicName,
-      selectedTopicDescription
-    );
-    if (response) {
-      setSelectedTopic(null);
-      setSelectedTopicName('');
-      setSelectedTopicDescription('');
-      setSelectedTopicModuleId('');
-      setShowEditTopicModal(false);
-      setRefreshKey(prev => prev + 1);
-    }
-  };
+    return (
+        <>
+            <div aria-hidden="true" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, background: 'transparent' }} />
 
-  const handleDeleteTopic = (props: any) => {
-    setSelectedTopic(props.id);
-    setSelectedTopicName(props.name);
-    setShowDeleteTopicModal(true);
-  };
-
-  const handleSubmitDeleteTopic = async () => {
-    const response = await deleteFAQTopic(selectedTopic);
-    if (response) {
-      setSelectedTopic(null);
-      setSelectedTopicName('');
-      setShowDeleteTopicModal(false);
-      setSuccessModalTitle('FAQ Topic Deleted');
-      setSuccessModalDescription('FAQ topic has been deleted successfully');
-      setTimeout(() => {
-        setShowSuccessfulModal(true);
-      }, 100);
-      setRefreshKey(prev => prev + 1);
-    }
-  };
-
-  const handleSubmitCreateTopic = async () => {
-    if (!newTopicModuleId || !newTopicName) {
-      return;
-    }
-    const response = await createFAQTopic(
-      Number.parseInt(newTopicModuleId, 10),
-      newTopicName,
-      newTopicDescription
-    );
-    if (response) {
-      setNewTopicName('');
-      setNewTopicDescription('');
-      setNewTopicModuleId('');
-      setShowCreateTopicModal(false);
-      setRefreshKey(prev => prev + 1);
-    }
-  };
-
-  return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="FAQs" mainLink="/faqs" subTitle="Topics" />
-      
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                {/* <h2 className="mb-0">FAQ Topics</h2> */}
-              </Col>
-              <Col md={8} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  <Button variant="primary" onClick={() => setShowCreateTopicModal(true)}>
-                    <Plus size={16} className="me-1" />
-                    Add Topic
-                  </Button>
+            <div style={{ position: 'fixed', top: 0, right: 0, width: '600px', height: '100vh', backgroundColor: '#ffffff', boxShadow: '-2px 0 8px rgba(0, 0, 0, 0.1)', zIndex: 999999, display: 'flex', flexDirection: 'column' }}>
+                {/* Header */}
+                <div style={{ padding: '20px 24px', borderBottom: '1px solid #eaf0f6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Tag size={20} style={{ color: '#0091ae' }} />
+                        <h2 style={{ fontSize: '20px', fontWeight: 600, color: '#141414', margin: 0 }}>
+                            {config.title}
+                        </h2>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        style={{ background: 'transparent', border: 'none', padding: '4px', cursor: 'pointer', color: '#718096', display: 'flex', alignItems: 'center' }}
+                    >
+                        <X size={24} />
+                    </button>
                 </div>
-              </Col>
-            </Row>
-          </div>
-        </Col>
-      </Row>
 
-      <GenericListPage
-        columns={columns}
-        fetchData={fetchTopics}
-        title="FAQ Topics"
-        searchPlaceholder="Search topics..."
-        defaultPageSize={15}
-        filters={memoizedFilters}
-        refreshKey={refreshKey}
-        search={true}
-        tableStyle="table-style-2"
-      />
+                <form onSubmit={handleFormSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                    {/* Body */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '40px' }}>
+                        <TopicModuleField
+                            moduleOptions={moduleOptions}
+                            value={moduleId}
+                            onChange={onModuleChange}
+                            isLoading={isLoadingModules}
+                        />
+                        <TopicNameField
+                            id={config.nameInputId}
+                            value={name}
+                            onChange={onNameChange}
+                            hint={config.nameHint}
+                            placeholder={config.namePlaceholder}
+                        />
+                        <TopicDescriptionField
+                            id={config.descInputId}
+                            value={description}
+                            onChange={onDescriptionChange}
+                        />
+                    </div>
 
-      {/* Edit Topic Modal */}
-      <FormModal
-        show={showEditTopicModal}
-        onHide={() => {
-          setShowEditTopicModal(false);
-          setSelectedTopic(null);
-          setSelectedTopicName('');
-          setSelectedTopicDescription('');
-          setSelectedTopicModuleId('');
-        }}
-        title="Edit FAQ Topic"
-        titleIcon={<Tag size={20} className="text-primary" />}
-        desc="Please fill in the details below to edit the FAQ topic."
-        formHtml={
-          <>
-            <div className="form-group mb-3">
-              <label htmlFor="editTopicModule" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                FAQ Module <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Select the FAQ module">
-                  <Info size={14} />
-                </span>
-              </label>
-              <Select
-                options={moduleOptions}
-                value={moduleOptions.find(opt => opt.value.toString() === selectedTopicModuleId)}
-                onChange={(option: any) => setSelectedTopicModuleId(option?.value?.toString() || '')}
-                placeholder="Select module..."
-                isLoading={isLoadingModules}
-                isClearable={false}
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Select the FAQ module this topic belongs to
-                </span>
-              </Form.Text>
+                    {/* Footer */}
+                    <div style={{ padding: '16px 24px', borderTop: '1px solid #eaf0f6', display: 'flex', gap: '12px' }}>
+                        <button
+                            type="submit"
+                            disabled={!canSubmit}
+                            style={{ padding: '10px 20px', backgroundColor: canSubmit ? '#0091ae' : '#cbd5e0', color: '#ffffff', border: 'none', borderRadius: '4px', fontSize: '14px', fontWeight: 500, cursor: canSubmit ? 'pointer' : 'not-allowed' }}
+                            onMouseEnter={(e) => { if (canSubmit) e.currentTarget.style.backgroundColor = '#007a94'; }}
+                            onMouseLeave={(e) => { if (canSubmit) e.currentTarget.style.backgroundColor = '#0091ae'; }}
+                        >
+                            {isSubmitting ? config.submittingLabel : config.submitLabel}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            style={{ padding: '10px 20px', backgroundColor: 'transparent', color: '#141414', border: '1px solid #8a8a8a', borderRadius: '4px', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f7fafc'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </form>
             </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editTopicName" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Topic Name <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Enter the name of the FAQ topic">
-                  <Info size={14} />
+        </>
+    );
+};
+
+// ---------------------------------------------------------------------------
+// Table cell renderers
+// ---------------------------------------------------------------------------
+
+function renderModuleCell(props: any) {
+    if (props.faq_module) {
+        return (
+            <div>
+                <span className="status-badge primary" title={props.faq_module.description || ''}>
+                    {props.faq_module.name}
                 </span>
-              </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="editTopicName"
-                value={selectedTopicName} 
-                onChange={(e) => setSelectedTopicName(e.target.value)} 
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Change the name of the FAQ topic
-                </span>
-              </Form.Text>
             </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editTopicDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Description
-                <span className="text-muted ms-2" title="Enter a description for the FAQ topic">
-                  <Info size={14} />
-                </span>
-              </label>
-              <textarea 
-                className="form-control" 
-                id="editTopicDescription"
-                rows={3}
-                value={selectedTopicDescription} 
-                onChange={(e) => setSelectedTopicDescription(e.target.value)} 
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Optional description for the FAQ topic
-                </span>
-              </Form.Text>
+        );
+    }
+    return <span className="text-muted">No module</span>;
+}
+
+function renderDescriptionCell(props: any) {
+    return (
+        <div>
+            <span className={props.description ? '' : 'text-muted'}>
+                {props.description || 'No description'}
+            </span>
+        </div>
+    );
+}
+
+function renderFaqsCountCell(props: any) {
+    return (
+        <div>
+            <span className="status-badge primary">{props.faqs_count || 0}</span>
+        </div>
+    );
+}
+
+function buildTopicActionCell(onEdit: (props: any) => void, onDelete: (props: any) => void) {
+    return function TopicActionCell(props: any) {
+        return (
+            <div className="d-flex gap-2">
+                <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => onEdit(props)}>
+                    <Edit size={16} />
+                </Button>
+                <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => onDelete(props)}>
+                    <Trash2 size={16} />
+                </Button>
             </div>
-          </>
+        );
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Main page component
+// ---------------------------------------------------------------------------
+
+const FAQTopics = () => {
+    const [refreshKey, setRefreshKey] = useState<number>(0);
+
+    // Module options (shared between create & edit)
+    const [moduleOptions, setModuleOptions] = useState<{ value: any; label: string }[]>([]);
+    const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
+
+    // Create state
+    const [showCreateSidebar, setShowCreateSidebar] = useState<boolean>(false);
+    const [newTopicName, setNewTopicName] = useState<string>('');
+    const [newTopicDescription, setNewTopicDescription] = useState<string>('');
+    const [newTopicModuleId, setNewTopicModuleId] = useState<string>('');
+
+    // Edit state
+    const [showEditSidebar, setShowEditSidebar] = useState<boolean>(false);
+    const [selectedTopic, setSelectedTopic] = useState<any>(null);
+    const [selectedTopicName, setSelectedTopicName] = useState<string>('');
+    const [selectedTopicDescription, setSelectedTopicDescription] = useState<string>('');
+    const [selectedTopicModuleId, setSelectedTopicModuleId] = useState<string>('');
+
+    // Delete state
+    const [showDeleteTopicModal, setShowDeleteTopicModal] = useState<boolean>(false);
+    const [deleteTopicName, setDeleteTopicName] = useState<string>('');
+
+    // Success modal state
+    const [showSuccessfulModal, setShowSuccessfulModal] = useState<boolean>(false);
+    const [successModalTitle, setSuccessModalTitle] = useState<string>('');
+    const [successModalDescription, setSuccessModalDescription] = useState<string>('');
+
+    const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
+
+    // ---- Module options loader ----
+    const fetchModuleOptions = useCallback(async () => {
+        if (moduleOptions.length > 0) return;
+        setIsLoadingModules(true);
+        try {
+            const modules = await getAllFAQModules();
+            setModuleOptions(modules.map((m: any) => ({ value: m.id, label: m.name })));
+        } catch (error) {
+            console.error('Error fetching modules:', error);
+        } finally {
+            setIsLoadingModules(false);
         }
-        submitButtonText="Update Topic"
-        isSubmitDisabled={!selectedTopicModuleId || !selectedTopicName}
-        cancelButtonText="Cancel"
-        onSubmit={handleSubmitEditTopic}
-        onCancel={() => {
-          setShowEditTopicModal(false);
-          setSelectedTopic(null);
-          setSelectedTopicName('');
-          setSelectedTopicDescription('');
-          setSelectedTopicModuleId('');
-        }}
-      />
+    }, [moduleOptions.length]);
 
-      {/* Create Topic Modal */}
-      <FormModal
-        show={showCreateTopicModal}
-        onHide={() => {
-          setShowCreateTopicModal(false);
-          setNewTopicName('');
-          setNewTopicDescription('');
-          setNewTopicModuleId('');
-        }}
-        title="New FAQ Topic"
-        titleIcon={<Tag size={20} className="text-primary" />}
-        desc="Please fill in the details below to create a new FAQ topic."
-        formHtml={
-          <>
-            <div className="form-group mb-3">
-              <label htmlFor="newTopicModule" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                FAQ Module <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Select the FAQ module">
-                  <Info size={14} />
-                </span>
-              </label>
-              <Select
-                options={moduleOptions}
-                value={moduleOptions.find(opt => opt.value.toString() === newTopicModuleId)}
-                onChange={(option: any) => setNewTopicModuleId(option?.value?.toString() || '')}
-                placeholder="Select module..."
-                isLoading={isLoadingModules}
-                isClearable={false}
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Select the FAQ module this topic belongs to
-                </span>
-              </Form.Text>
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newTopicName" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Topic Name <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Enter the name of the FAQ topic">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input 
-                type="text" 
-                className="form-control" 
-                id="newTopicName"
-                value={newTopicName} 
-                onChange={(e) => setNewTopicName(e.target.value)} 
-                placeholder="Topic Name" 
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Enter the name of the FAQ topic you want to create
-                </span>
-              </Form.Text>
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newTopicDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Description
-                <span className="text-muted ms-2" title="Enter a description for the FAQ topic">
-                  <Info size={14} />
-                </span>
-              </label>
-              <textarea 
-                className="form-control" 
-                id="newTopicDescription"
-                rows={3}
-                value={newTopicDescription} 
-                onChange={(e) => setNewTopicDescription(e.target.value)} 
-                placeholder="Topic Description"
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Optional description for the FAQ topic
-                </span>
-              </Form.Text>
-            </div>
-          </>
+    useEffect(() => {
+        if (showCreateSidebar || showEditSidebar) {
+            fetchModuleOptions();
         }
-        submitButtonText="Add Topic"
-        isSubmitDisabled={!newTopicModuleId || !newTopicName}
-        cancelButtonText="Cancel"
-        onSubmit={handleSubmitCreateTopic}
-        onCancel={() => {
-          setShowCreateTopicModal(false);
-          setNewTopicName('');
-          setNewTopicDescription('');
-          setNewTopicModuleId('');
-        }}
-      />
+    }, [showCreateSidebar, showEditSidebar, fetchModuleOptions]);
 
-      {/* Delete Topic Modal */}
-      <ConfirmModal
-        show={showDeleteTopicModal}
-        onHide={() => {
-          setShowDeleteTopicModal(false);
-          setSelectedTopic(null);
-          setSelectedTopicName('');
-        }}
-        title="Delete FAQ Topic"
-        description="Are you sure you want to delete the following FAQ topic?"
-        targetName={selectedTopicName}
-        onConfirm={handleSubmitDeleteTopic}
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        requireTextConfirmation={true}
-        requiredConfirmationText="delete"
-      />
+    // ---- Create handlers ----
+    const openCreateSidebar = useCallback(() => setShowCreateSidebar(true), []);
 
-      {/* Success Modal */}
-      <SuccessfulModal
-        show={showSuccessfulModal}
-        onHide={() => setShowSuccessfulModal(false)}
-        title={successModalTitle}
-        description={successModalDescription}
-      />
-    </React.Fragment>
-  );
+    const closeCreateSidebar = useCallback(() => {
+        setShowCreateSidebar(false);
+        setNewTopicName('');
+        setNewTopicDescription('');
+        setNewTopicModuleId('');
+    }, []);
+
+    const handleSubmitCreateTopic = useCallback(async () => {
+        if (!newTopicModuleId || !newTopicName) return;
+        const response = await createFAQTopic(Number.parseInt(newTopicModuleId, 10), newTopicName, newTopicDescription);
+        if (response) {
+            closeCreateSidebar();
+            triggerRefresh();
+        }
+    }, [newTopicModuleId, newTopicName, newTopicDescription, closeCreateSidebar, triggerRefresh]);
+
+    const handleNewTopicNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setNewTopicName(e.target.value), []);
+    const handleNewTopicDescChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setNewTopicDescription(e.target.value), []);
+    const handleNewTopicModuleChange = useCallback((value: string) => setNewTopicModuleId(value), []);
+
+    // ---- Edit handlers ----
+    const handleEditTopic = useCallback((props: any) => {
+        setSelectedTopic(props.id);
+        setSelectedTopicName(props.name);
+        setSelectedTopicDescription(props.description || '');
+        setSelectedTopicModuleId(props.faq_module_id?.toString() || '');
+        setShowEditSidebar(true);
+    }, []);
+
+    const closeEditSidebar = useCallback(() => {
+        setShowEditSidebar(false);
+        setSelectedTopic(null);
+        setSelectedTopicName('');
+        setSelectedTopicDescription('');
+        setSelectedTopicModuleId('');
+    }, []);
+
+    const handleSubmitEditTopic = useCallback(async () => {
+        if (!selectedTopicModuleId || !selectedTopicName) return;
+        const response = await updateFAQTopic(
+            selectedTopic,
+            Number.parseInt(selectedTopicModuleId, 10),
+            selectedTopicName,
+            selectedTopicDescription,
+        );
+        if (response) {
+            closeEditSidebar();
+            triggerRefresh();
+        }
+    }, [selectedTopic, selectedTopicModuleId, selectedTopicName, selectedTopicDescription, closeEditSidebar, triggerRefresh]);
+
+    const handleEditTopicNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSelectedTopicName(e.target.value), []);
+    const handleEditTopicDescChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setSelectedTopicDescription(e.target.value), []);
+    const handleEditTopicModuleChange = useCallback((value: string) => setSelectedTopicModuleId(value), []);
+
+    // ---- Delete handlers ----
+    const handleDeleteTopic = useCallback((props: any) => {
+        setSelectedTopic(props.id);
+        setDeleteTopicName(props.name);
+        setShowDeleteTopicModal(true);
+    }, []);
+
+    const closeDeleteModal = useCallback(() => {
+        setShowDeleteTopicModal(false);
+        setSelectedTopic(null);
+        setDeleteTopicName('');
+    }, []);
+
+    const handleSubmitDeleteTopic = useCallback(async () => {
+        const response = await deleteFAQTopic(selectedTopic);
+        if (response) {
+            setSelectedTopic(null);
+            setDeleteTopicName('');
+            setShowDeleteTopicModal(false);
+            setSuccessModalTitle('FAQ Topic Deleted');
+            setSuccessModalDescription('FAQ topic has been deleted successfully');
+            setTimeout(() => setShowSuccessfulModal(true), 100);
+            triggerRefresh();
+        }
+    }, [selectedTopic, triggerRefresh]);
+
+    const closeSuccessModal = useCallback(() => setShowSuccessfulModal(false), []);
+
+    // ---- Data fetching ----
+    const fetchTopics = useCallback(
+        async (page = 1, perPage = 15, search = '') =>
+            ListFAQTopics({ page, perPage, search, filters: {} }),
+        [],
+    );
+
+    // ---- Columns ----
+    const ActionCell = useMemo(
+        () => buildTopicActionCell(handleEditTopic, handleDeleteTopic),
+        [handleEditTopic, handleDeleteTopic],
+    );
+
+    const columns: Column[] = useMemo(() => [
+        { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
+        { key: 'faq_module', name: 'Module', selector: (row: any) => row.faq_module?.name || 'N/A', sortable: false, cell: renderModuleCell },
+        { key: 'description', name: 'Description', selector: (row: any) => row.description || 'N/A', sortable: false, cell: renderDescriptionCell },
+        { key: 'faqs_count', name: 'FAQs Count', selector: (row: any) => row.faqs_count || 0, sortable: true, cell: renderFaqsCountCell },
+        { key: 'Action', name: 'Actions', selector: (row: any) => row.id, sortable: false, cell: ActionCell },
+    ], [ActionCell]);
+
+    return (
+        <React.Fragment>
+            <BreadcrumbItem mainTitle="FAQs" mainLink="/faqs" subTitle="Topics" />
+
+            <div className="page-header-title style-2 mb-3">
+                <div className="d-flex justify-content-end">
+                    <Button variant="primary" onClick={openCreateSidebar}>
+                        <Plus size={16} className="me-1" />
+                        Add Topic
+                    </Button>
+                </div>
+            </div>
+
+            <GenericListPage
+                columns={columns}
+                fetchData={fetchTopics}
+                title="FAQ Topics"
+                searchPlaceholder="Search topics..."
+                defaultPageSize={15}
+                filters={{}}
+                refreshKey={refreshKey}
+                search={true}
+                tableStyle="table-style-2"
+            />
+
+            {/* Create Topic Sidebar */}
+            <FAQTopicSidebar
+                isOpen={showCreateSidebar}
+                config={CREATE_TOPIC_CONFIG}
+                name={newTopicName}
+                description={newTopicDescription}
+                moduleId={newTopicModuleId}
+                moduleOptions={moduleOptions}
+                isLoadingModules={isLoadingModules}
+                onNameChange={handleNewTopicNameChange}
+                onDescriptionChange={handleNewTopicDescChange}
+                onModuleChange={handleNewTopicModuleChange}
+                onSubmit={handleSubmitCreateTopic}
+                onClose={closeCreateSidebar}
+            />
+
+            {/* Edit Topic Sidebar */}
+            <FAQTopicSidebar
+                isOpen={showEditSidebar}
+                config={EDIT_TOPIC_CONFIG}
+                name={selectedTopicName}
+                description={selectedTopicDescription}
+                moduleId={selectedTopicModuleId}
+                moduleOptions={moduleOptions}
+                isLoadingModules={isLoadingModules}
+                onNameChange={handleEditTopicNameChange}
+                onDescriptionChange={handleEditTopicDescChange}
+                onModuleChange={handleEditTopicModuleChange}
+                onSubmit={handleSubmitEditTopic}
+                onClose={closeEditSidebar}
+            />
+
+            {/* Delete Topic Modal */}
+            <ConfirmModal
+                show={showDeleteTopicModal}
+                onHide={closeDeleteModal}
+                title="Delete FAQ Topic"
+                description="Are you sure you want to delete the following FAQ topic?"
+                targetName={deleteTopicName}
+                onConfirm={handleSubmitDeleteTopic}
+                confirmButtonText="Delete"
+                confirmButtonVariant="danger"
+                requireTextConfirmation={true}
+                requiredConfirmationText="delete"
+            />
+
+            {/* Success Modal */}
+            <SuccessfulModal
+                show={showSuccessfulModal}
+                onHide={closeSuccessModal}
+                title={successModalTitle}
+                description={successModalDescription}
+            />
+        </React.Fragment>
+    );
 };
 
 FAQTopics.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
+    return <Layout>{page}</Layout>;
 };
 
 export default FAQTopics;
-
