@@ -43,6 +43,7 @@ import {
   Trash2,
   Send,
   Undo2,
+  Eye,
   History,
   Info,
   Settings,
@@ -1145,8 +1146,10 @@ const BotsPage = () => {
           canEdit={canEditBots}
           canDelete={canDeleteBots}
           onView={(id) => {
-            setViewBotId(id);
-            setShowViewModal(true);
+            const targetRow = data.find((item) => getBotId(item) === id);
+            if (targetRow) {
+              openBotSidebar(targetRow);
+            }
           }}
           onEdit={(id) =>
             router.push(

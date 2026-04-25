@@ -151,7 +151,7 @@ export interface CreateCampaignPayload {
   campaign_script?: string;
   custom_greeting?: string;
   target_numbers: string[];
-  schedule_time: string;
+  schedule_time?: string;
   failure_threshold: number;
 }
 

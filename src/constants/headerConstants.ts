@@ -360,7 +360,7 @@ export const HEADER_CONSTANTS = {
     CREATE_INBOUND_BOTS_INBOUND: "create-inbound-bots-inbound",
     EDIT_INBOUND_BOTS_INBOUND: "edit-inbound-bots-inbound",
     DELETE_INBOUND_BOTS_INBOUND: "delete-inbound-bots-inbound",
-    VIEW_INBOUND_CONVERSATIONS_INBOUND: "view-Inbound-conversations-inbound",
+    VIEW_INBOUND_CONVERSATIONS_INBOUND: "view-inbound-conversations-inbound",
     VIEW_OUTBOUND_CAMPAIGNS_OUTBOUND: "view-outbound-campaign-outbound",
     CREATE_OUTBOUND_CAMPAIGNS_OUTBOUND: "create-outbound-campaign-outbound",
     EDIT_OUTBOUND_CAMPAIGNS_OUTBOUND: "edit-outbound-campaign-outbound",
