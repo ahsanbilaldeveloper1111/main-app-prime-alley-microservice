@@ -39,6 +39,12 @@ import {
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { isExactPhoneMatch, normalizePhoneValue } from "@utils/phoneMatch";
 import {
+  formatDateTimeFilterForApi,
+  formatFilterDateTimeLabel,
+  getDefaultCommunicationsDateFilterPair,
+  shouldSkipCommunicationsListFetch,
+} from "@utils/communicationsDateUtils";
+import {
   buildCallDirectionFilterPill,
   buildCallStatusFilterPill,
   buildDepartmentFilterPill,
@@ -196,30 +202,10 @@ const CallLogs = () => {
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
 
-  // Initialize filters with default values immediately to prevent first API call without dates
-  const getDefaultFilters = () => {
-    const now = moment();
-    const startDateApi =
-      now.clone().startOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    const endDateApi =
-      now.clone().endOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    // UI filter state must include the same default date range as `applied`; otherwise any
-    // pill change via `applyFilters({ ...currentFilters, ... })` drops start/end and breaks the API query.
-    const startDateUi = now.clone().startOf("day").format("YYYY-MM-DDTHH:mm");
-    const endDateUi = now.clone().endOf("day").format("YYYY-MM-DDTHH:mm");
-    return {
-      current: {
-        start_datetime: startDateUi,
-        end_datetime: endDateUi,
-      },
-      applied: {
-        start_datetime: startDateApi,
-        end_datetime: endDateApi,
-      },
-    };
-  };
-
-  const defaultFilters = getDefaultFilters();
+  const defaultFilters = getDefaultCommunicationsDateFilterPair(
+    "start_datetime",
+    "end_datetime",
+  );
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(
     defaultFilters.current,
   );
@@ -291,15 +277,13 @@ const CallLogs = () => {
       const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(appliedFiltersRef.current)}`;
 
       if (
-        isFetchingRef.current &&
-        lastFetchParamsRef.current === paramsKey &&
-        now - lastFetchTimeRef.current < 500
-      ) {
-        return;
-      }
-      if (
-        lastFetchParamsRef.current === paramsKey &&
-        now - lastFetchTimeRef.current < 100
+        shouldSkipCommunicationsListFetch(
+          isFetchingRef.current,
+          paramsKey,
+          lastFetchParamsRef.current,
+          lastFetchTimeRef.current,
+          now,
+        )
       ) {
         return;
       }
@@ -369,16 +353,16 @@ const CallLogs = () => {
           const dataFilters = response?.filters;
           setStartDateTime(dataFilters?.start_datetime);
           setEndDateTime(dataFilters?.end_datetime);
+          let extensionsMetric = response.summary.extensions;
+          if (rowsArray.length === 0) {
+            extensionsMetric = 0;
+          } else if (selectedExtensionFilter.length > 0) {
+            extensionsMetric = selectedExtensionFilter.length;
+          }
           setSummary({
             ...response.summary,
             // Keep metrics aligned with visible results.
-            // If no rows are returned, extension metric should be 0.
-            extensions:
-              rowsArray.length === 0
-                ? 0
-                : selectedExtensionFilter.length > 0
-                  ? selectedExtensionFilter.length
-                  : response.summary.extensions,
+            extensions: extensionsMetric,
           });
         }
 
@@ -416,46 +400,17 @@ const CallLogs = () => {
     }
 
     if (formattedFilters.start_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-      let startMoment = moment(formattedFilters.start_datetime);
-
-      if (
-        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-        startMoment = moment(formattedFilters.start_datetime + ":00");
-      } else if (!formattedFilters.start_datetime.includes("T")) {
-        // If only date, set to 00:00:00
-        startMoment = moment(formattedFilters.start_datetime).startOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.start_datetime =
-        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+      formattedFilters.start_datetime = formatDateTimeFilterForApi(
+        String(formattedFilters.start_datetime),
+        false,
+      );
     }
 
     if (formattedFilters.end_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-      let endMoment = moment(formattedFilters.end_datetime);
-
-      if (
-        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-        const timePart = formattedFilters.end_datetime.split("T")[1];
-        if (timePart === "23:59") {
-          endMoment = moment(formattedFilters.end_datetime + ":59");
-        } else {
-          endMoment = moment(formattedFilters.end_datetime + ":00");
-        }
-      } else if (!formattedFilters.end_datetime.includes("T")) {
-        // If only date, set to 23:59:59
-        endMoment = moment(formattedFilters.end_datetime).endOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.end_datetime =
-        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+      formattedFilters.end_datetime = formatDateTimeFilterForApi(
+        String(formattedFilters.end_datetime),
+        true,
+      );
     }
 
     // Remove timezone key from payload (timezone is now included in datetime values)
@@ -503,13 +458,6 @@ const CallLogs = () => {
     setCurrentFilters,
     handleFiltersChange,
   );
-
-  const formatFilterDateTimeLabel = useCallback((value: unknown) => {
-    if (typeof value !== "string" || value.trim() === "") return undefined;
-    const parsed = moment(value);
-    if (!parsed.isValid()) return String(value);
-    return parsed.format("DD MMM YYYY, hh:mm A");
-  }, []);
 
   const tableToolbar = useMemo<any>(() => {
     return {
@@ -691,7 +639,6 @@ const CallLogs = () => {
     handleResetFiltersClick,
     hasUnappliedFilterChanges,
     hasNonDefaultFilters,
-    formatFilterDateTimeLabel,
   ]);
 
   return (
