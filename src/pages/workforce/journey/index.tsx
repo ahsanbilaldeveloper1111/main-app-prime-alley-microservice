@@ -264,6 +264,44 @@ function pickActiveLabel(
   return undefined;
 }
 
+function reconcileSelectedEmployeeProgress(params: {
+  previousEmployee: OnboardingEmployee | null;
+  journeyId: number;
+  journeySteps: JourneyStepRecord[];
+}): OnboardingEmployee | null {
+  const prev = params.previousEmployee;
+  if (!prev || Number(prev.id) !== params.journeyId) return prev;
+  const { total, completed, progress } = deriveJourneyProgressFromSteps(params.journeySteps);
+  if (
+    Number(prev.total_steps_count ?? 0) === total &&
+    Number(prev.completed_steps_count ?? 0) === completed &&
+    prev.progress === progress
+  ) {
+    return prev;
+  }
+  return {
+    ...prev,
+    total_steps_count: total,
+    completed_steps_count: completed,
+    progress,
+  };
+}
+
+function toggleSelectedJourneyUserIds(
+  previousIds: string[],
+  idStr: string,
+  isSelected: boolean,
+): string[] {
+  if (isSelected) return previousIds.filter((id) => id !== idStr);
+  return [...previousIds, idStr];
+}
+
+function filterJourneyManagers(managers: LookupUser[], userSearchTerm: string): LookupUser[] {
+  const needle = userSearchTerm.trim().toLowerCase();
+  if (!needle) return managers;
+  return managers.filter((mgr) => hierarchyLabel(mgr).toLowerCase().includes(needle));
+}
+
 async function applyJourneyStatusChange(params: {
   journeyId: number;
   nextStatus: string;
@@ -1174,23 +1212,13 @@ const EmployeesOnboarding = () => {
   /** Keep list row / sidebar counts aligned with detail steps after add/edit/delete (list API aggregates can lag). */
   useEffect(() => {
     if (!journeyIdValid || stepsLoading) return;
-    setSelectedEmployee((prev) => {
-      if (!prev || Number(prev.id) !== journeyId) return prev;
-      const { total, completed, progress } = deriveJourneyProgressFromSteps(journeySteps);
-      if (
-        Number(prev.total_steps_count ?? 0) === total &&
-        Number(prev.completed_steps_count ?? 0) === completed &&
-        prev.progress === progress
-      ) {
-        return prev;
-      }
-      return {
-        ...prev,
-        total_steps_count: total,
-        completed_steps_count: completed,
-        progress,
-      };
-    });
+    setSelectedEmployee((prev) =>
+      reconcileSelectedEmployeeProgress({
+        previousEmployee: prev,
+        journeyId,
+        journeySteps,
+      }),
+    );
   }, [journeySteps, stepsLoading, journeyIdValid, journeyId]);
 
   const journeyDueDateMin = useMemo(
@@ -1203,17 +1231,15 @@ const EmployeesOnboarding = () => {
   }, [selectedEmployee?.id, selectedEmployee?.status]);
 
   const toggleSelectedUserId = useCallback((idStr: string, isSelected: boolean) => {
-    setSelectedUserIds((prev) => {
-      if (isSelected) return prev.filter((id) => id !== idStr);
-      return [...prev, idStr];
-    });
+    setSelectedUserIds((prev) =>
+      toggleSelectedJourneyUserIds(prev, idStr, isSelected),
+    );
   }, []);
 
-  const filteredManagers = useMemo(() => {
-    const needle = userSearchTerm.trim().toLowerCase();
-    if (!needle) return managers;
-    return managers.filter((mgr) => hierarchyLabel(mgr).toLowerCase().includes(needle));
-  }, [managers, userSearchTerm]);
+  const filteredManagers = useMemo(
+    () => filterJourneyManagers(managers, userSearchTerm),
+    [managers, userSearchTerm],
+  );
 
   const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     await handleJourneyStatusSelect({
