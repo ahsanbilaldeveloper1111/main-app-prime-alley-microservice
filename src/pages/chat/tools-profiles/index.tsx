@@ -1,9 +1,9 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useCallback, useEffect, useRef } from "react";
-import Layout from "@layout/index";
-import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import React, { ReactElement, useState, useCallback, useEffect } from "react";
+import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
 import PageHeader from "@components/PageHeader";
 import {
   getTools,
@@ -20,45 +20,87 @@ import {
 import { Button, Form, Modal, Spinner, Table, Badge } from "react-bootstrap";
 import { Plus, Pencil, Trash2, Power, Play, RefreshCw, FileJson } from "lucide-react";
 import { toast } from "react-toastify";
-import { useRouter } from "next/router";
 import ConfirmModal from "@pages/partial/ConfirmModal";
+import ToolEditSidebar, { type ToolFormState } from "@components/ToolEditSidebar";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const EMPTY_FORM: ToolFormState = {
+  display_name: "",
+  tool_name: "",
+  description: "",
+  method: "GET",
+  endpoint_url: "",
+  auth_type: "none",
+  auth_config: {},
+  enabled: true,
+  parameters: [],
+  headers: [],
+  response_mapping: {},
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildFormFromTool(tool: Tool): ToolFormState {
+  return {
+    display_name: tool.display_name ?? "",
+    tool_name: tool.tool_name ?? "",
+    description: tool.description ?? "",
+    method: tool.method ?? "GET",
+    endpoint_url: tool.endpoint_url ?? "",
+    auth_type: tool.auth_type ?? "none",
+    auth_config: tool.auth_config ?? {},
+    enabled: tool.enabled ?? true,
+    parameters: tool.parameters ?? [],
+    headers: tool.headers ?? [],
+    response_mapping: tool.response_mapping ?? {},
+  };
+}
+
+function getToolLabel(tool: Tool | null): string {
+  return tool?.display_name ?? tool?.tool_name ?? "";
+}
+
+function isCreatePayloadValid(payload: ToolFormState): boolean {
+  return (
+    Boolean(String(payload.tool_name ?? "").trim()) &&
+    Boolean(String(payload.display_name ?? "").trim()) &&
+    Boolean(String(payload.endpoint_url ?? "").trim())
+  );
+}
+
+function isUpdatePayloadValid(tool: Tool | null, payload: ToolFormState): boolean {
+  return (
+    Boolean(tool?.id) &&
+    Boolean(payload.display_name?.trim()) &&
+    Boolean(payload.endpoint_url?.trim())
+  );
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const ToolProfiles = () => {
-  const router = useRouter();
   const [tools, setTools] = useState<Tool[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showTestModal, setShowTestModal] = useState(false);
   const [showExecutorModal, setShowExecutorModal] = useState(false);
   const [executorConfig, setExecutorConfig] = useState<unknown>(null);
   const [executorLoading, setExecutorLoading] = useState(false);
   const [reloadExecutorLoading, setReloadExecutorLoading] = useState(false);
-  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
 
-  const [formPayload, setFormPayload] = useState<Partial<ToolPayload>>({
-    display_name: "",
-    tool_name: "",
-    description: "",
-    method: "GET",
-    endpoint_url: "",
-    auth_type: "none",
-    auth_config: {},
-    enabled: true,
-    parameters: [],
-    headers: [],
-    response_mapping: {},
-  });
+  const [selectedTool, setSelectedTool] = useState<Tool | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [formState, setFormState] = useState<ToolFormState>(EMPTY_FORM);
   const [submitLoading, setSubmitLoading] = useState(false);
+
   const [testParamsJson, setTestParamsJson] = useState("{}");
   const [testLoading, setTestLoading] = useState(false);
 
-  const formPayloadRef = useRef(formPayload);
-  formPayloadRef.current = formPayload;
-  const addEndpointUrlRef = useRef<HTMLInputElement>(null);
+  const triggerRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   const fetchTools = useCallback(async () => {
     setLoading(true);
@@ -77,61 +119,40 @@ const ToolProfiles = () => {
     fetchTools();
   }, [fetchTools, refreshKey]);
 
+  // ─── Sidebar open/close ───────────────────────────────────────────────────
+
   const openAdd = () => {
-    setFormPayload({
-      display_name: "",
-      tool_name: "",
-      description: "",
-      method: "GET",
-      endpoint_url: "",
-      auth_type: "none",
-      auth_config: {},
-      enabled: true,
-      parameters: [],
-      headers: [],
-      response_mapping: {},
-    });
-    setShowAddModal(true);
+    setFormState(EMPTY_FORM);
+    setIsEditing(false);
+    setSelectedTool(null);
+    setSidebarOpen(true);
   };
 
   const openEdit = (tool: Tool) => {
     setSelectedTool(tool);
-    setFormPayload({
-      display_name: tool.display_name ?? "",
-      description: tool.description ?? "",
-      method: tool.method ?? "GET",
-      endpoint_url: tool.endpoint_url ?? "",
-      auth_type: tool.auth_type ?? "none",
-      auth_config: tool.auth_config ?? {},
-      enabled: tool.enabled ?? true,
-      parameters: tool.parameters ?? [],
-      headers: tool.headers ?? [],
-      response_mapping: tool.response_mapping ?? {},
-    });
-    setShowEditModal(true);
+    setFormState(buildFormFromTool(tool));
+    setIsEditing(true);
+    setSidebarOpen(true);
   };
 
-  const handleCreate = async () => {
-    const payload = formPayloadRef.current;
-    const endpointUrl =
-      String(payload.endpoint_url ?? "").trim() ||
-      (addEndpointUrlRef.current?.value ?? "").trim();
-    const submitPayload = { ...payload, endpoint_url: endpointUrl };
+  const closeSidebar = () => {
+    setSidebarOpen(false);
+    setSelectedTool(null);
+  };
 
-    const missing: string[] = [];
-    if (!String(submitPayload.tool_name ?? "").trim()) missing.push("Tool name");
-    if (!String(submitPayload.display_name ?? "").trim()) missing.push("Display name");
-    if (!endpointUrl) missing.push("Endpoint URL");
-    if (missing.length > 0) {
-      toast.error(`Required: ${missing.join(", ")}`);
+  // ─── CRUD handlers ────────────────────────────────────────────────────────
+
+  const handleCreate = async () => {
+    if (!isCreatePayloadValid(formState)) {
+      toast.error("Tool name, display name, and endpoint URL are required");
       return;
     }
     setSubmitLoading(true);
     try {
-      await createTool(submitPayload as ToolPayload);
+      await createTool(formState as ToolPayload);
       toast.success("Tool created");
-      setShowAddModal(false);
-      setRefreshKey((k) => k + 1);
+      closeSidebar();
+      triggerRefresh();
     } catch (e) {
       console.error(e);
     } finally {
@@ -140,21 +161,28 @@ const ToolProfiles = () => {
   };
 
   const handleUpdate = async () => {
-    if (!selectedTool?.id || !formPayload.display_name?.trim() || !formPayload.endpoint_url?.trim()) {
+    if (!isUpdatePayloadValid(selectedTool, formState)) {
       toast.error("Display name and endpoint URL are required");
       return;
     }
     setSubmitLoading(true);
     try {
-      await updateTool(selectedTool.id, formPayload);
+      await updateTool(selectedTool!.id, formState);
       toast.success("Tool updated");
-      setShowEditModal(false);
-      setSelectedTool(null);
-      setRefreshKey((k) => k + 1);
+      closeSidebar();
+      triggerRefresh();
     } catch (e) {
       console.error(e);
     } finally {
       setSubmitLoading(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (isEditing) {
+      handleUpdate();
+    } else {
+      handleCreate();
     }
   };
 
@@ -165,7 +193,7 @@ const ToolProfiles = () => {
       toast.success("Tool deleted");
       setShowDeleteModal(false);
       setSelectedTool(null);
-      setRefreshKey((k) => k + 1);
+      triggerRefresh();
     } catch (e) {
       console.error(e);
     }
@@ -175,11 +203,13 @@ const ToolProfiles = () => {
     try {
       await toggleTool(tool.id, { enabled: !tool.enabled });
       toast.success(tool.enabled ? "Tool disabled" : "Tool enabled");
-      setRefreshKey((k) => k + 1);
+      triggerRefresh();
     } catch (e) {
       console.error(e);
     }
   };
+
+  // ─── Test ─────────────────────────────────────────────────────────────────
 
   const openTest = (tool: Tool) => {
     setSelectedTool(tool);
@@ -208,12 +238,14 @@ const ToolProfiles = () => {
     }
   };
 
+  // ─── Executor ─────────────────────────────────────────────────────────────
+
   const handleReloadExecutor = async () => {
     setReloadExecutorLoading(true);
     try {
       await reloadToolsExecutor();
       toast.success("Executor reloaded. Enabled tools are now in sync.");
-      setRefreshKey((k) => k + 1);
+      triggerRefresh();
     } catch (e) {
       console.error(e);
       toast.error("Failed to reload executor");
@@ -238,6 +270,104 @@ const ToolProfiles = () => {
     }
   };
 
+  // ─── Render helpers ───────────────────────────────────────────────────────
+
+  const renderTableBody = () => {
+    if (tools.length === 0) {
+      return (
+        <tr>
+          <td colSpan={6} className="text-center text-muted py-4">
+            No tools yet. Add a tool to get started.
+          </td>
+        </tr>
+      );
+    }
+
+    return tools.map((tool) => (
+      <tr key={tool.id}>
+        <td>{tool.display_name ?? "—"}</td>
+        <td>
+          <code className="small">{tool.tool_name ?? "—"}</code>
+        </td>
+        <td>
+          <Badge bg="secondary">{tool.method ?? "GET"}</Badge>
+        </td>
+        <td className="small text-break" style={{ maxWidth: 200 }}>
+          {tool.endpoint_url ?? "—"}
+        </td>
+        <td>
+          <Badge bg={tool.enabled ? "success" : "secondary"}>
+            {tool.enabled ? "Enabled" : "Disabled"}
+          </Badge>
+        </td>
+        <td className="text-end">
+          <Button
+            variant="light"
+            size="sm"
+            className="me-1"
+            onClick={() => openEdit(tool)}
+            title="Edit"
+          >
+            <Pencil size={14} />
+          </Button>
+          <Button
+            variant="light"
+            size="sm"
+            className="me-1"
+            onClick={() => handleToggle(tool)}
+            title={tool.enabled ? "Disable" : "Enable"}
+          >
+            <Power size={14} />
+          </Button>
+          <Button
+            variant="light"
+            size="sm"
+            className="me-1"
+            onClick={() => openTest(tool)}
+            title="Test"
+          >
+            <Play size={14} />
+          </Button>
+          <Button
+            variant="light"
+            size="sm"
+            className="text-danger"
+            onClick={() => {
+              setSelectedTool(tool);
+              setShowDeleteModal(true);
+            }}
+            title="Delete"
+          >
+            <Trash2 size={14} />
+          </Button>
+        </td>
+      </tr>
+    ));
+  };
+
+  const renderExecutorContent = () => {
+    if (executorLoading) {
+      return (
+        <div className="text-center py-4">
+          <Spinner animation="border" />
+        </div>
+      );
+    }
+    if (executorConfig !== null && executorConfig !== undefined) {
+      return (
+        <pre
+          className="bg-light p-3 rounded small mb-0"
+          style={{ maxHeight: 400, overflow: "auto" }}
+        >
+          {JSON.stringify(executorConfig, null, 2)}
+        </pre>
+      );
+    }
+    return <p className="text-muted mb-0">No config or failed to load.</p>;
+  };
+
+  // ─── JSX ──────────────────────────────────────────────────────────────────
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="" />
@@ -250,12 +380,28 @@ const ToolProfiles = () => {
               <Plus size={16} className="me-2" />
               Add Tool
             </Button>
-            <Button variant="outline-primary" onClick={handleViewExecutor} disabled={executorLoading}>
-              {executorLoading ? <Spinner size="sm" className="me-2" /> : <FileJson size={16} className="me-2" />}
+            <Button
+              variant="outline-primary"
+              onClick={handleViewExecutor}
+              disabled={executorLoading}
+            >
+              {executorLoading ? (
+                <Spinner size="sm" className="me-2" />
+              ) : (
+                <FileJson size={16} className="me-2" />
+              )}
               View Executor
             </Button>
-            <Button variant="outline-secondary" onClick={handleReloadExecutor} disabled={reloadExecutorLoading}>
-              {reloadExecutorLoading ? <Spinner size="sm" className="me-2" /> : <RefreshCw size={16} className="me-2" />}
+            <Button
+              variant="outline-secondary"
+              onClick={handleReloadExecutor}
+              disabled={reloadExecutorLoading}
+            >
+              {reloadExecutorLoading ? (
+                <Spinner size="sm" className="me-2" />
+              ) : (
+                <RefreshCw size={16} className="me-2" />
+              )}
               Reload Executor
             </Button>
           </>
@@ -280,180 +426,45 @@ const ToolProfiles = () => {
                   <th className="text-end">Actions</th>
                 </tr>
               </thead>
-              <tbody>
-                {tools.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="text-center text-muted py-4">
-                      No tools yet. Add a tool to get started.
-                    </td>
-                  </tr>
-                )}
-                {tools.map((tool) => (
-                  <tr key={tool.id}>
-                    <td>{tool.display_name ?? "—"}</td>
-                    <td><code className="small">{tool.tool_name ?? "—"}</code></td>
-                    <td><Badge bg="secondary">{tool.method ?? "GET"}</Badge></td>
-                    <td className="small text-break" style={{ maxWidth: 200 }}>{tool.endpoint_url ?? "—"}</td>
-                    <td>
-                      <Badge bg={tool.enabled ? "success" : "secondary"}>
-                        {tool.enabled ? "Enabled" : "Disabled"}
-                      </Badge>
-                    </td>
-                    <td className="text-end">
-                      <Button variant="light" size="sm" className="me-1" onClick={() => openEdit(tool)} title="Edit">
-                        <Pencil size={14} />
-                      </Button>
-                      <Button variant="light" size="sm" className="me-1" onClick={() => handleToggle(tool)} title={tool.enabled ? "Disable" : "Enable"}>
-                        <Power size={14} />
-                      </Button>
-                      <Button variant="light" size="sm" className="me-1" onClick={() => openTest(tool)} title="Test">
-                        <Play size={14} />
-                      </Button>
-                      <Button variant="light" size="sm" className="text-danger" onClick={() => { setSelectedTool(tool); setShowDeleteModal(true); }} title="Delete">
-                        <Trash2 size={14} />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+              <tbody>{renderTableBody()}</tbody>
             </Table>
           )}
         </div>
       </div>
 
-      {/* Add Tool Modal */}
-      <Modal show={showAddModal} onHide={() => setShowAddModal(false)} size="lg" centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Add Tool</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Tool Name *</Form.Label>
-            <Form.Control
-              value={formPayload.tool_name ?? ""}
-              onChange={(e) => setFormPayload((p) => ({ ...p, tool_name: e.target.value }))}
-              placeholder="e.g. get_faqs"
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Display Name *</Form.Label>
-            <Form.Control
-              value={formPayload.display_name ?? ""}
-              onChange={(e) => setFormPayload((p) => ({ ...p, display_name: e.target.value }))}
-              placeholder="e.g. Get FAQs"
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Description</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={2}
-              value={formPayload.description ?? ""}
-              onChange={(e) => setFormPayload((p) => ({ ...p, description: e.target.value }))}
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Method *</Form.Label>
-            <Form.Select
-              value={formPayload.method ?? "GET"}
-              onChange={(e) => setFormPayload((p) => ({ ...p, method: e.target.value }))}
-            >
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-            </Form.Select>
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Endpoint URL *</Form.Label>
-            <Form.Control
-              ref={addEndpointUrlRef}
-              value={formPayload.endpoint_url ?? ""}
-              onChange={(e) => setFormPayload((p) => ({ ...p, endpoint_url: e.target.value }))}
-              placeholder="https://..."
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Check
-              type="switch"
-              label="Enabled"
-              checked={!!formPayload.enabled}
-              onChange={(e) => setFormPayload((p) => ({ ...p, enabled: e.target.checked }))}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowAddModal(false)}>Cancel</Button>
-          <Button variant="primary" onClick={handleCreate} disabled={submitLoading}>
-            {submitLoading ? <Spinner size="sm" className="me-2" /> : null}
-            Create
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Edit Tool Modal */}
-      <Modal show={showEditModal} onHide={() => { setShowEditModal(false); setSelectedTool(null); }} size="lg" centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Edit Tool</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Display Name *</Form.Label>
-            <Form.Control
-              value={formPayload.display_name ?? ""}
-              onChange={(e) => setFormPayload((p) => ({ ...p, display_name: e.target.value }))}
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Description</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={2}
-              value={formPayload.description ?? ""}
-              onChange={(e) => setFormPayload((p) => ({ ...p, description: e.target.value }))}
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Method *</Form.Label>
-            <Form.Select
-              value={formPayload.method ?? "GET"}
-              onChange={(e) => setFormPayload((p) => ({ ...p, method: e.target.value }))}
-            >
-              <option value="GET">GET</option>
-              <option value="POST">POST</option>
-              <option value="PUT">PUT</option>
-              <option value="DELETE">DELETE</option>
-            </Form.Select>
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Endpoint URL *</Form.Label>
-            <Form.Control
-              value={formPayload.endpoint_url ?? ""}
-              onChange={(e) => setFormPayload((p) => ({ ...p, endpoint_url: e.target.value }))}
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Check
-              type="switch"
-              label="Enabled"
-              checked={!!formPayload.enabled}
-              onChange={(e) => setFormPayload((p) => ({ ...p, enabled: e.target.checked }))}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => { setShowEditModal(false); setSelectedTool(null); }}>Cancel</Button>
-          <Button variant="primary" onClick={handleUpdate} disabled={submitLoading}>
-            {submitLoading ? <Spinner size="sm" className="me-2" /> : null}
-            Update
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      {/* Add / Edit Tool Sidebar */}
+      <ToolEditSidebar
+        isOpen={sidebarOpen}
+        isEditing={isEditing}
+        formState={formState}
+        setFormState={setFormState}
+        submitLoading={submitLoading}
+        isFormValid={
+          isEditing
+            ? Boolean(selectedTool?.id) &&
+              Boolean(formState.display_name?.trim()) &&
+              Boolean(formState.endpoint_url?.trim())
+            : Boolean(formState.tool_name?.trim()) &&
+              Boolean(formState.display_name?.trim()) &&
+              Boolean(formState.endpoint_url?.trim())
+        }
+        onClose={closeSidebar}
+        onSubmit={handleSubmit}
+      />
 
       {/* Test Tool Modal */}
-      <Modal show={showTestModal} onHide={() => { setShowTestModal(false); setSelectedTool(null); }} centered>
+      <Modal
+        show={showTestModal}
+        onHide={() => {
+          setShowTestModal(false);
+          setSelectedTool(null);
+        }}
+        centered
+      >
         <Modal.Header closeButton>
-          <Modal.Title>Test Tool {selectedTool?.display_name ?? ""}</Modal.Title>
+          <Modal.Title>
+            Test Tool {selectedTool?.display_name ?? ""}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form.Group>
@@ -468,48 +479,65 @@ const ToolProfiles = () => {
           </Form.Group>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => { setShowTestModal(false); setSelectedTool(null); }}>Cancel</Button>
-          <Button variant="primary" onClick={handleTest} disabled={testLoading}>
-            {testLoading ? <Spinner size="sm" className="me-2" /> : null}
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowTestModal(false);
+              setSelectedTool(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleTest}
+            disabled={testLoading}
+          >
+            {testLoading && <Spinner size="sm" className="me-2" />}
             Run Test
           </Button>
         </Modal.Footer>
       </Modal>
 
+      {/* Delete Confirm Modal */}
       <ConfirmModal
         show={showDeleteModal}
-        onHide={() => { setShowDeleteModal(false); setSelectedTool(null); }}
+        onHide={() => {
+          setShowDeleteModal(false);
+          setSelectedTool(null);
+        }}
         title="Delete Tool"
-        description={`Are you sure you want to delete the tool "${selectedTool?.display_name ?? selectedTool?.tool_name ?? ""}"?`}
+        description={`Are you sure you want to delete the tool "${getToolLabel(selectedTool)}"?`}
         targetName={selectedTool?.tool_name ?? ""}
-        onConfirm={() => handleDelete()}
-        onCancel={() => { setShowDeleteModal(false); setSelectedTool(null); }}
+        onConfirm={handleDelete}
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setSelectedTool(null);
+        }}
         confirmButtonText="Delete"
         confirmButtonVariant="danger"
-        requireTextConfirmation={true}
+        requireTextConfirmation
         requiredConfirmationText="delete"
       />
 
-      {/* Executor config modal */}
-      <Modal show={showExecutorModal} onHide={() => setShowExecutorModal(false)} size="lg" centered>
+      {/* Executor Config Modal */}
+      <Modal
+        show={showExecutorModal}
+        onHide={() => setShowExecutorModal(false)}
+        size="lg"
+        centered
+      >
         <Modal.Header closeButton>
           <Modal.Title>Executor config (LangGraph)</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
-          {executorLoading ? (
-            <div className="text-center py-4">
-              <Spinner animation="border" />
-            </div>
-          ) : executorConfig !== null && executorConfig !== undefined ? (
-            <pre className="bg-light p-3 rounded small mb-0" style={{ maxHeight: 400, overflow: "auto" }}>
-              {JSON.stringify(executorConfig, null, 2)}
-            </pre>
-          ) : (
-            <p className="text-muted mb-0">No config or failed to load.</p>
-          )}
-        </Modal.Body>
+        <Modal.Body>{renderExecutorContent()}</Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowExecutorModal(false)}>Close</Button>
+          <Button
+            variant="secondary"
+            onClick={() => setShowExecutorModal(false)}
+          >
+            Close
+          </Button>
         </Modal.Footer>
       </Modal>
     </React.Fragment>
