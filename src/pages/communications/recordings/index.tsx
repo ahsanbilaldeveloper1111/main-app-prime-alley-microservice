@@ -8,7 +8,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { Col, Button, Card, Form, Modal, Row } from "react-bootstrap";
+import { Col, Button, Card, Modal, Row } from "react-bootstrap";
 
 import { useSession } from "next-auth/react";
 import type { NextPage } from "next";
@@ -61,6 +61,10 @@ import {
   buildDepartmentFilterPill,
   buildExtensionMultiSelectFilterPill,
 } from "@utils/communicationsFilterPills";
+import {
+  createDateTimeDropdownContent,
+  createTextFilterDropdownContent,
+} from "@utils/communicationsFilterDropdowns";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -206,125 +210,6 @@ interface RecordingRow {
 }
 
 // ─── Filter menu components (lifted out of CallRecordings to satisfy Sonar) ──
-
-interface PhoneFilterMenuProps {
-  value: string;
-  onChange: (value: string) => void;
-  onApply: (value: string) => void;
-  closeMenu: () => void;
-}
-const PhoneFilterMenu: React.FC<PhoneFilterMenuProps> = ({
-  value,
-  onChange,
-  onApply,
-  closeMenu,
-}) => (
-  <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-    <Form.Control
-      size="sm"
-      type="text"
-      placeholder="Enter phone number"
-      value={value}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-        onChange(e.target.value)
-      }
-    />
-    <div className="d-flex justify-content-end gap-2">
-      <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-        Cancel
-      </Button>
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={() => {
-          onApply(value.trim());
-          closeMenu();
-        }}
-      >
-        Apply
-      </Button>
-    </div>
-  </div>
-);
-
-interface DateFilterMenuProps {
-  value: string;
-  onChange: (value: string) => void;
-  onApply: (value: string) => void;
-  closeMenu: () => void;
-}
-const DateFilterMenu: React.FC<DateFilterMenuProps> = ({
-  value,
-  onChange,
-  onApply,
-  closeMenu,
-}) => (
-  <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-    <Form.Control
-      size="sm"
-      type="datetime-local"
-      value={value}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-        onChange(e.target.value)
-      }
-    />
-    <div className="d-flex justify-content-end gap-2">
-      <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-        Cancel
-      </Button>
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={() => {
-          onApply(value);
-          closeMenu();
-        }}
-      >
-        Apply
-      </Button>
-    </div>
-  </div>
-);
-
-// ─── Dropdown content factories (defined outside CallRecordings to satisfy Sonar) ──
-
-function createPhoneDropdownContent(
-  value: string,
-  onChange: (v: string) => void,
-  onApply: (v: string) => void,
-) {
-  return function PhoneDropdownRender({
-    closeMenu,
-  }: {
-    closeMenu: () => void;
-  }) {
-    return (
-      <PhoneFilterMenu
-        value={value}
-        onChange={onChange}
-        onApply={onApply}
-        closeMenu={closeMenu}
-      />
-    );
-  };
-}
-
-function createDateDropdownContent(
-  value: string,
-  onChange: (v: string) => void,
-  onApply: (v: string) => void,
-) {
-  return function DateDropdownRender({ closeMenu }: { closeMenu: () => void }) {
-    return (
-      <DateFilterMenu
-        value={value}
-        onChange={onChange}
-        onApply={onApply}
-        closeMenu={closeMenu}
-      />
-    );
-  };
-}
 
 const CallRecordings: NextPage & {
   getLayout?: (page: React.ReactElement) => React.ReactNode;
@@ -822,12 +707,13 @@ const CallRecordings: NextPage & {
             : undefined,
           onClear: () =>
             stageFilters({ ...currentFilters, remote_party_number: "" }),
-          dropdownContent: createPhoneDropdownContent(
+          dropdownContent: createTextFilterDropdownContent(
             currentFilters.remote_party_number ?? "",
             (v: string) =>
               setCurrentFilters({ ...currentFilters, remote_party_number: v }),
             (v: string) =>
               stageFilters({ ...currentFilters, remote_party_number: v }),
+            "Enter phone number",
           ),
         },
         {
@@ -839,7 +725,7 @@ const CallRecordings: NextPage & {
             ? String(currentFilters.start_date)
             : undefined,
           activeLabelOnly: true,
-          dropdownContent: createDateDropdownContent(
+          dropdownContent: createDateTimeDropdownContent(
             currentFilters.start_date ?? "",
             (v: string) =>
               setCurrentFilters({ ...currentFilters, start_date: v }),
@@ -855,7 +741,7 @@ const CallRecordings: NextPage & {
             ? String(currentFilters.end_date)
             : undefined,
           activeLabelOnly: true,
-          dropdownContent: createDateDropdownContent(
+          dropdownContent: createDateTimeDropdownContent(
             currentFilters.end_date ?? "",
             (v: string) =>
               setCurrentFilters({ ...currentFilters, end_date: v }),

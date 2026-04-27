@@ -12,7 +12,7 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import { ListCallLogs, DownloadCallsExport } from "@utils/calls";
-import { Form, Button } from "react-bootstrap";
+import { Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import {
@@ -45,6 +45,10 @@ import {
   buildDepartmentFilterPill,
   buildExtensionMultiSelectFilterPill,
 } from "@utils/communicationsFilterPills";
+import {
+  createDateTimeDropdownContent,
+  createTextFilterDropdownContent,
+} from "@utils/communicationsFilterDropdowns";
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -120,120 +124,6 @@ interface Summary {
   outbound: number;
 }
 
-interface NumberFilterMenuProps {
-  value: string;
-  onChange: (value: string) => void;
-  onApply: (value: string) => void;
-  closeMenu: () => void;
-}
-
-const NumberFilterMenu: React.FC<NumberFilterMenuProps> = ({
-  value,
-  onChange,
-  onApply,
-  closeMenu,
-}) => (
-  <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-    <Form.Control
-      size="sm"
-      type="text"
-      placeholder="Enter number"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-    <div className="d-flex justify-content-end gap-2">
-      <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-        Cancel
-      </Button>
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={() => {
-          onApply(value.trim());
-          closeMenu();
-        }}
-      >
-        Apply
-      </Button>
-    </div>
-  </div>
-);
-
-interface DateFilterMenuProps {
-  value: string;
-  onChange: (value: string) => void;
-  onApply: (value: string) => void;
-  closeMenu: () => void;
-}
-
-const DateFilterMenu: React.FC<DateFilterMenuProps> = ({
-  value,
-  onChange,
-  onApply,
-  closeMenu,
-}) => (
-  <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-    <Form.Control
-      size="sm"
-      type="datetime-local"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-    <div className="d-flex justify-content-end gap-2">
-      <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-        Cancel
-      </Button>
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={() => {
-          onApply(value);
-          closeMenu();
-        }}
-      >
-        Apply
-      </Button>
-    </div>
-  </div>
-);
-
-function createNumberDropdownContent(
-  value: string,
-  onChange: (value: string) => void,
-  onApply: (value: string) => void,
-) {
-  return function NumberDropdownRender({
-    closeMenu,
-  }: {
-    closeMenu: () => void;
-  }) {
-    return (
-      <NumberFilterMenu
-        value={value}
-        onChange={onChange}
-        onApply={onApply}
-        closeMenu={closeMenu}
-      />
-    );
-  };
-}
-
-function createDateDropdownContent(
-  value: string,
-  onChange: (value: string) => void,
-  onApply: (value: string) => void,
-) {
-  return function DateDropdownRender({ closeMenu }: { closeMenu: () => void }) {
-    return (
-      <DateFilterMenu
-        value={value}
-        onChange={onChange}
-        onApply={onApply}
-        closeMenu={closeMenu}
-      />
-    );
-  };
-}
 
 const CallLogs = () => {
   const { data: session } = useSession();
@@ -720,12 +610,13 @@ const CallLogs = () => {
             ? String(currentFilters.phone_number)
             : undefined,
           onClear: () => stageFilters({ ...currentFilters, phone_number: "" }),
-          dropdownContent: createNumberDropdownContent(
+          dropdownContent: createTextFilterDropdownContent(
             currentFilters.phone_number ?? "",
             (value: string) =>
               setCurrentFilters({ ...currentFilters, phone_number: value }),
             (value: string) =>
               stageFilters({ ...currentFilters, phone_number: value }),
+            "Enter number",
           ),
         },
         {
@@ -737,7 +628,7 @@ const CallLogs = () => {
             ? String(currentFilters.start_datetime)
             : undefined,
           activeLabelOnly: true,
-          dropdownContent: createDateDropdownContent(
+          dropdownContent: createDateTimeDropdownContent(
             currentFilters.start_datetime ?? "",
             (value: string) =>
               setCurrentFilters({ ...currentFilters, start_datetime: value }),
@@ -754,7 +645,7 @@ const CallLogs = () => {
             ? String(currentFilters.end_datetime)
             : undefined,
           activeLabelOnly: true,
-          dropdownContent: createDateDropdownContent(
+          dropdownContent: createDateTimeDropdownContent(
             currentFilters.end_datetime ?? "",
             (value: string) =>
               setCurrentFilters({ ...currentFilters, end_datetime: value }),
