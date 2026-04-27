@@ -155,7 +155,101 @@ import {
 import { useSession } from "next-auth/react";
 import moment from "moment";
 
-const ignoredKeys = ["order_stage_id"];
+const ignoredKeys = new Set(["order_stage_id"]);
+
+const OPTIONAL_STRING_FILTER_KEYS = [
+  "stage_id",
+  "assigned_to",
+  "search",
+  "industry",
+  "order_value_min",
+  "order_value_max",
+  "order_stage_id",
+  "order_approval_status",
+  "fulfillment_status",
+  "payment_status",
+  "date_from",
+  "date_to",
+] as const;
+
+const OPTIONAL_TRUE_FILTER_KEYS = ["include_lost", "include_archived"] as const;
+
+function setOptionalFilterValue(
+  target: Record<string, any>,
+  key: string,
+  value: unknown,
+  toStringValue = false,
+): void {
+  if (!value) {
+    delete target[key];
+    return;
+  }
+  target[key] = toStringValue ? String(value) : value;
+}
+
+function buildOrdersRequestParams(
+  page: number,
+  perPage: number,
+  filters: Record<string, any>,
+) {
+  const params: Record<string, any> = { page, per_page: perPage };
+  OPTIONAL_STRING_FILTER_KEYS.forEach((key) => {
+    if (!(key in filters)) return;
+    setOptionalFilterValue(
+      params,
+      key,
+      filters[key],
+      key === "stage_id" || key === "assigned_to" || key === "order_value_min" || key === "order_value_max" || key === "order_stage_id",
+    );
+  });
+  if ("is_lost" in filters) {
+    params.is_lost = filters.is_lost;
+  }
+  OPTIONAL_TRUE_FILTER_KEYS.forEach((key) => {
+    if (filters[key] !== undefined) {
+      params[key] = filters[key];
+    }
+  });
+  return params;
+}
+
+function applyActiveFilterState(
+  previousFilters: Record<string, any>,
+  activeFilter: string,
+  stages: any[],
+): { nextFilters: Record<string, any>; stageValue: string | null } {
+  const nextFilters = { ...previousFilters };
+
+  delete nextFilters.stage_id;
+  delete nextFilters.include_archived;
+  delete nextFilters.include_lost;
+
+  if (activeFilter === "lost") {
+    nextFilters.include_lost = true;
+    return { nextFilters, stageValue: null };
+  }
+
+  if (activeFilter === "deleted") {
+    nextFilters.include_archived = true;
+    return { nextFilters, stageValue: null };
+  }
+
+  if (activeFilter !== "all") {
+    const selectedStage = stages.find((s: any) => s.id.toString() === activeFilter);
+    if (selectedStage) {
+      const stageId = selectedStage.id.toString();
+      nextFilters.stage_id = stageId;
+      return { nextFilters, stageValue: stageId };
+    }
+  }
+
+  return { nextFilters, stageValue: null };
+}
+
+function isValidActiveFilterTab(tab: string, stages: any[]): boolean {
+  if (tab === "all" || tab === "lost" || tab === "deleted") return true;
+  return stages.some((s: any) => s.id.toString() === tab);
+}
 
 function resolveExtensionDisplayName(extensions: any[], assignedTo: unknown): string {
   const extensionMatch = extensions.find(
@@ -405,59 +499,7 @@ const CrmOrders = () => {
     async (page = 1, perPage = 15) => {
       setLoading(true);
       try {
-        const params: any = {
-          page,
-          per_page: perPage,
-        };
-
-        // Use search from currentFilters if available
-        if (currentFilters.search) {
-          params.search = currentFilters.search;
-        }
-
-        // Add filter parameters at top level
-        if (currentFilters.stage_id) {
-          params.stage_id = currentFilters.stage_id;
-        }
-        if (currentFilters.assigned_to) {
-          params.assigned_to = currentFilters.assigned_to;
-        }
-        if (currentFilters.is_lost !== undefined) {
-          params.is_lost = currentFilters.is_lost;
-        }
-        if (currentFilters.include_lost !== undefined) {
-          params.include_lost = currentFilters.include_lost;
-        }
-        if (currentFilters.include_archived !== undefined) {
-          params.include_archived = currentFilters.include_archived;
-        }
-        if (currentFilters.industry) {
-          params.industry = currentFilters.industry;
-        }
-        if (currentFilters.order_value_min) {
-          params.order_value_min = currentFilters.order_value_min;
-        }
-        if (currentFilters.order_value_max) {
-          params.order_value_max = currentFilters.order_value_max;
-        }
-        if (currentFilters.order_stage_id) {
-          params.order_stage_id = currentFilters.order_stage_id;
-        }
-        if (currentFilters.order_approval_status) {
-          params.order_approval_status = currentFilters.order_approval_status;
-        }
-        if (currentFilters.fulfillment_status) {
-          params.fulfillment_status = currentFilters.fulfillment_status;
-        }
-        if (currentFilters.payment_status) {
-          params.payment_status = currentFilters.payment_status;
-        }
-        if (currentFilters.date_from) {
-          params.date_from = currentFilters.date_from;
-        }
-        if (currentFilters.date_to) {
-          params.date_to = currentFilters.date_to;
-        }
+        const params = buildOrdersRequestParams(page, perPage, currentFilters);
 
         const response: any = await getOrders(params);
         console.log("Raw response from getOrders:", response);
@@ -480,74 +522,19 @@ const CrmOrders = () => {
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
   useEffect(() => {
-    if (activeFilter === "all") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.stage_id;
-        delete newFilters.include_archived;
-        delete newFilters.include_lost;
-        return newFilters;
-      });
-      // Clear stage dropdown
-      setOrdersFilters((prev) => ({
-        ...prev,
-        stage: null,
-      }));
-    } else if (activeFilter === "lost") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.stage_id;
-        delete newFilters.include_archived;
-        newFilters.include_lost = true;
-        return newFilters;
-      });
-      // Clear stage dropdown
-      setOrdersFilters((prev) => ({
-        ...prev,
-        stage: null,
-      }));
-    } else if (activeFilter === "deleted") {
-      setCurrentFilters((prev) => {
-        const newFilters = { ...prev };
-        delete newFilters.stage_id;
-        delete newFilters.include_lost;
-        newFilters.include_archived = true;
-        return newFilters;
-      });
-      // Clear stage dropdown
-      setOrdersFilters((prev) => ({
-        ...prev,
-        stage: null,
-      }));
-    } else if (activeFilter && stages.length > 0) {
-      // Find stage by id (activeFilter should be stage id as string)
-      const selectedStage = stages.find(
-        (s: any) => s.id.toString() === activeFilter
-      );
-      if (selectedStage) {
-        setCurrentFilters((prev) => {
-          const newFilters = { ...prev };
-          delete newFilters.include_archived;
-          delete newFilters.include_lost;
-          newFilters.stage_id = selectedStage.id.toString();
-          return newFilters;
-        });
-        // Auto-fill stage dropdown
-        setOrdersFilters((prev) => ({
-          ...prev,
-          stage: selectedStage.id.toString(),
-        }));
-      }
-    }
+    const { stageValue } = applyActiveFilterState({}, activeFilter, stages);
+    setCurrentFilters((prev) => applyActiveFilterState(prev, activeFilter, stages).nextFilters);
+    setOrdersFilters((prev) => ({
+      ...prev,
+      stage: stageValue,
+    }));
   }, [activeFilter, stages]);
   
   // Read tab from URL on mount and when router is ready
   useEffect(() => {
     if (router.isReady && router.query.tab) {
       const tabFromUrl = String(router.query.tab);
-      // Allow "all", "lost", "deleted", or any stage ID
-      const isValidFilter = tabFromUrl === "all" || tabFromUrl === "lost" || tabFromUrl === "deleted" || 
-        (stages.length > 0 && stages.some((s: any) => s.id.toString() === tabFromUrl));
+      const isValidFilter = isValidActiveFilterTab(tabFromUrl, stages);
       if (isValidFilter && tabFromUrl !== activeFilter) {
         setActiveFilter(tabFromUrl);
       }
@@ -709,137 +696,19 @@ const CrmOrders = () => {
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
     setCurrentFilters((prev) => {
       const newFilters = { ...prev };
-
-      // Handle stage_id filter (single value)
-      if ("stage_id" in filters) {
-        if (filters.stage_id) {
-          newFilters.stage_id = String(filters.stage_id);
-        } else {
-          delete newFilters.stage_id;
-        }
-      }
-
-      // Handle assigned_to filter (single value)
-      if ("assigned_to" in filters) {
-        if (filters.assigned_to) {
-          newFilters.assigned_to = String(filters.assigned_to);
-        } else {
-          delete newFilters.assigned_to;
-        }
-      }
-
-      // Handle search
-      if ("search" in filters) {
-        if (filters.search) {
-          newFilters.search = filters.search;
-        } else {
-          delete newFilters.search;
-        }
-      }
-
-      // Handle is_lost filter
       if ("is_lost" in filters) {
         newFilters.is_lost = filters.is_lost;
       }
-
-      // Handle include_lost filter
-      if ("include_lost" in filters) {
-        if (filters.include_lost) {
-          newFilters.include_lost = true;
-        } else {
-          delete newFilters.include_lost;
-        }
-      }
-
-      // Handle include_archived filter
-      if ("include_archived" in filters) {
-        if (filters.include_archived) {
-          newFilters.include_archived = true;
-        } else {
-          delete newFilters.include_archived;
-        }
-      }
-
-      // Handle industry filter
-      if ("industry" in filters) {
-        if (filters.industry) {
-          newFilters.industry = filters.industry;
-        } else {
-          delete newFilters.industry;
-        }
-      }
-
-      // Handle order_value_min filter
-      if ("order_value_min" in filters) {
-        if (filters.order_value_min) {
-          newFilters.order_value_min = String(filters.order_value_min);
-        } else {
-          delete newFilters.order_value_min;
-        }
-      }
-
-      // Handle order_value_max filter
-      if ("order_value_max" in filters) {
-        if (filters.order_value_max) {
-          newFilters.order_value_max = String(filters.order_value_max);
-        } else {
-          delete newFilters.order_value_max;
-        }
-      }
-
-      // Handle order_stage_id filter (note: this is different from stage_id, it's order_stage_id)
-      if ("order_stage_id" in filters) {
-        if (filters.order_stage_id) {
-          newFilters.order_stage_id = String(filters.order_stage_id);
-        } else {
-          delete newFilters.order_stage_id;
-        }
-      }
-
-      // Handle order_approval_status filter
-      if ("order_approval_status" in filters) {
-        if (filters.order_approval_status) {
-          newFilters.order_approval_status = filters.order_approval_status;
-        } else {
-          delete newFilters.order_approval_status;
-        }
-      }
-
-      // Handle fulfillment_status filter
-      if ("fulfillment_status" in filters) {
-        if (filters.fulfillment_status) {
-          newFilters.fulfillment_status = filters.fulfillment_status;
-        } else {
-          delete newFilters.fulfillment_status;
-        }
-      }
-
-      // Handle payment_status filter
-      if ("payment_status" in filters) {
-        if (filters.payment_status) {
-          newFilters.payment_status = filters.payment_status;
-        } else {
-          delete newFilters.payment_status;
-        }
-      }
-
-      // Handle date_from filter
-      if ("date_from" in filters) {
-        if (filters.date_from) {
-          newFilters.date_from = filters.date_from;
-        } else {
-          delete newFilters.date_from;
-        }
-      }
-
-      // Handle date_to filter
-      if ("date_to" in filters) {
-        if (filters.date_to) {
-          newFilters.date_to = filters.date_to;
-        } else {
-          delete newFilters.date_to;
-        }
-      }
+      OPTIONAL_STRING_FILTER_KEYS.forEach((key) => {
+        if (!(key in filters)) return;
+        const shouldStringify =
+          key === "stage_id" || key === "assigned_to" || key === "order_value_min" || key === "order_value_max" || key === "order_stage_id";
+        setOptionalFilterValue(newFilters, key, filters[key], shouldStringify);
+      });
+      OPTIONAL_TRUE_FILTER_KEYS.forEach((key) => {
+        if (!(key in filters)) return;
+        setOptionalFilterValue(newFilters, key, filters[key] ? true : undefined);
+      });
 
       return newFilters;
     });
@@ -4600,7 +4469,7 @@ const CrmOrders = () => {
                                     color: "#6b7280",
                                   }}>
                                     {Object.entries(history.changes).map(([key, change]: [string, any]) => {
-                                      if (ignoredKeys.includes(key)) {
+                                      if (ignoredKeys.has(key)) {
                                         return null;
                                       }
                                       return (
