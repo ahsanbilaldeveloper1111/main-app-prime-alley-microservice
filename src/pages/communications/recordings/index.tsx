@@ -165,21 +165,6 @@ function getEmptyCallRecordingsDirectionChartState() {
   };
 }
 
-import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import { createCommunicationsTextFilterDropdownContent } from '@utils/communications/communicationsDateExtensionFilters';
-import { formatCallRecordingsFiltersForApi } from '@utils/communications/communicationsAppliedFiltersFormat';
-import { getDefaultCommunicationsDateFilterPair } from '@utils/communications/communicationsFilterDefaults';
-import { shouldSkipCommunicationsListFetch } from '@utils/communications/communicationsListFetchDedup';
-import { getEmptyCallRecordingsDirectionChartState } from '@utils/communications/recordingsChartDefaults';
-import {
-    buildCallDirectionFilterPill,
-    buildDepartmentFilterPill,
-    buildEndDateTimeFilterPill,
-    buildExtensionNumberMultiSelectFilterPill,
-    buildStartDateTimeFilterPill,
-} from '@utils/communications/communicationsFilterPillFactories';
-const { PERMISSIONS } = HEADER_CONSTANTS;
-
 // Interfaces
 interface Summary {
   numbers: number;

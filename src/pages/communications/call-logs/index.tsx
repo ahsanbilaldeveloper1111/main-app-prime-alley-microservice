@@ -597,10 +597,41 @@ const CallLogs = () => {
     [currentFilters, defaultFilters.current],
   );
 
+  const extensionAllIds = useMemo(
+    () => hierarchyDataExtensions.map((ext: any) => String(ext.id)),
+    [hierarchyDataExtensions],
+  );
+  const selectedExtensionIds = useMemo(
+    () =>
+      Array.isArray(currentFilters.extension_number)
+        ? (currentFilters.extension_number as string[])
+        : [],
+    [currentFilters.extension_number],
+  );
+  const areAllExtensionsSelected = useMemo(
+    () =>
+      extensionAllIds.length > 0 &&
+      selectedExtensionIds.length === extensionAllIds.length,
+    [extensionAllIds, selectedExtensionIds],
+  );
+  const callDirectionActiveLabel = useMemo(() => {
+    const value = String(currentFilters.call_direction ?? "");
+    if (value === "OUTGOING") return "Outgoing";
+    if (value === "INCOMING") return "Incoming";
+    if (value === "Both") return "Both";
+    return undefined;
+  }, [currentFilters.call_direction]);
+  const toggleExtensionId = useCallback(
+    (idVal: string) => {
+      const next = selectedExtensionIds.includes(idVal)
+        ? selectedExtensionIds.filter((v) => v !== idVal)
+        : [...selectedExtensionIds, idVal];
+      stageFilters({ ...currentFilters, extension_number: next });
+    },
+    [currentFilters, selectedExtensionIds, stageFilters],
+  );
+
   const tableToolbar = useMemo<any>(() => {
-    const extensionAllIds = hierarchyDataExtensions.map((ext: any) =>
-      String(ext.id),
-    );
     return {
       showTabs: true,
       tabs: [
@@ -632,14 +663,7 @@ const CallLogs = () => {
           label: "Call Direction",
           showDropdown: true,
           active: Boolean(currentFilters.call_direction),
-          activeLabel:
-            currentFilters.call_direction === "OUTGOING"
-              ? "Outgoing"
-              : currentFilters.call_direction === "INCOMING"
-                ? "Incoming"
-                : currentFilters.call_direction === "Both"
-                  ? "Both"
-                  : undefined,
+          activeLabel: callDirectionActiveLabel,
           onClear: () =>
             stageFilters({ ...currentFilters, call_direction: "" }),
           dropdownOptions: [
@@ -770,24 +794,14 @@ const CallLogs = () => {
           searchable: true,
           multiSelect: true,
           onSelectAll: () => {
-            const selected = Array.isArray(currentFilters.extension_number)
-              ? (currentFilters.extension_number as string[])
-              : [];
-            const allSelected =
-              extensionAllIds.length > 0 &&
-              selected.length === extensionAllIds.length;
             stageFilters({
               ...currentFilters,
-              extension_number: allSelected ? [] : extensionAllIds,
+              extension_number: areAllExtensionsSelected ? [] : extensionAllIds,
             });
           },
-          selectAllLabel:
-            Array.isArray(currentFilters.extension_number) &&
-            extensionAllIds.length > 0 &&
-            (currentFilters.extension_number as string[]).length ===
-              extensionAllIds.length
-              ? "Deselect all"
-              : "Select all",
+          selectAllLabel: areAllExtensionsSelected
+            ? "Deselect all"
+            : "Select all",
           active:
             Array.isArray(currentFilters.extension_number) &&
             currentFilters.extension_number.length > 0,
@@ -800,22 +814,12 @@ const CallLogs = () => {
             stageFilters({ ...currentFilters, extension_number: [] }),
           dropdownOptions: hierarchyDataExtensions.map((ext: any) => {
             const idVal = String(ext.id);
-            const isSelected =
-              Array.isArray(currentFilters.extension_number) &&
-              (currentFilters.extension_number as string[]).includes(idVal);
+            const isSelected = selectedExtensionIds.includes(idVal);
             return {
               label: String(ext.name ?? ext.id),
               value: idVal,
               selected: isSelected,
-              onClick: () => {
-                const prev = Array.isArray(currentFilters.extension_number)
-                  ? (currentFilters.extension_number as string[])
-                  : [];
-                const next = isSelected
-                  ? prev.filter((v) => v !== idVal)
-                  : [...prev, idVal];
-                stageFilters({ ...currentFilters, extension_number: next });
-              },
+              onClick: () => toggleExtensionId(idVal),
             };
           }),
         },
@@ -934,6 +938,11 @@ const CallLogs = () => {
     handleResetFiltersClick,
     hasUnappliedFilterChanges,
     hasNonDefaultFilters,
+    callDirectionActiveLabel,
+    extensionAllIds,
+    areAllExtensionsSelected,
+    selectedExtensionIds,
+    toggleExtensionId,
   ]);
 
   return (
