@@ -325,12 +325,12 @@ function syncActiveTabFromRouter(params: {
   setActiveFilter: React.Dispatch<React.SetStateAction<string>>;
 }): void {
   if (!params.routerReady || !params.routerTab) return;
-  const tabFromUrl =
-    typeof params.routerTab === "string"
-      ? params.routerTab
-      : Array.isArray(params.routerTab)
-      ? params.routerTab[0]
-      : "";
+  let tabFromUrl = "";
+  if (typeof params.routerTab === "string") {
+    tabFromUrl = params.routerTab;
+  } else if (Array.isArray(params.routerTab)) {
+    tabFromUrl = params.routerTab[0] ?? "";
+  }
   if (!tabFromUrl) return;
   const isValidFilter = isValidActiveFilterTab(tabFromUrl, params.stages);
   if (isValidFilter && tabFromUrl !== params.activeFilter) {
@@ -346,8 +346,8 @@ function buildOrdersActions(params: {
   activeFilter: string;
   canEdit: boolean;
   canDelete: boolean;
-  onViewOrder: (orderId: number) => void;
-  onRestoreOrder: (orderId: number) => void;
+  onViewOrder: (orderId: number) => void | Promise<void>;
+  onRestoreOrder: (orderId: number) => void | Promise<void>;
   onEditOrder: (row: any) => void;
   onOpenAttachments: (row: any) => void;
   onDeleteOrder: (orderId: number, orderNumber?: string) => void;
@@ -1504,11 +1504,11 @@ const CrmOrders = () => {
         canDelete: Boolean(
           session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_ORDERS_BILLING),
         ),
-        onViewOrder: (orderId) => {
-          void handleViewOrder(orderId);
+        onViewOrder: async (orderId) => {
+          await handleViewOrder(orderId);
         },
-        onRestoreOrder: (orderId) => {
-          void handleRestoreOrder(orderId);
+        onRestoreOrder: async (orderId) => {
+          await handleRestoreOrder(orderId);
         },
         onEditOrder: (row) => {
           setEditingOrderId(getOrderRowId(row));
