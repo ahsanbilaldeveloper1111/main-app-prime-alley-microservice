@@ -166,6 +166,21 @@ export function computePlannerTaskRowPermissions(
   };
 }
 
+/**
+ * Applies rank-level planner task CRUD flags on top of row-level membership rules.
+ * Row logic stays the source of truth for *who* may act; session flags gate *whether* the role allows it.
+ */
+export function applyPlannerTaskSessionCrud(
+  perms: PlannerTaskRowPermissions,
+  opts: { canUpdateTask: boolean; canDeleteTask: boolean },
+): PlannerTaskRowPermissions {
+  return {
+    ...perms,
+    canOpenTaskEdit: perms.canOpenTaskEdit && opts.canUpdateTask,
+    canDeleteTask: perms.canDeleteTask && opts.canDeleteTask,
+  };
+}
+
 /** Tooltip for the task row "Edit" action when opening the menu is denied. */
 export function plannerTaskRowEditDeniedTitle(canOpenTaskEdit: boolean): string | undefined {
   return canOpenTaskEdit ? undefined : "You are not authorized to edit this task";

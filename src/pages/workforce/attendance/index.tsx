@@ -31,18 +31,22 @@ import { GlobalDateTimeFormat } from "@utils/Helper";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
 import { Calendar, Clock, LogIn, LogOut } from "lucide-react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { usePermissions } from "@utils/permissionUtils";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/attendance-page.scss";
 
 const ITEMS_PER_PAGE = 15;
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const dateOptions = ["Today", "Last 7 days", "Last 30 days", "Last 3 months", "All time"];
 
 type MainAppUser = {
   id: string | number;
   name?: string | null;
+  phone?: string | null;
 };
 
 const getInitials = (name: string): string => {
@@ -412,6 +416,8 @@ function AttendanceStatusDisplay({
 
 const AttendancePage = () => {
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
+  const canDeleteAttendance = hasPermission(PERMISSIONS.DELETE_ATTENDANCE_STAFF_MANAGEMENT);
   const { mainAppUsers } = useMainAppLookups();
 
   const users = useMemo(() => (mainAppUsers ?? []) as MainAppUser[], [mainAppUsers]);
@@ -426,7 +432,9 @@ const AttendancePage = () => {
     [users]
   );
 
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [appliedUserIds, setAppliedUserIds] = useState<string[]>([]);
+  const [userSearchTerm, setUserSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -450,14 +458,47 @@ const AttendancePage = () => {
   const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const managers = users;
+
+  const toggleSelectedUserId = useCallback((idStr: string, isSelected: boolean) => {
+    setSelectedUserIds((prev) => {
+      if (isSelected) return prev.filter((id) => id !== idStr);
+      return [...prev, idStr];
+    });
+  }, []);
+
+  const filteredManagers = useMemo(() => {
+    const needle = userSearchTerm.trim().toLowerCase();
+    if (!needle) return managers;
+    return managers.filter((mgr) => {
+      const label = String(mgr.name ?? mgr.id).toLowerCase();
+      const phone = String(mgr.phone ?? "").trim().toLowerCase();
+      return label.includes(needle) || phone.includes(needle);
+    });
+  }, [managers, userSearchTerm]);
+
   const loadAttendance = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: { page: number; limit: number; user_id?: string; date_from?: string; date_to?: string } = {
+      const params: {
+        page: number;
+        limit: number;
+        user_id?: string;
+        user_ids?: string[];
+        date_from?: string;
+        date_to?: string;
+      } = {
         page,
         limit: rowsPerPage,
       };
-      if (selectedUserId.trim()) params.user_id = selectedUserId.trim();
+      const normalizedUserIds = appliedUserIds
+        .map((id) => String(id).trim())
+        .filter(Boolean);
+      if (normalizedUserIds.length > 0) {
+        // Journey-compatible filter payload
+        params.user_ids = normalizedUserIds;
+        // Backward-compatible single user filter
+      }
       const dateRange = getDateRangeForOption(selectedDate ?? "");
       if (dateRange) {
         params.date_from = dateRange.date_from;
@@ -483,7 +524,7 @@ const AttendancePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedUserId, selectedDate, rowsPerPage]);
+  }, [appliedUserIds, selectedDate, rowsPerPage]);
 
   const handlePaginationChange = useCallback((page: number, limit: number) => {
     if (rowsPerPageRef.current !== limit) {
@@ -513,7 +554,7 @@ const AttendancePage = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedUserId, selectedDate]);
+  }, [appliedUserIds, selectedDate]);
 
   useEffect(() => {
     loadStatus();
@@ -554,7 +595,7 @@ const AttendancePage = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!recordToDelete) return;
+    if (!canDeleteAttendance || !recordToDelete) return;
     setDeleting(true);
     try {
       await deleteAttendance(recordToDelete.id);
@@ -570,20 +611,96 @@ const AttendancePage = () => {
     }
   };
 
-  const userFilterOptions = useMemo(
-    () => [
-      {
-        label: "All Users",
-        value: "__all__",
-        onClick: () => setSelectedUserId(""),
-      },
-      ...users.map((user) => ({
-        label: user.name ?? String(user.id),
-        value: String(user.id),
-        onClick: () => setSelectedUserId(String(user.id)),
-      })),
-    ],
-    [users],
+  const usersDropdownContent = useMemo(
+    () => (
+      <div style={{ minWidth: "260px" }}>
+        <input
+          type="text"
+          placeholder="Search user..."
+          value={userSearchTerm}
+          onChange={(e) => setUserSearchTerm(e.target.value)}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{
+            width: "100%",
+            marginBottom: "8px",
+            padding: "8px 10px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "6px",
+            fontSize: "13px",
+          }}
+        />
+        <div style={{ marginBottom: "8px", maxHeight: "220px", overflowY: "auto" }}>
+          {filteredManagers.map((mgr, idx) => {
+            const idStr = String(mgr.id);
+            const rowKey = `${String(mgr.id ?? "row")}-${idx}`;
+            const isSelected = selectedUserIds.includes(idStr);
+            const label = String(mgr.name ?? mgr.id);
+            return (
+              <label
+                key={rowKey}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "6px 4px",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onChange={() => {
+                    toggleSelectedUserId(idStr, isSelected);
+                  }}
+                />
+                <span>{label}</span>
+              </label>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            type="button"
+            onClick={() => {
+              setAppliedUserIds(selectedUserIds);
+              setCurrentPage(1);
+            }}
+            style={{
+              border: "none",
+              backgroundColor: "#6366f1",
+              color: "white",
+              borderRadius: "6px",
+              padding: "6px 10px",
+              fontSize: "12px",
+            }}
+          >
+            Apply
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedUserIds([]);
+              setAppliedUserIds([]);
+              setUserSearchTerm("");
+              setCurrentPage(1);
+            }}
+            style={{
+              border: "1px solid #d1d5db",
+              background: "white",
+              color: "#111827",
+              borderRadius: "6px",
+              padding: "6px 10px",
+              fontSize: "12px",
+            }}
+          >
+            Clear
+          </button>
+        </div>
+      </div>
+    ),
+    [filteredManagers, selectedUserIds, toggleSelectedUserId, userSearchTerm],
   );
 
   const dateFilterOptions = useMemo(
@@ -602,6 +719,11 @@ const AttendancePage = () => {
     [],
   );
 
+  const activeAttendanceUserId = selectedUserIds[0] || appliedUserIds[0] || "";
+  const activeAttendanceUserLabel = activeAttendanceUserId
+    ? getDisplayName(activeAttendanceUserId)
+    : undefined;
+
   const attendanceFilterPills = useMemo<FilterPill[]>(
     () => [
       {
@@ -609,10 +731,18 @@ const AttendancePage = () => {
         label: "User",
         showDropdown: true,
         searchable: true,
-        active: Boolean(selectedUserId),
-        activeLabel: selectedUserId ? getDisplayName(selectedUserId) : undefined,
-        onClear: selectedUserId ? () => setSelectedUserId("") : undefined,
-        dropdownOptions: userFilterOptions,
+        active: selectedUserIds.length > 0 || appliedUserIds.length > 0,
+        activeLabel: activeAttendanceUserLabel,
+        onClear:
+          selectedUserIds.length > 0 || appliedUserIds.length > 0
+            ? () => {
+                setSelectedUserIds([]);
+                setAppliedUserIds([]);
+                setUserSearchTerm("");
+                setCurrentPage(1);
+              }
+            : undefined,
+        dropdownContent: usersDropdownContent,
       },
       {
         id: "attendance-date-filter",
@@ -626,10 +756,11 @@ const AttendancePage = () => {
       },
     ],
     [
-      selectedUserId,
+      selectedUserIds,
+      appliedUserIds,
+      activeAttendanceUserLabel,
+      usersDropdownContent,
       selectedDate,
-      getDisplayName,
-      userFilterOptions,
       dateFilterOptions,
     ],
   );
@@ -681,7 +812,7 @@ const AttendancePage = () => {
 
   const isCheckedIn = status?.is_checked_in === true;
   const canCheckInOut = Boolean(
-    session?.user?.permissions?.includes("check-in-out-attendence-staff-management"),
+    session?.user?.permissions?.includes(PERMISSIONS.CHECK_IN_OUT_ATTENDENCE_STAFF_MANAGEMENT),
   );
 
   const sessionCheckInAt =

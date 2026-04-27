@@ -28,6 +28,7 @@ import {
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, GripVertical } from "lucide-react";
 import Select from "@components/AppSelect";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const FIELD_TYPES: { value: UserRequestCategoryFieldType; label: string }[] = [
   { value: "text", label: "Text" },
@@ -51,6 +52,7 @@ const CONDITION_OPS: { value: "eq" | "neq" | "in" | "contains"; label: string }[
 ];
 
 const OPTION_TYPES: UserRequestCategoryFieldType[] = ["select", "multiselect", "radio", "checkbox"];
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function slugifyForKey(label: string): string {
   const s = String(label ?? "")
@@ -466,7 +468,7 @@ const RequestSubCategories = () => {
         showSearch={false}
         buttons={
           <>
-          {session?.user?.permissions?.includes('manage-request-categories-staff-management') && (
+          {session?.user?.permissions?.includes(PERMISSIONS.MANAGE_REQUEST_CATEGORIES_STAFF_MANAGEMENT) && (
           <Button variant="primary" onClick={openCreateCategory}>
             <Plus size={18} className="me-1" />
             Add Category
@@ -553,7 +555,7 @@ const RequestSubCategories = () => {
                         </span>
                       </td>
                       <td style={{ padding: "16px" }}>
-                        {session?.user?.permissions?.includes('manage-request-categories-staff-management') && (
+                        {session?.user?.permissions?.includes(PERMISSIONS.MANAGE_REQUEST_CATEGORIES_STAFF_MANAGEMENT) && (
                        <>
                        <button
                           type="button"

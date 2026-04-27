@@ -17,6 +17,10 @@ import {
 } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { useRouter } from "next/router";
 import { formatDateTimeGlobal } from "@utils/Helper";
 import moment from "moment";
@@ -375,6 +379,14 @@ function BillingProductsToolbarButton({
 
 const BillingManagement = () => {
   const { data: session } = useSession();
+  const { hasPermission, hasAnyPermission } = usePermissions();
+  const canAccessBillingProducts = hasAnyPermission([
+    PERMISSIONS.VIEW_PRODUCTS_BILLING,
+    PERMISSIONS.LIST_CRM_DATA_MANAGEMENT,
+  ]);
+  const canCreateBillingProduct = hasPermission(PERMISSIONS.CREATE_PRODUCTS_BILLING);
+  const canUpdateBillingProduct = hasPermission(PERMISSIONS.UPDATE_PRODUCTS_BILLING);
+  const canDeleteBillingProduct = hasPermission(PERMISSIONS.DELETE_PRODUCTS_BILLING);
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
@@ -859,14 +871,15 @@ const BillingManagement = () => {
   }, [buildProductsParams, memoizedFilters.has_scheduled_calls, memoizedFilters.has_tickets]);
 
   const openProductDeleteModal = useCallback((row: any) => {
+    if (!canDeleteBillingProduct) return;
     const id = Number(row?.id);
     if (!Number.isFinite(id) || id <= 0) return;
     setProductToDelete({ id, name: getProductDisplayName(row) });
     setShowProductDeleteModal(true);
-  }, []);
+  }, [canDeleteBillingProduct]);
 
   const confirmProductDelete = useCallback(async () => {
-    if (!productToDelete) return;
+    if (!canDeleteBillingProduct || !productToDelete) return;
     setDeletingProduct(true);
     try {
       await deleteProduct(productToDelete.id);
@@ -879,10 +892,11 @@ const BillingManagement = () => {
     } finally {
       setDeletingProduct(false);
     }
-  }, [fetchCrmData, productToDelete]);
+  }, [fetchCrmData, productToDelete, canDeleteBillingProduct]);
 
   const openProductEditModal = useCallback(
     (rowOrId: { id?: unknown } | number, closeSidebarFirst = false) => {
+      if (!canUpdateBillingProduct) return;
       const id =
         typeof rowOrId === "number"
           ? rowOrId
@@ -892,7 +906,7 @@ const BillingManagement = () => {
       setEditingProductId(id);
       setShowCreateProductModal(true);
     },
-    [],
+    [canUpdateBillingProduct],
   );
 
   // Load data when filters or pagination changes
@@ -1077,49 +1091,66 @@ const BillingManagement = () => {
         sortable: false,
         type: "custom",
         render: (row: any) => {
-          return <div className="d-flex gap-1">
+          return (
+          <div className="d-flex gap-1">
+            {canUpdateBillingProduct ? (
             <button
-  onClick={() => openProductEditModal(row)}
-  style={{
-    background: "transparent",
-    border: "none",
-    padding: "4px",
-    cursor: "pointer",
-    color: "#0d6efd" // blue (edit)
-  }}
->
-  <FiEdit size={16} />
-</button>
-<button
-  onClick={() => openProductDeleteModal(row)}
-  style={{
-    background: "transparent",
-    border: "none",
-    padding: "4px",
-    cursor: "pointer",
-    color: "#dc3545" // red
-  }}
->
-  <FiTrash2 size={16} />
-</button>
-          </div>;
+              type="button"
+              onClick={() => openProductEditModal(row)}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "4px",
+                cursor: "pointer",
+                color: "#0d6efd",
+              }}
+            >
+              <FiEdit size={16} />
+            </button>
+            ) : null}
+            {canDeleteBillingProduct ? (
+            <button
+              type="button"
+              onClick={() => openProductDeleteModal(row)}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "4px",
+                cursor: "pointer",
+                color: "#dc3545",
+              }}
+            >
+              <FiTrash2 size={16} />
+            </button>
+            ) : null}
+          </div>
+          );
         },
       },
     ],
-    [openProductEditModal, openProductDeleteModal, productCategoryIdToName],
+    [
+      openProductEditModal,
+      openProductDeleteModal,
+      productCategoryIdToName,
+      canUpdateBillingProduct,
+      canDeleteBillingProduct,
+    ],
   );
 
   // Define table actions
   const productsActions: TableAction<any>[] = useMemo(
-    () => [
-      {
-        label: "Edit",
-        icon: <FiEdit size={16} />,
-        onClick: (row: any) => openProductEditModal(row),
-        variant: "link" as const,
-      },
-    ],
-    [openProductEditModal],
+    () =>
+      canUpdateBillingProduct
+        ? [
+            {
+              label: "Edit",
+              icon: <FiEdit size={16} />,
+              onClick: (row: any) => openProductEditModal(row),
+              variant: "link" as const,
+            },
+          ]
+        : [],
+    [openProductEditModal, canUpdateBillingProduct],
   );
 
   const renderAddProductButton = () => (
@@ -1135,7 +1166,7 @@ const BillingManagement = () => {
       ref={addContactsRef}
     >
       {session?.user?.permissions?.includes(
-        "products-categories-products-billing",
+        PERMISSIONS.MANAGE_PRODUCT_CATEGORIES_BILLING,
       ) ? (
         <button
           type="button"
@@ -1152,7 +1183,9 @@ const BillingManagement = () => {
           Manage Categories
         </button>
       ) : null}
+        {canCreateBillingProduct ? (
         <button
+          type="button"
           onClick={() => setShowCreateProductModal(true)}
           style={ACTION_BUTTON_BASE_STYLE}
           onMouseEnter={(e) => {
@@ -1165,6 +1198,7 @@ const BillingManagement = () => {
           <Plus size={16} />
           Add Product
         </button>
+        ) : null}
     
     </div>
   );
@@ -1363,7 +1397,7 @@ const BillingManagement = () => {
     productCategoryFilterOptions,
   ]);
 
-  if (!session?.user?.permissions?.includes("list-crm-data-management")) {
+  if (!canAccessBillingProducts) {
     return null;
   }
 

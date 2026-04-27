@@ -16,6 +16,10 @@ import DeleteConfirmationModal from '@pages/partial/DeleteConfirmationModal';
 import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 import { PlannerColorTableCell } from '@planner/PlannerColorTableCell';
 import { toast } from 'react-toastify';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface Status {
   id: number;
@@ -29,6 +33,11 @@ interface Status {
 }
 
 const WorkPlannerStatuses = () => {
+  const { hasPermission } = usePermissions();
+  const canCreateGlobalStatus = hasPermission(PERMISSIONS.CREATE_STATUSES_WORK_PLANNER);
+  const canUpdateGlobalStatus = hasPermission(PERMISSIONS.UPDATE_STATUSES_WORK_PLANNER);
+  const canDeleteGlobalStatus = hasPermission(PERMISSIONS.DELETE_STATUSES_WORK_PLANNER);
+
   const [statuses, setStatuses] = useState<Status[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -70,6 +79,7 @@ const WorkPlannerStatuses = () => {
 
   // Handle create status
   const handleCreateStatus = async () => {
+    if (!canCreateGlobalStatus) return;
     if (!formData.name.trim()) {
       toast.error('Status name is required');
       return;
@@ -105,6 +115,7 @@ const WorkPlannerStatuses = () => {
 
   // Handle edit status
   const handleEditStatus = async () => {
+    if (!canUpdateGlobalStatus) return;
     if (!selectedStatus || !formData.name.trim()) {
       toast.error('Status name is required');
       return;
@@ -141,7 +152,7 @@ const WorkPlannerStatuses = () => {
 
   // Handle delete status
   const handleDeleteStatus = async () => {
-    if (!selectedStatus) return;
+    if (!canDeleteGlobalStatus || !selectedStatus) return;
 
     try {
       setProcessing(true);
@@ -207,19 +218,34 @@ const WorkPlannerStatuses = () => {
     ) },
   ];
 
-  const statusActions: TableAction<Status>[] = [
-    {
-      label: 'Actions',
-      icon: <MoreVertical size={16} />,
-      dropdown: {
-        options: [
-          { label: 'Edit', icon: <Edit size={14} />, onClick: (row) => openEditModal(row) },
-          { label: 'Delete', icon: <Trash2 size={14} />, onClick: (row) => openDeleteModal(row), className: 'text-danger', divider: true },
-        ],
-        align: 'end',
-      },
-    },
-  ];
+  const statusActions: TableAction<Status>[] =
+    canUpdateGlobalStatus || canDeleteGlobalStatus
+      ? [
+          {
+            label: 'Actions',
+            icon: <MoreVertical size={16} />,
+            dropdown: {
+              options: [
+                ...(canUpdateGlobalStatus
+                  ? [{ label: 'Edit', icon: <Edit size={14} />, onClick: (row: Status) => openEditModal(row) }]
+                  : []),
+                ...(canDeleteGlobalStatus
+                  ? [
+                      {
+                        label: 'Delete',
+                        icon: <Trash2 size={14} />,
+                        onClick: (row: Status) => openDeleteModal(row),
+                        className: 'text-danger',
+                        divider: true,
+                      },
+                    ]
+                  : []),
+              ],
+              align: 'end' as const,
+            },
+          },
+        ]
+      : [];
 
   return (
     <React.Fragment>
@@ -246,6 +272,7 @@ const WorkPlannerStatuses = () => {
   </nav> */}
 </div>
 <div className="d-flex flex-wrap gap-2">
+{canCreateGlobalStatus ? (
 <Button
               variant="primary"
               onClick={() => setShowCreateModal(true)}
@@ -254,6 +281,7 @@ const WorkPlannerStatuses = () => {
               <Plus size={16} />
               Add Status
             </Button>
+) : null}
         </div>
 </div>
 
@@ -281,7 +309,7 @@ const WorkPlannerStatuses = () => {
                   data={statuses}
                   columns={statusColumns}
                   actions={statusActions}
-                  showActions={true}
+                  showActions={statusActions.length > 0}
                   actionsLabel="Actions"
                   sortable={true}
                   loading={loading}
@@ -289,6 +317,7 @@ const WorkPlannerStatuses = () => {
                     <div className="text-center py-5">
                       <AlertCircle size={48} className="text-muted mb-3" />
                       <p className="text-muted">No statuses found</p>
+                      {canCreateGlobalStatus ? (
                       <Button
                         variant="primary"
                         size="sm"
@@ -298,6 +327,7 @@ const WorkPlannerStatuses = () => {
                         <Plus size={16} className="me-2" />
                         Create First Status
                       </Button>
+                      ) : null}
                     </div>
                   }
                   loadingMessage="Loading statuses..."

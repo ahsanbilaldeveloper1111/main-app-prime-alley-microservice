@@ -28,6 +28,10 @@ import { JOURNEY_STATUS_OPTIONS } from "@utils/workforce/journeyStatusOptions";
 import { toast } from "react-toastify";
 import { Form, Modal } from "react-bootstrap";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface OnboardingEmployee {
   id: string;
@@ -307,7 +311,9 @@ type JourneyStepsSidebarSectionProps = {
   steps: JourneyStepRecord[];
   loading: boolean;
   isCompleted: boolean;
-  canUpdate: boolean;
+  canAddStep: boolean;
+  canEditStep: boolean;
+  canDeleteStep: boolean;
   deletingStepId: number | null;
   onAddStep: () => void;
   onEditStep: (step: JourneyStepRecord) => void;
@@ -318,7 +324,9 @@ function JourneyStepsSidebarSection({
   steps,
   loading,
   isCompleted,
-  canUpdate,
+  canAddStep,
+  canEditStep,
+  canDeleteStep,
   deletingStepId,
   onAddStep,
   onEditStep,
@@ -328,7 +336,7 @@ function JourneyStepsSidebarSection({
     <div style={{ padding: "0 4px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
         <span style={{ fontSize: "13px", fontWeight: "600", color: "#374151" }}>Journey Steps</span>
-        {!isCompleted && canUpdate && (
+        {!isCompleted && canAddStep && (
           <button
             type="button"
             onClick={onAddStep}
@@ -391,8 +399,9 @@ function JourneyStepsSidebarSection({
                       </div>
                     )}
                   </div>
-                  {!isCompleted && (
+                  {!isCompleted && (canEditStep || canDeleteStep) ? (
                     <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                      {canEditStep ? (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -411,6 +420,8 @@ function JourneyStepsSidebarSection({
                       >
                         <Pencil size={14} />
                       </button>
+                      ) : null}
+                      {canDeleteStep ? (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -430,8 +441,9 @@ function JourneyStepsSidebarSection({
                       >
                         <Trash2 size={14} />
                       </button>
+                      ) : null}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </li>
             );
@@ -533,13 +545,13 @@ function useWorkforceJourneysList({
 // ---------------------------------------------------------------------------
 // Hook: useSelectedJourneyDetail
 // ---------------------------------------------------------------------------
-function useSelectedJourneyDetail(journeyId: number, canUpdate: boolean) {
+function useSelectedJourneyDetail(journeyId: number, loadDetailEnabled: boolean) {
   const [journeySteps, setJourneySteps] = useState<JourneyStepRecord[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
   const [journeyStartDateIso, setJourneyStartDateIso] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!canUpdate) {
+    if (!loadDetailEnabled) {
       setJourneySteps([]);
       setJourneyStartDateIso(null);
       return;
@@ -566,7 +578,7 @@ function useSelectedJourneyDetail(journeyId: number, canUpdate: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [journeyId, canUpdate]);
+  }, [journeyId, loadDetailEnabled]);
 
   const refreshSteps = useCallback(async () => {
     const data = (await getJourney(journeyId)) as { steps?: JourneyStepRecord[]; start_date?: string };
@@ -930,6 +942,7 @@ function EditJourneyStepModal({
 // Main page component
 // ---------------------------------------------------------------------------
 const EmployeesOnboarding = () => {
+  const { hasPermission } = usePermissions();
   const { mainAppUsers, mainAppDepartments, companyIdentifier } = useMainAppLookups();
   const [searchTerm, setSearchTerm] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
@@ -963,7 +976,17 @@ const EmployeesOnboarding = () => {
   const managers = users;
 
   const journeyId = Number(selectedEmployee?.id);
-  const canUpdateJourney = Number.isInteger(journeyId) && journeyId > 0;
+  const journeyIdValid = Number.isInteger(journeyId) && journeyId > 0;
+  const canUpdateJourneyRecord =
+    journeyIdValid && hasPermission(PERMISSIONS.UPDATE_JOURNEY_STAFF_MANAGEMENT);
+  const canDeleteJourneyRecord =
+    journeyIdValid && hasPermission(PERMISSIONS.DELETE_JOURNEY_STAFF_MANAGEMENT);
+  const canCreateJourneyStep =
+    journeyIdValid && hasPermission(PERMISSIONS.CREATE_JOURNEY_STEP_STAFF_MANAGEMENT);
+  const canUpdateJourneyStep =
+    journeyIdValid && hasPermission(PERMISSIONS.UPDATE_JOURNEY_STEP_STAFF_MANAGEMENT);
+  const canDeleteJourneyStepPerm =
+    journeyIdValid && hasPermission(PERMISSIONS.DELETE_JOURNEY_STEP_STAFF_MANAGEMENT);
   const isJourneyCompleted = useMemo(
     () => statusValue === "completed" || isEmployeeJourneyDisplayCompleted(selectedEmployee?.status ?? ""),
     [statusValue, selectedEmployee?.status],
@@ -984,12 +1007,12 @@ const EmployeesOnboarding = () => {
 
   const { journeySteps, stepsLoading, journeyStartDateIso, refreshSteps } = useSelectedJourneyDetail(
     journeyId,
-    canUpdateJourney,
+    journeyIdValid,
   );
 
   /** Keep list row / sidebar counts aligned with detail steps after add/edit/delete (list API aggregates can lag). */
   useEffect(() => {
-    if (!canUpdateJourney || stepsLoading) return;
+    if (!journeyIdValid || stepsLoading) return;
     setSelectedEmployee((prev) => {
       if (!prev || Number(prev.id) !== journeyId) return prev;
       const { total, completed, progress } = deriveJourneyProgressFromSteps(journeySteps);
@@ -1007,7 +1030,7 @@ const EmployeesOnboarding = () => {
         progress,
       };
     });
-  }, [journeySteps, stepsLoading, canUpdateJourney, journeyId]);
+  }, [journeySteps, stepsLoading, journeyIdValid, journeyId]);
 
   const journeyDueDateMin = useMemo(
     () => journeyStartDateToInputMin(journeyStartDateIso),
@@ -1033,7 +1056,7 @@ const EmployeesOnboarding = () => {
 
   const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
-    if (!canUpdateJourney || isJourneyCompleted) return;
+    if (!canUpdateJourneyRecord || isJourneyCompleted) return;
     setStatusUpdating(true);
     try {
       await updateJourney(journeyId, { status: newStatus });
@@ -1065,7 +1088,7 @@ const EmployeesOnboarding = () => {
 
   const confirmDeleteStep = useCallback(async () => {
     const step = stepPendingDelete;
-    if (!canUpdateJourney || step?.id == null) {
+    if (!canDeleteJourneyStepPerm || step?.id == null) {
       closeDeleteStepModal();
       return;
     }
@@ -1081,10 +1104,10 @@ const EmployeesOnboarding = () => {
     } finally {
       setDeletingStepId(null);
     }
-  }, [canUpdateJourney, journeyId, stepPendingDelete, refreshSteps]);
+  }, [canDeleteJourneyStepPerm, journeyId, stepPendingDelete, refreshSteps]);
 
   const handleDeleteJourney = async () => {
-    if (!canUpdateJourney) return;
+    if (!canDeleteJourneyRecord) return;
     setDeletingJourney(true);
     try {
       await deleteJourney(journeyId);
@@ -1358,7 +1381,7 @@ const EmployeesOnboarding = () => {
 
   const journeySidebarSections = useMemo<SidebarSection[]>(() => {
     if (!selectedEmployee) return [];
-    const useLiveStepsProgress = canUpdateJourney && !stepsLoading;
+    const useLiveStepsProgress = journeyIdValid && !stepsLoading;
     const liveProgress = useLiveStepsProgress
       ? deriveJourneyProgressFromSteps(journeySteps)
       : null;
@@ -1486,7 +1509,7 @@ const EmployeesOnboarding = () => {
               className="form-select"
               value={statusValue}
               onChange={handleStatusChange}
-              disabled={statusUpdating || isJourneyCompleted || !canUpdateJourney}
+              disabled={statusUpdating || isJourneyCompleted || !canUpdateJourneyRecord}
               style={{
                 width: "100%",
                 padding: "10px 12px",
@@ -1521,7 +1544,9 @@ const EmployeesOnboarding = () => {
             steps={journeySteps}
             loading={stepsLoading}
             isCompleted={isJourneyCompleted}
-            canUpdate={canUpdateJourney}
+            canAddStep={canCreateJourneyStep}
+            canEditStep={canUpdateJourneyStep}
+            canDeleteStep={canDeleteJourneyStepPerm}
             deletingStepId={deletingStepId}
             onAddStep={() => setShowAddStepForm(true)}
             onEditStep={(step) => setEditingStep(step)}
@@ -1535,7 +1560,11 @@ const EmployeesOnboarding = () => {
     statusValue,
     statusUpdating,
     isJourneyCompleted,
-    canUpdateJourney,
+    journeyIdValid,
+    canUpdateJourneyRecord,
+    canCreateJourneyStep,
+    canUpdateJourneyStep,
+    canDeleteJourneyStepPerm,
     stepsLoading,
     journeySteps,
     deletingStepId,
@@ -1952,7 +1981,7 @@ const EmployeesOnboarding = () => {
               gradient: getAvatarColor(selectedEmployee.name),
             }}
             quickActions={
-              canUpdateJourney
+              canDeleteJourneyRecord
                 ? [
                     {
                       id: "delete-journey",

@@ -333,6 +333,27 @@ export const HEADER_CONSTANTS = {
     VIEW_CALENDAR_WORK_PLANNER: "view-calendar-work-planner-work-planner",
     VIEW_ORDERS_DELIVERY_WORK_PLANNER:
       "view-orders-delivery-work-planner-work-planner",
+    CREATE_STATUSES_WORK_PLANNER: "create-statuses-work-planner-work-planner",
+    UPDATE_STATUSES_WORK_PLANNER: "update-statuses-work-planner-work-planner",
+    DELETE_STATUSES_WORK_PLANNER: "delete-statuses-work-planner-work-planner",
+    REORDER_STATUSES_WORK_PLANNER: "reorder-statuses-work-planner-work-planner",
+    CREATE_LABELS_WORK_PLANNER: "create-labels-work-planner-work-planner",
+    UPDATE_LABELS_WORK_PLANNER: "update-labels-work-planner-work-planner",
+    DELETE_LABELS_WORK_PLANNER: "delete-labels-work-planner-work-planner",
+    EDIT_TASKS_WORK_PLANNER: "edit-tasks-work-planner",
+    CREATE_TASKS_WORK_PLANNER: "create-tasks-work-planner-work-planner",
+    DELETE_TASKS_WORK_PLANNER: "delete-tasks-work-planner-work-planner",
+    CREATE_PROJECTS_WORK_PLANNER: "create-projects-work-planner-work-planner",
+    UPDATE_PROJECTS_WORK_PLANNER: "update-projects-work-planner-work-planner",
+    DELETE_PROJECTS_WORK_PLANNER: "delete-projects-work-planner-work-planner",
+    VIEW_PROJECT_MEMBERS_WORK_PLANNER:
+      "view-project-members-work-planner-work-planner",
+    CREATE_PROJECT_MEMBERS_WORK_PLANNER:
+      "create-project-members-work-planner-work-planner",
+    UPDATE_PROJECT_MEMBERS_WORK_PLANNER:
+      "update-project-members-work-planner-work-planner",
+    DELETE_PROJECT_MEMBERS_WORK_PLANNER:
+      "delete-project-members-work-planner-work-planner",
     //Work Planner permissions end
 
     //Virtual Agents permissions start
@@ -407,7 +428,37 @@ export const HEADER_CONSTANTS = {
       "view-organizational-chart-staff-management",
     VIEW_REQUEST_CATEGORIES_STAFF_MANAGEMENT:
       "view-request-categories-staff-management",
+    MANAGE_REQUEST_CATEGORIES_STAFF_MANAGEMENT:
+      "manage-request-categories-staff-management",
     VIEW_ATTENDENCE_STAFF_MANAGEMENT: "view-attendences-staff-management",
+    CHECK_IN_OUT_ATTENDENCE_STAFF_MANAGEMENT:
+      "check-in-out-attendence-staff-management",
+    DELETE_ATTENDANCE_STAFF_MANAGEMENT:
+      "delete-attendance-staff-management-staff-management",
+    UPDATE_JOURNEY_STAFF_MANAGEMENT:
+      "update-journey-staff-management-staff-management",
+    DELETE_JOURNEY_STAFF_MANAGEMENT:
+      "delete-journey-staff-management-staff-management",
+    CREATE_JOURNEY_STEP_STAFF_MANAGEMENT:
+      "create-journey-step-staff-management-staff-management",
+    UPDATE_JOURNEY_STEP_STAFF_MANAGEMENT:
+      "update-journey-step-staff-management-staff-management",
+    DELETE_JOURNEY_STEP_STAFF_MANAGEMENT:
+      "delete-journey-step-staff-management-staff-management",
+    ADD_EMPLOYEE_STAFF_MANAGEMENT: "add-employee-staff-management",
+    UPDATE_EMPLOYEE_STAFF_MANAGEMENT: "update-employee-staff-management",
+    DELETE_EMPLOYEE_STAFF_MANAGEMENT: "delete-employee-staff-management",
+    ADD_APPROVAL_REQUEST_STAFF_MANAGEMENT: "add-approval-request-staff-management",
+    UPDATE_APPROVAL_REQUEST_STAFF_MANAGEMENT:
+      "update-approval-request-staff-management",
+    DELETE_APPROVAL_REQUEST_STAFF_MANAGEMENT:
+      "delete-approval-request-staff-management",
+    APPROVE_REQUEST_APPROVAL_REQUEST_STAFF_MANAGEMENT:
+      "approve-request-approval-request-staff-management",
+    REJECT_REQUEST_APPROVAL_REQUEST_STAFF_MANAGEMENT:
+      "reject-request-approval-request-staff-management",
+    REQUEST_CHANGES_APPROVAL_REQUEST_STAFF_MANAGEMENT:
+      "request-changes-approval-request-staff-management",
 
     VIEW_LOCATIONS_STAFF_MANAGEMENT: "view-locations-staff-management",
     ADD_LOCATION_STAFF_MANAGEMENT: "add-location-staff-management",
@@ -503,15 +554,55 @@ export const HEADER_CONSTANTS = {
     VIEW_INVENTORY_BILLING: "view-inventory-billing",
     VIEW_PRODUCT_PRICING_COMPANIES_BILLING: "manage-pricing-companies-billing",
 
-    VIEW_CUSTOMER_DASHBOARD_BILLING: "dashboard-billing",
     VIEW_ACCOUNT_OVERVIEW_BILLING: "account-overview-billing",
     VIEW_PRODUCT_DETAILS_BILLING: "products-billing",
-    VIEW_CUSTOMER_ORDERS_BILLING: "orders-billing",
     VIEW_BILLING_HISTORY_BILLING: "billing-history-billing",
     VIEW_INVOICES_BILLING: "invoices-billing",
+    CREATE_INVOICES_BILLING: "create-invoices-billing-billing",
+    UPDATE_INVOICES_BILLING: "update-invoices-billing-billing",
+    DELETE_INVOICES_BILLING: "delete-invoices-billing-billing",
+    CREATE_PRODUCTS_BILLING: "create-products-billing-billing",
+    UPDATE_PRODUCTS_BILLING: "update-products-billing-billing",
+    DELETE_PRODUCTS_BILLING: "delete-products-billing-billing",
+    CREATE_SUBSCRIPTIONS_BILLING: "create-subscriptions-billing-billing",
+    UPDATE_SUBSCRIPTIONS_BILLING: "update-subscriptions-billing-billing",
+    DELETE_SUBSCRIPTIONS_BILLING: "delete-subscriptions-billing-billing",
     VIEW_ORDER_INVOICES_BILLING: "view-order-invoices-billing-billing",
     VIEW_PAYMENT_METHODS_BILLING: "payment-methods-billing",
+    ADD_PAYMENT_METHOD_BILLING: "add-payment-method-billing",
+    MARK_PAYMENT_METHOD_DEFAULT_BILLING: "mark-payment-method-default-billing",
+    DELETE_PAYMENT_METHOD_BILLING: "delete-payment-method-billing",
     VIEW_QUOTES_BILLING: "view-quotes-billing",
+    PAY_INVOICES_BILLING: "pay-invoices-billing",
+    LIST_CRM_ORDERS_BILLING: "list-crm-orders",
+    EDIT_CRM_ORDERS_BILLING: "edit-crm-orders",
+    DELETE_CRM_ORDERS_BILLING: "delete-crm-orders",
+
+    CUSTOMER_ACCOUNTS_SERVICES: 'accounts-services',
+    VIEW_CUSTOMER_PRODUCTS_BILLING: 'view-customer-products-billing-billing',
+    VIEW_CUSTOMER_ACCOUNT_OVERVIEW_BILLING:
+      'view-customer-account-overview-billing-billing',
+    VIEW_CUSTOMER_DASHBOARD_BILLING: 'view-customer-dashboard-billing-billing',
+    VIEW_CUSTOMER_SUBSCRIPTION_BILLING:
+      'view-customer-subscription-billing-billing',
+    VIEW_CUSTOMER_INVOICES_BILLING: 'view-customer-invoices-billing-billing',
+    VIEW_CUSTOMER_PAYMENTS_BILLING: 'view-customer-payments-billing-billing',
+    VIEW_CUSTOMER_ORDERS_BILLING: 'view-customer-orders-billing-billing',
+    VIEW_CUSTOMER_BILLING_HISTORY_BILLING:
+      'view-customer-billing-history-billing-billing',
+    VIEW_CUSTOMER_QUOTES_BILLING: 'view-customer-quotes-billing-billing',
+    CREATE_CUSTOMER_INVOICES_BILLING: 'create-customer-invoices-billing-billing',
+    UPDATE_CUSTOMER_INVOICES_BILLING: 'update-customer-invoices-billing-billing',
+    DELETE_CUSTOMER_INVOICES_BILLING: 'delete-customer-invoices-billing-billing',
+    CREATE_CUSTOMER_PRODUCTS_BILLING: 'create-customer-products-billing-billing',
+    UPDATE_CUSTOMER_PRODUCTS_BILLING: 'update-customer-products-billing-billing',
+    DELETE_CUSTOMER_PRODUCTS_BILLING: 'delete-customer-products-billing-billing',
+    CREATE_CUSTOMER_SUBSCRIPTION_BILLING:
+      'create-customer-subscription-billing-billing',
+    UPDATE_CUSTOMER_SUBSCRIPTION_BILLING:
+      'update-customer-subscription-billing-billing',
+    DELETE_CUSTOMER_SUBSCRIPTION_BILLING:
+      'delete-customer-subscription-billing-billing',
 
     ADD_DOCUMENT_BILLING: "accounts-services",
     DELETE_DOCUMENT_BILLING: "accounts-services",
@@ -521,6 +612,7 @@ export const HEADER_CONSTANTS = {
     VIEW_CRM_CAMPAIGNS: "view-crm-campaigns",
     VIEW_CRM_DATA_MANAGEMENT: "view-crm-data-management",
     CREATE_CRM_DATA_MANAGEMENT: "add-crm-data-management",
+   
     VIEW_CRM_OPPORTUNITIES: "view-crm-opportunities",
     CREATE_CRM_OPPORTUNITIES: "add-crm-opportunities",
     VIEW_CRM_LEADS: "view-crm-leads",

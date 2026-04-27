@@ -21,6 +21,10 @@ import {
 import { createStatus, updateStatus, deleteStatus, reorderStatuses } from '@utils/tasks';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import { StatsCardData } from '@components/GenericStatsCards';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface StatusesTabProps {
   selectedProject: any;
@@ -61,7 +65,9 @@ type StatusesTableCustomBodyProps = {
   paginatedStatuses: any[];
   visibleColumns: TableColumn[];
   actions: TableAction[];
-  isAllow: boolean;
+  allowSelection: boolean;
+  allowReorder: boolean;
+  allowRowActions: boolean;
   processing: boolean;
   loading: boolean;
   selectedItems: number[];
@@ -89,7 +95,9 @@ const StatusesTableCustomBody: React.FC<StatusesTableCustomBodyProps> = ({
   paginatedStatuses,
   visibleColumns,
   actions,
-  isAllow,
+  allowSelection,
+  allowReorder,
+  allowRowActions,
   processing,
   loading,
   selectedItems,
@@ -112,10 +120,10 @@ const StatusesTableCustomBody: React.FC<StatusesTableCustomBodyProps> = ({
   pageSizeOptions,
   onPaginationChange,
 }) => {
-  const showReorder = isAllow && !processing && !loading;
-  const hasActions = isAllow && actions.length > 0;
+  const showReorder = allowReorder && !processing && !loading;
+  const hasActions = allowRowActions && actions.length > 0;
   const colCount =
-    (isAllow ? 1 : 0) +
+    (allowSelection ? 1 : 0) +
     (showReorder ? 1 : 0) +
     visibleColumns.length +
     (hasActions ? 1 : 0);
@@ -282,7 +290,7 @@ const StatusesTableCustomBody: React.FC<StatusesTableCustomBodyProps> = ({
           onReorderPageRows(fromPageIndex, pageIndex);
         }}
       >
-        {isAllow && (
+        {allowSelection && (
           <td
             className="generic-table-td"
             style={{ width: '40px' }}
@@ -395,7 +403,7 @@ const StatusesTableCustomBody: React.FC<StatusesTableCustomBodyProps> = ({
         <Table hover className="generic-table mb-0">
           <thead className="generic-table-header">
             <tr>
-              {isAllow && (
+              {allowSelection && (
                 <th className="generic-table-th" style={{ width: '40px' }}>
                   <Form.Check
                     type="checkbox"
@@ -447,7 +455,15 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   styles,
   canManageProject,
 }) => {
-  const isAllow = canManageProject;
+  const { hasPermission } = usePermissions();
+  const canCreateStatus =
+    canManageProject && hasPermission(PERMISSIONS.CREATE_STATUSES_WORK_PLANNER);
+  const canUpdateStatus =
+    canManageProject && hasPermission(PERMISSIONS.UPDATE_STATUSES_WORK_PLANNER);
+  const canDeleteStatus =
+    canManageProject && hasPermission(PERMISSIONS.DELETE_STATUSES_WORK_PLANNER);
+  const canReorderStatuses =
+    canManageProject && hasPermission(PERMISSIONS.REORDER_STATUSES_WORK_PLANNER);
 
   const [showAddModal, setShowAddModal]     = useState(false);
   const [showEditModal, setShowEditModal]   = useState(false);
@@ -470,7 +486,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
 
   // ── CRUD handlers ─────────────────────────────────────────────────────────
   const handleAddStatus = async () => {
-    if (!canManageProject || !selectedProject?.id || !formData.name) return;
+    if (!canCreateStatus || !selectedProject?.id || !formData.name) return;
     try {
       setProcessing(true);
       await createStatus(selectedProject.id, {
@@ -490,7 +506,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   };
 
   const handleUpdateStatus = async () => {
-    if (!canManageProject || !selectedProject?.id || !selectedStatus || !formData.name) return;
+    if (!canUpdateStatus || !selectedProject?.id || !selectedStatus || !formData.name) return;
     try {
       setProcessing(true);
       await updateStatus(selectedProject.id, selectedStatus.id, {
@@ -511,7 +527,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   };
 
   const handleDeleteStatus = async () => {
-    if (!canManageProject || !selectedProject?.id || !selectedStatus) return;
+    if (!canDeleteStatus || !selectedProject?.id || !selectedStatus) return;
     try {
       setProcessing(true);
       await deleteStatus(selectedProject.id, selectedStatus.id);
@@ -665,7 +681,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
         gap: "8px",
       }}
     >
-      {isAllow && selectedItems.length > 0 && (
+      {canDeleteStatus && selectedItems.length > 0 && (
         <button
           type="button"
           onClick={() => {
@@ -700,7 +716,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
           Delete ({selectedItems.length})
         </button>
       )}
-      {isAllow && (
+      {canCreateStatus && (
         <button
           onClick={() => {
             setFormData({ ...DEFAULT_STATUS_FORM });
@@ -766,26 +782,26 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
     },
     
     rightActions: renderAddStatusButton(),
-  }), [searchValue, filterPills, isAllow, selectedItems.length, statuses.length]);
+  }), [searchValue, filterPills, canCreateStatus, canDeleteStatus, selectedItems.length, statuses.length]);
 
   // ── Row Interaction Handlers ──────────────────────────────────────────────
   const handleFirstColumnClick = useCallback(
     (row: any) => {
-      if (!isAllow) return;
+      if (!canUpdateStatus) return;
       openEditModal(row);
     },
-    [isAllow],
+    [canUpdateStatus],
   );
 
   const handleRowDoubleClick = useCallback((row: any) => {
-    if (isAllow) {
+    if (canUpdateStatus) {
       openEditModal(row);
     }
-  }, [isAllow]);
+  }, [canUpdateStatus]);
 
   const handleStatusRowReorder = useCallback(
     async (fromPageIndex: number, toPageIndex: number) => {
-      if (!canManageProject || !selectedProject?.id || fromPageIndex === toPageIndex) return;
+      if (!canReorderStatuses || !selectedProject?.id || fromPageIndex === toPageIndex) return;
       const offset = (pagination.currentPage - 1) * pagination.rowsPerPage;
       const fromFiltered = offset + fromPageIndex;
       const toFiltered = offset + toPageIndex;
@@ -812,7 +828,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       }
     },
     [
-      canManageProject,
+      canReorderStatuses,
       selectedProject?.id,
       pagination.currentPage,
       pagination.rowsPerPage,
@@ -859,22 +875,30 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   ];
 
   // ── GenericTable actions ──────────────────────────────────────────────────
-  const actions: TableAction[] = isAllow ? [
-    {
-      label: 'Edit Status',
-      icon: <Edit size={16} />,
-      variant: 'link',
-      className: 'text-secondary p-1',
-      onClick: (row: any) => openEditModal(row),
-    },
-    {
-      label: 'Delete Status',
-      icon: <Trash2 size={16} />,
-      variant: 'link',
-      className: 'text-danger p-1',
-      onClick: (row: any) => openDeleteModal(row),
-    },
-  ] : [];
+  const actions: TableAction[] = [
+    ...(canUpdateStatus
+      ? [
+          {
+            label: 'Edit Status',
+            icon: <Edit size={16} />,
+            variant: 'link' as const,
+            className: 'text-secondary p-1',
+            onClick: (row: any) => openEditModal(row),
+          },
+        ]
+      : []),
+    ...(canDeleteStatus
+      ? [
+          {
+            label: 'Delete Status',
+            icon: <Trash2 size={16} />,
+            variant: 'link' as const,
+            className: 'text-danger p-1',
+            onClick: (row: any) => openDeleteModal(row),
+          },
+        ]
+      : []),
+  ];
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -914,7 +938,9 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
                 selectedColumns.includes(c.key),
               )}
               actions={actions}
-              isAllow={isAllow}
+              allowSelection={canDeleteStatus}
+              allowReorder={canReorderStatuses}
+              allowRowActions={canUpdateStatus || canDeleteStatus}
               processing={processing}
               loading={loading}
               selectedItems={selectedItems}

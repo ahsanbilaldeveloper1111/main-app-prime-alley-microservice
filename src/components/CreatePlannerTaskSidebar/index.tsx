@@ -1283,6 +1283,12 @@ function plannerPriorityIdToApiString(priorityId: number | null): string | undef
   return priorityMap[priorityId] || undefined;
 }
 
+function plannerPriorityDisplayName(name: string | null | undefined): string {
+  const raw = String(name ?? "").trim();
+  if (!raw) return "";
+  return raw.toLowerCase() === "normal" ? "Medium" : raw;
+}
+
 function applyPlannerSidebarParentTaskId(
   payload: Record<string, unknown>,
   fd: CreateTaskFormData,
@@ -2579,7 +2585,7 @@ const CreateTaskSidebar: React.FC<CreateTaskSidebarProps> = ({
                   >
                     {priorities.map((priority) => (
                       <option key={priority.id} value={priority.id}>
-                        {priority.name}
+                        {plannerPriorityDisplayName(priority.name)}
                       </option>
                     ))}
                   </Form.Select>

@@ -84,7 +84,10 @@ function humanizeActivityFieldKey(key: string): string {
     .join(" ");
 }
 
-function formatActivityChangeValue(val: unknown): string {
+/** Calendar fields in activity diffs: show date only (no time) in the Changes block. */
+const ACTIVITY_CHANGE_DATE_ONLY_FIELDS = new Set(["due_date", "start_date", "end_date"]);
+
+function formatActivityChangeValue(val: unknown, options?: { dateOnly?: boolean }): string {
   if (val == null || val === "") {
     return "—";
   }
@@ -94,6 +97,13 @@ function formatActivityChangeValue(val: unknown): string {
       try {
         const d = new Date(trimmed);
         if (!Number.isNaN(d.getTime())) {
+          if (options?.dateOnly) {
+            return d.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+          }
           return d.toLocaleString("en-US", {
             month: "short",
             day: "numeric",
@@ -210,7 +220,9 @@ function formatActivityChangeValueForField(
   if (ACTIVITY_CHANGE_HIERARCHY_EXTENSION_FIELDS.has(fieldKey)) {
     return formatExtensionListForActivityChange(val, extensions);
   }
-  return formatActivityChangeValue(val);
+  return formatActivityChangeValue(val, {
+    dateOnly: ACTIVITY_CHANGE_DATE_ONLY_FIELDS.has(fieldKey),
+  });
 }
 
 function normalizeCommentsResponse(commentsResponse: unknown): any[] {

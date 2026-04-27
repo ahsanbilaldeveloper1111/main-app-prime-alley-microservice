@@ -260,26 +260,57 @@ export const routePermissions: RoutePermission[] = [
     //billing services start
     {
         path: '/billing',
-        permissions: [PERMISSIONS.ACCOUNTS_SERVICES],
+        permissions: [PERMISSIONS.CUSTOMER_ACCOUNTS_SERVICES],
 
         children: [
             { path: '/dashboard',permissions: [PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING]},
             { path: '/account-overview',permissions: [PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING]},
             { path: '/account-billing',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
+            { path: '/account-billing/:tab',permissions: [PERMISSIONS.ACCOUNTS_SERVICES]},
             { path: '/subscriptions',permissions: [PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING]},
             { path: '/payment-history',permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING]},
             { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
             { path: '/invoices', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
-            { path: '/invoices/create', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
-            { path: '/invoices/edit/:invoiceId', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
+            { path: '/invoices/create', permissions: [PERMISSIONS.CREATE_INVOICES_BILLING] },
+            { path: '/invoices/edit/:invoiceId', permissions: [PERMISSIONS.UPDATE_INVOICES_BILLING] },
             { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_ORDER_INVOICES_BILLING] },
-            { path: '/create-invoice', permissions: [PERMISSIONS.VIEW_INVOICES_BILLING] },
+            { path: '/create-invoice', permissions: [PERMISSIONS.CREATE_INVOICES_BILLING] },
             { path: '/payments', permissions: [PERMISSIONS.VIEW_BILLING_HISTORY_BILLING] },
+            {
+                path: '/customer',
+                permissions: [PERMISSIONS.CUSTOMER_ACCOUNTS_SERVICES],
+        
+                children: [
+                    { path: '/dashboard',permissions: [PERMISSIONS.VIEW_CUSTOMER_DASHBOARD_BILLING]},
+                    { path: '/account-overview',permissions: [PERMISSIONS.VIEW_CUSTOMER_ACCOUNT_OVERVIEW_BILLING]},
+                    { path: '/products',permissions: [PERMISSIONS.VIEW_CUSTOMER_PRODUCTS_BILLING]},
+                    { path: '/products/create',permissions: [PERMISSIONS.CREATE_CUSTOMER_PRODUCTS_BILLING]},
+                    { path: '/products/edit/:productId',permissions: [PERMISSIONS.UPDATE_CUSTOMER_PRODUCTS_BILLING]},
+                    { path: '/products/delete/:productId',permissions: [PERMISSIONS.DELETE_CUSTOMER_PRODUCTS_BILLING]},
+                    { path: '/quotes',permissions: [PERMISSIONS.VIEW_CUSTOMER_QUOTES_BILLING]},
+                    { path: '/subscriptions',permissions: [PERMISSIONS.VIEW_CUSTOMER_SUBSCRIPTION_BILLING]},
+                    { path: '/subscriptions/create',permissions: [PERMISSIONS.CREATE_CUSTOMER_SUBSCRIPTION_BILLING]},
+                    { path: '/subscriptions/edit/:subscriptionId',permissions: [PERMISSIONS.UPDATE_CUSTOMER_SUBSCRIPTION_BILLING]},
+                    { path: '/subscriptions/delete/:subscriptionId',permissions: [PERMISSIONS.DELETE_CUSTOMER_SUBSCRIPTION_BILLING]},
+                    { path: '/payment-history',permissions: [PERMISSIONS.VIEW_CUSTOMER_BILLING_HISTORY_BILLING]},
+                    { path: '/payment-methods',permissions: [PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING]},
+                    { path: '/invoices', permissions: [PERMISSIONS.VIEW_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/invoices/create', permissions: [PERMISSIONS.CREATE_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/invoices/edit/:invoiceId', permissions: [PERMISSIONS.UPDATE_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/invoices/delete/:invoiceId', permissions: [PERMISSIONS.DELETE_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/order-invoicing', permissions: [PERMISSIONS.VIEW_CUSTOMER_ORDERS_BILLING] },
+                    { path: '/create-invoice', permissions: [PERMISSIONS.CREATE_CUSTOMER_INVOICES_BILLING] },
+                    { path: '/payments', permissions: [PERMISSIONS.VIEW_CUSTOMER_PAYMENTS_BILLING] },
+                    { path: '/transactions', permissions: [PERMISSIONS.VIEW_CUSTOMER_BILLING_HISTORY_BILLING] },
+                   
+                ]
+                
+            }
            
         ]
         
     },
-    //finance services end
+        //finance services end
 
 
     //virtual agents services start

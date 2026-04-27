@@ -680,6 +680,24 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
     setItems((prev) => prev.map((x) => (x.id === lineId ? { ...x, ...patch } : x)));
   }, []);
 
+  /**
+   * Manual amount entry for product lines.
+   * Keeps line subtotal (= quantity * unit_price) equal to the typed amount.
+   */
+  const setLineAmount = useCallback((lineId: string, nextAmount: number) => {
+    const safeAmount = Number.isFinite(nextAmount) ? Math.max(0, nextAmount) : 0;
+    setItems((prev) =>
+      prev.map((line) => {
+        if (line.id !== lineId) return line;
+        const qty = Number(line.quantity);
+        if (!Number.isFinite(qty) || qty <= 0) {
+          return { ...line, quantity: 1, unit_price: safeAmount };
+        }
+        return { ...line, unit_price: safeAmount / qty };
+      }),
+    );
+  }, []);
+
   const handleDueDateChange = useCallback(
     (next: string) => {
       const trimmed = String(next).trim();
@@ -864,6 +882,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
     cloneItem,
     removeItem,
     updateItem,
+    setLineAmount,
     handleDueDateChange,
     handleCreateInvoice,
     router,

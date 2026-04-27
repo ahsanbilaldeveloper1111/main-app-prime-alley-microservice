@@ -85,8 +85,31 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [selectedStatusForTask, setSelectedStatusForTask] = useState<number | null>(null);
   const [embeddedListRefreshSignal, setEmbeddedListRefreshSignal] = useState(0);
+  const [boardSearchTerm, setBoardSearchTerm] = useState('');
+  const [boardSelectedAssignee, setBoardSelectedAssignee] = useState('All Assignees');
+  const [boardSelectedPriority, setBoardSelectedPriority] = useState('All Priorities');
+  const [boardSelectedLabel, setBoardSelectedLabel] = useState('All Labels');
+  const [boardSelectedStatus, setBoardSelectedStatus] = useState('All Statuses');
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
 
   const selectedProjectId = selectedProject?.id;
+  const projectTabsDataOptions = useMemo<UseProjectTabsContentDataOptions>(
+    () => ({
+      ...PROJECT_DETAIL_LIST_TAB_OPTS,
+      boardFilters: {
+        searchTerm: boardSearchTerm,
+        selectedAssignee: boardSelectedAssignee,
+        selectedPriority: boardSelectedPriority,
+        selectedStatus: boardSelectedStatus,
+      },
+    }),
+    [
+      boardSearchTerm,
+      boardSelectedAssignee,
+      boardSelectedPriority,
+      boardSelectedStatus,
+    ],
+  );
   const {
     assignees,
     labels,
@@ -115,14 +138,7 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     handleListClearFilters,
     handleListPaginationChange,
     ingestEmbeddedListSummary,
-  } = useProjectTabsContentData(selectedProjectId, activeTab, PROJECT_DETAIL_LIST_TAB_OPTS);
-
-  const [boardSearchTerm, setBoardSearchTerm] = useState('');
-  const [boardSelectedAssignee, setBoardSelectedAssignee] = useState('All Assignees');
-  const [boardSelectedPriority, setBoardSelectedPriority] = useState('All Priorities');
-  const [boardSelectedLabel, setBoardSelectedLabel] = useState('All Labels');
-  const [boardSelectedStatus, setBoardSelectedStatus] = useState('All Statuses');
-  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
+  } = useProjectTabsContentData(selectedProjectId, activeTab, projectTabsDataOptions);
 
   useEffect(() => {
     if (router.isReady) {
@@ -152,12 +168,13 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     const filtered = filterBoardTasksForColumns(
       boardTasks,
       {
-        searchTerm: boardSearchTerm,
+        // Search/assignee/priority/status are now applied by backend query.
+        searchTerm: '',
         showCompletedTasks,
-        selectedAssignee: boardSelectedAssignee,
-        selectedPriority: boardSelectedPriority,
+        selectedAssignee: 'All Assignees',
+        selectedPriority: 'All Priorities',
         selectedLabel: boardSelectedLabel,
-        selectedStatus: boardSelectedStatus,
+        selectedStatus: 'All Statuses',
       },
       statuses,
     );
@@ -194,8 +211,11 @@ const ProjectTabsContent = forwardRef<ProjectTabsContentRef, ProjectTabsContentP
     const prioritySet = new Set<string>(BOARD_FILTER_STANDARD_PRIORITIES);
     boardTasks.forEach((task: any) => {
       if (task.priority) {
+        const raw = String(task.priority).trim().toLowerCase();
         const label =
-          task.priority.charAt(0).toUpperCase() + task.priority.slice(1).toLowerCase();
+          raw === 'normal'
+            ? 'Medium'
+            : raw.charAt(0).toUpperCase() + raw.slice(1);
         prioritySet.add(label);
       }
     });

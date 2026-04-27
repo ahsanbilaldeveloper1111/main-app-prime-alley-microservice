@@ -68,12 +68,14 @@ import {
   Spinner,
 } from "@crm/orders/orderListBootstrap";
 import Select, { type SingleValue } from "@components/AppSelect";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 type OrdersDeliverySelectOption = { value: string | number; label: string };
 const toOptionalSelectString = (value: string | number | null | undefined) => {
   if (value === null || value === undefined) return null;
   return String(value);
 };
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   Target,
@@ -1439,7 +1441,7 @@ const CrmOrders = () => {
           onClick: (row: any) => handleViewOrder(row.rawData?.id || row.id),
           variant: 'link' as const
         },
-        ...(session?.user?.permissions?.includes('edit-crm-orders') ? [{
+        ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING) ? [{
           label: 'Edit',
           icon: <Edit size={16} />,
           onClick: (row: any) => {
@@ -1458,7 +1460,7 @@ const CrmOrders = () => {
           variant: 'link' as const,
           className: 'text-info'
         },
-        ...(session?.user?.permissions?.includes('delete-crm-orders') ? [{
+        ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_ORDERS_BILLING) ? [{
           label: 'Delete',
           icon: <Trash2 size={16} />,
           onClick: (row: any) => handleDeleteOrder(row.rawData?.id || row.id, row.orderNumber),
@@ -1486,7 +1488,7 @@ const CrmOrders = () => {
     [session, activeFilter, handleViewOrder, handleRestoreOrder, handleDeleteOrder, handleMarkLost, fetchOrderDetails]
   );
 
-  if (!session?.user?.permissions?.includes("list-crm-orders")) {
+  if (!session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
     return null;
   }
 
@@ -2173,7 +2175,7 @@ const CrmOrders = () => {
           }}
           sortable={true}
           onRowClick={async (row) => {
-            if (session?.user?.permissions?.includes('list-crm-orders')) {
+            if (session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
               setSelectedOrder(row.rawData || row);
               setShowOrderSidebar(true);
               // Fetch full order details including related deal and lead
@@ -2664,7 +2666,9 @@ const CrmOrders = () => {
               setShowEditModal(true);
             },
             variant: 'primary',
-            show: session?.user?.permissions?.includes('edit-crm-orders') && activeFilter !== 'lost'
+            show:
+              session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING) &&
+              activeFilter !== 'lost'
           },
           {
             label: 'View Details',
@@ -4635,7 +4639,7 @@ const CrmOrders = () => {
                   Quick Actions
                 </h6>
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {session?.user?.permissions?.includes("edit-crm-orders") && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING) && (
                     <button
                       style={{
                         background: "white",

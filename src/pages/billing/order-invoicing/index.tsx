@@ -104,8 +104,10 @@ import {
   orderApprovalBadgeVariant,
   paymentStatusBadgeVariant,
 } from "@components/billings/order-invoicing";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const ignoredHistoryKeys = new Set<string>(["order_stage_id"]);
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function assignedSelectValue(
   opt: SingleValue<{ value: string | number }>,
@@ -984,7 +986,7 @@ const CrmOrders = () => {
         variant: "link" as const,
       },
 
-      ...(session?.user?.permissions?.includes("edit-crm-orders")
+      ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING)
         ? [
             {
               label: "Edit",
@@ -1009,7 +1011,7 @@ const CrmOrders = () => {
         className: "text-info",
       },
 
-      ...(session?.user?.permissions?.includes("delete-crm-orders")
+      ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_ORDERS_BILLING)
         ? [
             {
               label: "Delete",
@@ -1055,7 +1057,7 @@ const CrmOrders = () => {
     handleMarkLost,
   ]);
 
-  if (!session?.user?.permissions?.includes("list-crm-orders")) {
+  if (!session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
     return null;
   }
 
@@ -1805,7 +1807,7 @@ const CrmOrders = () => {
           }}
           sortable={true}
           onRowClick={async (row) => {
-            if (session?.user?.permissions?.includes("list-crm-orders")) {
+            if (session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
               setShowOrderSidebar(true);
               // Fetch full order details including related deal and lead
               await fetchOrderDetails(row.rawData?.id || row.id);

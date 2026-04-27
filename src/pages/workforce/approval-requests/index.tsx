@@ -55,6 +55,9 @@ import {
   getUserDisplayNameFromLookup,
   type UserRequestIdValue,
 } from "@utils/workforceApprovalRequestsUserLookup";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const TAB_TO_STATUS: Record<string, string> = {
   Pending: "pending",
@@ -1304,16 +1307,17 @@ function ApprovalActionsSection({
   const isApproved = statusDisplay === "approved";
   const canApprove = Boolean(
     isPending &&
-    permissions?.includes("approve-request-approval-request-staff-management") &&
+    permissions?.includes(PERMISSIONS.APPROVE_REQUEST_APPROVAL_REQUEST_STAFF_MANAGEMENT) &&
     approvalInfo?.can_approve
   );
   const canReject = Boolean(
     isPending &&
-    permissions?.includes("reject-request-approval-request-staff-management") &&
+    permissions?.includes(PERMISSIONS.REJECT_REQUEST_APPROVAL_REQUEST_STAFF_MANAGEMENT) &&
     approvalInfo?.can_reject
   );
   const canRequestChanges = Boolean(
-    isPending && permissions?.includes("request-changes-approval-request-staff-management")
+    isPending &&
+    permissions?.includes(PERMISSIONS.REQUEST_CHANGES_APPROVAL_REQUEST_STAFF_MANAGEMENT)
   );
 
   return (
@@ -2198,7 +2202,8 @@ const ApprovalRequest = () => {
         selectedRequestedByUserId);
   const dateOptions = ["Today", "Last 7 days", "Last 30 days", "All time"];
   const totalRequests = requestsPagination?.total ?? 0;
-  const canCreateRequest = session?.user?.permissions?.includes("add-approval-request-staff-management") ?? false;
+  const canCreateRequest =
+    session?.user?.permissions?.includes(PERMISSIONS.ADD_APPROVAL_REQUEST_STAFF_MANAGEMENT) ?? false;
 
   const handleRunSearch = useCallback(() => {
     setCurrentPage(1);
@@ -2424,7 +2429,10 @@ const ApprovalRequest = () => {
                 label: "Edit",
                 icon: Pencil,
                 onClick: () => openEditModal(selectedRequest),
-                disabled: !session?.user?.permissions?.includes("update-approval-request-staff-management"),
+                disabled:
+                  !session?.user?.permissions?.includes(
+                    PERMISSIONS.UPDATE_APPROVAL_REQUEST_STAFF_MANAGEMENT,
+                  ),
               },
               {
                 id: "delete-request",
@@ -2436,7 +2444,9 @@ const ApprovalRequest = () => {
                   closeSidebar();
                 },
                 disabled:
-                  !session?.user?.permissions?.includes("delete-approval-request-staff-management") || deleting,
+                  !session?.user?.permissions?.includes(
+                    PERMISSIONS.DELETE_APPROVAL_REQUEST_STAFF_MANAGEMENT,
+                  ) || deleting,
               },
             ]}
             sections={approvalSidebarSections}

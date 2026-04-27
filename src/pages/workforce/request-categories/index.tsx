@@ -33,9 +33,11 @@ import Select from "@components/AppSelect";
 import GenericTable from "@components/GenericTable";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 /** Permission key duplicated in UI checks — single source avoids typos (Sonar S1192). */
-const MANAGE_REQUEST_CATEGORIES_PERMISSION = "manage-request-categories-staff-management";
+const MANAGE_REQUEST_CATEGORIES_PERMISSION =
+  HEADER_CONSTANTS.PERMISSIONS.MANAGE_REQUEST_CATEGORIES_STAFF_MANAGEMENT;
 
 type FieldConditionOp = "eq" | "neq" | "in" | "contains";
 

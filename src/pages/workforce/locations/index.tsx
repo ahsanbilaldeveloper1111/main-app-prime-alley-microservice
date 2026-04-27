@@ -17,11 +17,13 @@ import {
 import { toast } from "react-toastify";
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
 import { ChevronLeft, ChevronRight, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 const ITEMS_PER_PAGE = 15;
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const emptyForm: Partial<LocationPayload> = {
   name: "",
@@ -224,7 +226,7 @@ const Locations = () => {
           )}
         </div>
 
-        {session?.user?.permissions?.includes('add-location-staff-management') && (
+        {session?.user?.permissions?.includes(PERMISSIONS.ADD_LOCATION_STAFF_MANAGEMENT) && (
         <Button
           variant="primary"
           size="sm"
@@ -328,7 +330,7 @@ const Locations = () => {
                     <td style={{ padding: "16px", textAlign: "center" }}>
                       <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                        
-                        {session?.user?.permissions?.includes('update-location-staff-management') && (
+                        {session?.user?.permissions?.includes(PERMISSIONS.UPDATE_LOCATION_STAFF_MANAGEMENT) && (
                         <button
                           type="button"
                           onClick={() => openEditModal(loc)}
@@ -357,7 +359,7 @@ const Locations = () => {
                           <Pencil size={18} />
                         </button>
                         )}
-                        {session?.user?.permissions?.includes('delete-location-staff-management') && (
+                        {session?.user?.permissions?.includes(PERMISSIONS.DELETE_LOCATION_STAFF_MANAGEMENT) && (
                         
                         <button
                           type="button"
