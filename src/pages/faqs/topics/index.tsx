@@ -340,18 +340,13 @@ const FAQTopics = () => {
     const [moduleOptions, setModuleOptions] = useState<{ value: any; label: string }[]>([]);
     const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
 
-    // Create state
-    const [showCreateSidebar, setShowCreateSidebar] = useState<boolean>(false);
-    const [newTopicName, setNewTopicName] = useState<string>('');
-    const [newTopicDescription, setNewTopicDescription] = useState<string>('');
-    const [newTopicModuleId, setNewTopicModuleId] = useState<string>('');
-
-    // Edit state
-    const [showEditSidebar, setShowEditSidebar] = useState<boolean>(false);
-    const [selectedTopic, setSelectedTopic] = useState<any>(null);
-    const [selectedTopicName, setSelectedTopicName] = useState<string>('');
-    const [selectedTopicDescription, setSelectedTopicDescription] = useState<string>('');
-    const [selectedTopicModuleId, setSelectedTopicModuleId] = useState<string>('');
+    // Unified sidebar state
+    const [showSidebar, setShowSidebar] = useState<boolean>(false);
+    const [sidebarMode, setSidebarMode] = useState<'create' | 'edit' | null>(null);
+    const [topicName, setTopicName] = useState<string>('');
+    const [topicDescription, setTopicDescription] = useState<string>('');
+    const [topicModuleId, setTopicModuleId] = useState<string>('');
+    const [selectedTopicId, setSelectedTopicId] = useState<any>(null);
 
     // Delete state
     const [showDeleteTopicModal, setShowDeleteTopicModal] = useState<boolean>(false);
@@ -379,86 +374,74 @@ const FAQTopics = () => {
     }, [moduleOptions.length]);
 
     useEffect(() => {
-        if (showCreateSidebar || showEditSidebar) {
+        if (showSidebar) {
             fetchModuleOptions();
         }
-    }, [showCreateSidebar, showEditSidebar, fetchModuleOptions]);
+    }, [showSidebar, fetchModuleOptions]);
 
-    // ---- Create handlers ----
-    const openCreateSidebar = useCallback(() => setShowCreateSidebar(true), []);
-
-    const closeCreateSidebar = useCallback(() => {
-        setShowCreateSidebar(false);
-        setNewTopicName('');
-        setNewTopicDescription('');
-        setNewTopicModuleId('');
+    // ---- Unified sidebar handlers ----
+    const openCreateSidebar = useCallback(() => {
+        setSidebarMode('create');
+        setTopicName('');
+        setTopicDescription('');
+        setTopicModuleId('');
+        setSelectedTopicId(null);
+        setShowSidebar(true);
     }, []);
 
-    const handleSubmitCreateTopic = useCallback(async () => {
-        if (!newTopicModuleId || !newTopicName) return;
-        const response = await createFAQTopic(Number.parseInt(newTopicModuleId, 10), newTopicName, newTopicDescription);
+    const openEditSidebar = useCallback((props: any) => {
+        setSidebarMode('edit');
+        setSelectedTopicId(props.id);
+        setTopicName(props.name);
+        setTopicDescription(props.description || '');
+        setTopicModuleId(props.faq_module_id?.toString() || '');
+        setShowSidebar(true);
+    }, []);
+
+    const closeSidebar = useCallback(() => {
+        setShowSidebar(false);
+        setSidebarMode(null);
+        setTopicName('');
+        setTopicDescription('');
+        setTopicModuleId('');
+        setSelectedTopicId(null);
+    }, []);
+
+    const handleSubmitTopic = useCallback(async () => {
+        if (!topicModuleId || !topicName) return;
+        let response;
+        if (sidebarMode === 'create') {
+            response = await createFAQTopic(Number.parseInt(topicModuleId, 10), topicName, topicDescription);
+        } else if (sidebarMode === 'edit') {
+            response = await updateFAQTopic(selectedTopicId, Number.parseInt(topicModuleId, 10), topicName, topicDescription);
+        }
         if (response) {
-            closeCreateSidebar();
+            closeSidebar();
             triggerRefresh();
         }
-    }, [newTopicModuleId, newTopicName, newTopicDescription, closeCreateSidebar, triggerRefresh]);
+    }, [sidebarMode, topicModuleId, topicName, topicDescription, selectedTopicId, closeSidebar, triggerRefresh]);
 
-    const handleNewTopicNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setNewTopicName(e.target.value), []);
-    const handleNewTopicDescChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setNewTopicDescription(e.target.value), []);
-    const handleNewTopicModuleChange = useCallback((value: string) => setNewTopicModuleId(value), []);
-
-    // ---- Edit handlers ----
-    const handleEditTopic = useCallback((props: any) => {
-        setSelectedTopic(props.id);
-        setSelectedTopicName(props.name);
-        setSelectedTopicDescription(props.description || '');
-        setSelectedTopicModuleId(props.faq_module_id?.toString() || '');
-        setShowEditSidebar(true);
-    }, []);
-
-    const closeEditSidebar = useCallback(() => {
-        setShowEditSidebar(false);
-        setSelectedTopic(null);
-        setSelectedTopicName('');
-        setSelectedTopicDescription('');
-        setSelectedTopicModuleId('');
-    }, []);
-
-    const handleSubmitEditTopic = useCallback(async () => {
-        if (!selectedTopicModuleId || !selectedTopicName) return;
-        const response = await updateFAQTopic(
-            selectedTopic,
-            Number.parseInt(selectedTopicModuleId, 10),
-            selectedTopicName,
-            selectedTopicDescription,
-        );
-        if (response) {
-            closeEditSidebar();
-            triggerRefresh();
-        }
-    }, [selectedTopic, selectedTopicModuleId, selectedTopicName, selectedTopicDescription, closeEditSidebar, triggerRefresh]);
-
-    const handleEditTopicNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setSelectedTopicName(e.target.value), []);
-    const handleEditTopicDescChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setSelectedTopicDescription(e.target.value), []);
-    const handleEditTopicModuleChange = useCallback((value: string) => setSelectedTopicModuleId(value), []);
+    const handleTopicNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setTopicName(e.target.value), []);
+    const handleTopicDescChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setTopicDescription(e.target.value), []);
+    const handleTopicModuleChange = useCallback((value: string) => setTopicModuleId(value), []);
 
     // ---- Delete handlers ----
     const handleDeleteTopic = useCallback((props: any) => {
-        setSelectedTopic(props.id);
+        setSelectedTopicId(props.id);
         setDeleteTopicName(props.name);
         setShowDeleteTopicModal(true);
     }, []);
 
     const closeDeleteModal = useCallback(() => {
         setShowDeleteTopicModal(false);
-        setSelectedTopic(null);
+        setSelectedTopicId(null);
         setDeleteTopicName('');
     }, []);
 
     const handleSubmitDeleteTopic = useCallback(async () => {
-        const response = await deleteFAQTopic(selectedTopic);
+        const response = await deleteFAQTopic(selectedTopicId);
         if (response) {
-            setSelectedTopic(null);
+            setSelectedTopicId(null);
             setDeleteTopicName('');
             setShowDeleteTopicModal(false);
             setSuccessModalTitle('FAQ Topic Deleted');
@@ -466,7 +449,7 @@ const FAQTopics = () => {
             setTimeout(() => setShowSuccessfulModal(true), 100);
             triggerRefresh();
         }
-    }, [selectedTopic, triggerRefresh]);
+    }, [selectedTopicId, triggerRefresh]);
 
     const closeSuccessModal = useCallback(() => setShowSuccessfulModal(false), []);
 
@@ -479,8 +462,8 @@ const FAQTopics = () => {
 
     // ---- Columns ----
     const ActionCell = useMemo(
-        () => buildTopicActionCell(handleEditTopic, handleDeleteTopic),
-        [handleEditTopic, handleDeleteTopic],
+        () => buildTopicActionCell(openEditSidebar, handleDeleteTopic),
+        [openEditSidebar, handleDeleteTopic],
     );
 
     const columns: Column[] = useMemo(() => [
@@ -516,36 +499,20 @@ const FAQTopics = () => {
                 tableStyle="table-style-2"
             />
 
-            {/* Create Topic Sidebar */}
+            {/* Topic Sidebar */}
             <FAQTopicSidebar
-                isOpen={showCreateSidebar}
-                config={CREATE_TOPIC_CONFIG}
-                name={newTopicName}
-                description={newTopicDescription}
-                moduleId={newTopicModuleId}
+                isOpen={showSidebar}
+                config={sidebarMode === 'create' ? CREATE_TOPIC_CONFIG : EDIT_TOPIC_CONFIG}
+                name={topicName}
+                description={topicDescription}
+                moduleId={topicModuleId}
                 moduleOptions={moduleOptions}
                 isLoadingModules={isLoadingModules}
-                onNameChange={handleNewTopicNameChange}
-                onDescriptionChange={handleNewTopicDescChange}
-                onModuleChange={handleNewTopicModuleChange}
-                onSubmit={handleSubmitCreateTopic}
-                onClose={closeCreateSidebar}
-            />
-
-            {/* Edit Topic Sidebar */}
-            <FAQTopicSidebar
-                isOpen={showEditSidebar}
-                config={EDIT_TOPIC_CONFIG}
-                name={selectedTopicName}
-                description={selectedTopicDescription}
-                moduleId={selectedTopicModuleId}
-                moduleOptions={moduleOptions}
-                isLoadingModules={isLoadingModules}
-                onNameChange={handleEditTopicNameChange}
-                onDescriptionChange={handleEditTopicDescChange}
-                onModuleChange={handleEditTopicModuleChange}
-                onSubmit={handleSubmitEditTopic}
-                onClose={closeEditSidebar}
+                onNameChange={handleTopicNameChange}
+                onDescriptionChange={handleTopicDescChange}
+                onModuleChange={handleTopicModuleChange}
+                onSubmit={handleSubmitTopic}
+                onClose={closeSidebar}
             />
 
             {/* Delete Topic Modal */}
