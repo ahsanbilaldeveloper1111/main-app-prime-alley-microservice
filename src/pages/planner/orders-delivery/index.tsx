@@ -325,11 +325,107 @@ function syncActiveTabFromRouter(params: {
   setActiveFilter: React.Dispatch<React.SetStateAction<string>>;
 }): void {
   if (!params.routerReady || !params.routerTab) return;
-  const tabFromUrl = String(params.routerTab);
+  const tabFromUrl =
+    typeof params.routerTab === "string"
+      ? params.routerTab
+      : Array.isArray(params.routerTab)
+      ? params.routerTab[0]
+      : "";
+  if (!tabFromUrl) return;
   const isValidFilter = isValidActiveFilterTab(tabFromUrl, params.stages);
   if (isValidFilter && tabFromUrl !== params.activeFilter) {
     params.setActiveFilter(tabFromUrl);
   }
+}
+
+function getOrderRowId(row: any): number {
+  return Number(row?.rawData?.id || row?.id || 0);
+}
+
+function buildOrdersActions(params: {
+  activeFilter: string;
+  canEdit: boolean;
+  canDelete: boolean;
+  onViewOrder: (orderId: number) => void;
+  onRestoreOrder: (orderId: number) => void;
+  onEditOrder: (row: any) => void;
+  onOpenAttachments: (row: any) => void;
+  onDeleteOrder: (orderId: number, orderNumber?: string) => void;
+  onMarkLost: (row: any) => void;
+}): TableAction<any>[] {
+  if (params.activeFilter === "deleted") {
+    return [
+      {
+        label: "View",
+        icon: <Eye size={16} />,
+        onClick: (row: any) => params.onViewOrder(getOrderRowId(row)),
+        variant: "link",
+      },
+      {
+        label: "Restore",
+        icon: <RotateCcw size={16} />,
+        onClick: (row: any) => params.onRestoreOrder(getOrderRowId(row)),
+        variant: "link",
+        className: "text-success",
+      },
+    ];
+  }
+
+  const actions: TableAction<any>[] = [
+    {
+      label: "View",
+      icon: <Eye size={16} />,
+      onClick: (row: any) => params.onViewOrder(getOrderRowId(row)),
+      variant: "link",
+    },
+    {
+      label: "Attachments",
+      icon: <Paperclip size={16} />,
+      onClick: (row: any) => params.onOpenAttachments(row),
+      variant: "link",
+      className: "text-info",
+    },
+  ];
+
+  if (params.canEdit) {
+    actions.splice(1, 0, {
+      label: "Edit",
+      icon: <Edit size={16} />,
+      onClick: (row: any) => params.onEditOrder(row),
+      variant: "link",
+    });
+  }
+
+  if (params.canDelete) {
+    actions.push({
+      label: "Delete",
+      icon: <Trash2 size={16} />,
+      onClick: (row: any) => params.onDeleteOrder(getOrderRowId(row), row.orderNumber),
+      variant: "link",
+      className: "text-danger",
+    });
+  }
+
+  if (params.activeFilter !== "lost") {
+    actions.push({
+      label: "More Actions",
+      icon: <MoreVertical size={16} />,
+      variant: "link",
+      dropdown: {
+        align: "end",
+        options: [
+          {
+            label: "Mark as Lost",
+            icon: <X size={14} />,
+            onClick: (row: any) => params.onMarkLost(row.rawData || row),
+            className: "text-danger",
+          },
+        ],
+      },
+    });
+  }
+
+  return actions;
 }
 
 async function fetchAttachmentsBundle(selectedOrder: any): Promise<{
@@ -1399,77 +1495,33 @@ const CrmOrders = () => {
 
   // Define actions for GenericTable
   const ordersActions: TableAction<any>[] = useMemo(
-    () => {
-      if (activeFilter === 'deleted') {
-        return [
-          {
-            label: 'View',
-            icon: <Eye size={16} />,
-            onClick: (row: any) => handleViewOrder(row.rawData?.id || row.id),
-            variant: 'link' as const
-          },
-          {
-            label: 'Restore',
-            icon: <RotateCcw size={16} />,
-            onClick: (row: any) => handleRestoreOrder(row.rawData?.id || row.id),
-            variant: 'link' as const,
-            className: 'text-success'
-          }
-        ];
-      }
-
-      return [
-        {
-          label: 'View',
-          icon: <Eye size={16} />,
-          onClick: (row: any) => handleViewOrder(row.rawData?.id || row.id),
-          variant: 'link' as const
+    () =>
+      buildOrdersActions({
+        activeFilter,
+        canEdit: Boolean(
+          session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING),
+        ),
+        canDelete: Boolean(
+          session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_ORDERS_BILLING),
+        ),
+        onViewOrder: (orderId) => {
+          void handleViewOrder(orderId);
         },
-        ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING) ? [{
-          label: 'Edit',
-          icon: <Edit size={16} />,
-          onClick: (row: any) => {
-            setEditingOrderId(row.rawData?.id || row.id);
-            setShowEditModal(true);
-          },
-          variant: 'link' as const
-        }] : []),
-        {
-          label: 'Attachments',
-          icon: <Paperclip size={16} />,
-          onClick: (row: any) => {
-            setSelectedOrderForAttachments(row.rawData || row);
-            setShowAttachmentModal(true);
-          },
-          variant: 'link' as const,
-          className: 'text-info'
+        onRestoreOrder: (orderId) => {
+          void handleRestoreOrder(orderId);
         },
-        ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_ORDERS_BILLING) ? [{
-          label: 'Delete',
-          icon: <Trash2 size={16} />,
-          onClick: (row: any) => handleDeleteOrder(row.rawData?.id || row.id, row.orderNumber),
-          variant: 'link' as const,
-          className: 'text-danger'
-        }] : []),
-        ...(activeFilter !== 'lost' ? [{
-          label: 'More Actions',
-          icon: <MoreVertical size={16} />,
-          variant: 'link' as const,
-          dropdown: {
-            align: 'end' as const,
-            options: [
-              {
-                label: 'Mark as Lost',
-                icon: <X size={14} />,
-                onClick: (row: any) => handleMarkLost(row.rawData || row),
-                className: 'text-danger'
-              }
-            ]
-          }
-        }] : [])
-      ];
-    },
-    [session, activeFilter, handleViewOrder, handleRestoreOrder, handleDeleteOrder, handleMarkLost, fetchOrderDetails]
+        onEditOrder: (row) => {
+          setEditingOrderId(getOrderRowId(row));
+          setShowEditModal(true);
+        },
+        onOpenAttachments: (row) => {
+          setSelectedOrderForAttachments(row.rawData || row);
+          setShowAttachmentModal(true);
+        },
+        onDeleteOrder: handleDeleteOrder,
+        onMarkLost: handleMarkLost,
+      }),
+    [activeFilter, session, handleViewOrder, handleRestoreOrder, handleDeleteOrder, handleMarkLost],
   );
 
   if (!session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
