@@ -1770,14 +1770,14 @@ font-weight:600;
                           )}
                           
                           {session?.user?.permissions?.some((permission) =>
-                            [
+                            ([
                               PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING,
                               PERMISSIONS.VIEW_BILLING_HISTORY_BILLING,
                               PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING,
                               PERMISSIONS.VIEW_INVOICES_BILLING,
                        
                               PERMISSIONS.VIEW_ORDER_INVOICES_BILLING
-                            ].includes(permission as any)
+                            ] as string[]).includes(permission)
                           ) && (
                      
                         <button type="button" className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>

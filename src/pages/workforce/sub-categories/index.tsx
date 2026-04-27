@@ -501,20 +501,26 @@ const RequestSubCategories = () => {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
-                      Loading…
-                    </td>
-                  </tr>
-                ) : categories.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
-                      No request categories yet. Create one to get started.
-                    </td>
-                  </tr>
-                ) : (
-                  categories.map((cat, index) => (
+                {(() => {
+                  if (loading) {
+                    return (
+                      <tr>
+                        <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
+                          Loading…
+                        </td>
+                      </tr>
+                    );
+                  }
+                  if (categories.length === 0) {
+                    return (
+                      <tr>
+                        <td colSpan={5} style={{ padding: "24px", fontSize: "14px", color: "#6b7280" }}>
+                          No request categories yet. Create one to get started.
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return categories.map((cat, index) => (
                     <tr
                       key={cat.id}
                       style={{
@@ -616,8 +622,8 @@ const RequestSubCategories = () => {
                         )}
                       </td>
                     </tr>
-                  ))
-                )}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

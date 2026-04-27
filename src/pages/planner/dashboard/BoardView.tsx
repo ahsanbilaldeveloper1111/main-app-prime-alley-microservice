@@ -856,10 +856,9 @@ const BoardView: React.FC<BoardViewProps> = ({
           >
             <span
               className="spinner-border spinner-border-sm"
-              role="status"
               aria-hidden="true"
             />
-            Updating tasks...
+            {" "}Updating tasks...
           </div>
         ) : null}
       </div>
