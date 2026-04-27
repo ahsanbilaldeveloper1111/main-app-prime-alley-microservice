@@ -61,6 +61,8 @@ import {
   formatDateForTable,
   formatCrmPreviewDate,
 } from "@utils/Helper";
+import { buildCrmOrderGridRowFromApiOrder } from "@utils/crmOrdersGridRowFromApiOrder";
+import { computeCrmOrdersAnalyticsFromGridRows } from "@utils/crmOrdersGridAnalyticsFromRows";
 import {
   Target,
   CheckCircle,
@@ -1338,119 +1340,30 @@ const CrmOrders = () => { // NOSONAR
 
   // Transform API order data to UI format
   const transformOrderData = (order: any) => {
-    return {
-      id: order.id,
-      orderNumber: order.order_number || "",
-      customer: order.customer_name || "",
-      customerEmail: order.customer_email || "",
-      customerPhone: order.customer_phone || "",
-      deal: order.deal?.name || order.deal_id || "",
-      dealId: order.deal_id || null,
-      stage: order.stage?.name || "No Stage",
-      stageColor: order.stage?.color || "grey",
-      stageId: order.order_stage_id || null,
-      value: order.final_amount || order.total_amount || "0",
-      currency: order.currency || "AED",
-      approvalStatus: order.order_approval_status || null,
-      fulfillmentStatus: order.fulfillment_status || null,
-      paymentStatus: order.payment_status || null,
-      //orderDate: formatDateForTable(order.order_date),
-      orderDate: order.order_date
-        ? moment(order.order_date).format(GlobalDateFormat)
-        : "-",
-      assignedUser:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.name ||
-        order.assigned_to ||
-        "",
-      expectedDeliveryDate: formatDateForTable(order.expected_delivery_date),
-      actualDeliveryDate: formatDateForTable(order.actual_delivery_date),
-      owner:
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.display_name ||
-        extensions.find(
-          (ext: any) =>
-            ext?.id == order?.assigned_to ||
-            ext?.extension == order?.assigned_to,
-        )?.name ||
-        order.assigned_to ||
-        "",
-      created: formatDateForTable(order.created_at),
-      contractType: order.contract_type || "",
-      contractLength: order.contract_length || "",
-      contractStartDate: formatDateForTable(order.contract_start_date),
-      contractEndDate: formatDateForTable(order.contract_end_date),
-      billingModel: order.billing_model || "",
-      billingStatus: order.billing_status || "",
-      paymentTerms: order.payment_terms || "",
-      progressDial: order.progress_dial || 0,
-      pocName: order.poc_name || order.customer_name || "",
-      pocTitle: order.poc_title || "",
-      pocPhone: order.poc_phone || "",
-      company: order.company || order.deal?.company_name || "",
-      industry: order.industry || order.deal?.industry || "",
-      status: order.status || "pending",
-      rawData: order, // Keep original data for actions
-    };
+    const assignedLabel =
+      extensions.find(
+        (ext: any) =>
+          ext?.id == order?.assigned_to ||
+          ext?.extension == order?.assigned_to,
+      )?.display_name ||
+      extensions.find(
+        (ext: any) =>
+          ext?.id == order?.assigned_to ||
+          ext?.extension == order?.assigned_to,
+      )?.name ||
+      order.assigned_to ||
+      "";
+    return buildCrmOrderGridRowFromApiOrder(order, assignedLabel) as any;
   };
 
   // Calculate analytics data
   const analyticsData = useMemo(() => {
     const transformedOrders = ordersData.map(transformOrderData);
-
-    const total = summaryTiles ? totalOrders : transformedOrders.length;
-    const delivered = transformedOrders.filter(
-      (o) =>
-        o.fulfillmentStatus?.toLowerCase().includes("completed") ||
-        o.fulfillmentStatus?.toLowerCase().includes("delivered"),
-    ).length;
-    const inProgress = transformedOrders.filter((o) =>
-      o.fulfillmentStatus?.toLowerCase().includes("progress"),
-    ).length;
-    const pendingApproval = transformedOrders.filter((o) =>
-      o.approvalStatus?.toLowerCase().includes("pending"),
-    ).length;
-
-    // Calculate total value
-    const totalValue = transformedOrders.reduce((sum, o) => {
-      const value = parseFloat(String(o.value).replace(/[^0-9.-]/g, "")) || 0;
-      return sum + value;
-    }, 0);
-
-    // Stage distribution
-    const stageCounts: Record<string, number> = {};
-    transformedOrders.forEach((o) => {
-      const stage = o.stage || "No Stage";
-      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
-    });
-
-    // Status distribution
-    const statusCounts: Record<string, number> = {};
-    transformedOrders.forEach((o) => {
-      const status = o.fulfillmentStatus || "pending";
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-    });
-
-    return {
-      total,
-      delivered,
-      inProgress,
-      pendingApproval,
-      totalValue,
-      stageCounts,
-      statusCounts,
-    };
+    return computeCrmOrdersAnalyticsFromGridRows(
+      transformedOrders,
+      summaryTiles,
+      totalOrders,
+    );
   }, [ordersData, extensions, summaryTiles, totalOrders]);
 
   // Transform orders data (no client-side filtering - API handles it)

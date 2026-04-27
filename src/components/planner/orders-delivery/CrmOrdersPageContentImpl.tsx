@@ -14,16 +14,14 @@ import {
   Button,
   Row,
   Col,
-  Badge,
   Form,
   Card,
 } from "@crm/orders/orderListBootstrap";
 import Select, { type SingleValue } from "@components/AppSelect";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { ModuleSlug } from "@utils/Helper";
 import {
   CheckCircle,
-  Eye,
-  Edit,
   Trash2,
   ShoppingBag,
   X,
@@ -31,10 +29,9 @@ import {
   DollarSign,
   Activity,
   ShoppingCart,
-  Paperclip,
-  RotateCcw,
 } from "@crm/orders/orderListLucideHeavy";
 import { toast } from "react-toastify";
+
 import {
   SuccessfulModal,
   FormModal,
@@ -51,6 +48,11 @@ import {
   CrmOrdersFulfillmentBarChart,
   CrmOrdersStagePieChart,
 } from "./CrmOrdersAnalyticsCharts";
+import {
+  PLANNER_CRM_ORDERS_TABLE_COLUMNS,
+  plannerBuildOrdersRowActions,
+  plannerGetOrderRowNumericId,
+} from "./plannerOrdersList/crmOrdersPlannerListTable";
 import {
   DEFAULT_ORDERS_UI_FILTERS,
   type OrdersDeliverySelectOption,
@@ -70,11 +72,7 @@ import {
   plannerComputeOrdersTabCounts,
   plannerTransformOrderRowForGrid,
 } from "./plannerOrdersList/crmOrdersPlannerListRowModel";
-import {
-  PLANNER_CRM_ORDERS_TABLE_COLUMNS,
-  plannerBuildOrdersRowActions,
-  plannerGetOrderRowNumericId,
-} from "./plannerOrdersList/crmOrdersPlannerListTable";
+import { useCrmOrdersPlannerLifecycleEffects } from "./plannerOrdersList/crmOrdersPlannerListLifecycle";
 import {
   plannerExecuteAttachmentDelete,
   plannerExecuteAttachmentLoad,
@@ -87,8 +85,6 @@ import {
   plannerExecuteOrdersListFetch,
   plannerExecuteRestoreOrder,
 } from "./plannerOrdersList/crmOrdersPlannerListCommands";
-import { useCrmOrdersPlannerLifecycleEffects } from "./plannerOrdersList/crmOrdersPlannerListLifecycle";
-import { ModuleSlug } from "@utils/Helper";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -175,7 +171,7 @@ export const CrmOrdersPageContentImpl = () => {
       await plannerExecuteOrdersListFetch(
         page,
         perPage,
-        currentFilters,
+        currentFilters as Record<string, unknown>,
         {
           sortBy: ordersPagination.sortBy,
           sortOrder: ordersPagination.sortOrder,
@@ -290,7 +286,9 @@ export const CrmOrdersPageContentImpl = () => {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) => mergePlannerOrdersSidebarFilters(prev, filters));
+    setCurrentFilters((prev) =>
+      mergePlannerOrdersSidebarFilters(prev, filters) as Record<string, any>,
+    );
     setRefreshKey((prev) => prev + 1);
   }, []);
 
@@ -410,7 +408,7 @@ export const CrmOrdersPageContentImpl = () => {
   // Transform orders data (no client-side filtering - API handles it)
   const filteredOrders = useMemo(() => {
     return ordersData.map(transformOrderData);
-  }, [ordersData, extensions]);
+  }, [ordersData, transformOrderData]);
 
   // Calculate filter counts (using summary_tiles if available, otherwise from data)
   const filterCounts = useMemo(
