@@ -161,7 +161,12 @@ function resolveExtensionDisplayName(extensions: any[], assignedTo: unknown): st
   const extensionMatch = extensions.find(
     (ext: any) => ext?.id == assignedTo || ext?.extension == assignedTo,
   );
-  return extensionMatch?.display_name || extensionMatch?.name || String(assignedTo || "");
+  if (extensionMatch?.display_name) return extensionMatch.display_name;
+  if (extensionMatch?.name) return extensionMatch.name;
+  if (typeof assignedTo === "string" || typeof assignedTo === "number") {
+    return String(assignedTo);
+  }
+  return "";
 }
 
 function transformOrderDataForTable(order: any, extensions: any[]) {
@@ -228,7 +233,8 @@ function computeOrdersAnalyticsData(
     o.approvalStatus?.toLowerCase().includes("pending"),
   ).length;
   const totalValue = transformedOrders.reduce((sum, o) => {
-    const value = parseFloat(String(o.value).replace(/[^0-9.-]/g, "")) || 0;
+    const value =
+      Number.parseFloat(String(o.value).replaceAll(/[^0-9.-]/g, "")) || 0;
     return sum + value;
   }, 0);
   const stageCounts: Record<string, number> = {};
@@ -1327,7 +1333,7 @@ const CrmOrders = () => {
         type: 'custom',
         render: (row) => (
           <span className="fw-semibold">
-            {row.currency} {parseFloat(String(row.value)).toLocaleString()}
+            {row.currency} {Number.parseFloat(String(row.value)).toLocaleString()}
           </span>
         )
       },
@@ -2285,7 +2291,7 @@ const CrmOrders = () => {
                   {
                     label: 'Final Amount',
                     value: viewingOrder?.final_amount || viewingOrder?.total_amount
-                      ? `${viewingOrder?.currency || 'AED'} ${parseFloat(String(viewingOrder.final_amount || viewingOrder.total_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      ? `${viewingOrder?.currency || 'AED'} ${Number.parseFloat(String(viewingOrder.final_amount || viewingOrder.total_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                       : 'N/A',
                     type: 'text' as const,
                     icon: DollarSign
@@ -2372,7 +2378,7 @@ const CrmOrders = () => {
                   {
                     label: 'Deal Value',
                     value: relatedDeal?.net_value || relatedDeal?.grand_total
-                      ? `${relatedDeal?.currency || 'AED'} ${parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total)).toLocaleString()}`
+                      ? `${relatedDeal?.currency || 'AED'} ${Number.parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total)).toLocaleString()}`
                       : 'N/A',
                     type: 'text' as const,
                     icon: DollarSign,
