@@ -1,8 +1,16 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, {
+  ReactElement,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
+import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import {
   getBots,
   getBot,
@@ -25,16 +33,29 @@ import {
   Modal,
   Form,
   Spinner,
-  Nav,
-  Tab,
   Accordion,
 } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useRouter } from "next/router";
-import { Plus, Pencil, Trash2, Send, Undo2, Eye, History } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Send,
+  Undo2,
+  Eye,
+  History,
+  Info,
+  Settings,
+  Mic,
+  Cpu,
+  SlidersHorizontal,
+  Phone,
+} from "lucide-react";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import "@assets/scss/common.scss";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 interface CompanyOption {
   id: string;
@@ -151,10 +172,16 @@ function getListFromResponse(res: unknown): unknown[] {
 function getCompanyOptions(list: unknown[]): CompanyOption[] {
   return list.map((c) => {
     const item = c as Record<string, unknown>;
+    const identifierVal = item.company_identifier ?? item.identifier;
     const idVal = item.id ?? item.company_id;
-    let idStr = "";
-    if (typeof idVal === "string") idStr = idVal;
-    else if (typeof idVal === "number") idStr = String(idVal);
+    let primary = "";
+    if (typeof identifierVal === "string") primary = identifierVal.trim();
+    else if (typeof identifierVal === "number")
+      primary = String(identifierVal).trim();
+    let fallback = "";
+    if (typeof idVal === "string") fallback = idVal;
+    else if (typeof idVal === "number") fallback = String(idVal);
+    const idStr = primary || fallback;
     const option: CompanyOption = {
       id: idStr,
       name: typeof item.name === "string" ? item.name : "",
@@ -168,7 +195,11 @@ function removeIdFromList(prev: string[], idToRemove: string): string[] {
   return prev.filter((id) => id !== idToRemove);
 }
 
-function toggleTabDraftSelection(prev: string[], tabId: string, isChecked: boolean): string[] {
+function toggleTabDraftSelection(
+  prev: string[],
+  tabId: string,
+  isChecked: boolean,
+): string[] {
   if (isChecked) {
     return prev.includes(tabId) ? prev : [...prev, tabId];
   }
@@ -344,6 +375,8 @@ const getBotId = (row: BotRow) => row.id ?? "";
 
 interface BotTableActionsProps {
   row: BotRow;
+  canEdit: boolean;
+  canDelete: boolean;
   onView: (id: string) => void;
   onEdit: (id: string) => void;
   onPublish: (id: string) => void;
@@ -356,242 +389,37 @@ function isConfigObject(config: unknown): config is Record<string, unknown> {
   return config != null && typeof config === "object";
 }
 
-interface BotViewModalBodyProps {
-  viewLoading: boolean;
-  viewBot: Record<string, unknown> | null;
-  viewActiveTab: string;
-  onTabChange: (key: string) => void;
+function getConfigValue(
+  source: Record<string, unknown> | null,
+  key: string,
+  nestedKey?: string,
+): string {
+  const isPresentPrimitive = (
+    value: unknown,
+  ): value is string | number | boolean =>
+    (typeof value === "string" && value.trim() !== "") ||
+    typeof value === "number" ||
+    typeof value === "boolean";
+
+  if (!source) return "—";
+  const config = source.configuration;
+  if (!isConfigObject(config)) return "—";
+  const direct = config[key];
+  if (isPresentPrimitive(direct)) {
+    return safeDisplayString(direct);
+  }
+  if (nestedKey) {
+    const nested = config[nestedKey];
+    if (isConfigObject(nested)) {
+      const nestedValue = nested[key];
+      if (isPresentPrimitive(nestedValue)) {
+        return safeDisplayString(nestedValue);
+      }
+    }
+  }
+  return "—";
 }
 
-const BotViewModalBody = ({
-  viewLoading,
-  viewBot,
-  viewActiveTab,
-  onTabChange,
-}: BotViewModalBodyProps) => {
-  if (viewLoading) {
-    return (
-      <div className="d-flex justify-content-center py-4">
-        <Spinner animation="border" />
-      </div>
-    );
-  }
-  if (!viewBot) {
-    return <p className="text-muted mb-0">No details to show.</p>;
-  }
-  const config = viewBot.configuration;
-  const hasConfig = isConfigObject(config);
-  const cfg = (key: string) =>
-    hasConfig ? safeDisplayString(config[key]) : "—";
-
-  return (
-    <Tab.Container
-      activeKey={viewActiveTab}
-      onSelect={(k) => onTabChange(k ?? "basic")}
-    >
-      <Nav variant="tabs" className="mb-3">
-        <Nav.Item>
-          <Nav.Link eventKey="basic">Basic Information</Nav.Link>
-        </Nav.Item>
-        <Nav.Item>
-          <Nav.Link eventKey="configuration">Configuration</Nav.Link>
-        </Nav.Item>
-        <Nav.Item>
-          <Nav.Link eventKey="voice">Voice Settings</Nav.Link>
-        </Nav.Item>
-        <Nav.Item>
-          <Nav.Link eventKey="llm">LLM Settings</Nav.Link>
-        </Nav.Item>
-        <Nav.Item>
-          <Nav.Link eventKey="behavior">Behavior</Nav.Link>
-        </Nav.Item>
-        <Nav.Item>
-          <Nav.Link eventKey="sip">SIP Settings</Nav.Link>
-        </Nav.Item>
-      </Nav>
-      <Tab.Content>
-        <Tab.Pane eventKey="basic">
-          <table className="table table-sm table-bordered mb-0">
-            <tbody>
-              <tr>
-                <th style={{ width: "140px" }}>Name</th>
-                <td>{safeDisplayString(viewBot.name)}</td>
-              </tr>
-              <tr>
-                <th>Description</th>
-                <td>{safeDisplayString(viewBot.description)}</td>
-              </tr>
-              <tr>
-                <th>Status</th>
-                <td>
-                  {viewBot.status === "published" ? (
-                    <span className="status-badge success">Published</span>
-                  ) : (
-                    <span className="status-badge secondary">Draft</span>
-                  )}
-                </td>
-              </tr>
-              <tr>
-                <th>Company</th>
-                <td>
-                  {safeDisplayString(
-                    viewBot.company_name ??
-                      viewBot.company_id ??
-                      viewBot.company,
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </Tab.Pane>
-        <Tab.Pane eventKey="configuration">
-          {hasConfig ? (
-            <table className="table table-sm table-bordered mb-0">
-              <tbody>
-                <tr>
-                  <th style={{ width: "140px" }}>Instructions</th>
-                  <td>
-                    <pre
-                      className="mb-0 small text-break"
-                      style={{ whiteSpace: "pre-wrap" }}
-                    >
-                      {cfg("instructions")}
-                    </pre>
-                  </td>
-                </tr>
-                <tr>
-                  <th>Knowledge Base</th>
-                  <td>
-                    <pre
-                      className="mb-0 small text-break"
-                      style={{ whiteSpace: "pre-wrap" }}
-                    >
-                      {cfg("knowledge_base")}
-                    </pre>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          ) : (
-            <p className="text-muted mb-0">No configuration.</p>
-          )}
-        </Tab.Pane>
-        <Tab.Pane eventKey="voice">
-          {hasConfig ? (
-            <table className="table table-sm table-bordered mb-0">
-              <tbody>
-                <tr>
-                  <th style={{ width: "160px" }}>Voice</th>
-                  <td>{cfg("voice_name")}</td>
-                </tr>
-                <tr>
-                  <th>Voice Model</th>
-                  <td>{cfg("voice_model")}</td>
-                </tr>
-                <tr>
-                  <th>Voice Speed</th>
-                  <td>{cfg("voice_speed")}</td>
-                </tr>
-                <tr>
-                  <th>Voice Instructions</th>
-                  <td>{cfg("voice_instructions")}</td>
-                </tr>
-                <tr>
-                  <th>Greeting Message</th>
-                  <td>{cfg("greeting_message")}</td>
-                </tr>
-              </tbody>
-            </table>
-          ) : (
-            <p className="text-muted mb-0">No voice settings.</p>
-          )}
-        </Tab.Pane>
-        <Tab.Pane eventKey="llm">
-          {hasConfig ? (
-            <table className="table table-sm table-bordered mb-0">
-              <tbody>
-                <tr>
-                  <th style={{ width: "160px" }}>LLM Model</th>
-                  <td>{cfg("llm_model")}</td>
-                </tr>
-                <tr>
-                  <th>Temperature</th>
-                  <td>{cfg("temperature")}</td>
-                </tr>
-                <tr>
-                  <th>Max Tokens</th>
-                  <td>{cfg("max_tokens")}</td>
-                </tr>
-              </tbody>
-            </table>
-          ) : (
-            <p className="text-muted mb-0">No LLM settings.</p>
-          )}
-        </Tab.Pane>
-        <Tab.Pane eventKey="behavior">
-          {hasConfig ? (
-            <table className="table table-sm table-bordered mb-0">
-              <tbody>
-                <tr>
-                  <th style={{ width: "160px" }}>Transfer Enabled</th>
-                  <td>{cfg("transfer_enabled")}</td>
-                </tr>
-                <tr>
-                  <th>Transfer Number</th>
-                  <td>{cfg("transfer_number")}</td>
-                </tr>
-                <tr>
-                  <th>Transfer Trunk ID</th>
-                  <td>{cfg("transfer_trunk_id")}</td>
-                </tr>
-                <tr>
-                  <th>Max Duration (s)</th>
-                  <td>{cfg("max_duration")}</td>
-                </tr>
-                <tr>
-                  <th>Idle Timeout (s)</th>
-                  <td>{cfg("idle_timeout")}</td>
-                </tr>
-                <tr>
-                  <th>Allow Interruptions</th>
-                  <td>{cfg("allow_interruptions")}</td>
-                </tr>
-                <tr>
-                  <th>Noise Cancellation</th>
-                  <td>{cfg("noise_cancellation")}</td>
-                </tr>
-                <tr>
-                  <th>Min Endpointing Delay</th>
-                  <td>{cfg("min_endpointing_delay")}</td>
-                </tr>
-              </tbody>
-            </table>
-          ) : (
-            <p className="text-muted mb-0">No behavior settings.</p>
-          )}
-        </Tab.Pane>
-        <Tab.Pane eventKey="sip">
-          {hasConfig ? (
-            <table className="table table-sm table-bordered mb-0">
-              <tbody>
-                <tr>
-                  <th style={{ width: "160px" }}>SIP Trunk ID</th>
-                  <td>{cfg("sip_trunk_id")}</td>
-                </tr>
-                <tr>
-                  <th>Phone Number</th>
-                  <td>{cfg("phone_number")}</td>
-                </tr>
-              </tbody>
-            </table>
-          ) : (
-            <p className="text-muted mb-0">No SIP settings.</p>
-          )}
-        </Tab.Pane>
-      </Tab.Content>
-    </Tab.Container>
-  );
-};
 
 interface BotHistoryModalBodyProps {
   historyLoading: boolean;
@@ -664,6 +492,8 @@ const BotHistoryModalBody = ({
 
 const BotTableActions = ({
   row,
+  canEdit,
+  canDelete,
   onView,
   onEdit,
   onPublish,
@@ -685,15 +515,17 @@ const BotTableActions = ({
       >
         <Eye size={14} />
       </Button>
-      <Button
-        title="Edit"
-        size="sm"
-        variant="outline-primary"
-        onClick={() => onEdit(id)}
-      >
-        <Pencil size={14} />
-      </Button>
-      {!isPublished && (
+      {canEdit && (
+        <Button
+          title="Edit"
+          size="sm"
+          variant="outline-primary"
+          onClick={() => onEdit(id)}
+        >
+          <Pencil size={14} />
+        </Button>
+      )}
+      {canEdit && !isPublished && (
         <Button
           title="Publish"
           size="sm"
@@ -703,7 +535,7 @@ const BotTableActions = ({
           <Send size={14} />
         </Button>
       )}
-      {isPublished && (
+      {canEdit && isPublished && (
         <Button
           title="Unpublish"
           size="sm"
@@ -721,14 +553,16 @@ const BotTableActions = ({
       >
         <History size={14} />
       </Button>
-      <Button
-        title="Delete"
-        size="sm"
-        variant="outline-danger"
-        onClick={() => onDelete(row)}
-      >
-        <Trash2 size={14} />
-      </Button>
+      {canDelete && (
+        <Button
+          title="Delete"
+          size="sm"
+          variant="outline-danger"
+          onClick={() => onDelete(row)}
+        >
+          <Trash2 size={14} />
+        </Button>
+      )}
     </div>
   );
 };
@@ -736,22 +570,37 @@ const BotTableActions = ({
 const BotsPage = () => {
   const router = useRouter();
   const { data: session } = useSession();
+  const { PERMISSIONS } = HEADER_CONSTANTS;
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
+  const permissions = session?.user?.permissions ?? [];
+  const canCreateBots = permissions.includes(
+    PERMISSIONS.CREATE_INBOUND_BOTS_INBOUND,
+  );
+  const canEditBots = permissions.includes(
+    PERMISSIONS.EDIT_INBOUND_BOTS_INBOUND,
+  );
+  const canDeleteBots = permissions.includes(
+    PERMISSIONS.DELETE_INBOUND_BOTS_INBOUND,
+  );
   const [data, setData] = useState<BotRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [companyFilter, setCompanyFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [showTabSelectorModal, setShowTabSelectorModal] = useState(false);
-  const [visibleTabIds, setVisibleTabIds] = useState<string[]>(["all", "published"]);
-  const [tabSelectionDraft, setTabSelectionDraft] = useState<string[]>(["published"]);
+  const [visibleTabIds, setVisibleTabIds] = useState<string[]>([
+    "all",
+    "published",
+  ]);
+  const [tabSelectionDraft, setTabSelectionDraft] = useState<string[]>([
+    "published",
+  ]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showViewModal, setShowViewModal] = useState(false);
-  const [viewBotId, setViewBotId] = useState<string | null>(null);
-  const [viewBot, setViewBot] = useState<Record<string, unknown> | null>(null);
-  const [viewLoading, setViewLoading] = useState(false);
-  const [viewActiveTab, setViewActiveTab] = useState("basic");
+  const [showBotSidebar, setShowBotSidebar] = useState(false);
+  const [sidebarBotId, setSidebarBotId] = useState<string | null>(null);
+  const [sidebarBot, setSidebarBot] = useState<Record<string, unknown> | null>(null);
+  const [sidebarLoading, setSidebarLoading] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyBotId, setHistoryBotId] = useState<string | null>(null);
   const [historyBotName, setHistoryBotName] = useState<string>("");
@@ -769,6 +618,7 @@ const BotsPage = () => {
     configuration: { ...defaultConfig },
   });
   const hasInitializedVisibleTabs = useRef(false);
+  const sidebarRequestSequence = useRef(0);
 
   const fetchCompanies = useCallback(async () => {
     try {
@@ -777,7 +627,9 @@ const BotsPage = () => {
       const opts = getCompanyOptions(list);
       setCompanies(opts);
       if (opts.length > 0)
-        setForm((f) => (f.company_id ? f : { ...f, company_id: opts[0].id }));
+        setForm((f: CreateBotPayload) =>
+          f.company_id ? f : { ...f, company_id: opts[0].id },
+        );
     } catch {
       setCompanies([]);
     }
@@ -826,17 +678,184 @@ const BotsPage = () => {
     hasInitializedVisibleTabs.current = true;
   }, []);
 
-  useEffect(() => {
-    if (showViewModal && viewBotId) {
-      setViewLoading(true);
-      getBot(viewBotId)
-        .then((data: Record<string, unknown>) => setViewBot(data))
-        .catch(() => toast.error("Failed to load bot details"))
-        .finally(() => setViewLoading(false));
-    } else {
-      setViewBot(null);
-    }
-  }, [showViewModal, viewBotId]);
+  const closeBotSidebar = useCallback(() => {
+    setShowBotSidebar(false);
+    setSidebarBotId(null);
+    setSidebarBot(null);
+    setSidebarLoading(false);
+  }, []);
+
+  const openBotSidebar = useCallback((row: BotRow) => {
+    const botId = getBotId(row);
+    if (!botId) return;
+    const requestId = sidebarRequestSequence.current + 1;
+    sidebarRequestSequence.current = requestId;
+    setSidebarBotId(botId);
+    setShowBotSidebar(true);
+    setSidebarLoading(true);
+    getBot(botId)
+      .then((details: Record<string, unknown>) => {
+        if (sidebarRequestSequence.current !== requestId) return;
+        setSidebarBot(details);
+      })
+      .catch(() => {
+        if (sidebarRequestSequence.current !== requestId) return;
+        toast.error("Failed to load bot details");
+      })
+      .finally(() => {
+        if (sidebarRequestSequence.current !== requestId) return;
+        setSidebarLoading(false);
+      });
+  }, []);
+
+  const botSidebarSections = useMemo<SidebarSection[]>(() => {
+    if (!sidebarBot) return [];
+    const rawStatus = sidebarBot.status;
+    const status = typeof rawStatus === "string" ? rawStatus.toLowerCase() : "";
+    return [
+      {
+        id: "about-bot",
+        title: "About this bot",
+        icon: Info,
+        collapsible: true,
+        defaultExpanded: true,
+        fields: [
+          { label: "Name", value: safeDisplayString(sidebarBot.name), copyable: true },
+          { label: "Description", value: safeDisplayString(sidebarBot.description) },
+          {
+            label: "Status",
+            value: status === "published" ? "Published" : "Draft",
+            type: "badge",
+            badgeVariant: status === "published" ? "success" : "secondary",
+          },
+          {
+            label: "Company",
+            value: safeDisplayString(
+              sidebarBot.company_name ?? sidebarBot.company_id ?? sidebarBot.company,
+            ),
+          },
+          {
+            label: "Version",
+            value: safeDisplayString(sidebarBot.current_version ?? sidebarBot.version),
+          },
+        ],
+      },
+      {
+        id: "configuration",
+        title: "Configuration",
+        icon: Settings,
+        collapsible: true,
+        defaultExpanded: true,
+        fields: [
+          {
+            label: "Instructions",
+            value: getConfigValue(sidebarBot, "instructions"),
+          },
+          {
+            label: "Knowledge Base",
+            value: getConfigValue(sidebarBot, "knowledge_base"),
+          },
+        ],
+      },
+      {
+        id: "voice-settings",
+        title: "Voice settings",
+        icon: Mic,
+        collapsible: true,
+        defaultExpanded: false,
+        fields: [
+          { label: "Voice", value: getConfigValue(sidebarBot, "voice_name", "voice_settings") },
+          { label: "Model", value: getConfigValue(sidebarBot, "voice_model", "voice_settings") },
+          { label: "Speed", value: getConfigValue(sidebarBot, "voice_speed", "voice_settings") },
+          {
+            label: "Instructions",
+            value: getConfigValue(sidebarBot, "voice_instructions", "voice_settings"),
+          },
+          {
+            label: "Greeting",
+            value: getConfigValue(sidebarBot, "greeting_message", "behavior_settings"),
+          },
+        ],
+      },
+      {
+        id: "llm-settings",
+        title: "LLM settings",
+        icon: Cpu,
+        collapsible: true,
+        defaultExpanded: false,
+        fields: [
+          { label: "Model", value: getConfigValue(sidebarBot, "llm_model", "llm_settings") },
+          {
+            label: "Temperature",
+            value: getConfigValue(sidebarBot, "temperature", "llm_settings"),
+          },
+          {
+            label: "Max tokens",
+            value: getConfigValue(sidebarBot, "max_tokens", "llm_settings"),
+          },
+        ],
+      },
+      {
+        id: "behavior-settings",
+        title: "Behavior settings",
+        icon: SlidersHorizontal,
+        collapsible: true,
+        defaultExpanded: false,
+        fields: [
+          {
+            label: "Transfer enabled",
+            value: getConfigValue(sidebarBot, "transfer_enabled", "behavior_settings"),
+          },
+          {
+            label: "Transfer number",
+            value: getConfigValue(sidebarBot, "transfer_number", "behavior_settings"),
+          },
+          {
+            label: "Transfer trunk ID",
+            value: getConfigValue(sidebarBot, "transfer_trunk_id", "behavior_settings"),
+          },
+          {
+            label: "Max duration (s)",
+            value: getConfigValue(sidebarBot, "max_duration", "behavior_settings"),
+          },
+          {
+            label: "Idle timeout (s)",
+            value: getConfigValue(sidebarBot, "idle_timeout", "behavior_settings"),
+          },
+          {
+            label: "Allow interruptions",
+            value: getConfigValue(sidebarBot, "allow_interruptions", "behavior_settings"),
+          },
+          {
+            label: "Noise cancellation",
+            value: getConfigValue(sidebarBot, "noise_cancellation", "behavior_settings"),
+          },
+          {
+            label: "Min endpointing delay",
+            value: getConfigValue(sidebarBot, "min_endpointing_delay", "behavior_settings"),
+          },
+        ],
+      },
+      {
+        id: "sip-settings",
+        title: "SIP settings",
+        icon: Phone,
+        collapsible: true,
+        defaultExpanded: false,
+        fields: [
+          {
+            label: "SIP trunk ID",
+            value: getConfigValue(sidebarBot, "sip_trunk_id", "sip_settings"),
+          },
+          {
+            label: "Phone number",
+            value: getConfigValue(sidebarBot, "phone_number", "sip_settings"),
+            copyable: true,
+          },
+        ],
+      },
+    ];
+  }, [sidebarBot]);
 
   useEffect(() => {
     if (showHistoryModal && historyBotId) {
@@ -938,9 +957,14 @@ const BotsPage = () => {
     [statusFilter],
   );
 
-  const applyTabDraftChange = useCallback((tabId: string, isChecked: boolean) => {
-    setTabSelectionDraft((prev) => toggleTabDraftSelection(prev, tabId, isChecked));
-  }, []);
+  const applyTabDraftChange = useCallback(
+    (tabId: string, isChecked: boolean) => {
+      setTabSelectionDraft((prev) =>
+        toggleTabDraftSelection(prev, tabId, isChecked),
+      );
+    },
+    [],
+  );
 
   const handleApplyTabSelector = useCallback(() => {
     const nextVisible = ["all", ...tabSelectionDraft];
@@ -986,36 +1010,56 @@ const BotsPage = () => {
       <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
         {isAdmin && (
           <Form.Select
-            style={{ width: "200px", padding: "7px", marginRight: "3px", borderRadius: "3px" }}
+            style={{ width: "200px", padding: "7px", borderRadius: "3px" }}
             value={companyFilter}
             onChange={(e) => setCompanyFilter(e.target.value)}
           >
             <option value="">All companies</option>
             {companies.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
             ))}
           </Form.Select>
         )}
-        <Button
-          onClick={() => {
-            router.push("/voicebot/inbound/bots/create");
-          }}
-          style={addBotButtonStyle}
-          className="bots-add-button"
+        <Form.Select
+          style={{ width: "140px", padding: "7px", borderRadius: "3px" }}
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Filter by status"
         >
-          <Plus size={16} />
-          <span>Add Bot</span>
-        </Button>
+          <option value="">All Bots</option>
+          <option value="draft">Draft</option>
+          <option value="published">Published</option>
+          <option value="archived">Archived</option>
+        </Form.Select>
+        {canCreateBots && (
+          <Button
+            onClick={() => {
+              router.push("/voicebot/inbound/bots/create");
+            }}
+            style={addBotButtonStyle}
+            className="bots-add-button"
+          >
+            <Plus size={16} />
+            <span>Add Bot</span>
+          </Button>
+        )}
       </div>
     ),
-    [isAdmin, companyFilter, companies, router],
+    [canCreateBots, isAdmin, companyFilter, companies, router, statusFilter],
   );
 
   const tableToolbar = useMemo(
     () => ({
       showTabs: true,
       tabs: [
-        { id: "all", label: "All Bots", count: botTabCounts.all, removable: false },
+        {
+          id: "all",
+          label: "All Bots",
+          count: botTabCounts.all,
+          removable: false,
+        },
         ...mapVisibleStatusTabsForToolbar(visibleTabIds, botTabCounts),
       ],
       activeTab: statusFilter || "all",
@@ -1030,7 +1074,13 @@ const BotsPage = () => {
       onTabRemove: handleTabRemove,
       rightActions: toolbarRightActions,
     }),
-    [botTabCounts, visibleTabIds, statusFilter, toolbarRightActions, handleTabRemove],
+    [
+      botTabCounts,
+      visibleTabIds,
+      statusFilter,
+      toolbarRightActions,
+      handleTabRemove,
+    ],
   );
 
   const columns: TableColumn<BotRow>[] = [
@@ -1093,9 +1143,13 @@ const BotsPage = () => {
       render: (row) => (
         <BotTableActions
           row={row}
+          canEdit={canEditBots}
+          canDelete={canDeleteBots}
           onView={(id) => {
-            setViewBotId(id);
-            setShowViewModal(true);
+            const targetRow = data.find((item) => getBotId(item) === id);
+            if (targetRow) {
+              openBotSidebar(targetRow);
+            }
           }}
           onEdit={(id) =>
             router.push(
@@ -1178,7 +1232,15 @@ const BotsPage = () => {
           as="textarea"
           rows={2}
           value={form.configuration?.instructions ?? ""}
-          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, instructions: e.target.value } })}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              configuration: {
+                ...form.configuration,
+                instructions: e.target.value,
+              },
+            })
+          }
           placeholder="Bot system instructions"
         />
       </Form.Group>
@@ -1186,7 +1248,15 @@ const BotsPage = () => {
         <Form.Label>Greeting message</Form.Label>
         <Form.Control
           value={form.configuration?.greeting_message ?? ""}
-          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, greeting_message: e.target.value } })}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              configuration: {
+                ...form.configuration,
+                greeting_message: e.target.value,
+              },
+            })
+          }
           placeholder="Hello! How can I help?"
         />
       </Form.Group>
@@ -1194,7 +1264,15 @@ const BotsPage = () => {
         <Form.Label>Voice name</Form.Label>
         <Form.Control
           value={form.configuration?.voice_name ?? ""}
-          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, voice_name: e.target.value } })}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              configuration: {
+                ...form.configuration,
+                voice_name: e.target.value,
+              },
+            })
+          }
           placeholder="onyx"
         />
       </Form.Group>
@@ -1202,7 +1280,15 @@ const BotsPage = () => {
         <Form.Label>LLM model</Form.Label>
         <Form.Control
           value={form.configuration?.llm_model ?? ""}
-          onChange={(e) => setForm({ ...form, configuration: { ...form.configuration, llm_model: e.target.value } })}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              configuration: {
+                ...form.configuration,
+                llm_model: e.target.value,
+              },
+            })
+          }
           placeholder="gpt-4o-mini"
         />
       </Form.Group>
@@ -1218,68 +1304,95 @@ const BotsPage = () => {
       />
       <Row className="mb-3">
         <Col md={12}>
-          <div className="page-header-title style-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div className="d-flex align-items-center gap-2">
-              <h2 className="mb-0">Bots</h2>
-            </div>
-            <div className="d-flex align-items-center gap-2">
-              {isAdmin && (
-                <Form.Select
-                  style={{ width: "200px" }}
-                  value={companyFilter}
-                  onChange={(e) => setCompanyFilter(e.target.value)}
-                >
-                  <option value="">All companies</option>
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </Form.Select>
-              )}
-              <Form.Select
-                style={{ width: "140px" }}
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="">All Bots</option>
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-                <option value="archived">Archived</option>
-              </Form.Select>
-
-              <Button
-                variant="primary"
-                onClick={() => {
-                  router.push("/voicebot/inbound/bots/create");
-                }}
-              >
-                <Plus size={18} className="me-1" /> Add Bot
-              </Button>
-            </div>
+          <div className="page-header-title style-2 d-flex align-items-center flex-wrap gap-2">
+            <h2 className="mb-0">Bots</h2>
           </div>
         </Col>
       </Row>
 
-      <GenericTable<BotRow>
-        data={data}
-        columns={columns}
-        loading={loading}
-        emptyMessage="No bots found."
-        loadingMessage="Loading bots..."
-        showToolbar
-        toolbar={tableToolbar}
-        showToolbarActions={false}
-        pagination={{
-          currentPage: 1,
-          rowsPerPage: 10,
-          totalRows: data.length,
-          pageSizeOptions: [10, 25, 50],
+      <div
+        style={{
+          display: "flex",
+          gap: "0",
+          height: "calc(100vh)",
+          overflow: "hidden",
         }}
-        uniqueKey="id"
-        hover
-        striped={false}
-      />
+      >
+        <div
+          style={{
+            flex: 1,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            minHeight: 0,
+          }}
+        >
+          <GenericTable<BotRow>
+            data={data}
+            columns={columns}
+            loading={loading}
+            emptyMessage="No bots found."
+            loadingMessage="Loading bots..."
+            showToolbar
+            toolbar={tableToolbar}
+            showToolbarActions={false}
+            pagination={{
+              currentPage: 1,
+              rowsPerPage: 10,
+              totalRows: data.length,
+              pageSizeOptions: [10, 25, 50],
+            }}
+            uniqueKey="id"
+            onPreviewClick={(row) => openBotSidebar(row)}
+            hover
+            striped={false}
+          />
+        </div>
+        {showBotSidebar && (
+          <GenericSidebar
+            isOpen={showBotSidebar}
+            onClose={closeBotSidebar}
+            title={safeDisplayString(sidebarBot?.name ?? "Bot Details")}
+            subtitle={safeDisplayString(sidebarBot?.description)}
+            avatar={{
+              initials: safeDisplayString(sidebarBot?.name ?? "B")
+                .slice(0, 2)
+                .toUpperCase(),
+              name: safeDisplayString(sidebarBot?.name ?? "Bot"),
+              gradient: "#0091ae",
+            }}
+            sections={
+              sidebarLoading
+                ? [
+                    {
+                      id: "sidebar-loading",
+                      title: "Loading bot details",
+                      icon: Info,
+                      isLoading: true,
+                      defaultExpanded: true,
+                      collapsible: false,
+                    },
+                  ]
+                : botSidebarSections
+            }
+            width="470px"
+            actionsDropdown={{
+              label: "Actions",
+              items: [
+                {
+                  label: "Edit Bot",
+                  onClick: () => {
+                    if (!sidebarBotId) return;
+                    router.push(
+                      `/voicebot/inbound/bots/edit?id=${encodeURIComponent(sidebarBotId)}`,
+                    );
+                  },
+                },
+              ],
+            }}
+          />
+        )}
+      </div>
 
       <Modal
         show={showTabSelectorModal}
@@ -1306,7 +1419,10 @@ const BotsPage = () => {
           ))}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setShowTabSelectorModal(false)}>
+          <Button
+            variant="outline-secondary"
+            onClick={() => setShowTabSelectorModal(false)}
+          >
             Cancel
           </Button>
           <Button variant="primary" onClick={handleApplyTabSelector}>
@@ -1331,7 +1447,7 @@ const BotsPage = () => {
               <Form.Select
                 value={form.company_id}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, company_id: e.target.value }))
+                  setForm((f: CreateBotPayload) => ({ ...f, company_id: e.target.value }))
                 }
                 required
               >
@@ -1348,7 +1464,7 @@ const BotsPage = () => {
               <Form.Control
                 value={form.name}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, name: e.target.value }))
+                  setForm((f: CreateBotPayload) => ({ ...f, name: e.target.value }))
                 }
                 required
                 placeholder="Bot name"
@@ -1361,7 +1477,7 @@ const BotsPage = () => {
                 rows={2}
                 value={form.description ?? ""}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, description: e.target.value }))
+                  setForm((f: CreateBotPayload) => ({ ...f, description: e.target.value }))
                 }
                 placeholder="Description"
               />
@@ -1385,59 +1501,6 @@ const BotsPage = () => {
             </Button>
           </Modal.Footer>
         </Form>
-      </Modal>
-
-      <Modal
-        show={showViewModal}
-        onHide={() => {
-          setShowViewModal(false);
-          setViewBotId(null);
-          setViewBot(null);
-          setViewActiveTab("basic");
-        }}
-        centered
-        size="lg"
-      >
-        <Modal.Header closeButton>
-          <Modal.Title>Bot Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <BotViewModalBody
-            viewLoading={viewLoading}
-            viewBot={viewBot}
-            viewActiveTab={viewActiveTab}
-            onTabChange={setViewActiveTab}
-          />
-        </Modal.Body>
-        <Modal.Footer>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowViewModal(false);
-              setViewBotId(null);
-              setViewBot(null);
-              setViewActiveTab("basic");
-            }}
-          >
-            Close
-          </Button>
-          {viewBot && viewBotId && (
-            <Button
-              variant="primary"
-              onClick={() => {
-                setShowViewModal(false);
-                setViewBotId(null);
-                setViewBot(null);
-                setViewActiveTab("basic");
-                router.push(
-                  `/voicebot/inbound/bots/edit?id=${encodeURIComponent(viewBotId)}`,
-                );
-              }}
-            >
-              Edit
-            </Button>
-          )}
-        </Modal.Footer>
       </Modal>
 
       <Modal

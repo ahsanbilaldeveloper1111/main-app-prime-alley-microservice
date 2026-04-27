@@ -131,7 +131,7 @@ const TrunkCreateSidebar: React.FC<TrunkCreateSidebarProps> = ({ isOpen, onClose
         setCompanies([]);
         return;
       }
-      setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
+      setCompanies(normalizeCompaniesResponse(res));
     } catch {
       setCompanies([]);
     } finally {

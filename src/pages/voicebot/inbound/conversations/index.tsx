@@ -9,13 +9,14 @@ import {
   getBots,
   getCall,
   getCallTranscript,
-  getCompanies,
 } from "@utils/voicebot/inbound";
+import { GetCompanies } from "@utils/users";
 import {
   normalizeCompaniesResponse,
   type CompanyOption,
 } from "@utils/companyOptions";
 import { safeDisplayString } from "@utils/voicebot/formDisplay";
+import { humanizeSnakeCase } from "@utils/Helper";
 import { Button, Col, Form, Modal, Nav, Row } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
@@ -105,6 +106,7 @@ const CALL_STATUS_OPTIONS = [
   { label: "Answered", value: "answered" },
   { label: "Completed", value: "completed" },
   { label: "Transferred", value: "transferred" },
+  { label: "Transfer Failed", value: "transfer_failed" },
   { label: "Failed", value: "failed" },
   { label: "Timeout", value: "timeout" },
   { label: "Dropped", value: "dropped" },
@@ -114,12 +116,42 @@ interface ConversationListFilters {
   company_id: string;
   bot_id: string;
   status: string;
-  start_date: string;
-  end_date: string;
+  date_from: string;
+  date_to: string;
   limit: number;
 }
 
 type FiltersSetter = React.Dispatch<React.SetStateAction<ConversationListFilters>>;
+
+const DEFAULT_CONVERSATION_FILTERS: ConversationListFilters = {
+  company_id: "",
+  bot_id: "",
+  status: "",
+  date_from: "",
+  date_to: "",
+  limit: 100,
+};
+
+/**
+ * Today’s range using the same UTC mapping as the datetime-local `onChange` handlers
+ * (start: local start of day; end: that instant in UTC, then `endOf("day")` like the end field).
+ */
+function getTodayDateRangeForFilters(): Pick<ConversationListFilters, "date_from" | "date_to"> {
+  const startLocal = moment().startOf("day");
+  const date_from = `${startLocal.clone().utc().format("YYYY-MM-DDTHH:mm:ss")}Z`;
+  const date_to = `${moment(startLocal.format("YYYY-MM-DDTHH:mm"))
+    .utc()
+    .endOf("day")
+    .format("YYYY-MM-DDTHH:mm:ss")}Z`;
+  return { date_from, date_to };
+}
+
+function getDefaultConversationFiltersWithToday(): ConversationListFilters {
+  return {
+    ...DEFAULT_CONVERSATION_FILTERS,
+    ...getTodayDateRangeForFilters(),
+  };
+}
 
 function applyCompanyFilterIds(setFilters: FiltersSetter, companyId: string) {
   setFilters((prev) => ({ ...prev, company_id: companyId, bot_id: "" }));
@@ -294,14 +326,13 @@ const CallsPage = () => {
     total_cost?: number;
   } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<ConversationListFilters>({
-    company_id: "",
-    bot_id: "",
-    status: "",
-    start_date: "",
-    end_date: "",
-    limit: 50,
-  });
+  const [filters, setFilters] = useState<ConversationListFilters>(() =>
+    getDefaultConversationFiltersWithToday(),
+  );
+  /** Values last committed via Apply, Search (phone), or explicit pill clear; drives API. */
+  const [appliedFilters, setAppliedFilters] = useState<ConversationListFilters>(() =>
+    getDefaultConversationFiltersWithToday(),
+  );
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [showViewModal, setShowViewModal] = useState(false);
@@ -314,18 +345,17 @@ const CallsPage = () => {
 
   const fetchCompanies = useCallback(async () => {
     try {
-      const params: { show_inactive: boolean; company_id?: string } = {
-        show_inactive: false,
-      };
-      const cid = filters.company_id?.trim();
-      if (cid) params.company_id = cid;
-      const res = await getCompanies(params);
-      setCompanies(normalizeCompaniesResponse(res, { prefer: "company_id" }));
+      const res = await GetCompanies();
+      if (res === false) {
+        setCompanies([]);
+        return;
+      }
+      setCompanies(normalizeCompaniesResponse(res));
     } catch {
       toast.error("Failed to load companies");
       setCompanies([]);
     }
-  }, [filters.company_id]);
+  }, []);
 
   useEffect(() => {}, [isAdmin, session?.user]);
 
@@ -363,18 +393,25 @@ const CallsPage = () => {
   }, []);
 
   const fetchCalls = useCallback(async () => {
+    const from = String(appliedFilters.date_from ?? "").trim();
+    const to = String(appliedFilters.date_to ?? "").trim();
+    if (!from || !to) {
+      setData([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const params: Record<string, string | number | undefined> = {
-        limit: filters.limit,
+        limit: appliedFilters.limit,
+        date_from: from,
+        date_to: to,
       };
-      const companyId = filters.company_id?.trim();
+      const companyId = appliedFilters.company_id?.trim();
       if (companyId) params.company_id = companyId;
-      if (filters.bot_id) params.bot_id = filters.bot_id;
-      if (filters.status) params.status = filters.status;
-      if (filters.start_date) params.start_date = filters.start_date;
-      if (filters.end_date) params.end_date = filters.end_date;
-      if (appliedSearch.trim()) params.search = appliedSearch.trim();
+      if (appliedFilters.bot_id) params.bot_id = appliedFilters.bot_id;
+      if (appliedFilters.status) params.status = appliedFilters.status;
+      if (appliedSearch.trim()) params.caller_phone = appliedSearch.trim();
       const res = await getCalls(params);
       const list = Array.isArray(res)
         ? res
@@ -393,16 +430,23 @@ const CallsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [appliedFilters, appliedSearch]);
 
   const fetchStats = useCallback(async () => {
+    const from = String(appliedFilters.date_from ?? "").trim();
+    const to = String(appliedFilters.date_to ?? "").trim();
+    if (!from || !to) {
+      setStats(null);
+      return;
+    }
     try {
-      const params: Record<string, string | undefined> = {};
-      const companyId = filters.company_id?.trim();
+      const params: Record<string, string | undefined> = {
+        start_date: from,
+        end_date: to,
+      };
+      const companyId = appliedFilters.company_id?.trim();
       if (companyId) params.company_id = companyId;
-      if (filters.bot_id) params.bot_id = filters.bot_id;
-      if (filters.start_date) params.start_date = filters.start_date;
-      if (filters.end_date) params.end_date = filters.end_date;
+      if (appliedFilters.bot_id) params.bot_id = appliedFilters.bot_id;
       const res = await getCallsStats(params);
       setStats(
         res as {
@@ -417,10 +461,10 @@ const CallsPage = () => {
       setStats(null);
     }
   }, [
-    filters.company_id,
-    filters.bot_id,
-    filters.start_date,
-    filters.end_date,
+    appliedFilters.company_id,
+    appliedFilters.bot_id,
+    appliedFilters.date_from,
+    appliedFilters.date_to,
   ]);
 
   useEffect(() => {
@@ -515,6 +559,66 @@ const CallsPage = () => {
   const formatDuration = (sec?: number) =>
     sec == null ? "—" : `${Math.floor(sec / 60)}m ${sec % 60}s`;
 
+  /** Fast bot id -> name map so each row render is O(1). Keys include raw and lowercased id. */
+  const botNameById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const b of bots) {
+      const id = String(b.id ?? "").trim();
+      const name = String(b.name ?? "").trim();
+      if (!id || !name) continue;
+      map[id] = name;
+      map[id.toLowerCase()] = name;
+    }
+    return map;
+  }, [bots]);
+
+  /**
+   * API returns bot info under several shapes (`bot_name`, `bot` string or object,
+   * `bot_id`, `bot_uuid`, etc.). Resolve to a display name using the fetched bot
+   * list, falling back to whatever id-like value we have so the cell is never empty.
+   */
+  const resolveBotName = useCallback(
+    (row: CallRow): string => {
+      const r = row as Record<string, unknown>;
+      const pickString = (v: unknown): string => {
+        if (typeof v !== "string") return "";
+        const s = v.trim();
+        return s && s !== "[object Object]" ? s : "";
+      };
+
+      const directName = pickString(r.bot_name);
+      if (directName) return directName;
+
+      const bot = r.bot;
+      if (bot && typeof bot === "object") {
+        const o = bot as Record<string, unknown>;
+        const nested = pickString(o.name) || pickString(o.title);
+        if (nested) return nested;
+        const nestedId =
+          pickString(o.id) ||
+          pickString(o.bot_id) ||
+          pickString(o.uuid) ||
+          pickString(o.voicebot_id);
+        if (nestedId) {
+          return botNameById[nestedId] ?? botNameById[nestedId.toLowerCase()] ?? nestedId;
+        }
+      }
+
+      const idCandidate =
+        pickString(r.bot_id) ||
+        pickString(r.bot_uuid) ||
+        pickString(r.botId) ||
+        pickString(r.voicebot_id) ||
+        pickString(bot);
+      if (idCandidate) {
+        return botNameById[idCandidate] ?? botNameById[idCandidate.toLowerCase()] ?? idCandidate;
+      }
+
+      return "";
+    },
+    [botNameById],
+  );
+
   const columns: TableColumn<CallRow>[] = [
     {
       key: "caller_phone",
@@ -534,7 +638,7 @@ const CallsPage = () => {
     {
       key: "bot_name",
       label: "Bot",
-      render: (r) => safeDisplayString(r.bot_name),
+      render: (r) => safeDisplayString(resolveBotName(r)),
     },
     {
       key: "status",
@@ -542,13 +646,14 @@ const CallsPage = () => {
       sortable: true,
       render: (r) => {
         const s = String(r.status ?? "");
+        const label = humanizeSnakeCase(s, "—");
         if (s === "completed")
-          return <span className="status-badge success">Completed</span>;
-        if (s === "failed" || s === "timeout")
-          return <span className="status-badge danger">{s}</span>;
+          return <span className="status-badge success text-capitalize">{label}</span>;
+        if (s === "failed" || s === "timeout" || s === "transfer_failed")
+          return <span className="status-badge danger text-capitalize">{label}</span>;
         if (s === "transferred")
-          return <span className="status-badge info">Transferred</span>;
-        return <span className="status-badge secondary">{s || "—"}</span>;
+          return <span className="status-badge info text-capitalize">{label}</span>;
+        return <span className="status-badge secondary text-capitalize">{label}</span>;
       },
     },
     {
@@ -595,11 +700,11 @@ const CallsPage = () => {
   ];
 
   const hasActiveFilters = !!(
-    filters.company_id ||
-    filters.bot_id ||
-    filters.status ||
-    filters.start_date ||
-    filters.end_date
+    appliedFilters.company_id ||
+    appliedFilters.bot_id ||
+    appliedFilters.status ||
+    appliedFilters.date_from ||
+    appliedFilters.date_to
   );
 
   const renderMessageContent = (msg: CallMessage, messageIndex: number) => {
@@ -639,30 +744,32 @@ const CallsPage = () => {
   };
 
   const resetFilters = () => {
-    setFilters({
-      company_id: "",
-      bot_id: "",
-      status: "",
-      start_date: "",
-      end_date: "",
-      limit: 50,
-    });
-    setShowFilters(false);
+    const next = getDefaultConversationFiltersWithToday();
+    setFilters({ ...next });
+    setAppliedFilters({ ...next });
+    setSearchInput("");
+    setAppliedSearch("");
   };
 
   const selectedCompany = useMemo(
-    () => companies.find((c) => c.id === filters.company_id),
-    [companies, filters.company_id],
+    () =>
+      companies.find(
+        (c) =>
+          c.id === appliedFilters.company_id ||
+          c.company_id === appliedFilters.company_id ||
+          c.identifier === appliedFilters.company_id,
+      ),
+    [companies, appliedFilters.company_id],
   );
 
   const selectedBot = useMemo(
-    () => bots.find((b) => b.id === filters.bot_id),
-    [bots, filters.bot_id],
+    () => bots.find((b) => b.id === appliedFilters.bot_id),
+    [bots, appliedFilters.bot_id],
   );
 
   const selectedStatus = useMemo(
-    () => CALL_STATUS_OPTIONS.find((o) => o.value === filters.status),
-    [filters.status],
+    () => CALL_STATUS_OPTIONS.find((o) => o.value === appliedFilters.status),
+    [appliedFilters.status],
   );
 
   const companyDropdownOptions = useMemo(
@@ -681,9 +788,19 @@ const CallsPage = () => {
   );
 
   const applyFilters = useCallback(() => {
-    fetchCalls().catch(() => undefined);
-    fetchStats().catch(() => undefined);
-  }, [fetchCalls, fetchStats]);
+    const from = String(filters.date_from ?? "").trim();
+    const to = String(filters.date_to ?? "").trim();
+    if (!from || !to) {
+      toast.error("Please select both a start date and an end date.");
+      return;
+    }
+    setAppliedFilters({ ...filters });
+    setAppliedSearch(searchInput.trim());
+  }, [filters, searchInput]);
+
+  const hasAppliedDateRange =
+    String(appliedFilters.date_from ?? "").trim() !== "" &&
+    String(appliedFilters.date_to ?? "").trim() !== "";
 
   const statsCards = useMemo(
     () => [
@@ -746,10 +863,9 @@ const CallsPage = () => {
       onTabChange: () => undefined,
       showSearch: true,
       searchValue: searchInput,
-      searchPlaceholder: "Search by caller, bot, status, room...",
+      searchPlaceholder: "Search by caller phone...",
       onSearchChange: (value: string) => {
         setSearchInput(value);
-        setAppliedSearch(value.trim());
       },
       onSearch: () => setAppliedSearch(searchInput.trim()),
       showFiltersButton: false,
@@ -793,9 +909,12 @@ const CallsPage = () => {
                 label: "Company",
                 showDropdown: true,
                 searchable: true,
-                active: Boolean(filters.company_id),
+                active: Boolean(appliedFilters.company_id),
                 activeLabel: selectedCompany?.name || undefined,
-                onClear: () => setFilters((prev) => ({ ...prev, company_id: "", bot_id: "" })),
+                onClear: () => {
+                  setFilters((prev) => ({ ...prev, company_id: "", bot_id: "" }));
+                  setAppliedFilters((prev) => ({ ...prev, company_id: "", bot_id: "" }));
+                },
                 dropdownOptions: companyDropdownOptions,
               },
             ]
@@ -805,46 +924,62 @@ const CallsPage = () => {
           label: "Bot",
           showDropdown: true,
           searchable: true,
-          active: Boolean(filters.bot_id),
+          active: Boolean(appliedFilters.bot_id),
           activeLabel: selectedBot?.name || undefined,
-          onClear: () => setFilters((prev) => ({ ...prev, bot_id: "" })),
+          onClear: () => {
+            setFilters((prev) => ({ ...prev, bot_id: "" }));
+            setAppliedFilters((prev) => ({ ...prev, bot_id: "" }));
+          },
           dropdownOptions: botDropdownOptions,
         },
         {
           id: "status",
           label: "Status",
           showDropdown: true,
-          active: Boolean(filters.status),
+          active: Boolean(appliedFilters.status),
           activeLabel: selectedStatus?.label || undefined,
-          onClear: () => setFilters((prev) => ({ ...prev, status: "" })),
+          onClear: () => {
+            setFilters((prev) => ({ ...prev, status: "" }));
+            setAppliedFilters((prev) => ({ ...prev, status: "" }));
+          },
           dropdownOptions: statusDropdownOptions,
         },
         {
-          id: "start_date",
+          id: "date_from",
           label: "Start Date",
           showDropdown: true,
-          active: Boolean(filters.start_date),
-          activeLabel: filters.start_date ? moment(filters.start_date).format("MMM DD, YYYY HH:mm") : undefined,
+          active: Boolean(appliedFilters.date_from),
+          activeLabel: appliedFilters.date_from
+            ? moment(appliedFilters.date_from).format("MMM DD, YYYY HH:mm")
+            : undefined,
           activeLabelOnly: true,
-          onClear: () => setFilters((prev) => ({ ...prev, start_date: "" })),
+          onClear: () => {
+            setFilters((prev) => ({ ...prev, date_from: "" }));
+            setAppliedFilters((prev) => ({ ...prev, date_from: "" }));
+          },
           dropdownContent: createConversationDateDropdown(
-            filters.start_date,
-            (value) => setFilters((prev) => ({ ...prev, start_date: value })),
-            () => setFilters((prev) => ({ ...prev, start_date: "" })),
+            filters.date_from,
+            (value) => setFilters((prev) => ({ ...prev, date_from: value })),
+            () => setFilters((prev) => ({ ...prev, date_from: "" })),
           ),
         },
         {
-          id: "end_date",
+          id: "date_to",
           label: "End Date",
           showDropdown: true,
-          active: Boolean(filters.end_date),
-          activeLabel: filters.end_date ? moment(filters.end_date).format("MMM DD, YYYY HH:mm") : undefined,
+          active: Boolean(appliedFilters.date_to),
+          activeLabel: appliedFilters.date_to
+            ? moment(appliedFilters.date_to).format("MMM DD, YYYY HH:mm")
+            : undefined,
           activeLabelOnly: true,
-          onClear: () => setFilters((prev) => ({ ...prev, end_date: "" })),
+          onClear: () => {
+            setFilters((prev) => ({ ...prev, date_to: "" }));
+            setAppliedFilters((prev) => ({ ...prev, date_to: "" }));
+          },
           dropdownContent: createConversationDateDropdown(
-            filters.end_date,
-            (value) => setFilters((prev) => ({ ...prev, end_date: value })),
-            () => setFilters((prev) => ({ ...prev, end_date: "" })),
+            filters.date_to,
+            (value) => setFilters((prev) => ({ ...prev, date_to: value })),
+            () => setFilters((prev) => ({ ...prev, date_to: "" })),
             true,
           ),
         },
@@ -853,11 +988,7 @@ const CallsPage = () => {
     [
       companies,
       data.length,
-      filters.bot_id,
-      filters.company_id,
-      filters.end_date,
-      filters.start_date,
-      filters.status,
+      appliedFilters,
       hasActiveFilters,
       isAdmin,
       bots,
@@ -942,29 +1073,35 @@ const CallsPage = () => {
       {showFilters && (
         <Row className="mb-3 p-3 border rounded bg-light">
           <Col md={12}>
-            <h6 className="mb-2">Filters</h6>
+            <h6 className="mb-1">Filters</h6>
+            <p className="small text-muted mb-2">
+              Default range is today. Both start and end dates are required—change them if needed, then
+              click Apply.
+            </p>
             <Row>
-              <Col md={2}>
-                <Form.Group className="mb-2">
-                  <Form.Label className="small">Company</Form.Label>
-                  <Form.Select
-                    value={filters.company_id}
-                    onChange={(e) =>
-                      setFilters((f) => ({
-                        ...f,
-                        company_id: e.target.value,
-                      }))
-                    }
-                  >
-                    <option value="">All</option>
-                    {companies.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </Form.Select>
-                </Form.Group>
-              </Col>
+              {isAdmin && (
+                <Col md={2}>
+                  <Form.Group className="mb-2">
+                    <Form.Label className="small">Company</Form.Label>
+                    <Form.Select
+                      value={filters.company_id}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          company_id: e.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">All</option>
+                      {companies.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+              )}
               <Col md={2}>
                 <Form.Group className="mb-2">
                   <Form.Label className="small">Bot</Form.Label>
@@ -997,6 +1134,7 @@ const CallsPage = () => {
                     <option value="answered">Answered</option>
                     <option value="completed">Completed</option>
                     <option value="transferred">Transferred</option>
+                    <option value="transfer_failed">Transfer Failed</option>
                     <option value="failed">Failed</option>
                     <option value="timeout">Timeout</option>
                     <option value="dropped">Dropped</option>
@@ -1005,13 +1143,15 @@ const CallsPage = () => {
               </Col>
               <Col md={2}>
                 <Form.Group className="mb-2">
-                  <Form.Label className="small">Start date</Form.Label>
+                  <Form.Label className="small">
+                    Start date <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Control
                     type="datetime-local"
                     value={
-                      filters.start_date
+                      filters.date_from
                         ? moment
-                            .utc(filters.start_date)
+                            .utc(filters.date_from)
                             .local()
                             .format("YYYY-MM-DDTHH:mm")
                         : ""
@@ -1019,7 +1159,7 @@ const CallsPage = () => {
                     onChange={(e) =>
                       setFilters((f) => ({
                         ...f,
-                        start_date: e.target.value
+                        date_from: e.target.value
                           ? moment(e.target.value)
                               .utc()
                               .format("YYYY-MM-DDTHH:mm:ss") + "Z"
@@ -1031,13 +1171,15 @@ const CallsPage = () => {
               </Col>
               <Col md={2}>
                 <Form.Group className="mb-2">
-                  <Form.Label className="small">End date</Form.Label>
+                  <Form.Label className="small">
+                    End date <span className="text-danger">*</span>
+                  </Form.Label>
                   <Form.Control
                     type="datetime-local"
                     value={
-                      filters.end_date
+                      filters.date_to
                         ? moment
-                            .utc(filters.end_date)
+                            .utc(filters.date_to)
                             .local()
                             .format("YYYY-MM-DDTHH:mm")
                         : ""
@@ -1045,7 +1187,7 @@ const CallsPage = () => {
                     onChange={(e) =>
                       setFilters((f) => ({
                         ...f,
-                        end_date: e.target.value
+                        date_to: e.target.value
                           ? moment(e.target.value)
                               .utc()
                               .endOf("day")
@@ -1057,7 +1199,14 @@ const CallsPage = () => {
                 </Form.Group>
               </Col>
               <Col md={2} className="d-flex align-items-end gap-2">
-                <Button variant="primary" onClick={applyFilters}>
+                <Button
+                  variant="primary"
+                  onClick={applyFilters}
+                  disabled={
+                    !String(filters.date_from ?? "").trim() ||
+                    !String(filters.date_to ?? "").trim()
+                  }
+                >
                   Apply
                 </Button>
                 {hasActiveFilters && (
@@ -1075,13 +1224,21 @@ const CallsPage = () => {
         data={data}
         columns={columns}
         loading={loading}
-        emptyMessage="No calls found."
+        emptyMessage={
+          hasAppliedDateRange
+            ? "No calls found for this range."
+            : "Select a start date and an end date in filters, then click Apply."
+        }
         loadingMessage="Loading calls..."
         pagination={{
           currentPage: 1,
-          rowsPerPage: filters.limit,
+          rowsPerPage: appliedFilters.limit,
           totalRows: data.length,
           pageSizeOptions: [25, 50, 100],
+        }}
+        onPaginationChange={(_newPage, newRowsPerPage) => {
+          setFilters((f) => ({ ...f, limit: newRowsPerPage }));
+          setAppliedFilters((f) => ({ ...f, limit: newRowsPerPage }));
         }}
         uniqueKey="id"
         hover

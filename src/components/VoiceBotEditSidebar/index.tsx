@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Form, Spinner, Row, Col, Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import {
@@ -16,6 +16,7 @@ import {
   buildCreatePayload,
   buildUpdatePayload,
   getOutboundVoicebotSubmitError,
+  OUTBOUND_VOICEBOT_CREATE_COMPANY_ID,
   type OutboundVoicebotFormState,
 } from "@utils/voicebot/outboundVoicebotForm";
 import { GetCompanies } from "@utils/users";
@@ -179,15 +180,21 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
 }) => {
   const { data: session } = useSession();
   const isAdmin = String(session?.user?.is_admin ?? "") === "1";
-  const userCompanyIdentifier =
-    (session?.user as { company_identifier?: string })?.company_identifier ?? "";
-  const userCompanyName =
-    (session?.user as { company_name?: string })?.company_name ?? userCompanyIdentifier;
+  const sessionUser = session?.user as
+    | {
+        company_id?: string | null;
+        company_identifier?: string | null;
+      }
+    | undefined;
+  const userCompanyId = String(sessionUser?.company_id ?? "").trim();
+  const userCompanyIdentifier = String(sessionUser?.company_identifier ?? "").trim();
+  /** Non-admin API scope and `company_id` on create/update — same as full-page create flow. */
+  const resolvedSessionCompany = userCompanyId || userCompanyIdentifier;
   const isEditMode = Boolean(botId);
 
   const [form, setForm] = useState<OutboundVoicebotFormState>(() => defaultOutboundVoicebotForm());
   const [loadingBot, setLoadingBot] = useState(false);
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [trunks, setTrunks] = useState<Array<{ id: string; trunk_id?: string; name?: string }>>([]);
@@ -198,17 +205,23 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
     call: true,
   });
 
+  /** Tenant id for GET /trunks — admin: form company identifier, else sidebar `companyId` prop; others: session. */
+  const trunksCompanyScope = useMemo(() => {
+    const fromForm = String(form.company_id ?? "").trim();
+    const fromProp = String(companyId ?? "").trim();
+    if (isAdmin) {
+      return fromForm || fromProp || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+    }
+    const sessionScope = String(resolvedSessionCompany ?? "").trim();
+    return sessionScope || OUTBOUND_VOICEBOT_CREATE_COMPANY_ID;
+  }, [isAdmin, form.company_id, companyId, resolvedSessionCompany]);
+
   const fetchCompanies = useCallback(async () => {
     setLoadingCompanies(true);
     try {
       const res = await GetCompanies();
       if (res === false) { setCompanies([]); return; }
-      const opts = normalizeCompaniesResponse(res, { prefer: "company_id" }).map((c: { id: string; company_id?: string; identifier?: string; name: string }) => ({
-        id: c.id,
-        company_id: c.company_id ?? c.identifier ?? c.id,
-        name: c.name,
-      }));
-      setCompanies(opts);
+      setCompanies(normalizeCompaniesResponse(res));
     } catch {
       setCompanies([]);
     } finally {
@@ -218,7 +231,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
 
   const fetchTrunks = useCallback(async () => {
     try {
-      const res = await getTrunks();
+      const res = await getTrunks({ company_id: trunksCompanyScope });
       const list = Array.isArray(res)
         ? res
         : (
@@ -237,7 +250,19 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
     } catch {
       setTrunks([]);
     }
-  }, []);
+  }, [trunksCompanyScope]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setForm(defaultOutboundVoicebotForm());
+      setTrunks([]);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchTrunks().catch(() => undefined);
+  }, [isOpen, fetchTrunks]);
 
   // Load bot data for edit mode when sidebar opens
   useEffect(() => {
@@ -249,19 +274,32 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
       prompts: true,
       call: true,
     });
-    fetchCompanies();
-    fetchTrunks();
+    if (isAdmin) {
+      fetchCompanies();
+    }
     getVoicebot(botId, companyId ? { company_id: companyId } : undefined)
       .then((res: Record<string, unknown>) => {
         const d = getVoicebotDetail(res);
-        setForm(mapVoicebotDetailToForm(d, defaultOutboundVoicebotForm()));
+        const mapped = mapVoicebotDetailToForm(d, defaultOutboundVoicebotForm());
+        if (!isAdmin && resolvedSessionCompany) {
+          mapped.company_id = resolvedSessionCompany;
+        }
+        setForm(mapped);
       })
       .catch(() => {
         toast.error("Failed to load voice bot");
         onClose();
       })
       .finally(() => setLoadingBot(false));
-  }, [isOpen, botId, companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    isOpen,
+    botId,
+    companyId,
+    isAdmin,
+    resolvedSessionCompany,
+    fetchCompanies,
+    onClose,
+  ]);
 
   // Initialize create mode (no prefilled bot data).
   useEffect(() => {
@@ -269,7 +307,7 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
 
     setForm({
       ...defaultOutboundVoicebotForm(),
-      company_id: companyId || (isAdmin ? "" : userCompanyIdentifier),
+      company_id: isAdmin ? (companyId || "") : (companyId || resolvedSessionCompany),
     });
     setLoadingBot(false);
     setExpandedSections({
@@ -278,16 +316,16 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
       prompts: true,
       call: true,
     });
-    fetchCompanies();
-    fetchTrunks();
+    if (isAdmin) {
+      fetchCompanies();
+    }
   }, [
     isOpen,
     isEditMode,
     companyId,
     isAdmin,
-    userCompanyIdentifier,
+    resolvedSessionCompany,
     fetchCompanies,
-    fetchTrunks,
   ]);
 
   const handleSave = () => {
@@ -462,30 +500,39 @@ const VoicebotEditSidebar: React.FC<VoicebotEditSidebarProps> = ({
                       />
                   </Form.Group>
 
-                  <Form.Group className="mb-3" controlId="vb-company">
+                  {isAdmin ? (
+                    <Form.Group className="mb-3" controlId="vb-company">
                       <Form.Label style={sidebarStyles.label}>
                         Company <span style={{ color: "#ef4444" }}>*</span>
                       </Form.Label>
                       <Form.Select
-                        value={isAdmin ? form.company_id : userCompanyIdentifier}
-                        onChange={(e) => {
-                          if (isAdmin) setForm((f) => ({ ...f, company_id: e.target.value }));
-                        }}
-                        disabled={loadingCompanies || !isAdmin}
+                        value={form.company_id}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            company_id: e.target.value,
+                            trunk_id: "",
+                            transfer_trunk_id: "",
+                          }))
+                        }
+                        disabled={loadingCompanies}
                         style={sidebarStyles.input}
                       >
                         <option value="">Select company</option>
-                        {isAdmin
-                          ? companies.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))
-                          : (
-                              <option value={userCompanyIdentifier}>{userCompanyName}</option>
-                            )}
+                        {companies.map((c, i) => {
+                          const optValue = String(
+                            c.identifier ?? c.company_id ?? c.id ?? "",
+                          ).trim();
+                          if (!optValue) return null;
+                          return (
+                            <option key={`${optValue}-${i}`} value={optValue}>
+                              {c.name}
+                            </option>
+                          );
+                        })}
                       </Form.Select>
-                  </Form.Group>
+                    </Form.Group>
+                  ) : null}
 
                   <Form.Group className="mb-3" controlId="vb-trunk">
                       <Form.Label style={sidebarStyles.label}>

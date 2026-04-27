@@ -642,13 +642,8 @@ const TaskRow: React.FC<TaskRowProps> = ({
         onMouseLeave={() => setHovered(false)}
         style={{ backgroundColor: hovered ? "#f8fafc" : "#fafbfc" }}
       >
-        {/* Checkbox placeholder */}
-        <td style={{ width: 40, paddingLeft: 12 }}>
-          <input type="checkbox" style={{ cursor: "pointer" }} onClick={(e) => e.stopPropagation()} />
-        </td>
-
-        {/* Name column - indented */}
-        <td style={{ paddingLeft: indentLeft + 8, position: "relative" }}>
+        {/* Name column - indented (offset replaces former checkbox column) */}
+        <td style={{ paddingLeft: 40 + indentLeft + 8, position: "relative" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {/* Tree line indicator */}
             <span
@@ -863,11 +858,7 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
       onMouseLeave={() => setHovered(false)}
       style={{ backgroundColor: hovered ? "#f0f4ff" : "#f5f7fb" }}
     >
-      <td style={{ width: 40, paddingLeft: 12 }}>
-        <input type="checkbox" style={{ cursor: "pointer" }} onClick={(e) => e.stopPropagation()} />
-      </td>
-
-      <td style={{ paddingLeft: indentLeft + 8, position: "relative" }}>
+      <td style={{ paddingLeft: 40 + indentLeft + 8, position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {/* Indent spacer */}
           <span style={{ width: 14, display: "inline-block", flexShrink: 0 }} />
@@ -1164,8 +1155,6 @@ interface ExpandableProjectTableProps {
   // Toolbar
   toolbarConfig: ToolbarConfig;
   statsCards: StatsCardData[];
-  selectedProjects: Set<string>;
-  onSelectionChange: (selected: Project[]) => void;
   columns: TableColumn<Project>[];
   actions: TableAction<Project>[];
   /** `session.user.phone` (or `extension` fallback), normalized for matching `members[].extension_number`. */
@@ -1261,8 +1250,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   onPaginationChange,
   toolbarConfig,
   statsCards,
-  selectedProjects,
-  onSelectionChange,
   columns,
   actions,
   sessionUserPhoneOrExtension,
@@ -1286,25 +1273,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   /** Only one project row actions menu open at a time (controlled Dropdown). */
   const [openProjectActionsId, setOpenProjectActionsId] = useState<string | null>(null);
   const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
-
-  const buildSelectedProjectsFromIds = (selectedIds: Set<string>): Project[] => {
-    const selected: Project[] = [];
-    for (const project of projects) {
-      if (selectedIds.has(project.id)) selected.push(project);
-    }
-    return selected;
-  };
-
-  const handleProjectSelectionChange = (projectId: string, checked: boolean) => {
-    const nextSelectedIds = new Set(selectedProjects);
-    if (checked) nextSelectedIds.add(projectId);
-    else nextSelectedIds.delete(projectId);
-    onSelectionChange(buildSelectedProjectsFromIds(nextSelectedIds));
-  };
-
-  const handleToggleAllProjects = (checked: boolean) => {
-    onSelectionChange(checked ? projects : []);
-  };
 
   const fetchAndStoreProjectTasks = async (projectId: string) => {
     setLoadingTasks((prev) => new Set(prev).add(projectId));
@@ -1392,7 +1360,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       return (
         <tbody>
           <tr>
-            <td colSpan={7} className="text-center py-5" style={{ color: "#94a3b8" }}>
+            <td colSpan={6} className="text-center py-5" style={{ color: "#94a3b8" }}>
               <Spinner animation="border" size="sm" className="me-2" />
               Loading projects...
             </td>
@@ -1405,7 +1373,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       return (
         <tbody>
           <tr>
-            <td colSpan={7} className="text-center py-5">
+            <td colSpan={6} className="text-center py-5">
               <FolderOpen size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
               <div style={{ color: "#64748b" }}>No projects found</div>
             </td>
@@ -1420,8 +1388,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       const isExpanded = expandedProjects.has(project.id);
       const isLoadingTasks = loadingTasks.has(project.id);
       const tasks = projectTasks[project.id] || [];
-      const isSelected = selectedProjects.has(project.id);
-
       // Project row
       rows.push(
         <tr
@@ -1432,16 +1398,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           onMouseLeave={() => handleProjectRowMouseLeave(project.id)}
           style={{ backgroundColor: isExpanded ? "#f0f7ff" : undefined }}
         >
-          {/* Checkbox */}
-          <td style={{ width: 40, paddingLeft: 12 }} onClick={(e) => e.stopPropagation()}>
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => handleProjectSelectionChange(project.id, e.target.checked)}
-              style={{ cursor: "pointer" }}
-            />
-          </td>
-
           {/* Expand chevron + Project name */}
           <td style={{ position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1592,7 +1548,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         if (isLoadingTasks) {
           rows.push(
             <tr key={`loading-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
+              <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
                 <Spinner animation="border" size="sm" className="me-2" style={{ color: "#94a3b8" }} />
                 <span style={{ color: "#94a3b8", fontSize: "0.875rem" }}>Loading tasks...</span>
               </td>
@@ -1601,7 +1557,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         } else if (tasks.length === 0) {
           rows.push(
             <tr key={`empty-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
+              <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
                 No tasks found for this project.
               </td>
             </tr>
@@ -1626,7 +1582,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         if (canManageProjectFromMembers(project, sessionUserPhoneOrExtension)) {
           rows.push(
             <tr key={`add-task-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
+              <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
                 <button
                   style={{
                     background: "none",
@@ -1699,9 +1655,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         showActions={true}
         showToolbarActions={false}
         actionsLabel="Actions"
-        selectable={true}
-        selectedRows={projects.filter((p) => selectedProjects.has(p.id))}
-        onSelectionChange={onSelectionChange}
         pagination={{
           currentPage: pagination.page,
           rowsPerPage: pagination.limit,
@@ -1749,13 +1702,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
             <table className="table generic-table mb-0" style={{ width: "100%" }}>
               <thead className="generic-table-header">
                 <tr>
-                  <th className="generic-table-th" style={{ width: 40 }}>
-                    <input
-                      type="checkbox"
-                      onChange={(e) => handleToggleAllProjects(e.target.checked)}
-                      checked={projects.length > 0 && selectedProjects.size === projects.length}
-                    />
-                  </th>
                   <th className="generic-table-th">Project Name</th>
                   <th className="generic-table-th">Members</th>
 
@@ -1830,7 +1776,10 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
   const sidebarEndDate = formatProjectSidebarDate(
     selectedProjectDetails?.end_date ?? selectedProject.apiData?.end_date ?? undefined,
   );
-  const sidebarProjectColor = selectedProjectDetails?.color?.trim() || selectedProject.iconColor;
+  const sidebarProjectColor =
+    selectedProjectDetails?.color?.trim() ||
+    selectedProject.iconColor ||
+    "#3b82f6";
   const projectMembers = selectedProjectDetails?.members || selectedProject.members;
   const progressPercent = Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100);
 
@@ -2027,7 +1976,12 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
           fields: [
             { label: "Start Date", value: sidebarStartDate, type: "date", icon: Calendar },
             { label: "End Date", value: sidebarEndDate, type: "date", icon: CalendarDays },
-            { label: "Color", value: sidebarProjectColor.toUpperCase() },
+            {
+              label: "Color",
+              type: "color",
+              value: sidebarProjectColor,
+              copyable: true,
+            },
           ],
         },
         {
@@ -2896,7 +2850,6 @@ const WorkPlannerProjects = () => {
     endDateTo: "",
   });
   const [customTabs] = useState<TabConfig[]>([]);
-  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<ApiProject | null>(null);
   const [loadingProjectDetails, setLoadingProjectDetails] = useState(false);
@@ -3471,8 +3424,6 @@ const WorkPlannerProjects = () => {
                   onPaginationChange={(page, rowsPerPage) => setPagination((prev) => ({ ...prev, page, limit: rowsPerPage }))}
                   toolbarConfig={toolbarConfig}
                   statsCards={statsCardsData}
-                  selectedProjects={selectedProjects}
-                  onSelectionChange={(selected) => setSelectedProjects(new Set(selected.map((p) => p.id)))}
                   columns={projectTableColumns}
                   actions={projectTableActions}
                 />

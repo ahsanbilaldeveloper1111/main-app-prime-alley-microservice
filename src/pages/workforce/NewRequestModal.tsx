@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, type CSSProperties } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Form } from "react-bootstrap";
 import { toast } from "react-toastify";
 import WorkforceSidebarShell from "@components/workforce/WorkforceSidebarShell";
@@ -10,6 +10,7 @@ import {
   type UserRequestCategory,
   type UserRequestCategoryField,
 } from "@utils/staffManagement";
+import "@assets/scss/workforce-user-request.scss";
 
 export interface NewRequestModalProps {
   show: boolean;
@@ -56,16 +57,6 @@ const defaultForm: CreateFormState = {
   attachments: [],
 };
 
-const sidebarLabelStyle: CSSProperties = {
-  fontSize: "14px",
-  fontWeight: 600,
-  color: "#141414",
-};
-
-const dateFieldGroupStyle: CSSProperties = {
-  minWidth: 140,
-};
-
 type SidebarDateInputFieldProps = {
   label: string;
   value: string;
@@ -81,8 +72,8 @@ const SidebarDateInputField: React.FC<SidebarDateInputFieldProps> = ({
   helpText,
   onChange,
 }) => (
-  <Form.Group className="mb-3 flex-grow-1" style={dateFieldGroupStyle}>
-    <Form.Label style={sidebarLabelStyle}>{label}</Form.Label>
+  <Form.Group className="mb-3 flex-grow-1 new-request-dateFieldGroup">
+    <Form.Label className="new-request-label">{label}</Form.Label>
     <Form.Control
       type="date"
       value={value}
@@ -99,9 +90,11 @@ function resolveSubmitCategoryId(
   hasSubCategories: boolean,
   selectedParentId: number | "",
 ): number | "" {
+  if (hasSubCategories) {
+    return formCategoryId;
+  }
   if (formCategoryId !== "") return formCategoryId;
-  if (hasSubCategories) return selectedParentId;
-  return "";
+  return selectedParentId;
 }
 
 /** Collects non-null dynamic files from the form state */
@@ -285,6 +278,10 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
       selectedParentId,
     );
     const hasSubject = form.subject.trim().length > 0;
+    if (hasSubCategories && form.user_request_category_id === "") {
+      toast.error("Sub-category is required");
+      return;
+    }
     if (categoryId === "" || !hasSubject) {
       toast.error("Category and subject are required");
       return;
@@ -337,23 +334,6 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
   }, [onHide]);
 
   return (
-    <>
-      <style>
-        {`
-          .new-request-sidebar {
-            font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
-            color: #141414;
-          }
-          .new-request-sidebar :is(.form-control, .form-select, input, select, textarea) {
-            font-size: 14px;
-            color: #141414;
-          }
-          .new-request-sidebar :is(.form-control, .form-select, input, select) {
-            min-height: 40px;
-          }
-        `}
-      </style>
-
       <WorkforceSidebarShell
         isOpen={show}
         className="new-request-sidebar"
@@ -365,7 +345,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
         primaryDisabled={submitting}
       >
             <Form.Group className="mb-3">
-              <Form.Label style={sidebarLabelStyle}>
+              <Form.Label className="new-request-label">
                 Category <span className="text-danger">*</span>
               </Form.Label>
               <Form.Select
@@ -393,8 +373,8 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
 
             {hasSubCategories && (
               <Form.Group className="mb-3">
-                <Form.Label style={sidebarLabelStyle}>
-                  Sub-category (Optional)
+                <Form.Label className="new-request-label">
+                  Sub-category <span className="text-danger">*</span>
                 </Form.Label>
                 <Form.Select
                   value={form.user_request_category_id === "" ? "" : String(form.user_request_category_id)}
@@ -402,8 +382,9 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
                     const val = e.target.value;
                     setForm((f) => resetCategoryDependentFields(f, val === "" ? "" : Number(val)));
                   }}
+                  required
                 >
-                  <option value="">Select sub-category (optional)</option>
+                  <option value="">Select sub-category</option>
                   {subCategories.map((ch) => (
                     <option key={ch.id} value={ch.id}>
                       {ch.name ?? ch.code ?? `Sub-category ${ch.id}`}
@@ -414,7 +395,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
             )}
 
             <Form.Group className="mb-3">
-              <Form.Label style={sidebarLabelStyle}>
+              <Form.Label className="new-request-label">
                 Subject <span className="text-danger">*</span>
               </Form.Label>
               <Form.Control
@@ -427,7 +408,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
             </Form.Group>
 
             <Form.Group className="mb-3">
-              <Form.Label style={sidebarLabelStyle}>
+              <Form.Label className="new-request-label">
                 Reason
               </Form.Label>
               <Form.Control
@@ -457,25 +438,30 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
 
             {displayFieldsCategoryId != null && (isLoadingDisplayFields || displayFields.length > 0) && (
               <Form.Group className="mb-3">
-                <Form.Label style={sidebarLabelStyle}>
+                <Form.Label className="new-request-label">
                   Additional fields
                 </Form.Label>
-                <div className="border rounded p-3 bg-light">
+                <div className="new-request-additionalFieldsPanel">
+                  <div className="new-request-additionalFieldsHint">
+                    Fill out the category-specific details below.
+                  </div>
                   {isLoadingDisplayFields ? (
                     <p className="text-muted mb-0 small">Loading fields…</p>
                   ) : (
                     displayFields.map((field) => (
-                      <div key={field.id} className="mb-2">
-                        <Form.Label className="small mb-1">
+                      <div key={field.id} className="new-request-additionalFieldCard">
+                        <Form.Label className="mb-2 new-request-additionalFieldLabel">
                           {field.label ?? field.key}
-                          {field.required && " *"}
+                          {field.required && <span className="text-danger"> *</span>}
                         </Form.Label>
-                        <UserRequestDynamicFieldInput
-                          field={field}
-                          values={form.dynamic_fields}
-                          onValueChange={handleDynamicFieldChange}
-                          onFileChange={handleDynamicFileChange}
-                        />
+                        <div className="new-request-additionalFieldInput">
+                          <UserRequestDynamicFieldInput
+                            field={field}
+                            values={form.dynamic_fields}
+                            onValueChange={handleDynamicFieldChange}
+                            onFileChange={handleDynamicFileChange}
+                          />
+                        </div>
                       </div>
                     ))
                   )}
@@ -483,7 +469,6 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
               </Form.Group>
             )}
       </WorkforceSidebarShell>
-    </>
   );
 };
 

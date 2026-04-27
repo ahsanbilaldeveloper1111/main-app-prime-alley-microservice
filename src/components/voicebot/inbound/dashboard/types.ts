@@ -3,17 +3,23 @@ export interface CompanyRow {
   company_id?: string;
   identifier?: string;
   name?: string;
+  company_name?: string;
   subscription_tier?: string;
+  subscriptionTier?: string;
   [key: string]: unknown;
 }
 
 export interface BotRow {
   id?: string;
+  bot_id?: string;
   company_id?: string;
+  companyId?: string;
   company?: string;
   name?: string;
+  bot_name?: string;
   status?: string;
   is_active?: boolean;
+  isActive?: boolean;
   [key: string]: unknown;
 }
 
@@ -21,9 +27,14 @@ export interface CallRow {
   id?: string;
   session_id?: string;
   company?: string;
+  company_id?: string;
   company_name?: string;
+  /** Some API versions return camelCase. */
+  companyName?: string;
   bot?: string;
+  bot_id?: string;
   bot_name?: string;
+  botName?: string;
   status?: string;
   session_start_time?: string;
   call_duration_seconds?: number;

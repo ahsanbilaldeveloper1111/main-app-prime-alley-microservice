@@ -40,7 +40,26 @@ export function companyIdFromBotApi(data: Record<string, unknown>): string {
   if (typeof co === "string") return co;
   if (co && typeof co === "object") {
     const o = co as Record<string, unknown>;
-    return firstString(o.id, o.company_id);
+    return firstString(
+      o.id,
+      o.company_id,
+      o.identifier,
+      o.company_identifier,
+    );
+  }
+  return "";
+}
+
+/**
+ * Normalized status for voicebot inbound GET /calls/ rows.
+ * Responses may use `status`, `call_status`, or `state`.
+ */
+export function inboundCallListStatus(call: Record<string, unknown>): string {
+  const raw = call.status ?? call.call_status ?? call.state;
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw.trim().toLowerCase();
+  if (typeof raw === "number" || typeof raw === "boolean") {
+    return String(raw).toLowerCase();
   }
   return "";
 }

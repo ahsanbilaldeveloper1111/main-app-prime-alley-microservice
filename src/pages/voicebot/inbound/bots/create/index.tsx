@@ -1,9 +1,10 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useState, useEffect, useRef } from "react";
+import React, { ReactElement, useState, useEffect, useRef, useMemo, useCallback } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import {
   getBot,
+  getSipTrunks,
   postBots,
   putBot,
   type CreateBotPayload,
@@ -399,11 +400,7 @@ function buildCreateBotPayload(form: CreateBotPayload): CreateBotPayload {
 async function loadCompanyOptions(): Promise<CompanyOption[]> {
   const res = await GetCompanies();
   if (res === false) return [];
-  return normalizeCompaniesResponse(res, { prefer: "company_id" }).map((c) => ({
-    id: c.id,
-    company_id: c.company_id ?? c.identifier ?? c.id,
-    name: c.name,
-  }));
+  return normalizeCompaniesResponse(res);
 }
 
 function validationItem(
@@ -595,8 +592,148 @@ function useSessionCompany() {
   };
 }
 
+type SipTrunkOption = { sip_trunk_id: string; name: string; caller_ids: string[] };
+
+function listFromSipTrunksResponse(res: unknown): unknown[] {
+  if (Array.isArray(res)) return res;
+  const o = res as Record<string, unknown> | null | undefined;
+  const inner = o?.data ?? o?.results;
+  return Array.isArray(inner) ? inner : [];
+}
+
+function callerIdsFromSipTrunkItem(item: Record<string, unknown>): string[] {
+  const raw = item.caller_ids ?? item.callerIds;
+  if (raw == null) {
+    return [];
+  }
+  if (Array.isArray(raw)) {
+    return raw
+      .map((x) => (typeof x === "string" || typeof x === "number" ? String(x) : ""))
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
+  if (typeof raw === "string" && raw.trim()) {
+    return raw
+      .split(/[,\n]/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
+  return [];
+}
+
+/** First usable trunk id field; avoids String() on objects (e.g. nested id payloads). */
+function sipTrunkRowIdFromItem(item: Record<string, unknown>): string {
+  const candidates = [item.sip_trunk_id, item.id, item.trunk_id];
+  for (const value of candidates) {
+    if (value == null || typeof value === "object") continue;
+    if (typeof value === "string") {
+      const t = value.trim();
+      if (t) return t;
+    }
+    if (
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint"
+    ) {
+      const s = String(value).trim();
+      if (s) return s;
+    }
+  }
+  return "";
+}
+
+function normalizeSipTrunkRows(list: unknown[]): SipTrunkOption[] {
+  const out: SipTrunkOption[] = [];
+  for (const raw of list) {
+    const item = raw as Record<string, unknown>;
+    const id = sipTrunkRowIdFromItem(item);
+    if (!id) continue;
+    const name = typeof item.name === "string" ? item.name : id;
+    out.push({ sip_trunk_id: id, name, caller_ids: callerIdsFromSipTrunkItem(item) });
+  }
+  return out;
+}
+
+/**
+ * GET /sip-trunks/ expects `company_id` to be the company identifier (TMS/slug), not a numeric
+ * id. The company `<Form.Select value={c.id}>` may be keyed by a non-identifier; prefer `identifier` when set.
+ */
+function companyIdentifierParamForSipTrunks(
+  companies: CompanyOption[],
+  selectedCompanyValue: string,
+): string {
+  const t = selectedCompanyValue.trim();
+  if (!t) return "";
+  const c = companies.find(
+    (x) => x.id === t || x.identifier === t || x.company_id === t,
+  );
+  if (c?.identifier?.trim()) return c.identifier.trim();
+  return t;
+}
+
+/** If the selected trunk id is not in the freshly loaded list, clear trunk + phone. */
+function clearStaleSipTrunkFormSelection(
+  prev: CreateBotPayload,
+  rows: SipTrunkOption[],
+): CreateBotPayload {
+  const current = prev.configuration?.sip_trunk_id?.trim() ?? "";
+  if (!current) return prev;
+  const stillValid = rows.some((row) => row.sip_trunk_id === current);
+  if (stillValid) return prev;
+  return {
+    ...prev,
+    configuration: {
+      ...prev.configuration,
+      sip_trunk_id: "",
+      phone_number: "",
+    },
+  };
+}
+
+/** Loads SIP trunks for the current company; `companyIdForSipTrunks` must be the API identifier. */
+function useSipTrunksForCompany(
+  companyIdForSipTrunks: string,
+  setForm: React.Dispatch<React.SetStateAction<CreateBotPayload>>,
+) {
+  const [sipTrunks, setSipTrunks] = useState<SipTrunkOption[]>([]);
+  const [loadingSipTrunks, setLoadingSipTrunks] = useState(false);
+  const paramTrim = companyIdForSipTrunks.trim();
+
+  useEffect(() => {
+    if (!paramTrim) {
+      setSipTrunks([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingSipTrunks(true);
+    getSipTrunks({ company_id: paramTrim })
+      .then((res) => {
+        if (cancelled) return;
+        const rows = normalizeSipTrunkRows(listFromSipTrunksResponse(res));
+        setSipTrunks(rows);
+        setForm((prev) => clearStaleSipTrunkFormSelection(prev, rows));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          toast.error("Failed to load SIP trunks");
+          setSipTrunks([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSipTrunks(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [paramTrim, setForm]);
+
+  return { sipTrunks, loadingSipTrunks };
+}
+
 function useCompanies(
   setForm: React.Dispatch<React.SetStateAction<CreateBotPayload>>,
+  /** When true, do not set company to the first list option (edit mode, or /edit before router isReady). */
+  skipDefaultingFirstCompany: boolean,
 ) {
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
@@ -605,30 +742,39 @@ function useCompanies(
     loadCompanyOptions()
       .then((opts) => {
         setCompanies(opts);
-        if (opts.length > 0)
+        if (skipDefaultingFirstCompany) return;
+        if (opts.length > 0) {
           setForm((f) => (f.company_id ? f : { ...f, company_id: opts[0].id }));
+        }
       })
       .catch(() => {
         toast.error("Failed to load companies");
         setCompanies([]);
       })
       .finally(() => setLoadingCompanies(false));
-  }, [setForm]);
+  }, [setForm, skipDefaultingFirstCompany]);
   return { companies, setCompanies, loadingCompanies };
 }
 
 function useBotLoader(
   botId: string | undefined,
   isEditMode: boolean,
+  isEditQueryPending: boolean,
   setForm: React.Dispatch<React.SetStateAction<CreateBotPayload>>,
   router: ReturnType<typeof useRouter>,
 ) {
-  const [loadingBot, setLoadingBot] = useState(isEditMode);
+  const [loadingBot, setLoadingBot] = useState(
+    () => isEditQueryPending || (isEditMode && Boolean(botId)),
+  );
   const loadSeqRef = useRef(0);
   const routerRef = useRef(router);
   routerRef.current = router;
 
   useEffect(() => {
+    if (isEditQueryPending) {
+      setLoadingBot(true);
+      return;
+    }
     if (!isEditMode || !botId) {
       setLoadingBot(false);
       return;
@@ -668,17 +814,20 @@ function useBotLoader(
     return () => {
       cancelled = true;
     };
-  }, [isEditMode, botId, setForm]);
+  }, [isEditMode, isEditQueryPending, botId, setForm]);
 
   return loadingBot;
 }
 
 const VoicebotInboundBotsCreate = () => {
   const router = useRouter();
+  const isReady = router.isReady;
   const botId =
     typeof router.query.id === "string" ? router.query.id : undefined;
-  const isEditMode = Boolean(botId);
-  const pageCopy = getPageCopy(isEditMode);
+  const isOnEditPath = router.pathname.includes("/inbound/bots/edit");
+  const isEditQueryPending = isOnEditPath && !isReady;
+  const isEditMode = isReady && Boolean(botId);
+  const pageCopy = getPageCopy(isOnEditPath);
   const { isAdmin, userCompanyId, userCompanyIdentifier } = useSessionCompany();
   const [activeTab, setActiveTab] = useState<string>(TAB_KEYS.basic);
   const [form, setForm] = useState<CreateBotPayload>({
@@ -688,8 +837,23 @@ const VoicebotInboundBotsCreate = () => {
     status: "draft",
     configuration: { ...defaultConfig },
   });
-  const { companies, loadingCompanies } = useCompanies(setForm);
-  const loadingBot = useBotLoader(botId, isEditMode, setForm, router);
+  const skipDefaultCompany = isEditMode || isEditQueryPending;
+  const { companies, loadingCompanies } = useCompanies(setForm, skipDefaultCompany);
+  const loadingBot = useBotLoader(
+    botId,
+    isEditMode,
+    isEditQueryPending,
+    setForm,
+    router,
+  );
+  const companyIdForSipTrunks = useMemo(
+    () => companyIdentifierParamForSipTrunks(companies, form.company_id),
+    [companies, form.company_id],
+  );
+  const { sipTrunks, loadingSipTrunks } = useSipTrunksForCompany(
+    companyIdForSipTrunks,
+    setForm,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [expandedValidation, setExpandedValidation] = useState<string | null>(
     null,
@@ -700,9 +864,11 @@ const VoicebotInboundBotsCreate = () => {
 
   useEffect(() => {
     if (isAdmin) return;
+    if (isEditMode) return;
+    if (isEditQueryPending) return;
     const cid = userCompanyId || userCompanyIdentifier;
     if (cid) setForm((f) => ({ ...f, company_id: cid }));
-  }, [isAdmin, userCompanyId, userCompanyIdentifier]);
+  }, [isAdmin, isEditMode, isEditQueryPending, userCompanyId, userCompanyIdentifier]);
 
   const updateConfig = (key: keyof BotConfiguration, value: unknown) => {
     setForm((f) => ({
@@ -737,6 +903,69 @@ const VoicebotInboundBotsCreate = () => {
   const cfg = form.configuration ?? defaultConfig;
   const validationItems = getValidationItems(form);
 
+  const selectedSipTrunk = useMemo(
+    () =>
+      sipTrunks.find(
+        (t) => t.sip_trunk_id === String(cfg.sip_trunk_id ?? "").trim(),
+      ),
+    [sipTrunks, cfg.sip_trunk_id],
+  );
+
+  /** Caller IDs for the select; include current `phone_number` if not in the list (legacy / API drift). */
+  const phoneNumberOptions = useMemo(() => {
+    const ids = selectedSipTrunk?.caller_ids ?? [];
+    if (!ids.length) return [];
+    const p = String(cfg.phone_number ?? "").trim();
+    if (p && !ids.includes(p)) {
+      return [p, ...ids];
+    }
+    return ids;
+  }, [selectedSipTrunk, cfg.phone_number]);
+
+  const handleSipTrunkChange = useCallback(
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const trunkId = e.target.value;
+      const trunk = sipTrunks.find((t) => t.sip_trunk_id === trunkId);
+      setForm((f) => {
+        let nextPhone = "";
+        if (trunkId && trunk) {
+          nextPhone =
+            trunk.caller_ids.length > 0 ? (trunk.caller_ids[0] ?? "") : "";
+        }
+        return {
+          ...f,
+          configuration: {
+            ...f.configuration,
+            sip_trunk_id: trunkId,
+            phone_number: nextPhone,
+          },
+        };
+      });
+    },
+    [sipTrunks],
+  );
+
+  /**
+   * After SIP trunks load (e.g. edit mode), set phone to the first caller_id when
+   * trunk is selected but number is still empty. Does not re-run on phone alone (deps).
+   */
+  useEffect(() => {
+    const tid = String(cfg.sip_trunk_id ?? "").trim();
+    if (!tid) return;
+    const trunk = sipTrunks.find((t) => t.sip_trunk_id === tid);
+    if (!trunk?.caller_ids?.length) return;
+    setForm((f) => {
+      if (String(f.configuration?.phone_number ?? "").trim()) return f;
+      return {
+        ...f,
+        configuration: {
+          ...f.configuration,
+          phone_number: trunk.caller_ids[0] ?? "",
+        },
+      };
+    });
+  }, [sipTrunks, cfg.sip_trunk_id, setForm]);
+
   const inputStyle = {
     width: "100%" as const,
     padding: "10px 12px",
@@ -752,6 +981,24 @@ const VoicebotInboundBotsCreate = () => {
     color: "#6b7280",
     marginBottom: "6px",
   };
+
+  const hasCompanyForSip = Boolean(form.company_id?.trim());
+  let sipTrunkDefaultOptionLabel = "Select SIP trunk";
+  if (!hasCompanyForSip) {
+    sipTrunkDefaultOptionLabel =
+      "Select a company in Basic Information first";
+  } else if (loadingSipTrunks) {
+    sipTrunkDefaultOptionLabel = "Loading…";
+  }
+
+  const hasSipTrunkSelected = Boolean(cfg.sip_trunk_id?.trim());
+  let phoneNumberFreeTextPlaceholder = "Select a SIP trunk first";
+  if (hasSipTrunkSelected) {
+    phoneNumberFreeTextPlaceholder =
+      "No caller_ids on this trunk; enter a number";
+  }
+  const sipTrunkSelectDisabled = hasCompanyForSip ? loadingSipTrunks : true;
+  const phoneNumberFreeTextDisabled = !hasSipTrunkSelected;
 
   if (loadingBot) return <LoadingBotPlaceholder />;
 
@@ -1278,31 +1525,58 @@ const VoicebotInboundBotsCreate = () => {
                       >
                         <Form.Group className="mb-3">
                           <Form.Label style={labelStyle}>
-                            SIP Trunk ID *
+                            SIP Trunk *
                           </Form.Label>
-                          <Form.Control
+                          <Form.Select
                             value={cfg.sip_trunk_id ?? ""}
-                            onChange={(e) =>
-                              updateConfig("sip_trunk_id", e.target.value)
-                            }
-                            placeholder="SIP trunk identifier"
+                            onChange={handleSipTrunkChange}
                             required
+                            disabled={sipTrunkSelectDisabled}
                             style={inputStyle}
-                          />
+                          >
+                            <option value="">{sipTrunkDefaultOptionLabel}</option>
+                            {sipTrunks.map((t) => (
+                              <option
+                                key={t.sip_trunk_id}
+                                value={t.sip_trunk_id}
+                              >
+                                {t.name} ({t.sip_trunk_id})
+                              </option>
+                            ))}
+                          </Form.Select>
                         </Form.Group>
                         <Form.Group className="mb-3">
                           <Form.Label style={labelStyle}>
-                            Phone Number *
+                            Phone Number (caller ID) *
                           </Form.Label>
-                          <Form.Control
-                            value={cfg.phone_number ?? ""}
-                            onChange={(e) =>
-                              updateConfig("phone_number", e.target.value)
-                            }
-                            placeholder="Phone number"
-                            required
-                            style={inputStyle}
-                          />
+                          {phoneNumberOptions.length > 0 ? (
+                            <Form.Select
+                              value={cfg.phone_number ?? ""}
+                              onChange={(e) =>
+                                updateConfig("phone_number", e.target.value)
+                              }
+                              required
+                              style={inputStyle}
+                            >
+                              <option value="">Select caller ID</option>
+                              {phoneNumberOptions.map((n) => (
+                                <option key={n} value={n}>
+                                  {n}
+                                </option>
+                              ))}
+                            </Form.Select>
+                          ) : (
+                            <Form.Control
+                              value={cfg.phone_number ?? ""}
+                              onChange={(e) =>
+                                updateConfig("phone_number", e.target.value)
+                              }
+                              placeholder={phoneNumberFreeTextPlaceholder}
+                              required
+                              style={inputStyle}
+                              disabled={phoneNumberFreeTextDisabled}
+                            />
+                          )}
                         </Form.Group>
                       </div>
                     </Tab.Pane>

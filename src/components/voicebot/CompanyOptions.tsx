@@ -2,6 +2,7 @@ import React from "react";
 
 export type CompanyOption = {
   id: string;
+  identifier?: string;
   company_id?: string;
   name: string;
 };
@@ -20,11 +21,15 @@ export function CompanyOptions({
   if (isAdmin) {
     return (
       <>
-        {companies.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
+        {companies.map((c, i) => {
+          const value = String(c.identifier ?? c.company_id ?? c.id ?? "").trim();
+          if (!value) return null;
+          return (
+            <option key={`co-${i}-${value}`} value={value}>
+              {c.name}
+            </option>
+          );
+        })}
       </>
     );
   }

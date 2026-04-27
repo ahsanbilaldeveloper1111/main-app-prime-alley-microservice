@@ -1,4 +1,9 @@
 import moment from "moment";
+import {
+  isStoredAsUtcMidnightCalendarDue,
+  parseApiDueTimeToTimeInput,
+  shouldSuppressDueTimeInListCell,
+} from "@utils/plannerTaskDueTime";
 import React from "react";
 import { Button } from "react-bootstrap";
 import { FiSearch } from "react-icons/fi";
@@ -106,9 +111,41 @@ export function TaskCompleteCircleButton({
   );
 }
 
+/** True when `due_time` from the API should affect the list cell (non-empty after parse). */
+export function isTaskDueTimePrefilled(dueTimeRaw: string | null | undefined): boolean {
+  return parseApiDueTimeToTimeInput(dueTimeRaw).length > 0;
+}
+
+function formatHhMmTo12Hour(hhMm: string): string {
+  const parsed = moment(hhMm, "HH:mm", true);
+  return parsed.isValid() ? parsed.format("h:mm A") : hhMm;
+}
+
+function taskDueDateListTimeClock12h(
+  dueDateIso: string,
+  dueTimeRaw: string | null | undefined,
+  m: moment.Moment,
+): string {
+  const useExplicitDueTime =
+    isTaskDueTimePrefilled(dueTimeRaw) &&
+    !shouldSuppressDueTimeInListCell(dueDateIso, dueTimeRaw);
+  if (useExplicitDueTime) {
+    const hhMm = parseApiDueTimeToTimeInput(dueTimeRaw);
+    if (hhMm === "") return "";
+    return formatHhMmTo12Hour(hhMm);
+  }
+  const dueHasClockInIso = /T\d{2}:\d{2}/.test(String(dueDateIso).trim());
+  if (dueHasClockInIso && !isStoredAsUtcMidnightCalendarDue(dueDateIso)) {
+    return m.format("h:mm A");
+  }
+  return "";
+}
+
+/** Date + optional time in 12-hour form; omits clock for UTC-midnight “date-only” dues unless a real `due_time` is present. */
 export function formatTaskDueDateCellParts(
   dueDateIso: string | null | undefined,
   rowStatus: "pending" | "completed" | "overdue",
+  dueTimeRaw?: string | null,
 ): { label: string; color: string; fontWeight: number } {
   if (!dueDateIso) {
     return { label: "—", color: "#9ca3af", fontWeight: 300 };
@@ -117,13 +154,16 @@ export function formatTaskDueDateCellParts(
   const overdue = m.isBefore(moment()) && rowStatus !== "completed";
   const isToday = m.isSame(moment(), "day");
   const isTomorrow = m.isSame(moment().add(1, "day"), "day");
+  const timeClock = taskDueDateListTimeClock12h(dueDateIso, dueTimeRaw, m);
   let label: string;
   if (isToday) {
-    label = `Today at ${m.format("HH:mm")}`;
+    label = timeClock ? `Today at ${timeClock}` : "Today";
   } else if (isTomorrow) {
-    label = `Tomorrow at ${m.format("HH:mm")}`;
+    label = timeClock ? `Tomorrow at ${timeClock}` : "Tomorrow";
   } else {
-    label = m.format("D MMMM YYYY HH:mm");
+    label = timeClock
+      ? `${m.format("D MMMM YYYY")} at ${timeClock}`
+      : m.format("D MMMM YYYY");
   }
   return {
     label,

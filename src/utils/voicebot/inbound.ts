@@ -35,10 +35,23 @@ export interface UpdateCompanyPayload {
   company_id?: string;
 }
 
-/** GET /companies/ - List companies. Set show_inactive=true to include inactive. */
+/**
+ * GET users/getCompanies — company list for the current user (aligned with `GetCompanies` in `@utils/users`).
+ * Query params `show_inactive` / `company_id` are forwarded when the API supports them.
+ * Voicebot company CRUD still uses `${PREFIX}/companies/…`.
+ */
 export const getCompanies = async (params?: ListCompaniesParams) => {
-  const response = await axiosInstance.get(`${PREFIX}/companies`, { params });
-  return response.data;
+  const response = await axiosInstance.get("users/getCompanies", { params });
+  const body = response.data;
+  if (
+    body &&
+    typeof body === "object" &&
+    (body as { code?: number }).code === 200 &&
+    "data" in body
+  ) {
+    return (body as { data: unknown }).data;
+  }
+  return body;
 };
 
 /** POST /companies/ - Create a new company */
@@ -245,16 +258,88 @@ export const switchBotVersion = async (botId: string, version: number) => {
 };
 
 // ---------------------------------------------------------------------------
+// SIP trunks
+// ---------------------------------------------------------------------------
+
+export interface ListSipTrunksParams {
+  company_id?: string;
+}
+
+/** Row shape for GET /sip-trunks/ list items (fields vary by API version). */
+export interface SipTrunkListItem {
+  sip_trunk_id?: string;
+  id?: string;
+  trunk_id?: string;
+  name?: string;
+  caller_ids?: string[];
+  company_id?: string;
+  company_name?: string;
+  company?: string | Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/** GET /sip-trunks/ - List SIP trunks (scoped by `company_id` when provided). */
+export const getSipTrunks = async (params?: ListSipTrunksParams) => {
+  const response = await axiosInstance.get(`${PREFIX}/sip-trunks/`, { params });
+  return response.data;
+};
+
+/**
+ * POST /sip-trunks/ - Create SIP trunk. `company_id` is the company identifier (TMS/slug) when
+ * available. Optional fields match API defaults: `sip_address` "" = any origin, `caller_ids` [] = none.
+ */
+export interface CreateSipTrunkPayload {
+  company_id: string;
+  name: string;
+  /** Allowed origin; empty string = any origin. */
+  sip_address: string;
+  caller_ids: string[];
+}
+
+export const postSipTrunk = async (payload: CreateSipTrunkPayload) => {
+  const response = await axiosInstance.post(
+    `${PREFIX}/sip-trunks/`,
+    payload,
+  );
+  return response.data;
+};
+
+/** DELETE /sip-trunks/{trunk_id}/ - Remove a SIP trunk. */
+export const deleteSipTrunk = async (trunkId: string) => {
+  const id = String(trunkId ?? "").trim();
+  if (!id) {
+    throw new Error("trunk_id is required");
+  }
+  const enc = encodeURIComponent(id);
+  const response = await axiosInstance.delete(
+    `${PREFIX}/sip-trunks/${enc}/`,
+  );
+  return response.data;
+};
+
+// ---------------------------------------------------------------------------
 // Calls
 // ---------------------------------------------------------------------------
 
+/**
+ * Query parameters for GET /calls/.
+ *
+ * `company_id` is required by the API at runtime; kept optional here because
+ * admin-facing views may omit it when aggregating across tenants.
+ */
 export interface ListCallsParams {
   company_id?: string;
   bot_id?: string;
   status?: string;
-  start_date?: string;
-  end_date?: string;
+  caller_phone?: string;
+  /** ISO datetime — calls on or after this time. */
+  date_from?: string;
+  /** ISO datetime — calls on or before this time. */
+  date_to?: string;
+  /** Records per page (max 100). */
   limit?: number;
+  /** Records to skip. */
+  offset?: number;
 }
 
 export interface CreateCallPayload {

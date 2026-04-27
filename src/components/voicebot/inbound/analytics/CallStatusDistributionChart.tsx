@@ -51,11 +51,15 @@ const CallStatusDistributionChart = ({ loading, data, totalCalls }: CallStatusDi
               cx="50%"
               cy="50%"
               outerRadius={100}
+              isAnimationActive={false}
               label={(props: Record<string, unknown>) =>
                 Number(props.percent) * 100 >= 5 ? `${(Number(props.percent) * 100).toFixed(0)}%` : null}
             >
-              {data.map((entry) => (
-                <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? defaultStatusColor} />
+              {data.map((entry, index) => (
+                <Cell
+                  key={`${entry.name}-${index}-${entry.value}`}
+                  fill={STATUS_COLORS[entry.name] ?? defaultStatusColor}
+                />
               ))}
             </Pie>
             <Tooltip
