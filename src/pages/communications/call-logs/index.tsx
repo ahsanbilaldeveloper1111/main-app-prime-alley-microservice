@@ -360,11 +360,26 @@ const CallLogs = () => {
         setTotalCalls(total);
 
         if (response?.summary) {
+          const selectedExtensionFilter = Array.isArray(
+            appliedFiltersRef.current?.extension_number,
+          )
+            ? (appliedFiltersRef.current.extension_number as string[])
+            : [];
           setShowDateRange(true);
           const dataFilters = response?.filters;
           setStartDateTime(dataFilters?.start_datetime);
           setEndDateTime(dataFilters?.end_datetime);
-          setSummary(response.summary);
+          setSummary({
+            ...response.summary,
+            // Keep metrics aligned with visible results.
+            // If no rows are returned, extension metric should be 0.
+            extensions:
+              rowsArray.length === 0
+                ? 0
+                : selectedExtensionFilter.length > 0
+                  ? selectedExtensionFilter.length
+                  : response.summary.extensions,
+          });
         }
 
         return response;
@@ -488,6 +503,13 @@ const CallLogs = () => {
     setCurrentFilters,
     handleFiltersChange,
   );
+
+  const formatFilterDateTimeLabel = useCallback((value: unknown) => {
+    if (typeof value !== "string" || value.trim() === "") return undefined;
+    const parsed = moment(value);
+    if (!parsed.isValid()) return String(value);
+    return parsed.format("DD MMM YYYY, hh:mm A");
+  }, []);
 
   const tableToolbar = useMemo<any>(() => {
     return {
@@ -620,9 +642,7 @@ const CallLogs = () => {
           label: "Start Date & Time",
           showDropdown: true,
           active: Boolean(currentFilters.start_datetime),
-          activeLabel: currentFilters.start_datetime
-            ? String(currentFilters.start_datetime)
-            : undefined,
+          activeLabel: formatFilterDateTimeLabel(currentFilters.start_datetime),
           activeLabelOnly: true,
           dropdownContent: createDateTimeDropdownContent(
             currentFilters.start_datetime ?? "",
@@ -637,9 +657,7 @@ const CallLogs = () => {
           label: "End Date & Time",
           showDropdown: true,
           active: Boolean(currentFilters.end_datetime),
-          activeLabel: currentFilters.end_datetime
-            ? String(currentFilters.end_datetime)
-            : undefined,
+          activeLabel: formatFilterDateTimeLabel(currentFilters.end_datetime),
           activeLabelOnly: true,
           dropdownContent: createDateTimeDropdownContent(
             currentFilters.end_datetime ?? "",
@@ -673,6 +691,7 @@ const CallLogs = () => {
     handleResetFiltersClick,
     hasUnappliedFilterChanges,
     hasNonDefaultFilters,
+    formatFilterDateTimeLabel,
   ]);
 
   return (

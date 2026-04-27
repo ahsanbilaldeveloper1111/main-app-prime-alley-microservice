@@ -622,6 +622,13 @@ const CallRecordings: NextPage & {
     handleFiltersChange,
   );
 
+  const formatFilterDateTimeLabel = useCallback((value: unknown) => {
+    if (typeof value !== "string" || value.trim() === "") return undefined;
+    const parsed = moment(value);
+    if (!parsed.isValid()) return String(value);
+    return parsed.format("DD MMM YYYY, hh:mm A");
+  }, []);
+
   const selectedStartDateTime = String(
     appliedFilters?.start_date || startDateTime || "",
   );
@@ -718,9 +725,7 @@ const CallRecordings: NextPage & {
           label: "Start Date & Time",
           showDropdown: true,
           active: Boolean(currentFilters.start_date),
-          activeLabel: currentFilters.start_date
-            ? String(currentFilters.start_date)
-            : undefined,
+          activeLabel: formatFilterDateTimeLabel(currentFilters.start_date),
           activeLabelOnly: true,
           dropdownContent: createDateTimeDropdownContent(
             currentFilters.start_date ?? "",
@@ -734,9 +739,7 @@ const CallRecordings: NextPage & {
           label: "End Date & Time",
           showDropdown: true,
           active: Boolean(currentFilters.end_date),
-          activeLabel: currentFilters.end_date
-            ? String(currentFilters.end_date)
-            : undefined,
+          activeLabel: formatFilterDateTimeLabel(currentFilters.end_date),
           activeLabelOnly: true,
           dropdownContent: createDateTimeDropdownContent(
             currentFilters.end_date ?? "",
@@ -825,6 +828,7 @@ const CallRecordings: NextPage & {
     handleResetFiltersClick,
     hasUnappliedFilterChanges,
     hasNonDefaultFilters,
+    formatFilterDateTimeLabel,
   ]);
 
   const handleDownload = async (props: any) => {
