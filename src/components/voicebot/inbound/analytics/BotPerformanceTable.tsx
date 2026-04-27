@@ -3,6 +3,8 @@ import { Table } from "react-bootstrap";
 
 export interface BotPerformanceRow {
   name: string;
+  /** Stable id for GET /bots/ name lookup (may differ from display `name`). */
+  botLookupId?: string;
   total: number;
   completed: number;
   transferred: number;

@@ -36,6 +36,8 @@ type ContactFormBase = {
   phone_country_code: string;
   phoneNumber: string;
   campaign_id: number | null;
+  campaign_name: string | null;
+  campaign_status: string | null;
   contact_owner: string | null;
   lifecycle_stage: string;
   disposition: string;
@@ -84,6 +86,32 @@ function resolveCampaignIdFromSources(
   const nestedRaw = item.campaign ?? d.campaign;
   if (nestedRaw && typeof nestedRaw === "object") {
     return coerceId((nestedRaw as { id?: unknown }).id);
+  }
+  return null;
+}
+
+/** Extracts the campaign display name (when available) from either a top-level or nested shape. */
+function resolveCampaignNameFromSources(
+  item: Record<string, unknown>,
+  d: Record<string, unknown>,
+): string | null {
+  const nestedRaw = item.campaign ?? d.campaign;
+  if (nestedRaw && typeof nestedRaw === "object") {
+    const name = (nestedRaw as { name?: unknown }).name;
+    if (typeof name === "string" && name.trim() !== "") return name;
+  }
+  return null;
+}
+
+/** Extracts the campaign status (when available) so we can lock inactive campaigns in the edit form. */
+function resolveCampaignStatusFromSources(
+  item: Record<string, unknown>,
+  d: Record<string, unknown>,
+): string | null {
+  const nestedRaw = item.campaign ?? d.campaign;
+  if (nestedRaw && typeof nestedRaw === "object") {
+    const status = (nestedRaw as { status?: unknown }).status;
+    if (typeof status === "string" && status.trim() !== "") return status;
   }
   return null;
 }
@@ -232,6 +260,8 @@ export function createEmptyCrmListContactFormState(
     phone_country_code: "",
     phoneNumber: "",
     campaign_id: null,
+    campaign_name: null,
+    campaign_status: null,
     contact_owner: options?.defaultContactOwner ?? null,
     lifecycle_stage: "Lead",
     disposition: "",
@@ -281,6 +311,8 @@ export function mapCrmDataItemToContactFormState(
     phone_country_code,
     phoneNumber,
     campaign_id: resolveCampaignIdFromSources(anyItem, d),
+    campaign_name: resolveCampaignNameFromSources(anyItem, d),
+    campaign_status: resolveCampaignStatusFromSources(anyItem, d),
     contact_owner: (anyItem.user_extension ??
       d.contact_owner ??
       anyItem.contact_owner ??

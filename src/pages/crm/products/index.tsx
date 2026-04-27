@@ -27,7 +27,6 @@ import {
 import Select from "react-select";
 import CreatableSelect from "react-select/creatable";
 import {
-  AlertCircle,
   PlusCircle,
   Eye,
   Edit,
@@ -51,6 +50,9 @@ import {
   CRM_DIALOG_SECONDARY_BUTTON_STYLE,
 } from "@components/crm/crmDialogActionButtonStyles";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { formatDateForTable, normalizeSearchQuery } from "@utils/Helper";
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
@@ -81,6 +83,151 @@ const DEFAULT_PRODUCT_TABLE_COLUMNS = [
   "status",
   "actions",
 ];
+
+const normalizeIndustryId = (industryId: unknown): number | null => {
+  if (industryId === null || industryId === undefined) {
+    return null;
+  }
+  if (typeof industryId === "string") {
+    const parsed = Number.parseInt(industryId, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  if (typeof industryId === "number") {
+    return industryId;
+  }
+  return null;
+};
+
+const getStatusByFilterId = (filterId: string): "Active" | "Inactive" | null => {
+  if (filterId === "active") {
+    return "Active";
+  }
+  if (filterId === "inactive") {
+    return "Inactive";
+  }
+  return null;
+};
+
+const getProductSubmitButtonLabel = (
+  isSubmitting: boolean,
+  isEditing: boolean,
+): string => {
+  if (isSubmitting) {
+    return isEditing ? "Updating Product..." : "Adding Product...";
+  }
+  if (isEditing) {
+    return "Update Product";
+  }
+  return "Add Product";
+};
+
+const PRODUCT_SIDEBAR_LABEL_STYLE = {
+  display: "block",
+  fontSize: "14px",
+  fontWeight: 600,
+  color: "#141414",
+  marginBottom: "8px",
+};
+
+const PRODUCT_SIDEBAR_FIELD_STYLE = {
+  marginBottom: "20px",
+};
+
+const PRODUCT_SIDEBAR_INPUT_STYLE = {
+  width: "100%",
+  minHeight: "40px",
+  padding: "10px 12px",
+  border: "1px solid #8a8a8a",
+  borderRadius: "4px",
+  fontSize: "14px",
+  outline: "none",
+};
+
+const PRODUCT_SIDEBAR_TEXTAREA_STYLE = {
+  ...PRODUCT_SIDEBAR_INPUT_STYLE,
+  minHeight: "96px",
+  resize: "vertical" as const,
+};
+
+const PRODUCT_SIDEBAR_SELECT_STYLES = {
+  control: (base: any) => ({
+    ...base,
+    minHeight: 40,
+    border: "1px solid #8a8a8a",
+    borderRadius: "4px",
+    fontSize: "14px",
+    boxShadow: "none",
+    "&:hover": {
+      borderColor: "#0091ae",
+    },
+  }),
+};
+
+const handleProductSidebarFieldFocus = (
+  e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+) => {
+  e.currentTarget.style.borderColor = "#0091ae";
+};
+
+const handleProductSidebarFieldBlur = (
+  e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
+) => {
+  e.currentTarget.style.borderColor = "#8a8a8a";
+};
+
+interface ProductDetailCardProps {
+  label: string;
+  children: React.ReactNode;
+  onMouseEnter?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onMouseLeave?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onFocus?: (e: React.FocusEvent<HTMLDivElement>) => void;
+  onBlur?: (e: React.FocusEvent<HTMLDivElement>) => void;
+}
+
+const ProductDetailCard: React.FC<ProductDetailCardProps> = ({
+  label,
+  children,
+  onMouseEnter,
+  onMouseLeave,
+  onFocus,
+  onBlur,
+}) => (
+  <section
+    style={{
+      background: "#f8f9fa",
+      padding: "16px",
+      borderRadius: "10px",
+      transition: "all 0.3s",
+    }}
+    onMouseEnter={onMouseEnter}
+    onMouseLeave={onMouseLeave}
+    onFocus={onFocus}
+    onBlur={onBlur}
+    aria-label={label}
+  >
+    <div
+      style={{
+        fontSize: "12px",
+        fontWeight: 600,
+        color: "#6b7280",
+        textTransform: "uppercase",
+        letterSpacing: "0.5px",
+        marginBottom: "6px",
+      }}
+    >
+      {label}
+    </div>
+    <div
+      style={{
+        fontSize: "15px",
+        color: "#1f2937",
+        fontWeight: 500,
+      }}
+    >
+      {children}
+    </div>
+  </section>
+);
 
 const ProductsPage = () => {
   const { data: session } = useSession();
@@ -172,7 +319,7 @@ const ProductsPage = () => {
     defaultSelectedColumns: DEFAULT_PRODUCT_TABLE_COLUMNS,
     selectableColumnKeys: productTableSelectableKeys,
     columnStorageKey: PRODUCTS_TABLE_COLUMN_STORAGE_KEY,
-    initialPagination: { rowsPerPage: 10 },
+    initialPagination: { rowsPerPage: 15 },
   });
   const [productFormData, setProductFormData] = useState({
     productName: "",
@@ -259,15 +406,7 @@ const ProductsPage = () => {
     // Normalize industry_id: convert string to number if needed
     const rawIndustryId =
       (product as any).industry_id || (product as any).industry?.id || null;
-    let normalizedIndustryId: number | null = null;
-    if (rawIndustryId !== null) {
-      if (typeof rawIndustryId === "string") {
-        const parsed = Number.parseInt(rawIndustryId, 10);
-        normalizedIndustryId = Number.isNaN(parsed) ? null : parsed;
-      } else {
-        normalizedIndustryId = rawIndustryId;
-      }
-    }
+    const normalizedIndustryId = normalizeIndustryId(rawIndustryId);
 
     return {
       id: product.id,
@@ -684,7 +823,7 @@ const ProductsPage = () => {
             >
               <Eye size={16} />
             </Button>
-            {session?.user?.permissions?.includes("edit-crm-products") && (
+            {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_PRODUCTS) && (
               <Button
                 variant="link"
                 size="sm"
@@ -695,7 +834,9 @@ const ProductsPage = () => {
                 <Edit size={16} />
               </Button>
             )}
-            {session?.user?.permissions?.includes("delete-crm-products") && (
+            {session?.user?.permissions?.includes(
+              PERMISSIONS.DELETE_CRM_PRODUCTS,
+            ) && (
               <Button
                 variant="link"
                 size="sm"
@@ -736,18 +877,13 @@ const ProductsPage = () => {
       activeTab: activeFilter,
       onTabChange: (filterId) => {
         setActiveFilter(filterId);
-        if (filterId === "active") {
-          setProductsFilters((prev) => ({ ...prev, status: "Active" }));
-        } else if (filterId === "inactive") {
-          setProductsFilters((prev) => ({ ...prev, status: "Inactive" }));
-        } else {
-          setProductsFilters((prev) => ({ ...prev, status: null }));
-        }
+        const nextStatus = getStatusByFilterId(filterId);
+        setProductsFilters((prev) => ({ ...prev, status: nextStatus }));
         setProductsPagination((prev) => ({ ...prev, currentPage: 1 }));
       },
       rightActions: (
         <div className="d-flex gap-2">
-          {session?.user?.permissions?.includes("add-crm-products") && (
+          {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_PRODUCTS) && (
             <Button
               onClick={() => handleOpenProductModal()}
               style={{
@@ -785,15 +921,7 @@ const ProductsPage = () => {
       setEditingProduct(product);
       // Convert industry_id to number if it's a string (API sometimes returns string)
       const industryId = product.industry_id || product.industry?.id || null;
-      let normalizedIndustryId: number | null = null;
-      if (industryId !== null) {
-        if (typeof industryId === "string") {
-          const parsed = Number.parseInt(industryId, 10);
-          normalizedIndustryId = Number.isNaN(parsed) ? null : parsed;
-        } else {
-          normalizedIndustryId = industryId;
-        }
-      }
+      const normalizedIndustryId = normalizeIndustryId(industryId);
 
       setProductFormData({
         productName: product.productName,
@@ -890,16 +1018,12 @@ const ProductsPage = () => {
     }
   };
 
-  let productSubmitButtonLabel = "Add Product";
-  if (submittingProduct) {
-    productSubmitButtonLabel = editingProduct
-      ? "Updating Product..."
-      : "Adding Product...";
-  } else if (editingProduct) {
-    productSubmitButtonLabel = "Update Product";
-  }
+  const productSubmitButtonLabel = getProductSubmitButtonLabel(
+    submittingProduct,
+    Boolean(editingProduct),
+  );
 
-  if (!session?.user?.permissions?.includes("list-crm-products")) {
+  if (!session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_PRODUCTS)) {
     return null;
   }
 
@@ -945,296 +1069,463 @@ const ProductsPage = () => {
         }}
       />
       <div>
-        {/* Product Form Modal */}
-        <Modal
-          show={showProductModal}
-          onHide={() => {
-            if (submittingProduct) return;
-            setShowProductModal(false);
-          }}
-          size="lg"
-          centered
-        >
-          <Modal.Header closeButton={!submittingProduct} className="border-0 pb-0">
-            <Modal.Title className="fw-bold">
-              {editingProduct ? "Edit Product" : "Add New Product"}
-            </Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form onSubmit={handleProductSubmit}>
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">
-                      Product Name <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={productFormData.productName}
-                      onChange={(e) =>
-                        setProductFormData({
-                          ...productFormData,
-                          productName: e.target.value,
-                        })
-                      }
-                      placeholder="Enter product name"
-                      required
-                    />
-                    <Form.Text className="text-muted">
-                      Enter a clear, descriptive name for your product
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">
-                      SKU <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={productFormData.sku}
-                      onChange={(e) =>
-                        setProductFormData({
-                          ...productFormData,
-                          sku: e.target.value,
-                        })
-                      }
-                      placeholder="Enter SKU"
-                      required
-                      disabled={!!editingProduct || submittingProduct}
-                    />
-                    <Form.Text className="text-muted">
-                      Unique product identifier (e.g., PROD-001)
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-              </Row>
+        {/* Product Form Sidebar */}
+        {showProductModal && (
+          <>
+            <div
+              className="contact-sidebar-overlay"
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 1000,
+                background: "transparent",
+              }}
+              onClick={() => {
+                if (!submittingProduct) {
+                  setShowProductModal(false);
+                }
+              }}
+              aria-hidden="true"
+            />
 
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">
-                      Price <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="number"
-                      step="0.01"
-                      value={productFormData.price}
-                      onChange={(e) =>
-                        setProductFormData({
-                          ...productFormData,
-                          price: e.target.value,
-                        })
-                      }
-                      placeholder="0.00"
-                      required
-                    />
-                    <Form.Text className="text-muted">
-                      Enter the base price (supports up to 2 decimal places)
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">Currency</Form.Label>
-                    <Form.Select
-                      value={productFormData.currency}
-                      onChange={(e) =>
-                        setProductFormData({
-                          ...productFormData,
-                          currency: e.target.value,
-                        })
-                      }
-                    >
-                      <option value="AED">AED</option>
-                    </Form.Select>
-                    <Form.Text className="text-muted">
-                      Select the currency for this product
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-              </Row>
+            <div
+              className="contact-sidebar-container"
+              style={{
+                position: "fixed",
+                top: 0,
+                right: 0,
+                width: "600px",
+                maxWidth: "100%",
+                height: "100vh",
+                backgroundColor: "#ffffff",
+                boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+                zIndex: 999999,
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <div
+                className="contact-sidebar-header"
+                style={{
+                  padding: "20px 24px",
+                  borderBottom: "1px solid #eaf0f6",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <h2
+                  className="contact-sidebar-title"
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: "600",
+                    color: "#141414",
+                    margin: 0,
+                  }}
+                >
+                  {editingProduct ? "Edit Product" : "Add New Product"}
+                </h2>
+                <button
+                  type="button"
+                  className="contact-sidebar-close-btn"
+                  onClick={() => {
+                    if (!submittingProduct) {
+                      setShowProductModal(false);
+                    }
+                  }}
+                  disabled={submittingProduct}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px",
+                    cursor: submittingProduct ? "not-allowed" : "pointer",
+                    color: "#718096",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                  aria-label="Close product form sidebar"
+                >
+                  <X size={24} />
+                </button>
+              </div>
 
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">
-                      Product Group <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Select
-                      options={industries.map((ind) => ({
-                        value: ind.id,
-                        label: ind.name,
-                      }))}
-                      value={
-                        productFormData.industry_id
-                          ? {
-                              value: productFormData.industry_id,
-                              label:
-                                industries.find(
-                                  (ind) =>
-                                    ind.id ===
-                                    Number(productFormData.industry_id),
-                                )?.name || "",
+              <Form
+                onSubmit={handleProductSubmit}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  flex: 1,
+                  minHeight: 0,
+                }}
+              >
+                <div
+                  className="contact-sidebar-content"
+                  style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "40px",
+                  }}
+                >
+                  <Row>
+                    <Col md={12}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
+                        <label
+                          htmlFor="product-name-input"
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
+                        >
+                          Product Name <span style={{ color: "#f2545b" }}>*</span>
+                        </label>
+                        <input
+                          id="product-name-input"
+                          type="text"
+                          value={productFormData.productName}
+                          onChange={(e) =>
+                            setProductFormData({
+                              ...productFormData,
+                              productName: e.target.value,
+                            })
+                          }
+                          placeholder="Enter product name"
+                          required
+                          style={PRODUCT_SIDEBAR_INPUT_STYLE}
+                          onFocus={handleProductSidebarFieldFocus}
+                          onBlur={handleProductSidebarFieldBlur}
+                        />
+                      </div>
+                    </Col>
+                    <Col md={12}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
+                        <label
+                          htmlFor="product-sku-input"
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
+                        >
+                          SKU <span style={{ color: "#f2545b" }}>*</span>
+                        </label>
+                        <input
+                          id="product-sku-input"
+                          type="text"
+                          value={productFormData.sku}
+                          onChange={(e) =>
+                            setProductFormData({
+                              ...productFormData,
+                              sku: e.target.value,
+                            })
+                          }
+                          placeholder="Enter SKU"
+                          required
+                          disabled={Boolean(editingProduct) || submittingProduct}
+                          style={{
+                            ...PRODUCT_SIDEBAR_INPUT_STYLE,
+                            backgroundColor: editingProduct ? "#f7fafc" : "#ffffff",
+                            cursor: editingProduct ? "not-allowed" : "text",
+                          }}
+                          onFocus={(e) => {
+                            if (!editingProduct && !submittingProduct) {
+                              handleProductSidebarFieldFocus(e);
                             }
-                          : null
-                      }
-                      onChange={(selected) =>
-                        setProductFormData({
-                          ...productFormData,
-                          industry_id: selected
-                            ? (() => {
-                                if (typeof selected.value === "string") {
-                                  const parsed = Number.parseInt(
-                                    selected.value,
-                                    10,
-                                  );
-                                  return Number.isNaN(parsed)
-                                    ? null
-                                    : parsed;
+                          }}
+                          onBlur={handleProductSidebarFieldBlur}
+                        />
+                      </div>
+                    </Col>
+                  </Row>
+
+                  <Row>
+                    <Col md={12}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
+                        <label
+                          htmlFor="product-price-input"
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
+                        >
+                          Price <span style={{ color: "#f2545b" }}>*</span>
+                        </label>
+                        <input
+                          id="product-price-input"
+                          type="number"
+                          step="0.01"
+                          value={productFormData.price}
+                          onChange={(e) =>
+                            setProductFormData({
+                              ...productFormData,
+                              price: e.target.value,
+                            })
+                          }
+                          placeholder="0.00"
+                          required
+                          style={PRODUCT_SIDEBAR_INPUT_STYLE}
+                          onFocus={handleProductSidebarFieldFocus}
+                          onBlur={handleProductSidebarFieldBlur}
+                        />
+                      </div>
+                    </Col>
+                    <Col md={12}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
+                        <label
+                          htmlFor="product-currency-select"
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
+                        >
+                          Currency
+                        </label>
+                        <select
+                          id="product-currency-select"
+                          value={productFormData.currency}
+                          onChange={(e) =>
+                            setProductFormData({
+                              ...productFormData,
+                              currency: e.target.value,
+                            })
+                          }
+                          style={PRODUCT_SIDEBAR_INPUT_STYLE}
+                          onFocus={handleProductSidebarFieldFocus}
+                          onBlur={handleProductSidebarFieldBlur}
+                        >
+                          <option value="AED">AED</option>
+                        </select>
+                      </div>
+                    </Col>
+                  </Row>
+
+                  <Row>
+                    <Col md={12}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
+                        <label
+                          htmlFor="product-industry-select"
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
+                        >
+                          Product Group <span style={{ color: "#f2545b" }}>*</span>
+                        </label>
+                        <Select
+                          inputId="product-industry-select"
+                          options={industries.map((ind) => ({
+                            value: ind.id,
+                            label: ind.name,
+                          }))}
+                          value={
+                            productFormData.industry_id
+                              ? {
+                                  value: productFormData.industry_id,
+                                  label:
+                                    industries.find(
+                                      (ind) =>
+                                        ind.id ===
+                                        Number(productFormData.industry_id),
+                                    )?.name || "",
                                 }
-                                return selected.value;
-                              })()
-                            : null,
-                        })
-                      }
-                      placeholder="Select product group..."
-                      styles={customSelectStyles}
-                      isLoading={loadingIndustries}
-                      isDisabled={loadingIndustries || submittingProduct}
-                      isClearable
-                      required
-                    />
-                    <Form.Text className="text-muted">
-                      Select the product group this product belongs to
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">Category</Form.Label>
-                    <CreatableSelect
-                      options={uniqueCategories.map((cat) => ({
-                        value: cat,
-                        label: cat,
-                      }))}
-                      value={
-                        productFormData.category
-                          ? {
-                              value: productFormData.category,
-                              label: productFormData.category,
-                            }
-                          : null
-                      }
-                      onChange={(selected) =>
-                        setProductFormData({
-                          ...productFormData,
-                          category: selected ? selected.value : "",
-                        })
-                      }
-                      placeholder="Select or create category..."
-                      styles={customSelectStyles}
-                      isDisabled={submittingProduct}
-                      isClearable
-                    />
-                    <Form.Text className="text-muted">
-                      Choose or create a product category for better
-                      organization
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label className="fw-semibold">Brand</Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={productFormData.brand}
+                              : null
+                          }
+                          onChange={(selected) =>
+                            setProductFormData({
+                              ...productFormData,
+                              industry_id: selected
+                                ? (() => {
+                                    if (typeof selected.value === "string") {
+                                      const parsed = Number.parseInt(
+                                        selected.value,
+                                        10,
+                                      );
+                                      return Number.isNaN(parsed)
+                                        ? null
+                                        : parsed;
+                                    }
+                                    return selected.value;
+                                  })()
+                                : null,
+                            })
+                          }
+                          placeholder="Select product group..."
+                          styles={PRODUCT_SIDEBAR_SELECT_STYLES}
+                          isLoading={loadingIndustries}
+                          isDisabled={loadingIndustries || submittingProduct}
+                          isClearable
+                          required
+                        />
+                      </div>
+                    </Col>
+                    <Col md={12}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
+                        <label
+                          htmlFor="product-category-select"
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
+                        >
+                          Category
+                        </label>
+                        <CreatableSelect
+                          inputId="product-category-select"
+                          options={uniqueCategories.map((cat) => ({
+                            value: cat,
+                            label: cat,
+                          }))}
+                          value={
+                            productFormData.category
+                              ? {
+                                  value: productFormData.category,
+                                  label: productFormData.category,
+                                }
+                              : null
+                          }
+                          onChange={(selected) =>
+                            setProductFormData({
+                              ...productFormData,
+                              category: selected ? selected.value : "",
+                            })
+                          }
+                          placeholder="Select or create category..."
+                          styles={PRODUCT_SIDEBAR_SELECT_STYLES}
+                          isDisabled={submittingProduct}
+                          isClearable
+                        />
+                      </div>
+                    </Col>
+                    <Col md={12}>
+                      <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
+                        <label
+                          htmlFor="product-brand-input"
+                          style={PRODUCT_SIDEBAR_LABEL_STYLE}
+                        >
+                          Brand
+                        </label>
+                        <input
+                          id="product-brand-input"
+                          type="text"
+                          value={productFormData.brand}
+                          onChange={(e) =>
+                            setProductFormData({
+                              ...productFormData,
+                              brand: e.target.value,
+                            })
+                          }
+                          placeholder="Enter brand name"
+                          style={PRODUCT_SIDEBAR_INPUT_STYLE}
+                          onFocus={handleProductSidebarFieldFocus}
+                          onBlur={handleProductSidebarFieldBlur}
+                        />
+                      </div>
+                    </Col>
+                  </Row>
+
+                  <div className="contact-form-field" style={PRODUCT_SIDEBAR_FIELD_STYLE}>
+                    <label
+                      htmlFor="product-description-input"
+                      style={PRODUCT_SIDEBAR_LABEL_STYLE}
+                    >
+                      Description
+                    </label>
+                    <textarea
+                      id="product-description-input"
+                      rows={3}
+                      value={productFormData.description}
                       onChange={(e) =>
                         setProductFormData({
                           ...productFormData,
-                          brand: e.target.value,
+                          description: e.target.value,
                         })
                       }
-                      placeholder="Enter brand name"
+                      placeholder="Enter product description"
+                      style={PRODUCT_SIDEBAR_TEXTAREA_STYLE}
+                      onFocus={handleProductSidebarFieldFocus}
+                      onBlur={handleProductSidebarFieldBlur}
                     />
-                    <Form.Text className="text-muted">
-                      Enter the brand or manufacturer name
-                    </Form.Text>
-                  </Form.Group>
-                </Col>
-              </Row>
+                  </div>
 
-              <Form.Group className="mb-3">
-                <Form.Label className="fw-semibold">Description</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  value={productFormData.description}
-                  onChange={(e) =>
-                    setProductFormData({
-                      ...productFormData,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="Enter product description"
-                />
-                <Form.Text className="text-muted">
-                  Provide detailed information about features, specifications,
-                  and benefits
-                </Form.Text>
-              </Form.Group>
+                  <div style={{ marginBottom: "20px" }}>
+                    <Form.Check
+                      type="switch"
+                      id="product-active-switch"
+                      label="Product Active"
+                      checked={productFormData.isActive}
+                      onChange={(e) =>
+                        setProductFormData({
+                          ...productFormData,
+                          isActive: e.target.checked,
+                        })
+                      }
+                      style={{
+                        fontSize: "14px",
+                      }}
+                    />
+                  </div>
+                </div>
 
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  id="product-active-switch"
-                  label="Product Active"
-                  checked={productFormData.isActive}
-                  onChange={(e) =>
-                    setProductFormData({
-                      ...productFormData,
-                      isActive: e.target.checked,
-                    })
-                  }
-                />
-                <Form.Text className="text-muted">
-                  Toggle to make this product visible or hidden in your catalog
-                </Form.Text>
-              </Form.Group>
-
-              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4 w-100">
-                <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0 align-self-center">
-                  <AlertCircle size={14} />
-                  <span style={{ fontSize: "0.813rem" }}>
-                    Fields marked with <span className="text-danger fw-bold">*</span> are required
-                  </span>
-                </Form.Text>
-                <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
-                  <Button
-                    variant="primary"
+                <div
+                  className="contact-sidebar-footer"
+                  style={{
+                    padding: "16px 24px",
+                    borderTop: "1px solid #eaf0f6",
+                    display: "flex",
+                    gap: "12px",
+                    justifyContent: "flex-start",
+                  }}
+                >
+                  <button
                     type="submit"
                     disabled={submittingProduct}
-                    style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: submittingProduct ? "#cbd5e0" : "#0091ae",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "4px",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      cursor: submittingProduct ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (submittingProduct) {
+                        return;
+                      }
+                      e.currentTarget.style.backgroundColor = "#007a94";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (submittingProduct) {
+                        return;
+                      }
+                      e.currentTarget.style.backgroundColor = "#0091ae";
+                    }}
                   >
                     <Check size={16} aria-hidden />
                     {productSubmitButtonLabel}
-                  </Button>
-                  <Button
-                    variant="outline-secondary"
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
-                      if (submittingProduct) return;
-                      setShowProductModal(false);
+                      if (!submittingProduct) {
+                        setShowProductModal(false);
+                      }
                     }}
                     disabled={submittingProduct}
-                    style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: "transparent",
+                      color: submittingProduct ? "#a0aec0" : "#141414",
+                      border: "1px solid #8a8a8a",
+                      borderRadius: "4px",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      cursor: submittingProduct ? "not-allowed" : "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (submittingProduct) {
+                        return;
+                      }
+                      e.currentTarget.style.backgroundColor = "#f7fafc";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
                   >
                     Cancel
-                  </Button>
+                  </button>
                 </div>
-              </div>
-            </Form>
-          </Modal.Body>
-        </Modal>
+              </Form>
+            </div>
+          </>
+        )}
 
         {/* Delete Confirmation Modal */}
         <DeleteConfirmationModal
@@ -1328,152 +1619,60 @@ const ProductsPage = () => {
                   marginBottom: "30px",
                 }}
               >
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseOver={handleHoverEnter}
-                  onMouseOut={handleHoverLeave}
+                <ProductDetailCard
+                  label="Product Name"
+                  onMouseEnter={handleHoverEnter}
+                  onMouseLeave={handleHoverLeave}
                   onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
                 >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    Product Name
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#1f2937",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {viewingProduct.productName}
-                  </div>
-                </div>
+                  {viewingProduct.productName}
+                </ProductDetailCard>
                 {(viewingProduct.industry || viewingProduct.industry_id) && (
-                  <div
-                    style={{
-                      background: "#f8f9fa",
-                      padding: "16px",
-                      borderRadius: "10px",
-                      transition: "all 0.3s",
-                    }}
-                    onMouseOver={handleHoverEnter}
-                    onMouseOut={handleHoverLeave}
+                  <ProductDetailCard
+                    label="Product Group"
+                    onMouseEnter={handleHoverEnter}
+                    onMouseLeave={handleHoverLeave}
                     onFocus={handleHoverEnter}
-                  onBlur={handleHoverLeave}
-                  >
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.5px",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      Product Group
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "15px",
-                        color: "#1f2937",
-                        fontWeight: 500,
-                      }}
-                    >
-                      <Badge
-                        bg="primary"
-                        className="bg-opacity-10 text-dark"
-                        style={{ padding: "6px 14px", fontSize: "13px" }}
-                      >
-                        <Building2 size={14} style={{ marginRight: "6px" }} />
-                        {viewingProduct.industry?.name ||
-                          industries.find(
-                            (ind) => ind.id === viewingProduct.industry_id,
-                          )?.name ||
-                          "N/A"}
-                      </Badge>
-                    </div>
-                  </div>
-                )}
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseOver={handleHoverEnter}
-                  onMouseOut={handleHoverLeave}
-                  onFocus={handleHoverEnter}
-                  onBlur={handleHoverLeave}
-                >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    SKU
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#1f2937",
-                      fontWeight: 500,
-                    }}
+                    onBlur={handleHoverLeave}
                   >
                     <Badge
-                      bg="light"
-                      text="dark"
-                      className="font-monospace"
+                      bg="primary"
+                      className="bg-opacity-10 text-dark"
                       style={{ padding: "6px 14px", fontSize: "13px" }}
                     >
-                      {viewingProduct.sku}
+                      <Building2 size={14} style={{ marginRight: "6px" }} />
+                      {viewingProduct.industry?.name ||
+                        industries.find(
+                          (ind) => ind.id === viewingProduct.industry_id,
+                        )?.name ||
+                        "N/A"}
                     </Badge>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseOver={handleHoverEnter}
-                  onMouseOut={handleHoverLeave}
+                  </ProductDetailCard>
+                )}
+                <ProductDetailCard
+                  label="SKU"
+                  onMouseEnter={handleHoverEnter}
+                  onMouseLeave={handleHoverLeave}
                   onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
                 >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      marginBottom: "6px",
-                    }}
+                  <Badge
+                    bg="light"
+                    text="dark"
+                    className="font-monospace"
+                    style={{ padding: "6px 14px", fontSize: "13px" }}
                   >
-                    Price
-                  </div>
+                    {viewingProduct.sku}
+                  </Badge>
+                </ProductDetailCard>
+                <ProductDetailCard
+                  label="Price"
+                  onMouseEnter={handleHoverEnter}
+                  onMouseLeave={handleHoverLeave}
+                  onFocus={handleHoverEnter}
+                  onBlur={handleHoverLeave}
+                >
                   <div
                     style={{
                       fontSize: "20px",
@@ -1483,127 +1682,52 @@ const ProductsPage = () => {
                   >
                     {viewingProduct.currency} {viewingProduct.price.toFixed(2)}
                   </div>
-                </div>
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseOver={handleHoverEnter}
-                  onMouseOut={handleHoverLeave}
+                </ProductDetailCard>
+                <ProductDetailCard
+                  label="Currency"
+                  onMouseEnter={handleHoverEnter}
+                  onMouseLeave={handleHoverLeave}
                   onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
                 >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    Currency
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#1f2937",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {viewingProduct.currency}
-                  </div>
-                </div>
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseOver={handleHoverEnter}
-                  onMouseOut={handleHoverLeave}
+                  {viewingProduct.currency}
+                </ProductDetailCard>
+                <ProductDetailCard
+                  label="Status"
+                  onMouseEnter={handleHoverEnter}
+                  onMouseLeave={handleHoverLeave}
                   onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
                 >
-                  <div
+                  <Badge
+                    bg={
+                      viewingProduct.status === "Active"
+                        ? "success"
+                        : "secondary"
+                    }
                     style={{
+                      padding: "6px 14px",
+                      borderRadius: "20px",
                       fontSize: "12px",
                       fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      marginBottom: "6px",
                     }}
                   >
-                    Status
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#1f2937",
-                      fontWeight: 500,
-                    }}
-                  >
-                    <Badge
-                      bg={
-                        viewingProduct.status === "Active"
-                          ? "success"
-                          : "secondary"
-                      }
-                      style={{
-                        padding: "6px 14px",
-                        borderRadius: "20px",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {viewingProduct.status}
-                    </Badge>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseOver={handleHoverEnter}
-                  onMouseOut={handleHoverLeave}
+                    {viewingProduct.status}
+                  </Badge>
+                </ProductDetailCard>
+                <ProductDetailCard
+                  label="Created Date"
+                  onMouseEnter={handleHoverEnter}
+                  onMouseLeave={handleHoverLeave}
                   onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
                 >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    Created Date
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#1f2937",
-                      fontWeight: 500,
-                    }}
-                  >
-                    <Calendar
-                      size={14}
-                      style={{ color: "#4680ff", marginRight: "6px" }}
-                    />
-                    {viewingProduct.created}
-                  </div>
-                </div>
+                  <Calendar
+                    size={14}
+                    style={{ color: "#4680ff", marginRight: "6px" }}
+                  />
+                  {viewingProduct.created}
+                </ProductDetailCard>
               </div>
 
               {/* Product Details Section */}
@@ -1631,84 +1755,34 @@ const ProductsPage = () => {
                   marginBottom: "30px",
                 }}
               >
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseOver={handleHoverEnter}
-                  onMouseOut={handleHoverLeave}
+                <ProductDetailCard
+                  label="Category"
+                  onMouseEnter={handleHoverEnter}
+                  onMouseLeave={handleHoverLeave}
                   onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
                 >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      marginBottom: "6px",
-                    }}
+                  <Badge
+                    bg="info"
+                    className="bg-opacity-10 text-dark"
+                    style={{ padding: "6px 14px", fontSize: "13px" }}
                   >
-                    Category
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#1f2937",
-                      fontWeight: 500,
-                    }}
-                  >
-                    <Badge
-                      bg="info"
-                      className="bg-opacity-10 text-dark"
-                      style={{ padding: "6px 14px", fontSize: "13px" }}
-                    >
-                      {viewingProduct.category || "N/A"}
-                    </Badge>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    background: "#f8f9fa",
-                    padding: "16px",
-                    borderRadius: "10px",
-                    transition: "all 0.3s",
-                  }}
-                  onMouseOver={handleHoverEnter}
-                  onMouseOut={handleHoverLeave}
+                    {viewingProduct.category || "N/A"}
+                  </Badge>
+                </ProductDetailCard>
+                <ProductDetailCard
+                  label="Brand"
+                  onMouseEnter={handleHoverEnter}
+                  onMouseLeave={handleHoverLeave}
                   onFocus={handleHoverEnter}
                   onBlur={handleHoverLeave}
                 >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      color: "#6b7280",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.5px",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    Brand
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: "#1f2937",
-                      fontWeight: 500,
-                    }}
-                  >
-                    <Building2
-                      size={14}
-                      style={{ color: "#4680ff", marginRight: "6px" }}
-                    />
-                    {viewingProduct.brand || "N/A"}
-                  </div>
-                </div>
+                  <Building2
+                    size={14}
+                    style={{ color: "#4680ff", marginRight: "6px" }}
+                  />
+                  {viewingProduct.brand || "N/A"}
+                </ProductDetailCard>
               </div>
 
               {/* Description Section */}
@@ -1742,7 +1816,7 @@ const ProductsPage = () => {
                 className="w-100 d-flex justify-content-end"
                 style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                {session?.user?.permissions?.includes("edit-crm-products") && (
+                {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_PRODUCTS) && (
                   <Button
                     variant="primary"
                     onClick={() => {

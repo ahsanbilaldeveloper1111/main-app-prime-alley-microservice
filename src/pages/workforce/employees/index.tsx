@@ -871,20 +871,20 @@ const Employees = () => {
       showMoreFiltersButton: false,
       customActions: (
         <div className="d-flex align-items-center gap-2 flex-wrap">
-          <button type="button" className="btn btn-outline-dark btn-sm" onClick={resetFilters}>
+          <button type="button" className="gt-toolbar-btn btn btn-outline-dark btn-sm" onClick={resetFilters}>
             Reset
           </button>
-          <button type="button" className="btn btn-dark btn-sm" onClick={handleApply}>
+          <button type="button" className="gt-toolbar-btn btn btn-dark btn-sm" onClick={handleApply}>
             Apply
           </button>
-          {session?.user?.permissions?.includes("add-employee-staff-management") && (
-            <button type="button" className="btn btn-dark btn-sm d-flex align-items-center gap-1" onClick={openCreateModal}>
-              <Plus size={14} />
-              Add Employee
-            </button>
-          )}
         </div>
       ),
+      rightActions: session?.user?.permissions?.includes("add-employee-staff-management") ? (
+        <button type="button" className="btn btn-dark btn-sm d-flex align-items-center gap-1" onClick={openCreateModal}>
+          <Plus size={14} />
+          Add Employee
+        </button>
+      ) : undefined,
     }),
     [employeeFilterPills, employeeTabs, handleApply, openCreateModal, resetFilters, searchTerm, session?.user?.permissions],
   );

@@ -18,7 +18,7 @@ import {
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/router";
-import { getErrorMessage } from "@utils/errors";
+import { formatDateTimeGlobal } from "@utils/Helper";
 import moment from "moment";
 import KanbanBoard, { prospectsToKanbanColumns } from "@components/KanbanBoard";
 import ProspectEditSidebar from "@components/ProspectEditSidebar";
@@ -40,11 +40,21 @@ import GenericTable, {
   FilterPill,
   TabConfig,
 } from "@components/GenericTable";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 
 import GenericSidebar from "@components/GenericSidebarNew";
-import GenericFilterSidebar, { type FilterField } from "@components/GenericFilterSidebar";
+import GenericFilterSidebar, {
+  type FilterField,
+  type FilterOption,
+} from "@components/GenericFilterSidebar";
 import { type StatsCardData } from "@components/GenericStatsCards";
-import { deleteProduct, getProducts, type ProductData } from "@utils/accounts";
+import {
+  deleteProduct,
+  getProductCategoriesList,
+  getProducts,
+  type ProductCategoryData,
+  type ProductData,
+} from "@utils/accounts";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -55,6 +65,7 @@ type BillingProductRow = ProductData & Record<string, unknown>;
 
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import ColumnEditorModal from "@components/ColumnEditorModal";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 
 const VALID_FILTERS = new Set(["all"]);
 
@@ -140,11 +151,55 @@ function getProductDisplayName(row: { id?: unknown; name?: string; title?: strin
 }
 const getProductSku = (row: { sku?: string; data?: { sku?: string } } | null, emptyFallback = "--"): string =>
   row?.sku ?? row?.data?.sku ?? emptyFallback;
-const getProductTaxCategory = (row: { tax_category?: string; data?: { tax_category?: string } } | null): string =>
-  row?.tax_category ?? row?.data?.tax_category ?? "Standard";
+
+type ProductCategoryRowSlice = {
+  category_id?: string | number;
+  category?: { name?: string } | null;
+  data?: {
+    category_id?: string | number;
+    category?: { name?: string } | null;
+  };
+} | null;
+
+/** Product catalog category label: nested `category.name` from API, else lookup by `category_id`. */
+function getProductCategoryDisplayName(
+  row: ProductCategoryRowSlice,
+  idToName: ReadonlyMap<string, string>,
+): string {
+  const fromApi = row?.category?.name ?? row?.data?.category?.name;
+  if (typeof fromApi === "string" && fromApi.trim() !== "") {
+    return fromApi.trim();
+  }
+  const rawId = row?.category_id ?? row?.data?.category_id;
+  if (rawId === undefined || rawId === null) {
+    return "—";
+  }
+  const idStr = String(rawId).trim();
+  if (idStr === "") {
+    return "—";
+  }
+  return idToName.get(idStr) ?? "—";
+}
 const formatProductPriceAED = (row: { base_price?: unknown; data?: { base_price?: unknown } } | null, emptyFallback = "--"): string => {
   const price = row?.base_price ?? row?.data?.base_price;
-  return price == null ? emptyFallback : `AED ${Number(price).toLocaleString()}`;
+  if (price == null || price === "") {
+    return emptyFallback;
+  }
+  let n: number;
+  if (typeof price === "number") {
+    n = price;
+  } else if (typeof price === "string") {
+    n = Number.parseFloat(price.replaceAll(",", ""));
+  } else {
+    return emptyFallback;
+  }
+  if (!Number.isFinite(n)) {
+    return emptyFallback;
+  }
+  return `AED ${n.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 };
 
 /** Billing products toolbar (same UX as billing subscriptions filter pills). */
@@ -169,23 +224,69 @@ function billingProductsIsActiveLabel(isActive: unknown): string | undefined {
   return undefined;
 }
 
-/** YYYY-MM-DD compares correctly as strings (end date not before start). */
+function billingProductsTodayYmd(): string {
+  return moment().format("YYYY-MM-DD");
+}
+
+/** YYYY-MM-DD compares correctly as strings (end not before start, not after today). */
 function billingProductsDateToOnOrAfterFrom(
   start: string | undefined,
   end: string | undefined,
 ): string | undefined {
+  const todayYmd = billingProductsTodayYmd();
   const s = start?.trim();
-  const e = end?.trim();
+  let e = end?.trim();
   if (!e) {
     return end;
   }
+  if (e > todayYmd) {
+    e = todayYmd;
+  }
   if (!s) {
-    return end;
+    return e;
   }
   if (e < s) {
     return s;
   }
-  return end;
+  return e;
+}
+
+/** Latest selectable "from" date: not after today and not after "to" (YYYY-MM-DD string order). */
+function billingProductsUpperBoundForCreatedFrom(
+  to: string | undefined,
+  todayYmd: string,
+): string {
+  const te = to?.trim();
+  if (!te) {
+    return todayYmd;
+  }
+  return te < todayYmd ? te : todayYmd;
+}
+
+/** Local calendar day from HTML `type="date"` → start of day as UTC ISO for list-products. */
+function billingProductsCreatedAtFromUtcIso(ymd: string | undefined): string | undefined {
+  const s = ymd?.trim();
+  if (!s) {
+    return undefined;
+  }
+  const m = moment(s, "YYYY-MM-DD", true);
+  if (!m.isValid()) {
+    return undefined;
+  }
+  return m.startOf("day").utc().toISOString();
+}
+
+/** Local calendar day from HTML `type="date"` → end of day as UTC ISO for list-products. */
+function billingProductsCreatedAtToUtcIso(ymd: string | undefined): string | undefined {
+  const s = ymd?.trim();
+  if (!s) {
+    return undefined;
+  }
+  const m = moment(s, "YYYY-MM-DD", true);
+  if (!m.isValid()) {
+    return undefined;
+  }
+  return m.endOf("day").utc().toISOString();
 }
 
 const BILLING_PRODUCTS_COLUMN_STORAGE_KEY = "billing-products-table-columns";
@@ -193,9 +294,10 @@ const BILLING_PRODUCTS_COLUMN_STORAGE_KEY = "billing-products-table-columns";
 const DEFAULT_PRODUCT_TABLE_COLUMN_KEYS: string[] = [
   "name",
   "sku",
-  "tax_category",
+  "category_id",
   "base_price",
   "is_active",
+  "created_at",
   "actions",
 ];
 
@@ -276,11 +378,21 @@ const BillingManagement = () => {
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>({});
-  /** Sidebar search + status; applied to `currentFilters` only when user clicks Apply. */
+  /** Sidebar search, status, category, created range; applied to `currentFilters` only when user clicks Apply. */
   const [filterSidebarDraft, setFilterSidebarDraft] = useState<{
     search: string;
     is_active: boolean | undefined;
-  }>({ search: "", is_active: undefined });
+    category_id: string;
+    created_at_from: string;
+    created_at_to: string;
+  }>({
+    search: "",
+    is_active: undefined,
+    category_id: "",
+    created_at_from: "",
+    created_at_to: "",
+  });
+  const [productCategories, setProductCategories] = useState<ProductCategoryData[]>([]);
   const requestIdRef = useRef(0);
 
 
@@ -290,17 +402,6 @@ const BillingManagement = () => {
     name: string;
   } | null>(null);
   const [deletingProduct, setDeletingProduct] = useState(false);
-  const [extensions] = useState<any[]>([]);
-
-  const [availableCampaigns] = useState<
-    Array<{
-      value: string;
-      label: string;
-      id: number;
-    }>
-  >([]);
-  
-  const [selectedItems, setSelectedItems] = useState<number[]>([]);
 
   // Sidebar states
   const [showProspectSidebar, setShowProspectSidebar] = useState(false);
@@ -336,12 +437,7 @@ const BillingManagement = () => {
     }>,
   });
   const [createContactLoading] = useState(false);
-  const [editingContactId, setEditingContactId] = useState<number | null>(null);
-  const [contactFormLoadError, setContactFormLoadError] = useState<
-    string | null
-  >(null);
-  const [contactFormLoading, setContactFormLoading] = useState(false);
-
+  
   const [showCreateProductModal, setShowCreateProductModal] = useState(false);
   const [createProductModalKey, setCreateProductModalKey] = useState(0);
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
@@ -363,18 +459,12 @@ const BillingManagement = () => {
   useEffect(() => {
     if (!router.isReady || router.query.createContact !== "1") return;
     setShowCreateContactSidebar(true);
-    const rawEditId = router.query.editContactId;
-    const editIdStr = Array.isArray(rawEditId) ? rawEditId[0] : rawEditId;
-    const editIdNum = editIdStr == null ? Number.NaN : Number(editIdStr);
-    if (Number.isFinite(editIdNum) && editIdNum > 0) {
-      setEditingContactId(editIdNum);
-    }
 
     const { createContact: _, editContactId: __, ...rest } = router.query;
     router.replace({ pathname: router.pathname, query: rest }, undefined, {
       shallow: true,
     });
-  }, [router.isReady, router.query.createContact, router.query.editContactId]);
+  }, [router.isReady, router.query.createContact, router]);
 
   // Close Add Contacts dropdown when clicking outside
   useEffect(() => {
@@ -393,22 +483,6 @@ const BillingManagement = () => {
         document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [showAddContactsDropdown]);
-
-  // Load prospect into form when sidebar opens in edit mode
-  useEffect(() => {
-    if (!showCreateContactSidebar || !editingContactId) {
-      setContactFormLoadError(null);
-      setContactFormLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setContactFormLoadError(null);
-    setContactFormLoading(true);
-    
-    return () => {
-      
-    };
-  }, [showCreateContactSidebar, editingContactId]);
 
   // Handler to update filter and URL
   const handleFilterChange = useCallback(
@@ -452,16 +526,15 @@ const BillingManagement = () => {
 
   const [pagination, setPagination] = useState({
     currentPage: 1,
-    rowsPerPage: 15,
-    sortBy: "",
-    sortOrder: "asc" as "asc" | "desc",
+    rowsPerPage: 10,
+    sortColumn: "",
+    sortDirection: "asc" as "asc" | "desc",
   });
   const [dataList, setDataList] = useState<BillingProductRow[]>([]);
   const [totalRecords, setTotalRecords] = useState(0);
   /** Total count of all products (unchanged when switching tabs) */
   const [totalAllProducts, setTotalAllProducts] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [clearSelectedRows, setClearSelectedRows] = useState(false);
   const [metrics, setMetrics] = useState<any>({
     assigned_records: 0,
     unassigned_records: 0,
@@ -472,6 +545,33 @@ const BillingManagement = () => {
   });
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getProductCategoriesList({ page: 1 })
+      .then((list) => {
+        if (cancelled) return;
+        setProductCategories(Array.isArray(list.data) ? list.data : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProductCategories([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const productCategoryIdToName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of productCategories) {
+      if (c && typeof c.id === "number") {
+        const label = String(c.name ?? "").trim() || `Category ${c.id}`;
+        m.set(String(c.id), label);
+      }
+    }
+    return m;
+  }, [productCategories]);
 
   // Keep toolbar search and filter fetch in sync (same pattern as billing subscriptions).
   useEffect(() => {
@@ -491,16 +591,28 @@ const BillingManagement = () => {
       if (typeof memoizedFilters.is_active === "boolean") {
         params.is_active = memoizedFilters.is_active;
       }
-      if (memoizedFilters.created_at_from) {
-        params.created_at_from = memoizedFilters.created_at_from;
+      const categoryIdParam = memoizedFilters.category_id;
+      if (
+        categoryIdParam !== undefined &&
+        categoryIdParam !== null &&
+        String(categoryIdParam).trim() !== ""
+      ) {
+        params.category_id = String(categoryIdParam).trim();
       }
-      if (memoizedFilters.created_at_to) {
-        params.created_at_to = memoizedFilters.created_at_to;
+      const createdFromUtc = billingProductsCreatedAtFromUtcIso(
+        memoizedFilters.created_at_from,
+      );
+      if (createdFromUtc) {
+        params.created_at_from = createdFromUtc;
+      }
+      const createdToUtc = billingProductsCreatedAtToUtcIso(memoizedFilters.created_at_to);
+      if (createdToUtc) {
+        params.created_at_to = createdToUtc;
       }
 
-      if (pagination.sortBy) {
-        params.sort_by = pagination.sortBy;
-        params.sort_order = pagination.sortOrder;
+      if (pagination.sortColumn) {
+        params["order[column]"] = pagination.sortColumn;
+        params["order[dir]"] = pagination.sortDirection;
       }
 
       return params;
@@ -508,6 +620,7 @@ const BillingManagement = () => {
     [
       memoizedFilters.search,
       memoizedFilters.is_active,
+      memoizedFilters.category_id,
       memoizedFilters.created_at_from,
       memoizedFilters.created_at_to,
       pagination.currentPage,
@@ -529,8 +642,73 @@ const BillingManagement = () => {
   }, []);
 
   // Filter pills: Active/Inactive (`is_active` true/false) + Create date (`created_at_from` / `created_at_to`).
-  const productsFilterPills = useMemo<FilterPill[]>(
-    () => [
+  const productsFilterPills = useMemo<FilterPill[]>(() => {
+    const todayYmd = billingProductsTodayYmd();
+    const createdFromMax = billingProductsUpperBoundForCreatedFrom(
+      currentFilters.created_at_to,
+      todayYmd,
+    );
+    const createDateDropdown = (
+      <div style={{ minWidth: 220, padding: "4px 0" }}>
+        <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>
+          From
+        </div>
+        <input
+          type="date"
+          value={currentFilters.created_at_from ?? ""}
+          max={createdFromMax}
+          style={{
+            width: "100%",
+            padding: "6px 12px",
+            border: "1px solid #e5e7eb",
+            borderRadius: 4,
+            marginBottom: 8,
+          }}
+          onChange={(e) => {
+            const nextStart = e.target.value || undefined;
+            setCurrentFilters((prev) => ({
+              ...prev,
+              created_at_from: nextStart,
+              created_at_to: billingProductsDateToOnOrAfterFrom(
+                nextStart,
+                prev.created_at_to,
+              ),
+            }));
+            setPagination((prev) => ({ ...prev, currentPage: 1 }));
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+        <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>
+          To
+        </div>
+        <input
+          type="date"
+          value={currentFilters.created_at_to ?? ""}
+          min={currentFilters.created_at_from || undefined}
+          max={todayYmd}
+          style={{
+            width: "100%",
+            padding: "6px 12px",
+            border: "1px solid #e5e7eb",
+            borderRadius: 4,
+          }}
+          onChange={(e) => {
+            const nextEndRaw = e.target.value || undefined;
+            setCurrentFilters((prev) => ({
+              ...prev,
+              created_at_to: billingProductsDateToOnOrAfterFrom(
+                prev.created_at_from,
+                nextEndRaw,
+              ),
+            }));
+            setPagination((prev) => ({ ...prev, currentPage: 1 }));
+            setRefreshKey((k) => k + 1);
+          }}
+        />
+      </div>
+    );
+
+    return [
       {
         id: "is_active",
         label: "Status",
@@ -590,64 +768,10 @@ const BillingManagement = () => {
           setPagination((prev) => ({ ...prev, currentPage: 1 }));
           setRefreshKey((k) => k + 1);
         },
-        dropdownContent: (
-          <div style={{ minWidth: 220, padding: "4px 0" }}>
-            <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>From</div>
-            <input
-              type="date"
-              value={currentFilters.created_at_from ?? ""}
-              max={currentFilters.created_at_to || undefined}
-              style={{
-                width: "100%",
-                padding: "6px 12px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 4,
-                marginBottom: 8,
-              }}
-              onChange={(e) => {
-                const nextStart = e.target.value || undefined;
-                setCurrentFilters((prev) => ({
-                  ...prev,
-                  created_at_from: nextStart,
-                  created_at_to: billingProductsDateToOnOrAfterFrom(
-                    nextStart,
-                    prev.created_at_to,
-                  ),
-                }));
-                setPagination((prev) => ({ ...prev, currentPage: 1 }));
-                setRefreshKey((k) => k + 1);
-              }}
-            />
-            <div style={{ padding: "4px 12px 8px", fontSize: 12, color: "#666" }}>To</div>
-            <input
-              type="date"
-              value={currentFilters.created_at_to ?? ""}
-              min={currentFilters.created_at_from || undefined}
-              style={{
-                width: "100%",
-                padding: "6px 12px",
-                border: "1px solid #e5e7eb",
-                borderRadius: 4,
-              }}
-              onChange={(e) => {
-                const nextEndRaw = e.target.value || undefined;
-                setCurrentFilters((prev) => ({
-                  ...prev,
-                  created_at_to: billingProductsDateToOnOrAfterFrom(
-                    prev.created_at_from,
-                    nextEndRaw,
-                  ),
-                }));
-                setPagination((prev) => ({ ...prev, currentPage: 1 }));
-                setRefreshKey((k) => k + 1);
-              }}
-            />
-          </div>
-        ),
+        dropdownContent: createDateDropdown,
       },
-    ],
-    [currentFilters, applyIsActiveFilter],
-  );
+    ];
+  }, [currentFilters, applyIsActiveFilter]);
 
   // Handle activeFilter changes to update currentFilters
   useEffect(() => {
@@ -750,8 +874,8 @@ const BillingManagement = () => {
       setShowProductDeleteModal(false);
       setProductToDelete(null);
       fetchCrmData();
-    } catch (e) {
-      toast.error(getErrorMessage(e, "Failed to delete product"));
+    } catch {
+      /* Error toast already shown in `deleteProduct` (accounts) */
     } finally {
       setDeletingProduct(false);
     }
@@ -775,13 +899,6 @@ const BillingManagement = () => {
   useEffect(() => {
     fetchCrmData();
   }, [fetchCrmData, refreshKey]);
-
-  // Clear selection after bulk delete or when clearSelectedRows changes
-  useEffect(() => {
-    if (clearSelectedRows) {
-      setSelectedItems([]);
-    }
-  }, [clearSelectedRows]);
 
   const handleViewProduct = useCallback((row: any) => {
     setSelectedProspect(row);
@@ -809,15 +926,34 @@ const BillingManagement = () => {
   }, []);
 
   const handleOpenFiltersSidebar = useCallback(() => {
+    const rawCat = currentFilters.category_id;
+    const rawFrom = currentFilters.created_at_from;
+    const rawTo = currentFilters.created_at_to;
     setFilterSidebarDraft({
       search: String(currentFilters.search ?? ""),
       is_active:
         typeof currentFilters.is_active === "boolean"
           ? currentFilters.is_active
           : undefined,
+      category_id:
+        rawCat !== undefined && rawCat !== null && String(rawCat).trim() !== ""
+          ? String(rawCat).trim()
+          : "",
+      created_at_from:
+        typeof rawFrom === "string" && rawFrom.trim() !== ""
+          ? rawFrom.trim()
+          : "",
+      created_at_to:
+        typeof rawTo === "string" && rawTo.trim() !== "" ? rawTo.trim() : "",
     });
     setShowFiltersSidebar(true);
-  }, [currentFilters.search, currentFilters.is_active]);
+  }, [
+    currentFilters.search,
+    currentFilters.is_active,
+    currentFilters.category_id,
+    currentFilters.created_at_from,
+    currentFilters.created_at_to,
+  ]);
 
   const handleCloseFiltersSidebar = useCallback(() => {
     setShowFiltersSidebar(false);
@@ -827,14 +963,6 @@ const BillingManagement = () => {
   const handlePreviewClick = useCallback((row: any) => {
     handleViewProduct(row);
   }, [handleViewProduct]);
-
-  // Handle first column click - navigates to detail page with prospect ID in URL
-  const handleFirstColumnClick = useCallback(
-    (prospect: any) => {
-      
-    },
-    [router],
-  );
 
   // Stats cards data for metrics
   const productsStatsCards: StatsCardData[] = useMemo(
@@ -875,20 +1003,14 @@ const BillingManagement = () => {
         sortable: true,
         type: "custom",
         render: (row) => (
-          <button
-            type="button"
+          <span
             style={{
               color: "#1d6ae5",
               fontWeight: 500,
-              cursor: "pointer",
-              background: "transparent",
-              border: "none",
-              padding: 0,
             }}
-            onClick={() => handleViewData(row)}
           >
             {getProductDisplayName(row)}
-          </button>
+          </span>
         ),
       },
      
@@ -904,13 +1026,13 @@ const BillingManagement = () => {
         ),
       },
       {
-        key: "tax_category",
-        label: "Tax Category",
-        sortable: true,
+        key: "category_id",
+        label: "Category",
+        sortable: false,
         type: "custom",
         render: (row) => (
           <span style={{ color: "#374151", fontSize: 13 }}>
-            {getProductTaxCategory(row)}
+            {getProductCategoryDisplayName(row, productCategoryIdToName)}
           </span>
         ),
       },
@@ -928,7 +1050,7 @@ const BillingManagement = () => {
       {
         key: "is_active",
         label: "Status",
-        sortable: true,
+        sortable: false,
         type: "custom",
         render: (row) => {
           const status = row.is_active ? "Active" : "Inactive";
@@ -938,31 +1060,53 @@ const BillingManagement = () => {
         },
       },
       {
+        key: "created_at",
+        label: "Created at",
+        sortable: true,
+        type: "custom",
+        render: (row) => (
+          <span style={{ color: "#374151", fontSize: 13 }}>
+            {formatDateTimeGlobal(row.created_at) || "—"}
+          </span>
+        ),
+      },
+
+      {
         key: "actions",
         label: "Actions",
         sortable: false,
         type: "custom",
         render: (row: any) => {
           return <div className="d-flex gap-1">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => openProductEditModal(row)}
-            >
-              <FiEdit size={16} />
-            </Button>
-            <Button
-              variant="outline-danger"
-              size="sm"
-              onClick={() => openProductDeleteModal(row)}
-            >
-              <FiTrash2 size={16} />
-            </Button>
+            <button
+  onClick={() => openProductEditModal(row)}
+  style={{
+    background: "transparent",
+    border: "none",
+    padding: "4px",
+    cursor: "pointer",
+    color: "#0d6efd" // blue (edit)
+  }}
+>
+  <FiEdit size={16} />
+</button>
+<button
+  onClick={() => openProductDeleteModal(row)}
+  style={{
+    background: "transparent",
+    border: "none",
+    padding: "4px",
+    cursor: "pointer",
+    color: "#dc3545" // red
+  }}
+>
+  <FiTrash2 size={16} />
+</button>
           </div>;
         },
       },
     ],
-    [handleViewData, openProductEditModal, openProductDeleteModal],
+    [openProductEditModal, openProductDeleteModal, productCategoryIdToName],
   );
 
   // Define table actions
@@ -978,7 +1122,6 @@ const BillingManagement = () => {
     [openProductEditModal],
   );
 
-  // Render Add Contacts Button with Dropdown (and Bulk Delete when rows selected)
   const renderAddProductButton = () => (
     <div
       style={{
@@ -991,18 +1134,37 @@ const BillingManagement = () => {
       }}
       ref={addContactsRef}
     >
-      <BillingProductsToolbarButton
-        onClick={() => router.push("/billing/products/manage-categories")}
-      >
-        <Plus size={16} />
-        Manage Categories
-      </BillingProductsToolbarButton>
-      <BillingProductsToolbarButton
-        onClick={() => setShowCreateProductModal(true)}
-      >
-        <Plus size={16} />
-        Add Product
-      </BillingProductsToolbarButton>
+      {session?.user?.permissions?.includes(
+        "products-categories-products-billing",
+      ) ? (
+        <button
+          type="button"
+          onClick={() => router.push("/billing/products/manage-categories")}
+          style={ACTION_BUTTON_BASE_STYLE}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#1a1a1a";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#000000";
+          }}
+        >
+          <Plus size={16} />
+          Manage Categories
+        </button>
+      ) : null}
+        <button
+          onClick={() => setShowCreateProductModal(true)}
+          style={ACTION_BUTTON_BASE_STYLE}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "#1a1a1a";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "#000000";
+          }}
+        >
+          <Plus size={16} />
+          Add Product
+        </button>
     
     </div>
   );
@@ -1011,42 +1173,24 @@ const BillingManagement = () => {
   const renderCreateContactSidebar = () => {
     if (!showCreateContactSidebar) return null;
   
-    const isFormValid =
-      contactForm.email?.trim() &&
-      contactForm.phoneNumber?.trim() &&
-      (contactForm.firstName?.trim() || contactForm.lastName?.trim());
-  
     return (
       <ProspectEditSidebar
         isOpen={showCreateContactSidebar}
-        title={editingContactId ? "Edit Prospect" : "Create Prospect"}
-        isEditing={!!editingContactId}
-        isFormValid={!!isFormValid}
+        title="Create Product"
+        isEditing={false}
+        isFormValid={true}
         createContactLoading={createContactLoading}
         contactForm={contactForm}
         setContactForm={setContactForm}
-        contactFormLoading={contactFormLoading}
-        contactFormLoadError={contactFormLoadError}
-        availableCampaigns={availableCampaigns}
-        extensions={extensions}
-        availableTags={[]}
+        contactFormLoading={false}
+        contactFormLoadError={null}
+        availableCampaigns={[]}
+        extensions={[]}
         parsePhoneNumberInput={() => undefined}
-        onSubmitPrimary={() => {
-         
-        }}
-        onClose={() => {
-          setShowCreateContactSidebar(false);
-          setEditingContactId(null);
-          setContactFormLoadError(null);
-          setContactFormLoading(false);
-        }}
-        onCreateAndAddAnother={
-          editingContactId
-            ? undefined
-            : () => {
-               
-              }
-        }
+        availableTags={[]}
+        onClose={() => setShowCreateContactSidebar(false)}
+        onSubmitPrimary={() => {}}
+        onCreateAndAddAnother={() => {}}
       />
     );
   };
@@ -1055,7 +1199,7 @@ const BillingManagement = () => {
   const productsToolbarConfig = useCrmToolbarConfig({
     entity: "invoices" as any,
     searchValue: prospectsSearch,
-    searchPlaceholder: "Search products...",
+    searchPlaceholder: "Search products by name or SKU...",
     onSearchChange: setProspectsSearch,
     onSearch: () => {
       setCurrentFilters((prev) => ({ ...prev, search: prospectsSearch || undefined }));
@@ -1076,8 +1220,7 @@ const BillingManagement = () => {
       },
       ...customTabs,
     ],
-    onTabAdd: () => setShowTabModal(true),
-    onTabRemove: (tabId) => {
+    onTabRemove: (tabId: string) => {
       setCustomTabs((tabs) => tabs.filter((t) => t.id !== tabId));
       if (activeFilter === tabId) handleFilterChange("all");
     },
@@ -1110,8 +1253,26 @@ const BillingManagement = () => {
         // Don't close modal, just reset form
       }, [fetchCrmData]);
 
-  const productFilterFields: FilterField[] = useMemo(
-    () => [
+  const productCategoryFilterOptions: FilterOption[] = useMemo(() => {
+    const opts: FilterOption[] = [{ value: "", label: "All categories" }];
+    for (const cat of productCategories) {
+      if (cat && typeof cat.id === "number") {
+        opts.push({
+          value: String(cat.id),
+          label: String(cat.name ?? "").trim() || `Category ${cat.id}`,
+        });
+      }
+    }
+    return opts;
+  }, [productCategories]);
+
+  const productFilterFields: FilterField[] = useMemo(() => {
+    const todayYmd = billingProductsTodayYmd();
+    const createdFromMax = billingProductsUpperBoundForCreatedFrom(
+      filterSidebarDraft.created_at_to,
+      todayYmd,
+    );
+    return [
       {
         id: "search",
         label: "Search",
@@ -1139,9 +1300,68 @@ const BillingManagement = () => {
           { value: "false", label: "Inactive" },
         ],
       },
-    ],
-    [filterSidebarDraft.search, filterSidebarDraft.is_active],
-  );
+      {
+        id: "category_id",
+        label: "Category",
+        type: "dropdown",
+        value: filterSidebarDraft.category_id ?? "",
+        onChange: (value) =>
+          setFilterSidebarDraft((prev) => ({
+            ...prev,
+            category_id: typeof value === "string" ? value : "",
+          })),
+        options: productCategoryFilterOptions,
+      },
+      {
+        id: "created_at_from",
+        label: "Created from",
+        type: "date",
+        value: filterSidebarDraft.created_at_from,
+        max: createdFromMax,
+        onChange: (value) => {
+          const nextFrom = typeof value === "string" ? value : "";
+          setFilterSidebarDraft((prev) => {
+            const adjustedTo =
+              billingProductsDateToOnOrAfterFrom(
+                nextFrom || undefined,
+                prev.created_at_to || undefined,
+              ) ?? "";
+            return {
+              ...prev,
+              created_at_from: nextFrom,
+              created_at_to: adjustedTo,
+            };
+          });
+        },
+      },
+      {
+        id: "created_at_to",
+        label: "Created to",
+        type: "date",
+        value: filterSidebarDraft.created_at_to,
+        min: filterSidebarDraft.created_at_from || undefined,
+        max: todayYmd,
+        onChange: (value) => {
+          const raw = typeof value === "string" ? value : "";
+          setFilterSidebarDraft((prev) => {
+            const adjusted =
+              billingProductsDateToOnOrAfterFrom(
+                prev.created_at_from || undefined,
+                raw || undefined,
+              ) ?? "";
+            return { ...prev, created_at_to: adjusted };
+          });
+        },
+      },
+    ];
+  }, [
+    filterSidebarDraft.search,
+    filterSidebarDraft.is_active,
+    filterSidebarDraft.category_id,
+    filterSidebarDraft.created_at_from,
+    filterSidebarDraft.created_at_to,
+    productCategoryFilterOptions,
+  ]);
 
   if (!session?.user?.permissions?.includes("list-crm-data-management")) {
     return null;
@@ -1274,25 +1494,14 @@ const BillingManagement = () => {
                   selectedColumns.includes(c.key),
                 )}
                 actions={productsActions}
+                showToolbarActions={false}
                 showActions={false}
-                // Selection
-                selectable={session?.user?.permissions?.includes(
-                  "delete-crm-data-management",
-                )}
-                selectedRows={dataList.filter((item) =>
-                  selectedItems.includes(item.id),
-                )}
-                onSelectionChange={(selected) => {
-                  setSelectedItems(selected.map((item) => item.id));
-                  setClearSelectedRows(false);
-                }}
-           
                 // Pagination
                 pagination={{
                   currentPage: pagination.currentPage,
                   rowsPerPage: pagination.rowsPerPage,
                   totalRows: totalRecords,
-                  pageSizeOptions: [10, 15, 25, 50, 100],
+                  pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
                 }}
                 onPaginationChange={(page, rowsPerPage) => {
                   setPagination({
@@ -1315,7 +1524,7 @@ const BillingManagement = () => {
                 }}
                 // Row interactions
                 onPreviewClick={(row) => handlePreviewClick(row)}
-                onFirstColumnClick={(row) => handleFirstColumnClick(row)}
+                onFirstColumnClick={(row) => handleViewData(row)}
                 onRowDoubleClick={(row) => {
                   if (
                     session?.user?.permissions?.includes(
@@ -1338,8 +1547,12 @@ const BillingManagement = () => {
                 showToolbar={true}
                 toolbar={{
                   ...productsToolbarConfig,
+                  tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
+                  showFiltersButton: false,
                   showFilterPills: true,
+                  showViewSwitcher: false,
                   filterPills: productsFilterPills,
+                  showExportButton: false,
                   showMoreFiltersButton: true,
                   onAdvancedFiltersClick: handleOpenFiltersSidebar,
                 }}
@@ -1439,8 +1652,11 @@ const BillingManagement = () => {
                     copyable: true,
                   },
                   {
-                    label: "Tax Category",
-                    value: getProductTaxCategory(selectedProspect),
+                    label: "Category",
+                    value: getProductCategoryDisplayName(
+                      selectedProspect,
+                      productCategoryIdToName,
+                    ),
                   },
                  
                   {
@@ -1535,7 +1751,7 @@ const BillingManagement = () => {
           isOpen={showFiltersSidebar}
           onClose={handleCloseFiltersSidebar}
           title="Filters"
-          subtitle="Filter products by search and active state"
+          subtitle="Filter products by search, status, category, and created date"
           width="400px"
           filters={productFilterFields}
           onApply={() => {
@@ -1552,6 +1768,29 @@ const BillingManagement = () => {
               } else {
                 delete next.is_active;
               }
+              const nextCategoryId = filterSidebarDraft.category_id.trim();
+              if (nextCategoryId) {
+                next.category_id = nextCategoryId;
+              } else {
+                delete next.category_id;
+              }
+              const fromYmd = filterSidebarDraft.created_at_from.trim();
+              const toYmdRaw = filterSidebarDraft.created_at_to.trim();
+              const toYmd =
+                billingProductsDateToOnOrAfterFrom(
+                  fromYmd || undefined,
+                  toYmdRaw || undefined,
+                ) ?? "";
+              if (fromYmd) {
+                next.created_at_from = fromYmd;
+              } else {
+                delete next.created_at_from;
+              }
+              if (toYmd) {
+                next.created_at_to = toYmd;
+              } else {
+                delete next.created_at_to;
+              }
               return next;
             });
             setProspectsSearch(trimmedSearch);
@@ -1560,7 +1799,13 @@ const BillingManagement = () => {
             setShowFiltersSidebar(false);
           }}
           onReset={() => {
-            setFilterSidebarDraft({ search: "", is_active: undefined });
+            setFilterSidebarDraft({
+              search: "",
+              is_active: undefined,
+              category_id: "",
+              created_at_from: "",
+              created_at_to: "",
+            });
             setCurrentFilters({});
             setProspectsSearch("");
             setPagination((prev) => ({ ...prev, currentPage: 1 }));
@@ -1577,7 +1822,7 @@ const BillingManagement = () => {
         title="Customize Columns"
         columns={productsColumns.map((c) => ({ key: c.key, label: c.label }))}
         selectedColumnKeys={selectedColumns}
-        onApply={(keys) => {
+        onApply={(keys: string[]) => {
           setSelectedColumns(keys);
           const w = (globalThis as unknown as { window?: Window }).window;
           if (w) {

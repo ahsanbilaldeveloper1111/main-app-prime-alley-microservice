@@ -84,6 +84,10 @@ import { useCrmQuotesListPageUploadHandlers } from "@crm/billing-quotes/useCrmQu
 import { CrmQuotesListPageDeleteConfirmationBlock } from "@crm/billing-quotes/CrmQuotesListPageDeleteConfirmationBlock";
 import { CrmQuotesListPageProspectSidebar } from "@crm/billing-quotes/CrmQuotesListPageProspectSidebar";
 import { CrmQuotesListPageQuotesFilterSidebar } from "@crm/billing-quotes/CrmQuotesListPageQuotesFilterSidebar";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 export type CrmQuotesListPageProps = Readonly<{
   variant: "billing" | "crm";
@@ -381,6 +385,10 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
   const showAdvancedFilterPills =
     showAdvancedFilters || hasAdvancedFiltersApplied;
 
+  useEffect(() => {
+    setShowAdvancedFilters(true);
+  }, [setShowAdvancedFilters]);
+
   const prospectQuickFilters = useMemo(
     () => getCrmQuotesListProspectQuickFilters(),
     [],
@@ -499,7 +507,9 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
       }}
       ref={addContactsRef}
     >
-      {session?.user?.permissions?.includes("delete-crm-data-management") &&
+      {session?.user?.permissions?.includes(
+        PERMISSIONS.DELETE_CRM_DATA_MANAGEMENT,
+      ) &&
         selectedItems.length > 0 && (
           <button
             type="button"
@@ -628,7 +638,9 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
     },
   });
 
-  if (!session?.user?.permissions?.includes("list-crm-data-management")) {
+  if (
+    !session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)
+  ) {
     return null;
   }
 
@@ -679,7 +691,9 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
         <div className="d-flex flex-wrap gap-2">
          
 
-{session?.user?.permissions?.includes("add-crm-data-management") && (
+{session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      ) && (
   <Button
     variant="outline-secondary"
     className=""
@@ -802,7 +816,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
             {/* Filter Bar */}
             {showFilterBar &&
               session?.user?.permissions?.includes(
-                "list-crm-data-management",
+                PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT,
               ) && (
                 <FilterBar
                   quickFilters={prospectQuickFilters}
@@ -853,6 +867,7 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                 columns={quotesColumns.filter((c) =>
                   selectedColumns.includes(c.key),
                 )}
+                showToolbarActions={false}
                 actions={quotesActions}
                 {...getCrmProspectsDataListGenericTableSharedProps({
                   session,
@@ -871,15 +886,22 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
                   onRowDoubleClick: (row) =>
                     prospectsTableRowDoubleClick(session, handleViewData, row),
                 })}
-                toolbar={mergeCrmQuotesListProspectsToolbarConfig(
-                  prospectsToolbarConfig,
-                  {
-                    showFiltersSidebar,
-                    setShowAdvancedFilters,
-                    showAdvancedFilterPills,
-                    quotesFilterPills,
-                  },
-                )}
+                toolbar={{
+                  ...mergeCrmQuotesListProspectsToolbarConfig(
+                    prospectsToolbarConfig,
+                    {
+                      showFiltersSidebar,
+                      setShowAdvancedFilters,
+                      showAdvancedFilterPills,
+                      quotesFilterPills,
+                    },
+                  ),
+                  tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
+                  showFilterPills: true,
+                  showMoreFiltersButton: false,
+                  showAdvancedFilters: false,
+                  advancedFiltersOpen: true,
+                }}
                 statsCards={prospectsStatsCards}
                 customBody={renderCrmQuotesListProspectsBoardCustomBody({
                   prospectsViewMode,
@@ -892,7 +914,9 @@ function CrmQuotesListPageContent({ variant }: Readonly<CrmQuotesListPageProps>)
           </div>
 
           {/* Upload Modal */}
-          {session?.user?.permissions?.includes("add-crm-data-management") && (
+          {session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      ) && (
             <CrmListUploadModal
               show={showUploadModal}
               onHide={() => setShowUploadModal(false)}

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Button, Form, Modal } from "react-bootstrap";
+import { Form } from "react-bootstrap";
 import { toast } from "react-toastify";
+import WorkforceSidebarShell from "@components/workforce/WorkforceSidebarShell";
+import UserRequestDynamicFieldInput from "@components/workforce/UserRequestDynamicFieldInput";
 import {
   getUserRequestCategories,
   getUserRequestCategoryFields,
@@ -8,13 +10,14 @@ import {
   type UserRequestCategory,
   type UserRequestCategoryField,
 } from "@utils/staffManagement";
+import "@assets/scss/workforce-user-request.scss";
 
 export interface NewRequestModalProps {
   show: boolean;
   onHide: () => void;
   /** Called after a request is created successfully (e.g. to refetch list) */
   onSuccess?: () => void;
-  /** Optional modal title */
+  /** Optional sidebar title */
   title?: string;
   /** Optional submit button label */
   submitLabel?: string;
@@ -36,38 +39,11 @@ type CreateFormState = {
   attachments: File[];
 };
 
-const getFieldKey = (field: UserRequestCategoryField): string | null => {
-  const key = field.key?.trim();
-  return key ?? null;
-};
-
-const getStringValue = (values: Record<string, unknown>, key: string): string => {
-  const value = values[key];
-  return typeof value === "string" ? value : "";
-};
-
-const getStringArrayValue = (values: Record<string, unknown>, key: string): string[] => {
-  const value = values[key];
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === "string");
-  }
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
-  return [];
-};
-
-const getBooleanValue = (values: Record<string, unknown>, key: string): boolean => Boolean(values[key]);
-
-const isAttachmentField = (fieldType: string): boolean => fieldType === "file" || fieldType === "attachment";
-
-const getBasicInputType = (fieldType: string): "number" | "date" | "text" => {
-  if (fieldType === "number") return "number";
-  if (fieldType === "date") return "date";
-  return "text";
+type ActiveChildCategory = {
+  id: number;
+  name?: string | null;
+  code?: string | null;
+  is_active?: boolean;
 };
 
 const defaultForm: CreateFormState = {
@@ -81,156 +57,102 @@ const defaultForm: CreateFormState = {
   attachments: [],
 };
 
-type DynamicFieldInputProps = {
-  field: UserRequestCategoryField;
-  dynamicFields: Record<string, unknown>;
-  onDynamicFieldChange: (key: string, value: unknown) => void;
-  onDynamicFileChange: (key: string, file: File | null) => void;
+type SidebarDateInputFieldProps = {
+  label: string;
+  value: string;
+  min?: string;
+  helpText: string;
+  onChange: (next: string) => void;
 };
 
-const DynamicFieldInput: React.FC<DynamicFieldInputProps> = ({
-  field,
-  dynamicFields,
-  onDynamicFieldChange,
-  onDynamicFileChange,
-}) => {
-  const key = getFieldKey(field);
-  if (!key) return null;
-
-  if (field.type === "textarea") {
-    return (
-      <Form.Control
-        as="textarea"
-        rows={2}
-        value={getStringValue(dynamicFields, key)}
-        onChange={(e) => onDynamicFieldChange(key, e.target.value)}
-        placeholder={field.config?.placeholder ?? undefined}
-      />
-    );
-  }
-
-  if (isAttachmentField(field.type)) {
-    return (
-      <Form.Control
-        type="file"
-        onChange={(e) => {
-          const file = (e.target as HTMLInputElement).files?.[0] ?? null;
-          onDynamicFileChange(key, file);
-        }}
-      />
-    );
-  }
-
-  if (field.type === "select") {
-    return (
-      <Form.Select value={getStringValue(dynamicFields, key)} onChange={(e) => onDynamicFieldChange(key, e.target.value)}>
-        <option value="">Select...</option>
-        {(field.options ?? []).map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </Form.Select>
-    );
-  }
-
-  if (field.type === "multiselect") {
-    return (
-      <Form.Select
-        multiple
-        value={getStringArrayValue(dynamicFields, key)}
-        onChange={(e) => {
-          const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, (option) => option.value);
-          onDynamicFieldChange(key, selected);
-        }}
-      >
-        {(field.options ?? []).map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </Form.Select>
-    );
-  }
-
-  if (field.type === "radio") {
-    return (
-      <div className="d-flex flex-wrap gap-2">
-        {(field.options ?? []).map((opt) => (
-          <Form.Check
-            key={opt.value}
-            type="radio"
-            id={`${key}-${opt.value}`}
-            name={key}
-            label={opt.label}
-            value={opt.value}
-            checked={getStringValue(dynamicFields, key) === opt.value}
-            onChange={() => onDynamicFieldChange(key, opt.value)}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  if (field.type === "checkbox") {
-    const selectedValues = getStringArrayValue(dynamicFields, key);
-    return (
-      <div className="d-flex flex-wrap gap-2">
-        {(field.options ?? []).map((opt) => {
-          const checked = selectedValues.includes(opt.value);
-          return (
-            <Form.Check
-              key={opt.value}
-              type="checkbox"
-              id={`${key}-${opt.value}`}
-              label={opt.label}
-              checked={checked}
-              onChange={() => {
-                const nextValues = checked
-                  ? selectedValues.filter((value) => value !== opt.value)
-                  : [...selectedValues, opt.value];
-                onDynamicFieldChange(key, nextValues);
-              }}
-            />
-          );
-        })}
-      </div>
-    );
-  }
-
-  if (field.type === "boolean") {
-    return (
-      <Form.Check
-        type="checkbox"
-        id={`${key}-boolean`}
-        label={field.config?.help_text ?? "Yes / No"}
-        checked={getBooleanValue(dynamicFields, key)}
-        onChange={(e) => onDynamicFieldChange(key, e.target.checked)}
-      />
-    );
-  }
-
-  if (field.type === "toggle") {
-    return (
-      <Form.Check
-        type="switch"
-        id={`${key}-toggle`}
-        label={field.config?.help_text ?? "Enable"}
-        checked={getBooleanValue(dynamicFields, key)}
-        onChange={(e) => onDynamicFieldChange(key, e.target.checked)}
-      />
-    );
-  }
-
-  return (
+const SidebarDateInputField: React.FC<SidebarDateInputFieldProps> = ({
+  label,
+  value,
+  min,
+  helpText,
+  onChange,
+}) => (
+  <Form.Group className="mb-3 flex-grow-1 new-request-dateFieldGroup">
+    <Form.Label className="new-request-label">{label}</Form.Label>
     <Form.Control
-      type={getBasicInputType(field.type)}
-      value={getStringValue(dynamicFields, key)}
-      onChange={(e) => onDynamicFieldChange(key, e.target.value)}
-      placeholder={field.config?.placeholder ?? undefined}
+      type="date"
+      value={value}
+      min={min}
+      onChange={(e) => onChange(e.target.value)}
     />
-  );
-};
+    <Form.Text className="text-muted">{helpText}</Form.Text>
+  </Form.Group>
+);
+
+/** Resolves the effective category id for form submission */
+function resolveSubmitCategoryId(
+  formCategoryId: number | "",
+  hasSubCategories: boolean,
+  selectedParentId: number | "",
+): number | "" {
+  if (hasSubCategories) {
+    return formCategoryId;
+  }
+  if (formCategoryId !== "") return formCategoryId;
+  return selectedParentId;
+}
+
+/** Collects non-null dynamic files from the form state */
+function collectDynamicFiles(dynamicFiles: Record<string, File | null>): Record<string, File> {
+  const result: Record<string, File> = {};
+  Object.entries(dynamicFiles).forEach(([key, file]) => {
+    if (file) result[key] = file;
+  });
+  return result;
+}
+
+/** Determines the category id whose fields should be displayed */
+function resolveDisplayFieldsCategoryId(
+  effectiveCategoryId: number | "",
+  hasSubCategories: boolean,
+  selectedParentId: number | "",
+): number | null {
+  if (effectiveCategoryId !== "") return Number(effectiveCategoryId);
+  if (hasSubCategories && selectedParentId !== "") return Number(selectedParentId);
+  return null;
+}
+
+/** Determines whether display fields are currently loading */
+function resolveIsLoadingDisplayFields(
+  hasDisplayFieldsCategory: boolean,
+  displayFieldsCategoryId: number | null,
+  effectiveCategoryId: number | "",
+  loadingFields: boolean,
+  categoryFields: Record<number, UserRequestCategoryField[]>,
+): boolean {
+  if (!hasDisplayFieldsCategory || displayFieldsCategoryId === null) return false;
+  if (displayFieldsCategoryId === Number(effectiveCategoryId)) return loadingFields;
+  return categoryFields[displayFieldsCategoryId] === undefined;
+}
+
+function getActiveChildCategories(children?: ActiveChildCategory[]): ActiveChildCategory[] {
+  return (children ?? []).filter((child: ActiveChildCategory) => child.is_active === true);
+}
+
+function resetCategoryDependentFields(
+  previousForm: CreateFormState,
+  userRequestCategoryId: number | "",
+): CreateFormState {
+  return {
+    ...previousForm,
+    user_request_category_id: userRequestCategoryId,
+    dynamic_fields: {},
+    dynamic_files: {},
+  };
+}
+
+function mapCategoryFieldsById(
+  previous: Record<number, UserRequestCategoryField[]>,
+  categoryId: number,
+  fields: UserRequestCategoryField[],
+): Record<number, UserRequestCategoryField[]> {
+  return { ...previous, [categoryId]: fields };
+}
 
 const NewRequestModal: React.FC<NewRequestModalProps> = ({
   show,
@@ -247,6 +169,14 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const [submitting, setSubmitting] = useState(false);
   /** Selected parent category id (for showing sub-category dropdown) */
   const [selectedParentId, setSelectedParentId] = useState<number | "">("");
+
+  const applyLoadedCategoryFields = useCallback((categoryId: number, fields: UserRequestCategoryField[]) => {
+    setCategoryFields((previous) => mapCategoryFieldsById(previous, categoryId, fields));
+  }, []);
+
+  const applyFailedCategoryFields = useCallback((categoryId: number) => {
+    setCategoryFields((previous) => mapCategoryFieldsById(previous, categoryId, []));
+  }, []);
 
   const loadCategories = useCallback(async () => {
     setLoadingCategories(true);
@@ -279,20 +209,20 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     const id = Number(selectedParentId);
     let cancelled = false;
     getUserRequestCategoryFields(id)
-      .then((data) => {
+      .then((data: UserRequestCategoryField[]) => {
         if (!cancelled) {
-          setCategoryFields((prev) => ({ ...prev, [id]: data ?? [] }));
+          applyLoadedCategoryFields(id, data ?? []);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setCategoryFields((prev) => ({ ...prev, [id]: [] }));
+          applyFailedCategoryFields(id);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [selectedParentId, parentHasChildren]);
+  }, [applyFailedCategoryFields, applyLoadedCategoryFields, selectedParentId, parentHasChildren]);
 
   const effectiveCategoryId = form.user_request_category_id;
   useEffect(() => {
@@ -303,14 +233,14 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     let cancelled = false;
     setLoadingFields(true);
     getUserRequestCategoryFields(id)
-      .then((data) => {
+      .then((data: UserRequestCategoryField[]) => {
         if (!cancelled) {
-          setCategoryFields((prev) => ({ ...prev, [id]: data ?? [] }));
+          applyLoadedCategoryFields(id, data ?? []);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setCategoryFields((prev) => ({ ...prev, [id]: [] }));
+          applyFailedCategoryFields(id);
         }
       })
       .finally(() => {
@@ -319,51 +249,40 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [effectiveCategoryId]);
+  }, [applyFailedCategoryFields, applyLoadedCategoryFields, effectiveCategoryId]);
 
   const topLevelCategories = categories.filter((c) => c.parent_id == null);
-  const subCategories = (selectedParent?.children ?? []).filter((ch) => ch.is_active === true);
+  const subCategories = getActiveChildCategories(selectedParent?.children);
   const hasSubCategories = subCategories.length > 0;
-  /** Category id whose fields to show: effective (child/parent) when set, else selected parent when it has children */
-  const getDisplayFieldsCategoryId = (): number | null => {
-    if (effectiveCategoryId !== "") {
-      return Number(effectiveCategoryId);
-    }
-    if (hasSubCategories && selectedParentId === "") {
-      return null;
-    }
-    if (hasSubCategories) {
-      return Number(selectedParentId);
-    }
-    return null;
-  };
-  const displayFieldsCategoryId = getDisplayFieldsCategoryId();
+
+  const displayFieldsCategoryId = resolveDisplayFieldsCategoryId(
+    effectiveCategoryId,
+    hasSubCategories,
+    selectedParentId,
+  );
   const hasDisplayFieldsCategory = displayFieldsCategoryId !== null;
   const displayFields = hasDisplayFieldsCategory ? (categoryFields[displayFieldsCategoryId] ?? []) : [];
-  const getIsLoadingDisplayFields = (): boolean => {
-    if (!hasDisplayFieldsCategory) {
-      return false;
-    }
-    if (displayFieldsCategoryId === Number(effectiveCategoryId)) {
-      return loadingFields;
-    }
-    return categoryFields[displayFieldsCategoryId] === undefined;
-  };
-  const isLoadingDisplayFields = getIsLoadingDisplayFields();
+  const isLoadingDisplayFields = resolveIsLoadingDisplayFields(
+    hasDisplayFieldsCategory,
+    displayFieldsCategoryId,
+    effectiveCategoryId,
+    loadingFields,
+    categoryFields,
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const categoryId = (() => {
-      if (form.user_request_category_id !== "") {
-        return form.user_request_category_id;
-      }
-      if (hasSubCategories) {
-        return selectedParentId;
-      }
-      return "";
-    })();
+    const categoryId = resolveSubmitCategoryId(
+      form.user_request_category_id,
+      hasSubCategories,
+      selectedParentId,
+    );
     const hasSubject = form.subject.trim().length > 0;
-    if (categoryId === "" || hasSubject === false) {
+    if (hasSubCategories && form.user_request_category_id === "") {
+      toast.error("Sub-category is required");
+      return;
+    }
+    if (categoryId === "" || !hasSubject) {
       toast.error("Category and subject are required");
       return;
     }
@@ -375,10 +294,7 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     }
     setSubmitting(true);
     try {
-      const dynamic_files: Record<string, File> = {};
-      Object.entries(form.dynamic_files).forEach(([key, file]) => {
-        if (file) dynamic_files[key] = file;
-      });
+      const dynamic_files = collectDynamicFiles(form.dynamic_files);
       await createUserRequest({
         user_request_category_id: Number(categoryId),
         subject: form.subject.trim(),
@@ -399,160 +315,160 @@ const NewRequestModal: React.FC<NewRequestModalProps> = ({
     }
   };
 
-  const handleDynamicFieldChange = (key: string, value: unknown) => {
+  const handleDynamicFieldChange = useCallback((key: string, value: unknown) => {
     setForm((currentForm) => ({
       ...currentForm,
       dynamic_fields: { ...currentForm.dynamic_fields, [key]: value },
     }));
-  };
+  }, []);
 
-  const handleDynamicFileChange = (key: string, file: File | null) => {
+  const handleDynamicFileChange = useCallback((key: string, file: File | null) => {
     setForm((currentForm) => ({
       ...currentForm,
       dynamic_files: { ...currentForm.dynamic_files, [key]: file },
     }));
-  };
+  }, []);
+
+  const handleCancelClick = useCallback(() => {
+    onHide();
+  }, [onHide]);
 
   return (
-    <Modal show={show} onHide={onHide} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>{title}</Modal.Title>
-      </Modal.Header>
-      <Form onSubmit={handleSubmit}>
-        <Modal.Body>
-          <Form.Group className="mb-3">
-            <Form.Label>Category <span className="text-danger">*</span></Form.Label>
-            <Form.Select
-              value={selectedParentId === "" ? "" : String(selectedParentId)}
-              onChange={(e) => {
-                const val = e.target.value;
-                const parentId = val === "" ? "" : Number(val);
-                setSelectedParentId(parentId);
-                const parent = parentId === "" ? null : categories.find((c) => c.id === parentId);
-                const activeChildrenCount =
-                  (parent as CategoryWithChildren)?.children?.filter((ch) => ch.is_active === true).length ?? 0;
-                const hasChildren = activeChildrenCount > 0;
-                setForm((f) => ({
-                  ...f,
-                  user_request_category_id: hasChildren ? "" : parentId,
-                  dynamic_fields: {},
-                  dynamic_files: {},
-                }));
-              }}
-              required
-              disabled={loadingCategories}
-            >
-              <option value="">{loadingCategories ? "Loading…" : "Select category"}</option>
-              {topLevelCategories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name ?? c.code ?? `Category ${c.id}`}
-                </option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-          {hasSubCategories && (
+      <WorkforceSidebarShell
+        isOpen={show}
+        className="new-request-sidebar"
+        title={title}
+        onClose={handleCancelClick}
+        onSubmit={handleSubmit}
+        submitLabel={submitLabel}
+        submitting={submitting}
+        primaryDisabled={submitting}
+      >
             <Form.Group className="mb-3">
-              <Form.Label>Sub-category (Optional)</Form.Label>
+              <Form.Label className="new-request-label">
+                Category <span className="text-danger">*</span>
+              </Form.Label>
               <Form.Select
-                value={form.user_request_category_id === "" ? "" : String(form.user_request_category_id)}
+                value={selectedParentId === "" ? "" : String(selectedParentId)}
                 onChange={(e) => {
                   const val = e.target.value;
-                  setForm((f) => ({
-                    ...f,
-                    user_request_category_id: val === "" ? "" : Number(val),
-                    dynamic_fields: {},
-                    dynamic_files: {},
-                  }));
+                  const parentId = val === "" ? "" : Number(val);
+                  setSelectedParentId(parentId);
+                  const parent = parentId === "" ? null : categories.find((c) => c.id === parentId);
+                  const activeChildren = getActiveChildCategories((parent as CategoryWithChildren)?.children);
+                  const hasChildren = activeChildren.length > 0;
+                  setForm((f) => resetCategoryDependentFields(f, hasChildren ? "" : parentId));
                 }}
+                required
+                disabled={loadingCategories}
               >
-                <option value="">Select sub-category (optional)</option>
-                {subCategories.map((ch) => (
-                  <option key={ch.id} value={ch.id}>
-                    {ch.name ?? ch.code ?? `Sub-category ${ch.id}`}
+                <option value="">{loadingCategories ? "Loading…" : "Select category"}</option>
+                {topLevelCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name ?? c.code ?? `Category ${c.id}`}
                   </option>
                 ))}
               </Form.Select>
             </Form.Group>
-          )}
-          <Form.Group className="mb-3">
-            <Form.Label>Subject <span className="text-danger">*</span></Form.Label>
-            <Form.Control
-              type="text"
-              value={form.subject}
-              onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
-              placeholder="Request subject"
-              required
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Reason</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              value={form.reason}
-              onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-              placeholder="Optional reason or description"
-            />
-          </Form.Group>
-          <div className="d-flex gap-3 flex-wrap">
-            <Form.Group className="mb-3 flex-grow-1" style={{ minWidth: 140 }}>
-              <Form.Label>Start date</Form.Label>
+
+            {hasSubCategories && (
+              <Form.Group className="mb-3">
+                <Form.Label className="new-request-label">
+                  Sub-category <span className="text-danger">*</span>
+                </Form.Label>
+                <Form.Select
+                  value={form.user_request_category_id === "" ? "" : String(form.user_request_category_id)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm((f) => resetCategoryDependentFields(f, val === "" ? "" : Number(val)));
+                  }}
+                  required
+                >
+                  <option value="">Select sub-category</option>
+                  {subCategories.map((ch) => (
+                    <option key={ch.id} value={ch.id}>
+                      {ch.name ?? ch.code ?? `Sub-category ${ch.id}`}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            )}
+
+            <Form.Group className="mb-3">
+              <Form.Label className="new-request-label">
+                Subject <span className="text-danger">*</span>
+              </Form.Label>
               <Form.Control
-                type="date"
-                value={form.start_date}
-                onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
+                type="text"
+                value={form.subject}
+                onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+                placeholder="Request subject"
+                required
               />
-              <Form.Text className="text-muted">Optional (YYYY-MM-DD)</Form.Text>
             </Form.Group>
-            <Form.Group className="mb-3 flex-grow-1" style={{ minWidth: 140 }}>
-              <Form.Label>End date</Form.Label>
+
+            <Form.Group className="mb-3">
+              <Form.Label className="new-request-label">
+                Reason
+              </Form.Label>
               <Form.Control
-                type="date"
+                as="textarea"
+                rows={3}
+                value={form.reason}
+                onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+                placeholder="Optional reason or description"
+              />
+            </Form.Group>
+
+            <div className="d-flex gap-3 flex-wrap">
+              <SidebarDateInputField
+                label="Start date"
+                value={form.start_date}
+                onChange={(next: string) => setForm((f) => ({ ...f, start_date: next }))}
+                helpText="Optional (YYYY-MM-DD)"
+              />
+              <SidebarDateInputField
+                label="End date"
                 value={form.end_date}
                 min={form.start_date || undefined}
-                onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
+                onChange={(next: string) => setForm((f) => ({ ...f, end_date: next }))}
+                helpText="Optional, must be on or after start date"
               />
-              <Form.Text className="text-muted">Optional, must be on or after start date</Form.Text>
-            </Form.Group>
-          </div>
-         
-          {displayFieldsCategoryId != null &&
-            (isLoadingDisplayFields || displayFields.length > 0) && (
-            <Form.Group className="mb-3">
-              <Form.Label>Additional fields</Form.Label>
-              <div className="border rounded p-3 bg-light">
-                {isLoadingDisplayFields ? (
-                  <p className="text-muted mb-0 small">Loading fields…</p>
-                ) : (
-                displayFields.map((field) => (
-                  <div key={field.id} className="mb-2">
-                    <Form.Label className="small mb-1">
-                      {field.label ?? field.key}
-                      {field.required && " *"}
-                    </Form.Label>
-                    <DynamicFieldInput
-                      field={field}
-                      dynamicFields={form.dynamic_fields}
-                      onDynamicFieldChange={handleDynamicFieldChange}
-                      onDynamicFileChange={handleDynamicFileChange}
-                    />
+            </div>
+
+            {displayFieldsCategoryId != null && (isLoadingDisplayFields || displayFields.length > 0) && (
+              <Form.Group className="mb-3">
+                <Form.Label className="new-request-label">
+                  Additional fields
+                </Form.Label>
+                <div className="new-request-additionalFieldsPanel">
+                  <div className="new-request-additionalFieldsHint">
+                    Fill out the category-specific details below.
                   </div>
-                ))
-                )}
-              </div>
-            </Form.Group>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onHide} type="button">
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit" disabled={submitting}>
-            {submitting ? "Creating…" : submitLabel}
-          </Button>
-        </Modal.Footer>
-      </Form>
-    </Modal>
+                  {isLoadingDisplayFields ? (
+                    <p className="text-muted mb-0 small">Loading fields…</p>
+                  ) : (
+                    displayFields.map((field) => (
+                      <div key={field.id} className="new-request-additionalFieldCard">
+                        <Form.Label className="mb-2 new-request-additionalFieldLabel">
+                          {field.label ?? field.key}
+                          {field.required && <span className="text-danger"> *</span>}
+                        </Form.Label>
+                        <div className="new-request-additionalFieldInput">
+                          <UserRequestDynamicFieldInput
+                            field={field}
+                            values={form.dynamic_fields}
+                            onValueChange={handleDynamicFieldChange}
+                            onFileChange={handleDynamicFileChange}
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </Form.Group>
+            )}
+      </WorkforceSidebarShell>
   );
 };
 

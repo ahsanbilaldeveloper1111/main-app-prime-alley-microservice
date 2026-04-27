@@ -1,4 +1,7 @@
 import { useCallback, useEffect, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { toast } from "react-toastify";
 import moment from "moment";
 import { getCrmData, uploadCrmDataCsv, deleteCrmData, CrmDataItem } from "@utils/crm";
@@ -48,6 +51,8 @@ interface UseCrmListDataOperationsParams {
   itemToDelete: CrmDataItem | null;
   session: any;
   refreshKey: number;
+  /** Called after a single record is successfully deleted from the list modal. */
+  onSingleRecordDeleted?: (deletedId: number) => void;
 }
 
 export function useCrmListDataOperations({
@@ -81,9 +86,10 @@ export function useCrmListDataOperations({
   exportFilters,
   selectedFile,
   fieldTags,
-  itemToDelete,
-  session,
-  refreshKey,
+    itemToDelete,
+    session,
+    refreshKey,
+    onSingleRecordDeleted,
 }: UseCrmListDataOperationsParams) {
   const fetchCrmDataForExport = useCallback(
     async (filters: Record<string, any>) => {
@@ -194,7 +200,11 @@ export function useCrmListDataOperations({
   );
 
   const handleUpload = useCallback(async () => {
-    if (!session?.user?.permissions?.includes("add-crm-data-management")) {
+    if (
+      !session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      )
+    ) {
       toast.error("You don't have permission to upload data");
       return;
     }
@@ -239,15 +249,17 @@ export function useCrmListDataOperations({
     if (!itemToDelete) return;
 
     try {
-      await deleteCrmData(itemToDelete.id);
+      const deletedId = itemToDelete.id;
+      await deleteCrmData(deletedId);
       setShowDeleteModal(false);
       setDeleteModalMode(null);
       setItemToDelete(null);
+      onSingleRecordDeleted?.(deletedId);
       setRefreshKey((prev) => prev + 1);
     } catch (error: any) {
       console.error("Delete error:", error);
     }
-  }, [itemToDelete]);
+  }, [itemToDelete, onSingleRecordDeleted]);
 
   return {
     fetchCrmData,

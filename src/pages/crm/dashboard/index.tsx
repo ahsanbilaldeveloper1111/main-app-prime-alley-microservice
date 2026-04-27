@@ -11,6 +11,9 @@ import {
   ListGroup,
 } from "react-bootstrap";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import {
   getCrmDashboard,
   getCrmDashboardOverview,
@@ -18,11 +21,13 @@ import {
   getDeals,
   getOrders,
   DashboardData as CrmDashboardData,
+  AuditTrailEntry,
   LeadData,
   DealData,
   OrderData,
 } from "@utils/crm";
 import { GetHierarchyData } from "@utils/users";
+import { buildCrmAuditLinesForEntry } from "@utils/crmAuditTrail";
 import {
   Target,
   Handshake,
@@ -61,7 +66,8 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import {
   formatCrmPreviewDate,
-  formatCrmPreviewDateTime,
+  formatMeetingDateLocal,
+  formatMeetingTimeLocal,
   formatNumber,
   ModuleSlug,
 } from "@utils/Helper";
@@ -133,6 +139,21 @@ const getRecordTypeFromAuditableType = (auditableType: unknown): string => {
   return typeParts.at(-1) || "";
 };
 
+const DASHBOARD_TIMEFRAME_LABEL = "Last 30 days";
+
+const formatDashboardHistoryUtcDateTime = (date: unknown): string => {
+  if (typeof date !== "string" || !date.trim()) {
+    return "";
+  }
+
+  const parsed = moment.utc(date);
+  if (!parsed.isValid()) {
+    return "";
+  }
+
+  return parsed.local().format("D MMMM, YYYY [at] hh:mm A");
+};
+
 const getLeadToOrderConversionPercentage = (
   apiValue: unknown,
   leadsCount: number,
@@ -188,6 +209,73 @@ const getMeetingRecordNavigation = (
     href: `/crm/detailspage?type=${detailType}&id=${encodeURIComponent(idValue)}`,
   };
 };
+
+const dashboardCellEllipsisStyle: React.CSSProperties = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const dashboardWrapTextStyle: React.CSSProperties = {
+  minWidth: 0,
+  overflowWrap: "anywhere",
+  wordBreak: "break-word",
+};
+
+const recentLeadsGridTemplate = "36px minmax(0, 1fr) 120px 80px 140px";
+const recentDealsGridTemplate = "36px minmax(0, 1fr) 100px 100px";
+
+const humanizeDashboardAuditKey = (key: string): string =>
+  key
+    .replaceAll("_", " ")
+    .replaceAll(/\b\w/g, (char) => char.toUpperCase());
+
+const formatDashboardAuditFieldValue = (
+  _field: string,
+  value: unknown,
+): string => {
+  if (value == null || value === "") {
+    return "—";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? String(value) : "—";
+  }
+
+  if (typeof value === "string") {
+    return value.trim() || "—";
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return "—";
+    }
+
+    return value
+      .map((item) => formatDashboardAuditFieldValue("", item))
+      .join(", ");
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "[Complex value]";
+  }
+};
+
+const getDashboardActivitySummary = (
+  activity: AuditTrailEntry,
+): string =>
+  buildCrmAuditLinesForEntry(
+    activity,
+    formatDashboardAuditFieldValue,
+    humanizeDashboardAuditKey,
+  );
 
 // Chart color palette - 15 colors for handling large datasets
 const CHART_COLORS = [
@@ -498,7 +586,12 @@ const CrmDashboard = () => {
       <Row className="mb-4 align-items-center">
           <Col xs={12} md={7} className="mb-2 mb-md-0">
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <h4 style={{ margin: 0, fontWeight: 600, color: '#1E293B' }}>CRM Dashboard</h4>
+              <div>
+                <h4 style={{ margin: 0, fontWeight: 600, color: '#1E293B' }}>CRM Dashboard</h4>
+                <p style={{ margin: '6px 0 0 0', fontSize: '13px', color: '#64748B' }}>
+                  Dashboard widgets and summary cards reflect the {DASHBOARD_TIMEFRAME_LABEL.toLowerCase()}.
+                </p>
+              </div>
               {/* <div style={{ flex: 1, maxWidth: '420px', position: 'relative' }}>
                 <Search className="position-absolute" style={{ left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6c757d', zIndex: 10 }} size={18} />
                 <Form.Control
@@ -630,6 +723,21 @@ const CrmDashboard = () => {
         </Row> */}
 
 <div className="mb-4">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+            <Badge
+              bg="light"
+              text="dark"
+              style={{
+                fontSize: '12px',
+                fontWeight: 500,
+                color: '#64748B',
+                border: '1px solid #E2E8F0',
+                padding: '6px 10px',
+              }}
+            >
+              Timeframe: {DASHBOARD_TIMEFRAME_LABEL}
+            </Badge>
+          </div>
           <StatsCards
             gridMinWidth="180px"
             data={[
@@ -667,6 +775,7 @@ const CrmDashboard = () => {
                 icon: TrendingUp,
                 iconColor: '#0EA5E9',
                 iconBgColor: '#E0F2FE',
+                subtitle: DASHBOARD_TIMEFRAME_LABEL,
               },
               {
                 title: 'Deals to Orders Conversion',
@@ -674,6 +783,7 @@ const CrmDashboard = () => {
                 icon: TrendingUp,
                 iconColor: '#10B981',
                 iconBgColor: '#D1FAE5',
+                subtitle: DASHBOARD_TIMEFRAME_LABEL,
               },
             ]}
           />
@@ -687,7 +797,14 @@ const CrmDashboard = () => {
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '24px' }}>
               <Card.Body>
                 <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: '#1E293B' }}>Leads Funnel</h5>
-                <p style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '16px' }}>Stage Volume</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <p style={{ fontSize: '13px', color: '#94A3B8', marginBottom: 0 }}>
+                    Stage volume for the {DASHBOARD_TIMEFRAME_LABEL.toLowerCase()}
+                  </p>
+                  <Badge bg="light" text="dark" style={{ fontSize: '12px', fontWeight: 500, color: '#64748B', border: '1px solid #E2E8F0' }}>
+                    {DASHBOARD_TIMEFRAME_LABEL}
+                  </Badge>
+                </div>
                 
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
@@ -757,6 +874,11 @@ const CrmDashboard = () => {
                 <ListGroup variant="flush">
                   {(dashboardData?.recent_activities || []).slice(0, 5).map((activity: any, index: number) => {
                     const recordType = getRecordTypeFromAuditableType(activity.auditable_type);
+                    const recordTypeLabel =
+                      recordType.toLowerCase() === "ticket" ? "Lead" : recordType;
+                    const activitySummary = getDashboardActivitySummary(
+                      activity as AuditTrailEntry,
+                    );
                     const getIcon = () => {
                       if (activity.type === 'lead') return <UserPlus size={16} color="#3B82F6" />;
                       if (activity.type === 'meeting') return <Calendar size={16} color="#10B981" />;
@@ -781,31 +903,42 @@ const CrmDashboard = () => {
                           <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: getBgColor(), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             {getIcon()}
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '4px' }}>
-                              <div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '8px', marginBottom: '4px' }}>
+                              <div style={{ ...dashboardWrapTextStyle, flex: 1 }}>
                                 <span style={{ fontSize: '13px', color: '#64748B' }}>
                                   {activity.created_at
-                                    ? formatCrmPreviewDateTime(activity.created_at)
+                                    ? formatDashboardHistoryUtcDateTime(activity.created_at)
                                     : ""}
                                 </span>
-                                <span style={{ fontSize: '14px', color: '#1E293B', marginLeft: '8px', fontWeight: 500 }}>
-                                  {activity.description || 'Activity'}
-                                </span>
+                                <div
+                                  title={activitySummary}
+                                  style={{
+                                    ...dashboardWrapTextStyle,
+                                    fontSize: '14px',
+                                    color: '#1E293B',
+                                    marginTop: '6px',
+                                    fontWeight: 500,
+                                    whiteSpace: 'pre-wrap',
+                                    lineHeight: '1.5',
+                                  }}
+                                >
+                                  {activitySummary}
+                                </div>
                               </div>
-                              <div style={{ padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px', fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <div style={{ padding: '4px 12px', backgroundColor: '#F1F5F9', borderRadius: '6px', fontSize: '12px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
                                 {getTypeLabel()}
                               </div>
                             </div>
                             {activity.user_extension && (
-                              <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0, marginTop: '8px' }}>
+                              <p style={{ ...dashboardWrapTextStyle, fontSize: '13px', color: '#94A3B8', margin: 0, marginTop: '8px' }}>
                                 Extension: {getNameByExtension(activity.user_extension)}
                               </p>
                             )}
-                            {recordType && (
-                              <div style={{ marginTop: '8px' }}>
+                            {recordTypeLabel && (
+                              <div style={{ marginTop: '8px', minWidth: 0 }}>
                                 <Badge bg="light" text="dark" style={{ fontSize: '12px', fontWeight: 500, color: '#64748B', border: '1px solid #E2E8F0' }}>
-                                  {recordType}
+                                  {recordTypeLabel}
                                 </Badge>
                               </div>
                             )}
@@ -837,7 +970,9 @@ const CrmDashboard = () => {
                   {(dashboardData?.upcoming_meetings || []).slice(0, 5).map((meeting: any, index: number) => {
                     const initials = meeting.name ? meeting.name.charAt(0).toUpperCase() : 'M';
                     const companyName = meeting.lead?.company_name || meeting.deal?.company_name || '';
-                    const meetingTime = meeting.meeting_time ? moment(meeting.meeting_time).format('HH:mm') : '';
+                    const meetingTime = meeting.meeting_time
+                      ? formatMeetingTimeLocal(meeting.meeting_date, meeting.meeting_time)
+                      : '';
                     const meetingRecordType = getMeetingRecordNavigation(meeting.record_type, meeting.record?.id);
                     return (
                       <ListGroup.Item key={meeting.id || index} style={{ padding: '16px 0', border: 'none', borderBottom: index < (dashboardData?.upcoming_meetings?.length || 0) - 1 ? '1px solid #F1F5F9' : 'none' }}>
@@ -845,15 +980,15 @@ const CrmDashboard = () => {
                           <div style={{ width: '40px', height: '40px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '16px', fontWeight: 600, color: '#3B82F6' }}>
                             {initials}
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <h6 style={{ ...dashboardWrapTextStyle, fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>
                               {meeting.name} {companyName && <span style={{ color: '#3B82F6' }}>– {companyName}</span>}
                             </h6>
-                            <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+                            <p style={{ ...dashboardWrapTextStyle, fontSize: '13px', color: '#64748B', margin: 0 }}>
                               {meeting.meeting_type} {meetingTime && `– ${meetingTime}`}
                             </p>
                             {meetingRecordType.label && (
-                              <div style={{ marginTop: '8px' }}>
+                              <div style={{ marginTop: '8px', minWidth: 0 }}>
                                 {meetingRecordType.href ? (
                                   <Link href={meetingRecordType.href} style={{ textDecoration: 'none' }}>
                                     <Badge bg="light" text="dark" style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 500, color: '#64748B', border: '1px solid #E2E8F0' }}>
@@ -868,10 +1003,10 @@ const CrmDashboard = () => {
                               </div>
                             )}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                             <Calendar size={14} color="#94A3B8" />
                             <span style={{ fontSize: '13px', color: '#64748B' }}>
-                              {formatCrmPreviewDate(meeting.meeting_date)}
+                              {formatMeetingDateLocal(meeting.meeting_date, meeting.meeting_time) || formatCrmPreviewDate(meeting.meeting_date)}
                             </span>
                           </div>
                         </div>
@@ -894,9 +1029,16 @@ const CrmDashboard = () => {
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '24px' }}>
               <Card.Body>
                 <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px', color: '#1E293B' }}>Orders Revenue</h5>
-                <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '16px' }}>Total Order Revenue</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <p style={{ fontSize: '13px', color: '#64748B', marginBottom: 0 }}>
+                    Total order revenue for the {DASHBOARD_TIMEFRAME_LABEL.toLowerCase()}
+                  </p>
+                  <Badge bg="light" text="dark" style={{ fontSize: '12px', fontWeight: 500, color: '#64748B', border: '1px solid #E2E8F0' }}>
+                    {DASHBOARD_TIMEFRAME_LABEL}
+                  </Badge>
+                </div>
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                   <h2 style={{ fontSize: '32px', fontWeight: 700, margin: 0, color: '#1E293B' }}>AED {formatNumber(dashboardData?.order_revenue_aed || 0)}</h2>
                   <div style={{ height: '32px' }}>
                     <svg width="120" height="32" viewBox="0 0 120 32">
@@ -909,10 +1051,9 @@ const CrmDashboard = () => {
                     </svg>
                   </div>
                 </div>
-
-                <div style={{ width: '100%', height: '40px', background: 'linear-gradient(90deg, #14B8A6 0%, #10B981 100%)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '16px', marginBottom: '16px' }}>
-                  AED {formatNumber(dashboardData?.order_revenue_aed || 0)}
-                </div>
+                <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 16px 0' }}>
+                  Revenue from orders created within the {DASHBOARD_TIMEFRAME_LABEL.toLowerCase()}.
+                </p>
 
                 <p style={{ fontSize: '13px', color: '#64748B', margin: 0, lineHeight: '1.6' }}>
                   Tip: Track pipeline volume in the Leads Funnel to monitor conversion rates. Revenue is only generated at the Orders stage.
@@ -971,7 +1112,7 @@ const CrmDashboard = () => {
               <Card.Body>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h5 style={{ fontSize: '16px', fontWeight: 600, margin: 0, color: '#1E293B' }}>Upcoming Tasks</h5>
-                  {session?.user?.permissions?.includes('view-crm-tasks') && (
+                  {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_TASKS) && (
                   <Link href="/crm/tasks" style={{ fontSize: '14px', color: '#3B82F6', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     View All <ChevronRight size={16} />
                   </Link>
@@ -991,13 +1132,13 @@ const CrmDashboard = () => {
                           <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '14px', fontWeight: 600, color: '#3B82F6' }}>
                             {initials}
                           </div>
-                          <div style={{ flex: 1 }}>
-                            <h6 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{task.name}</h6>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <h6 style={{ ...dashboardWrapTextStyle, fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: '#1E293B' }}>{task.name}</h6>
                             {task.company_name && (
-                              <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>{task.company_name}</p>
+                              <p style={{ ...dashboardWrapTextStyle, fontSize: '13px', color: '#64748B', margin: 0 }}>{task.company_name}</p>
                             )}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', backgroundColor: bgColor, borderRadius: '6px',textTransform: 'uppercase' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 12px', backgroundColor: bgColor, borderRadius: '6px',textTransform: 'uppercase', flexShrink: 0 }}>
                             <Calendar size={14} color={textColor} />
                             <span style={{ fontSize: '13px', color: textColor, fontWeight: 500 }}>
                               {task.due_date ? formatCrmPreviewDate(task.due_date) : "—"}
@@ -1019,10 +1160,10 @@ const CrmDashboard = () => {
 
           {/* Right Column */}
           <Col xxl={4} xl={12} lg={12} md={12}>
-            {/* Campaign Performance */}
+            {/* CRM Pipeline */}
             <Card style={{ border: 'none', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', marginBottom: '16px' }}>
               <Card.Body style={{ padding: '20px' }}>
-                <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: '#1E293B' }}>Campaign Performance</h5>
+                <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '20px', color: '#1E293B' }}>CRM Pipeline</h5>
                 
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={campaignData}>
@@ -1044,11 +1185,11 @@ const CrmDashboard = () => {
               <Card.Body style={{ padding: '20px' }}>
                 <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: '#1E293B' }}>Recent Leads</h5>
                 
-                <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500, marginBottom: '12px', display: 'grid', gridTemplateColumns: '36px 1fr 120px 80px 140px', gap: '8px', paddingLeft: '4px' }}>
+                <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500, marginBottom: '12px', display: 'grid', gridTemplateColumns: recentLeadsGridTemplate, gap: '8px', paddingLeft: '4px' }}>
                   <span></span>
-                  <span>Lead</span>
-                  <span style={{ textAlign: 'left' }}>Campaign Name</span>
-                  <span style={{ textAlign: 'right' }}>Stage At</span>
+                  <span style={dashboardCellEllipsisStyle}>Lead</span>
+                  <span style={{ ...dashboardCellEllipsisStyle, textAlign: 'left' }}>Campaign Name</span>
+                  <span style={{ ...dashboardCellEllipsisStyle, textAlign: 'right' }}>Stage At</span>
                   {/* <span style={{ textAlign: 'right' }}>Created At</span> */}
                 </div>
 
@@ -1060,13 +1201,13 @@ const CrmDashboard = () => {
                     const stageColor = lead.stage?.color || '#64748B';
                     return (
                       <ListGroup.Item key={lead.id || index} style={{ padding: '10px 0', border: 'none', borderBottom: index < (dashboardData?.recent_leads?.length || 0) - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 120px 80px 140px', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: recentLeadsGridTemplate, gap: '8px', alignItems: 'center' }}>
                           <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#3B82F6' }}>
                             {initials}
                           </div>
-                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>{lead.name || '-'}</span>
-                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500, textAlign: 'left' }}>{campaignName}</span>
-                          <span style={{ fontSize: '13px', color: stageColor, fontWeight: 500, textAlign: 'right' }}>{stageName}</span>
+                          <span title={lead.name || '-'} style={{ ...dashboardCellEllipsisStyle, fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>{lead.name || '-'}</span>
+                          <span title={campaignName} style={{ ...dashboardCellEllipsisStyle, fontSize: '13px', color: '#1E293B', fontWeight: 500, textAlign: 'left' }}>{campaignName}</span>
+                          <span title={stageName} style={{ ...dashboardCellEllipsisStyle, fontSize: '13px', color: stageColor, fontWeight: 500, textAlign: 'right' }}>{stageName}</span>
                           {/* <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>
                             {convertDateTimeWithOffsetToLocal(lead.created_at,undefined,'DD MMM YYYY,hh:mm:ss A')}
                           </span> */}
@@ -1088,11 +1229,11 @@ const CrmDashboard = () => {
               <Card.Body style={{ padding: '20px' }}>
                 <h5 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px', color: '#1E293B' }}>Recent Deals</h5>
                 
-                <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500, marginBottom: '12px', display: 'grid', gridTemplateColumns: '36px 1fr 100px 100px', gap: '8px', paddingLeft: '4px' }}>
+                <div style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 500, marginBottom: '12px', display: 'grid', gridTemplateColumns: recentDealsGridTemplate, gap: '8px', paddingLeft: '4px' }}>
                   <span></span>
-                  <span>LEAD</span>
-                  <span style={{ textAlign: 'right' }}>DEAL VALUE</span>
-                  <span style={{ textAlign: 'right' }}>LAST ORDERS</span>
+                  <span style={dashboardCellEllipsisStyle}>LEAD</span>
+                  <span style={{ ...dashboardCellEllipsisStyle, textAlign: 'right' }}>DEAL VALUE</span>
+                  <span style={{ ...dashboardCellEllipsisStyle, textAlign: 'right' }}>LAST ORDERS</span>
                 </div>
 
                 <ListGroup variant="flush">
@@ -1103,13 +1244,13 @@ const CrmDashboard = () => {
                     const currency = deal.currency || 'AED';
                     return (
                       <ListGroup.Item key={deal.id || index} style={{ padding: '10px 0', border: 'none', borderBottom: index < (dashboardData?.recent_deals?.length || 0) - 1 ? '1px solid #F1F5F9' : 'none' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 100px 100px', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: recentDealsGridTemplate, gap: '8px', alignItems: 'center' }}>
                           <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#3B82F6' }}>
                             {initials}
                           </div>
-                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>{companyName}</span>
-                          <span style={{ fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>{currency} {formatNumber(Number(dealValue))}</span>
-                          <span style={{ fontSize: '12px', color: '#64748B', textAlign: 'right' }}>
+                          <span title={companyName} style={{ ...dashboardCellEllipsisStyle, fontSize: '13px', color: '#1E293B', fontWeight: 500 }}>{companyName}</span>
+                          <span title={`${currency} ${formatNumber(Number(dealValue))}`} style={{ ...dashboardCellEllipsisStyle, fontSize: '13px', color: '#1E293B', fontWeight: 600, textAlign: 'right' }}>{currency} {formatNumber(Number(dealValue))}</span>
+                          <span style={{ ...dashboardCellEllipsisStyle, fontSize: '12px', color: '#64748B', textAlign: 'right' }}>
                             {deal.created_at ? formatCrmPreviewDate(deal.created_at) : "—"}
                           </span>
                         </div>

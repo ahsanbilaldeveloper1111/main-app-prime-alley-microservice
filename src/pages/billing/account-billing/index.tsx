@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, ReactElement } from "react";
+import { useEffect, useMemo, useState, startTransition, ReactElement } from "react";
 import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import OverviewPage from "@components/billings/Overview";
@@ -9,7 +9,12 @@ import TransactionsPage from "@components/billings/TransactionPage";
 import DocumentsPage from "@components/billings/DocumentPage";
 import PaymentMethodsPage from "@components/billings/PaymentMethodsPage";
 import CompanyInfoPage from "@components/billings/CompanyInfoPage";
-import { ACCOUNT_BILLING_TABS, tabLabelFromQuery, tabSlugFromLabel, type AccountBillingTab } from "@components/billings/shared/accountBillingTabs";
+import {
+  ACCOUNT_BILLING_TABS,
+  tabLabelFromQuery,
+  tabSlugFromLabel,
+  type AccountBillingTab,
+} from "@components/billings/shared/accountBillingTabs";
 
 type TabPageComponent = React.ComponentType<Record<string, never>>;
 
@@ -107,7 +112,10 @@ function handleRouteChange(promise: Promise<boolean>, label: string) {
 const AccountBilling = () => {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AccountBillingTab>("Overview");
-  const ActiveTabPage = TAB_PAGES[activeTab];
+  /** Keep visited tab panels mounted so switching tabs does not remount/refetch and flicker. */
+  const [mountedTabs, setMountedTabs] = useState<Set<AccountBillingTab>>(
+    () => new Set<AccountBillingTab>(["Overview"]),
+  );
 
   const queryWithoutTab = useMemo(() => {
     const { tab: _tab, ...rest } = router.query;
@@ -115,7 +123,9 @@ const AccountBilling = () => {
   }, [router.query]);
 
   const selectTab = (tab: AccountBillingTab) => {
-    setActiveTab(tab);
+    startTransition(() => {
+      setActiveTab(tab);
+    });
 
     if (!router.isReady) return;
 
@@ -182,6 +192,10 @@ const AccountBilling = () => {
     }
   }, [activeTab, queryWithoutTab, router.isReady, router.pathname, router.query.tab]);
 
+  useEffect(() => {
+    setMountedTabs((prev) => (prev.has(activeTab) ? prev : new Set(prev).add(activeTab)));
+  }, [activeTab]);
+
   return (
     <div style={styles.body}>
       {/* Tab Bar */}
@@ -196,9 +210,17 @@ const AccountBilling = () => {
         </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content — keep visited panels mounted to avoid blank flash on tab change */}
       <div style={{ ...styles.container, paddingTop: 24 }}>
-        <ActiveTabPage />
+        {ACCOUNT_BILLING_TABS.map(({ label }) => {
+          if (!mountedTabs.has(label)) return null;
+          const TabPanel = TAB_PAGES[label];
+          return (
+            <div key={label} hidden={activeTab !== label}>
+              <TabPanel />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

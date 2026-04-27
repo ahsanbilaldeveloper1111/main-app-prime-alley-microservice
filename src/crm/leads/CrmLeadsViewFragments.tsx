@@ -27,6 +27,7 @@ import { Country, State, City } from "country-state-city";
 import {
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
+  formatMeetingDateLocal,
   RECORD_TYPES,
 } from "@utils/Helper";
 import {
@@ -77,6 +78,7 @@ import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { CrmListColumnEditorModal } from "@crm/shared/CrmListColumnEditorModal";
 import CreateLeadModal from "@components/CreateLeadModal";
+import CallRecordingPlayerModal from "@components/CallRecordingPlayerModal";
 import {
   CrmPhoneDisplay as PhoneDisplay,
   CrmKPICard as KPICard,
@@ -103,6 +105,9 @@ import {
   CrmModalCloseButton,
   CrmModalAvatar,
 } from "@crm/shared/CrmListViewDataModalPrimitives";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function getCrmLeadsStringSelectValue(selected: unknown): string | undefined {
   if (selected && typeof selected === "object" && "value" in selected) {
@@ -1152,7 +1157,7 @@ function CrmLeadViewModalRightPanel() {
                         }}
                       >
                         {session?.user?.permissions?.includes(
-                          "edit-crm-leads",
+                          PERMISSIONS.EDIT_CRM_LEADS,
                         ) && (
                           <button
                             style={{
@@ -1226,7 +1231,7 @@ function CrmLeadViewModalRightPanel() {
                         )}
 
                         {session?.user?.permissions?.includes(
-                          "add-crm-deals",
+                          PERMISSIONS.CREATE_CRM_DEALS,
                         ) && (
                           <button
                             disabled={activeFilter === "lost"}
@@ -1524,7 +1529,7 @@ function CrmLeadViewModalRightPanel() {
                           Recent Follow-ups
                         </h6>
                         {session?.user?.permissions?.includes(
-                          "add-follow-up-crm-leads",
+                          PERMISSIONS.ADD_FOLLOW_UP_CRM_LEADS,
                         ) && (
                           <button
                             style={{
@@ -1706,7 +1711,7 @@ function CrmLeadViewModalRightPanel() {
                               No follow-ups yet
                             </div>
                             {session?.user?.permissions?.includes(
-                              "add-follow-up-crm-leads",
+                              PERMISSIONS.ADD_FOLLOW_UP_CRM_LEADS,
                             ) && (
                               <button
                                 style={{
@@ -1774,7 +1779,7 @@ function CrmLeadViewModalRightPanel() {
                           Recent Meetings
                         </h6>
                         {session?.user?.permissions?.includes(
-                          "add-meeting-crm-leads",
+                          PERMISSIONS.ADD_MEETING_CRM_LEADS,
                         ) && (
                           <button
                             style={{
@@ -1892,9 +1897,14 @@ function CrmLeadViewModalRightPanel() {
                                         }}
                                       >
                                         {meeting.meeting_date
-                                          ? formatCrmPreviewDate(
+                                          ? formatMeetingDateLocal(
                                               meeting.meeting_date,
-                                            ) || "N/A"
+                                              meeting.meeting_time,
+                                            ) ||
+                                            formatCrmPreviewDate(
+                                              meeting.meeting_date,
+                                            ) ||
+                                            "N/A"
                                           : "N/A"}
                                       </div>
                                       {meeting.meeting_outcome && (
@@ -1951,7 +1961,7 @@ function CrmLeadViewModalRightPanel() {
                               No meetings yet
                             </div>
                             {session?.user?.permissions?.includes(
-                              "add-meeting-crm-leads",
+                              PERMISSIONS.ADD_MEETING_CRM_LEADS,
                             ) && (
                               <button
                                 style={{
@@ -2112,8 +2122,13 @@ export function CrmLeadsViewFragment02() {
     handleFirstColumnClick,
     handleHideLeadSidebarKeepPersistence,
     handleNoteCreate,
+    handlePlayCallRecording,
     handlePreviewClick,
     handleViewLead,
+    sidebarLogActivityModals,
+    showRecordingPlayerModal,
+    selectedRecording,
+    handleCloseRecordingPlayerModal,
     leadFollowUps,
     leadsActions,
     leadsColumns,
@@ -2219,7 +2234,7 @@ export function CrmLeadsViewFragment02() {
 
             {/* Advanced Filters */}
             {showAdvancedFilters &&
-              session?.user?.permissions?.includes("list-crm-leads") && (
+              session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LEADS) && (
                 <Card className="border-0 shadow-sm mb-4">
                   <Card.Body>
                     <Row className="g-3 align-items-end">
@@ -2681,7 +2696,11 @@ export function CrmLeadsViewFragment02() {
                 onPreviewClick={(lead) => handlePreviewClick(lead)}
                 onFirstColumnClick={(lead) => handleFirstColumnClick(lead)}
                 onRowDoubleClick={(lead) => {
-                  if (session?.user?.permissions?.includes("list-crm-leads")) {
+                  if (
+                    session?.user?.permissions?.includes(
+                      PERMISSIONS.VIEW_CRM_LEADS,
+                    )
+                  ) {
                     handleViewLead(lead.rawData?.id || lead.id);
                   }
                 }}
@@ -2759,7 +2778,16 @@ export function CrmLeadsViewFragment02() {
             recordId={
               selectedLead?.id ?? selectedLead?.rawData?.id ?? undefined
             }
+            senderName={session?.user?.name || ""}
+            senderEmail={session?.user?.email || ""}
+            resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
+            onPlayCallRecording={handlePlayCallRecording}
+            onLogCall={sidebarLogActivityModals.openLogCall}
+            onLogEmail={sidebarLogActivityModals.openLogEmail}
+            onLogSms={sidebarLogActivityModals.openLogSms}
+            onLogWhatsApp={sidebarLogActivityModals.openLogWhatsApp}
+            onLogMeeting={sidebarLogActivityModals.openLogMeeting}
             crmSummary={selectedLead?.rawData?.crm_summary ?? selectedLead?.crm_summary ?? undefined}
             record={{
               id: selectedLead?.id || selectedLead?.rawData?.id,
@@ -2818,6 +2846,7 @@ export function CrmLeadsViewFragment02() {
                     const leadId =
                       selectedLead?.id || selectedLead?.rawData?.id;
                     if (leadId) {
+                      setShowLeadSidebar(false);
                       handleDeleteLead(leadId, selectedLead?.name);
                     }
                   },
@@ -2852,16 +2881,27 @@ export function CrmLeadsViewFragment02() {
                   },
                   {
                     label: "Phone",
-                    value:
-                      selectedLead?.phone ||
-                      selectedLead?.rawData?.phone || selectedLead.contact_phone_country_code+" "+selectedLead?.contact_phone ||
-                      "N/A",
+                    value: (() => {
+                      const directPhone =
+                        selectedLead?.phone || selectedLead?.rawData?.phone;
+                      if (directPhone) return directPhone;
+                      const contactPhoneNumber = selectedLead?.contact_phone;
+                      if (!contactPhoneNumber) return "N/A";
+                      const countryCode =
+                        selectedLead?.contact_phone_country_code;
+                      return countryCode
+                        ? `${countryCode} ${contactPhoneNumber}`
+                        : String(contactPhoneNumber);
+                    })(),
                     type: "phone",
                     copyable: true,
-                    externalLink:
-                      selectedLead?.phone || selectedLead?.rawData?.phone
-                        ? `tel:${selectedLead?.phone || selectedLead?.rawData?.phone}`
-                        : undefined,
+                    externalLink: (() => {
+                      const phoneForLink =
+                        selectedLead?.phone ||
+                        selectedLead?.rawData?.phone ||
+                        selectedLead?.contact_phone;
+                      return phoneForLink ? `tel:${phoneForLink}` : undefined;
+                    })(),
                   },
                   {
                     label: "Email",
@@ -2981,7 +3021,13 @@ export function CrmLeadsViewFragment02() {
                   message: "No recent activities for this lead.",
                   action: {
                     label: "Log activity",
-                    onClick: () => console.log("Log activity"),
+                    onClick: () => {
+                      const leadId =
+                        selectedLead?.id || selectedLead?.rawData?.id;
+                      if (!leadId) return;
+                      handleHideLeadSidebarKeepPersistence();
+                      router.push(`/crm/detailspage?type=lead&id=${leadId}`);
+                    },
                   },
                 },
               },
@@ -2999,10 +3045,16 @@ export function CrmLeadsViewFragment02() {
                   message: "No call recordings available yet.",
                   action: {
                     label: "Make a call",
-                    onClick: () =>
-                      (selectedLead?.contact_persons?.[0]?.phone ||
-                      selectedLead?.crm_data?.phone ) &&
-                      handleCallClick(selectedLead),
+                    onClick: () => {
+                      const hasPhone = !!(
+                        selectedLead?.phone ||
+                        selectedLead?.rawData?.phone ||
+                        selectedLead?.contact_persons?.[0]?.phone ||
+                        selectedLead?.crm_data?.phone
+                      );
+                      if (!hasPhone) return;
+                      handleCallClick(selectedLead);
+                    },
                   },
                 },
               },
@@ -3209,6 +3261,12 @@ export function CrmLeadsViewFragment02() {
             ]}
           />
         )}
+        {sidebarLogActivityModals.modals}
+        <CallRecordingPlayerModal
+          show={showRecordingPlayerModal}
+          onHide={handleCloseRecordingPlayerModal}
+          recording={selectedRecording}
+        />
       </div>
     </>
   );

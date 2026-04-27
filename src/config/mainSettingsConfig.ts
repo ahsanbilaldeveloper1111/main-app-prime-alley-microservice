@@ -19,14 +19,14 @@ export const sidebarGroups: SidebarGroup[] = [
   {
     heading: 'Your Preferences',
     items: [
-      { id: 'general-prefs', label: 'General' },
-      { id: 'notifications', label: 'Notifications'},
+      { id: 'general-prefs', label: 'General', permission: PERMISSIONS.VIEW_GENERAL_SETTINGS },
+      { id: 'notifications', label: 'Notifications', permission: PERMISSIONS.VIEW_NOTIFICATIONS_SETTINGS },
     ],
   },
   {
     heading: 'Services',
     items: [
-      { id: 'account-defaults', label: 'Account Defaults', permission: PERMISSIONS.CONTROL_HUB_SERVICES },
+      { id: 'account-defaults', label: 'Account Defaults', permission: PERMISSIONS.ACCOUNT_DEFAULTS_SERVICES },
       { id: 'users-teams', label: 'Users & Teams', permission: PERMISSIONS.CONTROL_HUB_SERVICES },
       { id: 'smart-crm', label: 'Smart CRM', permission: PERMISSIONS.CRM_SERVICES },
       { id: 'communications', label: 'Communications', permission: PERMISSIONS.COMMUNICATIONS_SERVICES },

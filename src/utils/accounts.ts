@@ -6,6 +6,142 @@ import {
   peelAccountingResponseBody,
 } from "./accountingResponseHelpers";
 
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+function firstNonEmptyString(...candidates: unknown[]): string | undefined {
+  for (const c of candidates) {
+    if (typeof c === "string") {
+      const t = c.trim();
+      if (t.length > 0) {
+        return t;
+      }
+    }
+  }
+  return undefined;
+}
+
+function joinValidationErrors(errors: Record<string, unknown>): string | undefined {
+  const parts: string[] = [];
+  for (const v of Object.values(errors)) {
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (typeof item === "string" && item.trim()) {
+          parts.push(item.trim());
+        }
+      }
+    } else if (typeof v === "string" && v.trim()) {
+      parts.push(v.trim());
+    }
+  }
+  if (parts.length === 0) {
+    return undefined;
+  }
+  return parts.join(" ");
+}
+
+function messageFromNestedData(inner: Record<string, unknown>): string | undefined {
+  const innerErrors = inner["errors"];
+  if (isPlainObject(innerErrors)) {
+    const joined = joinValidationErrors(innerErrors);
+    if (joined) {
+      return joined;
+    }
+  }
+  return firstNonEmptyString(inner["message"]);
+}
+
+function messageFromResponseData(data: unknown): string | undefined {
+  if (typeof data === "string") {
+    const t = data.trim();
+    return t.length > 0 ? t : undefined;
+  }
+  if (!isPlainObject(data)) {
+    return undefined;
+  }
+
+  const inner = data["data"];
+  if (isPlainObject(inner)) {
+    const fromInner = messageFromNestedData(inner);
+    if (fromInner) {
+      return fromInner;
+    }
+  }
+
+  const errs = data["errors"];
+  if (isPlainObject(errs)) {
+    const joined = joinValidationErrors(errs);
+    if (joined) {
+      return joined;
+    }
+  }
+
+  const rootMsg = firstNonEmptyString(data["message"]);
+  if (rootMsg) {
+    return rootMsg;
+  }
+
+  return firstNonEmptyString(data["error"]);
+}
+
+function hasAxiosResponse(
+  error: unknown,
+): error is { response: { data?: unknown }; message?: string } {
+  if (!isPlainObject(error) || !("response" in error)) {
+    return false;
+  }
+  return error["response"] !== undefined && error["response"] !== null;
+}
+
+const ACCOUNTS_AXIOS_STATUS_MESSAGE = /^request failed with status code \d+/i;
+
+/** Removes Axios boilerplate if it was concatenated with an API message. */
+function stripAxiosStatusNoise(text: string): string {
+  // Avoid `\s*…\s*` around the phrase (ReDoS / typescript:S5852): match the fixed
+  // substring only, then normalize whitespace in one pass.
+  return text
+    .replaceAll(/request failed with status code \d+/gi, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * User-facing message from axios errors for accounting/accounts API calls.
+ * Prefers response body over the generic "Request failed with status code …" string.
+ */
+export function getAccountsAxiosErrorMessage(error: unknown, fallback: string): string {
+  let resolved = fallback;
+
+  if (hasAxiosResponse(error)) {
+    const data = (error.response as { data?: unknown }).data;
+    const fromBody = messageFromResponseData(data);
+    if (fromBody) {
+      resolved = fromBody;
+    }
+  }
+
+  if (resolved === fallback && isPlainObject(error) && typeof error["message"] === "string") {
+    const raw = error["message"].trim();
+    if (raw.length > 0 && !ACCOUNTS_AXIOS_STATUS_MESSAGE.test(raw)) {
+      resolved = raw;
+    }
+  }
+
+  if (resolved === fallback && error instanceof Error) {
+    const raw = error.message.trim();
+    if (raw.length > 0 && !ACCOUNTS_AXIOS_STATUS_MESSAGE.test(raw)) {
+      resolved = raw;
+    }
+  }
+
+  const cleaned = stripAxiosStatusNoise(resolved);
+  if (!cleaned || ACCOUNTS_AXIOS_STATUS_MESSAGE.test(cleaned)) {
+    return fallback;
+  }
+  return cleaned;
+}
+
 // API body: legacy `{ code, data: inner }` or direct `inner` ({ success, data, message?, ... }).
 interface ControlhubResponse<T> {
   code: number;
@@ -130,6 +266,7 @@ export interface InvoiceData {
   invoice_date: string;
   due_date: string;
   amount_due: string;
+  tenant_id?: string;
   subtotal: string;
   tax_amount: string;
   total_amount: string;
@@ -138,6 +275,7 @@ export interface InvoiceData {
   notes: string | null;
   terms_conditions: string | null;
   is_recurring: boolean;
+  crm_company_id?: number | string;
   recurring_frequency: string | null;
   /** Subscription / recurring end date from API (create/update use this key). */
   end_date?: string | null;
@@ -1093,9 +1231,9 @@ export const downloadInvoicePdf = async (id: number): Promise<void> => {
     });
     
     // Check if response is valid
-    if (!response.data || response.data.size === 0) {
-      throw new Error('Empty PDF response received');
-    }
+    // if (!response.data || response.data.size === 0) {
+    //   throw new Error('Empty PDF response received');
+    // }
     
     // Extract filename from content-disposition header if available
     let filename = `invoice-${id}.pdf`;
@@ -1525,23 +1663,62 @@ export const createProduct = async (
         body instanceof FormData ? { "Content-Type": "multipart/form-data" } : {},
     });
     return extractData<ProductData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to create product");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to create product"));
     throw error;
   }
 };
 
-export const getProductCategoriesList = async (params: PaginationParams = {}): Promise<
-  ProductCategoryData[]
-> => {
+export const getProductCategoriesList = async (
+  params: PaginationParams = {},
+): Promise<PaginationWrapper<ProductCategoryData>> => {
   try {
     const response = await axiosInstance.get(
       "/accounting/products/categories-list",
-      { params }
+      { params },
     );
-    return extractData<ProductCategoryData[]>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to fetch product categories list");
+
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const raw = env.data;
+      const categoriesData = listRowsFromEnvelopePayload(raw) as ProductCategoryData[];
+      const pg = paginationFromAccountingEnvelope(env, raw);
+      return {
+        data: categoriesData,
+        summary: summaryFromAccountingEnvelope(env, raw),
+        pagination: {
+          current_page: pg.page || 1,
+          page: pg.page || 1,
+          limit: pg.limit || categoriesData.length,
+          per_page: pg.limit || categoriesData.length,
+          total: pg.total ?? categoriesData.length,
+          last_page: pg.last_page || 1,
+          from: pg.from || 1,
+          to: pg.to || categoriesData.length,
+        },
+      };
+    }
+
+    const categoriesData = extractData<ProductCategoryData[]>(response.data);
+    const peeled = peelAccountingResponseBody(response.data);
+    return {
+      data: Array.isArray(categoriesData) ? categoriesData : [],
+      summary: peeled?.summary,
+      pagination: {
+        current_page: 1,
+        page: 1,
+        limit: Array.isArray(categoriesData) ? categoriesData.length : 0,
+        per_page: Array.isArray(categoriesData) ? categoriesData.length : 0,
+        total: Array.isArray(categoriesData) ? categoriesData.length : 0,
+        last_page: 1,
+        from: 1,
+        to: Array.isArray(categoriesData) ? categoriesData.length : 0,
+      },
+    };
+  } catch (error: unknown) {
+    toast.error(
+      getAccountsAxiosErrorMessage(error, "Failed to fetch product categories list"),
+    );
     throw error;
   }
 };
@@ -1555,8 +1732,8 @@ export const createProductCategory = async (
       data
     );
     return extractData<ProductCategoryData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to create product category");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to create product category"));
     throw error;
   }
 };
@@ -1571,8 +1748,8 @@ export const updateProductCategory = async (
       data
     );
     return extractData<ProductCategoryData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to update product category");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to update product category"));
     throw error;
   }
 };
@@ -1580,8 +1757,8 @@ export const updateProductCategory = async (
 export const deleteProductCategory = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`/accounting/products/categories/${id}`);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to delete product category");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to delete product category"));
     throw error;
   }
 };
@@ -1591,8 +1768,10 @@ export const softDeleteProductCategory = async (id: number): Promise<void> => {
     await axiosInstance.post(
       `/accounting/products/categories/${id}/soft-delete`
     );
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to soft delete product category");
+  } catch (error: unknown) {
+    toast.error(
+      getAccountsAxiosErrorMessage(error, "Failed to soft delete product category"),
+    );
     throw error;
   }
 };
@@ -1600,8 +1779,8 @@ export const softDeleteProductCategory = async (id: number): Promise<void> => {
 export const restoreProductCategory = async (id: number): Promise<void> => {
   try {
     await axiosInstance.post(`/accounting/products/categories/${id}/restore`);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to restore product category");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to restore product category"));
     throw error;
   }
 };
@@ -1623,7 +1802,7 @@ export const updateProduct = async (
   try {
     const isMultipart = data.logo_file instanceof File;
     const body = isMultipart ? buildProductMultipartBody(data) : data;
-    const response = await axiosInstance.put(
+    const response = await axiosInstance.post(
       `/accounting/products/${id}`,
       body,
       {
@@ -1632,8 +1811,8 @@ export const updateProduct = async (
       },
     );
     return extractData<ProductData>(response.data);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to update product");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to update product"));
     throw error;
   }
 };
@@ -1641,8 +1820,8 @@ export const updateProduct = async (
 export const deleteProduct = async (id: number): Promise<void> => {
   try {
     await axiosInstance.delete(`/accounting/products/${id}`);
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to delete product");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to delete product"));
     throw error;
   }
 };
@@ -1696,12 +1875,13 @@ export const getProductCategories = async (
         to: categoriesData.length,
       },
     };
-  } catch (error: any) {
-    toast.error(error?.message || "Failed to fetch product categories");
+  } catch (error: unknown) {
+    toast.error(getAccountsAxiosErrorMessage(error, "Failed to fetch product categories"));
     throw error;
   }
 };
 
+// Stripe Payment Methods
 
 // Stripe Payment Methods
 export const getPaymentMethods = async (
@@ -1757,7 +1937,59 @@ export const getPaymentMethods = async (
     throw error;
   }
 };
+export const getCustomerPaymentMethods = async (
+  profileId: number
+): Promise<PaymentMethodData[]> => {
+  try {
+    const response = await axiosInstance.get(
+      `/accounting/stripe/payment-methods/customer/${profileId}`
+    );
 
+    const env = accountingEnvelopeSuccess(response.data);
+    if (env != null) {
+      const d = env.data as { payment_methods?: unknown } | unknown[] | null;
+      const rawList =
+        d != null && typeof d === "object" && !Array.isArray(d) && "payment_methods" in d
+          ? (d as { payment_methods: unknown[] }).payment_methods
+          : d;
+      const paymentMethods = Array.isArray(rawList) ? rawList : [];
+
+      // Transform the response to match our PaymentMethodData interface
+      return paymentMethods.map((pm: any) => ({
+        id: pm.id,
+        type: pm.type,
+        card: pm.card
+          ? {
+              brand: pm.card.brand,
+              last4: pm.card.last4,
+              exp_month: pm.card.exp_month,
+              exp_year: pm.card.exp_year,
+            }
+          : undefined,
+        bank_account: pm.bank_account
+          ? {
+              bank_name: pm.bank_account.bank_name,
+              last4: pm.bank_account.last4,
+              routing_number: pm.bank_account.routing_number,
+            }
+          : undefined,
+        billing_details: pm.billing_details
+          ? {
+              name: pm.billing_details.name,
+            }
+          : undefined,
+        is_default: pm.is_default,
+        created_at: new Date(pm.created * 1000).toISOString(), // Convert Unix timestamp to ISO string
+      }));
+    }
+
+    // Fallback to extractData if structure is different
+    return extractData<PaymentMethodData[]>(response.data);
+  } catch (error: any) {
+    toast.error(error?.message || "Failed to fetch payment methods");
+    throw error;
+  }
+};
 export const createPaymentMethod = async (
   profileId: number,
   data: any
@@ -1946,10 +2178,17 @@ export const getPublishableKey = async (): Promise<string> => {
 
 // Direct Payment Interfaces
 export interface CreateDirectPaymentData {
-  amount: number;
-  currency: string;
-  payment_method_id: string;
   invoice_id: number;
+  payment_method: string;
+  payment_mode: string;
+  amount: number;
+  processing_fee: number;
+  base_amount: number;
+  payment_method_id: string;
+  currency_code: string;
+  /** Lowercase currency (kept for API compatibility). */
+  currency: string;
+  notes: string;
   customer_id: number;
 }
 
@@ -2052,8 +2291,25 @@ export const getCustomer = async (
   customer: number | string,
 ): Promise<CustomerData> => {
   try {
-    const response = await axiosInstance.get(`/accounting/customers/${customer}`);
-    return extractData<CustomerData>(response.data);
+    const response = await axiosInstance.get(`/accounting/customers/${customer}`, {
+      /** Without this, axios rejects on 404 and you never get `response.data` in this block. */
+      validateStatus: (status) =>
+        (status >= 200 && status < 300) || status === 404,
+    });
+    console.log("getCustomer", response.data);
+
+    const raw = response.data;
+    const envelope = peelAccountingResponseBody(raw);
+    if (
+      envelope != null &&
+      typeof envelope === "object" &&
+      !Array.isArray(envelope) &&
+      envelope.success === false
+    ) {
+      return envelope as unknown as CustomerData;
+    }
+
+    return extractData<CustomerData>(raw);
   } catch (error: any) {
     toast.error(error?.message || "Failed to fetch customer");
     throw error;

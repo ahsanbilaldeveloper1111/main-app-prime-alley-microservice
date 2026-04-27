@@ -1,7 +1,8 @@
-import { ReactElement, useMemo, useState } from "react";
+import { ReactElement, useCallback, useMemo, useState } from "react";
 import moment from "moment";
 import { useRouter } from "next/router";
 import { useSession } from "next-auth/react";
+import { Eye } from "lucide-react";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable from "@components/GenericTable";
 import type {
@@ -9,10 +10,14 @@ import type {
     TableColumn,
     ToolbarConfig,
 } from "@components/GenericTable";
+import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 import Layout from "@layout/index";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/reports.scss";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 type ReportDefinition = {
     id: string;
@@ -30,7 +35,27 @@ type ReportRow = {
     type: string;
     lastRun: string;
     href: string;
+    permission: string;
 };
+
+function buildReportSidebarSections(report: ReportRow): SidebarSection[] {
+    return [
+        {
+            id: "about-report",
+            title: "About this report",
+            collapsible: true,
+            defaultExpanded: true,
+            fields: [
+                { label: "Report Name", value: report.title },
+                { label: "Type", value: report.type },
+                { label: "Last Run", value: report.lastRun },
+                { label: "Permission", value: report.permission },
+                { label: "Route", value: report.href, copyable: true },
+                { label: "Description", value: report.description },
+            ],
+        },
+    ];
+}
 
 const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
     {
@@ -40,7 +65,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across countries with dynamic charts and detailed metrics.",
         type: "Call Outbound",
         href: "/reports/call-analytics/stats/country",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.CALL_STATS_BY_COUNTRY_REPORTS,
     },
     {
         id: "stats-department",
@@ -49,7 +74,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across departments with dynamic charts and detailed metrics.",
         type: "Call Outbound",
         href: "/reports/call-analytics/stats/department",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.CALL_STATS_BY_DEPARTMENT_REPORTS,
     },
     {
         id: "stats-extension",
@@ -58,7 +83,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across extensions with dynamic charts and detailed metrics.",
         type: "Call Outbound",
         href: "/reports/call-analytics/stats/extension",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.CALL_STATS_BY_EXTENSION_REPORTS,
     },
     {
         id: "stats-department-extension",
@@ -67,7 +92,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across departments extensions with dynamic charts and detailed metrics.",
         type: "Inbound/Outbound",
         href: "/reports/call-analytics/stats/department/extension",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.CALL_STATS_BY_DEPARTMENT_EXTENSION_REPORTS,
     },
     {
         id: "stats-general",
@@ -76,7 +101,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across all calls with dynamic charts and detailed metrics.",
         type: "Call Outbound",
         href: "/reports/call-analytics/stats/general",
-        permission: "call-reports-by-statistics-reports",
+        permission: PERMISSIONS.GENERAL_CALL_STATISTICS_REPORTS,
     },
     {
         id: "incoming-country",
@@ -85,7 +110,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across countries with dynamic charts and detailed metrics.",
         type: "Call Incoming",
         href: "/reports/call-analytics/incoming/country",
-        permission: "call-reports-by-call-incoming-reports",
+        permission: PERMISSIONS.CALL_INCOMING_BY_COUNTRY_REPORTS,
     },
     {
         id: "incoming-department",
@@ -94,7 +119,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across departments with dynamic charts and detailed metrics.",
         type: "Call Incoming",
         href: "/reports/call-analytics/incoming/department",
-        permission: "call-reports-by-call-incoming-reports",
+        permission: PERMISSIONS.CALL_INCOMING_BY_DEPARTMENT_REPORTS,
     },
     {
         id: "incoming-extension",
@@ -103,7 +128,7 @@ const REPORT_DEFINITIONS: readonly ReportDefinition[] = [
             "Visualize call volumes, durations, and trends across extensions with dynamic charts and detailed metrics.",
         type: "Call Incoming",
         href: "/reports/call-analytics/incoming/extension",
-        permission: "call-reports-by-call-incoming-reports",
+        permission: PERMISSIONS.CALL_INCOMING_BY_EXTENSION_REPORTS,
     },
 ];
 
@@ -158,6 +183,8 @@ const PageReports = () => {
     const { data: session } = useSession();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
+    const [showPreviewSidebar, setShowPreviewSidebar] = useState(false);
+    const [selectedPreviewReport, setSelectedPreviewReport] = useState<ReportRow | null>(null);
 
     const userPermissions = session?.user?.permissions ?? [];
     const lastRunLabel = useMemo(() => moment().format("MMM D, YYYY"), []);
@@ -172,6 +199,7 @@ const PageReports = () => {
             type: report.type,
             lastRun: lastRunLabel,
             href: report.href,
+            permission: report.permission,
         }));
     }, [lastRunLabel, userPermissions]);
 
@@ -199,6 +227,37 @@ const PageReports = () => {
         [router],
     );
 
+    const handlePreviewClick = useCallback((row: ReportRow) => {
+        setSelectedPreviewReport(row);
+        setShowPreviewSidebar(true);
+    }, []);
+
+    const handleClosePreviewSidebar = useCallback(() => {
+        setShowPreviewSidebar(false);
+        setSelectedPreviewReport(null);
+    }, []);
+
+    const previewSections = useMemo<SidebarSection[]>(() => {
+        if (selectedPreviewReport === null) {
+            return [];
+        }
+        return buildReportSidebarSections(selectedPreviewReport);
+    }, [selectedPreviewReport]);
+
+    const previewQuickActions = useMemo(() => {
+        if (selectedPreviewReport === null) {
+            return [];
+        }
+        return [
+            {
+                id: "open-report",
+                label: "Open Report",
+                icon: Eye,
+                onClick: () => router.push(selectedPreviewReport.href),
+            },
+        ];
+    }, [router, selectedPreviewReport]);
+
     const toolbar = useMemo<ToolbarConfig>(
         () => ({
             showTabs: true,
@@ -221,18 +280,62 @@ const PageReports = () => {
     return (
         <>
             <BreadcrumbItem mainTitle="Reports" mainLink="/reports" subTitle="Reports" />
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 12,
+                    width: "100%",
+                    minWidth: 0,
+                }}
+            >
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                    <GenericTable<ReportRow>
+                        data={visibleReports}
+                        columns={REPORT_COLUMNS}
+                        uniqueKey="id"
+                        showActions
+                        showToolbarActions={false}
+                        actions={reportActions}
+                        showToolbar
+                        toolbar={toolbar}
+                        emptyMessage="No call reports available for your permissions."
+                    />
+                </div>
 
-            <GenericTable<ReportRow>
-                data={visibleReports}
-                columns={REPORT_COLUMNS}
-                uniqueKey="id"
-                showActions
-                showToolbarActions={false}
-                actions={reportActions}
-                showToolbar
-                toolbar={toolbar}
-                emptyMessage="No call reports available for your permissions."
-            />
+                {showPreviewSidebar && selectedPreviewReport !== null && (
+                    <div style={{ flex: "0 0 470px", width: 470, maxWidth: "40vw" }}>
+                        <GenericSidebar
+                            isOpen={showPreviewSidebar}
+                            onClose={handleClosePreviewSidebar}
+                            width="100%"
+                            title={selectedPreviewReport.title}
+                            subtitle={selectedPreviewReport.type}
+                            avatar={{
+                                initials: "CR",
+                                name: selectedPreviewReport.title,
+                                gradient: "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+                            }}
+                            quickActions={previewQuickActions}
+                            sections={previewSections}
+                            recordLink={{
+                                label: "View report",
+                                onClick: () => router.push(selectedPreviewReport.href),
+                            }}
+                            actionsDropdown={{
+                                label: "Actions",
+                                items: [
+                                    {
+                                        label: "Open report",
+                                        onClick: () => router.push(selectedPreviewReport.href),
+                                    },
+                                ],
+                            }}
+                            permissionMessage="Preview shows only values available in this reports table data source."
+                        />
+                    </div>
+                )}
+            </div>
         </>
     );
 };

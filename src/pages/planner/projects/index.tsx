@@ -19,6 +19,7 @@ import React, {
   type ComponentProps,
 } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/router";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import "@assets/scss/common.scss";
@@ -57,6 +58,7 @@ import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { StatsCardData } from "@components/GenericStatsCards";
 import GenericFilterSidebar, { type FilterOption, FilterField } from "@components/GenericFilterSidebar";
 import CreateTaskSidebar from "@components/CreatePlannerTaskSidebar";
+import GenericSidebar from "@components/GenericSidebarNew";
 import GenericTable, {
   TableColumn,
   TableAction,
@@ -65,14 +67,12 @@ import GenericTable, {
   TabConfig,
 } from "@components/GenericTable";
 import {
-  Badge,
   Button,
   Col,
   Container,
   Dropdown,
   Form,
   Nav,
-  Modal,
   Offcanvas,
   ProgressBar,
   Row,
@@ -233,6 +233,68 @@ interface Project {
   owner: string;
   team: string;
   apiData?: ApiProject;
+}
+
+type ProjectIconComponent = typeof Folder;
+
+const PROJECT_ICON_MAP: Record<string, ProjectIconComponent> = {
+  website: Palette,
+  mobile: Smartphone,
+  marketing: Megaphone,
+  it: Monitor,
+  client: Users,
+  support: Headphones,
+  product: Rocket,
+  crm: Settings,
+};
+
+function resolveProjectIconFromName(projectName: string): ProjectIconComponent {
+  const projectNameLower = projectName.toLowerCase();
+  for (const key in PROJECT_ICON_MAP) {
+    if (projectNameLower.includes(key)) {
+      return PROJECT_ICON_MAP[key];
+    }
+  }
+  return Folder;
+}
+
+function mapApiProjectToProject(apiProject: ApiProject): Project {
+  const tasks = apiProject.tasks || [];
+  const openTasks = tasks.filter((t: any) => !t.is_completed).length;
+  const overdueTasks = tasks.filter((t: any) => {
+    if (!t.due_date) return false;
+    return !t.is_completed && new Date(t.due_date) < new Date();
+  }).length;
+
+  const members = (apiProject.members || []).map((member, idx) => {
+    const colors = ["#667eea", "#f56565", "#48bb78", "#ed64a6", "#4299e1", "#9f7aea", "#fc8181"];
+    return {
+      name: member.extension_number,
+      initials: member.extension_number.substring(0, 2).toUpperCase(),
+      color: colors[idx % colors.length],
+    };
+  });
+
+  const lastUpdate = apiProject.updated_at
+    ? formatDateGlobal(apiProject.updated_at) || "N/A"
+    : "N/A";
+
+  const Icon = resolveProjectIconFromName(apiProject.name);
+
+  return {
+    id: apiProject.id.toString(),
+    name: apiProject.name,
+    icon: Icon,
+    iconColor: apiProject.color || "#3b82f6",
+    members,
+    open: openTasks,
+    overdue: overdueTasks,
+    lastUpdate,
+    status: getProjectStatusFromApiStatus(apiProject.status),
+    owner: members[0]?.name || "N/A",
+    team: "Team",
+    apiData: apiProject,
+  };
 }
 
 const getProjectStatusFromApiStatus = (apiStatus: string | undefined): Project["status"] => {
@@ -580,13 +642,8 @@ const TaskRow: React.FC<TaskRowProps> = ({
         onMouseLeave={() => setHovered(false)}
         style={{ backgroundColor: hovered ? "#f8fafc" : "#fafbfc" }}
       >
-        {/* Checkbox placeholder */}
-        <td style={{ width: 40, paddingLeft: 12 }}>
-          <input type="checkbox" style={{ cursor: "pointer" }} onClick={(e) => e.stopPropagation()} />
-        </td>
-
-        {/* Name column - indented */}
-        <td style={{ paddingLeft: indentLeft + 8, position: "relative" }}>
+        {/* Name column - indented (offset replaces former checkbox column) */}
+        <td style={{ paddingLeft: 40 + indentLeft + 8, position: "relative" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {/* Tree line indicator */}
             <span
@@ -698,7 +755,7 @@ const TaskRow: React.FC<TaskRowProps> = ({
                   right: 8,
                 }}
               >
-                <Eye size={12} />
+                {/* <Eye size={12} /> */}
                 Preview/Edit
               </button>
             )}
@@ -801,11 +858,7 @@ const SubtaskRow: React.FC<SubtaskRowProps> = ({
       onMouseLeave={() => setHovered(false)}
       style={{ backgroundColor: hovered ? "#f0f4ff" : "#f5f7fb" }}
     >
-      <td style={{ width: 40, paddingLeft: 12 }}>
-        <input type="checkbox" style={{ cursor: "pointer" }} onClick={(e) => e.stopPropagation()} />
-      </td>
-
-      <td style={{ paddingLeft: indentLeft + 8, position: "relative" }}>
+      <td style={{ paddingLeft: 40 + indentLeft + 8, position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {/* Indent spacer */}
           <span style={{ width: 14, display: "inline-block", flexShrink: 0 }} />
@@ -1102,8 +1155,6 @@ interface ExpandableProjectTableProps {
   // Toolbar
   toolbarConfig: ToolbarConfig;
   statsCards: StatsCardData[];
-  selectedProjects: Set<string>;
-  onSelectionChange: (selected: Project[]) => void;
   columns: TableColumn<Project>[];
   actions: TableAction<Project>[];
   /** `session.user.phone` (or `extension` fallback), normalized for matching `members[].extension_number`. */
@@ -1199,8 +1250,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   onPaginationChange,
   toolbarConfig,
   statsCards,
-  selectedProjects,
-  onSelectionChange,
   columns,
   actions,
   sessionUserPhoneOrExtension,
@@ -1223,25 +1272,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   const [showCreateTaskSidebar, setShowCreateTaskSidebar] = useState(false);
   /** Only one project row actions menu open at a time (controlled Dropdown). */
   const [openProjectActionsId, setOpenProjectActionsId] = useState<string | null>(null);
-
-  const buildSelectedProjectsFromIds = (selectedIds: Set<string>): Project[] => {
-    const selected: Project[] = [];
-    for (const project of projects) {
-      if (selectedIds.has(project.id)) selected.push(project);
-    }
-    return selected;
-  };
-
-  const handleProjectSelectionChange = (projectId: string, checked: boolean) => {
-    const nextSelectedIds = new Set(selectedProjects);
-    if (checked) nextSelectedIds.add(projectId);
-    else nextSelectedIds.delete(projectId);
-    onSelectionChange(buildSelectedProjectsFromIds(nextSelectedIds));
-  };
-
-  const handleToggleAllProjects = (checked: boolean) => {
-    onSelectionChange(checked ? projects : []);
-  };
+  const [hoveredProjectId, setHoveredProjectId] = useState<string | null>(null);
 
   const fetchAndStoreProjectTasks = async (projectId: string) => {
     setLoadingTasks((prev) => new Set(prev).add(projectId));
@@ -1315,13 +1346,21 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
     setShowCreateTaskSidebar(true);
   };
 
+  function handleProjectRowMouseEnter(projectId: string) {
+    setHoveredProjectId(projectId);
+  }
+
+  function handleProjectRowMouseLeave(projectId: string) {
+    setHoveredProjectId((prev) => (prev === projectId ? null : prev));
+  }
+
   // Build the custom table body
   const renderTableBody = () => {
     if (loading) {
       return (
         <tbody>
           <tr>
-            <td colSpan={7} className="text-center py-5" style={{ color: "#94a3b8" }}>
+            <td colSpan={6} className="text-center py-5" style={{ color: "#94a3b8" }}>
               <Spinner animation="border" size="sm" className="me-2" />
               Loading projects...
             </td>
@@ -1334,7 +1373,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       return (
         <tbody>
           <tr>
-            <td colSpan={7} className="text-center py-5">
+            <td colSpan={6} className="text-center py-5">
               <FolderOpen size={48} style={{ opacity: 0.3, marginBottom: 12 }} />
               <div style={{ color: "#64748b" }}>No projects found</div>
             </td>
@@ -1349,28 +1388,18 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
       const isExpanded = expandedProjects.has(project.id);
       const isLoadingTasks = loadingTasks.has(project.id);
       const tasks = projectTasks[project.id] || [];
-      const isSelected = selectedProjects.has(project.id);
-
       // Project row
       rows.push(
         <tr
           key={`project-${project.id}`}
           className="generic-table-row clickable"
           onClick={() => onProjectClick(project)}
+          onMouseEnter={() => handleProjectRowMouseEnter(project.id)}
+          onMouseLeave={() => handleProjectRowMouseLeave(project.id)}
           style={{ backgroundColor: isExpanded ? "#f0f7ff" : undefined }}
         >
-          {/* Checkbox */}
-          <td style={{ width: 40, paddingLeft: 12 }} onClick={(e) => e.stopPropagation()}>
-            <input
-              type="checkbox"
-              checked={isSelected}
-              onChange={(e) => handleProjectSelectionChange(project.id, e.target.checked)}
-              style={{ cursor: "pointer" }}
-            />
-          </td>
-
           {/* Expand chevron + Project name */}
-          <td>
+          <td style={{ position: "relative" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {/* Chevron toggle */}
               <button
@@ -1412,6 +1441,20 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                 <project.icon size={20} style={{ color: project.iconColor }} />
               </div>
               <span style={{ fontWeight: 600 }}>{project.name}</span>
+
+              {hoveredProjectId === project.id && (
+                <button
+                type="button"
+                className="preview-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onProjectClick(project);
+                }}
+                style={{ position: "absolute", right: 8, fontSize: "12px", color: "#141414", border: "1px solid #141414", borderRadius: "4px", backgroundColor: "#ffffff" }}
+              >
+                Preview
+              </button>
+              )}
             </div>
           </td>
 
@@ -1437,51 +1480,63 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
           <td className="generic-table-actions-cell" onClick={(e) => e.stopPropagation()}>
             <div className="generic-table-actions">
               <div>
-                {canAdministerProjectFromMembers(project, sessionUserPhoneOrExtension) ? (
-                  <Dropdown
-                    show={openProjectActionsId === project.id}
-                    onToggle={createProjectRowActionsToggleHandler(project.id, setOpenProjectActionsId)}
-                    onClick={(e) => e.stopPropagation()}
+                <Dropdown
+                  show={openProjectActionsId === project.id}
+                  onToggle={createProjectRowActionsToggleHandler(project.id, setOpenProjectActionsId)}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Dropdown.Toggle
+                    variant="link"
+                    size="sm"
+                    className="p-1 text-decoration-none shadow-none"
+                    style={{ color: "#6b7280" }}
+                    id={`project-row-actions-${project.id}`}
                   >
-                    <Dropdown.Toggle
-                      variant="link"
-                      size="sm"
-                      className="p-1 text-decoration-none shadow-none"
-                      style={{ color: "#6b7280" }}
-                      id={`project-row-actions-${project.id}`}
+                    <MoreVertical size={16} />
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu align="end" popperConfig={{ strategy: "fixed" }} renderOnMount>
+                    <Dropdown.Item
+                      as="button"
+                      type="button"
+                      onClick={() => {
+                        setOpenProjectActionsId(null);
+                        window.open(`/planner/projects/${project.id}`, "_blank");
+                      }}
                     >
-                      <MoreVertical size={16} />
-                    </Dropdown.Toggle>
-                    <Dropdown.Menu align="end">
-                      <Dropdown.Item
-                        as="button"
-                        type="button"
-                        onClick={() => {
-                          setOpenProjectActionsId(null);
-                          onEditProject(project);
-                        }}
-                      >
-                        <Settings size={14} className="me-2" />
-                        Edit Project
-                      </Dropdown.Item>
-                      <Dropdown.Divider />
-                      <Dropdown.Item
-                        as="button"
-                        type="button"
-                        className="text-danger"
-                        onClick={() => {
-                          setOpenProjectActionsId(null);
-                          onDeleteProject(project);
-                        }}
-                      >
-                        <Trash2 size={14} className="me-2" />
-                        Delete Project
-                      </Dropdown.Item>
-                    </Dropdown.Menu>
-                  </Dropdown>
-                ) : (
-                  <></>
-                )}
+                      <Eye size={14} className="me-2" />
+                      Project overview
+                    </Dropdown.Item>
+                    {canAdministerProjectFromMembers(project, sessionUserPhoneOrExtension) ? (
+                      <>
+                        <Dropdown.Divider />
+                        <Dropdown.Item
+                          as="button"
+                          type="button"
+                          onClick={() => {
+                            setOpenProjectActionsId(null);
+                            onEditProject(project);
+                          }}
+                        >
+                          <Settings size={14} className="me-2" />
+                          Edit Project
+                        </Dropdown.Item>
+                        <Dropdown.Divider />
+                        <Dropdown.Item
+                          as="button"
+                          type="button"
+                          className="text-danger"
+                          onClick={() => {
+                            setOpenProjectActionsId(null);
+                            onDeleteProject(project);
+                          }}
+                        >
+                          <Trash2 size={14} className="me-2" />
+                          Delete Project
+                        </Dropdown.Item>
+                      </>
+                    ) : null}
+                  </Dropdown.Menu>
+                </Dropdown>
               </div>
             </div>
           </td>
@@ -1493,7 +1548,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         if (isLoadingTasks) {
           rows.push(
             <tr key={`loading-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
+              <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
                 <Spinner animation="border" size="sm" className="me-2" style={{ color: "#94a3b8" }} />
                 <span style={{ color: "#94a3b8", fontSize: "0.875rem" }}>Loading tasks...</span>
               </td>
@@ -1502,7 +1557,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         } else if (tasks.length === 0) {
           rows.push(
             <tr key={`empty-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
+              <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
                 No tasks found for this project.
               </td>
             </tr>
@@ -1527,7 +1582,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         if (canManageProjectFromMembers(project, sessionUserPhoneOrExtension)) {
           rows.push(
             <tr key={`add-task-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={7} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
+              <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
                 <button
                   style={{
                     background: "none",
@@ -1598,10 +1653,8 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         columns={columns}
         actions={actions}
         showActions={true}
+        showToolbarActions={false}
         actionsLabel="Actions"
-        selectable={true}
-        selectedRows={projects.filter((p) => selectedProjects.has(p.id))}
-        onSelectionChange={onSelectionChange}
         pagination={{
           currentPage: pagination.page,
           rowsPerPage: pagination.limit,
@@ -1649,13 +1702,6 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
             <table className="table generic-table mb-0" style={{ width: "100%" }}>
               <thead className="generic-table-header">
                 <tr>
-                  <th className="generic-table-th" style={{ width: 40 }}>
-                    <input
-                      type="checkbox"
-                      onChange={(e) => handleToggleAllProjects(e.target.checked)}
-                      checked={projects.length > 0 && selectedProjects.size === projects.length}
-                    />
-                  </th>
                   <th className="generic-table-th">Project Name</th>
                   <th className="generic-table-th">Members</th>
 
@@ -1717,23 +1763,40 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
   formatTimeAgo,
   formatDateTime,
 }) => {
+  if (!show || !selectedProject) {
+    return null;
+  }
+
   const resolvedStatus =
-    selectedProjectDetails ? getProjectStatusFromApiStatus(selectedProjectDetails.status) : selectedProject?.status;
+    selectedProjectDetails ? getProjectStatusFromApiStatus(selectedProjectDetails.status) : selectedProject.status;
+
+  const sidebarStartDate = formatProjectSidebarDate(
+    selectedProjectDetails?.start_date ?? selectedProject.apiData?.start_date ?? undefined,
+  );
+  const sidebarEndDate = formatProjectSidebarDate(
+    selectedProjectDetails?.end_date ?? selectedProject.apiData?.end_date ?? undefined,
+  );
+  const sidebarProjectColor =
+    selectedProjectDetails?.color?.trim() ||
+    selectedProject.iconColor ||
+    "#3b82f6";
+  const projectMembers = selectedProjectDetails?.members || selectedProject.members;
+  const progressPercent = Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100);
 
   const activityActorDisplayName = (extension: string) =>
     extension === "system" ? "System" : getUserNameFromExtension(extension);
 
-  const recentActivityContent = (() => {
-    if (loadingActivities) return <Spinner animation="border" size="sm" />;
-    if (projectActivities.length === 0) {
-      return (
-        <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
-          No recent activity
-        </div>
-      );
-    }
-
-    return (
+  let recentActivityContent: React.ReactNode;
+  if (loadingActivities) {
+    recentActivityContent = <Spinner animation="border" size="sm" />;
+  } else if (projectActivities.length === 0) {
+    recentActivityContent = (
+      <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
+        No recent activity
+      </div>
+    );
+  } else {
+    recentActivityContent = (
       <div className="d-flex flex-column gap-3">
         {projectActivities.slice(0, 10).map((activity: any, idx: number) => {
           const ext = activity.extension_number || "system";
@@ -1776,19 +1839,19 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
         })}
       </div>
     );
-  })();
+  }
 
-  const historyContent = (() => {
-    if (loadingActivities) return <Spinner animation="border" size="sm" />;
-    if (projectActivities.length === 0) {
-      return (
-        <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
-          No history available
-        </div>
-      );
-    }
-
-    return (
+  let historyContent: React.ReactNode;
+  if (loadingActivities) {
+    historyContent = <Spinner animation="border" size="sm" />;
+  } else if (projectActivities.length === 0) {
+    historyContent = (
+      <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
+        No history available
+      </div>
+    );
+  } else {
+    historyContent = (
       <div className="d-flex flex-column gap-2">
         {projectActivities.map((activity: any, idx: number) => {
           const ext = activity.extension_number || "system";
@@ -1828,230 +1891,129 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
         })}
       </div>
     );
-  })();
+  }
 
-  const bodyContent = (() => {
-    if (loadingProjectDetails) {
-      return (
-        <div className="text-center py-5">
-          <Spinner animation="border" />
-          <p className="mt-3 text-muted">Loading project details...</p>
-        </div>
-      );
-    }
+  const descriptionHtml = selectedProjectDetails?.description?.trim();
 
-    if (!selectedProject) return null;
-
-    const sidebarStartDate = formatProjectSidebarDate(
-      selectedProjectDetails?.start_date ?? selectedProject.apiData?.start_date ?? undefined,
-    );
-    const sidebarEndDate = formatProjectSidebarDate(
-      selectedProjectDetails?.end_date ?? selectedProject.apiData?.end_date ?? undefined,
-    );
-    const sidebarProjectColor =
-      selectedProjectDetails?.color?.trim() || selectedProject.iconColor;
-
-    return (
-      <>
-        <Row className="g-2 mb-3">
-          <Col xs={6}>
-            <div className="detail-section">
-              <div className="detail-label">Open Tasks</div>
-              <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#3b82f6" }}>{selectedProject.open}</div>
-            </div>
-          </Col>
-          <Col xs={6}>
-            <div className="detail-section">
-              <div className="detail-label">Overdue Tasks</div>
-              {loadingOverdueTasks ? (
-                <Spinner animation="border" size="sm" />
-              ) : (
-                <div
-                  style={{
-                    fontSize: "1.75rem",
-                    fontWeight: 700,
-                    color: overdueTasks.length > 0 ? "#ef4444" : "#10b981",
-                  }}
-                >
-                  {overdueTasks.length}
-                </div>
-              )}
-            </div>
-          </Col>
-        </Row>
-
-        <div className="detail-section">
-          <div className="detail-label">Project Progress</div>
-          <ProgressBar
-            now={Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)}
-            style={{ height: 10, marginBottom: "0.5rem" }}
-            variant="primary"
-          />
-          <div style={{ fontSize: "0.875rem", color: "#64748b", textAlign: "right" }}>
-            {Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100)}% Complete
-          </div>
-        </div>
-
-        <Row className="g-2 mb-3">
-          <Col xs={6}>
-            <div
-              className="detail-section"
-              style={{ height: "100%", display: "flex", flexDirection: "column", padding: "0.75rem" }}
-            >
-              <div className="detail-label">Owner / PM</div>
-              <div
-                style={{
-                  fontSize: "0.875rem",
-                  fontWeight: 500,
-                  color: "#334155",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  marginTop: "auto",
-                }}
-              >
-                <span>
-                  {selectedProjectDetails?.owner_extension_number
-                    ? getUserNameFromExtension(selectedProjectDetails.owner_extension_number)
-                    : selectedProject.owner}
-                </span>
+  return (
+    <GenericSidebar
+      isOpen={show}
+      onClose={onHide}
+      width="470px"
+      title={selectedProject.name}
+      subtitle={resolvedStatus.toUpperCase()}
+      avatar={{
+        name: selectedProject.name,
+        initials: selectedProject.name.slice(0, 1).toUpperCase(),
+        gradient: selectedProject.iconColor,
+      }}
+      actionsDropdown={{
+        label: "Actions",
+        items: [
+          {
+            label: "Open Project",
+            onClick: () => {
+              globalThis.window?.open(`/planner/projects/${selectedProject.id}`, "_blank");
+            },
+          },
+        ],
+      }}
+      sections={[
+        {
+          id: "project-overview",
+          title: "Overview",
+          icon: FolderOpen,
+          collapsible: true,
+          defaultExpanded: true,
+          isLoading: loadingProjectDetails,
+          fields: [
+            { label: "Open Tasks", value: selectedProject.open },
+            {
+              label: "Overdue Tasks",
+              value: loadingOverdueTasks ? "Loading..." : overdueTasks.length,
+            },
+            {
+              label: "Owner / PM",
+              value: selectedProjectDetails?.owner_extension_number
+                ? getUserNameFromExtension(selectedProjectDetails.owner_extension_number)
+                : selectedProject.owner,
+            },
+            {
+              label: "Status",
+              value: resolvedStatus.toUpperCase(),
+              type: "badge",
+              badgeVariant: getProjectStatusVariant(resolvedStatus),
+            },
+            {
+              label: "Last Updated",
+              value: selectedProjectDetails?.updated_at ?? selectedProject.lastUpdate,
+              type: "date",
+              icon: Calendar,
+            },
+          ],
+        },
+        {
+          id: "project-progress",
+          title: "Progress",
+          icon: AlertCircle,
+          collapsible: true,
+          defaultExpanded: true,
+          customContent: (
+            <>
+              <ProgressBar now={progressPercent} style={{ height: 10, marginBottom: "0.5rem" }} variant="primary" />
+              <div style={{ fontSize: "0.875rem", color: "#64748b", textAlign: "right" }}>
+                {progressPercent}% Complete
               </div>
+            </>
+          ),
+        },
+        {
+          id: "project-dates",
+          title: "Dates & Color",
+          icon: CalendarDays,
+          collapsible: true,
+          defaultExpanded: true,
+          fields: [
+            { label: "Start Date", value: sidebarStartDate, type: "date", icon: Calendar },
+            { label: "End Date", value: sidebarEndDate, type: "date", icon: CalendarDays },
+            {
+              label: "Color",
+              type: "color",
+              value: sidebarProjectColor,
+              copyable: true,
+            },
+          ],
+        },
+        {
+          id: "project-members",
+          title: `Team Members (${projectMembers.length})`,
+          icon: Users,
+          collapsible: true,
+          defaultExpanded: true,
+          customContent: (
+            <div className="d-flex flex-column gap-2">
+              {projectMembers.map((member: any) => {
+                const ext = member.extension_number || member.name || "";
+                const key = String(
+                  member?.id ?? member?.extension_number ?? member?.name ?? `${ext}-${member?.role ?? ""}`,
+                );
+                return (
+                  <div key={key} style={{ fontSize: "0.85rem", color: "#334155" }}>
+                    {member.user?.name || getUserNameFromExtension(ext)}
+                    {member.role ? ` (${member.role})` : ""}
+                  </div>
+                );
+              })}
             </div>
-          </Col>
-          <Col xs={6}>
-            <div
-              className="detail-section"
-              style={{ height: "100%", display: "flex", flexDirection: "column", padding: "0.75rem" }}
-            >
-              <div className="detail-label">Status</div>
-              <div style={{ marginTop: "auto" }}>
-                <Badge
-                  bg={getProjectStatusVariant(resolvedStatus ?? selectedProject.status)}
-                  style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.5rem 0.75rem" }}
-                >
-                  {(resolvedStatus ?? selectedProject.status).toUpperCase()}
-                </Badge>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        <Row className="g-2 mb-3">
-          <Col xs={6}>
-            <div className="detail-section">
-              <div className="detail-label">
-                Team Members ({selectedProjectDetails?.members?.length || selectedProject.members.length})
-              </div>
-              <div className="d-flex flex-wrap gap-2">
-                {(selectedProjectDetails?.members || selectedProject.members).map((member: any) => {
-                  const ext = member.extension_number || member.name || "";
-                  const key = String(
-                    member?.id ?? member?.extension_number ?? member?.name ?? `${ext}-${member?.role ?? ""}`,
-                  );
-                  return (
-                    <div
-                      key={key}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.5rem",
-                        backgroundColor: "white",
-                        width: "100%",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "0.8125rem",
-                          fontWeight: 500,
-                          color: "#334155",
-                          flex: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {member.user?.name || getUserNameFromExtension(ext)} {member.role ? `(${member.role})` : ""}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </Col>
-
-          <Col xs={6}>
-            <div className="detail-section">
-              <div className="detail-label">Last Updated</div>
-              <div className="d-flex align-items-center" style={{ fontSize: "0.875rem", fontWeight: 500 }}>
-                <Calendar size={16} className="me-2 text-muted" />
-                <span>
-                  {selectedProjectDetails?.updated_at
-                    ? formatDateGlobal(selectedProjectDetails.updated_at) || selectedProject.lastUpdate
-                    : selectedProject.lastUpdate}
-                </span>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        <Row className="g-2 mb-3">
-          <Col xs={12} sm={4}>
-            <div className="detail-section">
-              <div className="detail-label">Start date</div>
-              <div
-                className="d-flex align-items-center"
-                style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}
-              >
-                <Calendar size={16} className="me-2 text-muted flex-shrink-0" />
-                <span>{sidebarStartDate ?? "—"}</span>
-              </div>
-            </div>
-          </Col>
-          <Col xs={12} sm={4}>
-            <div className="detail-section">
-              <div className="detail-label">End date</div>
-              <div
-                className="d-flex align-items-center"
-                style={{ fontSize: "0.875rem", fontWeight: 500, color: "#334155" }}
-              >
-                <CalendarDays size={16} className="me-2 text-muted flex-shrink-0" />
-                <span>{sidebarEndDate ?? "—"}</span>
-              </div>
-            </div>
-          </Col>
-          <Col xs={12} sm={4}>
-            <div className="detail-section">
-              <div className="detail-label">Color</div>
-              <div className="d-flex align-items-center gap-2 flex-wrap" style={{ marginTop: 4 }}>
-                <span
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 6,
-                    backgroundColor: sidebarProjectColor,
-                    border: "1px solid #e2e8f0",
-                    flexShrink: 0,
-                  }}
-                  title={sidebarProjectColor}
-                  aria-hidden
-                />
-                <span
-                  style={{
-                    fontSize: "0.8125rem",
-                    color: "#64748b",
-                    fontFamily: "ui-monospace, monospace",
-                  }}
-                >
-                  {sidebarProjectColor.toUpperCase()}
-                </span>
-              </div>
-            </div>
-          </Col>
-        </Row>
-
-        {selectedProjectDetails?.description?.trim() && (
-          <div className="detail-section">
-            <div className="detail-label">Description</div>
+          ),
+        },
+        {
+          id: "project-description",
+          title: "Description",
+          icon: ExternalLink,
+          collapsible: true,
+          defaultExpanded: true,
+          customContent: descriptionHtml ? (
             <div
               className="task-description-html"
               style={{
@@ -2062,133 +2024,446 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
                 overflowX: "auto",
                 wordBreak: "break-word",
               }}
-              dangerouslySetInnerHTML={{
-                __html: String(selectedProjectDetails.description).trim(),
-              }}
+              dangerouslySetInnerHTML={{ __html: String(descriptionHtml) }}
             />
-          </div>
-        )}
+          ) : (
+            <span style={{ color: "#9ca3af", fontSize: "0.875rem" }}>No description</span>
+          ),
+        },
+        // {
+        //   id: "project-activity",
+        //   title: "Activity & History",
+        //   icon: Clock,
+        //   collapsible: true,
+        //   defaultExpanded: true,
+        //   customContent: (
+        //     <>
+        //       <Nav
+        //         variant="tabs"
+        //         className="detail-tabs"
+        //         activeKey={detailTab}
+        //         onSelect={(k) => {
+        //           if (k) setDetailTab(k);
+        //         }}
+        //       >
+        //         <Nav.Item>
+        //           <Nav.Link eventKey="Activity">Activity</Nav.Link>
+        //         </Nav.Item>
+        //         <Nav.Item>
+        //           <Nav.Link eventKey="History">History</Nav.Link>
+        //         </Nav.Item>
+        //       </Nav>
+        //       <div style={{ marginTop: "1rem" }}>
+        //         {detailTab === "Activity" ? recentActivityContent : historyContent}
+        //       </div>
+        //     </>
+        //   ),
+        // },
+      ]}
+    />
+  );
+};
 
-        <Nav variant="tabs" className="detail-tabs" activeKey={detailTab} onSelect={(k) => k && setDetailTab(k)}>
-          <Nav.Item>
-            <Nav.Link eventKey="Activity">Activity</Nav.Link>
-          </Nav.Item>
-          <Nav.Item>
-            <Nav.Link eventKey="History">History</Nav.Link>
-          </Nav.Item>
-        </Nav>
+type ProjectFormSidebarProps = {
+  show: boolean;
+  editingProject: Project | null;
+  projectFormData: ProjectFormState;
+  setProjectFormData: React.Dispatch<React.SetStateAction<ProjectFormState>>;
+  submitting: boolean;
+  submitButtonText: string;
+  submittingButtonText: string;
+  onClose: () => void;
+  onSubmit: (e: React.FormEvent) => Promise<void>;
+};
 
-        <div style={{ marginTop: "1.5rem" }}>
-          {detailTab === "Activity" && (
-            <div>
-              <div className="detail-label" style={{ marginBottom: "1rem" }}>
-                Recent Activity
-              </div>
-              {recentActivityContent}
-            </div>
-          )}
-          {detailTab === "History" && (
-            <div>
-              <div className="detail-label" style={{ marginBottom: "1rem" }}>
-                Project History
-              </div>
-              {historyContent}
-            </div>
-          )}
-        </div>
-      </>
-    );
-  })();
+const ProjectFormSidebar: React.FC<ProjectFormSidebarProps> = ({
+  show,
+  editingProject,
+  projectFormData,
+  setProjectFormData,
+  submitting,
+  submitButtonText,
+  submittingButtonText,
+  onClose,
+  onSubmit,
+}) => {
+  if (!show) {
+    return null;
+  }
+
+  const hasName = projectFormData.name.trim() !== "";
+  const hasStartDate = projectFormData.start_date.trim() !== "";
+  const hasStartDateInPast =
+    editingProject == null &&
+    hasStartDate &&
+    projectFormData.start_date.trim() < todayYmdLocal();
+  const hasEndDateBeforeStart =
+    projectFormData.end_date.trim() !== "" &&
+    projectFormData.end_date.trim() < projectFormData.start_date.trim();
+  const disableSubmit =
+    submitting || !hasName || !hasStartDate || hasStartDateInPast || hasEndDateBeforeStart;
 
   return (
-    <Offcanvas show={show} onHide={onHide} placement="end" className="project-detail-panel">
-      <Offcanvas.Header style={{ position: "relative" }}>
-        <Offcanvas.Title>
-          <div className="d-flex align-items-center gap-3">
-            {selectedProject && (
-              <>
-                <div className="project-icon" style={{ backgroundColor: selectedProject.iconColor + "20" }}>
-                  <selectedProject.icon size={24} style={{ color: selectedProject.iconColor }} />
-                </div>
-                <div>
-                  <div className="fw-bold" style={{ fontSize: "1.125rem", marginBottom: "0.25rem" }}>
-                    {selectedProject.name}
-                  </div>
-                  <Badge bg={getProjectStatusVariant(selectedProject.status)} style={{ fontSize: "0.7rem" }}>
-                    {selectedProject.status.toUpperCase()}
-                  </Badge>
-                </div>
-              </>
-            )}
-          </div>
-        </Offcanvas.Title>
-
-        <div className="d-flex align-items-center gap-2">
-          {selectedProject && (
-            <Button
-              variant="link"
-              className="p-0"
-              onClick={() => {
-                globalThis.window?.open(`/planner/projects/${selectedProject.id}`, "_blank");
-              }}
-              style={{
-                color: "#6b7280",
-                textDecoration: "none",
-                width: 32,
-                height: 32,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: 4,
-              }}
-            >
-              <ExternalLink size={18} />
-            </Button>
-          )}
-          <Button
-            variant="link"
-            className="p-0"
-            onClick={onHide}
+    <>
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 1000,
+          background: "transparent",
+        }}
+        aria-hidden="true"
+      />
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          width: "600px",
+          height: "100vh",
+          backgroundColor: "#ffffff",
+          boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+          zIndex: 999999,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div
+          style={{
+            padding: "20px 24px",
+            borderBottom: "1px solid #eaf0f6",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <h2
             style={{
-              color: "#6b7280",
-              textDecoration: "none",
-              width: 32,
-              height: 32,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 4,
+              fontSize: "20px",
+              fontWeight: 600,
+              color: "#141414",
+              margin: 0,
             }}
           >
-            <X size={18} />
-          </Button>
+            {editingProject ? "Edit Project" : "Create New Project"}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "4px",
+              cursor: "pointer",
+              color: "#718096",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <X size={24} />
+          </button>
         </div>
-      </Offcanvas.Header>
 
-      <Offcanvas.Body>
-        <style>{`
-          .project-detail-panel .task-description-html ul,
-          .project-detail-panel .task-description-html ol {
-            padding-left: 1.25rem;
-            margin: 0.5rem 0;
-          }
-          .project-detail-panel .task-description-html p {
-            margin: 0.35rem 0;
-          }
-          .project-detail-panel .task-description-html p:first-child {
-            margin-top: 0;
-          }
-          .project-detail-panel .task-description-html p:last-child {
-            margin-bottom: 0;
-          }
-          .project-detail-panel .task-description-html a {
-            color: #4680ff;
-            text-decoration: underline;
-          }
-        `}</style>
-        {bodyContent}
-      </Offcanvas.Body>
-    </Offcanvas>
+        <Form
+          onSubmit={onSubmit}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              padding: "40px",
+            }}
+          >
+            <Form.Group style={{ marginBottom: "20px" }}>
+              <Form.Label
+                style={{
+                  display: "block",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#141414",
+                  marginBottom: "8px",
+                }}
+              >
+                Project Name <span style={{ color: "#f2545b" }}>*</span>
+              </Form.Label>
+              <Form.Control
+                type="text"
+                value={projectFormData.name}
+                maxLength={PROJECT_NAME_MAX_LENGTH}
+                onChange={(e) =>
+                  setProjectFormData((prev) => ({
+                    ...prev,
+                    name: e.target.value.slice(0, PROJECT_NAME_MAX_LENGTH),
+                  }))
+                }
+                placeholder="Enter project name"
+                required
+                style={{
+                  padding: "10px 12px",
+                  border: "1px solid #8a8a8a",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  minHeight: 40,
+                }}
+              />
+              <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
+                <Form.Text className="text-muted mb-0">
+                  Maximum {PROJECT_NAME_MAX_LENGTH} characters.
+                </Form.Text>
+                <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
+                  {projectFormData.name.length}/{PROJECT_NAME_MAX_LENGTH}
+                </Form.Text>
+              </div>
+            </Form.Group>
+
+            <Form.Group style={{ marginBottom: "20px" }}>
+              <Form.Label
+                style={{
+                  display: "block",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#141414",
+                  marginBottom: "8px",
+                }}
+              >
+                Description
+              </Form.Label>
+              <RichTextEditor
+                buttonSize="sm"
+                value={projectFormData.description || ""}
+                onChange={(html) =>
+                  setProjectFormData((prev) => ({ ...prev, description: html }))
+                }
+                placeholder="Enter project description"
+                minHeight="100px"
+                maxHeight="220px"
+                maxLength={5000}
+              />
+            </Form.Group>
+
+            <Row className="g-2" style={{ marginBottom: "20px" }}>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label
+                    style={{
+                      display: "block",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "#141414",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    Start date <span style={{ color: "#f2545b" }}>*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="date"
+                    required
+                    min={editingProject == null ? todayYmdLocal() : undefined}
+                    value={projectFormData.start_date}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      const today = todayYmdLocal();
+                      if (editingProject == null && newStart && newStart < today) {
+                        toast.error("Start date cannot be in the past");
+                        return;
+                      }
+                      setProjectFormData((prev) => {
+                        let nextEnd = prev.end_date;
+                        if (newStart && nextEnd && nextEnd < newStart) {
+                          nextEnd = newStart;
+                        }
+                        return { ...prev, start_date: newStart, end_date: nextEnd };
+                      });
+                    }}
+                    style={{
+                      padding: "10px 12px",
+                      border: "1px solid #8a8a8a",
+                      borderRadius: "4px",
+                      fontSize: "14px",
+                      minHeight: 40,
+                    }}
+                  />
+                  {editingProject == null ? (
+                    <Form.Text className="text-muted">Start date must be today or a future date.</Form.Text>
+                  ) : null}
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Label
+                    style={{
+                      display: "block",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "#141414",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    End date
+                  </Form.Label>
+                  <Form.Control
+                    type="date"
+                    min={projectFormData.start_date || todayYmdLocal()}
+                    value={projectFormData.end_date}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setProjectFormData((prev) => {
+                        if (v && prev.start_date && v < prev.start_date) {
+                          toast.error("End date cannot be before start date");
+                          return prev;
+                        }
+                        return { ...prev, end_date: v };
+                      });
+                    }}
+                    style={{
+                      padding: "10px 12px",
+                      border: "1px solid #8a8a8a",
+                      borderRadius: "4px",
+                      fontSize: "14px",
+                      minHeight: 40,
+                    }}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Form.Group style={{ marginBottom: "20px" }}>
+              <Form.Label
+                style={{
+                  display: "block",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#141414",
+                  marginBottom: "8px",
+                }}
+              >
+                Status
+              </Form.Label>
+              <Form.Select
+                value={projectFormData.status}
+                onChange={(e) =>
+                  setProjectFormData({
+                    ...projectFormData,
+                    status: e.target.value as ProjectFormStatus,
+                  })
+                }
+                style={{
+                  padding: "10px 12px",
+                  border: "1px solid #8a8a8a",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  minHeight: 40,
+                }}
+              >
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+                <option value="completed">Completed</option>
+              </Form.Select>
+            </Form.Group>
+
+            <Form.Group style={{ marginBottom: "20px" }}>
+              <Form.Label
+                style={{
+                  display: "block",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: "#141414",
+                  marginBottom: "8px",
+                }}
+              >
+                Color
+              </Form.Label>
+              <div className="d-flex align-items-center gap-3">
+                <Form.Control
+                  type="color"
+                  value={projectFormData.color}
+                  onChange={(e) =>
+                    setProjectFormData({ ...projectFormData, color: e.target.value })
+                  }
+                  style={{ width: 80, height: 40, padding: 4 }}
+                />
+                <Form.Control
+                  type="text"
+                  value={projectFormData.color}
+                  onChange={(e) =>
+                    setProjectFormData({ ...projectFormData, color: e.target.value })
+                  }
+                  placeholder="#3b82f6"
+                  style={{
+                    flex: 1,
+                    padding: "10px 12px",
+                    border: "1px solid #8a8a8a",
+                    borderRadius: "4px",
+                    fontSize: "14px",
+                    minHeight: 40,
+                  }}
+                />
+              </div>
+            </Form.Group>
+          </div>
+
+          <div
+            style={{
+              padding: "16px 24px",
+              borderTop: "1px solid #eaf0f6",
+              display: "flex",
+              gap: "12px",
+              justifyContent: "flex-start",
+            }}
+          >
+            <button
+              type="submit"
+              disabled={disableSubmit}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: disableSubmit ? "#cbd5e0" : "#0091ae",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor: disableSubmit ? "not-allowed" : "pointer",
+              }}
+            >
+              {submitting ? (
+                <>
+                  <Spinner as="span" animation="border" size="sm" className="me-2" />
+                  {submittingButtonText}
+                </>
+              ) : (
+                submitButtonText
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              style={{
+                padding: "10px 20px",
+                backgroundColor: "transparent",
+                color: "#141414",
+                border: "1px solid #8a8a8a",
+                borderRadius: "4px",
+                fontSize: "14px",
+                fontWeight: 500,
+                cursor: submitting ? "not-allowed" : "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </Form>
+      </div>
+    </>
   );
 };
 
@@ -2210,7 +2485,336 @@ type AppliedProjectFilters = {
 /** Optional `page` avoids stale `pagination` when resetting to page 1 in the same tick as `fetchProjects`. */
 type ProjectListFetchParams = Partial<AppliedProjectFilters> & { page?: number };
 
+type ProjectPaginationState = {
+  page: number;
+  limit: number;
+  total: number;
+  last_page: number;
+  from: number;
+  to: number;
+};
+
+type ProjectStatsState = {
+  activeProjects: number;
+  totalProjects: number;
+  tasksDueThisWeek: number;
+  overdueAcrossProjects: number;
+};
+
+type LoadProjectsFromApiArgs = {
+  filters?: ProjectListFetchParams;
+  pagination: Pick<ProjectPaginationState, "page" | "limit">;
+  setLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+  setPagination: React.Dispatch<React.SetStateAction<ProjectPaginationState>>;
+  setStats: React.Dispatch<React.SetStateAction<ProjectStatsState>>;
+};
+
+async function loadProjectsFromApi({
+  filters,
+  pagination,
+  setLoading,
+  setProjects,
+  setPagination,
+  setStats,
+}: LoadProjectsFromApiArgs): Promise<void> {
+  try {
+    setLoading(true);
+    const pageForRequest = typeof filters?.page === "number" ? filters.page : pagination.page;
+    const statusParam = filters?.status && filters.status !== "all" ? filters.status : undefined;
+    const extensionNumbers =
+      filters?.ownerExtensionNumbers && filters.ownerExtensionNumbers.length > 0
+        ? filters.ownerExtensionNumbers.map((ext) => String(ext).trim()).filter(Boolean)
+        : undefined;
+    let startFrom = filters?.startDateFrom?.trim() || undefined;
+    let endTo = filters?.endDateTo?.trim() || undefined;
+    if (startFrom && endTo && endTo < startFrom) {
+      endTo = startFrom;
+    }
+
+    const response = await listProjects({
+      page: pageForRequest,
+      limit: pagination.limit,
+      search: filters?.search || "",
+      status: statusParam,
+      extension_numbers: extensionNumbers,
+      start_date_from: startFrom,
+      end_date_to: endTo,
+    });
+
+    if (response?.success === true && Array.isArray(response.data)) {
+      setProjects(response.data.map((p: ApiProject) => mapApiProjectToProject(p)));
+      if (response.pagination) {
+        setPagination((prev) => ({ ...prev, ...response.pagination }));
+      }
+      const summary = response.summary;
+      if (summary) {
+        setStats({
+          activeProjects: summary.active ?? 0,
+          totalProjects: summary.total ?? 0,
+          tasksDueThisWeek: summary.task_due_this_week ?? 0,
+          overdueAcrossProjects: summary.overdue_tasks ?? 0,
+        });
+      }
+    } else {
+      setProjects([]);
+    }
+  } catch (error) {
+    console.error("Error fetching projects:", error);
+    setProjects([]);
+  } finally {
+    setLoading(false);
+  }
+}
+
+type LoadProjectSidebarDataArgs = {
+  project: Project;
+  setSelectedProject: React.Dispatch<React.SetStateAction<Project | null>>;
+  setShowProjectDetail: React.Dispatch<React.SetStateAction<boolean>>;
+  setLoadingProjectDetails: React.Dispatch<React.SetStateAction<boolean>>;
+  setLoadingActivities: React.Dispatch<React.SetStateAction<boolean>>;
+  setLoadingOverdueTasks: React.Dispatch<React.SetStateAction<boolean>>;
+  setSelectedProjectDetails: React.Dispatch<React.SetStateAction<ApiProject | null>>;
+  setProjectActivities: React.Dispatch<React.SetStateAction<any[]>>;
+  setOverdueTasks: React.Dispatch<React.SetStateAction<any[]>>;
+};
+
+async function loadProjectSidebarData({
+  project,
+  setSelectedProject,
+  setShowProjectDetail,
+  setLoadingProjectDetails,
+  setLoadingActivities,
+  setLoadingOverdueTasks,
+  setSelectedProjectDetails,
+  setProjectActivities,
+  setOverdueTasks,
+}: LoadProjectSidebarDataArgs): Promise<void> {
+  setSelectedProject(project);
+  setShowProjectDetail(true);
+  setLoadingProjectDetails(true);
+  setLoadingOverdueTasks(true);
+
+  try {
+    const withRelations = ["members.user", "tasks", "tasks.assignees", "tasks.labels", "tasks.status", "statuses", "owner"];
+    const [projectDetails, activities, overdue] = await Promise.all([
+      getProject(project.id, withRelations),
+      getRecentActivity(Number(project.id)),
+      getOverdueTasks(Number(project.id)),
+    ]);
+    setSelectedProjectDetails(projectDetails || project.apiData || null);
+    setProjectActivities(Array.isArray(activities) ? activities : []);
+    setOverdueTasks(Array.isArray(overdue) ? overdue : []);
+  } catch (error) {
+    console.error("Error fetching project details:", error);
+    setSelectedProjectDetails(project.apiData || null);
+    setProjectActivities([]);
+    setOverdueTasks([]);
+  } finally {
+    setLoadingProjectDetails(false);
+    setLoadingActivities(false);
+    setLoadingOverdueTasks(false);
+  }
+}
+
+type SubmitPlannerProjectParams = {
+  editingProject: Project | null;
+  projectFormData: ProjectFormState;
+  setSubmitting: React.Dispatch<React.SetStateAction<boolean>>;
+  appliedFilters: AppliedProjectFilters;
+  fetchProjects: (filters?: ProjectListFetchParams) => Promise<void>;
+  resetProjectModalState: () => void;
+};
+
+type ConfirmDeleteProjectParams = {
+  projectToDelete: Project | null;
+  setDeleting: React.Dispatch<React.SetStateAction<boolean>>;
+  fetchProjects: (filters?: ProjectListFetchParams) => Promise<void>;
+  appliedFilters: AppliedProjectFilters;
+  setShowDeleteModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setProjectToDelete: React.Dispatch<React.SetStateAction<Project | null>>;
+};
+
+type ApplyProjectTabChangeArgs = {
+  tabId: string;
+  searchTerm: string;
+  filterOwnerExtensions: string[];
+  filterTeam: string;
+  filterStartDateFrom: string;
+  filterEndDateTo: string;
+  setActiveTab: React.Dispatch<React.SetStateAction<string>>;
+  setFilterStatus: React.Dispatch<React.SetStateAction<ProjectStatusFilter>>;
+  setPagination: React.Dispatch<React.SetStateAction<ProjectPaginationState>>;
+  setAppliedFilters: React.Dispatch<React.SetStateAction<AppliedProjectFilters>>;
+  fetchProjects: (filters?: ProjectListFetchParams) => Promise<void>;
+};
+
+async function applyProjectTabChangeAndRefetch({
+  tabId,
+  searchTerm,
+  filterOwnerExtensions,
+  filterTeam,
+  filterStartDateFrom,
+  filterEndDateTo,
+  setActiveTab,
+  setFilterStatus,
+  setPagination,
+  setAppliedFilters,
+  fetchProjects,
+}: ApplyProjectTabChangeArgs): Promise<void> {
+  setActiveTab(tabId);
+  const statusMap: Record<string, ProjectStatusFilter> = {
+    all: "all",
+    active: "active",
+    completed: "completed",
+    archived: "archived",
+  };
+  const status = statusMap[tabId];
+  if (status == null) {
+    return;
+  }
+
+  setFilterStatus(status);
+  setPagination((prev) => ({ ...prev, page: 1 }));
+  const next: AppliedProjectFilters = {
+    search: searchTerm,
+    status,
+    ownerExtensionNumbers: filterOwnerExtensions,
+    team: filterTeam,
+    startDateFrom: filterStartDateFrom,
+    endDateTo: filterEndDateTo,
+  };
+  setAppliedFilters(next);
+  await fetchProjects({ ...next, page: 1 });
+}
+
+function clampProjectDateRangeOnStartChange(value: string, prevEnd: string): string {
+  if (value && prevEnd && prevEnd < value) {
+    return value;
+  }
+  return prevEnd;
+}
+
+function normalizeProjectEndDateByStart(value: string, start: string): string {
+  if (value && start && value < start) {
+    return start;
+  }
+  return value;
+}
+
+function getProjectDateRangePillLabel(fromRaw: string, toRaw: string): string | undefined {
+  const from = fromRaw.trim();
+  const to = toRaw.trim();
+  if (from === "" && to === "") {
+    return undefined;
+  }
+  if (from !== "" && to !== "") {
+    return `${from} → ${to}`;
+  }
+  if (from !== "") {
+    return `From ${from}`;
+  }
+  return `To ${to}`;
+}
+
+async function confirmDeleteProjectAndRefresh({
+  projectToDelete,
+  setDeleting,
+  fetchProjects,
+  appliedFilters,
+  setShowDeleteModal,
+  setProjectToDelete,
+}: ConfirmDeleteProjectParams): Promise<void> {
+  if (projectToDelete == null) {
+    return;
+  }
+
+  try {
+    setDeleting(true);
+    const result = await deleteProject(projectToDelete.id);
+    if (result) {
+      await fetchProjects(appliedFilters);
+      setShowDeleteModal(false);
+      setProjectToDelete(null);
+    }
+  } catch (error) {
+    console.error("Error deleting project:", error);
+  } finally {
+    setDeleting(false);
+  }
+}
+
+async function submitPlannerProjectForm({
+  editingProject,
+  projectFormData,
+  setSubmitting,
+  appliedFilters,
+  fetchProjects,
+  resetProjectModalState,
+}: SubmitPlannerProjectParams): Promise<void> {
+  const start = projectFormData.start_date.trim();
+  const end = projectFormData.end_date.trim();
+  if (start === "") {
+    toast.error("Start date is required");
+    return;
+  }
+  if (editingProject == null && start < todayYmdLocal()) {
+    toast.error("Start date cannot be in the past");
+    return;
+  }
+  if (end !== "" && end < start) {
+    toast.error("End date cannot be before start date");
+    return;
+  }
+
+  try {
+    setSubmitting(true);
+    const projectData: Parameters<typeof createProject>[0] = {
+      name: projectFormData.name.trim().slice(0, PROJECT_NAME_MAX_LENGTH),
+      description: projectFormData.description.trim() || undefined,
+      color: projectFormData.color,
+      status: projectFormData.status,
+      timezone: projectFormData.timezone,
+      start_date: start,
+    };
+    if (end !== "") {
+      projectData.end_date = end;
+    }
+
+    const result = editingProject
+      ? await updateProject(editingProject.id, projectData)
+      : await createProject(projectData);
+
+    if (result) {
+      await fetchProjects(appliedFilters);
+      resetProjectModalState();
+    }
+  } catch (error) {
+    console.error("Error saving project:", error);
+  } finally {
+    setSubmitting(false);
+  }
+}
+
+function projectMatchesFilters(project: Project, appliedFilters: AppliedProjectFilters): boolean {
+  const matchesSearch =
+    project.name.toLowerCase().includes(appliedFilters.search.toLowerCase()) ||
+    project.id.toLowerCase().includes(appliedFilters.search.toLowerCase());
+  const projectStatusKey = String(project.apiData?.status || project.status || "").toLowerCase();
+  const matchesStatus = appliedFilters.status === "all" || projectStatusKey === appliedFilters.status;
+  const projectOwnerExt = project.apiData?.owner_extension_number || project.owner;
+  const matchesOwner =
+    appliedFilters.ownerExtensionNumbers.length === 0 ||
+    appliedFilters.ownerExtensionNumbers.some((ext) => String(projectOwnerExt || "") === String(ext));
+  const projectMembers = (project.apiData?.members || project.members || []) as any[];
+  const matchesTeam =
+    appliedFilters.team === "All Teams" ||
+    projectMembers.some((m: any) => String(m?.extension_number || m?.name || "") === String(appliedFilters.team));
+  return matchesSearch && matchesStatus && matchesOwner && matchesTeam;
+}
+
 const WorkPlannerProjects = () => {
+  const router = useRouter();
   const { data: session } = useSession();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
@@ -2228,8 +2832,8 @@ const WorkPlannerProjects = () => {
   const [deleting, setDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [projectFormData, setProjectFormData] = useState<ProjectFormState>(() => createEmptyProjectForm());
-  const [stats, setStats] = useState({ activeProjects: 0, totalProjects: 0, tasksDueThisWeek: 0, overdueAcrossProjects: 0 });
-  const [pagination, setPagination] = useState({ page: 1, limit: 15, total: 0, last_page: 1, from: 0, to: 0 });
+  const [stats, setStats] = useState<ProjectStatsState>({ activeProjects: 0, totalProjects: 0, tasksDueThisWeek: 0, overdueAcrossProjects: 0 });
+  const [pagination, setPagination] = useState<ProjectPaginationState>({ page: 1, limit: 15, total: 0, last_page: 1, from: 0, to: 0 });
   const [activeTab, setActiveTab] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<ProjectStatusFilter>("all");
@@ -2246,7 +2850,6 @@ const WorkPlannerProjects = () => {
     endDateTo: "",
   });
   const [customTabs] = useState<TabConfig[]>([]);
-  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedProjectDetails, setSelectedProjectDetails] = useState<ApiProject | null>(null);
   const [loadingProjectDetails, setLoadingProjectDetails] = useState(false);
@@ -2263,6 +2866,20 @@ const WorkPlannerProjects = () => {
     setProjectFormData(createEmptyProjectForm());
   }, []);
 
+  const fetchProjects = useCallback(
+    async (filters?: ProjectListFetchParams) => {
+      await loadProjectsFromApi({
+        filters,
+        pagination,
+        setLoading,
+        setProjects,
+        setPagination,
+        setStats,
+      });
+    },
+    [pagination.page, pagination.limit],
+  );
+
   useEffect(() => {
     if (!hierarchyLoading) {
       fetchProjects({
@@ -2273,97 +2890,7 @@ const WorkPlannerProjects = () => {
         endDateTo: filterEndDateTo,
       });
     }
-  }, [pagination.page, pagination.limit, hierarchyLoading]);
-
-  const fetchProjects = async (filters?: ProjectListFetchParams) => {
-    try {
-      setLoading(true);
-      const pageForRequest = typeof filters?.page === "number" ? filters.page : pagination.page;
-      const statusParam = filters?.status && filters.status !== "all" ? filters.status : undefined;
-      const extensionNumbers =
-        filters?.ownerExtensionNumbers && filters.ownerExtensionNumbers.length > 0
-          ? filters.ownerExtensionNumbers.map((ext) => String(ext).trim()).filter(Boolean)
-          : undefined;
-      let startFrom = filters?.startDateFrom?.trim() || undefined;
-      let endTo = filters?.endDateTo?.trim() || undefined;
-      if (startFrom && endTo && endTo < startFrom) {
-        endTo = startFrom;
-      }
-      const response = await listProjects({
-        page: pageForRequest,
-        limit: pagination.limit,
-        search: filters?.search || "",
-        status: statusParam,
-        extension_numbers: extensionNumbers,
-        start_date_from: startFrom,
-        end_date_to: endTo,
-      });
-      if (response?.success === true && Array.isArray(response.data)) {
-        setProjects(response.data.map((p: ApiProject) => mapApiProjectToProject(p)));
-        if (response.pagination) setPagination((prev) => ({ ...prev, ...response.pagination }));
-        const summary = response.summary;
-        if (summary) {
-          setStats({
-            activeProjects: summary.active ?? 0,
-            totalProjects: summary.total ?? 0,
-            tasksDueThisWeek: summary.task_due_this_week ?? 0,
-            overdueAcrossProjects: summary.overdue_tasks ?? 0,
-          });
-        }
-      } else {
-        setProjects([]);
-      }
-    } catch (error) {
-      console.error("Error fetching projects:", error);
-      setProjects([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const mapApiProjectToProject = (apiProject: ApiProject): Project => {
-    const tasks = apiProject.tasks || [];
-    const openTasks = tasks.filter((t: any) => !t.is_completed).length;
-    const overdueTasks = tasks.filter((t: any) => {
-      if (!t.due_date) return false;
-      return !t.is_completed && new Date(t.due_date) < new Date();
-    }).length;
-
-    const members = (apiProject.members || []).map((member, idx) => {
-      const colors = ["#667eea", "#f56565", "#48bb78", "#ed64a6", "#4299e1", "#9f7aea", "#fc8181"];
-      return { name: member.extension_number, initials: member.extension_number.substring(0, 2).toUpperCase(), color: colors[idx % colors.length] };
-    });
-
-    const lastUpdate = apiProject.updated_at
-      ? formatDateGlobal(apiProject.updated_at) || "N/A"
-      : "N/A";
-
-    type IconComponent = typeof Folder;
-    const iconMap: Record<string, IconComponent> = {
-      website: Palette, mobile: Smartphone, marketing: Megaphone, it: Monitor,
-      client: Users, support: Headphones, product: Rocket, crm: Settings,
-    };
-    const projectNameLower = apiProject.name.toLowerCase();
-    let Icon: IconComponent = Folder;
-    for (const key in iconMap) {
-      if (projectNameLower.includes(key)) { Icon = iconMap[key]; break; }
-    }
-
-    return {
-      id: apiProject.id.toString(),
-      name: apiProject.name,
-      icon: Icon,
-      iconColor: apiProject.color || "#3b82f6",
-      members,
-      open: openTasks,
-      overdue: overdueTasks,
-      lastUpdate,
-      status: getProjectStatusFromApiStatus(apiProject.status),
-      owner: members[0]?.name || "N/A",
-      team: "Team",
-      apiData: apiProject,
-    };
-  };
+  }, [pagination.page, pagination.limit, hierarchyLoading, fetchProjects]);
 
   const handleCreateProject = () => {
     setEditingProject(null);
@@ -2395,88 +2922,40 @@ const WorkPlannerProjects = () => {
   };
 
   const confirmDelete = async () => {
-    if (!projectToDelete) return;
-    try {
-      setDeleting(true);
-      const result = await deleteProject(projectToDelete.id);
-      if (result) {
-        await fetchProjects(appliedFilters);
-        setShowDeleteModal(false);
-        setProjectToDelete(null);
-      }
-    } catch (error) {
-      console.error("Error deleting project:", error);
-    } finally {
-      setDeleting(false);
-    }
+    await confirmDeleteProjectAndRefresh({
+      projectToDelete,
+      setDeleting,
+      fetchProjects,
+      appliedFilters,
+      setShowDeleteModal,
+      setProjectToDelete,
+    });
   };
 
   const handleSubmitProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    const start = projectFormData.start_date.trim();
-    const end = projectFormData.end_date.trim();
-    if (!start) {
-      toast.error("Start date is required");
-      return;
-    }
-    if (editingProject == null && start < todayYmdLocal()) {
-      toast.error("Start date cannot be in the past");
-      return;
-    }
-    if (end && end < start) {
-      toast.error("End date cannot be before start date");
-      return;
-    }
-    try {
-      setSubmitting(true);
-      const projectData: Parameters<typeof createProject>[0] = {
-        name: projectFormData.name.trim().slice(0, PROJECT_NAME_MAX_LENGTH),
-        description: projectFormData.description.trim() || undefined,
-        color: projectFormData.color,
-        status: projectFormData.status,
-        timezone: projectFormData.timezone,
-        start_date: start,
-      };
-      if (end) projectData.end_date = end;
-      const result = editingProject
-        ? await updateProject(editingProject.id, projectData)
-        : await createProject(projectData);
-      if (result) {
-        await fetchProjects(appliedFilters);
-        resetProjectModalState();
-      }
-    } catch (error) {
-      console.error("Error saving project:", error);
-    } finally {
-      setSubmitting(false);
-    }
+    await submitPlannerProjectForm({
+      editingProject,
+      projectFormData,
+      setSubmitting,
+      appliedFilters,
+      fetchProjects,
+      resetProjectModalState,
+    });
   };
 
   const handleProjectClick = async (project: Project) => {
-    setSelectedProject(project);
-    setShowProjectDetail(true);
-    setLoadingProjectDetails(true);
-    setLoadingOverdueTasks(true);
-    try {
-      const withRelations = ["members.user", "tasks", "tasks.assignees", "tasks.labels", "tasks.status", "statuses", "owner"];
-      const [projectDetails, activities, overdue] = await Promise.all([
-        getProject(project.id, withRelations),
-        getRecentActivity(Number(project.id)),
-        getOverdueTasks(Number(project.id)),
-      ]);
-      setSelectedProjectDetails(projectDetails || project.apiData || null);
-      setProjectActivities(Array.isArray(activities) ? activities : []);
-      setOverdueTasks(Array.isArray(overdue) ? overdue : []);
-    } catch (error) {
-      console.error("Error fetching project details:", error);
-      setSelectedProjectDetails(project.apiData || null);
-      setProjectActivities([]);
-      setOverdueTasks([]);
-    } finally {
-      setLoadingProjectDetails(false);
-      setLoadingActivities(false);
-      setLoadingOverdueTasks(false);
-    }
+    await loadProjectSidebarData({
+      project,
+      setSelectedProject,
+      setShowProjectDetail,
+      setLoadingProjectDetails,
+      setLoadingActivities,
+      setLoadingOverdueTasks,
+      setSelectedProjectDetails,
+      setProjectActivities,
+      setOverdueTasks,
+    });
   };
 
   const formatTimeAgo = (dateString: string) => {
@@ -2586,68 +3065,36 @@ const WorkPlannerProjects = () => {
   const handleProjectStartDateChange = (value = "") => {
     setFilterStartDateFrom(value);
     setFilterEndDateTo((prevEnd) => {
-      if (value && prevEnd && prevEnd < value) {
-        return value;
-      }
-      return prevEnd;
+      return clampProjectDateRangeOnStartChange(value, prevEnd);
     });
   };
 
   const handleProjectEndDateChange = (value = "") => {
     const start = filterStartDateFrom.trim();
-    if (value && start && value < start) {
-      setFilterEndDateTo(start);
-      return;
-    }
-    setFilterEndDateTo(value);
+    setFilterEndDateTo(normalizeProjectEndDateByStart(value, start));
   };
 
   const dateRangePillActiveLabel = (): string | undefined => {
-    const from = filterStartDateFrom.trim();
-    const to = filterEndDateTo.trim();
-    if (!from && !to) return undefined;
-    if (from && to) return `${from} → ${to}`;
-    if (from) return `From ${from}`;
-    return `To ${to}`;
+    return getProjectDateRangePillLabel(filterStartDateFrom, filterEndDateTo);
   };
 
   const handleTabChange = (tabId: string) => {
-    setActiveTab(tabId);
-    const statusMap: Record<string, ProjectStatusFilter> = {
-      all: "all",
-      active: "active",
-      completed: "completed",
-      archived: "archived",
-    };
-    const status = statusMap[tabId];
-    if (!status) return;
-
-    setFilterStatus(status);
-    setPagination((prev) => ({ ...prev, page: 1 }));
-    const next: AppliedProjectFilters = {
-      search: searchTerm,
-      status,
-      ownerExtensionNumbers: filterOwnerExtensions,
-      team: filterTeam,
-      startDateFrom: filterStartDateFrom,
-      endDateTo: filterEndDateTo,
-    };
-    setAppliedFilters(next);
-    fetchProjects({ ...next, page: 1 });
+    void applyProjectTabChangeAndRefetch({
+      tabId,
+      searchTerm,
+      filterOwnerExtensions,
+      filterTeam,
+      filterStartDateFrom,
+      filterEndDateTo,
+      setActiveTab,
+      setFilterStatus,
+      setPagination,
+      setAppliedFilters,
+      fetchProjects,
+    });
   };
 
-  const filteredProjects = projects.filter((project) => {
-    const matchesSearch = project.name.toLowerCase().includes(appliedFilters.search.toLowerCase()) || project.id.toLowerCase().includes(appliedFilters.search.toLowerCase());
-    const projectStatusKey = String(project.apiData?.status || project.status || "").toLowerCase();
-    const matchesStatus = appliedFilters.status === "all" || projectStatusKey === appliedFilters.status;
-    const projectOwnerExt = project.apiData?.owner_extension_number || project.owner;
-    const matchesOwner =
-      appliedFilters.ownerExtensionNumbers.length === 0 ||
-      appliedFilters.ownerExtensionNumbers.some((ext) => String(projectOwnerExt || "") === String(ext));
-    const projectMembers = (project.apiData?.members || project.members || []) as any[];
-    const matchesTeam = appliedFilters.team === "All Teams" || projectMembers.some((m: any) => String(m?.extension_number || m?.name || "") === String(appliedFilters.team));
-    return matchesSearch && matchesStatus && matchesOwner && matchesTeam;
-  });
+  const filteredProjects = projects.filter((project) => projectMatchesFilters(project, appliedFilters));
 
   const userOptions = (() => {
     const list = (hierarchyDataExtensions as any[]) || [];
@@ -2833,6 +3280,7 @@ const WorkPlannerProjects = () => {
     showFilterPills: true,
     filterPills: filterPills,
     showFiltersButton: true,
+    showMoreFiltersButton: false,
     onFiltersClick: () => setShowFilterSidebar(true),
     rightActions: (
       <button
@@ -2851,6 +3299,9 @@ const WorkPlannerProjects = () => {
           lineHeight: "14px",
           backgroundColor: "rgb(20, 20, 20)",
           color: "#ffffff",
+          position: "absolute",
+          right: "35px",
+          top: "21px",
         }}
         onClick={handleCreateProject}
       >
@@ -2885,12 +3336,20 @@ const WorkPlannerProjects = () => {
       dropdown: {
         options: [
           {
+            label: "Project overview",
+            icon: <Eye size={14} />,
+            onClick: (row) => {
+              router.push(`/planner/projects/${row.id}`).catch(() => undefined);
+            },
+          },
+          {
             label: "Edit Project",
             icon: <Settings size={14} />,
             onClick: (row) => {
               if (!canAdministerProjectFromMembers(row, sessionUserPhoneOrExtension)) return;
               handleEditProject(row);
             },
+            divider: true,
           },
           {
             label: "Delete Project",
@@ -2950,198 +3409,60 @@ const WorkPlannerProjects = () => {
               showResetButton
             />
 
-            {/* CHANGED: Replaced GenericTable with ExpandableProjectTable */}
-            <ExpandableProjectTable
-              projects={filteredProjects}
-              loading={loading}
-              extensions={(hierarchyDataExtensions as any[]) || []}
-              sessionUserPhoneOrExtension={sessionUserPhoneOrExtension}
-              onProjectClick={handleProjectClick}
-              onEditProject={handleEditProject}
-              onDeleteProject={handleDeleteProject}
-              pagination={pagination}
-              onPaginationChange={(page, rowsPerPage) => setPagination((prev) => ({ ...prev, page, limit: rowsPerPage }))}
-              toolbarConfig={toolbarConfig}
-              statsCards={statsCardsData}
-              selectedProjects={selectedProjects}
-              onSelectionChange={(selected) => setSelectedProjects(new Set(selected.map((p) => p.id)))}
-              columns={projectTableColumns}
-              actions={projectTableActions}
-            />
+            <div style={{ display: "flex", alignItems: "stretch", gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* CHANGED: Replaced GenericTable with ExpandableProjectTable */}
+                <ExpandableProjectTable
+                  projects={filteredProjects}
+                  loading={loading}
+                  extensions={(hierarchyDataExtensions as any[]) || []}
+                  sessionUserPhoneOrExtension={sessionUserPhoneOrExtension}
+                  onProjectClick={handleProjectClick}
+                  onEditProject={handleEditProject}
+                  onDeleteProject={handleDeleteProject}
+                  pagination={pagination}
+                  onPaginationChange={(page, rowsPerPage) => setPagination((prev) => ({ ...prev, page, limit: rowsPerPage }))}
+                  toolbarConfig={toolbarConfig}
+                  statsCards={statsCardsData}
+                  columns={projectTableColumns}
+                  actions={projectTableActions}
+                />
+              </div>
+
+              <ProjectDetailOffcanvas
+                show={showProjectDetail}
+                onHide={() => setShowProjectDetail(false)}
+                selectedProject={selectedProject}
+                selectedProjectDetails={selectedProjectDetails}
+                loadingProjectDetails={loadingProjectDetails}
+                loadingOverdueTasks={loadingOverdueTasks}
+                overdueTasks={overdueTasks}
+                detailTab={detailTab}
+                setDetailTab={setDetailTab}
+                loadingActivities={loadingActivities}
+                projectActivities={projectActivities}
+                getUserNameFromExtension={getUserNameFromExtension}
+                getAvatarColor={getAvatarColor}
+                getInitials={getInitials}
+                getActionColor={getActionColor}
+                formatTimeAgo={formatTimeAgo}
+                formatDateTime={formatDateTime}
+              />
+            </div>
           </Container>
         </div>
 
-        <ProjectDetailOffcanvas
-          show={showProjectDetail}
-          onHide={() => setShowProjectDetail(false)}
-          selectedProject={selectedProject}
-          selectedProjectDetails={selectedProjectDetails}
-          loadingProjectDetails={loadingProjectDetails}
-          loadingOverdueTasks={loadingOverdueTasks}
-          overdueTasks={overdueTasks}
-          detailTab={detailTab}
-          setDetailTab={setDetailTab}
-          loadingActivities={loadingActivities}
-          projectActivities={projectActivities}
-          getUserNameFromExtension={getUserNameFromExtension}
-          getAvatarColor={getAvatarColor}
-          getInitials={getInitials}
-          getActionColor={getActionColor}
-          formatTimeAgo={formatTimeAgo}
-          formatDateTime={formatDateTime}
+        <ProjectFormSidebar
+          show={showProjectModal}
+          editingProject={editingProject}
+          projectFormData={projectFormData}
+          setProjectFormData={setProjectFormData}
+          submitting={submitting}
+          submitButtonText={submitButtonText}
+          submittingButtonText={submittingButtonText}
+          onClose={resetProjectModalState}
+          onSubmit={handleSubmitProject}
         />
-
-        {/* Project Form Modal */}
-        <Modal show={showProjectModal} onHide={resetProjectModalState} centered size="lg">
-          <Modal.Header closeButton>
-            <Modal.Title>{editingProject ? "Edit Project" : "Create New Project"}</Modal.Title>
-          </Modal.Header>
-          <Modal.Body>
-            <Form onSubmit={handleSubmitProject}>
-              <Form.Group className="mb-3">
-                <Form.Label>Project Name <span className="text-danger">*</span></Form.Label>
-                <Form.Control
-                  type="text"
-                  value={projectFormData.name}
-                  maxLength={PROJECT_NAME_MAX_LENGTH}
-                  onChange={(e) =>
-                    setProjectFormData((prev) => ({
-                      ...prev,
-                      name: e.target.value.slice(0, PROJECT_NAME_MAX_LENGTH),
-                    }))
-                  }
-                  placeholder="Enter project name"
-                  required
-                />
-                <div className="d-flex justify-content-between align-items-baseline gap-2 mt-1">
-                  <Form.Text className="text-muted mb-0">
-                    Maximum {PROJECT_NAME_MAX_LENGTH} characters.
-                  </Form.Text>
-                  <Form.Text className="text-muted mb-0 small text-nowrap" aria-live="polite">
-                    {projectFormData.name.length}/{PROJECT_NAME_MAX_LENGTH}
-                  </Form.Text>
-                </div>
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Description</Form.Label>
-                <RichTextEditor
-                  buttonSize="sm"
-                  value={projectFormData.description || ""}
-                  onChange={(html) =>
-                    setProjectFormData((prev) => ({ ...prev, description: html }))
-                  }
-                  placeholder="Enter project description"
-                  minHeight="100px"
-                  maxHeight="220px"
-                  maxLength={5000}
-                />
-              </Form.Group>
-              <Row className="mb-3 g-2">
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>
-                      Start date <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="date"
-                      required
-                      min={editingProject == null ? todayYmdLocal() : undefined}
-                      value={projectFormData.start_date}
-                      onChange={(e) => {
-                        const newStart = e.target.value;
-                        const today = todayYmdLocal();
-                        if (editingProject == null && newStart && newStart < today) {
-                          toast.error("Start date cannot be in the past");
-                          return;
-                        }
-                        setProjectFormData((prev) => {
-                          let nextEnd = prev.end_date;
-                          if (newStart && nextEnd && nextEnd < newStart) {
-                            nextEnd = newStart;
-                          }
-                          return { ...prev, start_date: newStart, end_date: nextEnd };
-                        });
-                      }}
-                    />
-                    {editingProject == null ? (
-                      <Form.Text className="text-muted">Start date must be today or a future date.</Form.Text>
-                    ) : null}
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group>
-                    <Form.Label>End date</Form.Label>
-                    <Form.Control
-                      type="date"
-                      min={projectFormData.start_date || todayYmdLocal()}
-                      value={projectFormData.end_date}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setProjectFormData((prev) => {
-                          if (v && prev.start_date && v < prev.start_date) {
-                            toast.error("End date cannot be before start date");
-                            return prev;
-                          }
-                          return { ...prev, end_date: v };
-                        });
-                      }}
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-              <Form.Group className="mb-3">
-                <Form.Label>Status</Form.Label>
-                <Form.Select
-                  value={projectFormData.status}
-                  onChange={(e) =>
-                    setProjectFormData({
-                      ...projectFormData,
-                      status: e.target.value as ProjectFormStatus,
-                    })
-                  }
-                >
-                  <option value="active">Active</option>
-                  <option value="archived">Archived</option>
-                  <option value="completed">Completed</option>
-                </Form.Select>
-              </Form.Group>
-              
-              <Form.Group className="mb-3">
-                <Form.Label>Color</Form.Label>
-                <div className="d-flex align-items-center gap-3">
-                  <Form.Control type="color" value={projectFormData.color} onChange={(e) => setProjectFormData({ ...projectFormData, color: e.target.value })} style={{ width: 80, height: 40 }} />
-                  <Form.Control type="text" value={projectFormData.color} onChange={(e) => setProjectFormData({ ...projectFormData, color: e.target.value })} placeholder="#3b82f6" style={{ flex: 1 }} />
-                </div>
-              </Form.Group>
-              <div className="d-flex justify-content-end gap-2">
-                <Button variant="secondary" onClick={resetProjectModalState} disabled={submitting}>Cancel</Button>
-                <Button
-                  variant="primary"
-                  type="submit"
-                  disabled={
-                    submitting ||
-                    !projectFormData.name.trim() ||
-                    !projectFormData.start_date.trim() ||
-                    (!editingProject && projectFormData.start_date.trim() < todayYmdLocal()) ||
-                    Boolean(
-                      projectFormData.end_date.trim() &&
-                        projectFormData.end_date.trim() < projectFormData.start_date.trim()
-                    )
-                  }
-                >
-                  {submitting ? (
-                    <>
-                      <Spinner as="span" animation="border" size="sm" className="me-2" />
-                      {submittingButtonText}
-                    </>
-                  ) : (
-                    submitButtonText
-                  )}
-                </Button>
-              </div>
-            </Form>
-          </Modal.Body>
-        </Modal>
 
         <DeleteConfirmationModal
           show={showDeleteModal}

@@ -9,7 +9,6 @@ import {
   CRM_PERSON_DISPOSITION_OPTIONS,
   formatCrmPersonDispositionLabel,
 } from "@utils/crmPersonDisposition";
-import { getDatetimeLocalMinNow } from "@utils/datetimeLocalInput";
 
 export interface ProspectFormState {
   firstName: string;
@@ -18,6 +17,8 @@ export interface ProspectFormState {
   phone_country_code: string;
   phoneNumber: string;
   campaign_id: number | null;
+  campaign_name: string | null;
+  campaign_status: string | null;
   contact_owner: string | null;
   lifecycle_stage: string;
   disposition: string;
@@ -53,6 +54,7 @@ export interface ProspectEditSidebarProps {
   onClose: () => void;
   onSubmitPrimary: () => void;
   onCreateAndAddAnother?: () => void;
+  showScheduledCallField?: boolean;
   parsePhoneNumberInput: (value: string) =>
     | { countryCallingCode: string; nationalNumber: string }
     | undefined;
@@ -69,13 +71,14 @@ interface ProspectMetaSectionProps {
   setContactForm: ProspectEditSidebarProps["setContactForm"];
   availableCampaigns: ProspectEditSidebarProps["availableCampaigns"];
   extensions: ProspectEditSidebarProps["extensions"];
+  isEditing: boolean;
 }
 
 interface ProspectAdditionalSectionProps {
   contactForm: ProspectFormState;
   setContactForm: ProspectEditSidebarProps["setContactForm"];
   availableTags: ProspectEditSidebarProps["availableTags"];
-  isEditing: boolean;
+  showScheduledCallField: boolean;
   updateCustomField: (
     index: number,
     key: "field_name" | "field_value",
@@ -177,6 +180,7 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
   setContactForm,
   availableCampaigns,
   extensions,
+  isEditing,
 }) => (
   <div className="contact-form-section" style={{ marginTop: "24px" }}>
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
@@ -202,14 +206,65 @@ const ProspectMetaSection: React.FC<ProspectMetaSectionProps> = ({
           .filter(
             (o): o is { value: string; label: string } => o != null,
           );
+        const currentCampaignId =
+          contactForm.campaign_id == null
+            ? null
+            : String(contactForm.campaign_id);
+        const campaignIsInActiveList =
+          currentCampaignId != null &&
+          campaignSelectOptions.some((o) => o.value === currentCampaignId);
+        // When editing, if the record points to a campaign that isn't in the
+        // active-campaign dropdown (e.g. the campaign is inactive), pre-fill
+        // and lock the field so users can see — but not change — the value.
+        const shouldLockCampaign =
+          isEditing && currentCampaignId != null && !campaignIsInActiveList;
+
+        if (shouldLockCampaign) {
+          const lockedLabel =
+            contactForm.campaign_name?.trim() ||
+            `Campaign #${currentCampaignId}`;
+          const statusSuffix =
+            contactForm.campaign_status &&
+            contactForm.campaign_status.toLowerCase() !== "active"
+              ? ` (${contactForm.campaign_status})`
+              : "";
+          return (
+            <>
+              <input
+                id="prospect-campaign-select"
+                type="text"
+                value={`${lockedLabel}${statusSuffix}`}
+                disabled
+                readOnly
+                aria-readonly="true"
+                title="This campaign is inactive and cannot be changed."
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  border: "1px solid #cbd5e0",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  outline: "none",
+                  backgroundColor: "#f1f5f9",
+                  color: "#475569",
+                  cursor: "not-allowed",
+                }}
+              />
+              <small style={{ color: "#64748b", fontSize: "12px" }}>
+                This campaign is inactive and cannot be changed.
+              </small>
+            </>
+          );
+        }
+
         return (
           <Select
             inputId="prospect-campaign-select"
             value={
-              contactForm.campaign_id == null
+              currentCampaignId == null
                 ? null
                 : campaignSelectOptions.find(
-                    (o) => o.value === String(contactForm.campaign_id),
+                    (o) => o.value === currentCampaignId,
                   ) ?? null
             }
             onChange={(opt: { value: string } | null) =>
@@ -448,17 +503,10 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
   contactForm,
   setContactForm,
   availableTags,
-  isEditing,
+  showScheduledCallField,
   updateCustomField,
   removeCustomField,
 }) => {
-  const scheduledFloor = getDatetimeLocalMinNow();
-  const allowLegacyPastScheduled =
-    isEditing &&
-    contactForm.scheduled_call_at !== "" &&
-    contactForm.scheduled_call_at < scheduledFloor;
-  const scheduledInputMin = allowLegacyPastScheduled ? undefined : scheduledFloor;
-
   return (
   <div
     className="contact-form-section"
@@ -506,7 +554,8 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
         onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
       />
     </div>
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+    {showScheduledCallField && (
+      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
         htmlFor="prospect-scheduled-call-input"
         className="contact-form-label"
@@ -523,26 +572,11 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
       <input
         id="prospect-scheduled-call-input"
         type="datetime-local"
-        {...(scheduledInputMin === undefined ? {} : { min: scheduledInputMin })}
         value={contactForm.scheduled_call_at}
-        onFocus={(e) => {
-          const floor = getDatetimeLocalMinNow();
-          const cur = contactForm.scheduled_call_at;
-          if (isEditing && cur !== "" && cur < floor) {
-            e.currentTarget.removeAttribute("min");
-          } else {
-            e.currentTarget.min = floor;
-          }
-        }}
         onChange={(e) => {
-          const v = e.target.value;
-          const minVal = getDatetimeLocalMinNow();
-          if (v !== "" && v < minVal) {
-            return;
-          }
           setContactForm({
             ...contactForm,
-            scheduled_call_at: v,
+            scheduled_call_at: e.target.value,
           });
         }}
         style={{
@@ -554,7 +588,8 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
           outline: "none",
         }}
       />
-    </div>
+      </div>
+    )}
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
         htmlFor="prospect-tags-select"
@@ -1060,6 +1095,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
   onClose,
   onSubmitPrimary,
   onCreateAndAddAnother,
+  showScheduledCallField = true,
   parsePhoneNumberInput,
 }) => {
   if (!isOpen) return null;
@@ -1230,12 +1266,13 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                   setContactForm={setContactForm}
                   availableCampaigns={availableCampaigns}
                   extensions={extensions}
+                  isEditing={isEditing}
                 />
                 <ProspectAdditionalSection
                   contactForm={contactForm}
                   setContactForm={setContactForm}
                   availableTags={availableTags}
-                  isEditing={isEditing}
+                  showScheduledCallField={showScheduledCallField}
                   updateCustomField={updateCustomField}
                   removeCustomField={removeCustomField}
                 />

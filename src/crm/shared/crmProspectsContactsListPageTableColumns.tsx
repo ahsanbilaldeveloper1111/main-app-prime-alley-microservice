@@ -1,7 +1,7 @@
 import React from "react";
 import moment from "moment";
 import type { TableColumn } from "@components/GenericTable";
-import { CRM_LIST_PAGE_CALL_END_REASONS } from "@utils/crmListPageStaticData";
+import { formatDateTimeToLocal } from "@utils/Helper";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import {
   formatCrmPersonDispositionLabel,
@@ -153,39 +153,6 @@ export function buildCrmProspectsContactsTableColumns(
       },
     },
     {
-      key: "last_called_at",
-      label: "Last Called",
-      sortable: true,
-      type: "text",
-      accessor: (row) =>
-        row.last_called_at
-          ? moment(row.last_called_at).format("MMM DD, HH:mm")
-          : "-",
-    },
-    {
-      key: "last_call_end_reason",
-      label: "Last Call Status",
-      sortable: true,
-      type: "badge",
-      accessor: (row) => {
-        if (!row.last_call_end_reason) return null;
-        const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
-          (r) => r.value === row.last_call_end_reason,
-        );
-        return endReason?.label || row.last_call_end_reason;
-      },
-      badge: {
-        getVariant: (row) => {
-          if (!row.last_call_end_reason) return "secondary";
-          const endReason = CRM_LIST_PAGE_CALL_END_REASONS.find(
-            (r) => r.value === row.last_call_end_reason,
-          );
-          return (endReason?.color as any) || "secondary";
-        },
-      },
-      emptyValue: "-",
-    },
-    {
       key: "disposition",
       label: "Disposition",
       sortable: true,
@@ -214,9 +181,13 @@ export function buildCrmProspectsContactsTableColumns(
         const isNextHour = moment(row.scheduled_call_at).isBefore(
           moment().add(1, "hour"),
         );
-        const formatted = moment(row.scheduled_call_at).format(
+        const formatted = formatDateTimeToLocal(
+          row.scheduled_call_at,
           "MMM DD, HH:mm",
         );
+        if (formatted === "Invalid Date") {
+          return "Not scheduled";
+        }
         if (isOverdue) return `${formatted} (Overdue)`;
         if (isNextHour) return `${formatted} (Soon)`;
         return formatted;

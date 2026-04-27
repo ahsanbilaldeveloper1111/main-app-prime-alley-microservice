@@ -308,6 +308,12 @@ body .nextjs-toast{
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    padding: 9px 13px;
+    
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    cursor: pointer;
 }
 
 // Action button container
@@ -403,6 +409,19 @@ transition: var(--transition-speed);
         background: linear-gradient(135deg, #2374d4, #4facfe);
     }
 }
+.btn-primary {
+   
+    background: rgb(0, 0, 0) !important;
+    color: rgb(255, 255, 255);
+    border: none;
+    &:hover {
+      background-color: rgb(30, 30, 30); // optional hover
+    }
+  }
+ 
+  .auth-form .btn-primary {
+        background: linear-gradient(135deg, #2583f2, #4facfe) !important;
+    }
 .btn-outline-primary{
     border-color: #2583f2;
     &:hover{
@@ -467,3 +486,12 @@ h2.react-datepicker__current-month, .react-datepicker-time__header{
   z-index: 10000099 !important;
 }
 
+
+.invoice-detail-logo {
+  width: 160px !important;
+  height: 80px !important;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
+  

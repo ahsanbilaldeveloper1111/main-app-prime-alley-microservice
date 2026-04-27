@@ -625,7 +625,7 @@ const Ranks = () => {
                         <Button variant="primary"  onClick={handleOpenCreateRankModal}>Add Rank</Button>
                         </>
                     )}
-                    {session?.user?.permissions?.includes('assign-rank-users') && (
+                    {session?.user?.permissions?.includes('bulk-assign-ranks') && (
                         <Button variant="danger"  onClick={handleBulkRankAssignment}>Bulk Rank Assignment</Button>
                     )}
                     {session?.user?.is_admin === "1" && (

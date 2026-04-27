@@ -86,6 +86,9 @@ import {
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -771,7 +774,7 @@ const CrmTasks = () => {
     return match || null;
   }, [extensionOptions, extensions]);
 
-  if (!session?.user?.permissions?.includes('list-crm-tasks')) {
+  if (!session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_TASKS)) {
     return null;
   }
 
@@ -824,7 +827,7 @@ const CrmTasks = () => {
                   <BarChart3 size={16} className="me-2" />
                   {showAnalytics ? 'Hide Analytics' : 'Show Analytics'}
                 </Button>
-                {session?.user?.permissions?.includes('add-crm-tasks') && (
+                {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_TASKS) && (
                   <Button variant="primary" onClick={() => {
                     setEditingTask(null);
                     setTaskFormData({
@@ -1210,7 +1213,7 @@ const CrmTasks = () => {
                                         >
                                           <Eye size={16} />
                                         </Button>
-                                        {session?.user?.permissions?.includes('edit-crm-tasks') && (
+                                        {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_TASKS) && (
                                           <Button
                                             variant="link"
                                             size="sm"
@@ -1238,7 +1241,7 @@ const CrmTasks = () => {
                                             <Edit size={16} />
                                           </Button>
                                         )}
-                                        {session?.user?.permissions?.includes('delete-crm-tasks') && (
+                                        {session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_TASKS) && (
                                           <Button
                                             variant="link"
                                             size="sm"

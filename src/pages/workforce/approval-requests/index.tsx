@@ -6,9 +6,11 @@ import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
+import "@assets/scss/workforce-user-request.scss";
 import { useSession } from "next-auth/react";
 import {
   getUserRequestCategories,
+  getUserRequestCategory,
   getUserRequestCategoryFields,
   getUserRequests,
   getUserRequest,
@@ -24,7 +26,7 @@ import {
 } from "@utils/staffManagement";
 import { useMainAppLookups, type MainAppUserLookup } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
-import { Badge, Button, Modal, Form } from "react-bootstrap";
+import { Badge, Modal, Form } from "react-bootstrap";
 import GenericTable, { FilterPill, TableColumn, ToolbarConfig } from "@components/GenericTable";
 import GenericSidebar, { SidebarSection } from "@components/GenericSidebarNew";
 
@@ -46,6 +48,8 @@ import {
 } from "lucide-react";
 import DeleteConfirmationModal from "../../partial/DeleteConfirmationModal";
 import NewRequestModal from "@pages/workforce/NewRequestModal";
+import UserRequestDynamicFieldInput from "@components/workforce/UserRequestDynamicFieldInput";
+import WorkforceSidebarShell from "@components/workforce/WorkforceSidebarShell";
 import {
   findMainAppUserByRequestUserId,
   getUserDisplayNameFromLookup,
@@ -125,21 +129,82 @@ function requestStatusBadgeVariant(status: string | null | undefined): "success"
   return "info";
 }
 
-function getMultiselectValues(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw as string[];
-  if (typeof raw === "string") return raw.split(",").filter(Boolean);
-  return [];
+function resolveUserRequestParentCategoryId(category: UserRequestCategory | undefined): number | null {
+  if (!category) return null;
+  const raw = category.parent_id;
+  if (raw == null) return null;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  return Number.isNaN(n) ? null : n;
 }
 
-function dynamicFieldInputType(fieldType: string): "number" | "date" | "text" {
-  if (fieldType === "number") return "number";
-  if (fieldType === "date") return "date";
-  return "text";
+/** API may return parents with a nested `children` array but omit `parent_id` on the child in the flat list. */
+type CategoryWithOptionalChildren = UserRequestCategory & {
+  children?: Array<{ id: number; name?: string | null; code?: string | null; is_active?: boolean }>;
+};
+
+function findParentCategoryNodeForChildId(
+  categories: UserRequestCategory[],
+  childId: number,
+): UserRequestCategory | null {
+  for (const c of categories) {
+    const children = (c as CategoryWithOptionalChildren).children;
+    if (!Array.isArray(children)) continue;
+    if (children.some((ch) => ch.id === childId)) {
+      return c;
+    }
+  }
+  return null;
 }
 
-function isFileOrAttachmentField(field: UserRequestCategoryField): boolean {
-  const t = String(field.type);
-  return t === "file" || t === "attachment";
+/** When the request category is a sub-category, expose parent + sub names for read-only display. */
+function getEditRequestCategoryView(
+  userRequestCategoryId: number | null | undefined,
+  categories: UserRequestCategory[],
+  getNameById: (id: number) => string,
+  options?: { categoryDetail?: UserRequestCategory | null },
+): {
+  hasParent: boolean;
+  parentName: string;
+  subCategoryId: number;
+  subCategoryName: string;
+} | null {
+  if (userRequestCategoryId == null) return null;
+  const id = userRequestCategoryId;
+  const detail = options?.categoryDetail;
+  const currentFromList = categories.find((c) => c.id === id);
+  const current =
+    detail != null && Number(detail.id) === Number(id) ? detail : currentFromList;
+  const parentNode = findParentCategoryNodeForChildId(categories, id);
+  const parentIdFromField = resolveUserRequestParentCategoryId(current);
+  const parentIdFromTree =
+    parentNode?.id == null ? null : Number(parentNode.id);
+  const parentId =
+    parentIdFromField ??
+    (parentIdFromTree != null && !Number.isNaN(parentIdFromTree) ? parentIdFromTree : null);
+
+  const subName = current?.name ?? current?.code ?? getNameById(id);
+  if (parentId == null) {
+    return {
+      hasParent: false,
+      parentName: "",
+      subCategoryId: id,
+      subCategoryName: subName,
+    };
+  }
+  const parentFromList = categories.find((c) => c.id === parentId);
+  const parentName =
+    (parentId === parentNode?.id
+      ? parentNode?.name ?? parentNode?.code
+      : undefined) ??
+    parentFromList?.name ??
+    parentFromList?.code ??
+    getNameById(parentId);
+  return {
+    hasParent: true,
+    parentName,
+    subCategoryId: id,
+    subCategoryName: subName,
+  };
 }
 
 type EditDynamicFieldsProps = {
@@ -149,149 +214,30 @@ type EditDynamicFieldsProps = {
   onDynamicFileChange: (key: string, file: File | null) => void;
 };
 
-type EditDynamicFieldRowProps = {
-  field: UserRequestCategoryField;
-  dynamic_fields: Record<string, unknown>;
-  onDynamicFieldChange: (key: string, value: unknown) => void;
-  onDynamicFileChange: (key: string, file: File | null) => void;
-};
-
-function EditRequestDynamicFieldRow({
-  field,
-  dynamic_fields,
-  onDynamicFieldChange,
-  onDynamicFileChange,
-}: Readonly<EditDynamicFieldRowProps>) {
-  const fieldKey = field.key ?? "";
-
-  if (field.type === "textarea") {
-    return (
-      <Form.Control
-        as="textarea"
-        rows={2}
-        value={(dynamic_fields[fieldKey] as string) ?? ""}
-        onChange={(e) => onDynamicFieldChange(fieldKey, e.target.value)}
-        placeholder={field.config?.placeholder ?? undefined}
-      />
-    );
-  }
-
-  if (isFileOrAttachmentField(field)) {
-    return (
-      <Form.Control
-        type="file"
-        onChange={(e) => {
-          const file = (e.target as HTMLInputElement).files?.[0] ?? null;
-          onDynamicFileChange(fieldKey, file);
-        }}
-      />
-    );
-  }
-
-  if (field.type === "select") {
-    return (
-      <Form.Select
-        value={(dynamic_fields[fieldKey] as string) ?? ""}
-        onChange={(e) => onDynamicFieldChange(fieldKey, e.target.value)}
-      >
-        <option value="">Select...</option>
-        {(field.options ?? []).map((opt: { value: string; label: string }) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </Form.Select>
-    );
-  }
-
-  if (field.type === "multiselect") {
-    return (
-      <Form.Select
-        multiple
-        value={getMultiselectValues(dynamic_fields[fieldKey])}
-        onChange={(e) => {
-          const selected = Array.from((e.target as HTMLSelectElement).selectedOptions, (o) => o.value);
-          onDynamicFieldChange(fieldKey, selected);
-        }}
-      >
-        {(field.options ?? []).map((opt: { value: string; label: string }) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </Form.Select>
-    );
-  }
-
-  if (field.type === "radio") {
-    return (
-      <div className="d-flex flex-wrap gap-2">
-        {(field.options ?? []).map((opt: { value: string; label: string }) => (
-          <Form.Check
-            key={opt.value}
-            type="radio"
-            id={`edit-${field.key}-${opt.value}`}
-            name={fieldKey}
-            label={opt.label}
-            value={opt.value}
-            checked={(dynamic_fields[fieldKey] as string) === opt.value}
-            onChange={() => onDynamicFieldChange(fieldKey, opt.value)}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  if (field.type === "checkbox") {
-    return (
-      <div className="d-flex flex-wrap gap-2">
-        {(field.options ?? []).map((opt: { value: string; label: string }) => {
-          const arr = getMultiselectValues(dynamic_fields[fieldKey]);
-          const checked = arr.includes(opt.value);
-          const next = checked ? arr.filter((v) => v !== opt.value) : [...arr, opt.value];
-          return (
-            <Form.Check
-              key={opt.value}
-              type="checkbox"
-              id={`edit-${field.key}-${opt.value}`}
-              label={opt.label}
-              checked={checked}
-              onChange={() => onDynamicFieldChange(fieldKey, next)}
-            />
-          );
-        })}
-      </div>
-    );
-  }
-
-  return (
-    <Form.Control
-      type={dynamicFieldInputType(field.type)}
-      value={(dynamic_fields[fieldKey] as string) ?? ""}
-      onChange={(e) => onDynamicFieldChange(fieldKey, e.target.value)}
-      placeholder={field.config?.placeholder ?? undefined}
-    />
-  );
-}
-
 function EditRequestAdditionalFieldsSection(props: Readonly<EditDynamicFieldsProps>) {
   const { fields, dynamic_fields, onDynamicFieldChange, onDynamicFileChange } = props;
   return (
     <Form.Group className="mb-3">
-      <Form.Label>Additional fields</Form.Label>
-      <div className="border rounded p-3 bg-light">
+      <Form.Label className="new-request-label">Additional fields</Form.Label>
+      <div className="new-request-additionalFieldsPanel">
+        <div className="new-request-additionalFieldsHint">
+          Fill out the category-specific details below.
+        </div>
         {fields.map((field) => (
-          <div key={field.id} className="mb-2">
-            <Form.Label className="small mb-1">
+          <div key={field.id} className="new-request-additionalFieldCard">
+            <Form.Label className="mb-2 new-request-additionalFieldLabel">
               {field.label ?? field.key}
-              {field.required ? " *" : ""}
+              {field.required && <span className="text-danger"> *</span>}
             </Form.Label>
-            <EditRequestDynamicFieldRow
-              field={field}
-              dynamic_fields={dynamic_fields}
-              onDynamicFieldChange={onDynamicFieldChange}
-              onDynamicFileChange={onDynamicFileChange}
-            />
+            <div className="new-request-additionalFieldInput">
+              <UserRequestDynamicFieldInput
+                field={field}
+                values={dynamic_fields}
+                onValueChange={onDynamicFieldChange}
+                onFileChange={onDynamicFileChange}
+                idPrefix="edit"
+              />
+            </div>
           </div>
         ))}
       </div>
@@ -1638,6 +1584,8 @@ function EditApprovalRequestModal({
     attachments: File[];
   }>({ subject: "", reason: "", dynamic_fields: {}, dynamic_files: {}, attachments: [] });
   const [editSubmitting, setEditSubmitting] = useState(false);
+  /** Single-category fetch so we get `parent_id` when the list endpoint omits it on sub-categories. */
+  const [editingCategoryDetail, setEditingCategoryDetail] = useState<UserRequestCategory | null>(null);
 
   useEffect(() => {
     if (!editingRequest) return;
@@ -1653,6 +1601,28 @@ function EditApprovalRequestModal({
       attachments: [],
     });
   }, [editingRequest]);
+
+  useEffect(() => {
+    setEditingCategoryDetail(null);
+    if (!show || editingRequest?.user_request_category_id == null) {
+      return;
+    }
+    const catId = Number(editingRequest.user_request_category_id);
+    if (Number.isNaN(catId)) {
+      return;
+    }
+    let cancelled = false;
+    getUserRequestCategory(catId)
+      .then((cat) => {
+        if (!cancelled) setEditingCategoryDetail(cat);
+      })
+      .catch(() => {
+        if (!cancelled) setEditingCategoryDetail(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [show, editingRequest?.user_request_category_id]);
 
   const getEditCategoryName = useCallback(
     (categoryId: number | string | null): string => {
@@ -1716,137 +1686,139 @@ function EditApprovalRequestModal({
   );
 
   return (
-    <Modal show={show} onHide={onHide} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>Edit Request</Modal.Title>
-      </Modal.Header>
-      <Form onSubmit={handleSubmit}>
-        <Modal.Body>
-          {editingRequest && (
-            <Form.Group className="mb-3">
-              <Form.Label>Category</Form.Label>
-              <Form.Select
-                value={editingRequest.user_request_category_id ?? ""}
-                disabled
-                className="bg-light"
-              >
-                <option value="">Select category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name ?? c.code ?? `Category ${c.id}`}
-                  </option>
-                ))}
-                {editingRequest.user_request_category_id != null &&
-                  !categories.some((c) => c.id === editingRequest.user_request_category_id) && (
-                  <option value={editingRequest.user_request_category_id}>
-                    {getEditCategoryName(editingRequest.user_request_category_id)}
-                  </option>
-                )}
-              </Form.Select>
-            </Form.Group>
-          )}
-          <Form.Group className="mb-3">
-            <Form.Label>Subject *</Form.Label>
-            <Form.Control
-              type="text"
-              value={editForm.subject}
-              onChange={(e) => setEditForm((f) => ({ ...f, subject: e.target.value }))}
-              placeholder="Request subject"
-              required
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Reason</Form.Label>
-            <Form.Control
-              as="textarea"
-              rows={3}
-              value={editForm.reason}
-              onChange={(e) => setEditForm((f) => ({ ...f, reason: e.target.value }))}
-              placeholder="Optional reason or description"
-            />
-          </Form.Group>
-          <Form.Group className="mb-3">
-            <Form.Label>Attachments</Form.Label>
-            {editingRequest && (editingRequest.attachments ?? []).length > 0 && (
-              <div className="mb-2 p-2 border rounded bg-light">
-                <div className="small text-muted mb-2">Current attachments</div>
-                {(editingRequest.attachments ?? []).map((att: UserRequestAttachmentRow) => (
-                  <div
-                    key={att.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "6px 8px",
-                      backgroundColor: "white",
-                      borderRadius: "6px",
-                      marginBottom: "4px",
-                      border: "1px solid #e5e7eb",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
-                      <FileText size={16} color="#6b7280" />
-                      <span className="text-truncate" style={{ fontSize: "13px" }}>
-                        {att.original_name || "Attachment"}
-                      </span>
-                      {(att.mime_type ?? att.size_bytes) && (
-                        <span className="text-muted" style={{ fontSize: "12px" }}>
-                          {att.mime_type ?? ""}
-                          {att.size_bytes != null && ` • ${(att.size_bytes / 1024).toFixed(1)} KB`}
-                        </span>
+    <WorkforceSidebarShell
+      isOpen={show && editingRequest != null}
+      className="new-request-sidebar"
+      title="Edit Request"
+      onClose={onHide}
+      onSubmit={handleSubmit}
+      submitLabel="Save"
+      submittingLabel="Saving…"
+      submitting={editSubmitting}
+      primaryDisabled={editSubmitting}
+    >
+      {editingRequest &&
+        (() => {
+          const categoryView = getEditRequestCategoryView(
+            editingRequest.user_request_category_id,
+            categories,
+            getEditCategoryName,
+            { categoryDetail: editingCategoryDetail },
+          );
+          if (!categoryView) return null;
+          const catId = editingRequest.user_request_category_id;
+          return (
+            <>
+              {categoryView.hasParent && (
+                <Form.Group className="mb-3">
+                  <Form.Label className="new-request-label">Main category</Form.Label>
+                  <Form.Control
+                    readOnly
+                    className="new-request-readonlyValue"
+                    value={categoryView.parentName}
+                    tabIndex={-1}
+                  />
+                </Form.Group>
+              )}
+              <Form.Group className="mb-3">
+                <Form.Label className="new-request-label">
+                  {categoryView.hasParent ? "Sub-category" : "Category"}
+                </Form.Label>
+                <Form.Select value={catId == null ? "" : String(catId)} disabled>
+                  {categoryView.hasParent ? (
+                    <option value={String(categoryView.subCategoryId)}>{categoryView.subCategoryName}</option>
+                  ) : (
+                    <>
+                      <option value="">Select category</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name ?? c.code ?? `Category ${c.id}`}
+                        </option>
+                      ))}
+                      {catId != null && !categories.some((c) => c.id === catId) && (
+                        <option value={catId}>{getEditCategoryName(catId)}</option>
                       )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDownloadAttachment(att)}
-                      style={{
-                        padding: "4px 8px",
-                        border: "none",
-                        borderRadius: "4px",
-                        backgroundColor: "#f3f4f6",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                      }}
-                      title="Download"
-                    >
-                      <Download size={14} color="#6b7280" />
-                    </button>
-                  </div>
-                ))}
+                    </>
+                  )}
+                </Form.Select>
+              </Form.Group>
+            </>
+          );
+        })()}
+      <Form.Group className="mb-3">
+        <Form.Label className="new-request-label">
+          Subject <span className="text-danger">*</span>
+        </Form.Label>
+        <Form.Control
+          type="text"
+          value={editForm.subject}
+          onChange={(e) => setEditForm((f) => ({ ...f, subject: e.target.value }))}
+          placeholder="Request subject"
+          required
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label className="new-request-label">Reason</Form.Label>
+        <Form.Control
+          as="textarea"
+          rows={3}
+          value={editForm.reason}
+          onChange={(e) => setEditForm((f) => ({ ...f, reason: e.target.value }))}
+          placeholder="Optional reason or description"
+        />
+      </Form.Group>
+      <Form.Group className="mb-3">
+        <Form.Label className="new-request-label">Attachments</Form.Label>
+        {editingRequest && (editingRequest.attachments ?? []).length > 0 && (
+          <div className="new-request-attachmentList">
+            <div className="new-request-attachmentListHeading">Current attachments</div>
+            {(editingRequest.attachments ?? []).map((att: UserRequestAttachmentRow) => (
+              <div key={att.id} className="new-request-attachmentRow">
+                <div className="new-request-attachmentRowMain">
+                  <FileText size={16} color="#6b7280" />
+                  <span className="text-truncate new-request-attachmentName">
+                    {att.original_name || "Attachment"}
+                  </span>
+                  {(att.mime_type ?? att.size_bytes) && (
+                    <span className="new-request-attachmentMeta">
+                      {att.mime_type ?? ""}
+                      {att.size_bytes != null && ` • ${(att.size_bytes / 1024).toFixed(1)} KB`}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="new-request-attachmentDownloadBtn"
+                  onClick={() => handleDownloadAttachment(att)}
+                  title="Download"
+                >
+                  <Download size={14} color="#6b7280" />
+                </button>
               </div>
-            )}
-          </Form.Group>
-          {editingRequest?.user_request_category_id != null &&
-            (categoryFields[editingRequest.user_request_category_id] ?? []).length > 0 && (
-              <EditRequestAdditionalFieldsSection
-                fields={categoryFields[editingRequest.user_request_category_id] ?? []}
-                dynamic_fields={editForm.dynamic_fields}
-                onDynamicFieldChange={(key, value) =>
-                  setEditForm((f) => ({
-                    ...f,
-                    dynamic_fields: { ...f.dynamic_fields, [key]: value },
-                  }))
-                }
-                onDynamicFileChange={(key, file) =>
-                  setEditForm((f) => ({
-                    ...f,
-                    dynamic_files: { ...f.dynamic_files, [key]: file },
-                  }))
-                }
-              />
-            )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onHide} type="button">
-            Cancel
-          </Button>
-          <Button variant="primary" type="submit" disabled={editSubmitting}>
-            {editSubmitting ? "Saving…" : "Save"}
-          </Button>
-        </Modal.Footer>
-      </Form>
-    </Modal>
+            ))}
+          </div>
+        )}
+      </Form.Group>
+      {editingRequest?.user_request_category_id != null &&
+        (categoryFields[editingRequest.user_request_category_id] ?? []).length > 0 && (
+          <EditRequestAdditionalFieldsSection
+            fields={categoryFields[editingRequest.user_request_category_id] ?? []}
+            dynamic_fields={editForm.dynamic_fields}
+            onDynamicFieldChange={(key, value) =>
+              setEditForm((f) => ({
+                ...f,
+                dynamic_fields: { ...f.dynamic_fields, [key]: value },
+              }))
+            }
+            onDynamicFileChange={(key, file) =>
+              setEditForm((f) => ({
+                ...f,
+                dynamic_files: { ...f.dynamic_files, [key]: file },
+              }))
+            }
+          />
+        )}
+    </WorkforceSidebarShell>
   );
 }
 
@@ -1909,8 +1881,14 @@ const ApprovalRequest = () => {
     async () => {
       setLoadingCategories(true);
       try {
-        const { data } = await getUserRequestCategories({ limit: 100,is_active:true });
-        setCategories(data ?? []);
+        const { data } = await getUserRequestCategories({
+          limit: 100,
+          is_active: true,
+          parent_id: null,
+          children: false,
+        });
+        const parentsOnly = (data ?? []).filter((c) => c.parent_id == null);
+        setCategories(parentsOnly);
         setCategoryFields({});
         if (data?.length) {
           const fieldsByCategory: Array<{ id: number; fields: UserRequestCategoryField[] }> = await Promise.all(
@@ -1944,6 +1922,29 @@ const ApprovalRequest = () => {
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
+
+  /** Sub-categories are not in `categories` when using `parent: null`; load fields when opening edit. */
+  useEffect(() => {
+    if (editingRequest?.user_request_category_id == null) return;
+    const categoryId = Number(editingRequest.user_request_category_id);
+    if (Number.isNaN(categoryId)) return;
+
+    let cancelled = false;
+    getUserRequestCategoryFields(categoryId)
+      .then((fields) => {
+        if (cancelled) return;
+        setCategoryFields((prev) => {
+          if (prev[categoryId] !== undefined) return prev;
+          return { ...prev, [categoryId]: fields ?? [] };
+        });
+      })
+      .catch((err) => {
+        console.error(`Failed to load fields for category ${categoryId}`, err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingRequest?.user_request_category_id]);
 
   const closeSidebar = useCallback(() => {
     setSelectedRequest(null);

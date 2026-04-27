@@ -922,7 +922,7 @@ const ProspectDetailPage: NextPageWithLayout = () => {
           phone: phoneForPayload,
           campaign_id: data.campaign_id ?? null,
           company_domain: data.company_domain?.trim() || undefined,
-          source_file: data.source_file?.trim() || undefined,
+          source: data.source_file?.trim() || undefined,
           scheduled_call_at: data.scheduled_call_at || undefined,
           data: dataPayload,
         });

@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import {
   assignCrmDataAdvanced,
   bulkDeleteCrmData,
+  createCrmAuditLog,
   getAllCrmDataById,
   scheduleCall,
   unscheduleCall,
@@ -61,6 +62,8 @@ export type CrmListSharedCallbacksDeps = {
   setDownloadingRecordings?: Dispatch<SetStateAction<Set<string>>>;
   setDownloadProgress?: Dispatch<SetStateAction<Record<string, number>>>;
   calculateEntryCounts: () => Promise<{ total: number; assigned: number; unassigned: number }>;
+  /** Optional: run after bulk delete succeeds (ids are the deleted record ids). */
+  onAfterBulkDelete?: (deletedIds: readonly number[]) => void;
 };
 
 const EMPTY_AFTER_CALL = { disposition: "", callStatus: "", comment: "", nextCallDate: "", nextCallTime: "", generateLead: "no" };
@@ -87,6 +90,7 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
     sidebarFetchTokenRef, setSelectedRecord, setShowSidebar,
     setSelectedRecording, setShowRecordingPlayerModal, setDownloadingRecordings, setDownloadProgress,
     calculateEntryCounts,
+    onAfterBulkDelete,
   } = deps;
 
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
@@ -248,6 +252,16 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
     try {
       const userExtension = session?.user?.extension ?? "default";
       await unscheduleCall(entryToUnschedule.id, userExtension);
+      const prevWhen = entryToUnschedule.scheduled_call_at
+        ? moment(entryToUnschedule.scheduled_call_at).format("MMM DD, YYYY HH:mm")
+        : "previously scheduled time";
+      void createCrmAuditLog({
+        record_type: "prospect",
+        record_id: Number(entryToUnschedule.id),
+        event: "scheduled_call_unscheduled",
+        action: "unscheduled",
+        description: `Scheduled call (${prevWhen}) was unscheduled by ${userExtension}.`,
+      });
       setRefreshKey((prev) => prev + 1);
       setShowUnscheduleModal(false);
       setEntryToUnschedule(null);
@@ -272,6 +286,19 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
       const userExtension = session?.user?.extension ?? "default";
       const scheduledDateTime = moment(`${scheduleData.date} ${scheduleData.time}`).toISOString();
       await scheduleCall(selectedEntryForSchedule.id, scheduledDateTime, userExtension, scheduleData.notes);
+      const localWhen = moment(`${scheduleData.date} ${scheduleData.time}`).format(
+        "MMM DD, YYYY HH:mm",
+      );
+      const noteSuffix = scheduleData.notes ? ` — Note: ${scheduleData.notes.slice(0, 200)}` : "";
+      void createCrmAuditLog({
+        record_type: "prospect",
+        record_id: Number(selectedEntryForSchedule.id),
+        event: isEditingSchedule ? "scheduled_call_updated" : "scheduled_call_created",
+        action: isEditingSchedule ? "updated" : "scheduled",
+        description: isEditingSchedule
+          ? `Scheduled call updated to ${localWhen} by ${userExtension}.${noteSuffix}`
+          : `Call scheduled for ${localWhen} by ${userExtension}.${noteSuffix}`,
+      });
       setRefreshKey((prev) => prev + 1);
       handleScheduleModalClose();
       showSuccess(
@@ -282,6 +309,51 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
       console.error(isEditingSchedule ? "Failed to update scheduled call:" : "Failed to schedule call:", error);
     }
   }, [scheduleData, selectedEntryForSchedule, handleScheduleModalClose, session, isEditingSchedule, setRefreshKey, showSuccess]);
+
+  /**
+   * Marks a previously-scheduled call with an outcome (e.g. completed, missed,
+   * no-answer, rescheduled). This:
+   *  1. Writes a `scheduled_call_status_changed` entry to the prospect's audit
+   *     log so the outcome is visible in the record's history.
+   *  2. Unschedules the call so it no longer appears in upcoming/overdue
+   *     buckets (terminal outcomes only — `keepScheduled` skips this).
+   */
+  const handleScheduledCallStatusChange = useCallback(
+    async (
+      entry: any,
+      status: string,
+      options: { keepScheduled?: boolean; note?: string } = {},
+    ) => {
+      if (!entry?.id) return;
+      const userExtension = session?.user?.extension ?? "default";
+      const prevWhen = entry?.scheduled_call_at
+        ? moment(entry.scheduled_call_at).format("MMM DD, YYYY HH:mm")
+        : "scheduled time";
+      const noteSuffix = options.note ? ` — Note: ${options.note.slice(0, 200)}` : "";
+      try {
+        await createCrmAuditLog({
+          record_type: "prospect",
+          record_id: Number(entry.id),
+          event: "scheduled_call_status_changed",
+          action: status,
+          description: `Scheduled call (${prevWhen}) marked as "${status}" by ${userExtension}.${noteSuffix}`,
+        });
+        if (!options.keepScheduled && entry?.scheduled_call_at) {
+          try {
+            await unscheduleCall(entry.id, userExtension);
+          } catch (err) {
+            console.error("Failed to unschedule after status change:", err);
+          }
+        }
+        setRefreshKey((prev) => prev + 1);
+        toast.success(`Scheduled call marked as ${status}`);
+      } catch (error) {
+        console.error("Failed to update scheduled call status:", error);
+        toast.error("Failed to update scheduled call status");
+      }
+    },
+    [session, setRefreshKey],
+  );
 
   const handleCallClick = useCallback(async (item: CrmDataItem) => {
     const phone = item.phone;
@@ -302,17 +374,19 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedItems.length === 0) { toast.error("Please select items to delete"); return; }
+    const idsToDelete = [...selectedItems];
     try {
-      await bulkDeleteCrmData(selectedItems);
+      await bulkDeleteCrmData(idsToDelete);
       setShowDeleteModal(false);
       setDeleteModalMode(null);
+      onAfterBulkDelete?.(idsToDelete);
       setRefreshKey((prev) => prev + 1);
       setSelectedItems([]);
       setClearSelectedRows(!clearSelectedRows);
     } catch (error: any) {
       console.error("Bulk delete error:", error);
     }
-  }, [selectedItems, setShowDeleteModal, setDeleteModalMode, setRefreshKey, setSelectedItems, clearSelectedRows, setClearSelectedRows]);
+  }, [selectedItems, setShowDeleteModal, setDeleteModalMode, setRefreshKey, setSelectedItems, clearSelectedRows, setClearSelectedRows, onAfterBulkDelete]);
 
   const handleDeleteData = useCallback((item: CrmDataItem) => {
     setItemToDelete(item);
@@ -384,6 +458,7 @@ export function useCrmListSharedCallbacks(deps: CrmListSharedCallbacksDeps) {
     confirmUnscheduleCall,
     handleScheduleModalClose,
     handleScheduleSubmit,
+    handleScheduledCallStatusChange,
     handleCallClick,
     handleBulkDelete,
     handleDeleteData,

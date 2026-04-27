@@ -1000,6 +1000,8 @@ export const createCrmData = async (payload: {
   scheduled_call_at?: string;
   company_domain?: string;
   company_name?: string;
+  source?: string;
+  /** When creating from a prospects list keyed by upload file name. */
   source_file?: string;
   tag_ids?: number[];
   directory?: string;
@@ -1063,6 +1065,7 @@ export const updateCrmData = async (
     scheduled_call_at?: string;
     company_domain?: string;
     company_name?: string;
+    source?: string;
     source_file?: string;
     tag_ids?: number[];
   },
@@ -4966,5 +4969,61 @@ export const getCrmAuditLogs = async (params: any = {}) => {
     toast.error("Failed to fetch audit logs");
     console.error("Audit logs error:", error);
     throw error;
+  }
+};
+
+/**
+ * Valid `record_type` values accepted by `POST /crm/audit-logs`.
+ * Mirrors the backend AuditableMorphMap.
+ */
+export type CrmAuditLogRecordType =
+  | "lead"
+  | "deal"
+  | "order"
+  | "prospect"
+  | "deal_estimate"
+  | "campaign";
+
+export interface CreateCrmAuditLogPayload {
+  record_type: CrmAuditLogRecordType;
+  record_id: number;
+  /** Short event identifier, max 64 chars (e.g. `note_logged`, `meeting_scheduled`). */
+  event?: string;
+  /** Action verb, max 64 chars (e.g. `created`, `updated`, `completed`). */
+  action?: string;
+  /** Human-readable description, max 2000 chars. */
+  description?: string;
+}
+
+/**
+ * Create a manual audit-log / history entry for a CRM record.
+ * Backend: POST /crm/audit-logs
+ *
+ * Failures are swallowed (only `console.error`) because audit logging is a
+ * best-effort side-effect — it must never block the user-facing action that
+ * triggered it (e.g. saving a note still succeeds even if the audit write
+ * fails).
+ */
+export const createCrmAuditLog = async (
+  payload: CreateCrmAuditLogPayload,
+): Promise<any> => {
+  try {
+    if (!payload?.record_type || !Number.isFinite(Number(payload?.record_id))) {
+      return null;
+    }
+    const body: Record<string, unknown> = {
+      record_type: payload.record_type,
+      record_id: Number(payload.record_id),
+    };
+    if (payload.event) body.event = payload.event.slice(0, 64);
+    if (payload.action) body.action = payload.action.slice(0, 64);
+    if (payload.description) {
+      body.description = payload.description.slice(0, 2000);
+    }
+    const response = await axiosInstance.post(`/crm/audit-logs`, body);
+    return response?.data?.data ?? response?.data ?? null;
+  } catch (error: unknown) {
+    console.error("Create audit log error:", error);
+    return null;
   }
 };

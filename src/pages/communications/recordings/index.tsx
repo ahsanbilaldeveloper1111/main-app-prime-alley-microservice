@@ -165,6 +165,21 @@ function getEmptyCallRecordingsDirectionChartState() {
   };
 }
 
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import { createCommunicationsTextFilterDropdownContent } from '@utils/communications/communicationsDateExtensionFilters';
+import { formatCallRecordingsFiltersForApi } from '@utils/communications/communicationsAppliedFiltersFormat';
+import { getDefaultCommunicationsDateFilterPair } from '@utils/communications/communicationsFilterDefaults';
+import { shouldSkipCommunicationsListFetch } from '@utils/communications/communicationsListFetchDedup';
+import { getEmptyCallRecordingsDirectionChartState } from '@utils/communications/recordingsChartDefaults';
+import {
+    buildCallDirectionFilterPill,
+    buildDepartmentFilterPill,
+    buildEndDateTimeFilterPill,
+    buildExtensionNumberMultiSelectFilterPill,
+    buildStartDateTimeFilterPill,
+} from '@utils/communications/communicationsFilterPillFactories';
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
 // Interfaces
 interface Summary {
   numbers: number;
@@ -673,8 +688,8 @@ const CallRecordings: NextPage & {
     setCurrentFilters({
       ...filters,
       remote_party_number: normalizedRemotePartyNumber,
-    }); // Keep input format for display
-    setAppliedFilters(formattedFilters); // Use formatted filters for API (with timezone in datetime)
+    });
+    setAppliedFilters(formattedFilters);
     appliedFiltersRef.current = formattedFilters;
     setRefreshKey((prev) => prev + 1);
 

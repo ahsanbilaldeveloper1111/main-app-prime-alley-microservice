@@ -60,6 +60,7 @@ const SSE_TYPE = {
   STATE: 'state',
   ERROR: 'error',
   PREVIEW: 'preview',
+  ROSTER_STATE: 'roster_state',
   STOMP_CONNECTED: 'stomp_connected',
   STOMP_CLOSED: 'stomp_closed',
   AUTH_REQUIRED: 'auth_required',
@@ -133,12 +134,27 @@ function parseAndForward(connectionKey, msg, eventType) {
     const payload = JSON.parse(msg.body);
     writeToStreams(connectionKey, { type: eventType, data: payload });
   } catch (e) {
+    if (eventType === SSE_TYPE.ROSTER_STATE) {
+      writeToStreams(connectionKey, {
+        type: eventType,
+        data: { __finesseRosterUnparsed: true },
+      });
+      if (isDev) {
+        console.warn('[Finesse WS Stream] Roster body not JSON; client will full-refetch team.');
+      }
+      return;
+    }
     if (isDev) console.error(`[Finesse WS Stream] Parse failed (${eventType}):`, e?.message ?? e);
   }
 }
 
-function setupSubscriptions(client, connectionKey, finesseUserId, hasPreview) {
-  if (subscriptionsSetup.has(connectionKey)) return;
+function rosterTopicPath(clusterId, teamId) {
+  const c = encodeURIComponent(String(clusterId));
+  const t = encodeURIComponent(String(teamId));
+  return `/topic/finesse/cluster/${c}/team/${t}/roster/state`;
+}
+
+function setupSubscriptions(client, connectionKey, finesseUserId, hasPreview, clusterId, teamId) {
   cleanupSubscriptions(connectionKey);
 
   const stateTopic = topicPath(finesseUserId, 'state');
@@ -148,7 +164,21 @@ function setupSubscriptions(client, connectionKey, finesseUserId, hasPreview) {
   const userQueueErrors = '/user/queue/errors';
   const userQueuePreview = '/user/queue/preview';
 
-  log('Subscribing:', finesseUserId, '→', stateTopic, errorTopic, hasPreview ? previewTopic : '(no preview)');
+  const hasRoster =
+    clusterId != null &&
+    String(clusterId).trim() !== '' &&
+    teamId != null &&
+    String(teamId).trim() !== '';
+
+  log(
+    'Subscribing:',
+    finesseUserId,
+    '→',
+    stateTopic,
+    errorTopic,
+    hasPreview ? previewTopic : '(no preview)',
+    hasRoster ? rosterTopicPath(clusterId, teamId) : '(no roster)',
+  );
 
   const subs = [
     client.subscribe(stateTopic, (msg) => parseAndForward(connectionKey, msg, SSE_TYPE.STATE)),
@@ -160,7 +190,14 @@ function setupSubscriptions(client, connectionKey, finesseUserId, hasPreview) {
   if (hasPreview) {
     subs.push(
       client.subscribe(previewTopic, (msg) => parseAndForward(connectionKey, msg, SSE_TYPE.PREVIEW)),
-      client.subscribe(userQueuePreview, (msg) => parseAndForward(connectionKey, msg, SSE_TYPE.PREVIEW))
+      client.subscribe(userQueuePreview, (msg) => parseAndForward(connectionKey, msg, SSE_TYPE.PREVIEW)),
+    );
+  }
+
+  if (hasRoster) {
+    const rt = rosterTopicPath(clusterId, teamId);
+    subs.push(
+      client.subscribe(rt, (msg) => parseAndForward(connectionKey, msg, SSE_TYPE.ROSTER_STATE)),
     );
   }
 
@@ -199,7 +236,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { token, finesseUserId, preview = 'true' } = req.query;
+  const { token, finesseUserId, preview = 'true', clusterId, teamId } = req.query;
   const hasPreview = preview === 'true' || preview === '1';
   const connectionKey = finesseUserId;
 
@@ -278,7 +315,7 @@ export default async function handler(req, res) {
   const existing = connectionPool.get(connectionKey);
   if (existing?.client?.connected) {
     existing.lastUsed = Date.now();
-    setupSubscriptions(existing.client, connectionKey, finesseUserId, hasPreview);
+    setupSubscriptions(existing.client, connectionKey, finesseUserId, hasPreview, clusterId, teamId);
     writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_CONNECTED });
     return;
   }
@@ -310,7 +347,7 @@ export default async function handler(req, res) {
           token,
           finesseUserId,
         });
-        setupSubscriptions(client, connectionKey, finesseUserId, hasPreview);
+        setupSubscriptions(client, connectionKey, finesseUserId, hasPreview, clusterId, teamId);
         writeToStreams(connectionKey, { type: SSE_TYPE.STOMP_CONNECTED });
       },
       onStompError: (frame) => {

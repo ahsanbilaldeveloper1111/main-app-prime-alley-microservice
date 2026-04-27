@@ -78,13 +78,13 @@ const Teams = () => {
                                 <Edit size={16} />
                             </Button>
                         )}
-                        {(session?.user?.permissions?.includes('assign-teams-groups') || session?.user?.permissions?.includes('remove-teams-groups')) && (
+                        {(session?.user?.permissions?.includes('edit-teams') || session?.user?.permissions?.includes('remove-teams-groups')) && (
                             <Button variant="light" className="btn-action-style-2 p-1 text-success" title="Assign Users" onClick={() => handleAssignUsers(props)}>
                                 <UserPlus size={16} />
                             </Button>
                         )}
                        
-                        {session?.user?.permissions?.includes('add-modules-teams') && (
+                        {session?.user?.permissions?.includes('edit-teams') && (
                             <Button variant="light" className="btn-action-style-2 p-1 text-warning" title="Assign Modules" onClick={() => handleAssignModules(props)}>
                                 <Package size={16} />
                             </Button>

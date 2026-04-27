@@ -60,6 +60,18 @@ export type UseCrmListAdvancedFilterPillsParams = {
   customSelectStyles: StylesConfig<unknown, boolean>;
 };
 
+const ADVANCED_FILTER_MENU_PORTAL =
+  typeof document === "undefined" ? null : document.body;
+
+function withMenuPortalStyles<T>(
+  base: StylesConfig<unknown, boolean>,
+): StylesConfig<T, boolean> {
+  return {
+    ...(base as StylesConfig<T, boolean>),
+    menuPortal: (provided) => ({ ...provided, zIndex: 1400 }),
+  };
+}
+
 /**
  * Advanced filter toolbar pills (campaigns, source, tags, next call date) shared by CRM list pages.
  */
@@ -116,9 +128,10 @@ export function useCrmListAdvancedFilterPills({
                 applyTableFiltersPatch({ campaign_id: values });
               }}
               placeholder="Select campaigns..."
-              styles={
-                customSelectStyles as StylesConfig<CampaignOption, true>
-              }
+              menuPortalTarget={ADVANCED_FILTER_MENU_PORTAL ?? undefined}
+              styles={withMenuPortalStyles<CampaignOption>(
+                customSelectStyles,
+              ) as StylesConfig<CampaignOption, true>}
               isClearable
             />
             <div className="d-flex justify-content-end mt-2">
@@ -161,9 +174,10 @@ export function useCrmListAdvancedFilterPills({
                 applyTableFiltersPatch({ source_file: v });
               }}
               placeholder="Select or type a source..."
-              styles={
-                customSelectStyles as StylesConfig<SourceOption, false>
-              }
+              menuPortalTarget={ADVANCED_FILTER_MENU_PORTAL ?? undefined}
+              styles={withMenuPortalStyles<SourceOption>(
+                customSelectStyles,
+              ) as StylesConfig<SourceOption, false>}
               isClearable
             />
             <div className="d-flex justify-content-end mt-2">
@@ -214,7 +228,10 @@ export function useCrmListAdvancedFilterPills({
                 applyTableFiltersPatch({ tags: values });
               }}
               placeholder="Select tags..."
-              styles={customSelectStyles as StylesConfig<TagOption, true>}
+              menuPortalTarget={ADVANCED_FILTER_MENU_PORTAL ?? undefined}
+              styles={withMenuPortalStyles<TagOption>(
+                customSelectStyles,
+              ) as StylesConfig<TagOption, true>}
               isClearable
             />
             <div className="d-flex justify-content-end mt-2">

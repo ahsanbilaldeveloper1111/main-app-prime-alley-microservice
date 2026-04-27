@@ -1,52 +1,50 @@
-import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useEffect, useState, useCallback, useRef } from 'react';
-import Layout from '@layout/index';
-import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
-import { ListCallLogs, ExportCallLogs, DownloadStreamingExport, DownloadCallsExport } from '@utils/calls';
-import { Column } from '@components/CustomDataTable';
-import { Modal, Row, Tab, Tabs, Form } from 'react-bootstrap';
-import { Col } from 'react-bootstrap';
-import { toast } from 'react-toastify';
-import { useTokenService } from 'src/hooks/useTokenService';
-import { useSession } from 'next-auth/react';
-import CallLogsFilters from '@components/filters/CallLogsFilters';
-import BarFilters from '@components/BarFilters';
-import SelectBox from '@components/SelectBox';
-import { useHierarchyData } from '@components/filters/useHierarchyData';
-import AnimatedNumber from '@components/AnimatedNumber';
-import ChartBar from '@components/ChartBar';
-import ChartDonut from '@components/ChartDonut';
-import PageSummaryGrid from '@components/PageSummaryGrid';
-import imgStatus2 from '@assets/images/widget/img-status-2.svg'
-import imgStatus3 from '@assets/images/widget/img-status-3.svg'
-import imgStatus4 from '@assets/images/widget/img-status-4.svg'
-import '@assets/scss/report-style.scss';
-import '@assets/scss/tabs.scss';
-import { motion, AnimatePresence } from "framer-motion";
-import { easeInOut, easeOut, easeIn } from "framer-motion";
-import moment from 'moment';
-import { formatCurrency, GlobalDateTimeFormat, formatDateTimeToLocal, ModuleSlug, getAutoTimezone } from '@utils/Helper';
-import { formatMinutesAndSeconds } from '@utils/Helper';
-
-import "@assets/scss/common.scss";
+import "@assets/scss/datatable-style.scss";
+import React, {
+  ReactElement,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
+import Layout from "@layout/index";
+import BreadcrumbItem from "@common/BreadcrumbItem";
+import GenericTable, {
+  FilterPill,
+  TableColumn,
+  ToolbarConfig,
+} from "@components/GenericTable";
+import { StatsCardData } from "@components/GenericStatsCards";
+import { ListCallLogs, DownloadCallsExport } from "@utils/calls";
+import { Modal, Row, Tab, Tabs, Form, Button, Col } from "react-bootstrap";
+import { toast } from "react-toastify";
+import { useSession } from "next-auth/react";
+import { useHierarchyData } from "@components/filters/useHierarchyData";
+import ChartBar from "@components/ChartBar";
+import ChartDonut from "@components/ChartDonut";
+import "@assets/scss/report-style.scss";
 import "@assets/scss/tabs.scss";
-import PageHeader from "@components/PageHeader";
-import FormModal from "@pages/partial/FormModal";
-import ConfirmModal from "@pages/partial/ConfirmModal";
-import SuccessfulModal from "@pages/partial/SuccessfulModal";
-import DatatableActionButton from "@components/DatatableActionButton";
-import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+import { motion, AnimatePresence } from "framer-motion";
+import moment from "moment";
+import {
+  GlobalDateTimeFormat,
+  formatDateTimeToLocal,
+  ModuleSlug,
+  getAutoTimezone,
+  formatMinutesAndSeconds,
+} from "@utils/Helper";
+import "@assets/scss/common.scss";
 
+type ChartDataType = "calls" | "time" | "cost" | "custom";
 
 interface Summary {
   total_calls: number;
   answered_calls: number;
   unanswered_calls: number;
   total_cost: number;
-  total_duration:number;
-  avg_duration:number;
-  avg_ring_time:number;
+  total_duration: number;
+  avg_duration: number;
+  avg_ring_time: number;
 }
 
 interface ChartData {
@@ -65,275 +63,456 @@ interface ChartData {
   max_duration: number[];
 }
 
+const donutDataLabelsFormatter = (value: number): string =>
+  `${value.toFixed(0)}%`;
+
+// ─── Date range pill menu component ────────────────────────────────────────
+interface DateRangePillMenuProps {
+  startVal: string;
+  endVal: string;
+  onStartChange: (v: string) => void;
+  onEndChange: (v: string) => void;
+  onApply: () => void;
+  closeMenu: () => void;
+}
+
+function DateRangePillMenu({
+  startVal,
+  endVal,
+  onStartChange,
+  onEndChange,
+  onApply,
+  closeMenu,
+}: Readonly<DateRangePillMenuProps>) {
+  return (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 260 }}>
+      <Form.Group>
+        <Form.Label className="small mb-1">Start Date &amp; Time</Form.Label>
+        <Form.Control
+          size="sm"
+          type="datetime-local"
+          value={startVal}
+          max={moment().format("YYYY-MM-DDTHH:mm")}
+          onChange={(e) => {
+            const v = e.target.value;
+            onStartChange(v);
+            if (endVal && moment(v).isAfter(moment(endVal))) {
+              onEndChange(v);
+            }
+          }}
+        />
+      </Form.Group>
+      <Form.Group>
+        <Form.Label className="small mb-1">End Date &amp; Time</Form.Label>
+        <Form.Control
+          size="sm"
+          type="datetime-local"
+          value={endVal}
+          min={startVal}
+          max={moment().format("YYYY-MM-DDTHH:mm")}
+          onChange={(e) => {
+            const v = e.target.value;
+            onEndChange(v);
+            if (startVal && moment(v).isBefore(moment(startVal))) {
+              onStartChange(v);
+            }
+          }}
+        />
+      </Form.Group>
+      <div className="d-flex justify-content-end gap-2">
+        <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => {
+            onApply();
+            closeMenu();
+          }}
+        >
+          Apply
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function createDateRangeDropdownContent(
+  startVal: string,
+  endVal: string,
+  onStartChange: (v: string) => void,
+  onEndChange: (v: string) => void,
+  onApply: () => void,
+) {
+  return function DateRangeRender({ closeMenu }: { closeMenu: () => void }) {
+    return (
+      <DateRangePillMenu
+        startVal={startVal}
+        endVal={endVal}
+        onStartChange={onStartChange}
+        onEndChange={onEndChange}
+        onApply={onApply}
+        closeMenu={closeMenu}
+      />
+    );
+  };
+}
+
+// ─── Called numbers pill menu component ────────────────────────────────────
+interface CalledNumbersPillMenuProps {
+  value: string;
+  onChange: (v: string) => void;
+  onApply: () => void;
+  closeMenu: () => void;
+}
+
+function CalledNumbersPillMenu({
+  value,
+  onChange,
+  onApply,
+  closeMenu,
+}: Readonly<CalledNumbersPillMenuProps>) {
+  return (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 260 }}>
+      <Form.Control
+        size="sm"
+        type="text"
+        placeholder="Enter numbers (comma separated)"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <div className="d-flex justify-content-end gap-2">
+        <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => {
+            onApply();
+            closeMenu();
+          }}
+        >
+          Apply
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function createCalledNumbersDropdownContent(
+  value: string,
+  onChange: (v: string) => void,
+  onApply: () => void,
+) {
+  return function CalledNumbersRender({
+    closeMenu,
+  }: {
+    closeMenu: () => void;
+  }) {
+    return (
+      <CalledNumbersPillMenu
+        value={value}
+        onChange={onChange}
+        onApply={onApply}
+        closeMenu={closeMenu}
+      />
+    );
+  };
+}
+
 const CallStatsCountry = () => {
   const { data: session } = useSession();
 
   const [showDateRange, setShowDateRange] = useState(false);
-  const [startDateTime, setStartDateTime] = useState<string>('');
-  const [endDateTime, setEndDateTime] = useState<string>('');
-  const [isExporting, setIsExporting] = useState(false);
+  const [startDateTime, setStartDateTime] = useState<string>("");
+  const [endDateTime, setEndDateTime] = useState<string>("");
 
-
-
-  // Initialize filters with default values immediately to prevent first API call without dates
+  // ─── Pending filter state for pill dropdowns ───────────────────────────────
   const getDefaultFilters = () => {
     const now = moment();
-    const startDateInput = now.clone().startOf('day').format('YYYY-MM-DDTHH:mm');
-    const endDateInput = now.clone().endOf('day').format('YYYY-MM-DDTHH:mm');
-    const startDateUTC = now.clone().startOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-    const endDateUTC = now.clone().endOf('day').utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+    const startDateInput = now
+      .clone()
+      .startOf("day")
+      .format("YYYY-MM-DDTHH:mm");
+    const endDateInput = now.clone().endOf("day").format("YYYY-MM-DDTHH:mm");
+    const startDateUTC =
+      now.clone().startOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+    const endDateUTC =
+      now.clone().endOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
     return {
       pending: {
         start_datetime: startDateInput,
-        end_datetime: endDateInput
+        end_datetime: endDateInput,
       },
       current: {
         start_datetime: startDateUTC,
-        end_datetime: endDateUTC
-      }
+        end_datetime: endDateUTC,
+      },
     };
   };
-  
+
   const defaultFilters = getDefaultFilters();
-  
-  const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('calls_chart');
-  const [refreshKey, setRefreshKey] = useState<number>(1); // Start at 1 to ensure initial fetch
-  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(defaultFilters.current);
-  const [pendingFilters, setPendingFilters] = useState<Record<string, any>>(defaultFilters.pending);
+
+  const [activeTab, setActiveTab] = useState("calls_chart");
+  const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(
+    defaultFilters.current,
+  );
   const [dataLoaded, setDataLoaded] = useState(false);
-  const filtersReady = true; // Always ready since filters are initialized immediately
-  
   // Refs to prevent duplicate API calls
   const currentFiltersRef = useRef<Record<string, any>>(defaultFilters.current);
   const isFetchingRef = useRef(false);
   const lastFetchTimeRef = useRef(0);
-  const lastFetchParamsRef = useRef<string>('');
-  
-  const {
-    hierarchyDataExtensions,
-    hierarchyDataDepartments,
-    loading: hierarchyLoading
-  } = useHierarchyData(ModuleSlug.CALL_REPORTS);
-  
+  const lastFetchParamsRef = useRef<string>("");
+
+  const { hierarchyDataExtensions, hierarchyDataDepartments } =
+    useHierarchyData(ModuleSlug.CALL_REPORTS);
+
   // Use ref to track if initial fetch has been done
   const initialFetchDone = React.useRef(false);
   // Use ref to track last filters used for charts to prevent unnecessary refetches
-  const lastChartFilters = React.useRef<string>('');
+  const lastChartFilters = React.useRef<string>("");
   const [summary, setSummary] = useState<Summary>({
     total_calls: 0,
     answered_calls: 0,
     unanswered_calls: 0,
     total_cost: 0,
-    total_duration:0,
-    avg_duration:0,
-    avg_ring_time:0
+    total_duration: 0,
+    avg_duration: 0,
+    avg_ring_time: 0,
   });
 
-  const columns: Column[] = [
-    { key: 'Country', name: 'Country', selector: (row: any) => row.Country, sortable: true },
-    { key: 'Calls', name: 'Total Calls', selector: (row: any) => row.Calls, sortable: true },
-    { key: 'Answered', name: 'Answered', selector: (row: any) => row.Answered, sortable: true },
-    { key: 'Unanswered', name: 'Un Answered', selector: (row: any) => row.Unanswered, sortable: true },
-
-    { key: 'AvgRingTime', name: 'Avg Ring Time', selector: (row: any) => row.AvgRingTime, sortable: true,
-      cell: (row: any) => formatMinutesAndSeconds(row.AvgRingTime)
-     },
-    { key: 'MaxRingTime', name: 'Max Ring Time', selector: (row: any) => row.MaxRingTime, sortable: true,
-      cell: (row: any) => formatMinutesAndSeconds(row.MaxRingTime)
-     },
-
-    { key: 'Duration', name: 'Total Duration', selector: (row: any) => row.Duration, sortable: true,
-      cell: (row: any) => formatMinutesAndSeconds(row.Duration)
-     },
-    { key: 'AvgDuration', name: 'Avg Duration', selector: (row: any) => row.AvgDuration, sortable: true,
-      cell: (row: any) => formatMinutesAndSeconds(row.AvgDuration)
-     },
-
-    // { key: 'Cost', name: 'Total Cost', selector: (row: any) => row.Cost, sortable: true,
-    //   cell: (row: any) => formatCurrency(row.Cost)
-    //  },
-    // { key: 'AvgCost', name: 'Avg Cost', selector: (row: any) => row['Avg Cost'], sortable: true,
-    //   cell: (row: any) => formatCurrency(Number(row['Avg Cost']))
-    //  },
-    
-  
+  const columns: TableColumn[] = [
+    { key: "Country", label: "Country", sortable: true },
+    { key: "Calls", label: "Total Calls", sortable: true },
+    { key: "Answered", label: "Answered", sortable: true },
+    { key: "Unanswered", label: "Un Answered", sortable: true },
+    {
+      key: "AvgRingTime",
+      label: "Avg Ring Time",
+      sortable: true,
+      render: (row: any) => formatMinutesAndSeconds(row.AvgRingTime),
+    },
+    {
+      key: "MaxRingTime",
+      label: "Max Ring Time",
+      sortable: true,
+      render: (row: any) => formatMinutesAndSeconds(row.MaxRingTime),
+    },
+    {
+      key: "Duration",
+      label: "Total Duration",
+      sortable: true,
+      render: (row: any) => formatMinutesAndSeconds(row.Duration),
+    },
+    {
+      key: "AvgDuration",
+      label: "Avg Duration",
+      sortable: true,
+      render: (row: any) => formatMinutesAndSeconds(row.AvgDuration),
+    },
   ];
 
   const [showPageLoader, setShowPageLoader] = useState(false);
-  const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
-    // Prevent duplicate calls - but always allow the first call
-    const now = Date.now();
-    const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
-    
-    // Skip if already fetching with same params within 500ms
-    if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
-      return;
-    }
-    
-    // Skip if same params were fetched recently (within 100ms) - but allow first call (when lastFetchParamsRef is empty string)
-    if (lastFetchParamsRef.current !== '' && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
-      return;
-    }
-    
-    isFetchingRef.current = true;
-    lastFetchTimeRef.current = now;
-    lastFetchParamsRef.current = paramsKey;
-    
-    setLoading(true);
-    setShowPageLoader(true);
-    
-    try {
-      const response = await ListCallLogs({ 
-        page, 
-        perPage, 
-        search, 
-        filters: currentFiltersRef.current, 
-        reportType: 'statsCountry',
-        moduleSlug: ModuleSlug.CALL_REPORTS
-      }, 'call-logs/statsByCountry');
-      
-      if (response?.summary) {
+  const [tableData, setTableData] = useState<any[]>([]);
+  const [totalRows, setTotalRows] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(15);
+  const [tableLoading, setTableLoading] = useState(false);
 
-        setShowDateRange(true);
-      const dataFilters = response?.filters;
-      setStartDateTime(dataFilters?.start_datetime);
-      setEndDateTime(dataFilters?.end_datetime);
+  const fetchCallLogs = useCallback(
+    async (page = 1, perPage = 15, search = "") => {
+      // Prevent duplicate calls - but always allow the first call
+      const now = Date.now();
+      const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
 
-
-        setSummary(response.summary);
-        setDataLoaded(true);
-      } else {
-        setDataLoaded(true);
+      // Skip if already fetching with same params within 500ms
+      if (
+        isFetchingRef.current &&
+        lastFetchParamsRef.current === paramsKey &&
+        now - lastFetchTimeRef.current < 500
+      ) {
+        return;
       }
-      
-      setLoading(false);
-      return response;
-    } catch {
-      setLoading(false);
-      setDataLoaded(true);
-      toast.error('Failed to fetch call data');
-      return null;
-    } finally {
-      setShowPageLoader(false);
-      isFetchingRef.current = false;
-    }
-  }, []);
+
+      // Skip if same params were fetched recently (within 100ms) - but allow first call (when lastFetchParamsRef is empty string)
+      if (
+        lastFetchParamsRef.current !== "" &&
+        lastFetchParamsRef.current === paramsKey &&
+        now - lastFetchTimeRef.current < 100
+      ) {
+        return;
+      }
+
+      isFetchingRef.current = true;
+      lastFetchTimeRef.current = now;
+      lastFetchParamsRef.current = paramsKey;
+
+      setTableLoading(true);
+      setShowPageLoader(true);
+
+      try {
+        const response = await ListCallLogs(
+          {
+            page,
+            perPage,
+            search,
+            filters: currentFiltersRef.current,
+            reportType: "statsCountry",
+            moduleSlug: ModuleSlug.CALL_REPORTS,
+          },
+          "call-logs/statsByCountry",
+        );
+
+        if (response.summary) {
+          setShowDateRange(true);
+          const dataFilters = response.filters;
+          setStartDateTime(dataFilters.start_datetime);
+          setEndDateTime(dataFilters.end_datetime);
+          setSummary(response.summary);
+          setDataLoaded(true);
+        } else {
+          setDataLoaded(true);
+        }
+
+        setTableData(response.data || []);
+        setTotalRows(response.total || 0);
+        setCurrentPage(response.current_page || page);
+        setRowsPerPage(response.per_page || perPage);
+
+        return response;
+      } catch {
+        setDataLoaded(true);
+        toast.error("Failed to fetch call data");
+        return null;
+      } finally {
+        setShowPageLoader(false);
+        setTableLoading(false);
+        isFetchingRef.current = false;
+      }
+    },
+    [],
+  );
 
   const handleExport = async () => {
-    setIsExporting(true);
     try {
       const exportPayload = {
         ...currentFilters,
-        timezone: getAutoTimezone()
+        timezone: getAutoTimezone(),
       };
-      await DownloadCallsExport(exportPayload, 'call-logs/report/country/download');
+      await DownloadCallsExport(
+        exportPayload,
+        "call-logs/report/country/download",
+      );
     } catch (error: unknown) {
-      console.error('Export error:', error);
-      toast.error('Export failed');
-    } finally {
-      setIsExporting(false);
+      console.error("Export error:", error);
+      toast.error("Export failed");
     }
   };
 
   const handleFiltersChange = (filters: any) => {
     // Convert datetime values from local timezone to UTC before sending to API
     const formattedFilters: any = { ...filters };
-    
+
     if (formattedFilters.start_datetime) {
       // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
       // Convert to UTC ISO format
       let startMoment = moment(formattedFilters.start_datetime);
-      
-      if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+
+      if (
+        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+      ) {
         // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-        startMoment = moment(formattedFilters.start_datetime + ':00');
-      } else if (!formattedFilters.start_datetime.includes('T')) {
+        startMoment = moment(formattedFilters.start_datetime + ":00");
+      } else if (!formattedFilters.start_datetime.includes("T")) {
         // If only date, set to 00:00:00
-        startMoment = moment(formattedFilters.start_datetime).startOf('day');
+        startMoment = moment(formattedFilters.start_datetime).startOf("day");
       }
-      
+
       // Convert to UTC
-      formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+      formattedFilters.start_datetime =
+        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
     }
-    
+
     if (formattedFilters.end_datetime) {
       // datetime-local returns YYYY-MM-DDTHH:mm format in local timezone
       // Convert to UTC ISO format
       let endMoment = moment(formattedFilters.end_datetime);
-      
-      if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+
+      if (
+        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+      ) {
         // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-        const timePart = formattedFilters.end_datetime.split('T')[1];
-        if (timePart === '23:59') {
-          endMoment = moment(formattedFilters.end_datetime + ':59');
+        const timePart = formattedFilters.end_datetime.split("T")[1];
+        if (timePart === "23:59") {
+          endMoment = moment(formattedFilters.end_datetime + ":59");
         } else {
-          endMoment = moment(formattedFilters.end_datetime + ':00');
+          endMoment = moment(formattedFilters.end_datetime + ":00");
         }
-      } else if (!formattedFilters.end_datetime.includes('T')) {
+      } else if (!formattedFilters.end_datetime.includes("T")) {
         // If only date, set to 23:59:59
-        endMoment = moment(formattedFilters.end_datetime).endOf('day');
+        endMoment = moment(formattedFilters.end_datetime).endOf("day");
       }
-      
+
       // Convert to UTC
-      formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
+      formattedFilters.end_datetime =
+        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
     }
-    
+
     // Remove is_incoming_only if it's empty, null, or undefined (don't send to API by default)
-    if (!formattedFilters.is_incoming_only || formattedFilters.is_incoming_only === '') {
+    if (
+      !formattedFilters.is_incoming_only ||
+      formattedFilters.is_incoming_only === ""
+    ) {
       delete formattedFilters.is_incoming_only;
     }
-    
-    const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(formattedFilters);
-    const isCompletelyCleared = Object.keys(formattedFilters).length === 0 || 
-      (Object.keys(formattedFilters).length === 1 && formattedFilters.hasOwnProperty('is_incoming_only'));
-    
+
     // Update both state and ref immediately
     setCurrentFilters(formattedFilters);
     currentFiltersRef.current = formattedFilters;
-    
-    if ((filtersChanged && filtersReady) || isCompletelyCleared) {
-      // Reset chart filters ref to allow chart refetch
-      lastChartFilters.current = '';
-      setRefreshKey(prev => prev + 1);
-    }
+    // Reset chart filters ref to allow chart refetch
+    lastChartFilters.current = "";
   };
 
   // Ensure initial fetch happens when session is ready
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (session && session.user?.permissions?.includes('list-call-logs')) {
+    if (session?.user?.permissions?.includes("list-call-logs")) {
       initialFetchDone.current = true;
-      // Ensure refreshKey triggers GenericListPage to fetch
-      // GenericListPage will call fetchCallLogs when it mounts with filters and refreshKey
+      fetchCallLogs(1, rowsPerPage, "");
     }
   }, [session]);
-  
+
   // Separate useEffect for chart data when filters change
   useEffect(() => {
     if (session && initialFetchDone.current) {
       // Check if filters have actually changed
       const currentFiltersString = JSON.stringify(currentFilters);
       const filtersChanged = lastChartFilters.current !== currentFiltersString;
-      
+
       if (filtersChanged) {
         lastChartFilters.current = currentFiltersString;
-        
+
         // Fetch chart data
         const fetchCharts = async () => {
           setChartLoading(true);
           try {
-            const response = await ListCallLogs({ 
-              page: 1, 
-              perPage: 15, 
-              search: "", 
-              filters: currentFilters, 
-              reportType: 'chartCountry',
-              moduleSlug: ModuleSlug.CALL_REPORTS
-            }, 'call-logs/stats/country/chart');
-            
-            const chartData = response?.chart_data;
-            
-            if(chartData && Array.isArray(chartData) && chartData.length > 0) {
+            const response = await ListCallLogs(
+              {
+                page: 1,
+                perPage: 15,
+                search: "",
+                filters: currentFilters,
+                reportType: "chartCountry",
+                moduleSlug: ModuleSlug.CALL_REPORTS,
+              },
+              "call-logs/stats/country/chart",
+            );
+
+            const chartData = response.chart_data;
+
+            if (chartData && Array.isArray(chartData) && chartData.length > 0) {
               const newChartData: ChartData = {
                 country: [],
                 answered_calls: [],
@@ -349,89 +528,92 @@ const CallStatsCountry = () => {
                 avg_duration: [],
                 max_duration: [],
               };
-              
+
               chartData.forEach((item: any) => {
-                if (item && item.label) {
+                if (item?.label) {
                   newChartData.country.push(item.label);
-                  newChartData.answered_calls.push(Number(item.answered_calls) || 0);
-                  newChartData.unanswered_calls.push(Number(item.unanswered_calls) || 0);
+                  newChartData.answered_calls.push(
+                    Number(item.answered_calls) || 0,
+                  );
+                  newChartData.unanswered_calls.push(
+                    Number(item.unanswered_calls) || 0,
+                  );
                   newChartData.total_calls.push(Number(item.total_calls) || 0);
-                  newChartData.max_ring_time.push(Number(item.max_ring_time) || 0);
-                  newChartData.avg_ring_time.push(Number(item.avg_ring_time) || 0);
-                  newChartData.min_ring_time.push(Number(item.min_ring_time) || 0);
+                  newChartData.max_ring_time.push(
+                    Number(item.max_ring_time) || 0,
+                  );
+                  newChartData.avg_ring_time.push(
+                    Number(item.avg_ring_time) || 0,
+                  );
+                  newChartData.min_ring_time.push(
+                    Number(item.min_ring_time) || 0,
+                  );
                   newChartData.min_cost.push(Number(item.min_cost) || 0);
                   newChartData.avg_cost.push(Number(item.avg_cost) || 0);
                   newChartData.max_cost.push(Number(item.max_cost) || 0);
-                  newChartData.min_duration.push(Number(item.min_duration) || 0);
-                  newChartData.avg_duration.push(Number(item.avg_duration) || 0);
-                  newChartData.max_duration.push(Number(item.max_duration) || 0);
+                  newChartData.min_duration.push(
+                    Number(item.min_duration) || 0,
+                  );
+                  newChartData.avg_duration.push(
+                    Number(item.avg_duration) || 0,
+                  );
+                  newChartData.max_duration.push(
+                    Number(item.max_duration) || 0,
+                  );
                 }
               });
-              
+
               const dataLength = newChartData.country.length;
-              
-              if (dataLength > 0 && 
-                  newChartData.answered_calls.length === dataLength &&
-                  newChartData.unanswered_calls.length === dataLength &&
-                  newChartData.total_calls.length === dataLength) {
-                
+
+              if (
+                dataLength > 0 &&
+                newChartData.answered_calls.length === dataLength &&
+                newChartData.unanswered_calls.length === dataLength &&
+                newChartData.total_calls.length === dataLength
+              ) {
                 // Calls Chart
                 setChartCalls({
                   series: [
-                    { name: 'Total', data: newChartData.total_calls },
-                    { name: 'Answered', data: newChartData.answered_calls },
-                    { name: 'Unanswered', data: newChartData.unanswered_calls }
+                    { name: "Total", data: newChartData.total_calls },
+                    { name: "Answered", data: newChartData.answered_calls },
+                    { name: "Unanswered", data: newChartData.unanswered_calls },
                   ],
-                  categories: newChartData.country
+                  categories: newChartData.country,
                 });
 
                 // Ring Time Chart
                 setChartRingTime({
                   series: [
-                    { name: 'Max Ring Time', data: newChartData.max_ring_time },
-                    { name: 'Avg Ring Time', data: newChartData.avg_ring_time },
-                    { name: 'Min Ring Time', data: newChartData.min_ring_time }
+                    { name: "Max Ring Time", data: newChartData.max_ring_time },
+                    { name: "Avg Ring Time", data: newChartData.avg_ring_time },
+                    { name: "Min Ring Time", data: newChartData.min_ring_time },
                   ],
-                  categories: newChartData.country
-                });
-
-                // Cost Chart
-                setChartCost({
-                  series: [
-                    { name: 'Max Cost', data: newChartData.max_cost },
-                    { name: 'Avg Cost', data: newChartData.avg_cost },
-                    { name: 'Min Cost', data: newChartData.min_cost }
-                  ],
-                  categories: newChartData.country
+                  categories: newChartData.country,
                 });
 
                 // Duration Chart
                 setChartDuration({
                   series: [
-                    { name: 'Max Duration', data: newChartData.max_duration },
-                    { name: 'Avg Duration', data: newChartData.avg_duration },
-                    { name: 'Min Duration', data: newChartData.min_duration }
+                    { name: "Max Duration", data: newChartData.max_duration },
+                    { name: "Avg Duration", data: newChartData.avg_duration },
+                    { name: "Min Duration", data: newChartData.min_duration },
                   ],
-                  categories: newChartData.country
+                  categories: newChartData.country,
                 });
               } else {
                 setChartCalls(null);
                 setChartRingTime(null);
-                setChartCost(null);
                 setChartDuration(null);
               }
             } else {
               setChartCalls(null);
               setChartRingTime(null);
-              setChartCost(null);
               setChartDuration(null);
             }
           } catch (error: unknown) {
-            console.error('Error fetching chart data:', error);
+            console.error("Error fetching chart data:", error);
             setChartCalls(null);
             setChartRingTime(null);
-            setChartCost(null);
-            setChartDuration(null);
           } finally {
             setChartLoading(false);
           }
@@ -440,21 +622,39 @@ const CallStatsCountry = () => {
         fetchCharts();
       }
     }
-  }, [currentFilters, filtersReady, session]);
+  }, [currentFilters, session]);
 
-
-  const [simpleDonut, setSimpleDonut] = useState<{ series: number[]; labels: string[] } | null>(null);
-  const [chartCalls, setChartCalls] = useState<{ series: any[]; categories: string[] } | null>(null);
-  const [chartRingTime, setChartRingTime] = useState<{ series: any[]; categories: string[] } | null>(null);
-  const [chartCost, setChartCost] = useState<{ series: any[]; categories: string[] } | null>(null);
-  const [chartDuration, setChartDuration] = useState<{ series: any[]; categories: string[] } | null>(null);
+  const [simpleDonut, setSimpleDonut] = useState<{
+    series: number[];
+    labels: string[];
+  } | null>(null);
+  const [chartCalls, setChartCalls] = useState<{
+    series: any[];
+    categories: string[];
+  } | null>(null);
+  const [chartRingTime, setChartRingTime] = useState<{
+    series: any[];
+    categories: string[];
+  } | null>(null);
+  const [chartDuration, setChartDuration] = useState<{
+    series: any[];
+    categories: string[];
+  } | null>(null);
   const [chartLoading, setChartLoading] = useState(false);
   const [showChartModal, setShowChartModal] = useState(false);
-  const [currentChartData, setCurrentChartData] = useState<{ series: any[]; categories: string[] } | null>(null);
-  const [currentChartTitle, setCurrentChartTitle] = useState('');
-  const [currentChartDataType, setCurrentChartDataType] = useState<'calls' | 'time' | 'cost' | 'custom'>('custom');
+  const [currentChartData, setCurrentChartData] = useState<{
+    series: any[];
+    categories: string[];
+  } | null>(null);
+  const [currentChartTitle, setCurrentChartTitle] = useState("");
+  const [currentChartDataType, setCurrentChartDataType] =
+    useState<ChartDataType>("custom");
 
-  const handleOpenChartModal = (chartData: { series: any[]; categories: string[] } | null, title: string, dataType: 'calls' | 'time' | 'cost' | 'custom') => {
+  const handleOpenChartModal = (
+    chartData: { series: any[]; categories: string[] } | null,
+    title: string,
+    dataType: ChartDataType,
+  ) => {
     if (chartData) {
       setCurrentChartData(chartData);
       setCurrentChartTitle(title);
@@ -464,647 +664,702 @@ const CallStatsCountry = () => {
   };
 
   useEffect(() => {
-    if(summary && dataLoaded) {
+    if (summary && dataLoaded) {
       const answeredCalls = Number(summary.answered_calls) || 0;
       const unansweredCalls = Number(summary.unanswered_calls) || 0;
-      
+
       if (answeredCalls === 0 && unansweredCalls === 0) {
         setSimpleDonut(null);
       } else {
         setSimpleDonut({
           series: [answeredCalls, unansweredCalls],
-          labels: ['Answered Calls', 'Unanswered Calls']
+          labels: ["Answered Calls", "Unanswered Calls"],
         });
       }
     }
   }, [summary, dataLoaded]);
 
+  const [pendingStartDate, setPendingStartDate] = useState<string>(
+    (currentFilters as any)?.start_datetime ||
+      defaultFilters.pending.start_datetime,
+  );
+  const [pendingEndDate, setPendingEndDate] = useState<string>(
+    (currentFilters as any)?.end_datetime ||
+      defaultFilters.pending.end_datetime,
+  );
+  const [isDateRangeSet, setIsDateRangeSet] = useState(false);
+  const [pendingCalledNumbers, setPendingCalledNumbers] = useState<string>("");
+
+  // ─── Apply filters helper (used by pills) ─────────────────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const applyFilters = useCallback(
+    (updated: Record<string, any>) => {
+      handleFiltersChange(updated);
+      fetchCallLogs(1, rowsPerPage, "");
+    },
+    [handleFiltersChange, rowsPerPage, fetchCallLogs],
+  );
+
+  const toggleStringIdInFilter = useCallback(
+    (key: "extension_number" | "department", id: string) => {
+      const current: string[] = (currentFilters as any)?.[key] || [];
+      const updated = current.includes(id)
+        ? current.filter((x) => x !== id)
+        : [...current, id];
+      applyFilters({ ...currentFilters, [key]: updated });
+    },
+    [currentFilters, applyFilters],
+  );
+
+  // ─── Stats cards ──────────────────────────────────────────────────────────
+  const statsCardsData: StatsCardData[] = useMemo(() => {
+    if (!dataLoaded) return [];
+    return [
+      {
+        title: "Total Calls",
+        value: summary.total_calls,
+        subtitle: "Total number of calls",
+      },
+      {
+        title: "Avg Ring Time",
+        value: formatMinutesAndSeconds(summary.avg_ring_time),
+        subtitle: "Average ring time per call",
+      },
+      {
+        title: "Avg Duration",
+        value: formatMinutesAndSeconds(summary.avg_duration),
+        subtitle: "Average call duration",
+      },
+      {
+        title: "Total Duration",
+        value: formatMinutesAndSeconds(summary.total_duration),
+        subtitle: "Total duration of calls",
+      },
+    ];
+  }, [dataLoaded, summary]);
+
+  // ─── Filter pills ─────────────────────────────────────────────────────────
+  const directionLabel = useMemo(() => {
+    const val = (currentFilters as any)?.is_incoming_only;
+    if (val === "true") return "Incoming";
+    if (val === "false") return "Outgoing";
+    return undefined;
+  }, [currentFilters]);
+
+  const statusLabel = useMemo(() => {
+    const val = (currentFilters as any)?.call_status;
+    if (val === "Answered") return "Answered";
+    if (val === "Not Answered") return "Not Answered";
+    if (val === "Both") return "Both";
+    return undefined;
+  }, [currentFilters]);
+
+  const trafficLabel = useMemo(() => {
+    const val = (currentFilters as any)?.traffic_type;
+    if (val === "internal") return "Internal";
+    if (val === "external") return "External";
+    return undefined;
+  }, [currentFilters]);
+
+  const destinationLabel = useMemo(() => {
+    const val = (currentFilters as any)?.destination_type;
+    if (val === "local") return "Local";
+    if (val === "national") return "National";
+    if (val === "international") return "International";
+    return undefined;
+  }, [currentFilters]);
+
+  const dateRangeActiveLabel = useMemo(() => {
+    const s = (currentFilters as any)?.start_datetime;
+    const e = (currentFilters as any)?.end_datetime;
+    if (s && e)
+      return `${formatDateTimeToLocal(s, GlobalDateTimeFormat)} – ${formatDateTimeToLocal(e, GlobalDateTimeFormat)}`;
+    if (s) return `From ${formatDateTimeToLocal(s, GlobalDateTimeFormat)}`;
+    if (e) return `To ${formatDateTimeToLocal(e, GlobalDateTimeFormat)}`;
+    return undefined;
+  }, [currentFilters]);
+
+  const extensionActiveLabel = useMemo(() => {
+    const exts: string[] = (currentFilters as any)?.extension_number || [];
+    if (exts.length === 0) return undefined;
+    return `${exts.length} selected`;
+  }, [currentFilters]);
+
+  const departmentActiveLabel = useMemo(() => {
+    const depts: string[] = (currentFilters as any)?.department || [];
+    if (depts.length === 0) return undefined;
+    return `${depts.length} selected`;
+  }, [currentFilters]);
+
+  const calledNumbersActiveLabel = useMemo(() => {
+    const nums: string[] = (currentFilters as any)?.called_numbers || [];
+    if (nums.length === 0) return undefined;
+    return `${nums.length} number(s)`;
+  }, [currentFilters]);
+
+  const filterPills: FilterPill[] = useMemo(
+    () => [
+      {
+        id: "date_range",
+        label: "Date Range",
+        showDropdown: true,
+        active: isDateRangeSet,
+        activeLabel: isDateRangeSet ? dateRangeActiveLabel : undefined,
+        activeLabelOnly: true,
+        onClear: () => {
+          const freshDefaults = getDefaultFilters();
+          setIsDateRangeSet(false);
+          setPendingStartDate(freshDefaults.pending.start_datetime);
+          setPendingEndDate(freshDefaults.pending.end_datetime);
+          applyFilters({
+            ...currentFilters,
+            start_datetime: freshDefaults.current.start_datetime,
+            end_datetime: freshDefaults.current.end_datetime,
+          });
+        },
+        dropdownContent: createDateRangeDropdownContent(
+          pendingStartDate,
+          pendingEndDate,
+          (v) => setPendingStartDate(v),
+          (v) => setPendingEndDate(v),
+          () => {
+            setIsDateRangeSet(true);
+            applyFilters({
+              ...currentFilters,
+              start_datetime: pendingStartDate,
+              end_datetime: pendingEndDate,
+            });
+          },
+        ),
+      },
+      {
+        id: "direction",
+        label: "Direction",
+        showDropdown: true,
+        active: Boolean((currentFilters as any)?.is_incoming_only),
+        activeLabel: directionLabel,
+        onClear: () => {
+          const updated = { ...currentFilters };
+          delete updated.is_incoming_only;
+          applyFilters(updated);
+        },
+        dropdownOptions: [
+          {
+            label: "All",
+            value: "",
+            onClick: () => {
+              const u = { ...currentFilters };
+              delete u.is_incoming_only;
+              applyFilters(u);
+            },
+          },
+          {
+            label: "Incoming",
+            value: "true",
+            onClick: () =>
+              applyFilters({ ...currentFilters, is_incoming_only: "true" }),
+          },
+          {
+            label: "Outgoing",
+            value: "false",
+            onClick: () =>
+              applyFilters({ ...currentFilters, is_incoming_only: "false" }),
+          },
+        ],
+      },
+      {
+        id: "call_status",
+        label: "Call Status",
+        showDropdown: true,
+        active: Boolean((currentFilters as any)?.call_status),
+        activeLabel: statusLabel,
+        onClear: () => applyFilters({ ...currentFilters, call_status: "" }),
+        dropdownOptions: [
+          {
+            label: "All",
+            value: "",
+            onClick: () => applyFilters({ ...currentFilters, call_status: "" }),
+          },
+          {
+            label: "Answered",
+            value: "Answered",
+            onClick: () =>
+              applyFilters({ ...currentFilters, call_status: "Answered" }),
+          },
+          {
+            label: "Not Answered",
+            value: "Not Answered",
+            onClick: () =>
+              applyFilters({ ...currentFilters, call_status: "Not Answered" }),
+          },
+          {
+            label: "Both",
+            value: "Both",
+            onClick: () =>
+              applyFilters({ ...currentFilters, call_status: "Both" }),
+          },
+        ],
+      },
+      {
+        id: "traffic_type",
+        label: "Traffic Type",
+        showDropdown: true,
+        active: Boolean((currentFilters as any)?.traffic_type),
+        activeLabel: trafficLabel,
+        onClear: () => applyFilters({ ...currentFilters, traffic_type: "" }),
+        dropdownOptions: [
+          {
+            label: "All",
+            value: "",
+            onClick: () =>
+              applyFilters({ ...currentFilters, traffic_type: "" }),
+          },
+          {
+            label: "Internal",
+            value: "internal",
+            onClick: () =>
+              applyFilters({ ...currentFilters, traffic_type: "internal" }),
+          },
+          {
+            label: "External",
+            value: "external",
+            onClick: () =>
+              applyFilters({ ...currentFilters, traffic_type: "external" }),
+          },
+        ],
+      },
+      {
+        id: "destination_type",
+        label: "Destination",
+        showDropdown: true,
+        active: Boolean((currentFilters as any)?.destination_type),
+        activeLabel: destinationLabel,
+        onClear: () =>
+          applyFilters({ ...currentFilters, destination_type: "" }),
+        dropdownOptions: [
+          {
+            label: "All",
+            value: "",
+            onClick: () =>
+              applyFilters({ ...currentFilters, destination_type: "" }),
+          },
+          {
+            label: "Local",
+            value: "local",
+            onClick: () =>
+              applyFilters({ ...currentFilters, destination_type: "local" }),
+          },
+          {
+            label: "National",
+            value: "national",
+            onClick: () =>
+              applyFilters({ ...currentFilters, destination_type: "national" }),
+          },
+          {
+            label: "International",
+            value: "international",
+            onClick: () =>
+              applyFilters({
+                ...currentFilters,
+                destination_type: "international",
+              }),
+          },
+        ],
+      },
+      {
+        id: "extension_number",
+        label: "Extension",
+        showDropdown: true,
+        active: ((currentFilters as any)?.extension_number || []).length > 0,
+        activeLabel: extensionActiveLabel,
+        onClear: () =>
+          applyFilters({ ...currentFilters, extension_number: [] }),
+        dropdownOptions: [
+          {
+            label: "All",
+            value: "",
+            onClick: () =>
+              applyFilters({ ...currentFilters, extension_number: [] }),
+          },
+          ...((hierarchyDataExtensions as any[]) || []).map((ext: any) => ({
+            label: ext.name,
+            value: String(ext.id),
+            onClick: () =>
+              toggleStringIdInFilter("extension_number", String(ext.id)),
+          })),
+        ],
+      },
+      {
+        id: "department",
+        label: "Department",
+        showDropdown: true,
+        active: ((currentFilters as any)?.department || []).length > 0,
+        activeLabel: departmentActiveLabel,
+        onClear: () => applyFilters({ ...currentFilters, department: [] }),
+        dropdownOptions: [
+          {
+            label: "All",
+            value: "",
+            onClick: () => applyFilters({ ...currentFilters, department: [] }),
+          },
+          ...((hierarchyDataDepartments as any[]) || []).map((dept: any) => ({
+            label: dept.name,
+            value: String(dept.id),
+            onClick: () =>
+              toggleStringIdInFilter("department", String(dept.id)),
+          })),
+        ],
+      },
+      {
+        id: "called_numbers",
+        label: "Called Numbers",
+        showDropdown: true,
+        active: ((currentFilters as any)?.called_numbers || []).length > 0,
+        activeLabel: calledNumbersActiveLabel,
+        onClear: () => {
+          setPendingCalledNumbers("");
+          applyFilters({ ...currentFilters, called_numbers: [] });
+        },
+        dropdownContent: createCalledNumbersDropdownContent(
+          pendingCalledNumbers,
+          (v) => setPendingCalledNumbers(v),
+          () => {
+            const values = pendingCalledNumbers
+              .split(",")
+              .map((v) => v.trim())
+              .filter(Boolean);
+            applyFilters({ ...currentFilters, called_numbers: values });
+          },
+        ),
+      },
+    ],
+    [
+      currentFilters,
+      isDateRangeSet,
+      dateRangeActiveLabel,
+      directionLabel,
+      statusLabel,
+      trafficLabel,
+      destinationLabel,
+      extensionActiveLabel,
+      departmentActiveLabel,
+      calledNumbersActiveLabel,
+      pendingStartDate,
+      pendingEndDate,
+      pendingCalledNumbers,
+      hierarchyDataExtensions,
+      hierarchyDataDepartments,
+      applyFilters,
+      toggleStringIdInFilter,
+    ],
+  );
+
+  // ─── Toolbar config ───────────────────────────────────────────────────────
+  const tableToolbar: ToolbarConfig = useMemo(
+    () => ({
+      showSearch: false,
+      showFilterPills: true,
+      filterPills,
+      showMoreFiltersButton: false,
+      showExportButton: true,
+      onExportClick: handleExport,
+      rightActions: showDateRange ? (
+        <p className="mb-0 small">
+          <span>Date Range:</span>
+          <span className="status-badge primary ms-2">
+            {formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}
+          </span>
+          <span className="mx-2">to</span>
+          <span className="status-badge primary">
+            {formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}
+          </span>
+        </p>
+      ) : undefined,
+    }),
+    [filterPills, handleExport, showDateRange, startDateTime, endDateTime],
+  );
+
+  // ─── Pagination handler ───────────────────────────────────────────────────
+  const handlePaginationChange = useCallback(
+    (page: number, perPage: number) => {
+      setCurrentPage(page);
+      setRowsPerPage(perPage);
+      fetchCallLogs(page, perPage, "");
+    },
+    [fetchCallLogs],
+  );
+
+  // ─── Chart render helpers ─────────────────────────────────────────────────
+  function renderDonutChart() {
+    if (!dataLoaded) {
+      return (
+        <div
+          className="d-flex flex-column align-items-center justify-content-center text-center"
+          style={{ height: "180px" }}
+        >
+          <output className="spinner-border text-primary mb-2">
+            <span className="visually-hidden">Loading chart data...</span>
+          </output>
+          <p className="text-muted mb-0">Loading chart data...</p>
+        </div>
+      );
+    }
+    if (!simpleDonut) {
+      return (
+        <div
+          className="d-flex flex-column align-items-center justify-content-center text-center"
+          style={{ height: "180px" }}
+        >
+          <i className="fa fa-chart-pie fa-2x text-muted mb-2" />
+          <h6 className="text-muted mb-1">No Call Data Available</h6>
+          <p className="text-muted mb-0">
+            No call statistics found for the selected filters
+          </p>
+        </div>
+      );
+    }
+    return (
+      <ChartDonut
+        series={simpleDonut.series}
+        labels={simpleDonut.labels}
+        dataType="calls"
+        height={200}
+        width={500}
+        showDataLabels={true}
+        dataLabelsFormatter={donutDataLabelsFormatter}
+      />
+    );
+  }
+
+  function renderBarChart(
+    chartData: { series: any[]; categories: string[] } | null,
+    dataType: ChartDataType,
+    modalData: { series: any[]; categories: string[] } | null,
+    modalTitle: string,
+    modalDataType: ChartDataType,
+  ) {
+    if (chartLoading) {
+      return (
+        <div
+          className="d-flex align-items-center justify-content-center"
+          style={{ height: "300px" }}
+        >
+          <output className="spinner-border text-primary">
+            <span className="visually-hidden">Loading chart...</span>
+          </output>
+        </div>
+      );
+    }
+    if (!chartData) {
+      return (
+        <div
+          className="d-flex flex-column align-items-center justify-content-center text-center"
+          style={{ height: "300px" }}
+        >
+          <i className="fa fa-chart-bar fa-3x text-muted mb-3" />
+          <h5 className="text-muted mb-2">No Data Available</h5>
+          <p className="text-muted mb-0">
+            No statistics found for the selected filters and date range.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <ChartBar
+        series={chartData.series}
+        categories={chartData.categories}
+        dataType={dataType}
+        height={300}
+        maxDisplayedItems={5}
+        showViewAllButton={true}
+        viewAllButtonText="View All"
+        showFullScreenButton={false}
+        onFullScreenClick={() =>
+          handleOpenChartModal(modalData, modalTitle, modalDataType)
+        }
+      />
+    );
+  }
+
   return (
     <React.Fragment>
-      <BreadcrumbItem mainTitle="" mainLink="" subTitle="Call Stats By Country" showPageLoader={showPageLoader} />
-      
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={5}>
-                <h2 className="mb-0">Call Stats By Country</h2>
-              </Col>
-              <Col md={7} className="d-flex justify-content-end">
-                <div className="action-buttons">
+      <BreadcrumbItem
+        mainTitle=""
+        mainLink=""
+        subTitle="Call Stats By Country"
+        showPageLoader={showPageLoader}
+      />
 
-                  {showDateRange && (
-                            <>
-                            <p className="mb-0">
-                            Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                            </p>
-                          
-                            </>
-                          )}
-                  {/* {session?.user?.permissions?.includes('') && ( */}
-                    <div className="d-flex align-items-center gap-2">
-                      <button 
-                        className="btn btn-outline-secondary" 
-                        onClick={() => handleExport()}
-                        disabled={isExporting}
-                      >
-                        {isExporting ? (
-                          <>
-                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            Exporting...
-                          </>
-                        ) : (
-                          'Export'
+      {/* GenericTable with filter pills and stats cards — at top */}
+      {session?.user?.permissions?.includes("list-call-logs") && (
+        <GenericTable
+          data={tableData}
+          columns={columns}
+          loading={tableLoading}
+          showToolbar={true}
+          toolbar={tableToolbar}
+          showToolbarActions={false}
+          statsCards={statsCardsData}
+          metricsGridMinWidth="180px"
+          pagination={{
+            currentPage,
+            rowsPerPage,
+            totalRows,
+            pageSizeOptions: [15, 25, 50, 100],
+          }}
+          onPaginationChange={handlePaginationChange}
+          emptyMessage="No call statistics found for the selected filters and date range."
+        />
+      )}
+
+      {/* Call Analytics charts section — below table, styled to match GenericTable card */}
+      <div className="mt-4">
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #ccc",
+            borderRadius: "12px",
+            overflow: "hidden",
+            boxShadow: "0 0.125rem 0.25rem rgba(0,0,0,0.075)",
+          }}
+        >
+          {/* Section header — matches GenericTable toolbar header style */}
+          <div
+            style={{
+              background: "#f7f2f7",
+              borderBottom: "1px solid #dfe1e6",
+              padding: "12px 20px",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <h6
+              className="mb-0 fw-semibold"
+              style={{ fontSize: "14px", color: "#222" }}
+            >
+              Call Analytics
+            </h6>
+          </div>
+
+          {/* Charts body */}
+          <div className="p-3">
+            <Row className="g-3">
+              {/* Donut chart — answered vs unanswered */}
+              <Col md={4}>
+                <div
+                  style={{
+                    background: "#fafafa",
+                    border: "1px solid #eee",
+                    borderRadius: "10px",
+                    padding: "16px",
+                    height: "100%",
+                  }}
+                >
+                  <p
+                    className="text-muted mb-3 fw-semibold"
+                    style={{
+                      fontSize: "12px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Answered vs Unanswered
+                  </p>
+                  {renderDonutChart()}
+                </div>
+              </Col>
+
+              {/* Tabbed bar charts */}
+              <Col md={8}>
+                <div
+                  style={{
+                    background: "#fafafa",
+                    border: "1px solid #eee",
+                    borderRadius: "10px",
+                    padding: "16px",
+                    height: "100%",
+                  }}
+                >
+                  <Tabs
+                    defaultActiveKey="calls_chart"
+                    id="system-tabs"
+                    className="mb-3"
+                    activeKey={activeTab}
+                    onSelect={(key) => key && setActiveTab(key)}
+                  >
+                    <Tab eventKey="calls_chart" title="Calls by Country">
+                      <AnimatePresence mode="wait">
+                        {activeTab === "calls_chart" && (
+                          <motion.div
+                            key="calls_chart"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                          >
+                            {renderBarChart(
+                              chartCalls,
+                              "calls",
+                              chartCalls,
+                              "Calls by Country",
+                              "calls",
+                            )}
+                          </motion.div>
                         )}
-                      </button>
-                    </div>
-                  {/* )} */}
+                      </AnimatePresence>
+                    </Tab>
+
+                    <Tab eventKey="duration_chart" title="Duration by Country">
+                      <AnimatePresence mode="wait">
+                        {activeTab === "duration_chart" && (
+                          <motion.div
+                            key="duration_chart"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                          >
+                            {renderBarChart(
+                              chartDuration,
+                              "time",
+                              chartDuration,
+                              "Duration by Country",
+                              "time",
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </Tab>
+
+                    <Tab eventKey="ring_chart" title="Ring Time by Country">
+                      <AnimatePresence mode="wait">
+                        {activeTab === "ring_chart" && (
+                          <motion.div
+                            key="ring_chart"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                          >
+                            {renderBarChart(
+                              chartRingTime,
+                              "time",
+                              chartRingTime,
+                              "Ring Time by Country",
+                              "time",
+                            )}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </Tab>
+                  </Tabs>
                 </div>
               </Col>
             </Row>
           </div>
-        </Col>
-      </Row>
+        </div>
+      </div>
 
-      <Row>
-        <Col md={6}>
-          <Row>
-            {!dataLoaded ? (
-              <>
-                {[...Array(4)].map((_, index) => (
-                  <Col md={6} className="mb-3" key={index}>
-                    <div className="card report-shadow h-100">
-                      <div className="card-body d-flex flex-column align-items-center justify-content-center text-center" style={{ minHeight: '120px' }}>
-                        <div className="spinner-border text-primary mb-2" role="status">
-                          <span className="visually-hidden">Loading...</span>
-                        </div>
-                        <p className="text-muted mb-0">Loading...</p>
-                      </div>
-                    </div>
-                  </Col>
-                ))}
-              </>
-            ) : dataLoaded && summary.total_calls === 0 && summary.total_cost === 0 && summary.answered_calls === 0 && summary.unanswered_calls === 0 ? (
-              <Col md={12}>
-                <div className="card report-shadow">
-                  <div className="card-body d-flex flex-column align-items-center justify-content-center text-center" style={{ minHeight: '120px' }}>
-                    <i className="fa fa-database fa-3x text-muted mb-3"></i>
-                    <h5 className="text-muted mb-2">No Data Available</h5>
-                    <p className="text-muted mb-0">No call statistics found for the selected filters and date range.</p>
-                  </div>
-                </div>
-              </Col>
-            ) : (
-              <>
-                <PageSummaryGrid
-                  gridColumns={2}
-                  
-                  cards={[
-                    {
-                      id: 'total-calls',
-                      title: 'Total Calls',
-                      value: summary.total_calls,
-                      description: 'Total number of calls',
-                      valueType: 'number',
-                      delay: 0
-                    },
-                    {
-                      id: 'avg-ring-time',
-                      title: 'Avg Ring Time',
-                      value: summary.avg_ring_time,
-                      description: 'Average ring time per call',
-                      valueType: 'seconds',
-                      delay: 0.3
-                    },
-                    {
-                      id: 'avg-duration',
-                      title: 'Avg Duration',
-                      value: summary.avg_duration,
-                      description: 'Average call duration',
-                      valueType: 'seconds',
-                      delay: 0.6
-                    },
-                    {
-                      id: 'total-cost',
-                      title: 'Total Duration',
-                      value: summary.total_duration,
-                      description: 'Total duration of calls',
-                      valueType: 'seconds',
-                      delay: 0.9
-                    }
-                  ]}
-                />
-              </>
-            )}
-          </Row>
-        </Col>
-
-        <Col md={6}>
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 * 0 }}
-          >
-            <div className="report-grid">
-              <p className="text-muted mb-0">Total Calls</p>
-              <div className="chart-one">
-                {!dataLoaded ? (
-                  <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '180px' }}>
-                    <div className="spinner-border text-primary mb-2" role="status">
-                      <span className="visually-hidden">Loading...</span>
-                    </div>
-                    <p className="text-muted mb-0">Loading chart data...</p>
-                  </div>
-                ) : (summary.answered_calls === 0 && summary.unanswered_calls === 0 && summary.total_duration === 0) ? (
-                  <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '180px' }}>
-                    <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
-                    <h6 className="text-muted mb-1">No Call Data Available</h6>
-                    <p className="text-muted mb-0">No call statistics found for the selected filters</p>
-                  </div>
-                ) : !simpleDonut ? (
-                  <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '180px' }}>
-                    <i className="fa fa-chart-pie fa-2x text-muted mb-2"></i>
-                    <h6 className="text-muted mb-1">No Call Data Available</h6>
-                    <p className="text-muted mb-0">No call statistics found for the selected filters</p>
-                  </div>
-                ) : (
-                  <ChartDonut 
-                    series={simpleDonut.series} 
-                    labels={simpleDonut.labels}
-                    dataType="calls"
-                    height={200}
-                    width={500}
-                    showDataLabels={true}
-                    dataLabelsFormatter={(value) => `${value.toFixed(0)}%`}
-                  />
-                )}
-              </div>
-            </div>
-          </motion.div>
-        </Col>
-      </Row>
-
-      <Row>
-        <Col md={12}>
-          <h4 className="">Core Metrics</h4>
-        </Col>
-
-        <Col md={12}>
-          <Tabs
-            defaultActiveKey="calls_chart"
-            id="system-tabs"
-            className="mb-3"
-            activeKey={activeTab}
-            onSelect={(key) => key && setActiveTab(key)}
-          >
-            <Tab eventKey="calls_chart" title="Calls by Country">
-              <AnimatePresence mode="wait">
-                {activeTab === 'calls_chart' && (
-                  <motion.div
-                    key="calls_chart"
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -30 }}
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {chartLoading ? (
-                              <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                <div className="spinner-border text-primary" role="status">
-                                  <span className="visually-hidden">Loading chart...</span>
-                                </div>
-                              </div>
-                            ) : chartCalls ? (
-                              <ChartBar 
-                                series={chartCalls.series}
-                                categories={chartCalls.categories}
-                                dataType="calls"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() => handleOpenChartModal(chartCalls, 'Calls by Country', 'calls')}
-                              />
-                            ) : (
-                              <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '300px' }}>
-                                <i className="fa fa-chart-bar fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">No Call Data Available</h5>
-                                <p className="text-muted mb-0">No call statistics found for the selected filters and date range.</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Tab>
-
-            <Tab eventKey="duration_chart" title="Duration by Country">
-              <AnimatePresence mode="wait">
-                {activeTab === 'duration_chart' && (
-                  <motion.div
-                    key="duration_chart"
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -30 }}
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {chartLoading ? (
-                              <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                <div className="spinner-border text-primary" role="status">
-                                  <span className="visually-hidden">Loading chart...</span>
-                                </div>
-                              </div>
-                            ) : chartDuration ? (
-                              <ChartBar 
-                                series={chartDuration.series}
-                                categories={chartDuration.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() => handleOpenChartModal(chartDuration, 'Duration by Country', 'time')}
-                              />
-                            ) : (
-                              <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '300px' }}>
-                                <i className="fa fa-clock fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">No Duration Data Available</h5>
-                                <p className="text-muted mb-0">No duration statistics found for the selected filters and date range.</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Tab>
-
-            <Tab eventKey="ring_chart" title="Ring Time by Country">
-              <AnimatePresence mode="wait">
-                {activeTab === 'ring_chart' && (
-                  <motion.div
-                    key="ring_chart"
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -30 }}
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {chartLoading ? (
-                              <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                <div className="spinner-border text-primary" role="status">
-                                  <span className="visually-hidden">Loading chart...</span>
-                                </div>
-                              </div>
-                            ) : chartRingTime ? (
-                              <ChartBar 
-                                series={chartRingTime.series}
-                                categories={chartRingTime.categories}
-                                dataType="time"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() => handleOpenChartModal(chartRingTime, 'Ring Time by Country', 'time')}
-                              />
-                            ) : (
-                              <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '300px' }}>
-                                <i className="fa fa-phone fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">No Ring Time Data Available</h5>
-                                <p className="text-muted mb-0">No ring time statistics found for the selected filters and date range.</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Tab>
-
-            {/* <Tab eventKey="cost_chart" title="Cost by Country">
-              <AnimatePresence mode="wait">
-                {activeTab === 'cost_chart' && (
-                  <motion.div
-                    key="cost_chart"
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -30 }}
-                  >
-                    <Row>
-                      <Col md={12}>
-                        <div className="card report-shadow">
-                          <div className="card-body">
-                            {chartLoading ? (
-                              <div className="d-flex align-items-center justify-content-center" style={{ height: '300px' }}>
-                                <div className="spinner-border text-primary" role="status">
-                                  <span className="visually-hidden">Loading chart...</span>
-                                </div>
-                              </div>
-                            ) : chartCost ? (
-                              <ChartBar 
-                                series={chartCost.series}
-                                categories={chartCost.categories}
-                                dataType="cost"
-                                height={300}
-                                maxDisplayedItems={5}
-                                showViewAllButton={true}
-                                viewAllButtonText="View All"
-                                showFullScreenButton={true}
-                                onFullScreenClick={() => handleOpenChartModal(chartCost, 'Cost by Country', 'cost')}
-                              />
-                            ) : (
-                              <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '300px' }}>
-                                <i className="fa fa-dollar-sign fa-3x text-muted mb-3"></i>
-                                <h5 className="text-muted mb-2">No Cost Data Available</h5>
-                                <p className="text-muted mb-0">No cost statistics found for the selected filters and date range.</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Col>
-                    </Row>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Tab> */}
-          </Tabs>
-        </Col>
-      </Row>
-
-      {session?.user?.permissions?.includes('list-call-logs') && (
-        <>
-            <BarFilters
-            leftContent={
-              <>
-                {showDateRange && (
-                  <p className="mb-0">
-                    Date Range: <span className="status-badge primary">{formatDateTimeToLocal(startDateTime, GlobalDateTimeFormat)}</span> to <span className="status-badge primary">{formatDateTimeToLocal(endDateTime, GlobalDateTimeFormat)}</span>
-                  </p>
-                )}
-              </>
-            }
-              searchValue=""
-              onSearchChange={() => {}}
-              onSearch={() => {}}
-              searchPlaceholder="Search call stats..."
-              showSearch={false}
-              filters={pendingFilters}
-              onSubmit={() => {
-                // Convert and apply filters, then trigger all APIs
-                handleFiltersChange(pendingFilters);
-                // fetchCallLogs will be triggered by refreshKey change
-                // Chart data will be triggered by useEffect watching currentFilters
-              }}
-              onReset={() => {
-                const freshDefaults = getDefaultFilters();
-                const resetPending = { ...freshDefaults.pending };
-                const resetCurrent = { ...freshDefaults.current };
-                setPendingFilters(resetPending);
-                setCurrentFilters(resetCurrent);
-                currentFiltersRef.current = resetCurrent;
-                handleFiltersChange(resetPending);
-              }}
-              filterContent={
-                <>
-                  
-
-                  {/* Call Direction */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Call Direction</Form.Label>
-                      <SelectBox
-                        isSearchable={false}
-                        value={(pendingFilters as any)?.is_incoming_only || null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, is_incoming_only: value as string || '' });
-                        }}
-                        options={[
-                          { value: 'true', label: 'Incoming' },
-                          { value: 'false', label: 'Outgoing' },
-                          { value: '', label: 'Both' }
-                        ]}
-                        placeholder="Select call direction"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Call Status */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Call Status</Form.Label>
-                      <SelectBox
-                        isSearchable={false}
-                        value={(pendingFilters as any)?.call_status || null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, call_status: value as string || '' });
-                        }}
-                        options={[
-                          { value: 'Answered', label: 'Answered' },
-                          { value: 'Not Answered', label: 'Not Answered' },
-                          { value: 'Both', label: 'Both' }
-                        ]}
-                        placeholder="Select call status"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Called Numbers */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Called Numbers</Form.Label>
-                      <Form.Control
-                        type="text"
-                        placeholder="Enter called numbers (comma separated)"
-                        value={((pendingFilters as any)?.called_numbers || []).join(', ')}
-                        onChange={(e) => {
-                          const values = e.target.value.split(',').map(v => v.trim()).filter(Boolean);
-                          setPendingFilters({ ...pendingFilters, called_numbers: values });
-                        }}
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Extension */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Extension</Form.Label>
-                      <SelectBox
-                        isMulti
-                        isSearchable={true}
-                        isDisabled={hierarchyLoading}
-                        value={(pendingFilters as any)?.extension_number?.length > 0 ? (pendingFilters as any)?.extension_number : null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, extension_number: value ? (value as string[]) : [] });
-                        }}
-                        options={(hierarchyDataExtensions as any)?.map((ext: any) => ({
-                          value: ext.id,
-                          label: ext.name
-                        })) || []}
-                        placeholder="Select extensions"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Traffic Type */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Traffic Type</Form.Label>
-                      <SelectBox
-                        isSearchable={false}
-                        value={(pendingFilters as any)?.traffic_type || null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, traffic_type: value as string || '' });
-                        }}
-                        options={[
-                          { value: '', label: 'All' },
-                          { value: 'internal', label: 'Internal' },
-                          { value: 'external', label: 'External' }
-                        ]}
-                        placeholder="Select traffic type"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Destination Type */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Destination Type</Form.Label>
-                      <SelectBox
-                        isSearchable={false}
-                        value={(pendingFilters as any)?.destination_type || null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, destination_type: value as string || '' });
-                        }}
-                        options={[
-                          { value: '', label: 'All' },
-                          { value: 'local', label: 'Local' },
-                          { value: 'national', label: 'National' },
-                          { value: 'international', label: 'International' }
-                        ]}
-                        placeholder="Select destination type"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Departments */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Departments</Form.Label>
-                      <SelectBox
-                        isMulti
-                        isSearchable={true}
-                        isDisabled={hierarchyLoading}
-                        value={(pendingFilters as any)?.department?.length > 0 ? (pendingFilters as any)?.department : null}
-                        onChange={(value) => {
-                          setPendingFilters({ ...pendingFilters, department: value ? (value as string[]) : [] });
-                        }}
-                        options={(hierarchyDataDepartments as any)?.map((dept: any) => ({
-                          value: dept.id,
-                          label: dept.name
-                        })) || []}
-                        placeholder="Select departments"
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Date Range - Start */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>Start Date & Time</Form.Label>
-                      <Form.Control
-                        type="datetime-local"
-                        value={(pendingFilters as any)?.start_datetime || ''}
-                        max={moment().format('YYYY-MM-DDTHH:mm')}
-                        onChange={(e) => {
-                          const datetimeValue = e.target.value;
-                          const endDate = (pendingFilters as any)?.end_datetime || '';
-                          
-                          // If start date is greater than end date, adjust end date to start date
-                          let updatedFilters: any = {
-                            ...pendingFilters,
-                            start_datetime: datetimeValue
-                          };
-                          
-                          if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) {
-                            updatedFilters.end_datetime = datetimeValue;
-                          }
-                          
-                          setPendingFilters(updatedFilters);
-                        }}
-                      />
-                    </Form.Group>
-                  </Col>
-
-                  {/* Date Range - End */}
-                  <Col md={4}>
-                    <Form.Group>
-                      <Form.Label>End Date & Time</Form.Label>
-                      <Form.Control
-                        type="datetime-local"
-                        value={(pendingFilters as any)?.end_datetime || ''}
-                        min={(pendingFilters as any)?.start_datetime || ''}
-                        max={moment().format('YYYY-MM-DDTHH:mm')}
-                        onChange={(e) => {
-                          const datetimeValue = e.target.value;
-                          const startDate = (pendingFilters as any)?.start_datetime || '';
-                          
-                          // If end date is less than start date, adjust start date to end date
-                          let updatedFilters: any = {
-                            ...pendingFilters,
-                            end_datetime: datetimeValue
-                          };
-                          
-                          if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) {
-                            updatedFilters.start_datetime = datetimeValue;
-                          }
-                          
-                          setPendingFilters(updatedFilters);
-                        }}
-                      />
-                    </Form.Group>
-                  </Col>
-                </>
-              }
-            />
-            
-
-
-
-            <GenericListPage
-              columns={columns}
-              fetchData={fetchCallLogs}
-              title="Call Logs"
-              searchPlaceholder="Search call stats..."
-              defaultPageSize={15}
-              filters={currentFilters}
-              refreshKey={refreshKey}
-              key={refreshKey}
-              search={false}
-              tableStyle='table-style-2'
-            />
-        </>
-      )}
-
-      {/* Chart Modal */}
-      <Modal 
-        show={showChartModal} 
+      {/* Chart fullscreen modal */}
+      <Modal
+        show={showChartModal}
         onHide={() => setShowChartModal(false)}
         size="xl"
         centered
@@ -1115,8 +1370,8 @@ const CallStatsCountry = () => {
         </Modal.Header>
         <Modal.Body>
           {currentChartData ? (
-            <div className="chart-container" style={{ minHeight: '500px' }}>
-              <ChartBar 
+            <div className="chart-container" style={{ minHeight: "500px" }}>
+              <ChartBar
                 series={currentChartData.series}
                 categories={currentChartData.categories}
                 height={500}
@@ -1124,10 +1379,15 @@ const CallStatsCountry = () => {
               />
             </div>
           ) : (
-            <div className="d-flex flex-column align-items-center justify-content-center text-center" style={{ height: '500px' }}>
-              <i className="fa fa-chart-area fa-4x text-muted mb-3"></i>
+            <div
+              className="d-flex flex-column align-items-center justify-content-center text-center"
+              style={{ height: "500px" }}
+            >
+              <i className="fa fa-chart-area fa-4x text-muted mb-3" />
               <h5 className="text-muted mb-2">No Chart Data Available</h5>
-              <p className="text-muted mb-0">The selected chart data is not available or has been cleared.</p>
+              <p className="text-muted mb-0">
+                The selected chart data is not available or has been cleared.
+              </p>
             </div>
           )}
         </Modal.Body>

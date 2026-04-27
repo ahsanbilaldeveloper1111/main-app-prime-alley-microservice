@@ -264,6 +264,7 @@ const APP_PERMISSION_MODULES: AppPermissionModule[] = [
       { id: "text-messages-communications", label: "Text Messages" },
       { id: "live-calls-campaign-manager", label: "Campaigns Manager" },
       { id: "live-calls-campaign-console", label: "Campaign Console" },
+      { id: "live-calls-campaign-agent", label: "Campaign Agent" },
     ],
   },
   {
@@ -349,6 +350,7 @@ const APP_PERMISSION_MODULES: AppPermissionModule[] = [
       { id: "voicebot-inbound-dashboard", label: "Dashboard" },
       { id: "voicebot-inbound-companies", label: "Companies" },
       { id: "voicebot-inbound-bots", label: "Bots" },
+      { id: "voicebot-inbound-sip-trunks", label: "SIP trunks" },
       { id: "voicebot-inbound-calls", label: "Conversations" },
       { id: "voicebot-inbound-analytics", label: "Analytics" },
     ],

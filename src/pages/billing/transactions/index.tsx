@@ -9,10 +9,12 @@ import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { GetPayments } from "@utils/accounting";
 import { getMinifiedCompanies } from "@utils/crm";
+import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 import moment from "moment";
 import { GlobalDateFormat } from "@utils/Helper";
 
 import GenericTable, { TableColumn, FilterPill } from "@components/GenericTable";
+import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 
@@ -36,9 +38,23 @@ const ProductDetails = () => {
 
   const [transactionSearch, setTransactionSearch] = useState("");
   const [totalAllTransactions, setTotalAllTransactions] = useState(0);
+  const [showColumnEditor, setShowColumnEditor] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(() => [
+    ...DEFAULT_TRANSACTION_TABLE_COLUMN_KEYS,
+  ]);
 
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const onAccountingCustomerCreated = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
+
+  useEnsureCustomerForCrmCompany(selectedCompanyId, {
+    onCreated: onAccountingCustomerCreated,
+    errorToastId: "billing_transactions_ensure_customer_failed",
+  });
+
   const [currentFilters, setCurrentFilters] = useState<{
     search?: string;
     status?: string;
@@ -56,6 +72,10 @@ const ProductDetails = () => {
     rowsPerPage: 15,
     totalRows: 0,
   });
+
+  useEffect(() => {
+    setSelectedColumns(loadTransactionTableColumnsFromStorage());
+  }, []);
 
   // Sync search bar value → currentFilters so fetch re-runs
   useEffect(() => {
@@ -315,12 +335,11 @@ const ProductDetails = () => {
         removable: false,
       },
     ],
-    onTabAdd: () => {},
     onTabRemove: () => {},
     tabsDropdownLabel: "Transactions",
     onFiltersClick: handleOpenFiltersSidebar,
     onExportClick: () => {},
-    onEditColumnsClick: () => {},
+    onEditColumnsClick: () => setShowColumnEditor(true),
     showImport: false,
     onImportClick: () => {},
     currentTableView: "table",
@@ -393,12 +412,12 @@ const ProductDetails = () => {
 
       <GenericTable
         data={dataList}
-        columns={tableColumns}
+        columns={tableColumns.filter((c) => selectedColumns.includes(c.key))}
         pagination={{
           currentPage: pagination.currentPage,
           rowsPerPage: pagination.rowsPerPage,
           totalRows: totalRecords,
-          pageSizeOptions: [10, 15, 25, 50],
+          pageSizeOptions: GENERIC_TABLE_PAGE_SIZE_OPTIONS,
         }}
         onPaginationChange={(page, rowsPerPage) => {
           setPagination((prev) => ({
@@ -413,17 +432,16 @@ const ProductDetails = () => {
         loadingMessage="Loading transactions..."
         hover={true}
         uniqueKey="id"
-        customizableColumns={true}
-        columnStorageKey="billing-transactions-columns"
         fixedHeight={true}
         maxHeight="calc(100vh - 345px)"
         showToolbar={true}
         toolbar={{
           ...transactionsToolbarConfig,
-          showFilterPills: true,
+          tabsDropdownItems: BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS,
+          showFilterPills: false,
           filterPills: transactionFilterPills,
-          showMoreFiltersButton: true,
-          onAdvancedFiltersClick: handleOpenFiltersSidebar,
+          showMoreFiltersButton: false,
+          showAdvancedFilters: false,
         }}
       />
 
@@ -444,6 +462,24 @@ const ProductDetails = () => {
           setTransactionSearch("");
           setPagination((prev) => ({ ...prev, currentPage: 1 }));
           setRefreshKey((k) => k + 1);
+        }}
+      />
+
+      <ColumnEditorModal
+        show={showColumnEditor}
+        onHide={() => setShowColumnEditor(false)}
+        title="Customize Columns"
+        columns={tableColumns.map((c) => ({ key: c.key, label: c.label }))}
+        selectedColumnKeys={selectedColumns}
+        onApply={(keys: string[]) => {
+          setSelectedColumns(keys);
+          const w = (globalThis as unknown as { window?: Window }).window;
+          if (w) {
+            w.localStorage.setItem(
+              BILLING_TRANSACTIONS_COLUMN_STORAGE_KEY,
+              JSON.stringify(keys),
+            );
+          }
         }}
       />
         </div>{/* End main content area */}

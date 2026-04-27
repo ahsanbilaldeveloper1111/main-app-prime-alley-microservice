@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { useProjectSettingsTabListState, paginatedSlice } from '@planner/projectTabTableShared';
+import { PlannerColorTableCell } from '@planner/PlannerColorTableCell';
 import { ProjectSettingsPresetColorPicker } from '@planner/ProjectSettingsPresetColorPicker';
 import { Spinner, Button, Modal, Form, Table } from 'react-bootstrap';
 import {
@@ -850,18 +851,8 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       label: 'Color',
       sortable: false,
       render: (row: any) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{
-            width: '40px',
-            height: '24px',
-            backgroundColor: row.color || '#4680FF',
-            borderRadius: '4px',
-            border: '1px solid #E5E9F2',
-            flexShrink: 0,
-          }} />
-          <span style={{ color: '#6B7280', fontSize: '0.875rem', fontFamily: 'monospace' }}>
-            {row.color || '#4680FF'}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
+          <PlannerColorTableCell color={row.color} variant="barWide" />
         </div>
       ),
     },

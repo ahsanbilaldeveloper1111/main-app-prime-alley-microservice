@@ -18,6 +18,7 @@ import GenericTable, {
 } from "@components/GenericTable";
 import KanbanBoard, { type KanbanCardData } from "@components/KanbanBoard";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
 import GenericSidebar from "@components/GenericSidebarNew";
 import GenericFilterSidebar from "@components/GenericFilterSidebar";
 import ColumnEditorModal from "@components/ColumnEditorModal";
@@ -74,6 +75,9 @@ import {
   checkRequiredFields,
   formatCrmPreviewDate,
   formatCrmPreviewDateTime,
+  formatMeetingDateLocal,
+  convertLocalMeetingToUtc,
+  convertUtcMeetingToLocal,
   RECORD_TYPES,
 } from "@utils/Helper";
 import {
@@ -174,6 +178,9 @@ import {
   buildDealsListTableActions,
 } from "@crm/deals/dealsListScreenTableBuilders";
 import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 const ignoredKeys = ["stage_id"];
 
 export type CrmDealsListVariant = "deals" | "approvals";
@@ -271,6 +278,29 @@ const DetailField = ({
     <div style={detailFieldValueStyle}>{value}</div>
   </div>
 );
+
+function getDealAttachmentIconBackground(
+  mimeType: string | undefined,
+): string {
+  if (!mimeType) {
+    return "#6c757d";
+  }
+  if (mimeType.includes("pdf")) {
+    return "#dc3545";
+  }
+  if (
+    mimeType.includes("csv") ||
+    mimeType.includes("excel") ||
+    mimeType.includes("spreadsheet")
+  ) {
+    return "#198754";
+  }
+  if (mimeType.includes("image")) {
+    return "#0d6efd";
+  }
+  return "#6c757d";
+}
+
 function CrmDealsListScreenDealHistoryModal({
   viewingDeal,
   showDealHistoryModal,
@@ -1786,7 +1816,7 @@ function CrmDealsListScreenDealViewModal({
                         }}
                       >
                         {session?.user?.permissions?.includes(
-                          "edit-crm-deals",
+                          PERMISSIONS.EDIT_CRM_DEALS,
                         ) && (
                           <button
                             style={{
@@ -2065,7 +2095,7 @@ function CrmDealsListScreenDealViewModal({
                           Recent Meetings
                         </h6>
                         {session?.user?.permissions?.includes(
-                          "add-meeting-crm-deals",
+                          PERMISSIONS.ADD_MEETING_CRM_DEALS,
                         ) && (
                           <button
                             style={{
@@ -2190,7 +2220,10 @@ function CrmDealsListScreenDealViewModal({
                                         }}
                                       >
                                         {meeting.meeting_date
-                                          ? moment(meeting.meeting_date).format(
+                                          ? formatMeetingDateLocal(
+                                              meeting.meeting_date,
+                                              meeting.meeting_time,
+                                            ) || moment(meeting.meeting_date).format(
                                               "MMM DD, YYYY",
                                             )
                                           : "N/A"}
@@ -2263,7 +2296,7 @@ function CrmDealsListScreenDealViewModal({
                               No meetings yet
                             </div>
                             {session?.user?.permissions?.includes(
-                              "add-meeting-crm-deals",
+                              PERMISSIONS.ADD_MEETING_CRM_DEALS,
                             ) && (
                               <button
                                 style={{
@@ -2364,6 +2397,14 @@ export function CrmDealsListScreenView({
 }>) {
   const isApprovalsList = listVariant === "approvals";
   const { data: session } = useSession();
+  const canAccessDealsScreen = useMemo(() => {
+    const p = session?.user?.permissions;
+    const canViewDeals = Boolean(p?.includes(PERMISSIONS.VIEW_CRM_DEALS));
+    const canApproveDeals = Boolean(
+      p?.includes(PERMISSIONS.APPROVE_REJECT_CRM_DEALS),
+    );
+    return isApprovalsList ? canViewDeals || canApproveDeals : canViewDeals;
+  }, [session?.user?.permissions, isApprovalsList]);
   const router = useRouter();
   const { dialNumber, isInitialized } = useCti();
   const [stages, setStages] = useState<any[]>([]);
@@ -2445,6 +2486,32 @@ export function CrmDealsListScreenView({
   const [showDealSidebar, setShowDealSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
   const [selectedDeal, setSelectedDeal] = useState<any>(null);
+  const [dealSidebarRefreshKey, setDealSidebarRefreshKey] = useState(0);
+
+  const sidebarDealRecordId = useMemo(() => {
+    const rawId = selectedDeal?.id ?? selectedDeal?.rawData?.id;
+    const numericId = Number(rawId);
+    return Number.isFinite(numericId) && numericId > 0 ? numericId : 0;
+  }, [selectedDeal]);
+
+  const sidebarLogActivityModals = useCrmLogActivityModals({
+    recordType: "deal",
+    recordId: sidebarDealRecordId,
+    recordName: selectedDeal?.name ?? "",
+    recordPhone:
+      selectedDeal?.phone ??
+      selectedDeal?.rawData?.phone ??
+      selectedDeal?.decision_maker_phone ??
+      "",
+    recordEmail:
+      selectedDeal?.email ??
+      selectedDeal?.rawData?.email ??
+      selectedDeal?.main_decision_maker?.email ??
+      "",
+    onLogged: () => {
+      setDealSidebarRefreshKey((prev) => prev + 1);
+    },
+  });
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [dealsViewMode, setDealsViewMode] = useState<"table" | "board">(() =>
@@ -3236,11 +3303,16 @@ export function CrmDealsListScreenView({
 
     setLoadingMeeting(true);
     try {
+      const utcMeeting = convertLocalMeetingToUtc(
+        String(meetingData.meetingDate || "").slice(0, 10),
+        String(meetingData.meetingTime || "").slice(0, 5),
+      );
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
+        meeting_date: utcMeeting.utcDate || meetingData.meetingDate,
+        meeting_time: utcMeeting.utcTime || meetingData.meetingTime,
+        ...(utcMeeting.utcIso && { start_date_time: utcMeeting.utcIso }),
         deal_id: String(meetingData.dealId),
         meeting_outcome: "Scheduled", // Default to "Scheduled" when creating
         extensions:
@@ -3281,11 +3353,16 @@ export function CrmDealsListScreenView({
 
     setLoadingMeeting(true);
     try {
+      const utcMeeting = convertLocalMeetingToUtc(
+        String(meetingData.meetingDate || "").slice(0, 10),
+        String(meetingData.meetingTime || "").slice(0, 5),
+      );
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
+        meeting_date: utcMeeting.utcDate || meetingData.meetingDate,
+        meeting_time: utcMeeting.utcTime || meetingData.meetingTime,
+        ...(utcMeeting.utcIso && { start_date_time: utcMeeting.utcIso }),
         extensions:
           meetingAttendees.length > 0
             ? meetingAttendees.map((user: any) => user.value)
@@ -3325,13 +3402,16 @@ export function CrmDealsListScreenView({
   // Handle edit meeting click
   const handleEditMeeting = useCallback(
     (meeting: any) => {
-      // Format date for input (YYYY-MM-DD)
-      const meetingDate = meeting.meeting_date
+      const utcDateRaw = meeting.meeting_date
         ? new Date(meeting.meeting_date).toISOString().split("T")[0]
         : "";
-
-      // Format time for input (HH:MM)
-      const meetingTime = meeting.meeting_time || "";
+      const utcTimeRaw = meeting.meeting_time || "";
+      const localized = convertUtcMeetingToLocal(
+        utcDateRaw,
+        String(utcTimeRaw || "").slice(0, 5),
+      );
+      const meetingDate = localized.localDate || utcDateRaw;
+      const meetingTime = localized.localTime || utcTimeRaw;
 
       // Set attendees from meeting extensions
       // meeting.extensions is an array of objects with 'extension' property (e.g., { extension: "511", ... })
@@ -3790,7 +3870,7 @@ export function CrmDealsListScreenView({
       setDealsPagination((prev) => ({ ...prev, currentPage: 1 })),
   });
 
-  if (!session?.user?.permissions?.includes("list-crm-deals")) {
+  if (!canAccessDealsScreen) {
     return null;
   }
 
@@ -4032,7 +4112,7 @@ export function CrmDealsListScreenView({
                   });
                 }}
                 onRowDoubleClick={(row) => {
-                  if (session?.user?.permissions?.includes("list-crm-deals")) {
+                  if (canAccessDealsScreen) {
                     handleViewDeal(row.rawData?.id || row.id);
                   }
                 }}
@@ -4084,6 +4164,7 @@ export function CrmDealsListScreenView({
         {/* Deal Sidebar */}
         {showDealSidebar && (
           <GenericSidebar
+            key={`deal-sidebar-${selectedDeal?.id ?? selectedDeal?.rawData?.id ?? "unknown"}-${dealSidebarRefreshKey}`}
             isOpen={showDealSidebar}
             onClose={handleCloseDealSidebar}
             title={selectedDeal?.name || "Deal Details"}
@@ -4118,7 +4199,15 @@ export function CrmDealsListScreenView({
             recordId={
               selectedDeal?.id ?? selectedDeal?.rawData?.id ?? undefined
             }
+            senderName={session?.user?.name || ""}
+            senderEmail={session?.user?.email || ""}
+            resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
+            onLogCall={sidebarLogActivityModals.openLogCall}
+            onLogEmail={sidebarLogActivityModals.openLogEmail}
+            onLogSms={sidebarLogActivityModals.openLogSms}
+            onLogWhatsApp={sidebarLogActivityModals.openLogWhatsApp}
+            onLogMeeting={sidebarLogActivityModals.openLogMeeting}
             crmSummary={selectedDeal?.rawData?.crm_summary ?? selectedDeal?.crm_summary ?? undefined}
             recordLink={{
               label: "View record",
@@ -4183,6 +4272,7 @@ export function CrmDealsListScreenView({
                     const dealId =
                       selectedDeal?.id || selectedDeal?.rawData?.id;
                     if (dealId) {
+                      setShowDealSidebar(false);
                       handleDeleteDeal(dealId, selectedDeal?.name);
                     }
                   },
@@ -4609,6 +4699,7 @@ export function CrmDealsListScreenView({
             ]}
           />
         )}
+        {sidebarLogActivityModals.modals}
       </div>
 
       {/* Delete Deal Modal */}
@@ -4800,108 +4891,112 @@ export function CrmDealsListScreenView({
                 Attached Files ({attachments.length})
               </h6>
 
-              {loadingAttachments ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                </div>
-              ) : attachments.length === 0 ? (
-                <div className="text-center py-5 text-muted">
-                  <Paperclip size={48} className="mb-3 opacity-25" />
-                  <div>No attachments yet</div>
-                  <small>Upload files using the form above</small>
-                </div>
-              ) : (
-                <div className="d-flex flex-column gap-2">
-                  {attachments.map((attachment: any) => (
-                    <Card key={attachment.id} className="border shadow-sm">
-                      <Card.Body className="p-3">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <div className="d-flex align-items-center gap-3 flex-grow-1">
-                            {/* File Icon */}
-                            <div
-                              className="rounded d-flex align-items-center justify-content-center"
-                              style={{
-                                width: "45px",
-                                height: "45px",
-                                background: attachment.mime_type?.includes(
-                                  "pdf",
-                                )
-                                  ? "#dc3545"
-                                  : attachment.mime_type?.includes("csv") ||
-                                      attachment.mime_type?.includes("excel") ||
-                                      attachment.mime_type?.includes(
-                                        "spreadsheet",
-                                      )
-                                    ? "#198754"
-                                    : attachment.mime_type?.includes("image")
-                                      ? "#0d6efd"
-                                      : "#6c757d",
-                                color: "white",
-                              }}
-                            >
-                              <FileText size={22} />
+              {(() => {
+                if (loadingAttachments) {
+                  return (
+                    <div className="text-center py-5">
+                      <output
+                        className="spinner-border text-primary d-inline-block"
+                        aria-live="polite"
+                      >
+                        <span className="visually-hidden">Loading...</span>
+                      </output>
+                    </div>
+                  );
+                }
+                if (attachments.length === 0) {
+                  return (
+                    <div className="text-center py-5 text-muted">
+                      <Paperclip size={48} className="mb-3 opacity-25" />
+                      <div>No attachments yet</div>
+                      <small>Upload files using the form above</small>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="d-flex flex-column gap-2">
+                    {attachments.map((attachment: any) => (
+                      <Card key={attachment.id} className="border shadow-sm">
+                        <Card.Body className="p-3">
+                          <div className="d-flex align-items-center justify-content-between">
+                            <div className="d-flex align-items-center gap-3 flex-grow-1">
+                              {/* File Icon */}
+                              <div
+                                className="rounded d-flex align-items-center justify-content-center"
+                                style={{
+                                  width: "45px",
+                                  height: "45px",
+                                  background: getDealAttachmentIconBackground(
+                                    attachment.mime_type,
+                                  ),
+                                  color: "white",
+                                }}
+                              >
+                                <FileText size={22} />
+                              </div>
+
+                              {/* File Info */}
+                              <div className="flex-grow-1">
+                                <div
+                                  className="fw-semibold"
+                                  style={{ fontSize: "14px" }}
+                                >
+                                  {attachment.name}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "12px",
+                                    color: "#6c757d",
+                                  }}
+                                >
+                                  {formatFileSize(attachment.file_size)} •{" "}
+                                  {attachment.created_at
+                                    ? formatDateForTable(attachment.created_at)
+                                    : "N/A"}
+                                </div>
+                              </div>
                             </div>
 
-                            {/* File Info */}
-                            <div className="flex-grow-1">
-                              <div
-                                className="fw-semibold"
-                                style={{ fontSize: "14px" }}
-                              >
-                                {attachment.name}
-                              </div>
-                              <div
-                                style={{ fontSize: "12px", color: "#6c757d" }}
-                              >
-                                {formatFileSize(attachment.file_size)} •{" "}
-                                {attachment.created_at
-                                  ? formatDateForTable(attachment.created_at)
-                                  : "N/A"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="d-flex gap-1">
-                            {session?.user?.permissions?.includes(
-                              "download-document-crm-deals",
-                            ) && (
+                            {/* Actions */}
+                            <div className="d-flex gap-1">
+                              {session?.user?.permissions?.includes(
+                                PERMISSIONS.DOWNLOAD_DOCUMENT_CRM_DEALS,
+                              ) && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="p-2 text-primary"
+                                  title="Download"
+                                  onClick={() =>
+                                    handleDownloadAttachment(attachment.id)
+                                  }
+                                >
+                                  <DownloadIcon size={18} />
+                                </Button>
+                              )}
                               <Button
                                 variant="link"
                                 size="sm"
-                                className="p-2 text-primary"
-                                title="Download"
-                                onClick={() =>
-                                  handleDownloadAttachment(attachment.id)
-                                }
+                                className="p-2 text-danger"
+                                title="Delete"
+                                onClick={() => {
+                                  setAttachmentToDelete({
+                                    id: attachment.id,
+                                    name: attachment.name,
+                                  });
+                                  setShowDeleteAttachmentModal(true);
+                                }}
                               >
-                                <DownloadIcon size={18} />
+                                <Trash2 size={18} />
                               </Button>
-                            )}
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-danger"
-                              title="Delete"
-                              onClick={() => {
-                                setAttachmentToDelete({
-                                  id: attachment.id,
-                                  name: attachment.name,
-                                });
-                                setShowDeleteAttachmentModal(true);
-                              }}
-                            >
-                              <Trash2 size={18} />
-                            </Button>
+                            </div>
                           </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                        </Card.Body>
+                      </Card>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </Modal.Body>
 

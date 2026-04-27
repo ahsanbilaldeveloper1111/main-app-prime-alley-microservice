@@ -83,6 +83,9 @@ import {
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import moment from "moment";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function consumeHandledApiError(error: unknown, source: string): void {
   reportApiErrorFromCatch(error, source, { scope: "CrmCampaigns" });
@@ -198,8 +201,10 @@ function toastCrmCsvUploadOutcome(processedCount: number, validationFailureCount
   }
 
   if (validationFailureCount > 0) {
-    const allLabel = validationFailureCount === 1 ? "record" : "records";
-    toast.error(`Upload failed: All ${validationFailureCount} ${allLabel} failed validation`);
+    const failedLabel = validationFailureCount === 1 ? "record" : "records";
+    toast.error(
+      `Upload failed: ${validationFailureCount} uploaded ${failedLabel} failed validation.`,
+    );
     return;
   }
 
@@ -643,6 +648,38 @@ const CRM_CAMPAIGNS_SELECT_STYLES = {
   menu: (provided: any) => ({ ...provided, fontSize: "0.875rem" }),
 };
 
+const CAMPAIGN_SIDEBAR_SELECT_STYLES = {
+  control: (base: any, state: any) => ({
+    ...base,
+    minHeight: "40px",
+    fontSize: "14px",
+    borderColor: state.isFocused ? "#0091ae" : "#8a8a8a",
+    borderRadius: "4px",
+    boxShadow: "none",
+    "&:hover": { borderColor: "#0091ae" },
+  }),
+};
+
+function onCampaignSidebarInputFocus(e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>): void {
+  e.currentTarget.style.borderColor = "#0091ae";
+}
+
+function onCampaignSidebarInputBlur(e: React.FocusEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>): void {
+  e.currentTarget.style.borderColor = "#8a8a8a";
+}
+
+function CampaignFieldTypeOptions(): React.ReactElement {
+  return (
+    <>
+      <option value="string">Text</option>
+      <option value="integer">Number</option>
+      <option value="date">Date</option>
+      <option value="email">Email</option>
+      <option value="dropdown">Dropdown</option>
+    </>
+  );
+}
+
 type ToolbarFactoryArgs = {
   campaignsSearch: string;
   onCampaignsSearchChange: (v: string) => void;
@@ -872,8 +909,12 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
           <BarChart3 size={15} />
           Analytics
         </Button>
-        {a.session?.user?.permissions?.includes("add-crm-data-management") &&
-          a.session?.user?.permissions?.includes("data-assignment-crm-data-management") && (
+        {a.session?.user?.permissions?.includes(
+          PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+        ) &&
+          a.session?.user?.permissions?.includes(
+            PERMISSIONS.DATA_ASSIGNMENT_CRM_DATA_MANAGEMENT,
+          ) && (
             <Button
               variant="light"
               onClick={a.onOpenUploadModal}
@@ -893,7 +934,9 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
               Import
             </Button>
           )}
-        {a.session?.user?.permissions?.includes("data-assignment-crm-data-management") && (
+        {a.session?.user?.permissions?.includes(
+          PERMISSIONS.DATA_ASSIGNMENT_CRM_DATA_MANAGEMENT,
+        ) && (
           <Button
             variant="light"
             onClick={a.handleDataAssignment}
@@ -913,7 +956,9 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
             Data Assignment
           </Button>
         )}
-        {a.session?.user?.permissions?.includes("add-crm-campaigns") && (
+        {a.session?.user?.permissions?.includes(
+          PERMISSIONS.CREATE_CRM_CAMPAIGNS,
+        ) && (
           <Button
             onClick={a.handleCreateCampaign}
             style={{
@@ -1497,7 +1542,9 @@ const CrmCampaigns = () => { // NOSONAR
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  const listCampaignsPermission = Boolean(session?.user?.permissions?.includes("list-crm-campaigns"));
+  const listCampaignsPermission = Boolean(
+    session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS),
+  );
 
   useEffect(() => {
     setCampaignsPagination((prev) =>
@@ -1694,6 +1741,18 @@ const CrmCampaigns = () => { // NOSONAR
     setCampaignFields(updated);
   }, [campaignFields]);
 
+  const handleFieldNameChange = useCallback((index: number, value: string) => {
+    const updated = [...campaignFields];
+    updated[index].field_name = value;
+    setCampaignFields(updated);
+  }, [campaignFields]);
+
+  const handleFieldRequiredChange = useCallback((index: number, checked: boolean) => {
+    const updated = [...campaignFields];
+    updated[index].is_required = checked;
+    setCampaignFields(updated);
+  }, [campaignFields]);
+
   const validateCsvFile = (file: File): { isValid: boolean; errors: string[] } => {
     const errors: string[] = [];
     if (!file.type.includes("csv") && !file.name.toLowerCase().endsWith(".csv")) errors.push("File must be a CSV file");
@@ -1713,7 +1772,11 @@ const CrmCampaigns = () => { // NOSONAR
   };
 
   const handleUpload = async () => {
-    if (!session?.user?.permissions?.includes("add-crm-data-management")) {
+    if (
+      !session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      )
+    ) {
       toast.error("You don't have permission to upload data"); return;
     }
     if (!selectedFile) { toast.error("Please select a file to upload"); return; }
@@ -1918,9 +1981,26 @@ const CrmCampaigns = () => { // NOSONAR
       label: "Campaign Name",
       sortable: true,
       type: "custom",
-      width: "min(240px, 28vw)",
+      width: "26%",
       render: (campaign: any) => (
-        <div className="fw-semibold">{campaign.name || "Unnamed Campaign"}</div>
+        <div
+          className="fw-semibold"
+          title={campaign.name || "Unnamed Campaign"}
+          style={{
+            minWidth: 0,
+            maxWidth: "100%",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "normal",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+          }}
+        >
+          {campaign.name || "Unnamed Campaign"}
+        </div>
       ),
     },
     {
@@ -1928,11 +2008,11 @@ const CrmCampaigns = () => { // NOSONAR
       label: "Description",
       sortable: true,
       type: "custom",
-      width: "min(280px, 32vw)",
+      width: "34%",
       render: (campaign: any) => (
         <CrmTruncatedDescriptionCell
           text={campaign.description}
-          emptyDisplay="No Description"
+          emptyDisplay="No description"
           className="small text-muted"
         />
       ),
@@ -1998,7 +2078,7 @@ const CrmCampaigns = () => { // NOSONAR
   const campaignsTableActions = useMemo(() => {
     const actions: any[] = [];
 
-    if (session?.user?.permissions?.includes("view-crm-campaigns")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS)) {
       actions.push({
         label: "View",
         icon: <Eye size={16} />,
@@ -2007,7 +2087,7 @@ const CrmCampaigns = () => { // NOSONAR
         className: "p-1 text-primary",
       });
     }
-    if (session?.user?.permissions?.includes("edit-crm-campaigns")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_CAMPAIGNS)) {
       actions.push({
         label: "Edit",
         icon: <Edit size={16} />,
@@ -2016,7 +2096,9 @@ const CrmCampaigns = () => { // NOSONAR
         className: "p-1 text-primary",
       });
     }
-    if (session?.user?.permissions?.includes("delete-crm-campaigns")) {
+    if (
+      session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_CAMPAIGNS)
+    ) {
       actions.push({
         label: "Delete",
         icon: <Trash2 size={16} />,
@@ -2089,7 +2171,8 @@ const CrmCampaigns = () => { // NOSONAR
       <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Campaigns" />
 
       {/* Analytics Section - Collapsible */}
-      {showCampaignsAnalytics && session?.user?.permissions?.includes("list-crm-campaigns") && (
+      {showCampaignsAnalytics &&
+        session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
         <Row className="mb-4">
           <Col lg={3} md={6} className="mb-3">
             <KPICard title="Total Campaigns" value={totalCampaigns.toString()} icon={<Megaphone size={24} />} color="primary" />
@@ -2107,7 +2190,7 @@ const CrmCampaigns = () => { // NOSONAR
       )}
 
       {/* Campaigns Table via GenericTable */}
-      {session?.user?.permissions?.includes("list-crm-campaigns") && (
+      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
         <GenericTable<any>
           data={campaignsData}
           columns={campaignsTableColumns}
@@ -2139,236 +2222,643 @@ const CrmCampaigns = () => { // NOSONAR
         />
       )}
 
-      {/* Create/Edit Campaign Modal */}
-      <Modal
-        show={showCreateModal || showEditModal}
-        onHide={() => {
-          if (loading) return;
-          closeCreateEditModal();
-        }}
-        size="xl"
-        centered
-      >
-        <Modal.Header closeButton={!loading}>
-          <Modal.Title>
-            {showEditModal ? `Edit Campaign: ${selectedCampaign?.name}` : "Add New Campaign"}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>
-                    Campaign Name <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Control type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Enter campaign name" />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Status</Form.Label>
-                  <Form.Select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>
-                    Start Date <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Control type="date" value={formData.start_date} onChange={handleStartDateChange} min={showEditModal ? getTodayDate(formData.start_date || "") : getTodayDate()} />
-                  <Form.Text className="text-muted">{showEditModal ? "Campaign start date" : "Must be today or a future date"}</Form.Text>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>
-                    End Date <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Form.Control type="date" value={formData.end_date} onChange={handleEndDateChange} min={showEditModal ? undefined : getMinEndDate()} />
-                  <Form.Text className="text-muted">Must be after start date</Form.Text>
-                </Form.Group>
-              </Col>
-            </Row>
-            <Form.Group className="mb-4">
-              <Form.Label>Description</Form.Label>
-              <Form.Control as="textarea" rows={3} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Enter campaign description (optional)" />
-            </Form.Group>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-4">
-                  <Form.Label>Product Groups</Form.Label>
-                  <Select
-                    isMulti
-                    value={selectedIndustries}
-                    onChange={(selected) => setSelectedIndustries(selected || [])}
-                    options={industries.map((industry) => ({ value: industry.id.toString(), label: industry.name, id: industry.id }))}
-                    placeholder="Select product groups..."
-                    styles={{ control: (base) => ({ ...base, borderColor: "#ced4da", boxShadow: "none", fontSize: "14px" }) }}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-4">
-                  <Form.Label>Deal Template</Form.Label>
-                  <Select
-                    value={selectedDealTemplate}
-                    onChange={(selected) => setSelectedDealTemplate(selected)}
-                    options={dealTemplates.map((template) => ({ value: template.id.toString(), label: template.name, id: template.id }))}
-                    placeholder="Select deal template..."
-                    isClearable
-                    styles={{ control: (base) => ({ ...base, borderColor: "#ced4da", boxShadow: "none", fontSize: "14px" }) }}
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-            <Form.Group className="mb-4">
-              <Form.Label>Campaign Users</Form.Label>
-              <Select
-                isMulti
-                value={campaignUsers}
-                onChange={(selected) => setCampaignUsers(selected || [])}
-                options={extensions.map((ext: any) => ({ value: ext.id, label: ext.display_name || ext.name || ext.id }))}
-                placeholder="Select users for this campaign..."
-                styles={{ control: (base) => ({ ...base, borderColor: "#ced4da", boxShadow: "none", fontSize: "14px" }) }}
-              />
-            </Form.Group>
+      {/* Create/Edit Campaign Sidebar */}
+      {(showCreateModal || showEditModal) && (
+        <>
+          <div
+            className="contact-sidebar-overlay"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1000,
+              background: "transparent",
+            }}
+            onClick={() => {
+              if (!loading) {
+                closeCreateEditModal();
+              }
+            }}
+            aria-hidden="true"
+          />
+          <div
+            className="contact-sidebar-container"
+            style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              width: "600px",
+              maxWidth: "100%",
+              height: "100vh",
+              backgroundColor: "#ffffff",
+              boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+              zIndex: 999999,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              className="contact-sidebar-header"
+              style={{
+                padding: "20px 24px",
+                borderBottom: "1px solid #eaf0f6",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <h2
+                className="contact-sidebar-title"
+                style={{
+                  fontSize: "20px",
+                  fontWeight: "600",
+                  color: "#141414",
+                  margin: 0,
+                }}
+              >
+                {showEditModal ? `Edit Campaign: ${selectedCampaign?.name}` : "Add New Campaign"}
+              </h2>
+              <button
+                type="button"
+                className="contact-sidebar-close-btn"
+                onClick={() => {
+                  if (!loading) {
+                    closeCreateEditModal();
+                  }
+                }}
+                disabled={loading}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "4px",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  color: "#718096",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+                aria-label="Close campaign form sidebar"
+              >
+                <X size={24} />
+              </button>
+            </div>
 
-            {/* Campaign Fields */}
-            <div className="border-top pt-3">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <h5>Campaign Fields</h5>
+            <div
+              className="contact-sidebar-content"
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "40px",
+              }}
+            >
+              {/* Campaign Name + Status */}
+              <Row>
+                <Col md={6}>
+                  <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                    <label
+                      htmlFor="campaign-name-input"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Campaign Name <span style={{ color: "#f2545b" }}>*</span>
+                    </label>
+                    <input
+                      id="campaign-name-input"
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Enter campaign name"
+                      style={{
+                        width: "100%",
+                        minHeight: "40px",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={onCampaignSidebarInputFocus}
+                      onBlur={onCampaignSidebarInputBlur}
+                    />
+                  </div>
+                </Col>
+                <Col md={6}>
+                  <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                    <label
+                      htmlFor="campaign-status-select"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Status
+                    </label>
+                    <select
+                      id="campaign-status-select"
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      style={{
+                        width: "100%",
+                        minHeight: "40px",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                        backgroundColor: "#ffffff",
+                        appearance: "auto",
+                      }}
+                      onFocus={onCampaignSidebarInputFocus}
+                      onBlur={onCampaignSidebarInputBlur}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </Col>
+              </Row>
+
+              {/* Start Date + End Date */}
+              <Row>
+                <Col md={6}>
+                  <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                    <label
+                      htmlFor="campaign-start-date-input"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Start Date <span style={{ color: "#f2545b" }}>*</span>
+                    </label>
+                    <input
+                      id="campaign-start-date-input"
+                      type="date"
+                      value={formData.start_date}
+                      onChange={handleStartDateChange}
+                      min={showEditModal ? getTodayDate(formData.start_date || "") : getTodayDate()}
+                      style={{
+                        width: "100%",
+                        minHeight: "40px",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={onCampaignSidebarInputFocus}
+                      onBlur={onCampaignSidebarInputBlur}
+                    />
+                    <span style={{ fontSize: "12px", color: "#718096", marginTop: "4px", display: "block" }}>
+                      {showEditModal ? "Campaign start date" : "Must be today or a future date"}
+                    </span>
+                  </div>
+                </Col>
+                <Col md={6}>
+                  <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                    <label
+                      htmlFor="campaign-end-date-input"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      End Date <span style={{ color: "#f2545b" }}>*</span>
+                    </label>
+                    <input
+                      id="campaign-end-date-input"
+                      type="date"
+                      value={formData.end_date}
+                      onChange={handleEndDateChange}
+                      min={showEditModal ? undefined : getMinEndDate()}
+                      style={{
+                        width: "100%",
+                        minHeight: "40px",
+                        padding: "10px 12px",
+                        border: "1px solid #8a8a8a",
+                        borderRadius: "4px",
+                        fontSize: "14px",
+                        outline: "none",
+                      }}
+                      onFocus={onCampaignSidebarInputFocus}
+                      onBlur={onCampaignSidebarInputBlur}
+                    />
+                    <span style={{ fontSize: "12px", color: "#718096", marginTop: "4px", display: "block" }}>
+                      Must be after start date
+                    </span>
+                  </div>
+                </Col>
+              </Row>
+
+              {/* Description */}
+              <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                <label
+                  htmlFor="campaign-description-input"
+                  style={{
+                    display: "block",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#141414",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Description
+                </label>
+                <textarea
+                  id="campaign-description-input"
+                  rows={3}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Enter campaign description (optional)"
+                  style={{
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #8a8a8a",
+                    borderRadius: "4px",
+                    fontSize: "14px",
+                    outline: "none",
+                    resize: "vertical",
+                  }}
+                  onFocus={onCampaignSidebarInputFocus}
+                  onBlur={onCampaignSidebarInputBlur}
+                />
               </div>
-              <Card className="mb-3">
-                <Card.Body>
-                  <Row>
+
+              {/* Product Groups + Deal Template */}
+              <Row>
+                <Col md={6}>
+                  <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                    <label
+                      htmlFor="campaign-product-groups-select"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Product Groups
+                    </label>
+                    <Select
+                      inputId="campaign-product-groups-select"
+                      isMulti
+                      value={selectedIndustries}
+                      onChange={(selected) => setSelectedIndustries(selected || [])}
+                      options={industries.map((industry) => ({ value: industry.id.toString(), label: industry.name, id: industry.id }))}
+                      placeholder="Select product groups..."
+                      styles={CAMPAIGN_SIDEBAR_SELECT_STYLES}
+                    />
+                  </div>
+                </Col>
+                <Col md={6}>
+                  <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                    <label
+                      htmlFor="campaign-deal-template-select"
+                      style={{
+                        display: "block",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: "#141414",
+                        marginBottom: "8px",
+                      }}
+                    >
+                      Deal Template
+                    </label>
+                    <Select
+                      inputId="campaign-deal-template-select"
+                      value={selectedDealTemplate}
+                      onChange={(selected) => setSelectedDealTemplate(selected)}
+                      options={dealTemplates.map((template) => ({ value: template.id.toString(), label: template.name, id: template.id }))}
+                      placeholder="Select deal template..."
+                      isClearable
+                      styles={CAMPAIGN_SIDEBAR_SELECT_STYLES}
+                    />
+                  </div>
+                </Col>
+              </Row>
+
+              {/* Campaign Users */}
+              <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+                <label
+                  htmlFor="campaign-users-select"
+                  style={{
+                    display: "block",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "#141414",
+                    marginBottom: "8px",
+                  }}
+                >
+                  Campaign Users
+                </label>
+                <Select
+                  inputId="campaign-users-select"
+                  isMulti
+                  value={campaignUsers}
+                  onChange={(selected) => setCampaignUsers(selected || [])}
+                  options={extensions.map((ext: any) => ({ value: ext.id, label: ext.display_name || ext.name || ext.id }))}
+                  placeholder="Select users for this campaign..."
+                  styles={CAMPAIGN_SIDEBAR_SELECT_STYLES}
+                />
+              </div>
+
+              {/* Campaign Fields */}
+              <div style={{ borderTop: "1px solid #eaf0f6", paddingTop: "20px" }}>
+                <div style={{ marginBottom: "16px" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: "#141414" }}>Campaign Fields</span>
+                </div>
+                <div style={{ background: "#f7fafc", border: "1px solid #eaf0f6", borderRadius: "4px", padding: "16px", marginBottom: "12px" }}>
+                  <Row className="g-2 align-items-center">
                     <Col md={4}>
-                      <Form.Control type="text" placeholder="Field name" value={newField.field_name} onChange={(e) => setNewField({ ...newField, field_name: e.target.value })} />
+                      <input
+                        type="text"
+                        placeholder="Field name"
+                        value={newField.field_name}
+                        onChange={(e) => setNewField({ ...newField, field_name: e.target.value })}
+                        style={{
+                          width: "100%",
+                          minHeight: "36px",
+                          padding: "8px 10px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                        }}
+                        onFocus={onCampaignSidebarInputFocus}
+                        onBlur={onCampaignSidebarInputBlur}
+                      />
                     </Col>
                     <Col md={3}>
-                      <Form.Select value={newField.field_type} onChange={(e) => setNewField({ ...newField, field_type: e.target.value })}>
-                        <option value="string">Text</option>
-                        <option value="integer">Number</option>
-                        <option value="date">Date</option>
-                        <option value="email">Email</option>
-                        <option value="dropdown">Dropdown</option>
-                      </Form.Select>
+                      <select
+                        value={newField.field_type}
+                        onChange={(e) => setNewField({ ...newField, field_type: e.target.value })}
+                        style={{
+                          width: "100%",
+                          minHeight: "36px",
+                          padding: "8px 10px",
+                          border: "1px solid #8a8a8a",
+                          borderRadius: "4px",
+                          fontSize: "14px",
+                          outline: "none",
+                          backgroundColor: "#ffffff",
+                        }}
+                        onFocus={onCampaignSidebarInputFocus}
+                        onBlur={onCampaignSidebarInputBlur}
+                      >
+                        <CampaignFieldTypeOptions />
+                      </select>
                     </Col>
                     <Col md={2}>
-                      <Form.Check type="checkbox" label="Required" checked={newField.is_required} onChange={(e) => setNewField({ ...newField, is_required: e.target.checked })} />
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <input
+                          type="checkbox"
+                          id="new-field-required"
+                          checked={newField.is_required}
+                          onChange={(e) => setNewField({ ...newField, is_required: e.target.checked })}
+                          style={{ width: "14px", height: "14px", cursor: "pointer" }}
+                        />
+                        <label htmlFor="new-field-required" style={{ fontSize: "13px", color: "#141414", margin: 0, cursor: "pointer" }}>Required</label>
+                      </div>
                     </Col>
                     <Col md={3}>
-                      <Button variant="success" className="app-button" onClick={handleAddField}>Add Field</Button>
+                      <button
+                        type="button"
+                        onClick={handleAddField}
+                        style={{
+                          width: "100%",
+                          padding: "8px 10px",
+                          backgroundColor: "#0091ae",
+                          color: "#ffffff",
+                          border: "none",
+                          borderRadius: "4px",
+                          fontSize: "13px",
+                          fontWeight: "500",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#007a94"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#0091ae"; }}
+                      >
+                        <Plus size={14} aria-hidden /> Add Field
+                      </button>
                     </Col>
                   </Row>
-                </Card.Body>
-              </Card>
-              {campaignFields.map((field, index) => {
-                const fieldKey = campaignFieldRowKey(field, index);
-                return (
-                  <Card key={fieldKey} className="mb-2">
-                    <Card.Body>
-                      <Row className="align-items-center">
+                </div>
+                {campaignFields.map((field, index) => {
+                  const fieldKey = campaignFieldRowKey(field, index);
+                  return (
+                    <div
+                      key={fieldKey}
+                      style={{ border: "1px solid #eaf0f6", borderRadius: "4px", padding: "12px 16px", marginBottom: "8px", background: "#ffffff" }}
+                    >
+                      <Row className="align-items-center g-2">
                         <Col md={4}>
-                          <Form.Control
+                          <input
                             type="text"
                             value={field.field_name}
-                            onChange={(e) => {
-                              const u = [...campaignFields];
-                              u[index].field_name = e.target.value;
-                              setCampaignFields(u);
+                            onChange={(e) => handleFieldNameChange(index, e.target.value)}
+                            style={{
+                              width: "100%",
+                              minHeight: "36px",
+                              padding: "8px 10px",
+                              border: "1px solid #8a8a8a",
+                              borderRadius: "4px",
+                              fontSize: "14px",
+                              outline: "none",
                             }}
+                            onFocus={onCampaignSidebarInputFocus}
+                            onBlur={onCampaignSidebarInputBlur}
                           />
                         </Col>
                         <Col md={3}>
-                          <Form.Select value={field.field_type} onChange={(e) => handleFieldTypeChange(index, e.target.value)}>
-                            <option value="string">Text</option>
-                            <option value="integer">Number</option>
-                            <option value="date">Date</option>
-                            <option value="email">Email</option>
-                            <option value="dropdown">Dropdown</option>
-                          </Form.Select>
+                          <select
+                            value={field.field_type}
+                            onChange={(e) => handleFieldTypeChange(index, e.target.value)}
+                            style={{
+                              width: "100%",
+                              minHeight: "36px",
+                              padding: "8px 10px",
+                              border: "1px solid #8a8a8a",
+                              borderRadius: "4px",
+                              fontSize: "14px",
+                              outline: "none",
+                              backgroundColor: "#ffffff",
+                            }}
+                            onFocus={onCampaignSidebarInputFocus}
+                            onBlur={onCampaignSidebarInputBlur}
+                          >
+                            <CampaignFieldTypeOptions />
+                          </select>
                         </Col>
                         <Col md={2}>
-                          <Form.Check
-                            type="checkbox"
-                            label="Required"
-                            checked={field.is_required || false}
-                            onChange={(e) => {
-                              const u = [...campaignFields];
-                              u[index].is_required = e.target.checked;
-                              setCampaignFields(u);
-                            }}
-                          />
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <input
+                              type="checkbox"
+                              id={`field-required-${fieldKey}`}
+                              checked={field.is_required || false}
+                              onChange={(e) => handleFieldRequiredChange(index, e.target.checked)}
+                              style={{ width: "14px", height: "14px", cursor: "pointer" }}
+                            />
+                            <label htmlFor={`field-required-${fieldKey}`} style={{ fontSize: "13px", color: "#141414", margin: 0, cursor: "pointer" }}>Required</label>
+                          </div>
                         </Col>
                         <Col md={3}>
-                          <Button variant="danger" className="app-button" onClick={() => handleRemoveField(index)}>
-                            <FiTrash2 /> Delete
-                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveField(index)}
+                            style={{
+                              width: "100%",
+                              padding: "8px 10px",
+                              backgroundColor: "transparent",
+                              color: "#e53e3e",
+                              border: "1px solid #e53e3e",
+                              borderRadius: "4px",
+                              fontSize: "13px",
+                              fontWeight: "500",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "4px",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#fff5f5"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                          >
+                            <FiTrash2 size={14} aria-hidden /> Delete
+                          </button>
                         </Col>
-                        {field.field_type === "dropdown" && (
-                          <Col md={12} className="mt-3">
-                            {field.field_options?.map((option: string, optionIndex: number) => (
-                              <div
-                                key={campaignFieldOptionKey(fieldKey, optionIndex)}
-                                className="d-flex mb-3 row align-items-center justify-content-left"
-                              >
-                                <Col md={5}>
-                                  <Form.Control
-                                    type="text"
-                                    size="sm"
-                                    value={option}
-                                    onChange={(e) => handleFieldOptionChange(index, optionIndex, e.target.value)}
-                                    placeholder="Option value"
-                                  />
-                                </Col>
-                                <Col md={5}>
-                                  <Button
-                                    variant="danger"
-                                    size="sm"
-                                    className="app-button"
-                                    onClick={() => handleRemoveFieldOption(index, optionIndex)}
-                                  >
-                                    Remove Option
-                                  </Button>
-                                </Col>
-                              </div>
-                            ))}
-                            <Button variant="primary" className="app-button" size="sm" onClick={() => handleAddFieldOption(index)}>
-                              Add Option
-                            </Button>
-                          </Col>
-                        )}
                       </Row>
-                    </Card.Body>
-                  </Card>
-                );
-              })}
-              {campaignFields.length === 0 && (
-                <Alert variant="info">No fields added yet. Click "Add Field" to create custom fields for this campaign.</Alert>
-              )}
+                      {field.field_type === "dropdown" && (
+                        <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "1px solid #eaf0f6" }}>
+                          {field.field_options?.map((option: string, optionIndex: number) => (
+                            <div
+                              key={campaignFieldOptionKey(fieldKey, optionIndex)}
+                              style={{ display: "flex", gap: "8px", marginBottom: "8px", alignItems: "center" }}
+                            >
+                              <input
+                                type="text"
+                                value={option}
+                                onChange={(e) => handleFieldOptionChange(index, optionIndex, e.target.value)}
+                                placeholder="Option value"
+                                style={{
+                                  flex: 1,
+                                  minHeight: "32px",
+                                  padding: "6px 10px",
+                                  border: "1px solid #8a8a8a",
+                                  borderRadius: "4px",
+                                  fontSize: "13px",
+                                  outline: "none",
+                                }}
+                                onFocus={onCampaignSidebarInputFocus}
+                                onBlur={onCampaignSidebarInputBlur}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFieldOption(index, optionIndex)}
+                                style={{
+                                  padding: "6px 12px",
+                                  backgroundColor: "transparent",
+                                  color: "#e53e3e",
+                                  border: "1px solid #e53e3e",
+                                  borderRadius: "4px",
+                                  fontSize: "12px",
+                                  cursor: "pointer",
+                                  whiteSpace: "nowrap",
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#fff5f5"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => handleAddFieldOption(index)}
+                            style={{
+                              padding: "6px 12px",
+                              backgroundColor: "transparent",
+                              color: "#0091ae",
+                              border: "1px solid #0091ae",
+                              borderRadius: "4px",
+                              fontSize: "12px",
+                              cursor: "pointer",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#e6f7fa"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                          >
+                            <Plus size={12} aria-hidden /> Add Option
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {campaignFields.length === 0 && (
+                  <div style={{ padding: "16px", background: "#e8f4fd", border: "1px solid #bee3f8", borderRadius: "4px", fontSize: "14px", color: "#2b6cb0" }}>
+                    No fields added yet. Click &ldquo;Add Field&rdquo; to create custom fields for this campaign.
+                  </div>
+                )}
+              </div>
             </div>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer className="border-0 pt-2">
-          <div className="d-flex justify-content-between align-items-center w-100 flex-wrap gap-2">
-            <Form.Text className="text-muted d-flex align-items-center gap-1 mb-0">
-              <AlertCircle size={14} />
-              <span style={{ fontSize: "0.813rem" }}>
-                Fields marked with <span className="text-danger fw-bold">*</span> are required
-              </span>
-            </Form.Text>
-            <div style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}>
-              <Button
-                variant="primary"
+
+            <div
+              className="contact-sidebar-footer"
+              style={{
+                padding: "16px 24px",
+                borderTop: "1px solid #eaf0f6",
+                display: "flex",
+                gap: "12px",
+                justifyContent: "flex-start",
+              }}
+            >
+              <button
+                type="button"
                 onClick={handleFormSubmit}
                 disabled={loading}
-                style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: loading ? "#cbd5e0" : "#0091ae",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+                onMouseEnter={(e) => {
+                  if (loading) return;
+                  e.currentTarget.style.backgroundColor = "#007a94";
+                }}
+                onMouseLeave={(e) => {
+                  if (loading) return;
+                  e.currentTarget.style.backgroundColor = "#0091ae";
+                }}
               >
                 {loading ? (
                   campaignFormSubmitButtonLabel(true, showEditModal)
@@ -2378,19 +2868,39 @@ const CrmCampaigns = () => { // NOSONAR
                     {campaignFormSubmitButtonLabel(false, showEditModal)}
                   </>
                 )}
-              </Button>
-              <Button
-                variant="outline-secondary"
-                onClick={closeCreateEditModal}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!loading) {
+                    closeCreateEditModal();
+                  }
+                }}
                 disabled={loading}
-                style={CRM_DIALOG_SECONDARY_BUTTON_STYLE}
+                style={{
+                  padding: "10px 20px",
+                  backgroundColor: "transparent",
+                  color: loading ? "#a0aec0" : "#141414",
+                  border: "1px solid #8a8a8a",
+                  borderRadius: "4px",
+                  fontSize: "14px",
+                  fontWeight: "500",
+                  cursor: loading ? "not-allowed" : "pointer",
+                }}
+                onMouseEnter={(e) => {
+                  if (loading) return;
+                  e.currentTarget.style.backgroundColor = "#f7fafc";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
               >
                 Cancel
-              </Button>
+              </button>
             </div>
           </div>
-        </Modal.Footer>
-      </Modal>
+        </>
+      )}
 
       {/* View Campaign Modal */}
       <Modal show={showViewModal} onHide={() => setShowViewModal(false)} size="xl" centered>
@@ -2538,7 +3048,9 @@ const CrmCampaigns = () => { // NOSONAR
                       borderTop: "1px solid #e5e7eb",
                     }}
                   >
-                    {session?.user?.permissions?.includes("edit-crm-campaigns") && (
+                    {session?.user?.permissions?.includes(
+                      PERMISSIONS.EDIT_CRM_CAMPAIGNS,
+                    ) && (
                       <Button
                         variant="primary"
                         onClick={() => {
@@ -2581,7 +3093,9 @@ const CrmCampaigns = () => { // NOSONAR
       />
 
       {/* Upload Modal */}
-      {session?.user?.permissions?.includes("add-crm-data-management") && (
+      {session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      ) && (
         <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} size="lg" centered>
           <Modal.Header closeButton className="border-bottom bg-light">
             <Modal.Title>Upload CSV - Import Prospects</Modal.Title>

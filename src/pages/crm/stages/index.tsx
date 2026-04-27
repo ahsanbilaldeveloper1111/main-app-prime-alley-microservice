@@ -61,6 +61,9 @@ import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import { formatCrmPreviewDate, normalizeSearchQuery } from "@utils/Helper";
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 type StageType = "lead" | "deal" | "order" | "lost_reason";
 
@@ -82,10 +85,6 @@ const DEFAULT_STAGES_SELECTED_COLUMNS = [
   "actions",
 ];
 
-const PERMISSION_LIST_STAGES = "list-crm-stages";
-const PERMISSION_ADD_STAGES = "add-crm-stages";
-const PERMISSION_EDIT_STAGES = "edit-crm-stages";
-const PERMISSION_DELETE_STAGES = "delete-crm-stages";
 
 const TYPE_DISPLAY_NAMES: Record<StageType, string> = {
   lead: "Lead",
@@ -238,6 +237,199 @@ const KPICard: React.FC<KPICardData> = ({
         <p className="text-muted mb-0 small">{title}</p>
       </Card.Body>
     </Card>
+  );
+};
+
+interface StageFormFieldsProps {
+  formData: StageFormState;
+  onChange: <K extends keyof StageFormState>(
+    field: K,
+    value: StageFormState[K],
+  ) => void;
+  singleColumn?: boolean;
+}
+
+const STAGE_FORM_LABEL_STYLE: React.CSSProperties = {
+  display: "block",
+  fontSize: "14px",
+  fontWeight: 600,
+  color: "#141414",
+  marginBottom: "8px",
+};
+
+const STAGE_FORM_INPUT_STYLE: React.CSSProperties = {
+  width: "100%",
+  minHeight: "40px",
+  padding: "10px 12px",
+  border: "1px solid #8a8a8a",
+  borderRadius: "4px",
+  fontSize: "14px",
+  outline: "none",
+};
+
+const StageFormFields: React.FC<StageFormFieldsProps> = ({
+  formData,
+  onChange,
+  singleColumn = false,
+}) => {
+  const fieldColumnWidth = singleColumn ? 12 : 6;
+
+  return (
+  <>
+    <Row>
+      <Col md={fieldColumnWidth}>
+        <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+          <label htmlFor="stage-name-input" style={STAGE_FORM_LABEL_STYLE}>
+            Stage Name <span style={{ color: "#f2545b" }}>*</span>
+          </label>
+          <input
+            id="stage-name-input"
+            type="text"
+            value={formData.name}
+            onChange={(e) => onChange("name", e.target.value)}
+            placeholder="Enter stage name"
+            required
+            style={STAGE_FORM_INPUT_STYLE}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#0091ae";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "#8a8a8a";
+            }}
+          />
+        </div>
+      </Col>
+      <Col md={fieldColumnWidth}>
+        <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+          <label htmlFor="stage-sequence-input" style={STAGE_FORM_LABEL_STYLE}>
+            Sequence <span style={{ color: "#f2545b" }}>*</span>
+          </label>
+          <input
+            id="stage-sequence-input"
+            type="number"
+            value={formData.sequence}
+            onChange={(e) =>
+              onChange(
+                "sequence",
+                parseSequenceInput(e.target.value, formData.sequence),
+              )
+            }
+            min="1"
+            required
+            style={STAGE_FORM_INPUT_STYLE}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#0091ae";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "#8a8a8a";
+            }}
+          />
+        </div>
+      </Col>
+    </Row>
+
+    <Row>
+      <Col md={fieldColumnWidth}>
+        <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+          <label htmlFor="stage-type-select" style={STAGE_FORM_LABEL_STYLE}>
+            Type <span style={{ color: "#f2545b" }}>*</span>
+          </label>
+          <select
+            id="stage-type-select"
+            value={formData.type}
+            onChange={(e) => onChange("type", e.target.value as StageType)}
+            required
+            style={STAGE_FORM_INPUT_STYLE}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#0091ae";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "#8a8a8a";
+            }}
+          >
+            <option value="lead">Lead</option>
+            <option value="deal">Deal</option>
+            <option value="order">Order</option>
+            <option value="lost_reason">Lost Reason</option>
+          </select>
+        </div>
+      </Col>
+      <Col md={2}>
+        <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+          <label htmlFor="stage-color-input" style={STAGE_FORM_LABEL_STYLE}>
+            Color
+          </label>
+          <input
+            id="stage-color-input"
+            type="color"
+            value={formData.color}
+            onChange={(e) => onChange("color", e.target.value)}
+            style={{
+              ...STAGE_FORM_INPUT_STYLE,
+              padding: "6px",
+              cursor: "pointer",
+            }}
+          />
+        </div>
+      </Col>
+    </Row>
+
+    <Row>
+      <Col md={fieldColumnWidth}>
+        <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+          <label htmlFor="stage-probability-input" style={STAGE_FORM_LABEL_STYLE}>
+            Probability
+          </label>
+          <input
+            id="stage-probability-input"
+            type="number"
+            value={formData.probability}
+            onChange={(e) => {
+              const n = Number.parseInt(e.target.value, 10);
+              onChange(
+                "probability",
+                Number.isNaN(n) ? 0 : Math.min(100, Math.max(0, n)),
+              );
+            }}
+            min="0"
+            max="100"
+            disabled={formData.type === "lost_reason"}
+            style={STAGE_FORM_INPUT_STYLE}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#0091ae";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "#8a8a8a";
+            }}
+          />
+        </div>
+      </Col>
+    </Row>
+
+    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+      <label htmlFor="stage-description-input" style={STAGE_FORM_LABEL_STYLE}>
+        Description
+      </label>
+      <textarea
+        id="stage-description-input"
+        rows={3}
+        value={formData.description}
+        onChange={(e) => onChange("description", e.target.value)}
+        placeholder="Enter stage description (optional)"
+        style={{
+          ...STAGE_FORM_INPUT_STYLE,
+          minHeight: "96px",
+          resize: "vertical",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = "#0091ae";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = "#8a8a8a";
+        }}
+      />
+    </div>
+  </>
   );
 };
 
@@ -630,7 +822,7 @@ const StagesManagement = () => {
               >
                 <Eye size={16} aria-hidden />
               </Button>
-              {session?.user?.permissions?.includes(PERMISSION_EDIT_STAGES) && (
+              {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_STAGES) && (
                 <Button
                   variant="link"
                   size="sm"
@@ -642,7 +834,7 @@ const StagesManagement = () => {
                   <Edit size={16} aria-hidden />
                 </Button>
               )}
-              {session?.user?.permissions?.includes(PERMISSION_DELETE_STAGES) && (
+              {session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_STAGES) && (
                 <Button
                   variant="link"
                   size="sm"
@@ -821,7 +1013,7 @@ const StagesManagement = () => {
             <BarChart3 size={15} aria-hidden />
             Analytics
           </Button>
-          {session?.user?.permissions?.includes(PERMISSION_ADD_STAGES) && (
+          {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_STAGES) && (
             <Button
               onClick={openCreateStageModal}
               style={{
@@ -858,7 +1050,7 @@ const StagesManagement = () => {
     ],
   );
 
-  if (!session?.user?.permissions?.includes(PERMISSION_LIST_STAGES)) {
+  if (!session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_STAGES)) {
     return null;
   }
 
@@ -1022,164 +1214,182 @@ const StagesManagement = () => {
         </div>
       </div>
 
-      <FormModal
-        show={showCreateModal}
-        onHide={() => setShowCreateModal(false)}
-        title="Create Stage"
-        desc="Please fill in the details below to create a new stage."
-        size="lg"
-        formHtml={
-            <Form onSubmit={handleSubmit}>
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      Stage Name <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) =>
-                        handleInputChange("name", e.target.value)
-                      }
-                      placeholder="Enter stage name"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      Sequence <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="number"
-                      value={formData.sequence}
-                      onChange={(e) =>
-                        handleInputChange(
-                          "sequence",
-                          parseSequenceInput(e.target.value, formData.sequence),
-                        )
-                      }
-                      min="1"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
+      {showCreateModal && (
+        <>
+          <div
+            className="contact-sidebar-overlay"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1000,
+              background: "transparent",
+            }}
+            aria-hidden="true"
+          />
 
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      Type <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Select
-                      value={formData.type}
-                      onChange={(e) =>
-                        handleInputChange(
-                          "type",
-                          e.target.value as StageType,
-                        )
-                      }
-                      required
-                    >
-                      <option value="lead">Lead</option>
-                      <option value="deal">Deal</option>
-                      <option value="order">Order</option>
-                      <option value="lost_reason">Lost Reason</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Color</Form.Label>
-                    <Form.Control
-                      type="color"
-                      value={formData.color}
-                      onChange={(e) =>
-                        handleInputChange("color", e.target.value)
-                      }
-                    />
-                  </Form.Group>
-                </Col>
-                {/* <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Status</Form.Label>
-                  <div className="d-flex gap-3">
-                    <Form.Check
-                      type="checkbox"
-                      label="Won Stage"
-                      checked={formData.is_won}
-                      onChange={(e) => handleInputChange("is_won", e.target.checked)}
-                    />
-                    <Form.Check
-                      type="checkbox"
-                      label="Fold Stage"
-                      checked={formData.fold}
-                      onChange={(e) => handleInputChange("fold", e.target.checked)}
-                    />
-                    <Form.Check
-                      type="checkbox"
-                      label="Default"
-                      checked={formData.is_default}
-                      onChange={(e) => handleInputChange("is_default", e.target.checked)}
-                    />
-                  </div>
-                </Form.Group>
-              </Col> */}
-              </Row>
+          <div
+            className="contact-sidebar-container"
+            style={{
+              position: "fixed",
+              top: 0,
+              right: 0,
+              width: "600px",
+              maxWidth: "100%",
+              height: "100vh",
+              backgroundColor: "#ffffff",
+              boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+              zIndex: 999999,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              className="contact-sidebar-header"
+              style={{
+                padding: "20px 24px",
+                borderBottom: "1px solid #eaf0f6",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <h2
+                className="contact-sidebar-title"
+                style={{
+                  fontSize: "20px",
+                  fontWeight: "600",
+                  color: "#141414",
+                  margin: 0,
+                }}
+              >
+                Create Stage
+              </h2>
+              <button
+                type="button"
+                className="contact-sidebar-close-btn"
+                onClick={() => setShowCreateModal(false)}
+                disabled={submittingStageForm}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: "4px",
+                  cursor: submittingStageForm ? "not-allowed" : "pointer",
+                  color: "#718096",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+                aria-label="Close create stage sidebar"
+              >
+                <X size={24} />
+              </button>
+            </div>
 
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Probability</Form.Label>
-                    <Form.Control
-                      type="number"
-                      value={formData.probability}
-                      onChange={(e) => {
-                        const n = Number.parseInt(e.target.value, 10);
-                        handleInputChange(
-                          "probability",
-                          Number.isNaN(n) ? 0 : Math.min(100, Math.max(0, n)),
-                        );
-                      }}
-                      min="0"
-                      max="100"
-                      disabled={formData.type === "lost_reason"}
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Description</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  value={formData.description}
-                  onChange={(e) =>
-                    handleInputChange("description", e.target.value)
-                  }
-                  placeholder="Enter stage description (optional)"
+            <Form
+              onSubmit={handleSubmit}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+              <div
+                className="contact-sidebar-content"
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  padding: "40px",
+                }}
+              >
+                <p
+                  style={{
+                    color: "#64748b",
+                    fontSize: "14px",
+                    marginTop: 0,
+                    marginBottom: "20px",
+                  }}
+                >
+                  Please fill in the details below to create a new stage.
+                </p>
+                <StageFormFields
+                  formData={formData}
+                  onChange={handleInputChange}
+                  singleColumn
                 />
-              </Form.Group>
+              </div>
+
+              <div
+                className="contact-sidebar-footer"
+                style={{
+                  padding: "16px 24px",
+                  borderTop: "1px solid #eaf0f6",
+                  display: "flex",
+                  gap: "12px",
+                  justifyContent: "flex-start",
+                }}
+              >
+                <button
+                  type="submit"
+                  disabled={submittingStageForm}
+                  style={{
+                    padding: "10px 20px",
+                    backgroundColor: submittingStageForm ? "#cbd5e0" : "#0091ae",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "4px",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    cursor: submittingStageForm ? "not-allowed" : "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (submittingStageForm) {
+                      return;
+                    }
+                    e.currentTarget.style.backgroundColor = "#007a94";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (submittingStageForm) {
+                      return;
+                    }
+                    e.currentTarget.style.backgroundColor = "#0091ae";
+                  }}
+                >
+                  {submittingStageForm ? "Creating Stage..." : "Create Stage"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  disabled={submittingStageForm}
+                  style={{
+                    padding: "10px 20px",
+                    backgroundColor: "transparent",
+                    color: submittingStageForm ? "#a0aec0" : "#141414",
+                    border: "1px solid #8a8a8a",
+                    borderRadius: "4px",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    cursor: submittingStageForm ? "not-allowed" : "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (submittingStageForm) {
+                      return;
+                    }
+                    e.currentTarget.style.backgroundColor = "#f7fafc";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </Form>
-        }
-        submitButtonText={submittingStageForm ? "Creating Stage..." : "Create Stage"}
-        cancelButtonText="Cancel"
-        onSubmit={() => {
-          handleSubmit(scaffoldFormEvent()).catch((error: unknown) => {
-            consumeHandledApiError(error, "StagesManagement.createStageSubmit");
-          });
-        }}
-        onCancel={() => setShowCreateModal(false)}
-        submitButtonVariant="primary"
-        cancelButtonVariant="secondary"
-        isSubmitting={submittingStageForm}
-        isSubmitDisabled={submittingStageForm}
-        useCrmDialogFooterStyle
-      />
+          </div>
+        </>
+      )}
 
       {/* Update Stage Modal */}
       <FormModal
@@ -1189,117 +1399,9 @@ const StagesManagement = () => {
         desc="Please update the details below for this stage."
         size="lg"
         formHtml={
-            <Form onSubmit={handleUpdateStage}>
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      Stage Name <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) =>
-                        handleInputChange("name", e.target.value)
-                      }
-                      placeholder="Enter stage name"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      Sequence <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Control
-                      type="number"
-                      value={formData.sequence}
-                      onChange={(e) =>
-                        handleInputChange(
-                          "sequence",
-                          parseSequenceInput(e.target.value, formData.sequence),
-                        )
-                      }
-                      min="1"
-                      required
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>
-                      Type <span className="text-danger">*</span>
-                    </Form.Label>
-                    <Form.Select
-                      value={formData.type}
-                      onChange={(e) =>
-                        handleInputChange(
-                          "type",
-                          e.target.value as StageType,
-                        )
-                      }
-                      required
-                    >
-                      <option value="lead">Lead</option>
-                      <option value="deal">Deal</option>
-                      <option value="order">Order</option>
-                      <option value="lost_reason">Lost Reason</option>
-                    </Form.Select>
-                  </Form.Group>
-                </Col>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Color</Form.Label>
-                    <Form.Control
-                      type="color"
-                      value={formData.color}
-                      onChange={(e) =>
-                        handleInputChange("color", e.target.value)
-                      }
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-
-              <Row>
-                <Col md={6}>
-                  <Form.Group className="mb-3">
-                    <Form.Label>Probability</Form.Label>
-                    <Form.Control
-                      type="number"
-                      value={formData.probability}
-                      onChange={(e) => {
-                        const n = Number.parseInt(e.target.value, 10);
-                        handleInputChange(
-                          "probability",
-                          Number.isNaN(n) ? 0 : Math.min(100, Math.max(0, n)),
-                        );
-                      }}
-                      min="0"
-                      max="100"
-                      disabled={formData.type === "lost_reason"}
-                    />
-                  </Form.Group>
-                </Col>
-              </Row>
-
-              <Form.Group className="mb-3">
-                <Form.Label>Description</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  value={formData.description}
-                  onChange={(e) =>
-                    handleInputChange("description", e.target.value)
-                  }
-                  placeholder="Enter stage description (optional)"
-                />
-              </Form.Group>
-            </Form>
+          <Form onSubmit={handleUpdateStage}>
+            <StageFormFields formData={formData} onChange={handleInputChange} />
+          </Form>
         }
         submitButtonText={submittingStageForm ? "Updating Stage..." : "Update Stage"}
         cancelButtonText="Cancel"
@@ -1665,7 +1767,7 @@ const StagesManagement = () => {
                 borderTop: "1px solid #e5e7eb",
               }}
             >
-              {session?.user?.permissions?.includes(PERMISSION_EDIT_STAGES) && (
+              {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_STAGES) && (
                 <Button
                   variant="primary"
                   style={CRM_DIALOG_PRIMARY_BUTTON_STYLE}

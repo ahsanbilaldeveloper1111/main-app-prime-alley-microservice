@@ -16,7 +16,6 @@ import GenericTable, {
   TableColumn,
   ToolbarConfig,
 } from "@components/GenericTable";
-import FormModal from "@pages/partial/FormModal";
 import { useSession } from "next-auth/react";
 import {
   Button,
@@ -49,8 +48,10 @@ import {
 } from "@components/crm/crmDialogActionButtonStyles";
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
-const PERMISSION_ADD_DEAL_TEMPLATES = "add-crm-deal-templates";
+const { PERMISSIONS } = HEADER_CONSTANTS;
+
 const DEAL_TEMPLATES_TABLE_COLUMN_STORAGE_KEY =
   "dealTemplatesSelectedColumns";
 const DEAL_TEMPLATES_TABLE_SELECTABLE_KEYS = [
@@ -65,6 +66,24 @@ const DEFAULT_DEAL_TEMPLATES_TABLE_COLUMNS = [
   "fields",
   "actions",
 ];
+
+const TEMPLATE_FORM_LABEL_STYLE: React.CSSProperties = {
+  display: "block",
+  fontSize: "14px",
+  fontWeight: 600,
+  color: "#141414",
+  marginBottom: "8px",
+};
+
+const TEMPLATE_FORM_INPUT_STYLE: React.CSSProperties = {
+  width: "100%",
+  minHeight: "40px",
+  padding: "10px 12px",
+  border: "1px solid #8a8a8a",
+  borderRadius: "4px",
+  fontSize: "14px",
+  outline: "none",
+};
 
 type DealTemplateFieldForm = {
   id: string;
@@ -464,7 +483,7 @@ const DealTemplatesPage = () => {
       },
       rightActions: (
         <div className="d-flex gap-2">
-          {session?.user?.permissions?.includes(PERMISSION_ADD_DEAL_TEMPLATES) && (
+          {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_DEAL_TEMPLATES) && (
             <Button
               variant="primary"
               size="sm"
@@ -517,7 +536,7 @@ const DealTemplatesPage = () => {
             <div className="text-center p-5">
               <FileText size={48} className="text-muted mb-3" />
               <p className="text-muted">No deal templates found</p>
-              {session?.user?.permissions?.includes(PERMISSION_ADD_DEAL_TEMPLATES) && (
+              {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_DEAL_TEMPLATES) && (
                 <Button variant="primary" onClick={() => handleOpenModal()}>
                   <PlusCircle size={18} className="me-2" />
                   Add First Template
@@ -529,247 +548,438 @@ const DealTemplatesPage = () => {
           showToolbarActions={false}
         />
 
-        {/* Create/Edit Modal */}
-        <FormModal
-          show={showModal}
-          onHide={() => setShowModal(false)}
-          title={
-            editingTemplate ? "Edit Deal Template" : "Add New Deal Template"
-          }
-          desc="Please fill in the details below to create or update a deal template."
-          size="lg"
-          formHtml={
-            <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
-              <Form.Group className="mb-3">
-                <Form.Label>
-                  Name <span className="text-danger">*</span>
-                </Form.Label>
-                <Form.Control
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter template name"
-                  required
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Description</Form.Label>
-                <Form.Control
-                  as="textarea"
-                  rows={3}
-                  value={formData.description}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Enter template description"
-                />
-              </Form.Group>
+        {/* Create/Edit Sidebar */}
+        {showModal && (
+          <>
+            <button
+              type="button"
+              className="contact-sidebar-overlay"
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 1000,
+                background: "transparent",
+                border: "none",
+                padding: 0,
+              }}
+              onClick={() => {
+                if (!submitting) {
+                  setShowModal(false);
+                }
+              }}
+              aria-label="Close deal template sidebar"
+              disabled={submitting}
+            />
 
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  id="is-default-switch"
-                  label="Default"
-                  checked={formData.is_default}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, is_default: e.target.checked }))}
-                />
-                <Form.Text className="text-muted">
-                  Mark this template as the default template
-                </Form.Text>
-              </Form.Group>
-
-              {/* Fields Section */}
-              <div className="mb-3">
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <Form.Label className="mb-0">
-                    Fields <span className="text-danger">*</span>
-                  </Form.Label>
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    type="button"
-                    onClick={handleAddField}
-                    className="d-flex align-items-center gap-1"
-                  >
-                    <Plus size={14} />
-                    Add Field
-                  </Button>
-                </div>
-                {fields.length === 0 ? (
-                  <div className="text-center p-4 border rounded text-muted">
-                    <p className="mb-0">
-                      No fields added. Click "Add Field" to get started.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="d-flex flex-column gap-3">
-                    {fields.map((field, index) => (
-                      <Card key={field.id} className="border">
-                        <Card.Body>
-                          <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div className="d-flex align-items-center gap-2">
-                              <GripVertical size={16} className="text-muted" />
-                              <span className="fw-semibold">
-                                Field {index + 1}
-                              </span>
-                            </div>
-                            <Button
-                              variant="outline-danger"
-                              size="sm"
-                              type="button"
-                              onClick={() => handleRemoveField(index)}
-                              aria-label={"Remove field " + String(index + 1)}
-                            >
-                              <X size={14} aria-hidden />
-                            </Button>
-                          </div>
-                          <Row className="g-3">
-                            <Col md={6}>
-                              <Form.Group>
-                                <Form.Label>
-                                  Field Name{" "}
-                                  <span className="text-danger">*</span>
-                                </Form.Label>
-                                <Form.Control
-                                  type="text"
-                                  value={field.field_name}
-                                  onChange={(e) =>
-                                    handleFieldChange(index, {
-                                      field_name: e.target.value,
-                                    })
-                                  }
-                                  placeholder="e.g., License Type"
-                                  required
-                                />
-                              </Form.Group>
-                            </Col>
-                            <Col md={6}>
-                              <Form.Group>
-                                <Form.Label>
-                                  Field Type{" "}
-                                  <span className="text-danger">*</span>
-                                </Form.Label>
-                                <Form.Select
-                                  value={field.field_type}
-                                  onChange={(e) => {
-                                    const ft = e.target.value as "text" | "dropdown";
-                                    handleFieldChange(index, {
-                                      field_type: ft,
-                                      options: ft === "text" ? [] : field.options,
-                                    });
-                                  }}
-                                >
-                                  <option value="text">Text</option>
-                                  <option value="dropdown">Dropdown</option>
-                                </Form.Select>
-                              </Form.Group>
-                            </Col>
-                          </Row>
-                          {field.field_type === "dropdown" && (
-                            <div className="mt-3">
-                              <Form.Label>Options</Form.Label>
-                              <div className="d-flex flex-wrap gap-2 mb-2">
-                                {field.options.map((option, optIndex) => (
-                                  <Badge
-                                    key={`option-${index}-${optIndex}-${option}`}
-                                    bg="primary"
-                                    className="d-flex align-items-center gap-1"
-                                    style={{
-                                      fontSize: "0.875rem",
-                                      padding: "0.5rem",
-                                    }}
-                                  >
-                                    <span>{option}</span>
-                                    <button
-                                      type="button"
-                                      className="btn btn-link text-white p-0 border-0 lh-1 ms-1"
-                                      aria-label={"Remove option " + option}
-                                      onClick={() => handleRemoveOption(index, optIndex)}
-                                    >
-                                      <X size={12} aria-hidden />
-                                    </button>
-                                  </Badge>
-                                ))}
-                              </div>
-                              <InputGroup>
-                                <Form.Control
-                                  type="text"
-                                  placeholder="Enter option and press Enter"
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      const input =
-                                        e.target as HTMLInputElement;
-                                      handleAddOption(index, input.value);
-                                      input.value = "";
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  variant="outline-secondary"
-                                  type="button"
-                                  aria-label="Add dropdown option"
-                                  onClick={(e) => {
-                                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                                    handleAddOption(index, input.value);
-                                    input.value = "";
-                                  }}
-                                >
-                                  <Plus size={14} aria-hidden />
-                                </Button>
-                              </InputGroup>
-                              <Form.Text className="text-muted">
-                                Add options for the dropdown field
-                              </Form.Text>
-                            </div>
-                          )}
-
-                          <Row>
-                            <Col md={6}>
-                              <Form.Check
-                                type="switch"
-                                id={`field-required-${index}`}
-                                label="Required"
-                                checked={field.is_required}
-                                onChange={(e) =>
-                                  handleFieldChange(index, {
-                                    is_required: e.target.checked,
-                                  })
-                                }
-                                className="mt-3"
-                              />
-                            </Col>
-                            <Col md={6}>
-                              <Form.Check
-                                type="switch"
-                                id={`field_require_approval-${index}`}
-                                label="Require Approval"
-                                checked={field.require_approval}
-                                onChange={(e) =>
-                                  handleFieldChange(index, {
-                                    require_approval: e.target.checked,
-                                  })
-                                }
-                                className="mt-3"
-                              />
-                            </Col>
-                          </Row>
-                        </Card.Body>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+            <div
+              className="contact-sidebar-container"
+              style={{
+                position: "fixed",
+                top: 0,
+                right: 0,
+                width: "600px",
+                maxWidth: "100%",
+                height: "100vh",
+                backgroundColor: "#ffffff",
+                boxShadow: "-2px 0 8px rgba(0, 0, 0, 0.1)",
+                zIndex: 999999,
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <div
+                className="contact-sidebar-header"
+                style={{
+                  padding: "20px 24px",
+                  borderBottom: "1px solid #eaf0f6",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <h2
+                  className="contact-sidebar-title"
+                  style={{
+                    fontSize: "20px",
+                    fontWeight: "600",
+                    color: "#141414",
+                    margin: 0,
+                  }}
+                >
+                  {editingTemplate ? "Edit Deal Template" : "Add New Deal Template"}
+                </h2>
+                <button
+                  type="button"
+                  className="contact-sidebar-close-btn"
+                  onClick={() => {
+                    if (!submitting) {
+                      setShowModal(false);
+                    }
+                  }}
+                  disabled={submitting}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    padding: "4px",
+                    cursor: submitting ? "not-allowed" : "pointer",
+                    color: "#718096",
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                  aria-label="Close deal template sidebar"
+                >
+                  <X size={24} />
+                </button>
               </div>
+
+              <Form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSubmit().catch((error: unknown) => {
+                    consumeHandledApiError(error, "DealTemplates.sidebarSubmit");
+                  });
+                }}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  flex: 1,
+                  minHeight: 0,
+                }}
+              >
+                <div
+                  className="contact-sidebar-content"
+                  style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "40px",
+                  }}
+                >
+                  <p
+                    style={{
+                      color: "#64748b",
+                      fontSize: "14px",
+                      marginTop: 0,
+                      marginBottom: "20px",
+                    }}
+                  >
+                    Please fill in the details below to create or update a deal template.
+                  </p>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label style={TEMPLATE_FORM_LABEL_STYLE}>
+                      Name <span style={{ color: "#f2545b" }}>*</span>
+                    </Form.Label>
+                    <Form.Control
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="Enter template name"
+                      required
+                      style={TEMPLATE_FORM_INPUT_STYLE}
+                    />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Label style={TEMPLATE_FORM_LABEL_STYLE}>Description</Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      value={formData.description}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                      placeholder="Enter template description"
+                      style={{
+                        ...TEMPLATE_FORM_INPUT_STYLE,
+                        minHeight: "96px",
+                        resize: "vertical",
+                      }}
+                    />
+                  </Form.Group>
+
+                  <Form.Group className="mb-3">
+                    <Form.Check
+                      type="switch"
+                      id="is-default-switch"
+                      label="Default"
+                      checked={formData.is_default}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, is_default: e.target.checked }))}
+                    />
+                    <Form.Text className="text-muted">
+                      Mark this template as the default template
+                    </Form.Text>
+                  </Form.Group>
+
+                  <div className="mb-3">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                      <Form.Label className="mb-0" style={TEMPLATE_FORM_LABEL_STYLE}>
+                        Fields <span style={{ color: "#f2545b" }}>*</span>
+                      </Form.Label>
+                      <Button
+                        variant="outline-primary"
+                        size="sm"
+                        type="button"
+                        onClick={handleAddField}
+                        className="d-flex align-items-center gap-1"
+                        disabled={submitting}
+                      >
+                        <Plus size={14} aria-hidden />
+                        Add Field
+                      </Button>
+                    </div>
+
+                    {fields.length === 0 ? (
+                      <div className="text-center p-4 border rounded text-muted">
+                        <p className="mb-0">
+                          No fields added. Click "Add Field" to get started.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="d-flex flex-column gap-3">
+                        {fields.map((field, index) => (
+                          <Card key={field.id} className="border">
+                            <Card.Body>
+                              <div className="d-flex justify-content-between align-items-start mb-3">
+                                <div className="d-flex align-items-center gap-2">
+                                  <GripVertical size={16} className="text-muted" />
+                                  <span className="fw-semibold">Field {index + 1}</span>
+                                </div>
+                                <Button
+                                  variant="outline-danger"
+                                  size="sm"
+                                  type="button"
+                                  onClick={() => handleRemoveField(index)}
+                                  aria-label={"Remove field " + String(index + 1)}
+                                  disabled={submitting}
+                                >
+                                  <X size={14} aria-hidden />
+                                </Button>
+                              </div>
+
+                              <Row className="g-3">
+                                <Col md={6}>
+                                  <Form.Group>
+                                    <Form.Label style={TEMPLATE_FORM_LABEL_STYLE}>
+                                      Field Name <span style={{ color: "#f2545b" }}>*</span>
+                                    </Form.Label>
+                                    <Form.Control
+                                      type="text"
+                                      value={field.field_name}
+                                      onChange={(e) =>
+                                        handleFieldChange(index, {
+                                          field_name: e.target.value,
+                                        })
+                                      }
+                                      placeholder="e.g., License Type"
+                                      required
+                                      disabled={submitting}
+                                      style={TEMPLATE_FORM_INPUT_STYLE}
+                                    />
+                                  </Form.Group>
+                                </Col>
+                                <Col md={6}>
+                                  <Form.Group>
+                                    <Form.Label style={TEMPLATE_FORM_LABEL_STYLE}>
+                                      Field Type <span style={{ color: "#f2545b" }}>*</span>
+                                    </Form.Label>
+                                    <Form.Select
+                                      value={field.field_type}
+                                      onChange={(e) => {
+                                        const ft = e.target.value as "text" | "dropdown";
+                                        handleFieldChange(index, {
+                                          field_type: ft,
+                                          options: ft === "text" ? [] : field.options,
+                                        });
+                                      }}
+                                      disabled={submitting}
+                                      style={TEMPLATE_FORM_INPUT_STYLE}
+                                    >
+                                      <option value="text">Text</option>
+                                      <option value="dropdown">Dropdown</option>
+                                    </Form.Select>
+                                  </Form.Group>
+                                </Col>
+                              </Row>
+
+                              {field.field_type === "dropdown" && (
+                                <div className="mt-3">
+                                  <Form.Label style={TEMPLATE_FORM_LABEL_STYLE}>Options</Form.Label>
+                                  <div className="d-flex flex-wrap gap-2 mb-2">
+                                    {field.options.map((option, optIndex) => (
+                                      <Badge
+                                        key={`option-${index}-${optIndex}-${option}`}
+                                        bg="primary"
+                                        className="d-flex align-items-center gap-1"
+                                        style={{
+                                          fontSize: "0.875rem",
+                                          padding: "0.5rem",
+                                        }}
+                                      >
+                                        <span>{option}</span>
+                                        <button
+                                          type="button"
+                                          className="btn btn-link text-white p-0 border-0 lh-1 ms-1"
+                                          aria-label={"Remove option " + option}
+                                          onClick={() => handleRemoveOption(index, optIndex)}
+                                          disabled={submitting}
+                                        >
+                                          <X size={12} aria-hidden />
+                                        </button>
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                  <InputGroup>
+                                    <Form.Control
+                                      type="text"
+                                      placeholder="Enter option and press Enter"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") {
+                                          e.preventDefault();
+                                          const input = e.target as HTMLInputElement;
+                                          handleAddOption(index, input.value);
+                                          input.value = "";
+                                        }
+                                      }}
+                                      disabled={submitting}
+                                      style={TEMPLATE_FORM_INPUT_STYLE}
+                                    />
+                                    <Button
+                                      variant="outline-secondary"
+                                      type="button"
+                                      aria-label="Add dropdown option"
+                                      onClick={(e) => {
+                                        const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                                        handleAddOption(index, input.value);
+                                        input.value = "";
+                                      }}
+                                      disabled={submitting}
+                                    >
+                                      <Plus size={14} aria-hidden />
+                                    </Button>
+                                  </InputGroup>
+                                  <Form.Text className="text-muted">
+                                    Add options for the dropdown field
+                                  </Form.Text>
+                                </div>
+                              )}
+
+                              <Row>
+                                <Col md={6}>
+                                  <Form.Check
+                                    type="switch"
+                                    id={`field-required-${index}`}
+                                    label="Required"
+                                    checked={field.is_required}
+                                    onChange={(e) =>
+                                      handleFieldChange(index, {
+                                        is_required: e.target.checked,
+                                      })
+                                    }
+                                    className="mt-3"
+                                    disabled={submitting}
+                                  />
+                                </Col>
+                                <Col md={6}>
+                                  <Form.Check
+                                    type="switch"
+                                    id={`field_require_approval-${index}`}
+                                    label="Require Approval"
+                                    checked={field.require_approval}
+                                    onChange={(e) =>
+                                      handleFieldChange(index, {
+                                        require_approval: e.target.checked,
+                                      })
+                                    }
+                                    className="mt-3"
+                                    disabled={submitting}
+                                  />
+                                </Col>
+                              </Row>
+                            </Card.Body>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  className="contact-sidebar-footer"
+                  style={{
+                    padding: "16px 24px",
+                    borderTop: "1px solid #eaf0f6",
+                    display: "flex",
+                    gap: "12px",
+                    justifyContent: "flex-start",
+                  }}
+                >
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: submitting ? "#cbd5e0" : "#0091ae",
+                      color: "#ffffff",
+                      border: "none",
+                      borderRadius: "4px",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      cursor: submitting ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (submitting) {
+                        return;
+                      }
+                      e.currentTarget.style.backgroundColor = "#007a94";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (submitting) {
+                        return;
+                      }
+                      e.currentTarget.style.backgroundColor = "#0091ae";
+                    }}
+                  >
+                    {editingTemplate ? "Update" : "Create"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!submitting) {
+                        setShowModal(false);
+                      }
+                    }}
+                    disabled={submitting}
+                    style={{
+                      padding: "10px 20px",
+                      backgroundColor: "transparent",
+                      color: submitting ? "#a0aec0" : "#141414",
+                      border: "1px solid #8a8a8a",
+                      borderRadius: "4px",
+                      fontSize: "14px",
+                      fontWeight: "500",
+                      cursor: submitting ? "not-allowed" : "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (submitting) {
+                        return;
+                      }
+                      e.currentTarget.style.backgroundColor = "#f7fafc";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </Form>
             </div>
-          }
-          submitButtonText={editingTemplate ? "Update" : "Create"}
-          cancelButtonText="Cancel"
-          onSubmit={handleSubmit}
-          onCancel={() => setShowModal(false)}
-          submitButtonVariant="primary"
-          cancelButtonVariant="secondary"
-          isSubmitting={submitting}
-          isSubmitDisabled={submitting}
-          useCrmDialogFooterStyle
-        />
+          </>
+        )}
 
         {/* Delete Confirmation Modal */}
         <DeleteConfirmationModal

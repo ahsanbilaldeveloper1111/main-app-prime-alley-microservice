@@ -15,6 +15,119 @@ const PRODUCT_NAME_MAX_LENGTH = 150;
 const PRODUCT_SKU_MAX_LENGTH = 150;
 const PRODUCT_DESCRIPTION_MAX_LENGTH = 500;
 
+/**
+ * ECMAScript `WhiteSpace` + `LineTerminator` (same class as `\s` in regex).
+ * O(1) per code point — no regex / no ReDoS (Sonar S5852).
+ */
+function isEcmaWhitespaceCodePoint(cp: number): boolean {
+  return (
+    cp === 0x0009 ||
+    cp === 0x000a ||
+    cp === 0x000b ||
+    cp === 0x000c ||
+    cp === 0x000d ||
+    cp === 0x0020 ||
+    cp === 0x00a0 ||
+    cp === 0xfeff ||
+    cp === 0x1680 ||
+    (cp >= 0x2000 && cp <= 0x200a) ||
+    cp === 0x2028 ||
+    cp === 0x2029 ||
+    cp === 0x202f ||
+    cp === 0x205f ||
+    cp === 0x3000
+  );
+}
+
+function isEcmaWhitespaceChar(ch: string): boolean {
+  const cp = ch.codePointAt(0);
+  return cp !== undefined && isEcmaWhitespaceCodePoint(cp);
+}
+
+function isAsciiLowerOrDigitOrHyphen(ch: string): boolean {
+  if (ch === "-") {
+    return true;
+  }
+  const cp = ch.codePointAt(0);
+  if (cp === undefined) {
+    return false;
+  }
+  return (cp >= 0x30 && cp <= 0x39) || (cp >= 0x61 && cp <= 0x7a);
+}
+
+/** Same as `.replaceAll(/\s+/g, "-")` on the string (linear time). */
+function insertHyphensForWhitespaceRuns(lower: string): string {
+  let out = "";
+  let inWhitespaceRun = false;
+  for (const ch of lower) {
+    if (isEcmaWhitespaceChar(ch)) {
+      inWhitespaceRun = true;
+      continue;
+    }
+    if (inWhitespaceRun && out.length > 0) {
+      out += "-";
+    }
+    inWhitespaceRun = false;
+    out += ch;
+  }
+  return out;
+}
+
+/** Same as `.replaceAll(/[^a-z0-9-]/g, "")` for ASCII letters (linear time). */
+function keepAsciiSkuChars(s: string): string {
+  let out = "";
+  for (const ch of s) {
+    if (isAsciiLowerOrDigitOrHyphen(ch)) {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/** Same as `.replaceAll(/-+/g, "-")` (linear time). */
+function collapseAdjacentHyphens(s: string): string {
+  let out = "";
+  let previousWasHyphen = false;
+  for (const ch of s) {
+    if (ch === "-") {
+      if (!previousWasHyphen) {
+        out += "-";
+        previousWasHyphen = true;
+      }
+    } else {
+      out += ch;
+      previousWasHyphen = false;
+    }
+  }
+  return out;
+}
+
+/** Same as `.replaceAll(/^-+/g, "").replaceAll(/-+$/g, "")` (linear time). */
+function trimLeadingTrailingHyphens(s: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s[start] === "-") {
+    start += 1;
+  }
+  while (end > start && s[end - 1] === "-") {
+    end -= 1;
+  }
+  return s.slice(start, end);
+}
+
+/**
+ * e.g. `Abc Product` → `abc-product` for auto-filled SKU while creating.
+ * Linear-time only (no vulnerable regex quantifiers — Sonar S5852 / ReDoS).
+ */
+function productNameToSuggestedSku(name: string): string {
+  const lower = name.trim().toLowerCase();
+  const hyphenated = insertHyphensForWhitespaceRuns(lower);
+  const filtered = keepAsciiSkuChars(hyphenated);
+  const collapsed = collapseAdjacentHyphens(filtered);
+  const trimmed = trimLeadingTrailingHyphens(collapsed);
+  return trimmed.slice(0, PRODUCT_SKU_MAX_LENGTH);
+}
+
 const FIELD_CHAR_COUNT_HINT: React.CSSProperties = {
   fontSize: "11px",
   color: "#888",
@@ -22,18 +135,29 @@ const FIELD_CHAR_COUNT_HINT: React.CSSProperties = {
   fontWeight: 300,
 };
 
+/** Maps API field `is_service` to a native `<select>` value (`true` / `false` / unset). */
+function isServiceSelectString(isService: boolean | null): "" | "true" | "false" {
+  if (isService === null) {
+    return "";
+  }
+  return isService ? "true" : "false";
+}
+
 function ProductLogoField({
   idPrefix,
   submitting,
   existingLogoUrl,
   logoFile,
   onLogoFileChange,
+  onExistingLogoClear,
 }: Readonly<{
   idPrefix: string;
   submitting: boolean;
   existingLogoUrl?: string | null;
   logoFile: File | null;
   onLogoFileChange: (file: File | null) => void;
+  /** Clear API/stored logo URL (edit mode). */
+  onExistingLogoClear?: () => void;
 }>) {
   const [dragOver, setDragOver] = useState(false);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
@@ -75,6 +199,15 @@ function ProductLogoField({
     onLogoFileChange(null);
     const input = fileInputRef.current;
     if (input) input.value = "";
+  };
+
+  const handleRemoveImage = () => {
+    if (submitting) return;
+    if (logoFile) {
+      handleRemoveNewUpload();
+      return;
+    }
+    onExistingLogoClear?.();
   };
 
   const dropZoneBorder = `1.5px dashed ${dragOver ? "#2d6ae0" : "rgb(138,138,138)"}`;
@@ -126,7 +259,11 @@ function ProductLogoField({
         }}
       >
         {displayImageSrc ? (
-          <img src={displayImageSrc} alt="product" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img
+            src={displayImageSrc}
+            alt=""
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
         ) : (
           <>
             <span style={{ ...BASE_BUTTON }}>Upload</span>
@@ -144,6 +281,28 @@ function ProductLogoField({
           </>
         )}
       </button>
+      {displayImageSrc ? (
+        <button
+          type="button"
+          onClick={handleRemoveImage}
+          disabled={submitting}
+          aria-label="Remove product image"
+          style={{
+            marginTop: "6px",
+            padding: 0,
+            border: "none",
+            background: "none",
+            cursor: submitting ? "not-allowed" : "pointer",
+            fontSize: "11px",
+            color: "#b91c1c",
+            textDecoration: "underline",
+            fontFamily: "Lexend Deca, Helvetica, Arial, sans-serif",
+            fontWeight: 300,
+          }}
+        >
+          Remove
+        </button>
+      ) : null}
       {logoFile && remoteLogoUrl ? (
         <button
           type="button"
@@ -183,8 +342,9 @@ export function ProductInformationCard({
   categories,
   loadingCategories,
   submitting,
-  productType,
-  onProductTypeChange,
+  /** `null` = "Choose type"; mirrors API `is_service` when set. */
+  isService,
+  onIsServiceChange,
   additionalOpen,
   onAdditionalOpenChange,
   idPrefix = "cmp",
@@ -192,6 +352,7 @@ export function ProductInformationCard({
   existingLogoUrl = null,
   logoFile,
   onLogoFileChange,
+  onExistingLogoClear,
 }: Readonly<{
   title?: string;
   error?: string | null;
@@ -206,8 +367,8 @@ export function ProductInformationCard({
   categories: ProductCategoryData[];
   loadingCategories: boolean;
   submitting: boolean;
-  productType: string;
-  onProductTypeChange: (value: string) => void;
+  isService: boolean | null;
+  onIsServiceChange: (value: boolean | null) => void;
   additionalOpen: boolean;
   onAdditionalOpenChange: (next: boolean) => void;
   idPrefix?: string;
@@ -217,6 +378,8 @@ export function ProductInformationCard({
   existingLogoUrl?: string | null;
   logoFile: File | null;
   onLogoFileChange: (file: File | null) => void;
+  /** Called when user removes the saved logo (no new file selected). */
+  onExistingLogoClear?: () => void;
 }>) {
   useEffect(() => {
     if (productName.length <= PRODUCT_NAME_MAX_LENGTH) return;
@@ -239,11 +402,7 @@ export function ProductInformationCard({
     <div style={SECTION_CARD}>
       <p style={SECTION_TITLE}>{title}</p>
 
-      {error && (
-        <div style={{ marginBottom: "16px", color: "#b91c1c", fontSize: "13px" }}>
-          {error}
-        </div>
-      )}
+    
 
       <div
         style={{
@@ -262,9 +421,13 @@ export function ProductInformationCard({
             type="text"
             value={productName}
             maxLength={PRODUCT_NAME_MAX_LENGTH}
-            onChange={(e) =>
-              onProductNameChange(e.target.value.slice(0, PRODUCT_NAME_MAX_LENGTH))
-            }
+            onChange={(e) => {
+              const next = e.target.value.slice(0, PRODUCT_NAME_MAX_LENGTH);
+              onProductNameChange(next);
+              if (!disableSku) {
+                onProductSkuChange(productNameToSuggestedSku(next));
+              }
+            }}
             style={FIELD_INPUT}
             onFocus={onBorderFocus}
             onBlur={onBorderBlur}
@@ -304,6 +467,7 @@ export function ProductInformationCard({
           existingLogoUrl={existingLogoUrl}
           logoFile={logoFile}
           onLogoFileChange={onLogoFileChange}
+          onExistingLogoClear={onExistingLogoClear}
         />
       </div>
 
@@ -362,17 +526,23 @@ export function ProductInformationCard({
         <div style={{ position: "relative" }}>
           <select
             id={`${idPrefix}-product-type`}
-            value={productType}
-            onChange={(e) => onProductTypeChange(e.target.value)}
+            value={isServiceSelectString(isService)}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "") {
+                onIsServiceChange(null);
+              } else {
+                onIsServiceChange(v === "true");
+              }
+            }}
             style={FIELD_SELECT}
             onFocus={onBorderFocus}
             onBlur={onBorderBlur}
+            disabled={submitting}
           >
-            <option value=""></option>
-            <option value="physical">Physical</option>
-            <option value="digital">Digital</option>
-            <option value="service">Service</option>
-            <option value="subscription">Subscription</option>
+            <option value="">Choose type</option>
+            <option value="false">Product</option>
+            <option value="true">Service</option>
           </select>
           <SelectCaret />
         </div>

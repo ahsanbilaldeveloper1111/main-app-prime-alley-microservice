@@ -49,6 +49,7 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import {
   RECORD_TYPES,
   formatCrmPreviewDate,
+  normalizeSearchQuery,
 } from "@utils/Helper";
 import {
   useCrmToolbarConfig,
@@ -60,6 +61,7 @@ import {
   type CrmActivitiesPanelRef,
 } from "@components/CrmActivitiesPanel";
 import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
+import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import { crmListPageReactSelectStyles as customSelectStyles } from "@utils/crmListPageReactSelectStyles";
 import {
@@ -101,6 +103,9 @@ import {
 } from "@crm/shared/crmProspectsContactsListPageHelpers";
 import { renderCrmProspectsKanbanTableCustomBody } from "@crm/shared/crmProspectsContactsListPageKanbanCustomBody";
 import { prospectsTableRowDoubleClick } from "@crm/shared/crmProspectsContactsListPageTableRowHandlers";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function resolveDeleteModalProps(
   mode: "single" | "bulk" | null,
@@ -162,6 +167,10 @@ export function CrmProspectsContactsListPage({
   const [deleteModalMode, setDeleteModalMode] = useState<
     "single" | "bulk" | null
   >(null);
+
+  const afterProspectsRemovedRef = useRef<(ids: readonly number[]) => void>(
+    () => {},
+  );
 
   const {
     assignmentFilters,
@@ -271,7 +280,6 @@ export function CrmProspectsContactsListPage({
 
   const {
     activeFilter,
-    setActiveFilter,
     showAdvancedFilters,
     setShowAdvancedFilters,
     search: prospectsSearch,
@@ -320,7 +328,7 @@ export function CrmProspectsContactsListPage({
     validFilters: ["all", "scheduled", "has_leads"],
     defaultColumnIds: [
       "name", "phone", "source_file", "user_extension", "campaign",
-      "last_called_at", "last_call_end_reason", "disposition",
+      "disposition",
       "scheduled_call_at", "tags",
     ],
     selectedColumnsStorageKey: config.selectedColumnsStorageKey,
@@ -367,7 +375,7 @@ export function CrmProspectsContactsListPage({
     handleDataAssignmentSubmit, handleDataAssignmentModalClose,
     handleAfterCallSubmit,
     handleScheduleCall, handleUnscheduleCallClick, confirmUnscheduleCall,
-    handleScheduleModalClose, handleScheduleSubmit,
+    handleScheduleModalClose, handleScheduleSubmit, handleScheduledCallStatusChange,
     handleCallClick, handleBulkDelete, handleDeleteData,
     openSidebar: openProspectSidebar, handleViewData,
     handlePlayCallRecording, handleDownloadCallRecording,
@@ -389,6 +397,7 @@ export function CrmProspectsContactsListPage({
     setSelectedRecording, setShowRecordingPlayerModal,
     ...callRecordingDownloadProgressProps,
     calculateEntryCounts: prospectsCalculateEntryCounts,
+    onAfterBulkDelete: (ids) => afterProspectsRemovedRef.current(ids),
   });
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
@@ -411,6 +420,24 @@ export function CrmProspectsContactsListPage({
     onEmailSent: () => sidebarActivitiesPanelRef.current?.refetchEmails?.(),
     onMeetingScheduled: () =>
       sidebarActivitiesPanelRef.current?.refetchMeetings?.(),
+  });
+
+  // "Log a Call / Email / SMS / WhatsApp / Meeting" — manual history entries
+  // (no actual send). These are wired into the GenericSidebar "more actions"
+  // overflow so each click opens a dedicated dialog where the user picks the
+  // time and subject; on submit we POST to /crm/audit-logs.
+  const sidebarLogActivityModals = useCrmLogActivityModals({
+    recordType: "prospect",
+    recordId: sidebarRecordId,
+    recordName: sidebarRecordName,
+    recordPhone: sidebarRecordPhone,
+    recordEmail: sidebarRecordEmail,
+    onLogged: () => {
+      // The audit log feeds the record's history / activity audit trail —
+      // refetch whatever the activities panel surfaces so the new entry
+      // shows up immediately without needing a manual reload.
+      sidebarActivitiesPanelRef.current?.refetchNotes?.();
+    },
   });
 
   const buildCrmDataParams = useCallback(
@@ -468,6 +495,29 @@ export function CrmProspectsContactsListPage({
     computeAdvancedFiltersApplied: config.computeAdvancedFiltersApplied,
   });
 
+  const handleResetListScope = useCallback(() => {
+    setProspectsSearch("");
+    setProspectsFilters({
+      assignedTo: null,
+      campaigns: null,
+      nextCallDateFrom: null,
+      nextCallDateTo: null,
+      sourceFile: null,
+      tags: null,
+    });
+    handleFiltersChange({});
+    handleFilterChange("all");
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+    setRefreshKey((prev) => prev + 1);
+  }, [
+    handleFiltersChange,
+    handleFilterChange,
+    setProspectsSearch,
+    setProspectsFilters,
+    setPagination,
+    setRefreshKey,
+  ]);
+
   /** Prospects only: Overdue metric switches to Scheduled tab + API overdue filter. */
   const handleProspectOverdueMetricClick = useCallback(() => {
     if (config.operationsEntityName !== "prospects") {
@@ -475,6 +525,32 @@ export function CrmProspectsContactsListPage({
     }
     handleFilterChange("scheduled");
     applyTableFiltersPatch({ scheduled_call_status: "overdue" });
+  }, [
+    applyTableFiltersPatch,
+    config.operationsEntityName,
+    handleFilterChange,
+  ]);
+
+  /** Prospects: Upcoming metric → Scheduled tab (all upcoming, not only overdue). */
+  const handleProspectUpcomingMetricClick = useCallback(() => {
+    if (config.operationsEntityName !== "prospects") {
+      return;
+    }
+    handleFilterChange("scheduled");
+    applyTableFiltersPatch({ scheduled_call_status: undefined });
+  }, [
+    applyTableFiltersPatch,
+    config.operationsEntityName,
+    handleFilterChange,
+  ]);
+
+  /** Prospects: Converted metric → Has leads tab. */
+  const handleProspectConvertedMetricClick = useCallback(() => {
+    if (config.operationsEntityName !== "prospects") {
+      return;
+    }
+    handleFilterChange("has_leads");
+    applyTableFiltersPatch({ scheduled_call_status: undefined });
   }, [
     applyTableFiltersPatch,
     config.operationsEntityName,
@@ -521,6 +597,8 @@ export function CrmProspectsContactsListPage({
     itemToDelete,
     session,
     refreshKey,
+    onSingleRecordDeleted: (deletedId) =>
+      afterProspectsRemovedRef.current([deletedId]),
   });
 
   const dispositionQuickUpdateInFlightRef = useRef<Set<number>>(new Set());
@@ -603,6 +681,28 @@ export function CrmProspectsContactsListPage({
     clearPreviewIdFromStorage();
   }, [handleCloseProspectSidebarCore, clearPreviewIdFromStorage]);
 
+  useEffect(() => {
+    afterProspectsRemovedRef.current = (ids: readonly number[]) => {
+      const selId = selectedProspect?.id;
+      if (selId != null && ids.includes(Number(selId))) {
+        handleCloseProspectSidebar();
+      }
+      if (
+        convertingToLeadCrmRecordId != null &&
+        ids.includes(convertingToLeadCrmRecordId)
+      ) {
+        setShowConvertToLeadModal(false);
+        setConvertingToLeadCrmRecordId(null);
+      }
+    };
+  }, [
+    selectedProspect?.id,
+    convertingToLeadCrmRecordId,
+    handleCloseProspectSidebar,
+    setShowConvertToLeadModal,
+    setConvertingToLeadCrmRecordId,
+  ]);
+
   /** Navigate away (e.g. View record) while keeping id so back-navigation can reopen preview. */
   const handleHideProspectSidebarKeepPersistence = useCallback(() => {
     handleCloseProspectSidebarCore();
@@ -649,7 +749,7 @@ export function CrmProspectsContactsListPage({
     });
   };
 
-  // Stats cards data for metrics (prospects: only Overdue is clickable → list filter)
+  // Stats cards: prospects wire Overdue / Upcoming / Converted to matching tabs + filters.
   const prospectsStatsCards: StatsCardData[] = useMemo(
     () => [
       {
@@ -670,6 +770,9 @@ export function CrmProspectsContactsListPage({
           text: `${metrics.scheduled_next_hour_records ?? 0} in next hour`,
           dotColor: "#F59E0B",
         },
+        ...(config.operationsEntityName === "prospects"
+          ? { onClick: handleProspectUpcomingMetricClick }
+          : {}),
       },
       {
         title: "Overdue",
@@ -695,6 +798,9 @@ export function CrmProspectsContactsListPage({
           text: "Has associated leads",
           dotColor: "#8B5CF6",
         },
+        ...(config.operationsEntityName === "prospects"
+          ? { onClick: handleProspectConvertedMetricClick }
+          : {}),
       },
       {
         title: "Recently Contacted",
@@ -723,6 +829,8 @@ export function CrmProspectsContactsListPage({
       config.operationsEntityName,
       config.stats,
       handleProspectOverdueMetricClick,
+      handleProspectUpcomingMetricClick,
+      handleProspectConvertedMetricClick,
       metrics,
     ],
   );
@@ -754,6 +862,7 @@ export function CrmProspectsContactsListPage({
         setItemToDelete,
         setShowDeleteModal,
         onDispositionChange: handleDispositionQuickUpdate,
+        onScheduledCallStatusChange: handleScheduledCallStatusChange,
       }),
     [
       session,
@@ -770,6 +879,7 @@ export function CrmProspectsContactsListPage({
       setItemToDelete,
       setShowDeleteModal,
       handleDispositionQuickUpdate,
+      handleScheduledCallStatusChange,
     ],
   );
 
@@ -826,6 +936,7 @@ export function CrmProspectsContactsListPage({
     onEditColumnsClick: () => setShowColumnEditor(true),
     showImport: true,
     onImportClick: () => setShowUploadModal(true),
+    showTableViewDropdown: config.enableBoardView,
     ...(config.enableBoardView
       ? {
           currentTableView: prospectsViewMode,
@@ -836,23 +947,38 @@ export function CrmProspectsContactsListPage({
     onPaginationReset: () =>
       setPagination((prev) => ({ ...prev, currentPage: 1 })),
     rightActions: (
-      <CrmProspectsContactsAddContactsButton
-        addContactsRef={addContactsRef}
-        session={session}
-        extensions={extensions}
-        config={config}
-        selectedItems={selectedItems}
-        showAddContactsDropdown={showAddContactsDropdown}
-        setShowAddContactsDropdown={setShowAddContactsDropdown}
-        setEditingContactId={setEditingContactId}
-        setContactForm={
-          setContactForm as Dispatch<SetStateAction<CrmListContactFormState>>
-        }
-        setShowCreateContactSidebar={setShowCreateContactSidebar}
-        setShowUploadModal={setShowUploadModal}
-        setDeleteModalMode={setDeleteModalMode}
-        setShowDeleteModal={setShowDeleteModal}
-      />
+      <div className="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+        {(hasAdvancedFiltersApplied ||
+          normalizeSearchQuery(prospectsSearch) ||
+          activeFilter !== "all" ||
+          Object.keys(currentFilters).length > 0) && (
+          <Button
+            type="button"
+            variant="outline-secondary"
+            size="sm"
+            onClick={handleResetListScope}
+          >
+            Reset filters
+          </Button>
+        )}
+        <CrmProspectsContactsAddContactsButton
+          addContactsRef={addContactsRef}
+          session={session}
+          extensions={extensions}
+          config={config}
+          selectedItems={selectedItems}
+          showAddContactsDropdown={showAddContactsDropdown}
+          setShowAddContactsDropdown={setShowAddContactsDropdown}
+          setEditingContactId={setEditingContactId}
+          setContactForm={
+            setContactForm as Dispatch<SetStateAction<CrmListContactFormState>>
+          }
+          setShowCreateContactSidebar={setShowCreateContactSidebar}
+          setShowUploadModal={setShowUploadModal}
+          setDeleteModalMode={setDeleteModalMode}
+          setShowDeleteModal={setShowDeleteModal}
+        />
+      </div>
     ),
     prospectsTabCountOverrides: {
       loading,
@@ -861,7 +987,9 @@ export function CrmProspectsContactsListPage({
     },
   });
 
-  if (!session?.user?.permissions?.includes("list-crm-data-management")) {
+  if (
+    !session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)
+  ) {
     return null;
   }
 
@@ -953,7 +1081,9 @@ export function CrmProspectsContactsListPage({
           </div>
 
           {/* Upload Modal */}
-          {session?.user?.permissions?.includes("add-crm-data-management") && (
+          {session?.user?.permissions?.includes(
+            PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+          ) && (
             <Modal
               show={showUploadModal}
               onHide={() => setShowUploadModal(false)}
@@ -1219,8 +1349,18 @@ export function CrmProspectsContactsListPage({
             recordId={resolveNumericProspectId(selectedProspect) || undefined}
             resolveUserLabel={getNameByExtension}
             onNoteCreate={handleNoteCreate}
+            onPlayCallRecording={handlePlayCallRecording}
+            onLogCall={sidebarLogActivityModals.openLogCall}
+            onLogEmail={sidebarLogActivityModals.openLogEmail}
+            onLogSms={sidebarLogActivityModals.openLogSms}
+            onLogWhatsApp={sidebarLogActivityModals.openLogWhatsApp}
+            onLogMeeting={sidebarLogActivityModals.openLogMeeting}
             crmSummary={
-              selectedProspect?.crm_summary ?? selectedProspect?.data?.crm_summary ?? undefined
+              selectedProspect?.crm_summary ??
+              selectedProspect?.data?.crm_summary ??
+              (selectedProspect?.data as { data?: { crm_summary?: unknown } } | undefined)
+                ?.data?.crm_summary ??
+              undefined
             }
             recordLink={{
               label: "View record",
@@ -1261,7 +1401,11 @@ export function CrmProspectsContactsListPage({
                 // },
                 {
                   label: "Delete",
-                  onClick: () => handleDeleteData(selectedProspect),
+                  onClick: () => {
+                    const prospectToDelete = selectedProspect;
+                    setShowProspectSidebar(false);
+                    handleDeleteData(prospectToDelete);
+                  },
                 },
               ],
             }}
@@ -1400,6 +1544,7 @@ export function CrmProspectsContactsListPage({
           />
         )}
         {sidebarActivityModals.modals}
+        {sidebarLogActivityModals.modals}
         {/* Filters Sidebar */}
         <GenericFilterSidebar
           isOpen={showFiltersSidebar}
@@ -1440,7 +1585,7 @@ export function CrmProspectsContactsListPage({
                   ...prev,
                   assignedTo: assignedToValue,
                 }));
-                setActiveFilter("all");
+                handleFilterChange("all");
               },
               options: extensions.map((ext: any) => ({
                 value: ext.id || ext.extension,
@@ -1472,7 +1617,7 @@ export function CrmProspectsContactsListPage({
                   ...prev,
                   campaigns: campaignValues,
                 }));
-                setActiveFilter("all");
+                handleFilterChange("all");
               },
               options: availableCampaigns.map((c) => ({
                 value: c.value,
@@ -1524,7 +1669,7 @@ export function CrmProspectsContactsListPage({
                   ...prev,
                   sourceFile: sourceValue,
                 }));
-                setActiveFilter("all");
+                handleFilterChange("all");
               },
               options: uniqueSources,
               placeholder: "Select source...",
@@ -1553,7 +1698,7 @@ export function CrmProspectsContactsListPage({
                   ...prev,
                   tags: tagValues,
                 }));
-                setActiveFilter("all");
+                handleFilterChange("all");
               },
               options: availableTags.map((tag) => ({
                 value: tag.value,
@@ -1589,7 +1734,7 @@ export function CrmProspectsContactsListPage({
             });
             handleFiltersChange({});
             setCurrentFilters({});
-            setActiveFilter("all");
+            handleFilterChange("all");
             setPagination((prev) => ({
               ...prev,
               currentPage: 1,
@@ -1656,7 +1801,7 @@ export function CrmProspectsContactsListPage({
         customTabs={customTabs}
         setCustomTabs={setCustomTabs}
         scheduledRecordsCount={metrics.scheduled_records}
-        hasLeadsTabLabel="Converted Leads"
+        hasLeadsTabLabel="Converted Prospects"
       />
       {/* Create Contact Sidebar */}
       <CrmListCreateContactSidebar

@@ -1,0 +1,356 @@
+/* New Request sidebar + additional fields (Workforce) */
+.new-request-sidebar {
+  font-family: "Lexend Deca", Helvetica, Arial, sans-serif;
+  color: #141414;
+}
+
+.new-request-sidebar :is(.form-control, .form-select, input, select, textarea) {
+  font-size: 14px;
+  color: #141414;
+}
+
+.new-request-sidebar :is(.form-control, .form-select, input, select) {
+  min-height: 40px;
+}
+
+.new-request-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #141414;
+}
+
+.new-request-dateFieldGroup {
+  min-width: 140px;
+}
+
+.new-request-additionalFieldsPanel {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background-color: #f8fafc;
+  padding: 14px;
+}
+
+.new-request-additionalFieldsHint {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+
+.new-request-additionalFieldCard {
+  margin-bottom: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background-color: #ffffff;
+  padding: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.new-request-additionalFieldCard:focus-within {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+.new-request-additionalFieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  display: block;
+}
+
+.new-request-additionalFieldInput :is(.form-control, .form-select, input[type="date"], input[type="number"]) {
+  min-height: 44px;
+  border-radius: 10px;
+  border-color: #dbe3ee;
+  font-size: 14px;
+  color: #0f172a;
+  background-color: #f8fafc;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.new-request-additionalFieldInput textarea.form-control {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.new-request-additionalFieldInput :is(.form-control, .form-select):focus {
+  border-color: #93c5fd;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.new-request-selectbox .new-request-selectbox__control {
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid #dbe3ee;
+  background-color: #f8fafc;
+  box-shadow: none;
+}
+
+.new-request-selectbox .new-request-selectbox__control--is-focused {
+  border-color: #93c5fd;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.new-request-selectbox .new-request-selectbox__placeholder {
+  color: #94a3b8;
+}
+
+.new-request-selectbox .new-request-selectbox__multi-value {
+  background-color: #dbeafe;
+  border-radius: 999px;
+}
+
+.new-request-selectbox .new-request-selectbox__multi-value__label {
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.new-request-selectbox .new-request-selectbox__multi-value__remove {
+  color: #1e40af;
+}
+
+.new-request-selectbox .new-request-selectbox__multi-value__remove:hover {
+  background-color: #bfdbfe;
+  color: #1e3a8a;
+}
+
+.new-request-booleanControl .form-check-input,
+.new-request-switchControl .form-check-input {
+  cursor: pointer;
+}
+
+.new-request-booleanControl .form-check-label,
+.new-request-switchControl .form-check-label {
+  color: #334155;
+  font-weight: 500;
+}
+
+/* User request dynamic field — radio (urdf-*) */
+.urdf-radioGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.urdf-radioOption {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.urdf-radioOption--selected {
+  border-color: #6366f1;
+  background-color: #eef2ff;
+  color: #3730a3;
+}
+
+.urdf-radioInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.urdf-radioMark {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #9ca3af;
+  background-color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.urdf-radioMark--selected {
+  border-color: #4f46e5;
+}
+
+.urdf-radioDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #4f46e5;
+  display: inline-block;
+}
+
+.urdf-checkboxGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.urdf-checkboxOption {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease;
+}
+
+.urdf-checkboxOption--selected {
+  border-color: #0ea5e9;
+  background-color: #f0f9ff;
+  color: #0f172a;
+}
+
+.urdf-checkboxInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.urdf-checkboxMark {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 2px solid #94a3b8;
+  background-color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.urdf-checkboxMark--selected {
+  border-color: #0ea5e9;
+  background-color: #0ea5e9;
+}
+
+.urdf-checkboxTick {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Main form controls (Create / Edit request — outside “additional fields” cards) */
+.new-request-sidebar .new-request-fieldControl {
+  border-radius: 10px;
+  border-color: #dbe3ee;
+  background-color: #f8fafc;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.new-request-sidebar textarea.new-request-fieldControl {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.new-request-sidebar .new-request-fieldControl:focus {
+  border-color: #93c5fd;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.new-request-sidebar :is(.form-select, .form-control):disabled {
+  background-color: #f1f5f9;
+  opacity: 1;
+  /* Darker than slate-500 for sufficient contrast on #f1f5f9 (WCAG) */
+  color: #334155;
+  box-shadow: none;
+}
+
+/* Read-only value (e.g. main category on edit request) */
+.new-request-readonlyValue,
+.new-request-sidebar .form-control.new-request-readonlyValue:read-only {
+  background-color: #f1f5f9;
+  color: #334155;
+  cursor: default;
+}
+
+/* Edit request — existing attachment list */
+.new-request-attachmentList {
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background-color: #f8fafc;
+}
+
+.new-request-attachmentListHeading {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.new-request-attachmentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.new-request-attachmentRow:last-child {
+  margin-bottom: 0;
+}
+
+.new-request-attachmentRowMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.new-request-attachmentName {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.new-request-attachmentMeta {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.new-request-attachmentDownloadBtn {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background-color: #f1f5f9;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease;
+}
+
+.new-request-attachmentDownloadBtn:hover {
+  background-color: #e2e8f0;
+}

@@ -1,4 +1,5 @@
 import { useRouter } from "next/router";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import React, {
   useState,
   useCallback,
@@ -12,6 +13,7 @@ import type {
   TabConfig,
 } from "@components/GenericTable";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
+import { useCrmLogActivityModals } from "@hooks/useCrmLogActivityModals";
 import {
   buildShallowTabFilterPushArgs,
   resolveTabFilterFromUrlQuery,
@@ -56,6 +58,8 @@ import {
   formatDateForTable,
   checkRequiredFields,
   GlobalDateFormat,
+  convertLocalMeetingToUtc,
+  convertUtcMeetingToLocal,
 } from "@utils/Helper";
 import {
   Target,
@@ -94,6 +98,8 @@ import {
   buildLeadsListExportCsvText,
   getContactPersonsValidationError,
 } from "./leadsPageShared";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function parseLeadsListApiEnvelope(response: unknown): {
   leadsArray: unknown[];
@@ -1097,8 +1103,6 @@ export function useCrmLeadsPageModel() {
     return () => {
       cancelled = true;
     };
-    // Intentionally empty: bootstrap runs once per mount; helpers close over latest setters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot reference-data load
   }, []);
 
   // Transform API lead data to UI format
@@ -1243,6 +1247,25 @@ export function useCrmLeadsPageModel() {
     return extensionData?.display_name || extensionData?.name || extension;
   }
 
+  const sidebarLeadRecordId = useMemo(() => {
+    const rawId = selectedLead?.id ?? selectedLead?.rawData?.id;
+    const numericId = Number(rawId);
+    return Number.isFinite(numericId) && numericId > 0 ? numericId : 0;
+  }, [selectedLead]);
+  const sidebarLeadRecordName = selectedLead?.name ?? "";
+  const sidebarLeadRecordPhone =
+    selectedLead?.phone ?? selectedLead?.rawData?.phone ?? "";
+  const sidebarLeadRecordEmail =
+    selectedLead?.email ?? selectedLead?.rawData?.email ?? "";
+
+  const sidebarLogActivityModals = useCrmLogActivityModals({
+    recordType: "lead",
+    recordId: sidebarLeadRecordId,
+    recordName: sidebarLeadRecordName,
+    recordPhone: sidebarLeadRecordPhone,
+    recordEmail: sidebarLeadRecordEmail,
+  });
+
   // Handle note creation
   const handleNoteCreate = useCallback(
     (note: string, createTask: boolean, taskDueDate?: string) => {
@@ -1252,12 +1275,6 @@ export function useCrmLeadsPageModel() {
         createTask,
         taskDueDate,
       });
-
-      // Here you would typically:
-      // 1. Save the note to your backend/database
-      // 2. If createTask is true, create a task with the due date
-      // 3. Update the UI to show the new note
-      // 4. Maybe refresh the notes section
 
       toast.success(
         `Note saved successfully!${createTask ? " Task created." : ""}`,
@@ -1404,6 +1421,19 @@ export function useCrmLeadsPageModel() {
   const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
   const [successModalTitle, setSuccessModalTitle] = useState("");
   const [successModalDescription, setSuccessModalDescription] = useState("");
+
+  // Call recording playback (matches prospects sidebar behaviour)
+  const [showRecordingPlayerModal, setShowRecordingPlayerModal] =
+    useState(false);
+  const [selectedRecording, setSelectedRecording] = useState<any>(null);
+  const handlePlayCallRecording = useCallback((recording: any) => {
+    setSelectedRecording(recording);
+    setShowRecordingPlayerModal(true);
+  }, []);
+  const handleCloseRecordingPlayerModal = useCallback(() => {
+    setShowRecordingPlayerModal(false);
+    setSelectedRecording(null);
+  }, []);
 
   const handleMarkLostSubmit = useCallback(async () => {
     if (!leadToMarkLost || !lostReasonId || !lostFeedback.trim()) return;
@@ -1873,11 +1903,16 @@ export function useCrmLeadsPageModel() {
         extensions.push((session?.user as any)?.extension || "admin");
       }
 
+      const utcMeeting = convertLocalMeetingToUtc(
+        String(meetingData.meetingDate || "").slice(0, 10),
+        String(meetingData.meetingTime || "").slice(0, 5),
+      );
       const payload: any = {
         name: meetingData.meetingName,
         meeting_type: meetingData.meetingType,
-        meeting_date: meetingData.meetingDate,
-        meeting_time: meetingData.meetingTime,
+        meeting_date: utcMeeting.utcDate || meetingData.meetingDate,
+        meeting_time: utcMeeting.utcTime || meetingData.meetingTime,
+        ...(utcMeeting.utcIso && { start_date_time: utcMeeting.utcIso }),
         extensions,
       };
 
@@ -1948,10 +1983,14 @@ export function useCrmLeadsPageModel() {
   // Handle edit meeting click
   const handleEditMeeting = useCallback(
     (meeting: any) => {
-      const meetingDate = toIsoDateInputValueFromDbField(meeting.meeting_date);
-
-      // Format time for input (HH:MM)
-      const meetingTime = meeting.meeting_time || "";
+      const utcDateRaw = toIsoDateInputValueFromDbField(meeting.meeting_date);
+      const utcTimeRaw = meeting.meeting_time || "";
+      const localized = convertUtcMeetingToLocal(
+        String(utcDateRaw || "").slice(0, 10),
+        String(utcTimeRaw || "").slice(0, 5),
+      );
+      const meetingDate = localized.localDate || utcDateRaw;
+      const meetingTime = localized.localTime || utcTimeRaw;
 
       const meetingExtensionStrings =
         meeting.extensions && Array.isArray(meeting.extensions)
@@ -2322,7 +2361,7 @@ export function useCrmLeadsPageModel() {
       },
     ];
 
-    if (session?.user?.permissions?.includes("edit-crm-leads")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_LEADS)) {
       actions.push({
         label: "Edit",
         icon: <Edit size={16} />,
@@ -2332,7 +2371,7 @@ export function useCrmLeadsPageModel() {
       });
     }
 
-    if (session?.user?.permissions?.includes("add-crm-deals")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_DEALS)) {
       actions.push({
         label: "Convert to Deal",
         icon: <Handshake size={16} />,
@@ -2345,7 +2384,7 @@ export function useCrmLeadsPageModel() {
       });
     }
 
-    if (session?.user?.permissions?.includes("delete-crm-leads")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_LEADS)) {
       actions.push({
         label: "Delete",
         icon: <Trash2 size={16} />,
@@ -2357,7 +2396,7 @@ export function useCrmLeadsPageModel() {
 
     // Add Change Stage and Lost actions (only when not viewing lost leads)
     if (activeFilter !== "lost") {
-      if (session?.user?.permissions?.includes("edit-crm-leads")) {
+      if (session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_LEADS)) {
         actions.push({
           label: "Change Stage",
           icon: <GitBranch size={16} />,
@@ -2365,7 +2404,9 @@ export function useCrmLeadsPageModel() {
         });
       }
 
-      if (session?.user?.permissions?.includes("mark-as-lost-crm-leads")) {
+      if (
+        session?.user?.permissions?.includes(PERMISSIONS.MARK_AS_LOST_CRM_LEADS)
+      ) {
         actions.push({
           label: "Lost",
           icon: <X size={16} />,
@@ -2424,7 +2465,7 @@ export function useCrmLeadsPageModel() {
       setLeadsPagination((prev) => ({ ...prev, currentPage: 1 })),
     stages,
     rightActions:
-      session?.user?.permissions?.includes("add-crm-leads") ? (
+      session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_LEADS) ? (
         <div
           style={{
             position: "absolute",
@@ -2685,7 +2726,12 @@ export function useCrmLeadsPageModel() {
     handleCallClick,
     handleSidebarCall,
     getNameByExtension,
+    sidebarLogActivityModals,
     handleNoteCreate,
+    handlePlayCallRecording,
+    showRecordingPlayerModal,
+    selectedRecording,
+    handleCloseRecordingPlayerModal,
     handleCloseLeadSidebar,
     handleHideLeadSidebarKeepPersistence,
     handleDeleteLead,
