@@ -23,7 +23,6 @@ import {
   Filter,
   MoreVertical,
   Menu,
-  Check,
 } from "lucide-react";
 import "@assets/css/GenericTable.css";
 import StatsCards, { StatsCardData } from "@components/GenericStatsCards";
@@ -183,7 +182,9 @@ function buildDropdownContextMenuItems<T>(
   });
 
   if (action.dropdown!.nestInContextMenu) {
-    return [{ label: action.label, icon: action.icon, submenu: opts.map(mapOption) }];
+    return [
+      { label: action.label, icon: action.icon, submenu: opts.map(mapOption) },
+    ];
   }
   return opts.map(mapOption);
 }
@@ -250,7 +251,10 @@ export function buildBoundTableContextMenuItems<T>(
   actions: TableAction<T>[],
   row: T,
 ): BoundTableContextMenuItem[] {
-  return bindTableContextMenuItemsToRow(buildTableContextMenuItems(actions, row), row);
+  return bindTableContextMenuItemsToRow(
+    buildTableContextMenuItems(actions, row),
+    row,
+  );
 }
 
 /** One row in `gt-context-menu`; `onClick` is a bound handler (no row argument). */
@@ -401,8 +405,6 @@ export interface FilterPill {
     value: string;
     selected?: boolean;
     onClick?: () => void;
-    /** Shown when `multiSelect` is true (e.g. checkmark for selected options). */
-    selected?: boolean;
   }>;
   /** Override the default `Dropdown.Menu` inline styles (e.g. remove maxHeight/overflow for portalled selects). */
   dropdownMenuStyle?: React.CSSProperties;
@@ -556,10 +558,10 @@ export interface GenericTableProps<T = any> {
   // Stats cards
   statsCards?: StatsCardData[]; // Stats cards data to display above table
   metricsGridMinWidth?: string; // Grid min width for metrics cards layout
-  
+
   // Hide toolbar actions (three dots menu)
   showToolbarActions?: boolean;
-  
+
   // Remove border from table card
   noBorder?: boolean;
 
@@ -570,7 +572,12 @@ export interface GenericTableProps<T = any> {
 function safeStringifyValue(val: unknown): string {
   if (val === null || val === undefined) return "";
   if (typeof val === "string") return val;
-  if (typeof val === "number" || typeof val === "boolean" || typeof val === "bigint") return String(val);
+  if (
+    typeof val === "number" ||
+    typeof val === "boolean" ||
+    typeof val === "bigint"
+  )
+    return String(val);
   try {
     return JSON.stringify(val);
   } catch {
@@ -584,7 +591,10 @@ function truncateGtText(text: string | number, maxLength = 20): string {
   return `${str.slice(0, maxLength)}...`;
 }
 
-function parseStoredColumnKeys(raw: string | null, defaults: string[]): string[] | null {
+function parseStoredColumnKeys(
+  raw: string | null,
+  defaults: string[],
+): string[] | null {
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -619,7 +629,9 @@ function buildContextMenuItemsForRow<T extends Record<string, any>>(
   for (const action of tableActions) {
     if (action.show && !action.show(row)) continue;
     if (action.dropdown) {
-      const opts = action.dropdown.options.filter((o) => !o.show || o.show(row));
+      const opts = action.dropdown.options.filter(
+        (o) => !o.show || o.show(row),
+      );
       for (const o of opts) {
         items.push({
           reactKey: `gt-ctxm-${seq++}-${action.label}-${o.label}`,
@@ -673,8 +685,7 @@ function renderGenericTableCellContent<T extends Record<string, any>>(
       const name = safeStringifyValue(value);
       const displayName = truncateGtText(name, 20);
       const initials =
-        column.avatar?.getInitials?.(row) ||
-        name.slice(0, 2).toUpperCase();
+        column.avatar?.getInitials?.(row) || name.slice(0, 2).toUpperCase();
       const bgColor = column.avatar?.getColor?.(row) || "#6c757d";
       return (
         <div className="gt-name-cell" title={name}>
@@ -720,10 +731,7 @@ function renderGenericTableCellContent<T extends Record<string, any>>(
       const multiTitleSecondary = secondaryValue ? `\n${secondaryValue}` : "";
       const multiTitle = `${primaryValue}${multiTitleSecondary}`;
       return (
-        <div
-          className="gt-company-cell"
-          title={multiTitle}
-        >
+        <div className="gt-company-cell" title={multiTitle}>
           <div className="gt-company-name gt-text">
             {truncatedPrimary || column.emptyValue || "--"}
           </div>
@@ -772,7 +780,9 @@ function filterPillOptionsForQuery(
   return opts.filter(
     (o) =>
       (o.label ?? "").toLowerCase().includes(q) ||
-      String(o.value ?? "").toLowerCase().includes(q),
+      String(o.value ?? "")
+        .toLowerCase()
+        .includes(q),
   );
 }
 
@@ -845,16 +855,6 @@ function GenericTableFilterPillMenuBody({
       )}
       {hasOptions ? (
         <>
-          {pill.multiSelect && pill.onSelectAll && (
-            <Dropdown.Item
-              onClick={() => {
-                pill.onSelectAll?.();
-                clearPillQuery();
-              }}
-            >
-              <strong>{pill.selectAllLabel ?? "Select all"}</strong>
-            </Dropdown.Item>
-          )}
           {optionsToShow.map((option) => (
             <Dropdown.Item
               key={`${pill.id}:${option.value}:${option.label}`}
@@ -875,9 +875,30 @@ function GenericTableFilterPillMenuBody({
         </>
       ) : (
         <>
-          <Dropdown.Item onClick={() => { pill.onClick?.(); closeMenu(); }}>All</Dropdown.Item>
-          <Dropdown.Item onClick={() => { pill.onClick?.(); closeMenu(); }}>Active</Dropdown.Item>
-          <Dropdown.Item onClick={() => { pill.onClick?.(); closeMenu(); }}>Inactive</Dropdown.Item>
+          <Dropdown.Item
+            onClick={() => {
+              pill.onClick?.();
+              closeMenu();
+            }}
+          >
+            All
+          </Dropdown.Item>
+          <Dropdown.Item
+            onClick={() => {
+              pill.onClick?.();
+              closeMenu();
+            }}
+          >
+            Active
+          </Dropdown.Item>
+          <Dropdown.Item
+            onClick={() => {
+              pill.onClick?.();
+              closeMenu();
+            }}
+          >
+            Inactive
+          </Dropdown.Item>
         </>
       )}
     </>
@@ -947,8 +968,7 @@ function GenericTableBodyDataCell<T extends Record<string, any>>({
   hoveredRowIndex: number | null;
 }>) {
   const cellContent = renderGenericTableCellContent(col, row, index);
-  const firstColumnClickable =
-    colIdx === 0 && onFirstColumnClick !== undefined;
+  const firstColumnClickable = colIdx === 0 && onFirstColumnClick !== undefined;
 
   return (
     <td
@@ -1163,9 +1183,7 @@ const GenericTable = <T extends Record<string, any>>({
   const columnCustomizerActionsHeaderId = useId();
   // Sorting state (synced from props when parent controls sort, e.g. server-side)
   const [sortBy, setSortBy] = useState(defaultSortBy);
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
-    defaultSortOrder,
-  );
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(defaultSortOrder);
   const baseActionsEnabled = showActions && actions.length > 0;
   const allSelectableColumnKeys = useMemo(() => {
     const keys = columns.map((c) => c.key);
@@ -1208,20 +1226,25 @@ const GenericTable = <T extends Record<string, any>>({
   useEffect(() => {
     setSelectedColumns((prev) => {
       const source = selectedColumnsProp ?? prev;
-      const next = source.filter((key) => allSelectableColumnKeys.includes(key));
+      const next = source.filter((key) =>
+        allSelectableColumnKeys.includes(key),
+      );
       return next;
     });
   }, [allSelectableColumnKeys, selectedColumnsProp]);
   useEffect(() => {
     if (selectedColumnsProp !== undefined) {
       setSelectedColumns(
-        selectedColumnsProp.filter((key) => allSelectableColumnKeys.includes(key)),
+        selectedColumnsProp.filter((key) =>
+          allSelectableColumnKeys.includes(key),
+        ),
       );
     }
   }, [selectedColumnsProp, allSelectableColumnKeys]);
   const actionsColumnVisible =
     baseActionsEnabled &&
-    (!customizableColumns || effectiveSelectedColumns.includes(ACTION_COLUMN_KEY));
+    (!customizableColumns ||
+      effectiveSelectedColumns.includes(ACTION_COLUMN_KEY));
 
   // Context menu (right‑click) state
   const [contextMenu, setContextMenu] = useState<{
@@ -1286,9 +1309,7 @@ const GenericTable = <T extends Record<string, any>>({
 
   /** No data columns and no actions column: still show the picker (e.g. optional row without actions). */
   const showColumnPickerPlaceholder =
-    customizableColumns &&
-    visibleColumns.length === 0 &&
-    !actionsColumnVisible;
+    customizableColumns && visibleColumns.length === 0 && !actionsColumnVisible;
 
   // Sortable columns for toolbar Sort dropdown
   const sortableColumns = useMemo(
@@ -1657,18 +1678,14 @@ const GenericTable = <T extends Record<string, any>>({
                     <>
                       {toolbar.currentTableView === "table" && (
                         <Dropdown.Item
-                          onClick={() =>
-                            toolbar.onTableViewChange?.("board")
-                          }
+                          onClick={() => toolbar.onTableViewChange?.("board")}
                         >
                           Board View
                         </Dropdown.Item>
                       )}
                       {toolbar.currentTableView === "board" && (
                         <Dropdown.Item
-                          onClick={() =>
-                            toolbar.onTableViewChange?.("table")
-                          }
+                          onClick={() => toolbar.onTableViewChange?.("table")}
                         >
                           Table view
                         </Dropdown.Item>
@@ -1751,7 +1768,9 @@ const GenericTable = <T extends Record<string, any>>({
                   </Dropdown.Toggle>
                   <Dropdown.Menu>
                     {sortableColumns.length === 0 ? (
-                      <Dropdown.Item disabled>No sortable columns</Dropdown.Item>
+                      <Dropdown.Item disabled>
+                        No sortable columns
+                      </Dropdown.Item>
                     ) : (
                       sortableColumns.map((col) => (
                         <Dropdown.Item
@@ -1834,7 +1853,9 @@ const GenericTable = <T extends Record<string, any>>({
             {toolbar.customActions}
 
             {/* Right-aligned actions (shown here when no tabs section is rendered) */}
-            {(!toolbar.showTabs || !toolbar.tabs || toolbar.tabs.length === 0) &&
+            {(!toolbar.showTabs ||
+              !toolbar.tabs ||
+              toolbar.tabs.length === 0) &&
               toolbar.rightActions}
           </div>
         </div>
@@ -1862,15 +1883,24 @@ const GenericTable = <T extends Record<string, any>>({
                       >
                         {pill.icon && <span className="me-1">{pill.icon}</span>}
                         <span>
-                          {pill.active && pill.activeLabel && pill.activeLabelOnly
+                          {pill.active &&
+                          pill.activeLabel &&
+                          pill.activeLabelOnly
                             ? pill.activeLabel
                             : pill.label}
                         </span>
-                        {pill.active && pill.activeLabel && !pill.activeLabelOnly && (
-                          <span className="gt-filter-pill-value">: {pill.activeLabel}</span>
-                        )}
+                        {pill.active &&
+                          pill.activeLabel &&
+                          !pill.activeLabelOnly && (
+                            <span className="gt-filter-pill-value">
+                              : {pill.activeLabel}
+                            </span>
+                          )}
                         {pill.active && !pill.activeLabel && (
-                          <span className="gt-filter-pill-dot" title="Filter applied" />
+                          <span
+                            className="gt-filter-pill-dot"
+                            title="Filter applied"
+                          />
                         )}
                         {pill.active && pill.onClear && (
                           <button
@@ -1889,7 +1919,12 @@ const GenericTable = <T extends Record<string, any>>({
                         )}
                       </Dropdown.Toggle>
                       <Dropdown.Menu
-                        style={pill.dropdownMenuStyle ?? { maxHeight: "280px", overflowY: "auto" }}
+                        style={
+                          pill.dropdownMenuStyle ?? {
+                            maxHeight: "280px",
+                            overflowY: "auto",
+                          }
+                        }
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         <GenericTableFilterPillMenuBody
@@ -1932,9 +1967,12 @@ const GenericTable = <T extends Record<string, any>>({
                   </div>
                 )}
               </div>
-              {toolbar.advancedFiltersOpen && toolbar.advancedFiltersContent && (
-                <div className="w-100 mt-2">{toolbar.advancedFiltersContent}</div>
-              )}
+              {toolbar.advancedFiltersOpen &&
+                toolbar.advancedFiltersContent && (
+                  <div className="w-100 mt-2">
+                    {toolbar.advancedFiltersContent}
+                  </div>
+                )}
             </div>
           )}
 
@@ -1968,14 +2006,10 @@ const GenericTable = <T extends Record<string, any>>({
       totalRows,
       pageSizeOptions = [10, 25, 50, 100],
     } = pagination;
-    const totalPages =
-      totalRows === 0 ? 1 : Math.ceil(totalRows / rowsPerPage);
-    const startRow =
-      totalRows === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
+    const totalPages = totalRows === 0 ? 1 : Math.ceil(totalRows / rowsPerPage);
+    const startRow = totalRows === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1;
     const endRow =
-      totalRows === 0
-        ? 0
-        : Math.min(currentPage * rowsPerPage, totalRows);
+      totalRows === 0 ? 0 : Math.min(currentPage * rowsPerPage, totalRows);
 
     return (
       <div className="generic-table-pagination">
@@ -1984,9 +2018,7 @@ const GenericTable = <T extends Record<string, any>>({
           <Form.Select
             size="sm"
             value={rowsPerPage}
-            onChange={(e) =>
-              onPaginationChange?.(1, Number(e.target.value))
-            }
+            onChange={(e) => onPaginationChange?.(1, Number(e.target.value))}
             className="pagination-select"
           >
             {pageSizeOptions.map((size) => (
@@ -2040,10 +2072,7 @@ const GenericTable = <T extends Record<string, any>>({
                 </Button>
               );
             }
-            if (
-              pageNum === currentPage - 2 ||
-              pageNum === currentPage + 2
-            ) {
+            if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
               return (
                 <span key={pageNum} className="px-2">
                   ...
@@ -2151,10 +2180,7 @@ const GenericTable = <T extends Record<string, any>>({
             />
           ))}
           {showColumnPickerPlaceholder && (
-            <td
-              className="generic-table-td"
-              style={{ width: "52px" }}
-            />
+            <td className="generic-table-td" style={{ width: "52px" }} />
           )}
           {actionsColumnVisible && (
             <td
@@ -2197,120 +2223,134 @@ const GenericTable = <T extends Record<string, any>>({
 
       {/* Table or custom body (e.g. Board view) */}
       {customBody === undefined || customBody === null ? (
-      <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
-        <Card.Body className="p-0">
-          <div
-            className={`generic-table-responsive ${fixedHeight ? "fixed-height-table" : ""}`}
-            style={
-              fixedHeight
-                ? {
-                    maxHeight,
-                    overflow: "auto",
-                  }
-                : {}
-            }
-          >
-            <Table
-              hover={hover}
-              striped={striped}
-              bordered={bordered}
-              size={size}
-              className="generic-table mb-0"
+        <Card
+          className={
+            noBorder
+              ? "border-0 shadow-none generic-table-card"
+              : "border-1 shadow-sm generic-table-card"
+          }
+        >
+          <Card.Body className="p-0">
+            <div
+              className={`generic-table-responsive ${fixedHeight ? "fixed-height-table" : ""}`}
+              style={
+                fixedHeight
+                  ? {
+                      maxHeight,
+                      overflow: "auto",
+                    }
+                  : {}
+              }
             >
-              <thead className="generic-table-header">
-                <tr>
-                  {selectable && (
-                    <th className="generic-table-th" style={{ width: "40px" }}>
-                      <Form.Check
-                        type="checkbox"
-                        checked={
-                          sortedData.length > 0 &&
-                          sortedData.every((row) => isSelected(row))
-                        }
-                        onChange={handleSelectAll}
-                      />
-                    </th>
-                  )}
-                  {visibleColumns.map((col, colIndex) => {
-                    const isLastColumn = colIndex === visibleColumns.length - 1;
-                    const showCustomizerInDataHeader =
-                      customizableColumns && isLastColumn && !actionsColumnVisible;
-                    return (
+              <Table
+                hover={hover}
+                striped={striped}
+                bordered={bordered}
+                size={size}
+                className="generic-table mb-0"
+              >
+                <thead className="generic-table-header">
+                  <tr>
+                    {selectable && (
                       <th
-                        key={col.key}
-                        className={`generic-table-th ${col.sortable !== false && sortable ? "sortable" : ""}`}
-                        style={{
-                          textAlign: col.align || "left",
-                          ...(col.width ? { width: col.width } : {}),
-                        }}
-                        onClick={(e) => {
-                          if (
-                            showCustomizerInDataHeader &&
-                            (e.target as HTMLElement).closest(".dropdown")
-                          )
-                            return;
-                          col.sortable !== false &&
-                            sortable &&
-                            handleSort(col.key);
-                        }}
+                        className="generic-table-th"
+                        style={{ width: "40px" }}
                       >
-                        <div className="th-content d-flex align-items-center justify-content-between">
-                          {/* Left Side - Column Name */}
-                          <span>{col.label}</span>
+                        <Form.Check
+                          type="checkbox"
+                          checked={
+                            sortedData.length > 0 &&
+                            sortedData.every((row) => isSelected(row))
+                          }
+                          onChange={handleSelectAll}
+                        />
+                      </th>
+                    )}
+                    {visibleColumns.map((col, colIndex) => {
+                      const isLastColumn =
+                        colIndex === visibleColumns.length - 1;
+                      const showCustomizerInDataHeader =
+                        customizableColumns &&
+                        isLastColumn &&
+                        !actionsColumnVisible;
+                      return (
+                        <th
+                          key={col.key}
+                          className={`generic-table-th ${col.sortable !== false && sortable ? "sortable" : ""}`}
+                          style={{
+                            textAlign: col.align || "left",
+                            ...(col.width ? { width: col.width } : {}),
+                          }}
+                          onClick={(e) => {
+                            if (
+                              showCustomizerInDataHeader &&
+                              (e.target as HTMLElement).closest(".dropdown")
+                            )
+                              return;
+                            col.sortable !== false &&
+                              sortable &&
+                              handleSort(col.key);
+                          }}
+                        >
+                          <div className="th-content d-flex align-items-center justify-content-between">
+                            {/* Left Side - Column Name */}
+                            <span>{col.label}</span>
 
-                          {/* Right Side - Sort Icon */}
-                          {col.sortable !== false &&
-                            sortable &&
-                            renderSortIcon(col.key)}
-                          {showCustomizerInDataHeader &&
+                            {/* Right Side - Sort Icon */}
+                            {col.sortable !== false &&
+                              sortable &&
+                              renderSortIcon(col.key)}
+                            {showCustomizerInDataHeader &&
+                              renderColumnCustomizerDropdown(
+                                columnCustomizerHeaderId,
+                              )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                    {showColumnPickerPlaceholder && (
+                      <th
+                        className="generic-table-th"
+                        style={{ width: "52px" }}
+                        aria-label="Column visibility"
+                      >
+                        <div className="d-flex align-items-center justify-content-center">
+                          {renderColumnCustomizerDropdown(
+                            columnCustomizerPlaceholderId,
+                          )}
+                        </div>
+                      </th>
+                    )}
+                    {actionsColumnVisible && (
+                      <th className="generic-table-th generic-table-actions-header">
+                        <div className="d-flex align-items-center justify-content-center gap-1 w-100">
+                          <span className="text-center">{actionsLabel}</span>
+                          {customizableColumns &&
                             renderColumnCustomizerDropdown(
-                              columnCustomizerHeaderId,
+                              columnCustomizerActionsHeaderId,
                             )}
                         </div>
                       </th>
-                    );
-                  })}
-                  {showColumnPickerPlaceholder && (
-                    <th
-                      className="generic-table-th"
-                      style={{ width: "52px" }}
-                      aria-label="Column visibility"
-                    >
-                      <div className="d-flex align-items-center justify-content-center">
-                        {renderColumnCustomizerDropdown(
-                          columnCustomizerPlaceholderId,
-                        )}
-                      </div>
-                    </th>
-                  )}
-                  {actionsColumnVisible && (
-                    <th className="generic-table-th generic-table-actions-header">
-                      <div className="d-flex align-items-center justify-content-center gap-1 w-100">
-                        <span className="text-center">{actionsLabel}</span>
-                        {customizableColumns &&
-                          renderColumnCustomizerDropdown(
-                            columnCustomizerActionsHeaderId,
-                          )}
-                      </div>
-                    </th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {renderTableBodyContent()}
-              </tbody>
-            </Table>
-          </div>
-          {pagination && (
-            <div className="p-3">{renderPaginationControls()}</div>
-          )}
-        </Card.Body>
-      </Card>
-      ) : (
-        <Card className={noBorder ? "border-0 shadow-none generic-table-card" : "border-1 shadow-sm generic-table-card"}>
-          <Card.Body className="p-0">
-            {customBody}
+                    )}
+                  </tr>
+                </thead>
+                <tbody>{renderTableBodyContent()}</tbody>
+              </Table>
+            </div>
+            {pagination && (
+              <div className="p-3">{renderPaginationControls()}</div>
+            )}
           </Card.Body>
+        </Card>
+      ) : (
+        <Card
+          className={
+            noBorder
+              ? "border-0 shadow-none generic-table-card"
+              : "border-1 shadow-sm generic-table-card"
+          }
+        >
+          <Card.Body className="p-0">{customBody}</Card.Body>
         </Card>
       )}
     </div>
