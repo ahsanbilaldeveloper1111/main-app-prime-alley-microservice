@@ -643,14 +643,11 @@ const CrmOrders = () => {
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [relatedDeal, setRelatedDeal] = useState<any>(null);
   const [relatedLead, setRelatedLead] = useState<any>(null);
-  const [loadingDeal, setLoadingDeal] = useState(false);
-  const [loadingLead, setLoadingLead] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("tab1");
 
   // Sidebar states
   const [showOrderSidebar, setShowOrderSidebar] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
 
   // Attachments Modal
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
@@ -686,25 +683,6 @@ const CrmOrders = () => {
   const [showFilterBar, setShowFilterBar] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [ordersSearch, setOrdersSearch] = useState("");
-  const [selectedOrdersColumns, setSelectedOrdersColumns] = useState<string[]>(
-    () => {
-      const saved = localStorage.getItem("ordersSelectedColumns");
-      return saved
-        ? JSON.parse(saved)
-        : [
-            "orderNumber",
-            "customer",
-            "deal",
-            "stage",
-            "value",
-            "approvalStatus",
-            "fulfillmentStatus",
-            "assignedUser",
-            "orderDate",
-            "owner",
-          ];
-    }
-  );
   const [ordersPagination, setOrdersPagination] = useState({
     currentPage: 1,
     rowsPerPage: 15,
@@ -981,8 +959,6 @@ const CrmOrders = () => {
 
   const fetchOrderDetails = useCallback(async (orderId: number) => {
     setLoadingOrder(true);
-    setLoadingDeal(true);
-    setLoadingLead(true);
     setRelatedDeal(null);
     setRelatedLead(null);
     try {
@@ -994,8 +970,6 @@ const CrmOrders = () => {
       console.error("Failed to fetch order:", error);
     } finally {
       setLoadingOrder(false);
-      setLoadingDeal(false);
-      setLoadingLead(false);
     }
   }, []);
 
@@ -1008,8 +982,6 @@ const CrmOrders = () => {
       toast.error("Failed to load order details");
     } finally {
       setLoadingOrder(false);
-      setLoadingDeal(false);
-      setLoadingLead(false);
     }
   }, []);
 
@@ -1950,7 +1922,6 @@ const CrmOrders = () => {
           sortable={true}
           onRowClick={async (row) => {
             if (session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
-              setSelectedOrder(row.rawData || row);
               setShowOrderSidebar(true);
               // Fetch full order details including related deal and lead
               await fetchOrderDetails(row.rawData?.id || row.id);
@@ -2000,7 +1971,6 @@ const CrmOrders = () => {
         isOpen={showOrderSidebar}
         onClose={() => {
           setShowOrderSidebar(false);
-          setSelectedOrder(null);
           setViewingOrder(null);
           setRelatedDeal(null);
           setRelatedLead(null);
