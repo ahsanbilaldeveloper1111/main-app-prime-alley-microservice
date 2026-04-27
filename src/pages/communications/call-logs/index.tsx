@@ -12,7 +12,6 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import { ListCallLogs, DownloadCallsExport } from "@utils/calls";
-import { Button } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
 import {
@@ -49,6 +48,10 @@ import {
   createDateTimeDropdownContent,
   createTextFilterDropdownContent,
 } from "@utils/communicationsFilterDropdowns";
+import {
+  renderApplyResetFilterActions,
+  useStagedFiltersActions,
+} from "@utils/communicationsStagedFilters";
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -473,24 +476,17 @@ const CallLogs = () => {
     setCurrentFilters(nextFilters);
   }, []);
 
-  const handleApplyFiltersClick = useCallback(() => {
-    handleFiltersChange(currentFilters);
-  }, [handleFiltersChange, currentFilters]);
-
-  const handleResetFiltersClick = useCallback(() => {
-    setCurrentFilters(defaultFilters.current);
-    handleFiltersChange(defaultFilters.current);
-  }, [defaultFilters.current, handleFiltersChange]);
-
-  const hasUnappliedFilterChanges = useMemo(
-    () => JSON.stringify(currentFilters) !== JSON.stringify(appliedFilters),
-    [currentFilters, appliedFilters],
-  );
-
-  const hasNonDefaultFilters = useMemo(
-    () =>
-      JSON.stringify(currentFilters) !== JSON.stringify(defaultFilters.current),
-    [currentFilters, defaultFilters.current],
+  const {
+    handleApplyFiltersClick,
+    handleResetFiltersClick,
+    hasUnappliedFilterChanges,
+    hasNonDefaultFilters,
+  } = useStagedFiltersActions(
+    currentFilters,
+    appliedFilters,
+    defaultFilters.current,
+    setCurrentFilters,
+    handleFiltersChange,
   );
 
   const tableToolbar = useMemo<any>(() => {
@@ -654,28 +650,12 @@ const CallLogs = () => {
           ),
         },
       ],
-      filterPillsRightActions: (
-        <>
-          {hasNonDefaultFilters && (
-            <Button
-              variant="outline-secondary"
-              size="sm"
-              onClick={handleResetFiltersClick}
-              className="call-logs-reset-filters-btn"
-            >
-              Reset
-            </Button>
-          )}
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleApplyFiltersClick}
-            disabled={!hasUnappliedFilterChanges}
-            className="call-logs-apply-filters-btn"
-          >
-            Apply Filters
-          </Button>
-        </>
+      filterPillsRightActions: renderApplyResetFilterActions(
+        hasNonDefaultFilters,
+        hasUnappliedFilterChanges,
+        handleResetFiltersClick,
+        handleApplyFiltersClick,
+        "call-logs",
       ),
     };
   }, [

@@ -65,6 +65,10 @@ import {
   createDateTimeDropdownContent,
   createTextFilterDropdownContent,
 } from "@utils/communicationsFilterDropdowns";
+import {
+  renderApplyResetFilterActions,
+  useStagedFiltersActions,
+} from "@utils/communicationsStagedFilters";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -605,24 +609,17 @@ const CallRecordings: NextPage & {
     setCurrentFilters(nextFilters);
   }, []);
 
-  const handleApplyFiltersClick = useCallback(() => {
-    handleFiltersChange(currentFilters);
-  }, [handleFiltersChange, currentFilters]);
-
-  const handleResetFiltersClick = useCallback(() => {
-    setCurrentFilters(defaultFilters.current);
-    handleFiltersChange(defaultFilters.current);
-  }, [defaultFilters.current, handleFiltersChange]);
-
-  const hasUnappliedFilterChanges = useMemo(
-    () => JSON.stringify(currentFilters) !== JSON.stringify(appliedFilters),
-    [currentFilters, appliedFilters],
-  );
-
-  const hasNonDefaultFilters = useMemo(
-    () =>
-      JSON.stringify(currentFilters) !== JSON.stringify(defaultFilters.current),
-    [currentFilters, defaultFilters.current],
+  const {
+    handleApplyFiltersClick,
+    handleResetFiltersClick,
+    hasUnappliedFilterChanges,
+    hasNonDefaultFilters,
+  } = useStagedFiltersActions(
+    currentFilters,
+    appliedFilters,
+    defaultFilters.current,
+    setCurrentFilters,
+    handleFiltersChange,
   );
 
   const selectedStartDateTime = String(
@@ -749,28 +746,12 @@ const CallRecordings: NextPage & {
           ),
         },
       ],
-      filterPillsRightActions: (
-        <>
-          {hasNonDefaultFilters && (
-            <Button
-              variant="outline-secondary"
-              size="sm"
-              onClick={handleResetFiltersClick}
-              className="call-recordings-reset-filters-btn"
-            >
-              Reset
-            </Button>
-          )}
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleApplyFiltersClick}
-            disabled={!hasUnappliedFilterChanges}
-            className="call-recordings-apply-filters-btn"
-          >
-            Apply Filters
-          </Button>
-        </>
+      filterPillsRightActions: renderApplyResetFilterActions(
+        hasNonDefaultFilters,
+        hasUnappliedFilterChanges,
+        handleResetFiltersClick,
+        handleApplyFiltersClick,
+        "call-recordings",
       ),
       rightActions: (
         <div className="d-flex align-items-center gap-2 call-recordings-date-range-wrap">
