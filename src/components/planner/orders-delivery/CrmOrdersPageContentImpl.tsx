@@ -87,6 +87,7 @@ import {
   CrmOrdersStagePieChart,
 } from "./CrmOrdersAnalyticsCharts";
 import moment from "moment";
+import { crmPlannerExtensionDisplayName } from "./crmOrdersPlannerOrderDisplayHelpers";
 
 
 const OPTIONAL_STRING_FILTER_KEYS = [
@@ -612,20 +613,12 @@ async function fetchOrderDetailsBundle(orderId: number) {
   return { orderData, dealData, leadData };
 }
 
-function resolveExtensionDisplayName(extensions: any[], assignedTo: unknown): string {
-  const extensionMatch = extensions.find(
-    (ext: any) => ext?.id == assignedTo || ext?.extension == assignedTo,
-  );
-  if (extensionMatch?.display_name) return extensionMatch.display_name;
-  if (extensionMatch?.name) return extensionMatch.name;
-  if (typeof assignedTo === "string" || typeof assignedTo === "number") {
-    return String(assignedTo);
-  }
-  return "";
-}
-
 function transformOrderDataForTable(order: any, extensions: any[]) {
-  const assignedDisplay = resolveExtensionDisplayName(extensions, order?.assigned_to);
+  const assignedDisplay = crmPlannerExtensionDisplayName(
+    extensions,
+    order?.assigned_to,
+    { labelWhenUnassigned: "" },
+  );
   return {
     id: order.id,
     orderNumber: order.order_number || "",

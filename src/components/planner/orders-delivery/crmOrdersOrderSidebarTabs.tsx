@@ -17,90 +17,16 @@ import {
   Edit,
   Eye,
 } from "@crm/orders/orderListLucideHeavy";
-
-function assignedToLookupKey(assignedTo: unknown): string | number | null {
-  if (assignedTo === undefined || assignedTo === null || assignedTo === "") {
-    return null;
-  }
-  if (typeof assignedTo === "object") {
-    return null;
-  }
-  if (typeof assignedTo === "string" || typeof assignedTo === "number") {
-    return assignedTo;
-  }
-  if (typeof assignedTo === "boolean") {
-    return Number(assignedTo);
-  }
-  return null;
-}
-
-function extensionDisplayName(
-  extensions: any[],
-  assignedTo: unknown,
-): string {
-  const key = assignedToLookupKey(assignedTo);
-  if (key === null) {
-    return "Not assigned";
-  }
-  const match = extensions.find(
-    (ext: any) => ext?.id == key || ext?.extension == key,
-  );
-  if (match?.display_name) return match.display_name;
-  if (match?.name) return match.name;
-  return String(key);
-}
-
-function orderStatusBadgeVariant(status: string | undefined): string {
-  const s = status?.toLowerCase() ?? "";
-  if (s === "completed") return "success";
-  if (s === "pending") return "warning";
-  return "secondary";
-}
-
-function orderApprovalBadgeVariant(status: string | undefined): string {
-  const s = status?.toLowerCase() ?? "";
-  if (s === "approved") return "success";
-  if (s === "rejected") return "danger";
-  return "warning";
-}
-
-function fulfillmentBadgeVariant(status: string | undefined): string {
-  const s = status?.toLowerCase() ?? "";
-  if (s.includes("completed") || s.includes("delivered")) return "success";
-  if (s.includes("progress")) return "primary";
-  return "secondary";
-}
-
-function paymentBadgeVariant(status: string | undefined): string {
-  const s = status?.toLowerCase() ?? "";
-  if (s === "paid") return "success";
-  if (s === "partial") return "warning";
-  return "danger";
-}
-
-function leadPotentialBadgeVariant(potential: string | undefined): string {
-  if (potential === "Hot") return "danger";
-  if (potential === "Warm") return "warning";
-  return "secondary";
-}
-
-function formatOrderAmount(viewingOrder: any): string {
-  const amount = viewingOrder?.final_amount || viewingOrder?.total_amount;
-  if (!amount) return "N/A";
-  const cur = viewingOrder?.currency || "AED";
-  const n = Number.parseFloat(String(amount)).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `${cur} ${n}`;
-}
-
-function formatDealValue(relatedDeal: any): string {
-  const v = relatedDeal?.net_value || relatedDeal?.grand_total;
-  if (!v) return "N/A";
-  const cur = relatedDeal?.currency || "AED";
-  return `${cur} ${Number.parseFloat(String(v)).toLocaleString()}`;
-}
+import {
+  crmPlannerExtensionDisplayName,
+  formatDealValue,
+  formatOrderAmount,
+  fulfillmentBadgeVariant,
+  leadPotentialBadgeVariant,
+  orderApprovalBadgeVariant,
+  orderStatusBadgeVariant,
+  paymentBadgeVariant,
+} from "./crmOrdersPlannerOrderDisplayHelpers";
 
 function CrmOrdersSidebarHistoryList(props: Readonly<{ histories: any[] }>) {
   const { histories } = props;
@@ -289,7 +215,7 @@ function buildLeadDealSections(
         },
         {
           label: "Assigned To",
-          value: extensionDisplayName(
+          value: crmPlannerExtensionDisplayName(
             extensions,
             relatedDeal?.assigned_to,
           ),
@@ -365,7 +291,7 @@ function buildLeadDealSections(
         },
         {
           label: "Assigned To",
-          value: extensionDisplayName(
+          value: crmPlannerExtensionDisplayName(
             extensions,
             relatedLead?.assigned_to,
           ),
@@ -499,7 +425,7 @@ function buildAdditionalInfoTab(
           },
           {
             label: "Assigned To",
-            value: extensionDisplayName(
+            value: crmPlannerExtensionDisplayName(
               extensions,
               viewingOrder?.assigned_to,
             ),
