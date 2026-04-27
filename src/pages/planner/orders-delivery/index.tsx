@@ -304,6 +304,55 @@ function buildOrdersFiltersToApply(
   return filtersToApply;
 }
 
+function syncOrdersFiltersFromActiveTab(params: {
+  activeFilter: string;
+  stages: any[];
+  setCurrentFilters: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  setOrdersFilters: React.Dispatch<React.SetStateAction<OrdersUiFilters>>;
+}): void {
+  const { stageValue } = applyActiveFilterState({}, params.activeFilter, params.stages);
+  params.setCurrentFilters((prev) =>
+    applyActiveFilterState(prev, params.activeFilter, params.stages).nextFilters,
+  );
+  params.setOrdersFilters((prev) => ({ ...prev, stage: stageValue }));
+}
+
+function syncActiveTabFromRouter(params: {
+  routerReady: boolean;
+  routerTab: unknown;
+  stages: any[];
+  activeFilter: string;
+  setActiveFilter: React.Dispatch<React.SetStateAction<string>>;
+}): void {
+  if (!params.routerReady || !params.routerTab) return;
+  const tabFromUrl = String(params.routerTab);
+  const isValidFilter = isValidActiveFilterTab(tabFromUrl, params.stages);
+  if (isValidFilter && tabFromUrl !== params.activeFilter) {
+    params.setActiveFilter(tabFromUrl);
+  }
+}
+
+async function fetchAttachmentsBundle(selectedOrder: any): Promise<{
+  orderAttachments: any[];
+  relatedDealAttachments: any[];
+}> {
+  const orderAttachments = await getOrderAttachments(selectedOrder.id);
+  if (!selectedOrder.deal_id) {
+    return { orderAttachments: orderAttachments || [], relatedDealAttachments: [] };
+  }
+
+  try {
+    const dealData = await getDealAttachments(Number(selectedOrder.deal_id));
+    return {
+      orderAttachments: orderAttachments || [],
+      relatedDealAttachments: dealData || [],
+    };
+  } catch (error) {
+    console.error("Failed to fetch deal attachments:", error);
+    return { orderAttachments: orderAttachments || [], relatedDealAttachments: [] };
+  }
+}
+
 function normalizeLeadContactPersons(leadData: any) {
   if (!leadData?.contact_persons || typeof leadData.contact_persons !== "string") {
     return leadData;
@@ -605,23 +654,23 @@ const CrmOrders = () => {
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
   useEffect(() => {
-    const { stageValue } = applyActiveFilterState({}, activeFilter, stages);
-    setCurrentFilters((prev) => applyActiveFilterState(prev, activeFilter, stages).nextFilters);
-    setOrdersFilters((prev) => ({
-      ...prev,
-      stage: stageValue,
-    }));
+    syncOrdersFiltersFromActiveTab({
+      activeFilter,
+      stages,
+      setCurrentFilters,
+      setOrdersFilters,
+    });
   }, [activeFilter, stages]);
   
   // Read tab from URL on mount and when router is ready
   useEffect(() => {
-    if (router.isReady && router.query.tab) {
-      const tabFromUrl = String(router.query.tab);
-      const isValidFilter = isValidActiveFilterTab(tabFromUrl, stages);
-      if (isValidFilter && tabFromUrl !== activeFilter) {
-        setActiveFilter(tabFromUrl);
-      }
-    }
+    syncActiveTabFromRouter({
+      routerReady: router.isReady,
+      routerTab: router.query.tab,
+      stages,
+      activeFilter,
+      setActiveFilter,
+    });
   }, [router.isReady, router.query.tab, stages, activeFilter]);
   
   // Handler to update filter and URL
@@ -664,26 +713,10 @@ const CrmOrders = () => {
     if (!selectedOrderForAttachments?.id) return;
     setLoadingAttachments(true);
     try {
-      // Fetch order attachments
-      const orderData = await getOrderAttachments(
-        selectedOrderForAttachments.id
-      );
-      setAttachments(orderData || []);
-
-      // Fetch deal attachments if deal_id exists
-      if (selectedOrderForAttachments.deal_id) {
-        try {
-          const dealData = await getDealAttachments(
-            Number(selectedOrderForAttachments.deal_id)
-          );
-          setDealAttachments(dealData || []);
-        } catch (error) {
-          console.error("Failed to fetch deal attachments:", error);
-          setDealAttachments([]);
-        }
-      } else {
-        setDealAttachments([]);
-      }
+      const { orderAttachments, relatedDealAttachments } =
+        await fetchAttachmentsBundle(selectedOrderForAttachments);
+      setAttachments(orderAttachments);
+      setDealAttachments(relatedDealAttachments);
     } catch (error) {
       console.error("Failed to fetch attachments:", error);
       setAttachments([]);
