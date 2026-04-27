@@ -123,8 +123,8 @@ function buildCampaignPayload(form: CampaignFormState): CreateCampaignPayload | 
     return null;
   }
   const schedule_time = toScheduleTimeIso(form.schedule_time);
-  if (!schedule_time) {
-    toast.error("Schedule time is required");
+  if ((form.schedule_time ?? "").trim() && !schedule_time) {
+    toast.error("Invalid schedule time");
     return null;
   }
   const target_numbers = parseTargetListRaw(form.target_list_raw ?? "");
@@ -145,7 +145,7 @@ function buildCampaignPayload(form: CampaignFormState): CreateCampaignPayload | 
     campaign_script: script,
     custom_greeting: (form.custom_greeting ?? "").trim() || undefined,
     target_numbers,
-    schedule_time,
+    ...(schedule_time ? { schedule_time } : {}),
     failure_threshold: Number.isFinite(Number(form.failure_threshold))
       ? Number(form.failure_threshold)
       : 5,
@@ -243,8 +243,7 @@ interface ValidationItem {
 function buildValidationItems(form: CampaignFormState, targetCount: number): ValidationItem[] {
   const basicOk = Boolean(
     form.name?.trim() &&
-      form.voicebot_id != null &&
-      (form.schedule_time ?? "").trim(),
+      form.voicebot_id != null,
   );
   const scriptOk = Boolean((form.campaign_script ?? "").trim());
   return [
@@ -313,7 +312,6 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
     submitting ||
     !form.name?.trim() ||
     form.voicebot_id == null ||
-    !(form.schedule_time ?? "").trim() ||
     !(form.campaign_script ?? "").trim() ||
     targetCount === 0;
   return (
@@ -361,7 +359,7 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
                       </Form.Group>
                       <Form.Group className="mb-3">
                         <Form.Label style={labelStyle}>
-                          Schedule time <span className="text-danger">*</span>
+                          Schedule time
                         </Form.Label>
                         <Form.Control
                           type="datetime-local"
@@ -371,7 +369,7 @@ function CampaignFormBody(props: Readonly<CampaignFormBodyProps>) {
                           }
                           style={inputStyle}
                         />
-                        <Form.Text className="text-muted">Sent to API as ISO 8601 UTC (e.g. 2026-06-01T09:00:00Z)</Form.Text>
+                        <Form.Text className="text-muted">Optional. Sent to API as ISO 8601 UTC (e.g. 2026-06-01T09:00:00Z).</Form.Text>
                       </Form.Group>
                       <Form.Group className="mb-3">
                         <Form.Label style={labelStyle}>Failure threshold</Form.Label>

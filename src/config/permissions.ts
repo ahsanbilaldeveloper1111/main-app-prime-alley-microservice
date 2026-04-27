@@ -783,33 +783,36 @@ export const routePermissions: RoutePermission[] = [
     // voicebot inbound (platform) – companies, bots, calls
     {
         path: '/voicebot/inbound',
-        permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML],
+        permissions: [PERMISSIONS.VIRTUAL_AGENTS_SERVICES],
         children: [
-            { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/companies', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/bots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/bots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/sip-trunks', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/sip-trunks/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/conversations', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_DASHBOARD_INBOUND] },
+            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_INBOUND_DASHBOARD_INBOUND] },
+            { path: '/companies', permissions: [PERMISSIONS.VIEW_INBOUND_DASHBOARD_INBOUND] },
+            { path: '/bots', permissions: [PERMISSIONS.VIEW_INBOUND_BOTS_INBOUND] },
+            { path: '/bots/create', permissions: [PERMISSIONS.CREATE_INBOUND_BOTS_INBOUND] },
+            { path: '/bots/edit', permissions: [PERMISSIONS.EDIT_INBOUND_BOTS_INBOUND] },
+            { path: '/sip-trunks', permissions: [PERMISSIONS.VIEW_INBOUND_TRUNK_INBOUND] },
+            { path: '/sip-trunks/create', permissions: [PERMISSIONS.CREATE_INBOUND_TRUNK_INBOUND] },
+            { path: '/conversations', permissions: [PERMISSIONS.VIEW_INBOUND_CONVERSATIONS_INBOUND] },
+            { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_ANALYTICS_INBOUND] },
         ]
     },
 
     {
         path: '/voicebot/outbound',
-        permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML],
+        permissions: [PERMISSIONS.VIRTUAL_AGENTS_SERVICES],
         children: [
-            { path: '/', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/trunks', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/voicebots', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/voicebots/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/campaigns', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/campaigns/create', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/reports', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
-            { path: '/analytics', permissions: [PERMISSIONS.VIEW_INBOUND_CALLS_AIML] },
+            { path: '/', permissions: [PERMISSIONS.VIEW_OUTBOUND_DASHBOARD_OUTBOUND] },
+            { path: '/dashboard', permissions: [PERMISSIONS.VIEW_OUTBOUND_DASHBOARD_OUTBOUND] },
+            { path: '/trunks', permissions: [PERMISSIONS.VIEW_OUTBOUND_SIP_TRUNCK_OUTBOUND] },
+            { path: '/voicebots', permissions: [PERMISSIONS.VIEW_OUTBOUND_BOTS_OUTBOUND] },
+            { path: '/voicebots/create', permissions: [PERMISSIONS.CREATE_OUTBOUND_BOTS_OUTBOUND] },
+            { path: '/voicebots/edit', permissions: [PERMISSIONS.EDIT_OUTBOUND_BOTS_OUTBOUND] },
+            { path: '/campaigns', permissions: [PERMISSIONS.VIEW_OUTBOUND_CAMPAIGNS_OUTBOUND] },
+            { path: '/campaigns/create', permissions: [PERMISSIONS.CREATE_OUTBOUND_CAMPAIGNS_OUTBOUND] },
+            { path: '/campaigns/edit/:id', permissions: [PERMISSIONS.EDIT_OUTBOUND_CAMPAIGNS_OUTBOUND] },
+            { path: '/reports', permissions: [PERMISSIONS.VIEW_OUTBOUND_REPORT_OUTBOUND] },
+            { path: '/analytics', permissions: [PERMISSIONS.VIEW_OUTBOUND_ANALYTICS_OUTBOUND] },
 
 
 

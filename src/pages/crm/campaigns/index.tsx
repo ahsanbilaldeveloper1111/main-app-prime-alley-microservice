@@ -83,6 +83,9 @@ import {
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import moment from "moment";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function consumeHandledApiError(error: unknown, source: string): void {
   reportApiErrorFromCatch(error, source, { scope: "CrmCampaigns" });
@@ -198,8 +201,10 @@ function toastCrmCsvUploadOutcome(processedCount: number, validationFailureCount
   }
 
   if (validationFailureCount > 0) {
-    const allLabel = validationFailureCount === 1 ? "record" : "records";
-    toast.error(`Upload failed: All ${validationFailureCount} ${allLabel} failed validation`);
+    const failedLabel = validationFailureCount === 1 ? "record" : "records";
+    toast.error(
+      `Upload failed: ${validationFailureCount} uploaded ${failedLabel} failed validation.`,
+    );
     return;
   }
 
@@ -904,8 +909,12 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
           <BarChart3 size={15} />
           Analytics
         </Button>
-        {a.session?.user?.permissions?.includes("add-crm-data-management") &&
-          a.session?.user?.permissions?.includes("data-assignment-crm-data-management") && (
+        {a.session?.user?.permissions?.includes(
+          PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+        ) &&
+          a.session?.user?.permissions?.includes(
+            PERMISSIONS.DATA_ASSIGNMENT_CRM_DATA_MANAGEMENT,
+          ) && (
             <Button
               variant="light"
               onClick={a.onOpenUploadModal}
@@ -925,7 +934,9 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
               Import
             </Button>
           )}
-        {a.session?.user?.permissions?.includes("data-assignment-crm-data-management") && (
+        {a.session?.user?.permissions?.includes(
+          PERMISSIONS.DATA_ASSIGNMENT_CRM_DATA_MANAGEMENT,
+        ) && (
           <Button
             variant="light"
             onClick={a.handleDataAssignment}
@@ -945,7 +956,9 @@ function createCrmCampaignsToolbarConfig(a: ToolbarFactoryArgs): ToolbarConfig {
             Data Assignment
           </Button>
         )}
-        {a.session?.user?.permissions?.includes("add-crm-campaigns") && (
+        {a.session?.user?.permissions?.includes(
+          PERMISSIONS.CREATE_CRM_CAMPAIGNS,
+        ) && (
           <Button
             onClick={a.handleCreateCampaign}
             style={{
@@ -1529,7 +1542,9 @@ const CrmCampaigns = () => { // NOSONAR
     setRefreshKey((prev) => prev + 1);
   }, []);
 
-  const listCampaignsPermission = Boolean(session?.user?.permissions?.includes("list-crm-campaigns"));
+  const listCampaignsPermission = Boolean(
+    session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS),
+  );
 
   useEffect(() => {
     setCampaignsPagination((prev) =>
@@ -1757,7 +1772,11 @@ const CrmCampaigns = () => { // NOSONAR
   };
 
   const handleUpload = async () => {
-    if (!session?.user?.permissions?.includes("add-crm-data-management")) {
+    if (
+      !session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      )
+    ) {
       toast.error("You don't have permission to upload data"); return;
     }
     if (!selectedFile) { toast.error("Please select a file to upload"); return; }
@@ -1962,17 +1981,22 @@ const CrmCampaigns = () => { // NOSONAR
       label: "Campaign Name",
       sortable: true,
       type: "custom",
-      width: "min(240px, 28vw)",
+      width: "26%",
       render: (campaign: any) => (
         <div
           className="fw-semibold"
           title={campaign.name || "Unnamed Campaign"}
           style={{
+            minWidth: 0,
             maxWidth: "100%",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-            display: "block",
+            whiteSpace: "normal",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
           }}
         >
           {campaign.name || "Unnamed Campaign"}
@@ -1984,11 +2008,11 @@ const CrmCampaigns = () => { // NOSONAR
       label: "Description",
       sortable: true,
       type: "custom",
-      width: "min(280px, 32vw)",
+      width: "34%",
       render: (campaign: any) => (
         <CrmTruncatedDescriptionCell
           text={campaign.description}
-          emptyDisplay="No Description"
+          emptyDisplay="No description"
           className="small text-muted"
         />
       ),
@@ -2054,7 +2078,7 @@ const CrmCampaigns = () => { // NOSONAR
   const campaignsTableActions = useMemo(() => {
     const actions: any[] = [];
 
-    if (session?.user?.permissions?.includes("view-crm-campaigns")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS)) {
       actions.push({
         label: "View",
         icon: <Eye size={16} />,
@@ -2063,7 +2087,7 @@ const CrmCampaigns = () => { // NOSONAR
         className: "p-1 text-primary",
       });
     }
-    if (session?.user?.permissions?.includes("edit-crm-campaigns")) {
+    if (session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_CAMPAIGNS)) {
       actions.push({
         label: "Edit",
         icon: <Edit size={16} />,
@@ -2072,7 +2096,9 @@ const CrmCampaigns = () => { // NOSONAR
         className: "p-1 text-primary",
       });
     }
-    if (session?.user?.permissions?.includes("delete-crm-campaigns")) {
+    if (
+      session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_CAMPAIGNS)
+    ) {
       actions.push({
         label: "Delete",
         icon: <Trash2 size={16} />,
@@ -2145,7 +2171,8 @@ const CrmCampaigns = () => { // NOSONAR
       <BreadcrumbItem mainTitle="CRM" mainLink="/crm/dashboard" subTitle="Campaigns" />
 
       {/* Analytics Section - Collapsible */}
-      {showCampaignsAnalytics && session?.user?.permissions?.includes("list-crm-campaigns") && (
+      {showCampaignsAnalytics &&
+        session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
         <Row className="mb-4">
           <Col lg={3} md={6} className="mb-3">
             <KPICard title="Total Campaigns" value={totalCampaigns.toString()} icon={<Megaphone size={24} />} color="primary" />
@@ -2163,7 +2190,7 @@ const CrmCampaigns = () => { // NOSONAR
       )}
 
       {/* Campaigns Table via GenericTable */}
-      {session?.user?.permissions?.includes("list-crm-campaigns") && (
+      {session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_CAMPAIGNS) && (
         <GenericTable<any>
           data={campaignsData}
           columns={campaignsTableColumns}
@@ -3021,7 +3048,9 @@ const CrmCampaigns = () => { // NOSONAR
                       borderTop: "1px solid #e5e7eb",
                     }}
                   >
-                    {session?.user?.permissions?.includes("edit-crm-campaigns") && (
+                    {session?.user?.permissions?.includes(
+                      PERMISSIONS.EDIT_CRM_CAMPAIGNS,
+                    ) && (
                       <Button
                         variant="primary"
                         onClick={() => {
@@ -3064,7 +3093,9 @@ const CrmCampaigns = () => { // NOSONAR
       />
 
       {/* Upload Modal */}
-      {session?.user?.permissions?.includes("add-crm-data-management") && (
+      {session?.user?.permissions?.includes(
+        PERMISSIONS.CREATE_CRM_DATA_MANAGEMENT,
+      ) && (
         <Modal show={showUploadModal} onHide={() => setShowUploadModal(false)} size="lg" centered>
           <Modal.Header closeButton className="border-bottom bg-light">
             <Modal.Title>Upload CSV - Import Prospects</Modal.Title>

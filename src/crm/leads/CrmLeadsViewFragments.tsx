@@ -105,6 +105,9 @@ import {
   CrmModalCloseButton,
   CrmModalAvatar,
 } from "@crm/shared/CrmListViewDataModalPrimitives";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function getCrmLeadsStringSelectValue(selected: unknown): string | undefined {
   if (selected && typeof selected === "object" && "value" in selected) {
@@ -1154,7 +1157,7 @@ function CrmLeadViewModalRightPanel() {
                         }}
                       >
                         {session?.user?.permissions?.includes(
-                          "edit-crm-leads",
+                          PERMISSIONS.EDIT_CRM_LEADS,
                         ) && (
                           <button
                             style={{
@@ -1228,7 +1231,7 @@ function CrmLeadViewModalRightPanel() {
                         )}
 
                         {session?.user?.permissions?.includes(
-                          "add-crm-deals",
+                          PERMISSIONS.CREATE_CRM_DEALS,
                         ) && (
                           <button
                             disabled={activeFilter === "lost"}
@@ -1526,7 +1529,7 @@ function CrmLeadViewModalRightPanel() {
                           Recent Follow-ups
                         </h6>
                         {session?.user?.permissions?.includes(
-                          "add-follow-up-crm-leads",
+                          PERMISSIONS.ADD_FOLLOW_UP_CRM_LEADS,
                         ) && (
                           <button
                             style={{
@@ -1708,7 +1711,7 @@ function CrmLeadViewModalRightPanel() {
                               No follow-ups yet
                             </div>
                             {session?.user?.permissions?.includes(
-                              "add-follow-up-crm-leads",
+                              PERMISSIONS.ADD_FOLLOW_UP_CRM_LEADS,
                             ) && (
                               <button
                                 style={{
@@ -1776,7 +1779,7 @@ function CrmLeadViewModalRightPanel() {
                           Recent Meetings
                         </h6>
                         {session?.user?.permissions?.includes(
-                          "add-meeting-crm-leads",
+                          PERMISSIONS.ADD_MEETING_CRM_LEADS,
                         ) && (
                           <button
                             style={{
@@ -1958,7 +1961,7 @@ function CrmLeadViewModalRightPanel() {
                               No meetings yet
                             </div>
                             {session?.user?.permissions?.includes(
-                              "add-meeting-crm-leads",
+                              PERMISSIONS.ADD_MEETING_CRM_LEADS,
                             ) && (
                               <button
                                 style={{
@@ -2231,7 +2234,7 @@ export function CrmLeadsViewFragment02() {
 
             {/* Advanced Filters */}
             {showAdvancedFilters &&
-              session?.user?.permissions?.includes("list-crm-leads") && (
+              session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_LEADS) && (
                 <Card className="border-0 shadow-sm mb-4">
                   <Card.Body>
                     <Row className="g-3 align-items-end">
@@ -2693,7 +2696,11 @@ export function CrmLeadsViewFragment02() {
                 onPreviewClick={(lead) => handlePreviewClick(lead)}
                 onFirstColumnClick={(lead) => handleFirstColumnClick(lead)}
                 onRowDoubleClick={(lead) => {
-                  if (session?.user?.permissions?.includes("list-crm-leads")) {
+                  if (
+                    session?.user?.permissions?.includes(
+                      PERMISSIONS.VIEW_CRM_LEADS,
+                    )
+                  ) {
                     handleViewLead(lead.rawData?.id || lead.id);
                   }
                 }}

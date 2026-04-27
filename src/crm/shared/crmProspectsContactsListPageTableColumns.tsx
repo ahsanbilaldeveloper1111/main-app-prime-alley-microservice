@@ -1,6 +1,7 @@
 import React from "react";
 import moment from "moment";
 import type { TableColumn } from "@components/GenericTable";
+import { formatDateTimeToLocal } from "@utils/Helper";
 import { getInitials, getRandomColor } from "@utils/crmNameAvatar";
 import {
   formatCrmPersonDispositionLabel,
@@ -180,9 +181,13 @@ export function buildCrmProspectsContactsTableColumns(
         const isNextHour = moment(row.scheduled_call_at).isBefore(
           moment().add(1, "hour"),
         );
-        const formatted = moment(row.scheduled_call_at).format(
+        const formatted = formatDateTimeToLocal(
+          row.scheduled_call_at,
           "MMM DD, HH:mm",
         );
+        if (formatted === "Invalid Date") {
+          return "Not scheduled";
+        }
         if (isOverdue) return `${formatted} (Overdue)`;
         if (isNextHour) return `${formatted} (Soon)`;
         return formatted;

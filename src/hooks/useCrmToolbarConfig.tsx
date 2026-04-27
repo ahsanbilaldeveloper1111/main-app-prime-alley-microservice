@@ -210,6 +210,8 @@ export interface UseCrmToolbarConfigOptions {
   // View (table / board)
   currentTableView?: "table" | "board";
   onTableViewChange?: (view: "table" | "board") => void;
+  /** When false, hides the table/board (or legacy table/grid/list) toolbar dropdown. Defaults to true. */
+  showTableViewDropdown?: boolean;
 
   // Owner/assignee pill – extensions list
   extensions: Array<{ id?: string; extension?: string; display_name?: string; name?: string }>;
@@ -320,6 +322,7 @@ export function useCrmToolbarConfig(
     onImportClick,
     currentTableView,
     onTableViewChange,
+    showTableViewDropdown = true,
     extensions,
     onPaginationReset,
     rightActions,
@@ -544,7 +547,7 @@ export function useCrmToolbarConfig(
         refresh();
       },
 
-      showTableViewDropdown: true,
+      showTableViewDropdown,
       currentTableView,
       onTableViewChange,
       showEditColumns: true,
@@ -578,6 +581,7 @@ export function useCrmToolbarConfig(
       searchPlaceholder,
       currentTableView,
       onTableViewChange,
+      showTableViewDropdown,
       onEditColumnsClick,
       onFiltersClick,
       onExportClick,

@@ -54,6 +54,9 @@ import {
 import "@assets/scss/common.scss";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { useCrmSettingsTableState } from "@hooks/useCrmSettingsTableState";
 import { useDebouncedSearchInput } from "@hooks/useDebouncedSearchInput";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
@@ -399,7 +402,7 @@ const IndustriesPage = () => {
             >
               <Eye size={14} />
             </Button>
-            {session?.user?.permissions?.includes("edit-crm-industry") && (
+            {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_INDUSTRY) && (
               <Button
                 variant="outline-primary"
                 size="sm"
@@ -408,7 +411,9 @@ const IndustriesPage = () => {
                 <Edit size={14} />
               </Button>
             )}
-            {session?.user?.permissions?.includes("delete-crm-industry") && (
+            {session?.user?.permissions?.includes(
+              PERMISSIONS.DELETE_CRM_INDUSTRY,
+            ) && (
               <Button
                 variant="outline-danger"
                 size="sm"
@@ -439,7 +444,7 @@ const IndustriesPage = () => {
       },
       rightActions: (
         <div className="d-flex gap-2">
-          {session?.user?.permissions?.includes("add-crm-industry") && (
+          {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_INDUSTRY) && (
             <Button
               variant="primary"
               size="sm"
@@ -624,7 +629,7 @@ const IndustriesPage = () => {
                     Products ({industryProducts.length})</Form.Label>
                   <div className="d-flex align-items-center gap-2">
                     
-                    {session?.user?.permissions?.includes('add-crm-products') && (
+                    {session?.user?.permissions?.includes(PERMISSIONS.CREATE_CRM_PRODUCTS) && (
                       <Button
                         variant="primary"
                         size="sm"
@@ -637,107 +642,244 @@ const IndustriesPage = () => {
                     )}
                   </div>
                 </div>
-                {loadingProducts ? (
-                  <div className="text-center py-3">
-                    <Spinner animation="border" size="sm" variant="primary" />
-                    <p className="text-muted small mt-2 mb-0">Loading products...</p>
-                  </div>
-                ) : industryProducts.length === 0 ? (
-                  <div className="text-center py-3 border rounded">
-                    <p className="text-muted small mb-0">No products found for this industry</p>
-                  </div>
-                ) : (
-                  <div className="border rounded" style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                    <Table hover className="mb-0">
-                      <thead className="bg-light">
-                        <tr>
-                          <th style={{ fontSize: '0.875rem', padding: '12px' }}>Product Name</th>
-                          <th style={{ fontSize: '0.875rem', padding: '12px' }}>SKU</th>
-                          <th style={{ fontSize: '0.875rem', padding: '12px' }}>Price</th>
-                          <th style={{ fontSize: '0.875rem', padding: '12px' }}>Currency</th>
-                          <th style={{ fontSize: '0.875rem', padding: '12px' }}>Category</th>
-                          <th style={{ fontSize: '0.875rem', padding: '12px' }}>Brand</th>
-                          <th style={{ fontSize: '0.875rem', padding: '12px' }}>Status</th>
-                          <th style={{ fontSize: '0.875rem', padding: '12px', width: '120px' }}>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {industryProducts.map((product) => (
-                          <tr key={product.id}>
-                            <td style={{ fontSize: '0.875rem', padding: '12px' }} className="fw-semibold">
-                              {product.name}
-                            </td>
-                            <td style={{ fontSize: '0.875rem', padding: '12px' }}>
-                              <Badge bg="light" text="dark" className="font-monospace">
-                                {product.sku}
-                              </Badge>
-                            </td>
-                            <td style={{ fontSize: '0.875rem', padding: '12px' }} className="fw-semibold text-success">
-                              {product.currency} {Number.parseFloat(product.price || '0').toFixed(2)}
-                            </td>
-                            <td style={{ fontSize: '0.875rem', padding: '12px' }}>
-                              {product.currency}
-                            </td>
-                            <td style={{ fontSize: '0.875rem', padding: '12px' }}>
-                              <Badge bg="info" className="bg-opacity-10 text-dark">
-                                {product.category || "N/A"}
-                              </Badge>
-                            </td>
-                            <td style={{ fontSize: '0.875rem', padding: '12px' }}>
-                              {product.brand || "N/A"}
-                            </td>
-                            <td style={{ fontSize: '0.875rem', padding: '12px' }}>
-                              <Badge bg={product.active ? "success" : "secondary"}>
-                                {product.active ? "Active" : "Inactive"}
-                              </Badge>
-                            </td>
-                            <td style={{ fontSize: '0.875rem', padding: '12px', width: '120px' }}>
-                              <div className="d-flex gap-1">
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-1"
-                                  title="View"
-                                  onClick={() => {
-                                    setViewingProduct(product);
-                                    setShowProductViewModal(true);
-                                  }}
+                {(() => {
+                  if (loadingProducts) {
+                    return (
+                      <div className="text-center py-3">
+                        <Spinner
+                          animation="border"
+                          size="sm"
+                          variant="primary"
+                        />
+                        <p className="text-muted small mt-2 mb-0">
+                          Loading products...
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (industryProducts.length === 0) {
+                    return (
+                      <div className="text-center py-3 border rounded">
+                        <p className="text-muted small mb-0">
+                          No products found for this industry
+                        </p>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div
+                      className="border rounded"
+                      style={{ maxHeight: "400px", overflowY: "auto" }}
+                    >
+                      <Table hover className="mb-0">
+                        <thead className="bg-light">
+                          <tr>
+                            <th
+                              style={{
+                                fontSize: "0.875rem",
+                                padding: "12px",
+                              }}
+                            >
+                              Product Name
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.875rem",
+                                padding: "12px",
+                              }}
+                            >
+                              SKU
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.875rem",
+                                padding: "12px",
+                              }}
+                            >
+                              Price
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.875rem",
+                                padding: "12px",
+                              }}
+                            >
+                              Currency
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.875rem",
+                                padding: "12px",
+                              }}
+                            >
+                              Category
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.875rem",
+                                padding: "12px",
+                              }}
+                            >
+                              Brand
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.875rem",
+                                padding: "12px",
+                              }}
+                            >
+                              Status
+                            </th>
+                            <th
+                              style={{
+                                fontSize: "0.875rem",
+                                padding: "12px",
+                                width: "120px",
+                              }}
+                            >
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {industryProducts.map((product) => (
+                            <tr key={product.id}>
+                              <td
+                                style={{
+                                  fontSize: "0.875rem",
+                                  padding: "12px",
+                                }}
+                                className="fw-semibold"
+                              >
+                                {product.name}
+                              </td>
+                              <td
+                                style={{
+                                  fontSize: "0.875rem",
+                                  padding: "12px",
+                                }}
+                              >
+                                <Badge
+                                  bg="light"
+                                  text="dark"
+                                  className="font-monospace"
                                 >
-                                  <Eye size={16} />
-                                </Button>
-                                {session?.user?.permissions?.includes('edit-crm-products') && (
+                                  {product.sku}
+                                </Badge>
+                              </td>
+                              <td
+                                style={{
+                                  fontSize: "0.875rem",
+                                  padding: "12px",
+                                }}
+                                className="fw-semibold text-success"
+                              >
+                                {product.currency}{" "}
+                                {Number.parseFloat(
+                                  product.price || "0",
+                                ).toFixed(2)}
+                              </td>
+                              <td
+                                style={{
+                                  fontSize: "0.875rem",
+                                  padding: "12px",
+                                }}
+                              >
+                                {product.currency}
+                              </td>
+                              <td
+                                style={{
+                                  fontSize: "0.875rem",
+                                  padding: "12px",
+                                }}
+                              >
+                                <Badge
+                                  bg="info"
+                                  className="bg-opacity-10 text-dark"
+                                >
+                                  {product.category || "N/A"}
+                                </Badge>
+                              </td>
+                              <td
+                                style={{
+                                  fontSize: "0.875rem",
+                                  padding: "12px",
+                                }}
+                              >
+                                {product.brand || "N/A"}
+                              </td>
+                              <td
+                                style={{
+                                  fontSize: "0.875rem",
+                                  padding: "12px",
+                                }}
+                              >
+                                <Badge
+                                  bg={product.active ? "success" : "secondary"}
+                                >
+                                  {product.active ? "Active" : "Inactive"}
+                                </Badge>
+                              </td>
+                              <td
+                                style={{
+                                  fontSize: "0.875rem",
+                                  padding: "12px",
+                                  width: "120px",
+                                }}
+                              >
+                                <div className="d-flex gap-1">
                                   <Button
                                     variant="link"
                                     size="sm"
                                     className="p-1"
-                                    title="Edit"
-                                    onClick={() => handleOpenProductModal(product)}
-                                  >
-                                    <Edit size={16} />
-                                  </Button>
-                                )}
-                                {session?.user?.permissions?.includes('delete-crm-products') && (
-                                  <Button
-                                    variant="link"
-                                    size="sm"
-                                    className="p-1 text-danger"
-                                    title="Delete"
+                                    title="View"
                                     onClick={() => {
-                                      setDeletingProduct(product);
-                                      setShowProductDeleteModal(true);
+                                      setViewingProduct(product);
+                                      setShowProductViewModal(true);
                                     }}
                                   >
-                                    <Trash2 size={16} />
+                                    <Eye size={16} />
                                   </Button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </Table>
-                  </div>
-                )}
+                                  {session?.user?.permissions?.includes(
+                                    PERMISSIONS.EDIT_CRM_PRODUCTS,
+                                  ) && (
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      className="p-1"
+                                      title="Edit"
+                                      onClick={() =>
+                                        handleOpenProductModal(product)
+                                      }
+                                    >
+                                      <Edit size={16} />
+                                    </Button>
+                                  )}
+                                  {session?.user?.permissions?.includes(
+                                    PERMISSIONS.DELETE_CRM_PRODUCTS,
+                                  ) && (
+                                    <Button
+                                      variant="link"
+                                      size="sm"
+                                      className="p-1 text-danger"
+                                      title="Delete"
+                                      onClick={() => {
+                                        setDeletingProduct(product);
+                                        setShowProductDeleteModal(true);
+                                      }}
+                                    >
+                                      <Trash2 size={16} />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </div>
+                  );
+                })()}
               </div>
               
             </Modal.Body>
@@ -746,7 +888,7 @@ const IndustriesPage = () => {
                 className="w-100 d-flex justify-content-end"
                 style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                {session?.user?.permissions?.includes("edit-crm-industry") && (
+                {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_INDUSTRY) && (
                   <Button
                     variant="primary"
                     onClick={() => {
@@ -1441,7 +1583,7 @@ const IndustriesPage = () => {
                 className="w-100 d-flex justify-content-end"
                 style={CRM_DIALOG_FOOTER_ACTIONS_ROW_STYLE}
               >
-                {session?.user?.permissions?.includes("edit-crm-products") && (
+                {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_PRODUCTS) && (
                   <Button
                     variant="primary"
                     onClick={() => {

@@ -13,6 +13,9 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { TableAction } from "@components/GenericTable";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import {
   CRM_PERSON_DISPOSITION_OPTIONS,
   getCrmPersonRowDispositionRaw,
@@ -73,7 +76,7 @@ export function buildCrmProspectsContactsTableActions({
   onScheduledCallStatusChange,
 }: BuildCrmProspectsContactsTableActionsParams): TableAction<any>[] {
   return [
-    ...(session?.user?.permissions?.includes("view-crm-data-management")
+    ...(session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_DATA_MANAGEMENT)
       ? [
           {
             label: "View",
@@ -83,7 +86,7 @@ export function buildCrmProspectsContactsTableActions({
           },
         ]
       : []),
-    ...(session?.user?.permissions?.includes("view-crm-data-management")
+    ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_DATA_MANAGEMENT)
       ? [
           {
             label: "Edit",
@@ -96,7 +99,7 @@ export function buildCrmProspectsContactsTableActions({
           },
         ]
       : []),
-    ...(session?.user?.permissions?.includes("view-crm-data-management") &&
+    ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_DATA_MANAGEMENT) &&
     onDispositionChange
       ? [
           {
@@ -121,7 +124,7 @@ export function buildCrmProspectsContactsTableActions({
         ]
       : []),
     ...(session?.user?.permissions?.includes(
-      "call-service-crm-data-management",
+      PERMISSIONS.CALL_SERVICE_CRM_DATA_MANAGEMENT,
     )
       ? [
           {
@@ -144,7 +147,7 @@ export function buildCrmProspectsContactsTableActions({
               align: "end" as const,
               options: [
                 ...(session?.user?.permissions?.includes(
-                  "call-service-crm-data-management",
+                  PERMISSIONS.CALL_SERVICE_CRM_DATA_MANAGEMENT,
                 )
                   ? [
                       {
@@ -222,7 +225,9 @@ export function buildCrmProspectsContactsTableActions({
             },
           },
         ]),
-    ...(session?.user?.permissions?.includes("delete-crm-data-management")
+    ...(session?.user?.permissions?.includes(
+      PERMISSIONS.DELETE_CRM_DATA_MANAGEMENT,
+    )
       ? [
           {
             label: "Delete",

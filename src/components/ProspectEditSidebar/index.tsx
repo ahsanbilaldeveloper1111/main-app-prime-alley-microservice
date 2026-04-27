@@ -9,7 +9,6 @@ import {
   CRM_PERSON_DISPOSITION_OPTIONS,
   formatCrmPersonDispositionLabel,
 } from "@utils/crmPersonDisposition";
-import { getDatetimeLocalMinNow } from "@utils/datetimeLocalInput";
 
 export interface ProspectFormState {
   firstName: string;
@@ -55,6 +54,7 @@ export interface ProspectEditSidebarProps {
   onClose: () => void;
   onSubmitPrimary: () => void;
   onCreateAndAddAnother?: () => void;
+  showScheduledCallField?: boolean;
   parsePhoneNumberInput: (value: string) =>
     | { countryCallingCode: string; nationalNumber: string }
     | undefined;
@@ -78,7 +78,7 @@ interface ProspectAdditionalSectionProps {
   contactForm: ProspectFormState;
   setContactForm: ProspectEditSidebarProps["setContactForm"];
   availableTags: ProspectEditSidebarProps["availableTags"];
-  isEditing: boolean;
+  showScheduledCallField: boolean;
   updateCustomField: (
     index: number,
     key: "field_name" | "field_value",
@@ -503,17 +503,10 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
   contactForm,
   setContactForm,
   availableTags,
-  isEditing,
+  showScheduledCallField,
   updateCustomField,
   removeCustomField,
 }) => {
-  const scheduledFloor = getDatetimeLocalMinNow();
-  const allowLegacyPastScheduled =
-    isEditing &&
-    contactForm.scheduled_call_at !== "" &&
-    contactForm.scheduled_call_at < scheduledFloor;
-  const scheduledInputMin = allowLegacyPastScheduled ? undefined : scheduledFloor;
-
   return (
   <div
     className="contact-form-section"
@@ -561,7 +554,8 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
         onBlur={(e) => (e.currentTarget.style.borderColor = "#8a8a8a")}
       />
     </div>
-    <div className="contact-form-field" style={{ marginBottom: "20px" }}>
+    {showScheduledCallField && (
+      <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
         htmlFor="prospect-scheduled-call-input"
         className="contact-form-label"
@@ -578,26 +572,11 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
       <input
         id="prospect-scheduled-call-input"
         type="datetime-local"
-        {...(scheduledInputMin === undefined ? {} : { min: scheduledInputMin })}
         value={contactForm.scheduled_call_at}
-        onFocus={(e) => {
-          const floor = getDatetimeLocalMinNow();
-          const cur = contactForm.scheduled_call_at;
-          if (isEditing && cur !== "" && cur < floor) {
-            e.currentTarget.removeAttribute("min");
-          } else {
-            e.currentTarget.min = floor;
-          }
-        }}
         onChange={(e) => {
-          const v = e.target.value;
-          const minVal = getDatetimeLocalMinNow();
-          if (v !== "" && v < minVal) {
-            return;
-          }
           setContactForm({
             ...contactForm,
-            scheduled_call_at: v,
+            scheduled_call_at: e.target.value,
           });
         }}
         style={{
@@ -609,7 +588,8 @@ const ProspectAdditionalSection: React.FC<ProspectAdditionalSectionProps> = ({
           outline: "none",
         }}
       />
-    </div>
+      </div>
+    )}
     <div className="contact-form-field" style={{ marginBottom: "20px" }}>
       <label
         htmlFor="prospect-tags-select"
@@ -1115,6 +1095,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
   onClose,
   onSubmitPrimary,
   onCreateAndAddAnother,
+  showScheduledCallField = true,
   parsePhoneNumberInput,
 }) => {
   if (!isOpen) return null;
@@ -1291,7 +1272,7 @@ const ProspectEditSidebar: React.FC<ProspectEditSidebarProps> = ({
                   contactForm={contactForm}
                   setContactForm={setContactForm}
                   availableTags={availableTags}
-                  isEditing={isEditing}
+                  showScheduledCallField={showScheduledCallField}
                   updateCustomField={updateCustomField}
                   removeCustomField={removeCustomField}
                 />

@@ -21,3 +21,20 @@
 .gt-filter-pills {
     padding-bottom: 13px !important;
 }
+
+.generic-table-td button {
+    border: none;
+    color: #141414;
+}
+.action-buttons button {
+    padding: 9px 13px;
+    
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    background: rgb(0, 0, 0) !important;
+    color: rgb(255, 255, 255);
+}
+div:has(> .generic-table-container) {
+    padding: 0px !important;
+  }

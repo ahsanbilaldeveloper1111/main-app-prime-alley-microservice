@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 import { useRouter } from 'next/router';
 import { getStorageImageUrl } from '@utils/imageUtils';
 import ResetPasswordModal from '@components/ResetPasswordModal';
@@ -477,7 +480,7 @@ const ProfileSidebar: React.FC<ProfileSidebarProps> = ({
                 </button>
               </li>
 
-{session?.user?.permissions?.includes('view-crm-tasks') && (
+{session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_TASKS) && (
               <li className="profile-menu-item">
                 <button className="profile-menu-button" onClick={() => {
                   router.push('/crm/tasks');

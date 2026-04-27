@@ -132,6 +132,9 @@ import {
 } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
 import { useCrmListPreviewPersistence } from "@crm/shared/useCrmListPreviewPersistence";
 import { applyCrmFilterRules, CRM_BASE_FILTER_RULES } from "@crm/shared/crmListFilterHelpers";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const ignoredKeys = ["order_stage_id"];
 
@@ -1817,7 +1820,7 @@ const CrmOrders = () => { // NOSONAR
         className: "text-info",
       },
 
-      ...(session?.user?.permissions?.includes("delete-crm-orders")
+      ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_ORDERS)
         ? [
             {
               label: "Delete",
@@ -1897,7 +1900,7 @@ const CrmOrders = () => { // NOSONAR
       setOrdersPagination((prev) => ({ ...prev, currentPage: 1 })),
   });
 
-  if (!session?.user?.permissions?.includes("list-crm-orders")) {
+  if (!session?.user?.permissions?.includes(PERMISSIONS.VIEW_CRM_ORDERS)) {
     return null;
   }
 
@@ -2586,7 +2589,11 @@ const CrmOrders = () => { // NOSONAR
                 onPreviewClick={(order) => handlePreviewClick(order)}
                 onFirstColumnClick={(order) => handleFirstColumnClick(order)}
                 onRowDoubleClick={(row) => {
-                  if (session?.user?.permissions?.includes("list-crm-orders")) {
+                  if (
+                    session?.user?.permissions?.includes(
+                      PERMISSIONS.VIEW_CRM_ORDERS,
+                    )
+                  ) {
                     handleViewOrder(row.rawData?.id || row.id);
                   }
                 }}
@@ -6015,7 +6022,7 @@ const CrmOrders = () => { // NOSONAR
                         }}
                       >
                         {session?.user?.permissions?.includes(
-                          "edit-crm-orders",
+                          PERMISSIONS.EDIT_CRM_ORDERS,
                         ) && (
                           <button
                             style={{

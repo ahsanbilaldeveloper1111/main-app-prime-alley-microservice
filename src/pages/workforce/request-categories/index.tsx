@@ -31,6 +31,14 @@ import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { Pencil, Trash2, List, Plus, ChevronUp, ChevronDown, GripVertical, FolderTree } from "lucide-react";
 import Select from "@components/AppSelect";
 import GenericTable from "@components/GenericTable";
+import CategoryEditSidebar, {
+  CategorySidebarField,
+  CategorySidebarLabel,
+  CategorySidebarSelect,
+  CategorySidebarTextArea,
+  CategorySidebarTextInput,
+  categorySidebarLabelStyle,
+} from "@components/CategoryEditSidebar";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { reportApiErrorFromCatch } from "@utils/sentryLogger";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
@@ -149,11 +157,11 @@ function normalizeWorkflowLevelsForPayload(
   levels: WorkflowLevelPayload[] | undefined | null
 ): WorkflowLevelPayload[] | undefined {
   if (!levels?.length) return undefined;
-  return levels.map((lvl) => ({
+  return levels.map((lvl: WorkflowLevelPayload) => ({
     ...lvl,
     assignees: (lvl.assignees ?? [])
-      .filter((a) => (a.user_id ?? "").trim() !== "")
-      .map((a, i) => ({ ...a, sort_order: i })),
+      .filter((a: WorkflowLevelAssignee) => (a.user_id ?? "").trim() !== "")
+      .map((a: WorkflowLevelAssignee, i: number) => ({ ...a, sort_order: i })),
   }));
 }
 
@@ -172,7 +180,10 @@ function getCategoryFormSubmitValidationError(form: CategoryFormState): string |
   const workflowLevels = form.workflow_levels ?? [];
   if (
     workflowLevels.every(
-      (lvl) => !(lvl.assignees ?? []).some((a) => (a.user_id ?? "").trim() !== ""),
+      (lvl: WorkflowLevelPayload) =>
+        !(lvl.assignees ?? []).some(
+          (a: WorkflowLevelAssignee) => (a.user_id ?? "").trim() !== "",
+        ),
     )
   ) {
     return "Sub-categories require at least one approval workflow level with at least one assignee.";
@@ -244,7 +255,7 @@ function AssigneesList({ assignees, mainAppUsers, levelIndex, categoryForm, setC
   const updateAssignees = (newAssignees: WorkflowLevelAssignee[]) => {
     const levels = [...(categoryForm.workflow_levels ?? [])];
     levels[levelIndex] = { ...levels[levelIndex], assignees: newAssignees };
-    setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
+    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
   };
 
   const handleDragStart = (e: React.DragEvent, assigneeIdx: number) => {
@@ -284,7 +295,13 @@ function AssigneesList({ assignees, mainAppUsers, levelIndex, categoryForm, setC
     <ul className="list-unstyled d-flex flex-column gap-2 mb-0" aria-label="Workflow assignees">
       {assignees.map((assignee, assigneeIdx) => {
         const uid = (assignee.user_id ?? "").trim();
-        const rowKey = uid.length > 0 ? "wl-" + String(levelIndex) + "-u-" + uid : "wl-" + String(levelIndex) + "-slot-" + String(assigneeIdx);
+        const rowKey =
+          "wl-" +
+          String(levelIndex) +
+          "-assignee-" +
+          String(assignee.sort_order) +
+          "-" +
+          (uid.length > 0 ? uid : "empty");
         return (
         <li
           key={rowKey}
@@ -361,28 +378,30 @@ type WorkflowLevelRowProps = Readonly<{
 function WorkflowLevelRow({ lvl, idx, categoryForm, setCategoryForm, mainAppUsers }: WorkflowLevelRowProps) {
   const removeLevel = () => {
     const levels = categoryForm.workflow_levels ?? [];
-    setCategoryForm((f) => ({
+    setCategoryForm((f: CategoryFormState) => ({
       ...f,
-      workflow_levels: levels.filter((_, i) => i !== idx).map((l, i) => ({ ...l, level: i + 1 })),
+      workflow_levels: levels
+        .filter((_: WorkflowLevelPayload, i: number) => i !== idx)
+        .map((l: WorkflowLevelPayload, i: number) => ({ ...l, level: i + 1 })),
     }));
   };
 
   const updateLevelName = (name: string) => {
     const levels = [...(categoryForm.workflow_levels ?? [])];
     levels[idx] = { ...levels[idx], name: name || undefined };
-    setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
+    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
   };
 
   const updateApprovalRule = (value: string) => {
     const levels = [...(categoryForm.workflow_levels ?? [])];
     levels[idx] = { ...levels[idx], approval_rule: (value as "any" | "all") || undefined };
-    setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
+    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
   };
 
   const updateApproveInOrder = (checked: boolean) => {
     const levels = [...(categoryForm.workflow_levels ?? [])];
     levels[idx] = { ...levels[idx], approve_in_order: checked };
-    setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
+    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
   };
 
   const addAssignee = () => {
@@ -392,52 +411,58 @@ function WorkflowLevelRow({ lvl, idx, categoryForm, setCategoryForm, mainAppUser
       ...levels[idx],
       assignees: [...current, { user_id: "", sort_order: current.length }],
     };
-    setCategoryForm((f) => ({ ...f, workflow_levels: levels }));
+    setCategoryForm((f: CategoryFormState) => ({ ...f, workflow_levels: levels }));
   };
+
+  const approvalRuleAll = lvl.approval_rule === "all";
 
   return (
     <div className="mb-3 pb-3 border-bottom border-secondary border-opacity-25">
       <div className="d-flex align-items-center justify-content-between mb-2">
-        <strong>Level {lvl.level}</strong>
+        <strong style={{ fontSize: "14px", color: "#141414" }}>Level {lvl.level}</strong>
         <Button type="button" variant="outline-danger" size="sm" onClick={removeLevel}>
           Remove
         </Button>
       </div>
-      <Form.Group className="mb-2">
-        <Form.Label className="small">Level name (optional)</Form.Label>
-        <Form.Control
-          size="sm"
+      <CategorySidebarField>
+        <CategorySidebarLabel htmlFor={"wl-name-" + String(idx)}>Level name (optional)</CategorySidebarLabel>
+        <CategorySidebarTextInput
+          id={"wl-name-" + String(idx)}
           type="text"
           value={lvl.name ?? ""}
           onChange={(e) => updateLevelName(e.target.value)}
           placeholder="e.g. Manager approval"
         />
-      </Form.Group>
-      <div className="row g-2 mb-2">
-        <div className="col-md-6">
-          <Form.Select value={lvl.approval_rule ?? "any"} onChange={(e) => updateApprovalRule(e.target.value)}>
-            <option value="any">Any one can approve</option>
-            <option value="all">All must approve</option>
-          </Form.Select>
-        </div>
-        <div className="col-md-6 d-flex align-items-center">
-          <Form.Check
-            type="checkbox"
-            id={"wl-order-" + String(idx)}
-            label="Approve in order"
-            disabled={lvl.approval_rule !== "all"}
-            checked={lvl.approve_in_order === true}
-            onChange={(e) => updateApproveInOrder(e.target.checked)}
-            title={lvl.approval_rule === "all" ? undefined : "Only available when 'All must approve' is selected"}
-          />
-          <span className="ms-1 small text-muted" title="Only when All must approve">
-            ⓘ
-          </span>
-        </div>
-      </div>
-      <Form.Group>
+      </CategorySidebarField>
+      <CategorySidebarField>
+        <CategorySidebarLabel htmlFor={"wl-rule-" + String(idx)}>Approval rule</CategorySidebarLabel>
+        <CategorySidebarSelect
+          id={"wl-rule-" + String(idx)}
+          value={lvl.approval_rule ?? "any"}
+          onChange={(e) => updateApprovalRule(e.target.value)}
+        >
+          <option value="any">Any one can approve</option>
+          <option value="all">All must approve</option>
+        </CategorySidebarSelect>
+      </CategorySidebarField>
+      <CategorySidebarField>
+        <Form.Check
+          type="checkbox"
+          id={"wl-order-" + String(idx)}
+          label="Approve in order"
+          disabled={!approvalRuleAll}
+          checked={lvl.approve_in_order === true}
+          onChange={(e) => updateApproveInOrder(e.target.checked)}
+          title={approvalRuleAll ? undefined : "Only available when 'All must approve' is selected"}
+          style={{ fontSize: "14px", color: "#141414" }}
+        />
+        <span className="ms-1 small text-muted" title="Only when All must approve">
+          ⓘ
+        </span>
+      </CategorySidebarField>
+      <CategorySidebarField>
         <div className="d-flex align-items-center justify-content-between mb-2">
-          <Form.Label className="small mb-0">Assignees (who can approve this level)</Form.Label>
+          <span style={{ ...categorySidebarLabelStyle, marginBottom: 0 }}>Assignees (who can approve this level)</span>
           <Button type="button" variant="outline-primary" size="sm" onClick={addAssignee}>
             <Plus size={14} className="me-1" />
             Add
@@ -454,7 +479,7 @@ function WorkflowLevelRow({ lvl, idx, categoryForm, setCategoryForm, mainAppUser
             setCategoryForm={setCategoryForm}
           />
         )}
-      </Form.Group>
+      </CategorySidebarField>
     </div>
   );
 }
@@ -469,9 +494,9 @@ function SubCategoryWorkflowForm({ categoryForm, setCategoryForm, mainAppUsers }
   const workflowLevels = categoryForm.workflow_levels ?? [];
 
   return (
-    <div className="col-12">
+    <div style={{ marginTop: "24px" }}>
       <div className="d-flex align-items-center justify-content-between mb-2">
-        <Form.Label className="mb-0">Approval workflow (level & order) <span className="text-danger">*</span></Form.Label>
+        <CategorySidebarLabel required>Approval workflow (level & order)</CategorySidebarLabel>
 
         {workflowLevels.length > 0 && (
           <Button
@@ -481,7 +506,7 @@ function SubCategoryWorkflowForm({ categoryForm, setCategoryForm, mainAppUsers }
             onClick={() => {
               const levels = categoryForm.workflow_levels ?? [];
               const nextLevel = levels.length + 1;
-              setCategoryForm((f) => ({
+              setCategoryForm((f: CategoryFormState) => ({
                 ...f,
                 workflow_levels: [...levels, { level: nextLevel, name: "Level " + String(nextLevel), assignees: [] }],
               }));
@@ -501,7 +526,7 @@ function SubCategoryWorkflowForm({ categoryForm, setCategoryForm, mainAppUsers }
             variant="outline-primary"
             size="sm"
             onClick={() => {
-              setCategoryForm((f) => ({
+              setCategoryForm((f: CategoryFormState) => ({
                 ...f,
                 workflow_levels: [{ level: 1, name: "Level 1", assignees: [] }],
               }));
@@ -513,9 +538,9 @@ function SubCategoryWorkflowForm({ categoryForm, setCategoryForm, mainAppUsers }
         </div>
       ) : (
         <div className="border rounded p-3 bg-light">
-          {workflowLevels.map((lvl, idx) => (
+          {workflowLevels.map((lvl: WorkflowLevelPayload, idx: number) => (
             <WorkflowLevelRow
-              key={"workflow-level-" + String(lvl.level) + "-" + String(idx)}
+              key={"workflow-level-" + String(lvl.level)}
               lvl={lvl}
               idx={idx}
               categoryForm={categoryForm}
@@ -1114,103 +1139,113 @@ const RequestCategories = () => {
       />
 
 
-      {/* Create/Edit Category Modal */}
-      <Modal show={showCategoryModal} onHide={() => setShowCategoryModal(false)} centered size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>{categoryModalTitle(editingCategory, categoryForm.parent_id)}</Modal.Title>
-        </Modal.Header>
-        <Form onSubmit={handleSaveCategory}>
-          <Modal.Body>
-            <div className="row g-3">
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Name <span className="text-danger">*</span></Form.Label>
-                  <Form.Control
-                    type="text"
-                    value={categoryForm.name ?? ""}
-                    onChange={(e) => setCategoryForm((f) => ({ ...f, name: e.target.value }))}
-                    required
-                    placeholder="e.g. Leave Request"
-                  />
-                </Form.Group>
-              </div>
-              
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Status <span className="text-danger">*</span></Form.Label>
-                  <Form.Select
-                    value={categoryForm.is_active === false ? "false" : "true"}
-                    onChange={(e) => setCategoryForm((f) => ({ ...f, is_active: e.target.value === "true" }))}
-                  >
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
-                  </Form.Select>
-                </Form.Group>
-              </div>
-              
-              
-             
-              {categoryForm.parent_id != null && categoryForm.parent_id !== 0 && (
-                <SubCategoryWorkflowForm
-                  categoryForm={categoryForm}
-                  setCategoryForm={setCategoryForm}
-                  mainAppUsers={mainAppUsers}
-                />
-              )}
+      <CategoryEditSidebar
+        isOpen={showCategoryModal}
+        title={categoryModalTitle(editingCategory, categoryForm.parent_id)}
+        onClose={() => setShowCategoryModal(false)}
+        onSubmit={handleSaveCategory}
+        savingCategory={savingCategory}
+        submitDisabled={savingCategory || !isCategoryFormReadyForSubmit(categoryForm)}
+        submitLabel={categorySaveButtonLabel(savingCategory, editingCategory)}
+      >
+        <CategorySidebarField>
+          <CategorySidebarLabel htmlFor="category-name" required>
+            Name
+          </CategorySidebarLabel>
+          <CategorySidebarTextInput
+            id="category-name"
+            type="text"
+            value={categoryForm.name ?? ""}
+            onChange={(e) =>
+              setCategoryForm((f: CategoryFormState) => ({ ...f, name: e.target.value }))
+            }
+            required
+            placeholder="e.g. Leave Request"
+          />
+        </CategorySidebarField>
 
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Tracking</Form.Label>
-                  <Form.Select
-                    value={categoryForm.tracking_enabled ? "true" : "false"}
-                    onChange={(e) => setCategoryForm((f) => ({ ...f, tracking_enabled: e.target.value === "true" }))}
-                  >
-                    <option value="false">Disabled</option>
-                    <option value="true">Enabled</option>
-                  </Form.Select>
-                </Form.Group>
-              </div>
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label>Tracking code prefix (optional)</Form.Label>
-                  <Form.Control
-                    type="text"
-                    maxLength={50}
-                    value={categoryForm.tracking_code_prefix ?? ""}
-                    onChange={(e) => setCategoryForm((f) => ({ ...f, tracking_code_prefix: e.target.value || undefined }))}
-                    placeholder="e.g. REQ"
-                  />
-                  <Form.Text className="text-muted">Used when tracking is enabled.</Form.Text>
-                </Form.Group>
-              </div>
-              <div className="col-12">
-                <Form.Group>
-                  <Form.Label>Description (optional)</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={3}
-                    value={categoryForm.description ?? ""}
-                    onChange={(e) => setCategoryForm((f) => ({ ...f, description: e.target.value || undefined }))}
-                    placeholder="Optional description"
-                  />
-                </Form.Group>
-              </div>
-            </div>
-            <div className="d-flex justify-content-end gap-2 mt-4">
-              <Button variant="light" type="button" onClick={() => setShowCategoryModal(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                type="submit"
-                disabled={savingCategory || !isCategoryFormReadyForSubmit(categoryForm)}
-              >
-                {categorySaveButtonLabel(savingCategory, editingCategory)}
-              </Button>
-            </div>
-          </Modal.Body>
-        </Form>
-      </Modal>
+        <CategorySidebarField>
+          <CategorySidebarLabel htmlFor="category-status" required>
+            Status
+          </CategorySidebarLabel>
+          <CategorySidebarSelect
+            id="category-status"
+            value={categoryForm.is_active === false ? "false" : "true"}
+            onChange={(e) =>
+              setCategoryForm((f: CategoryFormState) => ({
+                ...f,
+                is_active: e.target.value === "true",
+              }))
+            }
+          >
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </CategorySidebarSelect>
+        </CategorySidebarField>
+
+        {categoryForm.parent_id != null && categoryForm.parent_id !== 0 ? (
+          <SubCategoryWorkflowForm
+            categoryForm={categoryForm}
+            setCategoryForm={setCategoryForm}
+            mainAppUsers={mainAppUsers}
+          />
+        ) : null}
+
+        <CategorySidebarField>
+          <CategorySidebarLabel htmlFor="category-tracking">Tracking</CategorySidebarLabel>
+          <CategorySidebarSelect
+            id="category-tracking"
+            value={categoryForm.tracking_enabled ? "true" : "false"}
+            onChange={(e) =>
+              setCategoryForm((f: CategoryFormState) => ({
+                ...f,
+                tracking_enabled: e.target.value === "true",
+              }))
+            }
+          >
+            <option value="false">Disabled</option>
+            <option value="true">Enabled</option>
+          </CategorySidebarSelect>
+        </CategorySidebarField>
+
+        <CategorySidebarField>
+          <CategorySidebarLabel htmlFor="category-tracking-prefix">
+            Tracking code prefix (optional)
+          </CategorySidebarLabel>
+          <CategorySidebarTextInput
+            id="category-tracking-prefix"
+            type="text"
+            maxLength={50}
+            value={categoryForm.tracking_code_prefix ?? ""}
+            onChange={(e) =>
+              setCategoryForm((f: CategoryFormState) => ({
+                ...f,
+                tracking_code_prefix: e.target.value || undefined,
+              }))
+            }
+            placeholder="e.g. REQ"
+          />
+          <Form.Text style={{ fontSize: "12px", color: "#64748b", marginTop: "6px" }}>
+            Used when tracking is enabled.
+          </Form.Text>
+        </CategorySidebarField>
+
+        <CategorySidebarField>
+          <CategorySidebarLabel htmlFor="category-description">Description (optional)</CategorySidebarLabel>
+          <CategorySidebarTextArea
+            id="category-description"
+            rows={3}
+            value={categoryForm.description ?? ""}
+            onChange={(e) =>
+              setCategoryForm((f: CategoryFormState) => ({
+                ...f,
+                description: e.target.value || undefined,
+              }))
+            }
+            placeholder="Optional description"
+          />
+        </CategorySidebarField>
+      </CategoryEditSidebar>
 
       <DeleteConfirmationModal
         show={showDeleteModal}
