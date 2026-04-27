@@ -1,6 +1,5 @@
 import React from "react";
 import type { SidebarAction, SidebarTab } from "@components/GenericSidebar";
-import { formatDateForTable } from "@utils/Helper";
 import {
   ShoppingBag,
   DollarSign,
@@ -17,147 +16,17 @@ import {
   Edit,
   Eye,
 } from "@crm/orders/orderListLucideHeavy";
-
-function assignedToLookupKey(assignedTo: unknown): string | number | null {
-  if (assignedTo === undefined || assignedTo === null || assignedTo === "") {
-    return null;
-  }
-  if (typeof assignedTo === "object") {
-    return null;
-  }
-  if (typeof assignedTo === "string" || typeof assignedTo === "number") {
-    return assignedTo;
-  }
-  if (typeof assignedTo === "boolean") {
-    return Number(assignedTo);
-  }
-  return null;
-}
-
-function extensionDisplayName(
-  extensions: any[],
-  assignedTo: unknown,
-): string {
-  const key = assignedToLookupKey(assignedTo);
-  if (key === null) {
-    return "Not assigned";
-  }
-  const match = extensions.find(
-    (ext: any) => ext?.id == key || ext?.extension == key,
-  );
-  if (match?.display_name) return match.display_name;
-  if (match?.name) return match.name;
-  return String(key);
-}
-
-function orderStatusBadgeVariant(status: string | undefined): string {
-  const s = status?.toLowerCase() ?? "";
-  if (s === "completed") return "success";
-  if (s === "pending") return "warning";
-  return "secondary";
-}
-
-function orderApprovalBadgeVariant(status: string | undefined): string {
-  const s = status?.toLowerCase() ?? "";
-  if (s === "approved") return "success";
-  if (s === "rejected") return "danger";
-  return "warning";
-}
-
-function fulfillmentBadgeVariant(status: string | undefined): string {
-  const s = status?.toLowerCase() ?? "";
-  if (s.includes("completed") || s.includes("delivered")) return "success";
-  if (s.includes("progress")) return "primary";
-  return "secondary";
-}
-
-function paymentBadgeVariant(status: string | undefined): string {
-  const s = status?.toLowerCase() ?? "";
-  if (s === "paid") return "success";
-  if (s === "partial") return "warning";
-  return "danger";
-}
-
-function leadPotentialBadgeVariant(potential: string | undefined): string {
-  if (potential === "Hot") return "danger";
-  if (potential === "Warm") return "warning";
-  return "secondary";
-}
-
-function formatOrderAmount(viewingOrder: any): string {
-  const amount = viewingOrder?.final_amount || viewingOrder?.total_amount;
-  if (!amount) return "N/A";
-  const cur = viewingOrder?.currency || "AED";
-  const n = Number.parseFloat(String(amount)).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `${cur} ${n}`;
-}
-
-function formatDealValue(relatedDeal: any): string {
-  const v = relatedDeal?.net_value || relatedDeal?.grand_total;
-  if (!v) return "N/A";
-  const cur = relatedDeal?.currency || "AED";
-  return `${cur} ${Number.parseFloat(String(v)).toLocaleString()}`;
-}
-
-function CrmOrdersSidebarHistoryList(props: Readonly<{ histories: any[] }>) {
-  const { histories } = props;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      {histories.map((history: any, idx: number) => (
-        <div
-          key={history.id || idx}
-          style={{
-            padding: "16px",
-            backgroundColor: "#f9fafb",
-            borderRadius: "10px",
-            border: "1px solid #f3f4f6",
-            position: "relative",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "13px",
-              fontWeight: "600",
-              color: "#111827",
-              marginBottom: "6px",
-            }}
-          >
-            {history.action || "Activity"}
-          </div>
-          <div
-            style={{
-              fontSize: "12px",
-              color: "#6b7280",
-              marginBottom: "4px",
-            }}
-          >
-            by {history.user?.name || history.created_by || "System"}
-          </div>
-          <div style={{ fontSize: "11px", color: "#9ca3af" }}>
-            {history.created_at
-              ? formatDateForTable(history.created_at)
-              : "N/A"}
-          </div>
-          {history.description ? (
-            <div
-              style={{
-                marginTop: "8px",
-                fontSize: "12px",
-                color: "#4b5563",
-                fontStyle: "italic",
-              }}
-            >
-              {history.description}
-            </div>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  );
-}
+import {
+  crmPlannerExtensionDisplayName,
+  formatDealValue,
+  formatOrderAmount,
+  fulfillmentBadgeVariant,
+  leadPotentialBadgeVariant,
+  orderApprovalBadgeVariant,
+  orderStatusBadgeVariant,
+  paymentBadgeVariant,
+} from "./crmOrdersPlannerOrderDisplayHelpers";
+import { PlannerCrmOrdersSidebarHistoryList } from "./crmOrdersPlannerSidebarHistoryList";
 
 function buildGeneralTab(viewingOrder: any): SidebarTab {
   return {
@@ -289,7 +158,7 @@ function buildLeadDealSections(
         },
         {
           label: "Assigned To",
-          value: extensionDisplayName(
+          value: crmPlannerExtensionDisplayName(
             extensions,
             relatedDeal?.assigned_to,
           ),
@@ -365,7 +234,7 @@ function buildLeadDealSections(
         },
         {
           label: "Assigned To",
-          value: extensionDisplayName(
+          value: crmPlannerExtensionDisplayName(
             extensions,
             relatedLead?.assigned_to,
           ),
@@ -499,7 +368,7 @@ function buildAdditionalInfoTab(
           },
           {
             label: "Assigned To",
-            value: extensionDisplayName(
+            value: crmPlannerExtensionDisplayName(
               extensions,
               viewingOrder?.assigned_to,
             ),
@@ -561,7 +430,7 @@ function buildHistoryTab(viewingOrder: any): SidebarTab {
               message: "No activity history yet",
             },
         customContent: hasHistories ? (
-          <CrmOrdersSidebarHistoryList histories={histories} />
+          <PlannerCrmOrdersSidebarHistoryList histories={histories} />
         ) : undefined,
       },
     ],

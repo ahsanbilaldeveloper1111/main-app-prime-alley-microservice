@@ -23,6 +23,11 @@ import {
   getRandomColor,
 } from "@crm/orders/orderListOrderPageShared";
 import moment from "moment";
+import {
+  crmOrdersOrderViewModalEditRowHoverHandlers,
+  crmOrdersOrderViewModalFooterCloseHoverHandlers,
+  crmOrdersOrderViewModalHeaderCloseHoverHandlers,
+} from "./crmOrdersPlannerModalHoverHandlers";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -62,52 +67,6 @@ function orderHistoryRowKey(orderId: unknown, history: any): string {
 type ReadonlyPick<K extends keyof CrmOrdersOrderViewModalRenderProps> = Readonly<
   Pick<CrmOrdersOrderViewModalRenderProps, K>
 >;
-
-function applyHeaderCloseHover(
-  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
-): void {
-  e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-  e.currentTarget.style.transform = "scale(1.05)";
-}
-
-function resetHeaderCloseHover(
-  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
-): void {
-  e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-  e.currentTarget.style.transform = "scale(1)";
-}
-
-function applyEditOrderRowHover(
-  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
-): void {
-  e.currentTarget.style.borderColor = "#f59e0b";
-  e.currentTarget.style.background = "#fffbeb";
-  e.currentTarget.style.transform = "translateX(4px)";
-}
-
-function resetEditOrderRowHover(
-  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
-): void {
-  e.currentTarget.style.borderColor = "#e5e7eb";
-  e.currentTarget.style.background = "white";
-  e.currentTarget.style.transform = "translateX(0)";
-}
-
-function applyFooterCloseHover(
-  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
-): void {
-  e.currentTarget.style.borderColor = "#f59e0b";
-  e.currentTarget.style.color = "#f59e0b";
-  e.currentTarget.style.background = "#fffbeb";
-}
-
-function resetFooterCloseHover(
-  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
-): void {
-  e.currentTarget.style.borderColor = "#e5e7eb";
-  e.currentTarget.style.color = "#6c757d";
-  e.currentTarget.style.background = "white";
-}
 
 export type CrmOrdersOrderViewModalRenderProps = Readonly<{
   viewingOrder: any;
@@ -159,10 +118,7 @@ function OrderViewModalHeader(
       alignItems: "center",
       justifyContent: "center",
     }}
-    onMouseOver={applyHeaderCloseHover}
-    onFocus={applyHeaderCloseHover}
-    onMouseOut={resetHeaderCloseHover}
-    onBlur={resetHeaderCloseHover}
+    {...crmOrdersOrderViewModalHeaderCloseHoverHandlers}
   >
     <X size={18} />
   </button>
@@ -1900,10 +1856,7 @@ function OrderViewModalRightPanel(
                     setShowOrderViewModal(false);
                     globalThis.location.href = `/crm/orders/${viewingOrder.id}/edit`;
                   }}
-                  onMouseOver={applyEditOrderRowHover}
-                  onFocus={applyEditOrderRowHover}
-                  onMouseOut={resetEditOrderRowHover}
-                  onBlur={resetEditOrderRowHover}
+                  {...crmOrdersOrderViewModalEditRowHoverHandlers}
                 >
                   <div style={{
                     width: "32px",
@@ -2084,10 +2037,7 @@ function OrderViewModalFooterBar(
       border: "2px solid #e5e7eb",
       transition: "all 0.2s ease",
     }}
-    onMouseOver={applyFooterCloseHover}
-    onFocus={applyFooterCloseHover}
-    onMouseOut={resetFooterCloseHover}
-    onBlur={resetFooterCloseHover}
+    {...crmOrdersOrderViewModalFooterCloseHoverHandlers}
   >
     Close
   </Button>
