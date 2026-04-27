@@ -1,39 +1,15 @@
 import "@crm/orders/orderListPageOrderScss";
-import { useRouter, type NextRouter } from "next/router";
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-  useEffect,
-} from "react";
+import { useRouter } from "next/router";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   BreadcrumbItem,
   GenericTable,
   GenericFilterSidebar,
   StatsCards,
   OrderEditModal,
-  type TableColumn,
   type TableAction,
 } from "@crm/orders/orderListOrderPageFrame";
 import { FiFilter } from "@crm/orders/orderListFiIcons";
-import {
-  getOrders,
-  getOrder,
-  getStages,
-  deleteOrder,
-  restoreOrder,
-  getOrderAttachments,
-  uploadOrderAttachment,
-  deleteOrderAttachment,
-  downloadOrderAttachment,
-  markOrderLost,
-  getDeal,
-  getLead,
-  getDealAttachments,
-  downloadDealAttachment,
-} from "@crm/orders/orderListCrmApi";
-import { buildCrmOrdersListGetOrdersParams } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
-import { GetHierarchyData } from "@utils/users";
 import {
   Button,
   Row,
@@ -44,21 +20,12 @@ import {
 } from "@crm/orders/orderListBootstrap";
 import Select, { type SingleValue } from "@components/AppSelect";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
-
-type OrdersDeliverySelectOption = { value: string | number; label: string };
-const toOptionalSelectString = (value: string | number | null | undefined) => {
-  if (value === null || value === undefined) return null;
-  return String(value);
-};
-const { PERMISSIONS } = HEADER_CONSTANTS;
-import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
   CheckCircle,
   Eye,
   Edit,
   Trash2,
   ShoppingBag,
-  MoreVertical,
   X,
   Layers,
   DollarSign,
@@ -68,15 +35,12 @@ import {
   RotateCcw,
 } from "@crm/orders/orderListLucideHeavy";
 import { toast } from "react-toastify";
-
 import {
   SuccessfulModal,
   FormModal,
   DeleteConfirmationModal,
   KPICard,
   FilterBar,
-  getInitials,
-  getRandomColor,
   customSelectStyles,
 } from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
@@ -87,974 +51,46 @@ import {
   CrmOrdersFulfillmentBarChart,
   CrmOrdersStagePieChart,
 } from "./CrmOrdersAnalyticsCharts";
-import moment from "moment";
 import {
-  crmPlannerExtensionDisplayName,
-  fulfillmentBadgeVariant,
-  orderApprovalBadgeVariant,
-  paymentBadgeVariant,
-} from "./crmOrdersPlannerOrderDisplayHelpers";
+  DEFAULT_ORDERS_UI_FILTERS,
+  type OrdersDeliverySelectOption,
+  type OrdersUiFilters,
+  plannerOrdersToOptionalSelectString,
+} from "./plannerOrdersList/crmOrdersPlannerListConstants";
+import {
+  buildPlannerOrdersFiltersPayload,
+  mergePlannerOrdersSidebarFilters,
+} from "./plannerOrdersList/crmOrdersPlannerListFilters";
+import {
+  plannerBuildAssignedToSelectValue,
+  plannerBuildStageSelectValue,
+} from "./plannerOrdersList/crmOrdersPlannerListSelectHelpers";
+import {
+  plannerComputeOrdersAnalyticsSlice,
+  plannerComputeOrdersTabCounts,
+  plannerTransformOrderRowForGrid,
+} from "./plannerOrdersList/crmOrdersPlannerListRowModel";
+import {
+  PLANNER_CRM_ORDERS_TABLE_COLUMNS,
+  plannerBuildOrdersRowActions,
+  plannerGetOrderRowNumericId,
+} from "./plannerOrdersList/crmOrdersPlannerListTable";
+import {
+  plannerExecuteAttachmentDelete,
+  plannerExecuteAttachmentLoad,
+  plannerExecuteAttachmentUpload,
+  plannerExecuteDeleteOrder,
+  plannerExecuteDownloadDealAttachment,
+  plannerExecuteDownloadOrderAttachment,
+  plannerExecuteFetchOrderDetailsForView,
+  plannerExecuteMarkOrderLost,
+  plannerExecuteOrdersListFetch,
+  plannerExecuteRestoreOrder,
+} from "./plannerOrdersList/crmOrdersPlannerListCommands";
+import { useCrmOrdersPlannerLifecycleEffects } from "./plannerOrdersList/crmOrdersPlannerListLifecycle";
+import { ModuleSlug } from "@utils/Helper";
 
-
-const OPTIONAL_STRING_FILTER_KEYS = [
-  "stage_id",
-  "assigned_to",
-  "search",
-  "industry",
-  "order_value_min",
-  "order_value_max",
-  "order_stage_id",
-  "order_approval_status",
-  "fulfillment_status",
-  "payment_status",
-  "date_from",
-  "date_to",
-] as const;
-
-const OPTIONAL_TRUE_FILTER_KEYS = ["include_lost", "include_archived"] as const;
-
-type OrdersUiFilters = {
-  assignedTo: string | null;
-  stage: string | null;
-  industry: string | null;
-  orderValueMin: string | null;
-  orderValueMax: string | null;
-  orderApprovalStatus: string | null;
-  fulfillmentStatus: string | null;
-  paymentStatus: string | null;
-  dateFrom: string | null;
-  dateTo: string | null;
-};
-
-const DEFAULT_ORDERS_UI_FILTERS: OrdersUiFilters = {
-  assignedTo: null,
-  stage: null,
-  industry: null,
-  orderValueMin: null,
-  orderValueMax: null,
-  orderApprovalStatus: null,
-  fulfillmentStatus: null,
-  paymentStatus: null,
-  dateFrom: null,
-  dateTo: null,
-};
-
-type OrdersFilterSelectOption = { value: string; label: string };
-
-function buildAssignedToSelectValue(
-  assignedTo: string | null,
-  extensions: any[],
-): OrdersFilterSelectOption | null {
-  if (!assignedTo) {
-    return null;
-  }
-  const ext = extensions.find((e: any) => (e.id || e.extension) === assignedTo);
-  if (ext) {
-    return {
-      value: assignedTo,
-      label: String(ext.display_name || ext.name || assignedTo),
-    };
-  }
-  return { value: assignedTo, label: assignedTo };
-}
-
-function buildStageSelectValue(
-  stageId: string | null,
-  stages: any[],
-): OrdersFilterSelectOption | null {
-  if (!stageId) {
-    return null;
-  }
-  const stage = stages.find((st: any) => st.id.toString() === stageId);
-  if (stage) {
-    return { value: stageId, label: String(stage.name) };
-  }
-  return { value: stageId, label: stageId };
-}
-
-function setOptionalFilterValue(
-  target: Record<string, any>,
-  key: string,
-  value: unknown,
-  toStringValue = false,
-): void {
-  if (!value) {
-    delete target[key];
-    return;
-  }
-  if (!toStringValue) {
-    target[key] = value;
-    return;
-  }
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    target[key] = String(value);
-    return;
-  }
-  delete target[key];
-}
-
-function applyActiveFilterState(
-  previousFilters: Record<string, any>,
-  activeFilter: string,
-  stages: any[],
-): { nextFilters: Record<string, any>; stageValue: string | null } {
-  const nextFilters = { ...previousFilters };
-
-  delete nextFilters.stage_id;
-  delete nextFilters.include_archived;
-  delete nextFilters.include_lost;
-
-  if (activeFilter === "lost") {
-    nextFilters.include_lost = true;
-    return { nextFilters, stageValue: null };
-  }
-
-  if (activeFilter === "deleted") {
-    nextFilters.include_archived = true;
-    return { nextFilters, stageValue: null };
-  }
-
-  if (activeFilter !== "all") {
-    const selectedStage = stages.find((s: any) => s.id.toString() === activeFilter);
-    if (selectedStage) {
-      const stageId = selectedStage.id.toString();
-      nextFilters.stage_id = stageId;
-      return { nextFilters, stageValue: stageId };
-    }
-  }
-
-  return { nextFilters, stageValue: null };
-}
-
-function isValidActiveFilterTab(tab: string, stages: any[]): boolean {
-  if (tab === "all" || tab === "lost" || tab === "deleted") return true;
-  return stages.some((s: any) => s.id.toString() === tab);
-}
-
-function buildOrdersFiltersToApply(
-  ordersSearch: string,
-  ordersFilters: OrdersUiFilters,
-): Record<string, string> {
-  const filtersToApply: Record<string, string> = {};
-  setOptionalFilterValue(filtersToApply, "search", ordersSearch);
-  setOptionalFilterValue(filtersToApply, "assigned_to", ordersFilters.assignedTo, true);
-  setOptionalFilterValue(filtersToApply, "order_stage_id", ordersFilters.stage, true);
-  setOptionalFilterValue(filtersToApply, "industry", ordersFilters.industry);
-  setOptionalFilterValue(filtersToApply, "order_value_min", ordersFilters.orderValueMin, true);
-  setOptionalFilterValue(filtersToApply, "order_value_max", ordersFilters.orderValueMax, true);
-  setOptionalFilterValue(filtersToApply, "order_approval_status", ordersFilters.orderApprovalStatus);
-  setOptionalFilterValue(filtersToApply, "fulfillment_status", ordersFilters.fulfillmentStatus);
-  setOptionalFilterValue(filtersToApply, "payment_status", ordersFilters.paymentStatus);
-  setOptionalFilterValue(filtersToApply, "date_from", ordersFilters.dateFrom);
-  setOptionalFilterValue(filtersToApply, "date_to", ordersFilters.dateTo);
-  return filtersToApply;
-}
-
-function syncOrdersFiltersFromActiveTab(params: {
-  activeFilter: string;
-  stages: any[];
-  setCurrentFilters: React.Dispatch<React.SetStateAction<Record<string, any>>>;
-  setOrdersFilters: React.Dispatch<React.SetStateAction<OrdersUiFilters>>;
-}): void {
-  const { stageValue } = applyActiveFilterState({}, params.activeFilter, params.stages);
-  params.setCurrentFilters((prev) =>
-    applyActiveFilterState(prev, params.activeFilter, params.stages).nextFilters,
-  );
-  params.setOrdersFilters((prev) => ({ ...prev, stage: stageValue }));
-}
-
-function syncActiveTabFromRouter(params: {
-  routerReady: boolean;
-  routerTab: unknown;
-  stages: any[];
-  activeFilter: string;
-  setActiveFilter: React.Dispatch<React.SetStateAction<string>>;
-}): void {
-  if (!params.routerReady || !params.routerTab) return;
-  let tabFromUrl = "";
-  if (typeof params.routerTab === "string") {
-    tabFromUrl = params.routerTab;
-  } else if (Array.isArray(params.routerTab)) {
-    tabFromUrl = params.routerTab[0] ?? "";
-  }
-  if (!tabFromUrl) return;
-  const isValidFilter = isValidActiveFilterTab(tabFromUrl, params.stages);
-  if (isValidFilter && tabFromUrl !== params.activeFilter) {
-    params.setActiveFilter(tabFromUrl);
-  }
-}
-
-function getOrderRowId(row: any): number {
-  return Number(row?.rawData?.id || row?.id || 0);
-}
-
-function buildOrdersActions(params: {
-  activeFilter: string;
-  canEdit: boolean;
-  canDelete: boolean;
-  onViewOrder: (orderId: number) => void | Promise<void>;
-  onRestoreOrder: (orderId: number) => void | Promise<void>;
-  onEditOrder: (row: any) => void;
-  onOpenAttachments: (row: any) => void;
-  onDeleteOrder: (orderId: number, orderNumber?: string) => void;
-  onMarkLost: (row: any) => void;
-}): TableAction<any>[] {
-  if (params.activeFilter === "deleted") {
-    return [
-      {
-        label: "View",
-        icon: <Eye size={16} />,
-        onClick: (row: any) => params.onViewOrder(getOrderRowId(row)),
-        variant: "link",
-      },
-      {
-        label: "Restore",
-        icon: <RotateCcw size={16} />,
-        onClick: (row: any) => params.onRestoreOrder(getOrderRowId(row)),
-        variant: "link",
-        className: "text-success",
-      },
-    ];
-  }
-
-  const actions: TableAction<any>[] = [
-    {
-      label: "View",
-      icon: <Eye size={16} />,
-      onClick: (row: any) => params.onViewOrder(getOrderRowId(row)),
-      variant: "link",
-    },
-    {
-      label: "Attachments",
-      icon: <Paperclip size={16} />,
-      onClick: (row: any) => params.onOpenAttachments(row),
-      variant: "link",
-      className: "text-info",
-    },
-  ];
-
-  if (params.canEdit) {
-    actions.splice(1, 0, {
-      label: "Edit",
-      icon: <Edit size={16} />,
-      onClick: (row: any) => params.onEditOrder(row),
-      variant: "link",
-    });
-  }
-
-  if (params.canDelete) {
-    actions.push({
-      label: "Delete",
-      icon: <Trash2 size={16} />,
-      onClick: (row: any) => params.onDeleteOrder(getOrderRowId(row), row.orderNumber),
-      variant: "link",
-      className: "text-danger",
-    });
-  }
-
-  if (params.activeFilter !== "lost") {
-    actions.push({
-      label: "More Actions",
-      icon: <MoreVertical size={16} />,
-      variant: "link",
-      dropdown: {
-        align: "end",
-        options: [
-          {
-            label: "Mark as Lost",
-            icon: <X size={14} />,
-            onClick: (row: any) => params.onMarkLost(row.rawData || row),
-            className: "text-danger",
-          },
-        ],
-      },
-    });
-  }
-
-  return actions;
-}
-
-function buildOrdersTableColumns(): TableColumn<any>[] {
-  return [
-    {
-      key: "orderNumber",
-      label: "Order Number",
-      sortable: true,
-      type: "text",
-      emptyValue: "-",
-    },
-    {
-      key: "customer",
-      label: "Company",
-      sortable: true,
-      type: "multi-field",
-      fields: {
-        primary: "customer",
-        secondary: "customerEmail",
-        secondaryClass: "text-muted small",
-      },
-      render: (row: any) => (
-        <div className="d-flex align-items-center gap-2">
-          {row.customer ? (
-            <>
-              <div
-                style={{
-                  width: "30px",
-                  height: "30px",
-                  borderRadius: "50%",
-                  backgroundColor: getRandomColor(row.customer),
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "10px",
-                  fontWeight: "600",
-                  flexShrink: 0,
-                }}
-              >
-                {getInitials(row.customer)}
-              </div>
-              <div>
-                <div className="fw-medium">{row.customer}</div>
-                {row.customerEmail ? (
-                  <small className="text-muted">{row.customerEmail}</small>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <div>No Company</div>
-          )}
-        </div>
-      ),
-      emptyValue: "No Company",
-    },
-    {
-      key: "deal",
-      label: "Linked Deal",
-      sortable: true,
-      type: "text",
-      accessor: (row: any) => row.deal || "No Deal",
-      emptyValue: "No Deal",
-    },
-    {
-      key: "stage",
-      label: "Stage",
-      sortable: true,
-      type: "custom",
-      render: (row: any) => (
-        <span style={{ backgroundColor: row?.stageColor || "grey" }} className="badge">
-          {row.stage}
-        </span>
-      ),
-    },
-    {
-      key: "value",
-      label: "Value",
-      sortable: true,
-      type: "custom",
-      render: (row: any) => (
-        <span className="fw-semibold">
-          {row.currency} {Number.parseFloat(String(row.value)).toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      key: "approvalStatus",
-      label: "Approval",
-      sortable: true,
-      type: "custom",
-      render: (row: any) => (
-        <Badge bg={orderApprovalBadgeVariant(row.approvalStatus)}>
-          {row.approvalStatus}
-        </Badge>
-      ),
-      emptyValue: "-",
-    },
-    {
-      key: "fulfillmentStatus",
-      label: "Fulfillment",
-      sortable: true,
-      type: "custom",
-      render: (row: any) => (
-        <Badge bg={fulfillmentBadgeVariant(row.fulfillmentStatus)}>
-          {row.fulfillmentStatus}
-        </Badge>
-      ),
-      emptyValue: "-",
-    },
-    {
-      key: "paymentStatus",
-      label: "Payment",
-      sortable: true,
-      type: "custom",
-      render: (row: any) => (
-        <Badge bg={paymentBadgeVariant(row.paymentStatus)}>{row.paymentStatus}</Badge>
-      ),
-      emptyValue: "-",
-    },
-    {
-      key: "assignedUser",
-      label: "Assigned To",
-      sortable: true,
-      type: "text",
-      emptyValue: "-",
-    },
-    {
-      key: "orderDate",
-      label: "Order Date",
-      sortable: true,
-      type: "text",
-      emptyValue: "-",
-    },
-    {
-      key: "owner",
-      label: "Owner",
-      sortable: true,
-      type: "text",
-      emptyValue: "-",
-    },
-    {
-      key: "created",
-      label: "Created",
-      sortable: true,
-      type: "text",
-      emptyValue: "-",
-    },
-  ];
-}
-
-const CRM_ORDERS_TABLE_COLUMNS = buildOrdersTableColumns();
-
-async function fetchAttachmentsBundle(selectedOrder: any): Promise<{
-  orderAttachments: any[];
-  relatedDealAttachments: any[];
-}> {
-  const orderAttachments = await getOrderAttachments(selectedOrder.id);
-  if (!selectedOrder.deal_id) {
-    return { orderAttachments: orderAttachments || [], relatedDealAttachments: [] };
-  }
-
-  try {
-    const dealData = await getDealAttachments(Number(selectedOrder.deal_id));
-    return {
-      orderAttachments: orderAttachments || [],
-      relatedDealAttachments: dealData || [],
-    };
-  } catch (error) {
-    console.error("Failed to fetch deal attachments:", error);
-    return { orderAttachments: orderAttachments || [], relatedDealAttachments: [] };
-  }
-}
-
-function normalizeLeadContactPersons(leadData: any) {
-  if (!leadData?.contact_persons || typeof leadData.contact_persons !== "string") {
-    return leadData;
-  }
-
-  try {
-    return { ...leadData, contact_persons: JSON.parse(leadData.contact_persons) };
-  } catch (error) {
-    console.error("Failed to parse contact_persons:", error);
-    return { ...leadData, contact_persons: [] };
-  }
-}
-
-async function fetchOrderDetailsBundle(orderId: number) {
-  const orderData: any = await getOrder(orderId);
-
-  let dealData: any = null;
-  let leadData: any = null;
-
-  if (orderData?.deal_id) {
-    try {
-      dealData = await getDeal(Number(orderData.deal_id));
-    } catch (error) {
-      console.error("Failed to fetch deal:", error);
-    }
-  }
-
-  if (dealData?.ticket_id) {
-    try {
-      const lead = await getLead(Number(dealData.ticket_id));
-      leadData = normalizeLeadContactPersons(lead);
-    } catch (error) {
-      console.error("Failed to fetch lead:", error);
-    }
-  }
-
-  return { orderData, dealData, leadData };
-}
-
-function transformOrderDataForTable(order: any, extensions: any[]) {
-  const assignedDisplay = crmPlannerExtensionDisplayName(
-    extensions,
-    order?.assigned_to,
-    { labelWhenUnassigned: "" },
-  );
-  return {
-    id: order.id,
-    orderNumber: order.order_number || "",
-    customer: order.customer_name || "",
-    customerEmail: order.customer_email || "",
-    customerPhone: order.customer_phone || "",
-    deal: order.deal?.name || order.deal_id || "",
-    dealId: order.deal_id || null,
-    stage: order.stage?.name || "No Stage",
-    stageColor: order.stage?.color || "grey",
-    stageId: order.order_stage_id || null,
-    value: order.final_amount || order.total_amount || "0",
-    currency: order.currency || "AED",
-    approvalStatus: order.order_approval_status || null,
-    fulfillmentStatus: order.fulfillment_status || null,
-    paymentStatus: order.payment_status || null,
-    orderDate: order.order_date ? moment(order.order_date).format(GlobalDateFormat) : "-",
-    assignedUser: assignedDisplay,
-    expectedDeliveryDate: formatDateForTable(order.expected_delivery_date),
-    actualDeliveryDate: formatDateForTable(order.actual_delivery_date),
-    owner: assignedDisplay,
-    created: formatDateForTable(order.created_at),
-    contractType: order.contract_type || "",
-    contractLength: order.contract_length || "",
-    contractStartDate: formatDateForTable(order.contract_start_date),
-    contractEndDate: formatDateForTable(order.contract_end_date),
-    billingModel: order.billing_model || "",
-    billingStatus: order.billing_status || "",
-    paymentTerms: order.payment_terms || "",
-    progressDial: order.progress_dial || 0,
-    pocName: order.poc_name || order.customer_name || "",
-    pocTitle: order.poc_title || "",
-    pocPhone: order.poc_phone || "",
-    company: order.company || order.deal?.company_name || "",
-    industry: order.industry || order.deal?.industry || "",
-    status: order.status || "pending",
-    rawData: order,
-  };
-}
-
-function computeOrdersAnalyticsData(
-  ordersData: any[],
-  extensions: any[],
-  summaryTiles: any,
-  totalOrders: number,
-) {
-  const transformedOrders = ordersData.map((order) =>
-    transformOrderDataForTable(order, extensions),
-  );
-  const total = summaryTiles ? totalOrders : transformedOrders.length;
-  const delivered = transformedOrders.filter(
-    (o) =>
-      o.fulfillmentStatus?.toLowerCase().includes("completed") ||
-      o.fulfillmentStatus?.toLowerCase().includes("delivered"),
-  ).length;
-  const inProgress = transformedOrders.filter((o) =>
-    o.fulfillmentStatus?.toLowerCase().includes("progress"),
-  ).length;
-  const pendingApproval = transformedOrders.filter((o) =>
-    o.approvalStatus?.toLowerCase().includes("pending"),
-  ).length;
-  const totalValue = transformedOrders.reduce((sum, o) => {
-    const value =
-      Number.parseFloat(String(o.value).replaceAll(/[^0-9.-]/g, "")) || 0;
-    return sum + value;
-  }, 0);
-  const stageCounts: Record<string, number> = {};
-  transformedOrders.forEach((o) => {
-    const stage = o.stage || "No Stage";
-    stageCounts[stage] = (stageCounts[stage] || 0) + 1;
-  });
-  const statusCounts: Record<string, number> = {};
-  transformedOrders.forEach((o) => {
-    const status = o.fulfillmentStatus || "pending";
-    statusCounts[status] = (statusCounts[status] || 0) + 1;
-  });
-
-  return {
-    total,
-    delivered,
-    inProgress,
-    pendingApproval,
-    totalValue,
-    stageCounts,
-    statusCounts,
-  };
-}
-
-function computeOrdersFilterCounts(
-  ordersData: any[],
-  extensions: any[],
-  stages: any[],
-  summaryTiles: any,
-  totalOrders: number,
-): Record<string, number> {
-  const transformed = ordersData.map((order) =>
-    transformOrderDataForTable(order, extensions),
-  );
-  const counts: Record<string, number> = {
-    all: summaryTiles?.total_orders || totalOrders || transformed.length,
-    lost:
-      summaryTiles?.lost_orders || transformed.filter((o) => o.rawData?.is_lost).length,
-    deleted: summaryTiles?.deleted_orders || 0,
-  };
-
-  stages.slice(0, 5).forEach((stage: any) => {
-    const stageOrders = transformed.filter(
-      (o) => o.stage === stage.name || o.rawData?.order_stage_id === stage.id,
-    );
-    counts[stage.id] = stageOrders.length;
-  });
-  return counts;
-}
-
-type OrdersListFetchSetters = {
-  setLoading: (v: boolean) => void;
-  setOrdersData: (v: any[]) => void;
-  setTotalOrders: (v: number) => void;
-  setSummaryTiles: (v: any) => void;
-};
-
-async function executeCrmOrdersListFetch(
-  page: number,
-  perPage: number,
-  currentFilters: Record<string, any>,
-  tableSort: { sortBy: string; sortOrder: string },
-  setters: OrdersListFetchSetters,
-): Promise<void> {
-  setters.setLoading(true);
-  try {
-    const params = buildCrmOrdersListGetOrdersParams({
-      filters: currentFilters,
-      page,
-      perPage,
-      tableSort: tableSort.sortBy ? tableSort : null,
-      normalizeSearch: true,
-      ownerParamStyle: "user_extension_filter",
-    });
-    const response: any = await getOrders(params);
-    const ordersArray: any[] = response?.dataList || [];
-    const pagination: any = response?.meta || {};
-    const summary: any = response?.summary_tiles || null;
-    setters.setOrdersData(Array.isArray(ordersArray) ? ordersArray : []);
-    setters.setTotalOrders(pagination?.total || 0);
-    setters.setSummaryTiles(summary);
-  } finally {
-    setters.setLoading(false);
-  }
-}
-
-async function loadCrmOrdersStagesIntoState(setStages: (v: any[]) => void): Promise<void> {
-  try {
-    const stagesData = await getStages("order");
-    setStages(stagesData || []);
-  } catch (error) {
-    console.error("Failed to fetch stages:", error);
-  }
-}
-
-async function loadCrmOrdersLostReasonsIntoState(
-  setLostReasons: (v: any[]) => void,
-): Promise<void> {
-  try {
-    const lostReasonsData = await (getStages as any)("lost_reason");
-    setLostReasons(lostReasonsData || []);
-  } catch (error) {
-    console.error("Failed to fetch lost reasons:", error);
-  }
-}
-
-async function loadCrmOrdersExtensionsIntoState(
-  setExtensions: (v: any[]) => void,
-  moduleSlug: string,
-): Promise<void> {
-  try {
-    const hierarchyData = await GetHierarchyData(moduleSlug);
-    if (hierarchyData?.extensions) {
-      setExtensions(hierarchyData.extensions);
-    }
-  } catch (error) {
-    console.error("Failed to fetch extensions:", error);
-  }
-}
-
-async function executeCrmOrdersAttachmentLoad(
-  selectedOrder: any,
-  setLoadingAttachments: (v: boolean) => void,
-  setAttachments: (v: any[]) => void,
-  setDealAttachments: (v: any[]) => void,
-): Promise<void> {
-  if (!selectedOrder?.id) return;
-  setLoadingAttachments(true);
-  try {
-    const { orderAttachments, relatedDealAttachments } =
-      await fetchAttachmentsBundle(selectedOrder);
-    setAttachments(orderAttachments);
-    setDealAttachments(relatedDealAttachments);
-  } catch (error) {
-    console.error("Failed to fetch attachments:", error);
-    setAttachments([]);
-    setDealAttachments([]);
-  } finally {
-    setLoadingAttachments(false);
-  }
-}
-
-async function executeCrmOrdersAttachmentUpload(
-  selectedOrder: any,
-  file: File,
-  fileInputRef: HTMLInputElement | null,
-  fetchAgain: () => Promise<void>,
-  setUploadingFile: (v: boolean) => void,
-): Promise<void> {
-  if (!selectedOrder?.id) return;
-  setUploadingFile(true);
-  try {
-    await uploadOrderAttachment(selectedOrder.id, file, file.name);
-    await fetchAgain();
-    if (fileInputRef) {
-      fileInputRef.value = "";
-    }
-  } catch (error) {
-    console.error("Failed to upload file:", error);
-  } finally {
-    setUploadingFile(false);
-  }
-}
-
-async function executeCrmOrdersAttachmentDelete(
-  selectedOrder: any,
-  attachmentId: number,
-  refresh: () => Promise<void>,
-): Promise<void> {
-  if (!selectedOrder?.id) return;
-  try {
-    await deleteOrderAttachment(selectedOrder.id, attachmentId);
-    await refresh();
-    toast.success("Attachment deleted successfully!");
-  } catch (error) {
-    console.error("Failed to delete attachment:", error);
-    toast.error("Failed to delete attachment");
-  }
-}
-
-async function executeCrmOrdersDownloadOrderAttachment(
-  selectedOrder: any,
-  attachmentId: number,
-): Promise<void> {
-  if (!selectedOrder?.id) return;
-  try {
-    await downloadOrderAttachment(selectedOrder.id, attachmentId);
-  } catch (error) {
-    console.error("Failed to download attachment:", error);
-  }
-}
-
-async function executeCrmOrdersDownloadDealAttachment(
-  selectedOrder: any,
-  attachmentId: number,
-): Promise<void> {
-  if (!selectedOrder?.deal_id) return;
-  try {
-    await downloadDealAttachment(Number(selectedOrder.deal_id), attachmentId);
-  } catch (error) {
-    console.error("Failed to download deal attachment:", error);
-  }
-}
-
-async function executeCrmOrdersFetchOrderDetailsForView(
-  orderId: number,
-  setLoadingOrder: (v: boolean) => void,
-  setViewingOrder: (v: any) => void,
-  setRelatedDeal: (v: any) => void,
-  setRelatedLead: (v: any) => void,
-): Promise<void> {
-  setLoadingOrder(true);
-  setRelatedDeal(null);
-  setRelatedLead(null);
-  try {
-    const { orderData, dealData, leadData } = await fetchOrderDetailsBundle(orderId);
-    setViewingOrder(orderData);
-    setRelatedDeal(dealData);
-    setRelatedLead(leadData);
-  } catch (error) {
-    console.error("Failed to fetch order:", error);
-  } finally {
-    setLoadingOrder(false);
-  }
-}
-
-async function executeCrmOrdersDeleteOrder(
-  orderToDelete: { id: number } | null,
-  setShowDeleteModal: (v: boolean) => void,
-  setOrderToDelete: (v: any) => void,
-  bumpSuccessModal: (title: string, description: string) => void,
-  bumpRefresh: () => void,
-): Promise<void> {
-  if (!orderToDelete) return;
-  try {
-    await deleteOrder(orderToDelete.id);
-    setShowDeleteModal(false);
-    setOrderToDelete(null);
-    bumpSuccessModal("Order Deleted", "Order has been deleted successfully");
-    bumpRefresh();
-  } catch (error) {
-    console.error("Failed to delete order:", error);
-  }
-}
-
-async function executeCrmOrdersRestoreOrder(
-  orderId: number,
-  bumpSuccessModal: (title: string, description: string) => void,
-  bumpRefresh: () => void,
-): Promise<void> {
-  if (!globalThis.confirm("Are you sure you want to restore this order?")) return;
-  try {
-    await restoreOrder(orderId);
-    toast.success("Order restored successfully!");
-    bumpSuccessModal("Order Restored", "Order has been restored successfully");
-    bumpRefresh();
-  } catch (error) {
-    console.error("Failed to restore order:", error);
-    toast.error("Failed to restore order");
-  }
-}
-
-async function executeCrmOrdersMarkLost(
-  orderToMarkLost: any,
-  lostReasonId: number | null,
-  lostFeedback: string,
-  resetLostModal: () => void,
-  bumpSuccessModal: (title: string, description: string) => void,
-  bumpRefresh: () => void,
-): Promise<void> {
-  if (!orderToMarkLost || !lostReasonId || !lostFeedback.trim()) return;
-  try {
-    await markOrderLost(orderToMarkLost.id, {
-      lost_reason_id: lostReasonId,
-      lost_feedback: lostFeedback,
-    });
-    resetLostModal();
-    toast.success("Order marked as lost!");
-    bumpSuccessModal(
-      "Order Marked as Lost",
-      "Order has been marked as lost successfully",
-    );
-    bumpRefresh();
-  } catch (error) {
-    console.error("Failed to mark order as lost:", error);
-  }
-}
-
-type UseCrmOrdersPlannerLifecycleEffectsInput = Readonly<{
-  setStages: React.Dispatch<React.SetStateAction<any[]>>;
-  setLostReasons: React.Dispatch<React.SetStateAction<any[]>>;
-  setExtensions: React.Dispatch<React.SetStateAction<any[]>>;
-  activeFilter: string;
-  stages: any[];
-  setCurrentFilters: React.Dispatch<React.SetStateAction<Record<string, any>>>;
-  setOrdersFilters: React.Dispatch<React.SetStateAction<OrdersUiFilters>>;
-  router: NextRouter;
-  setActiveFilter: React.Dispatch<React.SetStateAction<string>>;
-  refreshKey: number;
-  currentFilters: Record<string, any>;
-  ordersPagination: {
-    currentPage: number;
-    rowsPerPage: number;
-    sortBy: string;
-    sortOrder: "asc" | "desc";
-  };
-  fetchOrders: (page?: number, perPage?: number) => Promise<void>;
-  showAttachmentModal: boolean;
-  selectedOrderForAttachments: any;
-  fetchAttachments: () => Promise<void>;
-  setAttachments: React.Dispatch<React.SetStateAction<any[]>>;
-  setDealAttachments: React.Dispatch<React.SetStateAction<any[]>>;
-}>;
-
-function useCrmOrdersPlannerLifecycleEffects(
-  input: UseCrmOrdersPlannerLifecycleEffectsInput,
-): void {
-  const {
-    setStages,
-    setLostReasons,
-    setExtensions,
-    activeFilter,
-    stages,
-    setCurrentFilters,
-    setOrdersFilters,
-    router,
-    setActiveFilter,
-    refreshKey,
-    currentFilters,
-    ordersPagination,
-    fetchOrders,
-    showAttachmentModal,
-    selectedOrderForAttachments,
-    fetchAttachments,
-    setAttachments,
-    setDealAttachments,
-  } = input;
-
-  useEffect(() => {
-    Promise.all([
-      loadCrmOrdersStagesIntoState(setStages),
-      loadCrmOrdersLostReasonsIntoState(setLostReasons),
-      loadCrmOrdersExtensionsIntoState(setExtensions, ModuleSlug.CRM_ORDERS),
-    ]).catch((error: unknown) => {
-      console.error("Failed to load CRM orders bootstrap data:", error);
-    });
-  }, []);
-
-  useEffect(() => {
-    syncOrdersFiltersFromActiveTab({
-      activeFilter,
-      stages,
-      setCurrentFilters,
-      setOrdersFilters,
-    });
-  }, [activeFilter, stages, setCurrentFilters, setOrdersFilters]);
-
-  useEffect(() => {
-    syncActiveTabFromRouter({
-      routerReady: router.isReady,
-      routerTab: router.query.tab,
-      stages,
-      activeFilter,
-      setActiveFilter,
-    });
-  }, [router, router.isReady, router.query.tab, stages, activeFilter, setActiveFilter]);
-
-  useEffect(() => {
-    fetchOrders(ordersPagination.currentPage, ordersPagination.rowsPerPage).catch(
-      (error: unknown) => {
-        console.error("Failed to fetch orders:", error);
-      },
-    );
-  }, [
-    refreshKey,
-    currentFilters,
-    ordersPagination.currentPage,
-    ordersPagination.rowsPerPage,
-    ordersPagination.sortBy,
-    ordersPagination.sortOrder,
-    fetchOrders,
-  ]);
-
-  useEffect(() => {
-    if (showAttachmentModal && selectedOrderForAttachments?.id) {
-      fetchAttachments().catch((error: unknown) => {
-        console.error("Failed to fetch attachments:", error);
-      });
-      return;
-    }
-    setAttachments([]);
-    setDealAttachments([]);
-  }, [
-    showAttachmentModal,
-    selectedOrderForAttachments?.id,
-    fetchAttachments,
-    setAttachments,
-    setDealAttachments,
-  ]);
-}
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 export const CrmOrdersPageContentImpl = () => {
   const { data: session } = useSession();
@@ -1136,7 +172,7 @@ export const CrmOrdersPageContentImpl = () => {
   // Fetch orders when filters or search change
   const fetchOrders = useCallback(
     async (page = 1, perPage = 15) => {
-      await executeCrmOrdersListFetch(
+      await plannerExecuteOrdersListFetch(
         page,
         perPage,
         currentFilters,
@@ -1172,7 +208,7 @@ export const CrmOrdersPageContentImpl = () => {
   }, [router]);
 
   const fetchAttachments = useCallback(async () => {
-    await executeCrmOrdersAttachmentLoad(
+    await plannerExecuteAttachmentLoad(
       selectedOrderForAttachments,
       setLoadingAttachments,
       setAttachments,
@@ -1210,7 +246,7 @@ export const CrmOrdersPageContentImpl = () => {
   };
 
   const handleFileUpload = async (file: File) => {
-    await executeCrmOrdersAttachmentUpload(
+    await plannerExecuteAttachmentUpload(
       selectedOrderForAttachments,
       file,
       fileInputRef,
@@ -1221,7 +257,7 @@ export const CrmOrdersPageContentImpl = () => {
 
   const handleDeleteAttachment = useCallback(
     async (attachmentId: number) => {
-      await executeCrmOrdersAttachmentDelete(
+      await plannerExecuteAttachmentDelete(
         selectedOrderForAttachments,
         attachmentId,
         fetchAttachments,
@@ -1239,14 +275,14 @@ export const CrmOrdersPageContentImpl = () => {
   }, [attachmentToDelete, handleDeleteAttachment]);
 
   const handleDownloadAttachment = async (attachmentId: number) => {
-    await executeCrmOrdersDownloadOrderAttachment(
+    await plannerExecuteDownloadOrderAttachment(
       selectedOrderForAttachments,
       attachmentId,
     );
   };
 
   const handleDownloadDealAttachment = async (attachmentId: number) => {
-    await executeCrmOrdersDownloadDealAttachment(
+    await plannerExecuteDownloadDealAttachment(
       selectedOrderForAttachments,
       attachmentId,
     );
@@ -1254,30 +290,13 @@ export const CrmOrdersPageContentImpl = () => {
 
   // Handle filter changes
   const handleFiltersChange = useCallback((filters: Record<string, any>) => {
-    setCurrentFilters((prev) => {
-      const newFilters = { ...prev };
-      if ("is_lost" in filters) {
-        newFilters.is_lost = filters.is_lost;
-      }
-      OPTIONAL_STRING_FILTER_KEYS.forEach((key) => {
-        if (!(key in filters)) return;
-        const shouldStringify =
-          key === "stage_id" || key === "assigned_to" || key === "order_value_min" || key === "order_value_max" || key === "order_stage_id";
-        setOptionalFilterValue(newFilters, key, filters[key], shouldStringify);
-      });
-      OPTIONAL_TRUE_FILTER_KEYS.forEach((key) => {
-        if (!(key in filters)) return;
-        setOptionalFilterValue(newFilters, key, filters[key] ? true : undefined);
-      });
-
-      return newFilters;
-    });
+    setCurrentFilters((prev) => mergePlannerOrdersSidebarFilters(prev, filters));
     setRefreshKey((prev) => prev + 1);
   }, []);
 
   const applyOrdersUiFilters = useCallback(
     (closeSidebar = false) => {
-      const filtersToApply = buildOrdersFiltersToApply(ordersSearch, ordersFilters);
+      const filtersToApply = buildPlannerOrdersFiltersPayload(ordersSearch, ordersFilters);
       handleFiltersChange(filtersToApply);
       setOrdersPagination((prev) => ({ ...prev, currentPage: 1 }));
       setRefreshKey((prev) => prev + 1);
@@ -1300,7 +319,7 @@ export const CrmOrdersPageContentImpl = () => {
 
   const handleViewOrder = useCallback(async (orderId: number) => {
     try {
-      await executeCrmOrdersFetchOrderDetailsForView(
+      await plannerExecuteFetchOrderDetailsForView(
         orderId,
         setLoadingOrder,
         setViewingOrder,
@@ -1323,7 +342,7 @@ export const CrmOrdersPageContentImpl = () => {
   );
 
   const confirmDeleteOrder = useCallback(async () => {
-    await executeCrmOrdersDeleteOrder(
+    await plannerExecuteDeleteOrder(
       orderToDelete,
       setShowDeleteModal,
       setOrderToDelete,
@@ -1338,7 +357,7 @@ export const CrmOrdersPageContentImpl = () => {
 
   // Restore Order Handler
   const handleRestoreOrder = useCallback(async (orderId: number) => {
-    await executeCrmOrdersRestoreOrder(
+    await plannerExecuteRestoreOrder(
       orderId,
       (title, description) => {
         setShowSuccessfulModal(true);
@@ -1356,7 +375,7 @@ export const CrmOrdersPageContentImpl = () => {
   }, []);
 
   const handleMarkLostSubmit = useCallback(async () => {
-    await executeCrmOrdersMarkLost(
+    await plannerExecuteMarkOrderLost(
       orderToMarkLost,
       lostReasonId,
       lostFeedback,
@@ -1377,14 +396,14 @@ export const CrmOrdersPageContentImpl = () => {
 
   // Transform API order data to UI format
   const transformOrderData = useCallback(
-    (order: any) => transformOrderDataForTable(order, extensions),
+    (order: any) => plannerTransformOrderRowForGrid(order, extensions),
     [extensions],
   );
 
   // Calculate analytics data
   const analyticsData = useMemo(
     () =>
-      computeOrdersAnalyticsData(ordersData, extensions, summaryTiles, totalOrders),
+      plannerComputeOrdersAnalyticsSlice(ordersData, extensions, summaryTiles, totalOrders),
     [ordersData, extensions, summaryTiles, totalOrders],
   );
 
@@ -1396,7 +415,7 @@ export const CrmOrdersPageContentImpl = () => {
   // Calculate filter counts (using summary_tiles if available, otherwise from data)
   const filterCounts = useMemo(
     () =>
-      computeOrdersFilterCounts(
+      plannerComputeOrdersTabCounts(
         ordersData,
         extensions,
         stages,
@@ -1407,12 +426,12 @@ export const CrmOrdersPageContentImpl = () => {
   );
 
   // Define columns for GenericTable
-  const ordersColumns = CRM_ORDERS_TABLE_COLUMNS;
+  const ordersColumns = PLANNER_CRM_ORDERS_TABLE_COLUMNS;
 
   // Define actions for GenericTable
   const ordersActions: TableAction<any>[] = useMemo(
     () =>
-      buildOrdersActions({
+      plannerBuildOrdersRowActions({
         activeFilter,
         canEdit: Boolean(
           session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING),
@@ -1427,7 +446,7 @@ export const CrmOrdersPageContentImpl = () => {
           await handleRestoreOrder(orderId);
         },
         onEditOrder: (row) => {
-          setEditingOrderId(getOrderRowId(row));
+          setEditingOrderId(plannerGetOrderRowNumericId(row));
           setShowEditModal(true);
         },
         onOpenAttachments: (row) => {
@@ -1724,14 +743,14 @@ export const CrmOrdersPageContentImpl = () => {
                       label:
                         ext.display_name || ext.name || ext.id || ext.extension,
                     }))}
-                    value={buildAssignedToSelectValue(
+                    value={plannerBuildAssignedToSelectValue(
                       ordersFilters.assignedTo,
                       extensions,
                     )}
                     onChange={(selected) => {
                       const opt =
                         selected as SingleValue<OrdersDeliverySelectOption>;
-                      const assignedToValue = toOptionalSelectString(opt?.value);
+                      const assignedToValue = plannerOrdersToOptionalSelectString(opt?.value);
                       setOrdersFilters((prev) => ({
                         ...prev,
                         assignedTo: assignedToValue,
@@ -1753,14 +772,14 @@ export const CrmOrdersPageContentImpl = () => {
                       value: s.id.toString(),
                       label: s.name,
                     }))}
-                    value={buildStageSelectValue(
+                    value={plannerBuildStageSelectValue(
                       ordersFilters.stage,
                       stages,
                     )}
                     onChange={(selected) => {
                       const opt =
                         selected as SingleValue<OrdersDeliverySelectOption>;
-                      const stageValue = toOptionalSelectString(opt?.value);
+                      const stageValue = plannerOrdersToOptionalSelectString(opt?.value);
                       setOrdersFilters((prev) => ({
                         ...prev,
                         stage: stageValue,
@@ -1991,7 +1010,7 @@ export const CrmOrdersPageContentImpl = () => {
             if (session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
               setShowOrderSidebar(true);
               // Fetch full order details including related deal and lead
-              await executeCrmOrdersFetchOrderDetailsForView(
+              await plannerExecuteFetchOrderDetailsForView(
                 row.rawData?.id || row.id,
                 setLoadingOrder,
                 setViewingOrder,
@@ -2090,14 +1109,14 @@ export const CrmOrdersPageContentImpl = () => {
             id: 'assignedTo',
             label: 'Assigned To',
             type: 'select' as const,
-            value: buildAssignedToSelectValue(
+            value: plannerBuildAssignedToSelectValue(
               ordersFilters.assignedTo,
               extensions,
             ),
             onChange: (selected) => {
               const opt =
                 selected as SingleValue<OrdersDeliverySelectOption>;
-              const assignedToValue = toOptionalSelectString(opt?.value);
+              const assignedToValue = plannerOrdersToOptionalSelectString(opt?.value);
               setOrdersFilters(prev => ({
                 ...prev,
                 assignedTo: assignedToValue
@@ -2116,11 +1135,11 @@ export const CrmOrdersPageContentImpl = () => {
             id: 'stage',
             label: 'Order Stage',
             type: 'select' as const,
-            value: buildStageSelectValue(ordersFilters.stage, stages),
+            value: plannerBuildStageSelectValue(ordersFilters.stage, stages),
             onChange: (selected) => {
               const opt =
                 selected as SingleValue<OrdersDeliverySelectOption>;
-              const stageValue = toOptionalSelectString(opt?.value);
+              const stageValue = plannerOrdersToOptionalSelectString(opt?.value);
               setOrdersFilters(prev => ({
                 ...prev,
                 stage: stageValue
