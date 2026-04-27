@@ -550,7 +550,8 @@ export const HEADER_CONSTANTS = {
 
     VIEW_CRM_ORDERS: "view-crm-orders",
     CREATE_CRM_ORDERS: "add-crm-orders",
-    EDIT_CRM_ORDERS: "edit-crm-orders",
+    EDIT_CRM_ORDERS_BILLING: "edit-crm-orders",
+    EDIT_CRM_ORDERS_DELIVERY: "edit-delivery-crm-orders",
     DELETE_CRM_ORDERS: "delete-crm-orders",
     VIEW_CRM_TASKS: "view-crm-tasks",
     CREATE_CRM_TASKS: "add-crm-tasks",
