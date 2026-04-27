@@ -153,9 +153,9 @@ import {
   customSelectStyles,
 } from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
+import { renderCrmOrdersOrderViewModal } from "./CrmOrdersOrderViewModal";
 import moment from "moment";
 
-const ignoredKeys = new Set(["order_stage_id"]);
 
 const OPTIONAL_STRING_FILTER_KEYS = [
   "stage_id",
@@ -775,1938 +775,235 @@ function computeOrdersFilterCounts(
   return counts;
 }
 
-type CrmOrdersOrderViewModalRenderProps = {
-  viewingOrder: any;
-  showOrderViewModal: boolean;
-  setShowOrderViewModal: React.Dispatch<React.SetStateAction<boolean>>;
-  loadingOrder: boolean;
-  relatedDeal: any;
-  relatedLead: any;
-  extensions: any[];
-  activeTab: string;
-  setActiveTab: React.Dispatch<React.SetStateAction<string>>;
-  session: { user?: { permissions?: string[] } } | null;
+type OrdersListFetchSetters = {
+  setLoading: (v: boolean) => void;
+  setOrdersData: (v: any[]) => void;
+  setTotalOrders: (v: number) => void;
+  setSummaryTiles: (v: any) => void;
 };
 
-function renderCrmOrdersOrderViewModal(props: CrmOrdersOrderViewModalRenderProps): React.ReactNode {
-  const {
-    viewingOrder,
-    showOrderViewModal,
-    setShowOrderViewModal,
-    loadingOrder,
-    relatedDeal,
-    relatedLead,
-    extensions,
-    activeTab,
-    setActiveTab,
-    session,
-  } = props;
-  if (!viewingOrder) {
-    return null;
+async function executeCrmOrdersListFetch(
+  page: number,
+  perPage: number,
+  currentFilters: Record<string, any>,
+  setters: OrdersListFetchSetters,
+): Promise<void> {
+  setters.setLoading(true);
+  try {
+    const params = buildOrdersRequestParams(page, perPage, currentFilters);
+    const response: any = await getOrders(params);
+    console.log("Raw response from getOrders:", response);
+    const ordersArray: any[] = response?.dataList || [];
+    const pagination: any = response?.meta || {};
+    const summary: any = response?.summary_tiles || null;
+    setters.setOrdersData(Array.isArray(ordersArray) ? ordersArray : []);
+    setters.setTotalOrders(pagination?.total || 0);
+    setters.setSummaryTiles(summary);
+  } finally {
+    setters.setLoading(false);
   }
-  return (
-  <Modal
-    show={showOrderViewModal}
-    onHide={() => setShowOrderViewModal(false)}
-    size="xl"
-    centered
-    className="order-view-modal"
-  >
-    {/* Modern Header with Gradient */}
-    <div
-      style={{
-        background: "#fff",
-        color: "black",
-        padding: "24px 32px",
-        position: "relative",
-        borderTopLeftRadius: "12px",
-        borderTopRightRadius: "12px",
-        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-        borderBottom: "1px solid #ccc",
-      }}
-    >
-      <button
-        onClick={() => setShowOrderViewModal(false)}
-        style={{
-          position: "absolute",
-          top: "16px",
-          right: "16px",
-          background: "rgba(255,255,255,0.15)",
-          backdropFilter: "blur(10px)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          color: "black",
-          width: "32px",
-          height: "32px",
-          borderRadius: "8px",
-          cursor: "pointer",
-          transition: "all 0.2s ease",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-          e.currentTarget.style.transform = "scale(1.05)";
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-          e.currentTarget.style.transform = "scale(1)";
-        }}
-      >
-        <X size={18} />
-      </button>
-      
-      {/* Header Content */}
-      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        <div
-          style={{
-            width: "64px",
-            height: "64px",
-            borderRadius: "16px",
-            background: "#f59e0b",
-            backdropFilter: "blur(10px)",
-            border: "2px solid rgba(255,255,255,0.3)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "28px",
-            fontWeight: "700",
-            flexShrink: 0,
-            color: "#fff",
-          }}
-        >
-          <ShoppingBag size={32} style={{ color: "white" }} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h2 style={{ 
-            margin: 0, 
-            fontWeight: 700, 
-            fontSize: "26px",
-            textShadow: "0 2px 4px rgba(0,0,0,0.1)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}>
-            {viewingOrder.order_number || `Order #${viewingOrder.id}`}
-          </h2>
-          <div style={{ 
-            marginTop: "6px", 
-            opacity: 0.95, 
-            fontSize: "14px",
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            flexWrap: "wrap",
-            color: "#000",
-          }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <Target size={14} />
-              {viewingOrder.stage?.name || "No stage"}
-            </span>
-            <span>•</span>
-            <span style={{ fontWeight: 600 }}>
-              {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </span>
-            <span>•</span>
-            <span>
-              {viewingOrder.order_date ? moment(viewingOrder.order_date).format("MMM DD, YYYY") : "N/A"}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
+}
 
-    <Modal.Body style={{ padding: 0, maxHeight: "calc(90vh - 200px)", overflowY: "auto" }}>
-      {loadingOrder ? (
-        <div style={{
-          padding: "48px 20px",
-          textAlign: "center",
-        }}>
-          <Spinner animation="border" variant="primary" size="sm" style={{ marginBottom: "12px" }} />
-          <p className="mb-0" style={{ color: "#6b7280", fontSize: "14px" }}>Loading order details...</p>
-        </div>
-      ) : (
-        <>
-          <style>{`
-            .order-detail-filter-buttons {
-              display: flex;
-              flex-direction: row;
-              align-items: center;
-              gap: 12px;
-              flex-wrap: wrap;
-              margin-bottom: 0;
-              padding: 0;
-              width: 100%;
-            }
+async function loadCrmOrdersStagesIntoState(setStages: (v: any[]) => void): Promise<void> {
+  try {
+    const stagesData = await getStages("order");
+    setStages(stagesData || []);
+  } catch (error) {
+    console.error("Failed to fetch stages:", error);
+  }
+}
 
-            .order-detail-filter-button {
-              display: flex;
-              align-items: center;
-              gap: 8px;
-              padding: 10px 20px;
-              border-radius: 8px;
-              border: 1px solid;
-              font-weight: 500;
-              font-size: 14px;
-              cursor: pointer;
-              transition: all 0.2s ease;
-              background: white;
-              white-space: nowrap;
-            }
+async function loadCrmOrdersLostReasonsIntoState(
+  setLostReasons: (v: any[]) => void,
+): Promise<void> {
+  try {
+    const lostReasonsData = await (getStages as any)("lost_reason");
+    setLostReasons(lostReasonsData || []);
+  } catch (error) {
+    console.error("Failed to fetch lost reasons:", error);
+  }
+}
 
-            .order-detail-filter-button:hover {
-              transform: translateY(-1px);
-              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            }
+async function loadCrmOrdersExtensionsIntoState(
+  setExtensions: (v: any[]) => void,
+  moduleSlug: string,
+): Promise<void> {
+  try {
+    const hierarchyData = await GetHierarchyData(moduleSlug);
+    if (hierarchyData?.extensions) {
+      setExtensions(hierarchyData.extensions);
+    }
+  } catch (error) {
+    console.error("Failed to fetch extensions:", error);
+  }
+}
 
-            .order-detail-filter-button.active {
-              color: white;
-            }
+async function executeCrmOrdersAttachmentLoad(
+  selectedOrder: any,
+  setLoadingAttachments: (v: boolean) => void,
+  setAttachments: (v: any[]) => void,
+  setDealAttachments: (v: any[]) => void,
+): Promise<void> {
+  if (!selectedOrder?.id) return;
+  setLoadingAttachments(true);
+  try {
+    const { orderAttachments, relatedDealAttachments } =
+      await fetchAttachmentsBundle(selectedOrder);
+    setAttachments(orderAttachments);
+    setDealAttachments(relatedDealAttachments);
+  } catch (error) {
+    console.error("Failed to fetch attachments:", error);
+    setAttachments([]);
+    setDealAttachments([]);
+  } finally {
+    setLoadingAttachments(false);
+  }
+}
 
-            .order-detail-filter-button.active .filter-icon {
-              color: white;
-            }
+async function executeCrmOrdersAttachmentUpload(
+  selectedOrder: any,
+  file: File,
+  fileInputRef: HTMLInputElement | null,
+  fetchAgain: () => Promise<void>,
+  setUploadingFile: (v: boolean) => void,
+): Promise<void> {
+  if (!selectedOrder?.id) return;
+  setUploadingFile(true);
+  try {
+    await uploadOrderAttachment(selectedOrder.id, file, file.name);
+    await fetchAgain();
+    if (fileInputRef) {
+      fileInputRef.value = "";
+    }
+  } catch (error) {
+    console.error("Failed to upload file:", error);
+  } finally {
+    setUploadingFile(false);
+  }
+}
 
-            .order-detail-filter-button:not(.active) .filter-icon {
-              color: inherit;
-            }
+async function executeCrmOrdersAttachmentDelete(
+  selectedOrder: any,
+  attachmentId: number,
+  refresh: () => Promise<void>,
+): Promise<void> {
+  if (!selectedOrder?.id) return;
+  try {
+    await deleteOrderAttachment(selectedOrder.id, attachmentId);
+    await refresh();
+    toast.success("Attachment deleted successfully!");
+  } catch (error) {
+    console.error("Failed to delete attachment:", error);
+    toast.error("Failed to delete attachment");
+  }
+}
 
-            .filter-icon {
-              width: 18px;
-              height: 18px;
-              flex-shrink: 0;
-            }
-          `}</style>
+async function executeCrmOrdersDownloadOrderAttachment(
+  selectedOrder: any,
+  attachmentId: number,
+): Promise<void> {
+  if (!selectedOrder?.id) return;
+  try {
+    await downloadOrderAttachment(selectedOrder.id, attachmentId);
+  } catch (error) {
+    console.error("Failed to download attachment:", error);
+  }
+}
 
-          {/* Main Content Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", minHeight: "500px" }}>
-            
-            {/* Left Panel - Main Information */}
-            <div style={{ padding: "32px", borderRight: "1px solid #e5e7eb" }}>
-              
-              {/* Tabs Navigation */}
-              <div className="order-detail-filter-buttons mb-4">
-                <button
-                  className={`order-detail-filter-button ${activeTab === "tab1" ? 'active' : ''}`}
-                  onClick={() => setActiveTab("tab1")}
-                  style={{
-                    backgroundColor: activeTab === "tab1" ? "#f59e0b" : 'white',
-                    borderColor: "#f59e0b",
-                    color: activeTab === "tab1" ? 'white' : "#f59e0b"
-                  }}
-                >
-                  <ShoppingBag className="filter-icon" size={18} />
-                  <span>General Information</span>
-                </button>
-                <button
-                  className={`order-detail-filter-button ${activeTab === "tab2" ? 'active' : ''}`}
-                  onClick={() => setActiveTab("tab2")}
-                  style={{
-                    backgroundColor: activeTab === "tab2" ? "#f59e0b" : 'white',
-                    borderColor: "#f59e0b",
-                    color: activeTab === "tab2" ? 'white' : "#f59e0b"
-                  }}
-                >
-                  <FileText className="filter-icon" size={18} />
-                  <span>Lead/Deal Information</span>
-                </button>
-                <button
-                  className={`order-detail-filter-button ${activeTab === "additional-info" ? 'active' : ''}`}
-                  onClick={() => setActiveTab("additional-info")}
-                  style={{
-                    backgroundColor: activeTab === "additional-info" ? "#f59e0b" : 'white',
-                    borderColor: "#f59e0b",
-                    color: activeTab === "additional-info" ? 'white' : "#f59e0b"
-                  }}
-                >
-                  <Info className="filter-icon" size={18} />
-                  <span>Additional Information</span>
-                </button>
-                <button
-                  className={`order-detail-filter-button ${activeTab === "history" ? 'active' : ''}`}
-                  onClick={() => setActiveTab("history")}
-                  style={{
-                    backgroundColor: activeTab === "history" ? "#f59e0b" : 'white',
-                    borderColor: "#f59e0b",
-                    color: activeTab === "history" ? 'white' : "#f59e0b"
-                  }}
-                >
-                  <History className="filter-icon" size={18} />
-                  <span>History</span>
-                </button>
-              </div>
+async function executeCrmOrdersDownloadDealAttachment(
+  selectedOrder: any,
+  attachmentId: number,
+): Promise<void> {
+  if (!selectedOrder?.deal_id) return;
+  try {
+    await downloadDealAttachment(Number(selectedOrder.deal_id), attachmentId);
+  } catch (error) {
+    console.error("Failed to download deal attachment:", error);
+  }
+}
 
-              {/* Tab Content */}
-              {activeTab === "tab1" && (
-                <div>
-                  {/* Quick Info Cards */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "28px" }}>
-                    <div
-                      style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        padding: "20px",
-                        borderRadius: "12px",
-                        transition: "all 0.3s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "10px",
-                          background: viewingOrder.stage?.color || "#6c757d",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          <Target size={20} style={{ color: "white" }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.8px",
-                            marginBottom: "4px",
-                          }}>
-                            Stage
-                          </div>
-                          <div style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}>
-                            {viewingOrder.stage?.name || "Not assigned"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+async function executeCrmOrdersFetchOrderDetailsForView(
+  orderId: number,
+  setLoadingOrder: (v: boolean) => void,
+  setViewingOrder: (v: any) => void,
+  setRelatedDeal: (v: any) => void,
+  setRelatedLead: (v: any) => void,
+): Promise<void> {
+  setLoadingOrder(true);
+  setRelatedDeal(null);
+  setRelatedLead(null);
+  try {
+    const { orderData, dealData, leadData } = await fetchOrderDetailsBundle(orderId);
+    setViewingOrder(orderData);
+    setRelatedDeal(dealData);
+    setRelatedLead(leadData);
+  } catch (error) {
+    console.error("Failed to fetch order:", error);
+  } finally {
+    setLoadingOrder(false);
+  }
+}
 
-                    <div
-                      style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        padding: "20px",
-                        borderRadius: "12px",
-                        transition: "all 0.3s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "10px",
-                          background: viewingOrder.status?.toLowerCase() === "completed" ? "#10b981" : viewingOrder.status?.toLowerCase() === "pending" ? "#f59e0b" : "#6c757d",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          <CheckCircle size={20} style={{ color: "white" }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.8px",
-                            marginBottom: "4px",
-                          }}>
-                            Status
-                          </div>
-                          <div style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}>
-                            {viewingOrder.status || "N/A"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+async function executeCrmOrdersDeleteOrder(
+  orderToDelete: { id: number } | null,
+  setShowDeleteModal: (v: boolean) => void,
+  setOrderToDelete: (v: any) => void,
+  bumpSuccessModal: (title: string, description: string) => void,
+  bumpRefresh: () => void,
+): Promise<void> {
+  if (!orderToDelete) return;
+  try {
+    await deleteOrder(orderToDelete.id);
+    setShowDeleteModal(false);
+    setOrderToDelete(null);
+    bumpSuccessModal("Order Deleted", "Order has been deleted successfully");
+    bumpRefresh();
+  } catch (error) {
+    console.error("Failed to delete order:", error);
+  }
+}
 
-                    <div
-                      style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        padding: "20px",
-                        borderRadius: "12px",
-                        transition: "all 0.3s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "10px",
-                          background: "#10b981",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          <DollarSign size={20} style={{ color: "white" }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#10b981",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.8px",
-                            marginBottom: "4px",
-                          }}>
-                            Final Amount
-                          </div>
-                          <div style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}>
-                            {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+async function executeCrmOrdersRestoreOrder(
+  orderId: number,
+  bumpSuccessModal: (title: string, description: string) => void,
+  bumpRefresh: () => void,
+): Promise<void> {
+  if (!globalThis.confirm("Are you sure you want to restore this order?")) return;
+  try {
+    await restoreOrder(orderId);
+    toast.success("Order restored successfully!");
+    bumpSuccessModal("Order Restored", "Order has been restored successfully");
+    bumpRefresh();
+  } catch (error) {
+    console.error("Failed to restore order:", error);
+    toast.error("Failed to restore order");
+  }
+}
 
-                    <div
-                      style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        padding: "20px",
-                        borderRadius: "12px",
-                        transition: "all 0.3s ease",
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = "translateY(-4px)";
-                        e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{
-                          width: "44px",
-                          height: "44px",
-                          borderRadius: "10px",
-                          background: "#3b82f6",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                        }}>
-                          <Calendar size={20} style={{ color: "white" }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#3b82f6",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.8px",
-                            marginBottom: "4px",
-                          }}>
-                            Order Date
-                          </div>
-                          <div style={{
-                            fontSize: "15px",
-                            color: "#1f2937",
-                            fontWeight: 600,
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}>
-                            {viewingOrder.order_date ? formatDateForTable(viewingOrder.order_date) : "N/A"}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Order Information Section */}
-                  <div style={{ marginBottom: "28px" }}>
-                    <h5 style={{
-                      fontSize: "15px",
-                      fontWeight: 700,
-                      color: "#1f2937",
-                      marginBottom: "16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}>
-                      <div style={{
-                        width: "4px",
-                        height: "18px",
-                        background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                        borderRadius: "2px",
-                      }} />
-                      Order Details
-                    </h5>
-                    <div style={{
-                      background: "#f9fafb",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "12px",
-                      padding: "20px",
-                    }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: "16px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
-                          <ShoppingBag size={16} style={{ color: "#f59e0b" }} />
-                          Order Number
-                        </div>
-                        <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
-                          {viewingOrder.order_number || `ORD-${viewingOrder.id}`}
-                        </div>
-                        
-                        {viewingOrder.expected_delivery_date && (
-                          <>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
-                              <Calendar size={16} style={{ color: "#f59e0b" }} />
-                              Expected Delivery
-                            </div>
-                            <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
-                              {formatDateForTable(viewingOrder.expected_delivery_date)}
-                            </div>
-                          </>
-                        )}
-
-                        {viewingOrder.industry && (
-                          <>
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#6b7280", fontSize: "14px", fontWeight: 600 }}>
-                              <Building2 size={16} style={{ color: "#f59e0b" }} />
-                              Industry
-                            </div>
-                            <div style={{ color: "#1f2937", fontSize: "15px", fontWeight: 500 }}>
-                              {viewingOrder.industry}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Company Information Section */}
-                  <div style={{ marginBottom: "28px" }}>
-                    <h5 style={{
-                      fontSize: "15px",
-                      fontWeight: 700,
-                      color: "#1f2937",
-                      marginBottom: "16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}>
-                      <div style={{
-                        width: "4px",
-                        height: "18px",
-                        background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                        borderRadius: "2px",
-                      }} />
-                      Company Information
-                    </h5>
-                    <div style={{
-                      background: "#f9fafb",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "12px",
-                      padding: "20px",
-                    }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                        {viewingOrder.customer_name && (
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Company Name
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "8px",
-                            }}>
-                              <div
-                                style={{
-                                  width: "30px",
-                                  height: "30px",
-                                  borderRadius: "50%",
-                                  backgroundColor: getRandomColor(viewingOrder.customer_name),
-                                  color: "#fff",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontSize: "10px",
-                                  fontWeight: "600",
-                                  flexShrink: 0,
-                                }}
-                              >
-                                {getInitials(viewingOrder.customer_name)}
-                              </div>
-                              <span>{viewingOrder.customer_name}</span>
-                            </div>
-                          </div>
-                        )}
-                        {viewingOrder.customer_email && (
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Email
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              <Mail size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
-                              {viewingOrder.customer_email}
-                            </div>
-                          </div>
-                        )}
-                        {viewingOrder.customer_phone && (
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Phone
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              <PhoneDisplay phone={viewingOrder.customer_phone || ""} />
-                            </div>
-                          </div>
-                        )}
-                        {viewingOrder.customer_address && (
-                          <div style={{ gridColumn: "1 / -1" }}>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Address
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              {viewingOrder.customer_address}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Order Items/Products */}
-                  {viewingOrder.items && Array.isArray(viewingOrder.items) && viewingOrder.items.length > 0 && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Order Items
-                        <Badge 
-                          bg="secondary"
-                          style={{
-                            marginLeft: "8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            padding: "4px 10px",
-                            borderRadius: "6px",
-                          }}
-                        >
-                          {viewingOrder.items.length}
-                        </Badge>
-                      </h5>
-                      <div style={{
-                        background: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        overflow: "hidden",
-                      }}>
-                        <div style={{ overflowX: "auto" }}>
-                          <Table hover style={{ width: "100%", marginBottom: 0, tableLayout: "auto" }}>
-                            <thead style={{ background: "#f9fafb" }}>
-                              <tr>
-                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>#</th>
-                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Product Name</th>
-                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>SKU</th>
-                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Quantity</th>
-                                {viewingOrder.items.some((item: any) => item.description) && (
-                                  <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Description</th>
-                                )}
-                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Unit Price</th>
-                                <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Total Price</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {viewingOrder.items.map((item: any, index: number) => (
-                                <tr key={item.id || index} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937" }}>{index + 1}</td>
-                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 600 }}>
-                                    {item.product_name || item.product?.name || "N/A"}
-                                  </td>
-                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#6b7280" }}>{item.product?.sku || "N/A"}</td>
-                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937" }}>{item.quantity || "0"}</td>
-                                  {viewingOrder.items.some((i: any) => i.description) && (
-                                    <td style={{ padding: "14px 16px", fontSize: "13px", color: "#6b7280", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                      {item.description || "-"}
-                                    </td>
-                                  )}
-                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937" }}>
-                                    {viewingOrder.currency || "AED"} {parseFloat(item.unit_price || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </td>
-                                  <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 600 }}>
-                                    {viewingOrder.currency || "AED"} {parseFloat(item.total_price || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot style={{ background: "#f9fafb", fontWeight: 600 }}>
-                              <tr>
-                                <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
-                                  Subtotal:
-                                </td>
-                                <td style={{ padding: "12px 16px", fontSize: "13px", color: "#1f2937" }}>
-                                  {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                              </tr>
-                              {viewingOrder.discount_amount && parseFloat(viewingOrder.discount_amount) > 0 && (
-                                <tr>
-                                  <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
-                                    Discount:
-                                  </td>
-                                  <td style={{ padding: "12px 16px", fontSize: "13px", color: "#dc2626" }}>
-                                    - {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </td>
-                                </tr>
-                              )}
-                              {viewingOrder.tax_amount && parseFloat(viewingOrder.tax_amount) > 0 && (
-                                <tr>
-                                  <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
-                                    Tax:
-                                  </td>
-                                  <td style={{ padding: "12px 16px", fontSize: "13px", color: "#1f2937" }}>
-                                    {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.tax_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </td>
-                                </tr>
-                              )}
-                              <tr style={{ fontSize: "16px" }}>
-                                <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "14px", color: "#1f2937", fontWeight: 700 }}>
-                                  Total:
-                                </td>
-                                <td style={{ padding: "12px 16px", fontSize: "14px", color: "#1f2937", fontWeight: 700 }}>
-                                  {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </td>
-                              </tr>
-                            </tfoot>
-                          </Table>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === "tab2" && (
-                <div>
-                  {/* Deal Information */}
-                  {relatedDeal && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Deal Information
-                      </h5>
-                      <div style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                      }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Deal Name
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              {relatedDeal.name || "N/A"}
-                            </div>
-                          </div>
-                          {relatedDeal.stage && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Stage
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <Badge
-                                  style={{
-                                    padding: "6px 14px",
-                                    borderRadius: "20px",
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                    backgroundColor: relatedDeal.stage?.color || "#6c757d",
-                                  }}
-                                >
-                                  {relatedDeal.stage?.name || "Not assigned"}
-                                </Badge>
-                              </div>
-                            </div>
-                          )}
-                          {relatedDeal.net_value && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Deal Value
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                {relatedDeal.currency || "AED"} {parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total || 0)).toLocaleString()}
-                              </div>
-                            </div>
-                          )}
-                          {relatedDeal.assigned_to && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Assigned To
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <User size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
-                                {extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.display_name || 
-                                 extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.name || 
-                                 relatedDeal.assigned_to || "Not assigned"}
-                              </div>
-                            </div>
-                          )}
-                          {relatedDeal.created_at && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Created Date
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <Calendar size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
-                                {relatedDeal.created_at ? formatDateForTable(relatedDeal.created_at) : "N/A"}
-                              </div>
-                            </div>
-                          )}
-                          {relatedDeal.company_name && (
-                            <div style={{ gridColumn: "1 / -1" }}>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Company Name
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <Building2 size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
-                                {relatedDeal.company_name}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Lead Information */}
-                  {relatedLead && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Lead Information
-                      </h5>
-                      <div style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                      }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Lead Name
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              {relatedLead.name}
-                            </div>
-                          </div>
-                          {relatedLead.stage && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Stage
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <Badge
-                                  style={{
-                                    padding: "6px 14px",
-                                    borderRadius: "20px",
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                    backgroundColor: relatedLead.stage?.color || "#6c757d",
-                                  }}
-                                >
-                                  {relatedLead.stage?.name || "Not assigned"}
-                                </Badge>
-                              </div>
-                            </div>
-                          )}
-                          {relatedLead.lead_potential && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Lead Potential
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <Badge
-                                  bg={relatedLead.lead_potential === "Hot" ? "danger" : relatedLead.lead_potential === "Warm" ? "warning" : "secondary"}
-                                  style={{
-                                    padding: "6px 14px",
-                                    borderRadius: "20px",
-                                    fontSize: "12px",
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  {relatedLead.lead_potential || "N/A"}
-                                </Badge>
-                              </div>
-                            </div>
-                          )}
-                          {relatedLead.user_extension && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Assigned To
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                <User size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
-                                {extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.display_name || 
-                                 extensions.find((ext: any) => ext?.id == relatedLead?.user_extension || ext?.extension == relatedLead?.user_extension)?.name || 
-                                 relatedLead.user_extension || "Not assigned"}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Campaign Information */}
-                  {relatedLead?.campaign && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Campaign Information
-                      </h5>
-                      <div style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                      }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Campaign Name
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              {relatedLead.campaign.name}
-                            </div>
-                          </div>
-                          {relatedLead.campaign_field_values && Object.keys(relatedLead.campaign_field_values).length > 0 && (
-                            Object.entries(relatedLead.campaign_field_values).map(([key, value]: [string, any]) => (
-                              <div key={key}>
-                                <div style={{
-                                  fontSize: "12px",
-                                  fontWeight: 700,
-                                  color: "#6b7280",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.5px",
-                                  marginBottom: "6px",
-                                }}>
-                                  {key}
-                                </div>
-                                <div style={{
-                                  fontSize: "14px",
-                                  color: "#1f2937",
-                                  fontWeight: 500,
-                                  wordBreak: "break-word",
-                                }}>
-                                  {String(value)}
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Prospect Information */}
-                  {relatedLead?.crm_data && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Prospect Information
-                      </h5>
-                      <div style={{
-                        background: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                      }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                          {relatedLead.crm_data.id && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                CRM Data ID
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                #{relatedLead.crm_data.id}
-                              </div>
-                            </div>
-                          )}
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Name
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              {relatedLead.crm_data.name || (relatedLead.crm_data.data && relatedLead.crm_data.data.name) || "N/A"}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Phone
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              <PhoneDisplay phone={relatedLead.crm_data.phone || (relatedLead.crm_data.data && relatedLead.crm_data.data.phone) || ""} />
-                            </div>
-                          </div>
-                          {relatedLead.crm_data.source_file && (
-                            <div>
-                              <div style={{
-                                fontSize: "12px",
-                                fontWeight: 700,
-                                color: "#6b7280",
-                                textTransform: "uppercase",
-                                letterSpacing: "0.5px",
-                                marginBottom: "6px",
-                              }}>
-                                Source File
-                              </div>
-                              <div style={{
-                                fontSize: "14px",
-                                color: "#1f2937",
-                                fontWeight: 500,
-                                wordBreak: "break-word",
-                              }}>
-                                {relatedLead.crm_data.source_file}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === "additional-info" && (
-                <div>
-                  {/* Additional Information Section */}
-                  <div style={{ marginBottom: "28px" }}>
-                    <h5 style={{
-                      fontSize: "15px",
-                      fontWeight: 700,
-                      color: "#1f2937",
-                      marginBottom: "16px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}>
-                      <div style={{
-                        width: "4px",
-                        height: "18px",
-                        background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                        borderRadius: "2px",
-                      }} />
-                      Additional Information
-                    </h5>
-                    <div style={{
-                      background: "#f9fafb",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "12px",
-                      padding: "20px",
-                    }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px" }}>
-                        <div>
-                          <div style={{
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            marginBottom: "6px",
-                          }}>
-                            Approval Status
-                          </div>
-                          <div style={{
-                            fontSize: "14px",
-                            color: "#1f2937",
-                            fontWeight: 500,
-                            wordBreak: "break-word",
-                          }}>
-                            {viewingOrder.order_approval_status ? (
-                              <Badge
-                                bg={
-                                  viewingOrder.order_approval_status?.toLowerCase() === "approved"
-                                    ? "success"
-                                    : viewingOrder.order_approval_status?.toLowerCase() === "rejected"
-                                    ? "danger"
-                                    : "warning"
-                                }
-                              >
-                                {viewingOrder.order_approval_status}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted">Not Set</span>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <div style={{
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            marginBottom: "6px",
-                          }}>
-                            Fulfillment Status
-                          </div>
-                          <div style={{
-                            fontSize: "14px",
-                            color: "#1f2937",
-                            fontWeight: 500,
-                            wordBreak: "break-word",
-                          }}>
-                            {viewingOrder.fulfillment_status ? (
-                              <Badge
-                                bg={
-                                  viewingOrder.fulfillment_status?.toLowerCase().includes("completed") ||
-                                  viewingOrder.fulfillment_status?.toLowerCase().includes("delivered")
-                                    ? "success"
-                                    : viewingOrder.fulfillment_status?.toLowerCase().includes("progress")
-                                    ? "primary"
-                                    : "secondary"
-                                }
-                              >
-                                {viewingOrder.fulfillment_status}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted">Not Set</span>
-                            )}
-                          </div>
-                        </div>
-                        <div>
-                          <div style={{
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.5px",
-                            marginBottom: "6px",
-                          }}>
-                            Payment Status
-                          </div>
-                          <div style={{
-                            fontSize: "14px",
-                            color: "#1f2937",
-                            fontWeight: 500,
-                            wordBreak: "break-word",
-                          }}>
-                            {viewingOrder.payment_status ? (
-                              <Badge
-                                bg={
-                                  viewingOrder.payment_status?.toLowerCase() === "paid"
-                                    ? "success"
-                                    : viewingOrder.payment_status?.toLowerCase() === "partial"
-                                    ? "warning"
-                                    : "danger"
-                                }
-                              >
-                                {viewingOrder.payment_status}
-                              </Badge>
-                            ) : (
-                              <span className="text-muted">Not Set</span>
-                            )}
-                          </div>
-                        </div>
-                        {viewingOrder.assigned_to && (
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Assigned To
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              <User size={14} style={{ color: "#f59e0b", marginRight: "6px", display: "inline" }} />
-                              {extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.display_name ||
-                               extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.name ||
-                               viewingOrder.assigned_to || "Not assigned"}
-                            </div>
-                          </div>
-                        )}
-                        {viewingOrder.contract_length && (
-                          <div>
-                            <div style={{
-                              fontSize: "12px",
-                              fontWeight: 700,
-                              color: "#6b7280",
-                              textTransform: "uppercase",
-                              letterSpacing: "0.5px",
-                              marginBottom: "6px",
-                            }}>
-                              Contract Length
-                            </div>
-                            <div style={{
-                              fontSize: "14px",
-                              color: "#1f2937",
-                              fontWeight: 500,
-                              wordBreak: "break-word",
-                            }}>
-                              {viewingOrder.contract_length}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Notes */}
-                  {viewingOrder.notes && (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Notes
-                      </h5>
-                      <div style={{
-                        background: "#fffbeb",
-                        border: "1px solid #fcd34d",
-                        borderRadius: "12px",
-                        padding: "16px 20px",
-                        fontSize: "14px",
-                        color: "#78350f",
-                        lineHeight: "1.6",
-                        whiteSpace: "pre-wrap",
-                      }}>
-                        {viewingOrder.notes}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {activeTab === "history" && (
-                <div>
-                  {/* Activity History */}
-                  {viewingOrder.histories && Array.isArray(viewingOrder.histories) && viewingOrder.histories.length > 0 ? (
-                    <div style={{ marginBottom: "28px" }}>
-                      <h5 style={{
-                        fontSize: "15px",
-                        fontWeight: 700,
-                        color: "#1f2937",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      }}>
-                        <div style={{
-                          width: "4px",
-                          height: "18px",
-                          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
-                          borderRadius: "2px",
-                        }} />
-                        Activity History
-                        <Badge 
-                          bg="secondary"
-                          style={{
-                            marginLeft: "8px",
-                            fontSize: "11px",
-                            fontWeight: 600,
-                            padding: "4px 10px",
-                            borderRadius: "6px",
-                          }}
-                        >
-                          {viewingOrder.histories.length}
-                        </Badge>
-                      </h5>
-                      <div style={{
-                        background: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "12px",
-                        padding: "20px",
-                      }}>
-                        <div style={{ position: "relative", paddingLeft: "30px" }}>
-                          <div style={{
-                            content: "",
-                            position: "absolute",
-                            left: "8px",
-                            top: 0,
-                            bottom: 0,
-                            width: "2px",
-                            background: "#e5e7eb",
-                          }} />
-                          {viewingOrder.histories.map((history: any, idx: number) => (
-                            <div key={history.id || idx} style={{ position: "relative", paddingBottom: idx < viewingOrder.histories.length - 1 ? "20px" : "0" }}>
-                              <div style={{
-                                content: "",
-                                position: "absolute",
-                                left: "-26px",
-                                top: "4px",
-                                width: "12px",
-                                height: "12px",
-                                borderRadius: "50%",
-                                background: history.event === "created" ? "#10b981" : "#f59e0b",
-                                border: "3px solid white",
-                                boxShadow: "0 0 0 2px #e5e7eb",
-                              }} />
-                              <div style={{
-                                background: "#f9fafb",
-                                padding: "12px 16px",
-                                borderRadius: "8px",
-                              }}>
-                                <div style={{
-                                  fontSize: "12px",
-                                  color: "#6b7280",
-                                  fontWeight: 600,
-                                  marginBottom: "4px",
-                                }}>
-                                  {new Date(history.created_at).toLocaleString()}
-                                </div>
-                                <div style={{
-                                  fontSize: "14px",
-                                  color: "#1f2937",
-                                  marginBottom: "4px",
-                                  fontWeight: 500,
-                                }}>
-                                  {history.event === "created" ? "Created" : history.event === "updated" ? "Updated" : history.event}
-                                </div>
-                                {history.description && (
-                                  <div style={{
-                                    fontSize: "13px",
-                                    color: "#6b7280",
-                                    marginBottom: "8px",
-                                  }}>
-                                    {history.description}
-                                  </div>
-                                )}
-                                {history.changes && Object.keys(history.changes).length > 0 && (
-                                  <div style={{
-                                    fontSize: "12px",
-                                    color: "#6b7280",
-                                  }}>
-                                    {Object.entries(history.changes).map(([key, change]: [string, any]) => {
-                                      if (ignoredKeys.has(key)) {
-                                        return null;
-                                      }
-                                      return (
-                                        <div key={key} style={{ marginTop: "4px" }}>
-                                          <strong>{key}:</strong> {change.old ? `${change.old} → ` : ""}{change.new || "N/A"}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{
-                      padding: "40px",
-                      textAlign: "center",
-                      color: "#6b7280",
-                      background: "#f9fafb",
-                      border: "2px dashed #d1d5db",
-                      borderRadius: "12px"
-                    }}>
-                      <History size={40} style={{ marginBottom: "12px", opacity: 0.5 }} />
-                      <div style={{ fontSize: "14px", fontWeight: 500 }}>No activity history found</div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Right Panel - Quick Actions & Info */}
-            <div style={{ 
-              padding: "32px 24px", 
-              background: "#fafbfc",
-              display: "flex",
-              flexDirection: "column",
-              gap: "24px",
-            }}>
-              
-              {/* Quick Actions */}
-              <div>
-                <h6 style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#6b7280",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  marginBottom: "14px",
-                }}>
-                  Quick Actions
-                </h6>
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING) && (
-                    <button
-                      style={{
-                        background: "white",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "10px",
-                        padding: "12px 16px",
-                        cursor: "pointer",
-                        transition: "all 0.2s ease",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        fontSize: "14px",
-                        fontWeight: 500,
-                        color: "#1f2937",
-                      }}
-                      onClick={() => {
-                        setShowOrderViewModal(false);
-                        window.location.href = `/crm/orders/${viewingOrder.id}/edit`;
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.borderColor = "#f59e0b";
-                        e.currentTarget.style.background = "#fffbeb";
-                        e.currentTarget.style.transform = "translateX(4px)";
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.borderColor = "#e5e7eb";
-                        e.currentTarget.style.background = "white";
-                        e.currentTarget.style.transform = "translateX(0)";
-                      }}
-                    >
-                      <div style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "8px",
-                        background: "#f59e0b",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}>
-                        <Edit size={16} style={{ color: "white" }} />
-                      </div>
-                      Edit Order
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Status Overview */}
-              <div>
-                <h6 style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#6b7280",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  marginBottom: "14px",
-                }}>
-                  Status Overview
-                </h6>
-                <div style={{
-                  background: "white",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "10px",
-                  padding: "16px",
-                }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                        Stage
-                      </span>
-                      <Badge 
-                        style={{
-                          fontSize: "11px",
-                          fontWeight: 600,
-                          padding: "4px 10px",
-                          borderRadius: "6px",
-                          backgroundColor: viewingOrder.stage?.color || "#6c757d",
-                        }}
-                      >
-                        {viewingOrder.stage?.name || "N/A"}
-                      </Badge>
-                    </div>
-                    
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                        Status
-                      </span>
-                      <Badge
-                        bg={
-                          viewingOrder.status?.toLowerCase() === "completed"
-                            ? "success"
-                            : viewingOrder.status?.toLowerCase() === "pending"
-                            ? "warning"
-                            : "secondary"
-                        }
-                        style={{ fontSize: "11px", padding: "4px 10px" }}
-                      >
-                        {viewingOrder.status || "N/A"}
-                      </Badge>
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                        Total Amount
-                      </span>
-                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
-                        {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "13px", color: "#6b7280", fontWeight: 500 }}>
-                        Items
-                      </span>
-                      <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
-                        {viewingOrder.items?.length || 0}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Order Summary */}
-              <div style={{ flex: 1 }}>
-                <h6 style={{
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#6b7280",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                  marginBottom: "14px",
-                }}>
-                  Order Summary
-                </h6>
-                <div style={{
-                  background: "white",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "10px",
-                  padding: "16px",
-                }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {viewingOrder.order_date && (
-                      <div>
-                        <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: 600, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                          Order Date
-                        </div>
-                        <div style={{ fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
-                          {moment(viewingOrder.order_date).format("MMM DD, YYYY")}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {viewingOrder.expected_delivery_date && (
-                      <div>
-                        <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: 600, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                          Expected Delivery
-                        </div>
-                        <div style={{ fontSize: "13px", color: "#1f2937", fontWeight: 500 }}>
-                          {moment(viewingOrder.expected_delivery_date).format("MMM DD, YYYY")}
-                        </div>
-                      </div>
-                    )}
-
-                    {viewingOrder.payment_status && (
-                      <div>
-                        <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: 600, marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                          Payment Status
-                        </div>
-                        <Badge
-                          bg={
-                            viewingOrder.payment_status?.toLowerCase() === "paid"
-                              ? "success"
-                              : viewingOrder.payment_status?.toLowerCase() === "partial"
-                              ? "warning"
-                              : "danger"
-                          }
-                          style={{ fontSize: "11px", padding: "4px 10px" }}
-                        >
-                          {viewingOrder.payment_status}
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-    </Modal.Body>
-
-    {/* Footer */}
-    <div style={{
-      padding: "20px 32px",
-      borderTop: "1px solid #e5e7eb",
-      background: "white",
-      borderBottomLeftRadius: "12px",
-      borderBottomRightRadius: "12px",
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-    }}>
-      <div style={{ fontSize: "13px", color: "#6b7280" }}>
-        Order ID: <strong>#{viewingOrder.id}</strong>
-      </div>
-      <Button
-        variant="outline-secondary"
-        onClick={() => setShowOrderViewModal(false)}
-        style={{
-          padding: "10px 24px",
-          borderRadius: "8px",
-          fontWeight: 600,
-          fontSize: "14px",
-          border: "2px solid #e5e7eb",
-          transition: "all 0.2s ease",
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.borderColor = "#f59e0b";
-          e.currentTarget.style.color = "#f59e0b";
-          e.currentTarget.style.background = "#fffbeb";
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.borderColor = "#e5e7eb";
-          e.currentTarget.style.color = "#6c757d";
-          e.currentTarget.style.background = "white";
-        }}
-      >
-        Close
-      </Button>
-    </div>
-  </Modal>
-  );
+async function executeCrmOrdersMarkLost(
+  orderToMarkLost: any,
+  lostReasonId: number | null,
+  lostFeedback: string,
+  resetLostModal: () => void,
+  bumpSuccessModal: (title: string, description: string) => void,
+  bumpRefresh: () => void,
+): Promise<void> {
+  if (!orderToMarkLost || !lostReasonId || !lostFeedback.trim()) return;
+  try {
+    await markOrderLost(orderToMarkLost.id, {
+      lost_reason_id: lostReasonId,
+      lost_feedback: lostFeedback,
+    });
+    resetLostModal();
+    toast.success("Order marked as lost!");
+    bumpSuccessModal(
+      "Order Marked as Lost",
+      "Order has been marked as lost successfully",
+    );
+    bumpRefresh();
+  } catch (error) {
+    console.error("Failed to mark order as lost:", error);
+  }
 }
 
 export const CrmOrdersPageContentImpl = () => {
@@ -2788,35 +1085,22 @@ export const CrmOrdersPageContentImpl = () => {
 
   // Fetch stages and extensions on component mount
   useEffect(() => {
-    fetchStages();
-    fetchLostReasons();
-    fetchExtensions(ModuleSlug.CRM_ORDERS);
+    void loadCrmOrdersStagesIntoState(setStages);
+    void loadCrmOrdersLostReasonsIntoState(setLostReasons);
+    void loadCrmOrdersExtensionsIntoState(setExtensions, ModuleSlug.CRM_ORDERS);
   }, []);
 
   // Fetch orders when filters or search change
   const fetchOrders = useCallback(
     async (page = 1, perPage = 15) => {
-      setLoading(true);
-      try {
-        const params = buildOrdersRequestParams(page, perPage, currentFilters);
-
-        const response: any = await getOrders(params);
-        console.log("Raw response from getOrders:", response);
-
-        const ordersArray: any[] = response?.dataList || [];
-        const pagination: any = response?.meta || {};
-        const summary: any = response?.summary_tiles || null;
-
-        setOrdersData(Array.isArray(ordersArray) ? ordersArray : []);
-        setTotalOrders(pagination?.total || 0);
-        setSummaryTiles(summary);
-
-        return response;
-      } finally {
-        setLoading(false);
-      }
+      await executeCrmOrdersListFetch(page, perPage, currentFilters, {
+        setLoading,
+        setOrdersData,
+        setTotalOrders,
+        setSummaryTiles,
+      });
     },
-    [currentFilters]
+    [currentFilters],
   );
 
   // Handle activeFilter changes to update currentFilters and stage dropdown
@@ -2866,32 +1150,24 @@ export const CrmOrdersPageContentImpl = () => {
     fetchOrders,
   ]);
 
+  const fetchAttachments = useCallback(async () => {
+    await executeCrmOrdersAttachmentLoad(
+      selectedOrderForAttachments,
+      setLoadingAttachments,
+      setAttachments,
+      setDealAttachments,
+    );
+  }, [selectedOrderForAttachments]);
+
   // Fetch attachments when modal opens
   useEffect(() => {
     if (showAttachmentModal && selectedOrderForAttachments?.id) {
-      fetchAttachments();
+      void fetchAttachments();
     } else {
       setAttachments([]);
       setDealAttachments([]);
     }
-  }, [showAttachmentModal, selectedOrderForAttachments?.id]);
-
-  const fetchAttachments = async () => {
-    if (!selectedOrderForAttachments?.id) return;
-    setLoadingAttachments(true);
-    try {
-      const { orderAttachments, relatedDealAttachments } =
-        await fetchAttachmentsBundle(selectedOrderForAttachments);
-      setAttachments(orderAttachments);
-      setDealAttachments(relatedDealAttachments);
-    } catch (error) {
-      console.error("Failed to fetch attachments:", error);
-      setAttachments([]);
-      setDealAttachments([]);
-    } finally {
-      setLoadingAttachments(false);
-    }
-  };
+  }, [showAttachmentModal, selectedOrderForAttachments?.id, fetchAttachments]);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
@@ -2902,43 +1178,24 @@ export const CrmOrdersPageContentImpl = () => {
   };
 
   const handleFileUpload = async (file: File) => {
-    if (!selectedOrderForAttachments?.id) return;
-
-    setUploadingFile(true);
-    try {
-      await uploadOrderAttachment(
-        selectedOrderForAttachments.id,
-        file,
-        file.name
-      );
-      await fetchAttachments(); // Refresh attachments list
-      if (fileInputRef) {
-        fileInputRef.value = "";
-      }
-    } catch (error) {
-      console.error("Failed to upload file:", error);
-    } finally {
-      setUploadingFile(false);
-    }
+    await executeCrmOrdersAttachmentUpload(
+      selectedOrderForAttachments,
+      file,
+      fileInputRef,
+      fetchAttachments,
+      setUploadingFile,
+    );
   };
 
   const handleDeleteAttachment = useCallback(
     async (attachmentId: number) => {
-      if (!selectedOrderForAttachments?.id) return;
-
-      try {
-        await deleteOrderAttachment(
-          selectedOrderForAttachments.id,
-          attachmentId
-        );
-        await fetchAttachments(); // Refresh attachments list
-        toast.success("Attachment deleted successfully!");
-      } catch (error) {
-        console.error("Failed to delete attachment:", error);
-        toast.error("Failed to delete attachment");
-      }
+      await executeCrmOrdersAttachmentDelete(
+        selectedOrderForAttachments,
+        attachmentId,
+        fetchAttachments,
+      );
     },
-    [selectedOrderForAttachments?.id]
+    [selectedOrderForAttachments, fetchAttachments],
   );
 
   const confirmDeleteAttachment = useCallback(async () => {
@@ -2950,29 +1207,17 @@ export const CrmOrdersPageContentImpl = () => {
   }, [attachmentToDelete, handleDeleteAttachment]);
 
   const handleDownloadAttachment = async (attachmentId: number) => {
-    if (!selectedOrderForAttachments?.id) return;
-
-    try {
-      await downloadOrderAttachment(
-        selectedOrderForAttachments.id,
-        attachmentId
-      );
-    } catch (error) {
-      console.error("Failed to download attachment:", error);
-    }
+    await executeCrmOrdersDownloadOrderAttachment(
+      selectedOrderForAttachments,
+      attachmentId,
+    );
   };
 
   const handleDownloadDealAttachment = async (attachmentId: number) => {
-    if (!selectedOrderForAttachments?.deal_id) return;
-
-    try {
-      await downloadDealAttachment(
-        Number(selectedOrderForAttachments.deal_id),
-        attachmentId
-      );
-    } catch (error) {
-      console.error("Failed to download deal attachment:", error);
-    }
+    await executeCrmOrdersDownloadDealAttachment(
+      selectedOrderForAttachments,
+      attachmentId,
+    );
   };
 
   // Handle filter changes
@@ -3021,60 +1266,19 @@ export const CrmOrdersPageContentImpl = () => {
     setRefreshKey((prev) => prev + 1);
   }, [handleFiltersChange]);
 
-  const fetchStages = async () => {
-    try {
-      const stagesData = await getStages("order");
-      setStages(stagesData || []);
-    } catch (error) {
-      console.error("Failed to fetch stages:", error);
-    }
-  };
-
-  const fetchLostReasons = async () => {
-    try {
-      const lostReasonsData = await (getStages as any)("lost_reason");
-      setLostReasons(lostReasonsData || []);
-    } catch (error) {
-      console.error("Failed to fetch lost reasons:", error);
-    }
-  };
-
-  const fetchExtensions = async (moduleSlug: string = ModuleSlug.CRM_LEADS) => {
-    try {
-      const hierarchyData = await GetHierarchyData(moduleSlug);
-      if (hierarchyData?.extensions) {
-        setExtensions(hierarchyData.extensions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch extensions:", error);
-    }
-  };
-
-  const fetchOrderDetails = useCallback(async (orderId: number) => {
-    setLoadingOrder(true);
-    setRelatedDeal(null);
-    setRelatedLead(null);
-    try {
-      const { orderData, dealData, leadData } = await fetchOrderDetailsBundle(orderId);
-      setViewingOrder(orderData);
-      setRelatedDeal(dealData);
-      setRelatedLead(leadData);
-    } catch (error) {
-      console.error("Failed to fetch order:", error);
-    } finally {
-      setLoadingOrder(false);
-    }
-  }, []);
-
   const handleViewOrder = useCallback(async (orderId: number) => {
-    await fetchOrderDetails(orderId);
     try {
+      await executeCrmOrdersFetchOrderDetailsForView(
+        orderId,
+        setLoadingOrder,
+        setViewingOrder,
+        setRelatedDeal,
+        setRelatedLead,
+      );
       setShowOrderViewModal(true);
     } catch (error) {
       console.error("Failed to fetch order:", error);
       toast.error("Failed to load order details");
-    } finally {
-      setLoadingOrder(false);
     }
   }, []);
 
@@ -3087,36 +1291,30 @@ export const CrmOrdersPageContentImpl = () => {
   );
 
   const confirmDeleteOrder = useCallback(async () => {
-    if (!orderToDelete) return;
-
-    try {
-      await deleteOrder(orderToDelete.id);
-      setShowDeleteModal(false);
-      setOrderToDelete(null);
-      setShowSuccessfulModal(true);
-      setSuccessModalTitle("Order Deleted");
-      setSuccessModalDescription("Order has been deleted successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
-      console.error("Failed to delete order:", error);
-    }
+    await executeCrmOrdersDeleteOrder(
+      orderToDelete,
+      setShowDeleteModal,
+      setOrderToDelete,
+      (title, description) => {
+        setShowSuccessfulModal(true);
+        setSuccessModalTitle(title);
+        setSuccessModalDescription(description);
+      },
+      () => setRefreshKey((oldKey) => oldKey + 1),
+    );
   }, [orderToDelete]);
 
   // Restore Order Handler
   const handleRestoreOrder = useCallback(async (orderId: number) => {
-    if (!globalThis.confirm("Are you sure you want to restore this order?")) return;
-
-    try {
-      await restoreOrder(orderId);
-      toast.success("Order restored successfully!");
-      setShowSuccessfulModal(true);
-      setSuccessModalTitle("Order Restored");
-      setSuccessModalDescription("Order has been restored successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
-      console.error("Failed to restore order:", error);
-      toast.error("Failed to restore order");
-    }
+    await executeCrmOrdersRestoreOrder(
+      orderId,
+      (title, description) => {
+        setShowSuccessfulModal(true);
+        setSuccessModalTitle(title);
+        setSuccessModalDescription(description);
+      },
+      () => setRefreshKey((oldKey) => oldKey + 1),
+    );
   }, []);
 
   // Mark Order Lost Modal
@@ -3126,25 +1324,23 @@ export const CrmOrdersPageContentImpl = () => {
   }, []);
 
   const handleMarkLostSubmit = useCallback(async () => {
-    if (!orderToMarkLost || !lostReasonId || !lostFeedback.trim()) return;
-
-    try {
-      await markOrderLost(orderToMarkLost.id, {
-        lost_reason_id: lostReasonId,
-        lost_feedback: lostFeedback,
-      });
-      setShowMarkLostModal(false);
-      setOrderToMarkLost(null);
-      setLostReasonId(null);
-      setLostFeedback("");
-      toast.success("Order marked as lost!");
-      setShowSuccessfulModal(true);
-      setSuccessModalTitle("Order Marked as Lost");
-      setSuccessModalDescription("Order has been marked as lost successfully");
-      setRefreshKey((oldKey) => oldKey + 1);
-    } catch (error) {
-      console.error("Failed to mark order as lost:", error);
-    }
+    await executeCrmOrdersMarkLost(
+      orderToMarkLost,
+      lostReasonId,
+      lostFeedback,
+      () => {
+        setShowMarkLostModal(false);
+        setOrderToMarkLost(null);
+        setLostReasonId(null);
+        setLostFeedback("");
+      },
+      (title, description) => {
+        setShowSuccessfulModal(true);
+        setSuccessModalTitle(title);
+        setSuccessModalDescription(description);
+      },
+      () => setRefreshKey((oldKey) => oldKey + 1),
+    );
   }, [orderToMarkLost, lostReasonId, lostFeedback]);
 
   // Transform API order data to UI format
@@ -3839,7 +2035,13 @@ export const CrmOrdersPageContentImpl = () => {
             if (session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
               setShowOrderSidebar(true);
               // Fetch full order details including related deal and lead
-              await fetchOrderDetails(row.rawData?.id || row.id);
+              await executeCrmOrdersFetchOrderDetailsForView(
+                row.rawData?.id || row.id,
+                setLoadingOrder,
+                setViewingOrder,
+                setRelatedDeal,
+                setRelatedLead,
+              );
             }
           }}
           loading={loading}
