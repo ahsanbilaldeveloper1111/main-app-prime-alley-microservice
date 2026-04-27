@@ -18,7 +18,13 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react';
-import { createStatus, updateStatus, deleteStatus, reorderStatuses } from '@utils/tasks';
+import {
+  createStatus,
+  updateStatus,
+  deleteStatus,
+  reorderStatuses,
+  bulkDeleteStatuses,
+} from '@utils/tasks';
 import GenericTable, { TableColumn, TableAction, ToolbarConfig, FilterPill } from '@components/GenericTable';
 import { StatsCardData } from '@components/GenericStatsCards';
 import { usePermissions } from '@utils/permissionUtils';
@@ -468,6 +474,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
   const [showAddModal, setShowAddModal]     = useState(false);
   const [showEditModal, setShowEditModal]   = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<any>(null);
   const [formData, setFormData]             = useState(() => ({ ...DEFAULT_STATUS_FORM }));
   const [processing, setProcessing]         = useState(false);
@@ -536,6 +543,25 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       onRefresh();
     } catch (error) {
       console.error('Error deleting status:', error);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleBulkDeleteStatuses = async () => {
+    if (!canDeleteStatus || selectedItems.length === 0) return;
+    const statusIds = selectedItems
+      .map((id) => Math.trunc(Number(id)))
+      .filter((id) => Number.isFinite(id));
+    if (statusIds.length === 0) return;
+    try {
+      setProcessing(true);
+      await bulkDeleteStatuses({ status_ids: statusIds });
+      setShowBulkDeleteModal(false);
+      setSelectedItems([]);
+      onRefresh();
+    } catch (error) {
+      console.error('Error bulk-deleting statuses:', error);
     } finally {
       setProcessing(false);
     }
@@ -684,14 +710,7 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
       {canDeleteStatus && selectedItems.length > 0 && (
         <button
           type="button"
-          onClick={() => {
-            // Bulk delete - open delete modal for first selected item
-            const firstSelected = statuses.find((s: any) => selectedItems.includes(s.id));
-            if (firstSelected) {
-              setSelectedStatus(firstSelected);
-              setShowDeleteModal(true);
-            }
-          }}
+          onClick={() => setShowBulkDeleteModal(true)}
           style={{
             padding: "9px 13px",
             backgroundColor: "#dc3545",
@@ -1161,6 +1180,35 @@ const StatusesTab: React.FC<StatusesTabProps> = ({
           <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
           <Button variant="danger" onClick={handleDeleteStatus} disabled={processing}>
             {processing ? <Spinner size="sm" animation="border" /> : 'Delete Status'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* ── Bulk delete selected statuses ── */}
+      <Modal show={showBulkDeleteModal} onHide={() => setShowBulkDeleteModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Delete statuses</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>
+            Are you sure you want to delete{' '}
+            <strong>{selectedItems.length}</strong>{' '}
+            {selectedItems.length === 1 ? 'status' : 'statuses'}? This action cannot be undone.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowBulkDeleteModal(false)} type="button">
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              void handleBulkDeleteStatuses();
+            }}
+            disabled={processing}
+            type="button"
+          >
+            {processing ? <Spinner size="sm" animation="border" /> : 'Delete'}
           </Button>
         </Modal.Footer>
       </Modal>

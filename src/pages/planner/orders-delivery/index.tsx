@@ -1,5 +1,5 @@
 import "@crm/orders/orderListPageOrderScss";
-import React, { ReactElement } from "react";
+import type { ReactElement } from "react";
 import { Layout } from "@crm/orders/orderListOrderPageFrame";
 import { CrmOrdersPageContentImpl } from "./CrmOrdersPageContentImpl";
 

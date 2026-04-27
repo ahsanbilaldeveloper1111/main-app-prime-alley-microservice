@@ -1,42 +1,21 @@
 import "@crm/orders/orderListPageOrderScss";
-import { useRouter } from "next/router";
+import { useRouter, type NextRouter } from "next/router";
 import React, {
-  ReactElement,
   useState,
   useCallback,
   useMemo,
   useEffect,
 } from "react";
 import {
-  Layout,
   BreadcrumbItem,
   GenericTable,
-  GenericSidebar,
   GenericFilterSidebar,
   StatsCards,
   OrderEditModal,
   type TableColumn,
   type TableAction,
 } from "@crm/orders/orderListOrderPageFrame";
-import {
-  FiUpload,
-  FiDatabase,
-  FiSearch,
-  FiFilter,
-  FiTrash2,
-  FiEye,
-  FiUser,
-  FiUsers,
-  FiPhone,
-  FiMessageCircle,
-  FiPlay,
-  FiClock,
-  FiX,
-  FiAlertCircle,
-  FiCalendar,
-  FiTarget,
-  FiMoreVertical,
-} from "@crm/orders/orderListFiIcons";
+import { FiFilter } from "@crm/orders/orderListFiIcons";
 import {
   getOrders,
   getOrder,
@@ -59,13 +38,8 @@ import {
   Row,
   Col,
   Badge,
-  Dropdown,
   Form,
   Card,
-  Table,
-  InputGroup,
-  Modal,
-  Spinner,
 } from "@crm/orders/orderListBootstrap";
 import Select, { type SingleValue } from "@components/AppSelect";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
@@ -78,74 +52,26 @@ const toOptionalSelectString = (value: string | number | null | undefined) => {
 const { PERMISSIONS } = HEADER_CONSTANTS;
 import { GlobalDateFormat, ModuleSlug, formatDateForTable } from "@utils/Helper";
 import {
-  Target,
   CheckCircle,
-  TrendingUp,
-  BarChart3,
-  Plus,
   Eye,
   Edit,
   Trash2,
   ShoppingBag,
   MoreVertical,
   X,
-  Users,
-  PlusCircle,
-  Zap,
-  Star,
-  Clock,
-  Search,
-  Filter,
   Layers,
-  Calendar,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   DollarSign,
   Activity,
-  FileText,
   ShoppingCart,
-  AlertTriangle,
-  RefreshCw,
-  History,
-  Mail,
-  Phone,
-  Building2,
-  Package,
-  Link2,
-  User,
   Paperclip,
-  Upload,
-  DownloadIcon,
   RotateCcw,
-  AlertCircle,
-  Handshake,
-  Info,
 } from "@crm/orders/orderListLucideHeavy";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "@crm/orders/orderListRecharts";
-import Link from "next/link";
 import { toast } from "react-toastify";
 
 import {
   SuccessfulModal,
   FormModal,
   DeleteConfirmationModal,
-  PhoneDisplay,
   KPICard,
   FilterBar,
   getInitials,
@@ -154,6 +80,12 @@ import {
 } from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
 import { renderCrmOrdersOrderViewModal } from "./CrmOrdersOrderViewModal";
+import { CrmOrdersOrderPageSidebar } from "./CrmOrdersOrderPageSidebar";
+import { CrmOrdersAttachmentsModal } from "./CrmOrdersAttachmentsModal";
+import {
+  CrmOrdersFulfillmentBarChart,
+  CrmOrdersStagePieChart,
+} from "./CrmOrdersAnalyticsCharts";
 import moment from "moment";
 
 
@@ -199,6 +131,39 @@ const DEFAULT_ORDERS_UI_FILTERS: OrdersUiFilters = {
   dateFrom: null,
   dateTo: null,
 };
+
+type OrdersFilterSelectOption = { value: string; label: string };
+
+function buildAssignedToSelectValue(
+  assignedTo: string | null,
+  extensions: any[],
+): OrdersFilterSelectOption | null {
+  if (!assignedTo) {
+    return null;
+  }
+  const ext = extensions.find((e: any) => (e.id || e.extension) === assignedTo);
+  if (ext) {
+    return {
+      value: assignedTo,
+      label: String(ext.display_name || ext.name || assignedTo),
+    };
+  }
+  return { value: assignedTo, label: assignedTo };
+}
+
+function buildStageSelectValue(
+  stageId: string | null,
+  stages: any[],
+): OrdersFilterSelectOption | null {
+  if (!stageId) {
+    return null;
+  }
+  const stage = stages.find((st: any) => st.id.toString() === stageId);
+  if (stage) {
+    return { value: stageId, label: String(stage.name) };
+  }
+  return { value: stageId, label: stageId };
+}
 
 function setOptionalFilterValue(
   target: Record<string, any>,
@@ -1006,6 +971,117 @@ async function executeCrmOrdersMarkLost(
   }
 }
 
+type UseCrmOrdersPlannerLifecycleEffectsInput = Readonly<{
+  setStages: React.Dispatch<React.SetStateAction<any[]>>;
+  setLostReasons: React.Dispatch<React.SetStateAction<any[]>>;
+  setExtensions: React.Dispatch<React.SetStateAction<any[]>>;
+  activeFilter: string;
+  stages: any[];
+  setCurrentFilters: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+  setOrdersFilters: React.Dispatch<React.SetStateAction<OrdersUiFilters>>;
+  router: NextRouter;
+  setActiveFilter: React.Dispatch<React.SetStateAction<string>>;
+  refreshKey: number;
+  currentFilters: Record<string, any>;
+  ordersPagination: {
+    currentPage: number;
+    rowsPerPage: number;
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+  };
+  fetchOrders: (page?: number, perPage?: number) => Promise<void>;
+  showAttachmentModal: boolean;
+  selectedOrderForAttachments: any;
+  fetchAttachments: () => Promise<void>;
+  setAttachments: React.Dispatch<React.SetStateAction<any[]>>;
+  setDealAttachments: React.Dispatch<React.SetStateAction<any[]>>;
+}>;
+
+function useCrmOrdersPlannerLifecycleEffects(
+  input: UseCrmOrdersPlannerLifecycleEffectsInput,
+): void {
+  const {
+    setStages,
+    setLostReasons,
+    setExtensions,
+    activeFilter,
+    stages,
+    setCurrentFilters,
+    setOrdersFilters,
+    router,
+    setActiveFilter,
+    refreshKey,
+    currentFilters,
+    ordersPagination,
+    fetchOrders,
+    showAttachmentModal,
+    selectedOrderForAttachments,
+    fetchAttachments,
+    setAttachments,
+    setDealAttachments,
+  } = input;
+
+  useEffect(() => {
+    Promise.all([
+      loadCrmOrdersStagesIntoState(setStages),
+      loadCrmOrdersLostReasonsIntoState(setLostReasons),
+      loadCrmOrdersExtensionsIntoState(setExtensions, ModuleSlug.CRM_ORDERS),
+    ]).catch((error: unknown) => {
+      console.error("Failed to load CRM orders bootstrap data:", error);
+    });
+  }, []);
+
+  useEffect(() => {
+    syncOrdersFiltersFromActiveTab({
+      activeFilter,
+      stages,
+      setCurrentFilters,
+      setOrdersFilters,
+    });
+  }, [activeFilter, stages, setCurrentFilters, setOrdersFilters]);
+
+  useEffect(() => {
+    syncActiveTabFromRouter({
+      routerReady: router.isReady,
+      routerTab: router.query.tab,
+      stages,
+      activeFilter,
+      setActiveFilter,
+    });
+  }, [router, router.isReady, router.query.tab, stages, activeFilter, setActiveFilter]);
+
+  useEffect(() => {
+    fetchOrders(ordersPagination.currentPage, ordersPagination.rowsPerPage).catch(
+      (error: unknown) => {
+        console.error("Failed to fetch orders:", error);
+      },
+    );
+  }, [
+    refreshKey,
+    currentFilters,
+    ordersPagination.currentPage,
+    ordersPagination.rowsPerPage,
+    fetchOrders,
+  ]);
+
+  useEffect(() => {
+    if (showAttachmentModal && selectedOrderForAttachments?.id) {
+      fetchAttachments().catch((error: unknown) => {
+        console.error("Failed to fetch attachments:", error);
+      });
+      return;
+    }
+    setAttachments([]);
+    setDealAttachments([]);
+  }, [
+    showAttachmentModal,
+    selectedOrderForAttachments?.id,
+    fetchAttachments,
+    setAttachments,
+    setDealAttachments,
+  ]);
+}
+
 export const CrmOrdersPageContentImpl = () => {
   const { data: session } = useSession();
   const router = useRouter();
@@ -1068,8 +1144,8 @@ export const CrmOrdersPageContentImpl = () => {
   const [lostFeedback, setLostFeedback] = useState("");
 
   // UI State
-  const [showOrdersAnalytics, setShowOrdersAnalytics] = useState(false);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showOrdersAnalytics] = useState(false);
+  const [showAdvancedFilters] = useState(false);
   const [showFilterBar, setShowFilterBar] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const [ordersSearch, setOrdersSearch] = useState("");
@@ -1082,13 +1158,6 @@ export const CrmOrdersPageContentImpl = () => {
   const [ordersFilters, setOrdersFilters] = useState<OrdersUiFilters>(
     DEFAULT_ORDERS_UI_FILTERS,
   );
-
-  // Fetch stages and extensions on component mount
-  useEffect(() => {
-    void loadCrmOrdersStagesIntoState(setStages);
-    void loadCrmOrdersLostReasonsIntoState(setLostReasons);
-    void loadCrmOrdersExtensionsIntoState(setExtensions, ModuleSlug.CRM_ORDERS);
-  }, []);
 
   // Fetch orders when filters or search change
   const fetchOrders = useCallback(
@@ -1103,27 +1172,6 @@ export const CrmOrdersPageContentImpl = () => {
     [currentFilters],
   );
 
-  // Handle activeFilter changes to update currentFilters and stage dropdown
-  useEffect(() => {
-    syncOrdersFiltersFromActiveTab({
-      activeFilter,
-      stages,
-      setCurrentFilters,
-      setOrdersFilters,
-    });
-  }, [activeFilter, stages]);
-  
-  // Read tab from URL on mount and when router is ready
-  useEffect(() => {
-    syncActiveTabFromRouter({
-      routerReady: router.isReady,
-      routerTab: router.query.tab,
-      stages,
-      activeFilter,
-      setActiveFilter,
-    });
-  }, [router.isReady, router.query.tab, stages, activeFilter]);
-  
   // Handler to update filter and URL
   const handleFilterChange = useCallback((filterId: string) => {
     setActiveFilter(filterId);
@@ -1140,16 +1188,6 @@ export const CrmOrdersPageContentImpl = () => {
     );
   }, [router]);
 
-  useEffect(() => {
-    fetchOrders(ordersPagination.currentPage, ordersPagination.rowsPerPage);
-  }, [
-    refreshKey,
-    currentFilters,
-    ordersPagination.currentPage,
-    ordersPagination.rowsPerPage,
-    fetchOrders,
-  ]);
-
   const fetchAttachments = useCallback(async () => {
     await executeCrmOrdersAttachmentLoad(
       selectedOrderForAttachments,
@@ -1159,15 +1197,26 @@ export const CrmOrdersPageContentImpl = () => {
     );
   }, [selectedOrderForAttachments]);
 
-  // Fetch attachments when modal opens
-  useEffect(() => {
-    if (showAttachmentModal && selectedOrderForAttachments?.id) {
-      void fetchAttachments();
-    } else {
-      setAttachments([]);
-      setDealAttachments([]);
-    }
-  }, [showAttachmentModal, selectedOrderForAttachments?.id, fetchAttachments]);
+  useCrmOrdersPlannerLifecycleEffects({
+    setStages,
+    setLostReasons,
+    setExtensions,
+    activeFilter,
+    stages,
+    setCurrentFilters,
+    setOrdersFilters,
+    router,
+    setActiveFilter,
+    refreshKey,
+    currentFilters,
+    ordersPagination,
+    fetchOrders,
+    showAttachmentModal,
+    selectedOrderForAttachments,
+    fetchAttachments,
+    setAttachments,
+    setDealAttachments,
+  });
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
@@ -1463,13 +1512,6 @@ export const CrmOrdersPageContentImpl = () => {
   </nav>
 </div>
           <div className="d-flex flex-wrap gap-2">
-            {/* <Button
-              variant={showOrdersAnalytics ? "primary" : "outline-secondary"}
-              onClick={() => setShowOrdersAnalytics(!showOrdersAnalytics)}
-            >
-              <BarChart3 size={16} className="me-2" />
-              {showOrdersAnalytics ? "Hide Analytics" : "Show Analytics"}
-            </Button> */}
             <Button
               variant={showFilterBar ? "secondary" : "outline-secondary"}
               onClick={() => setShowFilterBar(!showFilterBar)}
@@ -1582,44 +1624,9 @@ export const CrmOrdersPageContentImpl = () => {
                 <Card className="border-0 shadow-sm h-100">
                   <Card.Body>
                     <h6 className="fw-bold mb-3">Orders by Stage</h6>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={Object.entries(analyticsData.stageCounts).map(
-                            ([stage, count]) => ({ name: stage, value: count })
-                          )}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          label={({ name, percent }: any) =>
-                            `${name}: ${(percent * 100).toFixed(0)}%`
-                          }
-                          outerRadius={80}
-                          fill="#8884d8"
-                          dataKey="value"
-                        >
-                          {Object.entries(analyticsData.stageCounts).map(
-                            ([stage, count], index) => {
-                              const colors = [
-                                "#0dcaf0",
-                                "#0d6efd",
-                                "#ffc107",
-                                "#fd7e14",
-                                "#198754",
-                                "#6c757d",
-                              ];
-                              return (
-                                <Cell
-                                  key={`cell-${index}`}
-                                  fill={colors[index % colors.length]}
-                                />
-                              );
-                            }
-                          )}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <CrmOrdersStagePieChart
+                      stageCounts={analyticsData.stageCounts}
+                    />
                   </Card.Body>
                 </Card>
               </Col>
@@ -1629,19 +1636,9 @@ export const CrmOrdersPageContentImpl = () => {
                     <h6 className="fw-bold mb-3">
                       Fulfillment Status Distribution
                     </h6>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart
-                        data={Object.entries(analyticsData.statusCounts).map(
-                          ([status, count]) => ({ status, count })
-                        )}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="status" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#0d6efd" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <CrmOrdersFulfillmentBarChart
+                      statusCounts={analyticsData.statusCounts}
+                    />
                   </Card.Body>
                 </Card>
               </Col>
@@ -1744,25 +1741,10 @@ export const CrmOrdersPageContentImpl = () => {
                       label:
                         ext.display_name || ext.name || ext.id || ext.extension,
                     }))}
-                    value={
-                      ordersFilters.assignedTo
-                        ? (() => {
-                            const assignedToId = ordersFilters.assignedTo;
-                            const ext = extensions.find(
-                              (e: any) => (e.id || e.extension) === assignedToId
-                            );
-                            return ext
-                              ? {
-                                  value: assignedToId,
-                                  label:
-                                    ext.display_name ||
-                                    ext.name ||
-                                    assignedToId,
-                                }
-                              : { value: assignedToId, label: assignedToId };
-                          })()
-                        : null
-                    }
+                    value={buildAssignedToSelectValue(
+                      ordersFilters.assignedTo,
+                      extensions,
+                    )}
                     onChange={(selected) => {
                       const opt =
                         selected as SingleValue<OrdersDeliverySelectOption>;
@@ -1788,19 +1770,10 @@ export const CrmOrdersPageContentImpl = () => {
                       value: s.id.toString(),
                       label: s.name,
                     }))}
-                    value={
-                      ordersFilters.stage
-                        ? (() => {
-                            const stageId = ordersFilters.stage;
-                            const stage = stages.find(
-                              (st: any) => st.id.toString() === stageId
-                            );
-                            return stage
-                              ? { value: stageId, label: stage.name }
-                              : { value: stageId, label: stageId };
-                          })()
-                        : null
-                    }
+                    value={buildStageSelectValue(
+                      ordersFilters.stage,
+                      stages,
+                    )}
                     onChange={(selected) => {
                       const opt =
                         selected as SingleValue<OrdersDeliverySelectOption>;
@@ -2083,8 +2056,7 @@ export const CrmOrdersPageContentImpl = () => {
         itemType="attachment"
       />
 
-      {/* Order Sidebar */}
-      <GenericSidebar
+      <CrmOrdersOrderPageSidebar
         isOpen={showOrderSidebar}
         onClose={() => {
           setShowOrderSidebar(false);
@@ -2093,454 +2065,26 @@ export const CrmOrdersPageContentImpl = () => {
           setRelatedLead(null);
         }}
         moduleSlug={ModuleSlug.WORK_PLANNER}
-        title={viewingOrder?.order_number || `Order #${viewingOrder?.id}` || 'Order Details'}
-        subtitle={viewingOrder?.customer_name || ''}
-        metadata={viewingOrder?.id ? `Order ID: ${viewingOrder.id}` : ''}
-        email={viewingOrder?.customer_email || ''}
-        phone={viewingOrder?.customer_phone || ''}
-        avatar={{
-          name: viewingOrder?.customer_name || 'Order',
-          useIcon: true
+        viewingOrder={viewingOrder}
+        relatedDeal={relatedDeal}
+        relatedLead={relatedLead}
+        extensions={extensions}
+        showEditAction={Boolean(
+          session?.user?.permissions?.includes(
+            PERMISSIONS.EDIT_CRM_ORDERS_BILLING,
+          ) && activeFilter !== "lost",
+        )}
+        onEditOrder={() => {
+          setShowOrderSidebar(false);
+          setEditingOrderId(viewingOrder?.id);
+          setShowEditModal(true);
         }}
-        width="420px"
-        tabs={[
-          {
-            id: 'general',
-            label: 'General Information',
-            sections: [
-              {
-                id: 'order-info',
-                title: 'Order Information',
-                icon: ShoppingBag,
-                fields: [
-                  {
-                    label: 'Order Number',
-                    value: viewingOrder?.order_number || `ORD-${viewingOrder?.id}` || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Stage',
-                    value: viewingOrder?.stage?.name || 'Not assigned',
-                    type: 'badge' as const,
-                    badgeVariant: 'secondary',
-                    show: !!viewingOrder?.stage
-                  },
-                  {
-                    label: 'Status',
-                    value: viewingOrder?.status || 'N/A',
-                    type: 'badge' as const,
-                    badgeVariant: viewingOrder?.status?.toLowerCase() === 'completed' ? 'success' : 
-                                 viewingOrder?.status?.toLowerCase() === 'pending' ? 'warning' : 'secondary'
-                  },
-                  {
-                    label: 'Final Amount',
-                    value: viewingOrder?.final_amount || viewingOrder?.total_amount
-                      ? `${viewingOrder?.currency || 'AED'} ${Number.parseFloat(String(viewingOrder.final_amount || viewingOrder.total_amount)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                      : 'N/A',
-                    type: 'text' as const,
-                    icon: DollarSign
-                  },
-                  {
-                    label: 'Order Date',
-                    value: viewingOrder?.order_date,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!viewingOrder?.order_date
-                  },
-                  {
-                    label: 'Expected Delivery',
-                    value: viewingOrder?.expected_delivery_date,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!viewingOrder?.expected_delivery_date
-                  },
-                  {
-                    label: 'Industry',
-                    value: viewingOrder?.industry || 'N/A',
-                    type: 'text' as const,
-                    show: !!viewingOrder?.industry
-                  }
-                ]
-              },
-              {
-                id: 'customer-info',
-                title: 'Company Information',
-                icon: User,
-                fields: [
-                  {
-                    label: 'Company Name',
-                    value: viewingOrder?.customer_name || 'N/A',
-                    type: 'text' as const,
-                    icon: Building2
-                  },
-                  {
-                    label: 'Email',
-                    value: viewingOrder?.customer_email || 'N/A',
-                    type: 'text' as const,
-                    icon: Mail,
-                    show: !!viewingOrder?.customer_email
-                  },
-                  {
-                    label: 'Phone',
-                    value: viewingOrder?.customer_phone || 'N/A',
-                    type: 'text' as const,
-                    icon: Phone,
-                    show: !!viewingOrder?.customer_phone
-                  },
-                  {
-                    label: 'Address',
-                    value: viewingOrder?.customer_address || 'N/A',
-                    type: 'text' as const,
-                    show: !!viewingOrder?.customer_address
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            id: 'lead-deal',
-            label: 'Lead/Deal Information',
-            sections: [
-              // Deal Information Section
-              ...(relatedDeal ? [{
-                id: 'deal-info',
-                title: 'Deal Information',
-                icon: Link2,
-                fields: [
-                  {
-                    label: 'Deal Name',
-                    value: relatedDeal?.name || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Stage',
-                    value: relatedDeal?.stage?.name || 'Not assigned',
-                    type: 'badge' as const,
-                    badgeVariant: 'primary',
-                    show: !!relatedDeal?.stage
-                  },
-                  {
-                    label: 'Deal Value',
-                    value: relatedDeal?.net_value || relatedDeal?.grand_total
-                      ? `${relatedDeal?.currency || 'AED'} ${Number.parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total)).toLocaleString()}`
-                      : 'N/A',
-                    type: 'text' as const,
-                    icon: DollarSign,
-                    show: !!(relatedDeal?.net_value || relatedDeal?.grand_total)
-                  },
-                  {
-                    label: 'Assigned To',
-                    value: extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.display_name ||
-                           extensions.find((ext: any) => ext?.id == relatedDeal?.assigned_to || ext?.extension == relatedDeal?.assigned_to)?.name ||
-                           relatedDeal?.assigned_to || 'Not assigned',
-                    type: 'text' as const,
-                    icon: User,
-                    show: !!relatedDeal?.assigned_to
-                  },
-                  {
-                    label: 'Created Date',
-                    value: relatedDeal?.created_at,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!relatedDeal?.created_at
-                  }
-                ]
-              }] : []),
-              // Deal Company Information Section
-              ...(relatedDeal?.company_name ? [{
-                id: 'deal-company-info',
-                title: 'Deal Company Information',
-                icon: Building2,
-                fields: [
-                  {
-                    label: 'Company Name',
-                    value: relatedDeal?.company_name || 'N/A',
-                    type: 'text' as const,
-                    icon: Building2
-                  },
-                  {
-                    label: 'Industry',
-                    value: relatedDeal?.industry || 'N/A',
-                    type: 'text' as const,
-                    show: !!relatedDeal?.industry
-                  }
-                ]
-              }] : []),
-              // Lead Information Section
-              ...(relatedLead ? [{
-                id: 'lead-info',
-                title: 'Lead Information',
-                icon: Target,
-                fields: [
-                  {
-                    label: 'Lead Name',
-                    value: relatedLead?.name || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Stage',
-                    value: relatedLead?.stage?.name || 'Not assigned',
-                    type: 'badge' as const,
-                    badgeVariant: 'primary',
-                    show: !!relatedLead?.stage
-                  },
-                  {
-                    label: 'Lead Potential',
-                    value: relatedLead?.lead_potential || 'N/A',
-                    type: 'badge' as const,
-                    badgeVariant: relatedLead?.lead_potential === 'Hot' ? 'danger' :
-                                 relatedLead?.lead_potential === 'Warm' ? 'warning' : 'secondary',
-                    show: !!relatedLead?.lead_potential
-                  },
-                  {
-                    label: 'Status',
-                    value: relatedLead?.status || 'N/A',
-                    type: 'text' as const,
-                    show: !!relatedLead?.status
-                  },
-                  {
-                    label: 'Assigned To',
-                    value: extensions.find((ext: any) => ext?.id == relatedLead?.assigned_to || ext?.extension == relatedLead?.assigned_to)?.display_name ||
-                           extensions.find((ext: any) => ext?.id == relatedLead?.assigned_to || ext?.extension == relatedLead?.assigned_to)?.name ||
-                           relatedLead?.assigned_to || 'Not assigned',
-                    type: 'text' as const,
-                    icon: User,
-                    show: !!relatedLead?.assigned_to
-                  },
-                  {
-                    label: 'Created Date',
-                    value: relatedLead?.created_at,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!relatedLead?.created_at
-                  }
-                ]
-              }] : []),
-              // Campaign Information Section - only if campaign exists
-              ...(relatedLead?.campaign ? [{
-                id: 'campaign-info',
-                title: 'Campaign Information',
-                icon: FileText,
-                fields: [
-                  {
-                    label: 'Campaign Name',
-                    value: relatedLead?.campaign?.name || 'N/A',
-                    type: 'text' as const
-                  }
-                ]
-              }] : []),
-              // Prospect Information Section - only if crm_data exists
-              ...(relatedLead?.crm_data ? [{
-                id: 'prospect-info',
-                title: 'Prospect Information',
-                icon: User,
-                fields: [
-                  {
-                    label: 'CRM Data ID',
-                    value: relatedLead?.crm_data?.id ? `#${relatedLead.crm_data.id}` : 'N/A',
-                    type: 'text' as const,
-                    show: !!relatedLead?.crm_data?.id
-                  },
-                  {
-                    label: 'Name',
-                    value: relatedLead?.crm_data?.name || relatedLead?.crm_data?.data?.name || 'N/A',
-                    type: 'text' as const
-                  },
-                  {
-                    label: 'Phone',
-                    value: relatedLead?.crm_data?.phone || relatedLead?.crm_data?.data?.phone || 'N/A',
-                    type: 'text' as const,
-                    icon: Phone
-                  },
-                  {
-                    label: 'Source File',
-                    value: relatedLead?.crm_data?.source_file || 'N/A',
-                    type: 'text' as const,
-                    show: !!relatedLead?.crm_data?.source_file
-                  },
-                  {
-                    label: 'Uploaded By',
-                    value: relatedLead?.crm_data?.uploaded_by || 'N/A',
-                    type: 'text' as const,
-                    icon: User,
-                    show: !!relatedLead?.crm_data?.uploaded_by
-                  },
-                  {
-                    label: 'Created At',
-                    value: relatedLead?.crm_data?.created_at,
-                    type: 'date' as const,
-                    icon: Calendar,
-                    show: !!relatedLead?.crm_data?.created_at
-                  }
-                ]
-              }] : []),
-              // Empty state if no deal or lead information at all
-              ...(!relatedDeal && !relatedLead ? [{
-                id: 'no-info',
-                title: 'No Information Available',
-                icon: AlertCircle,
-                emptyState: {
-                  icon: AlertCircle,
-                  message: 'No deal or lead information available for this order'
-                }
-              }] : [])
-            ]
-          },
-          {
-            id: 'additional-info',
-            label: 'Additional Information',
-            sections: [
-              {
-                id: 'additional-details',
-                title: 'Additional Information',
-                icon: FileText,
-                fields: [
-                  {
-                    label: 'Approval Status',
-                    value: viewingOrder?.order_approval_status || 'Not Set',
-                    type: 'badge' as const,
-                    badgeVariant: viewingOrder?.order_approval_status?.toLowerCase() === 'approved' ? 'success' :
-                                 viewingOrder?.order_approval_status?.toLowerCase() === 'rejected' ? 'danger' : 'warning'
-                  },
-                  {
-                    label: 'Fulfillment Status',
-                    value: viewingOrder?.fulfillment_status || 'Not Set',
-                    type: 'badge' as const,
-                    badgeVariant: viewingOrder?.fulfillment_status?.toLowerCase().includes('completed') ||
-                                 viewingOrder?.fulfillment_status?.toLowerCase().includes('delivered') ? 'success' :
-                                 viewingOrder?.fulfillment_status?.toLowerCase().includes('progress') ? 'primary' : 'secondary'
-                  },
-                  {
-                    label: 'Payment Status',
-                    value: viewingOrder?.payment_status || 'Not Set',
-                    type: 'badge' as const,
-                    badgeVariant: viewingOrder?.payment_status?.toLowerCase() === 'paid' ? 'success' :
-                                 viewingOrder?.payment_status?.toLowerCase() === 'partial' ? 'warning' : 'danger'
-                  },
-                  {
-                    label: 'Assigned To',
-                    value: extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.display_name ||
-                           extensions.find((ext: any) => ext?.id == viewingOrder?.assigned_to || ext?.extension == viewingOrder?.assigned_to)?.name ||
-                           viewingOrder?.assigned_to || 'Not assigned',
-                    type: 'text' as const,
-                    icon: User,
-                    show: !!viewingOrder?.assigned_to
-                  },
-                  {
-                    label: 'Contract Length',
-                    value: viewingOrder?.contract_length || 'N/A',
-                    type: 'text' as const,
-                    show: !!viewingOrder?.contract_length
-                  }
-                ]
-              },
-              {
-                id: 'notes',
-                title: 'Notes',
-                icon: FileText,
-                fields: viewingOrder?.notes ? [
-                  {
-                    label: 'Notes',
-                    value: viewingOrder?.notes,
-                    type: 'text' as const
-                  }
-                ] : [],
-                emptyState: !viewingOrder?.notes ? {
-                  icon: FileText,
-                  message: 'No notes available'
-                } : undefined
-              }
-            ]
-          },
-          {
-            id: 'history',
-            label: 'History',
-            sections: [
-              {
-                id: 'activity-history',
-                title: 'Activity History',
-                icon: History,
-                badge: {
-                  value: viewingOrder?.histories?.length || 0,
-                  variant: 'secondary'
-                },
-                emptyState: !viewingOrder?.histories || viewingOrder.histories.length === 0 ? {
-                  icon: History,
-                  message: 'No activity history yet'
-                } : undefined,
-                customContent: viewingOrder?.histories && viewingOrder.histories.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {viewingOrder.histories.map((history: any, idx: number) => (
-                      <div key={history.id || idx} style={{
-                        padding: '16px',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '10px',
-                        border: '1px solid #f3f4f6',
-                        position: 'relative'
-                      }}>
-                        <div style={{
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          color: '#111827',
-                          marginBottom: '6px'
-                        }}>
-                          {history.action || 'Activity'}
-                        </div>
-                        <div style={{
-                          fontSize: '12px',
-                          color: '#6b7280',
-                          marginBottom: '4px'
-                        }}>
-                          by {history.user?.name || history.created_by || 'System'}
-                        </div>
-                        <div style={{
-                          fontSize: '11px',
-                          color: '#9ca3af'
-                        }}>
-                          {history.created_at ? formatDateForTable(history.created_at) : 'N/A'}
-                        </div>
-                        {history.description && (
-                          <div style={{
-                            marginTop: '8px',
-                            fontSize: '12px',
-                            color: '#4b5563',
-                            fontStyle: 'italic'
-                          }}>
-                            {history.description}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : undefined
-              }
-            ]
-          }
-        ]}
-        actions={[
-          {
-            label: 'Edit Order',
-            icon: Edit,
-            onClick: () => {
-              setShowOrderSidebar(false);
-              setEditingOrderId(viewingOrder?.id);
-              setShowEditModal(true);
-            },
-            variant: 'primary',
-            show:
-              session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING) &&
-              activeFilter !== 'lost'
-          },
-          {
-            label: 'View Details',
-            icon: Eye,
-            onClick: () => {
-              setShowOrderSidebar(false);
-              handleViewOrder(viewingOrder?.id);
-            },
-            variant: 'outline-primary'
-          }
-        ]}
+        onViewOrderDetails={() => {
+          setShowOrderSidebar(false);
+          handleViewOrder(viewingOrder?.id).catch((error: unknown) => {
+            console.error("Failed to open order from sidebar:", error);
+          });
+        }}
       />
 
       {/* Filters Sidebar */}
@@ -2563,16 +2107,10 @@ export const CrmOrdersPageContentImpl = () => {
             id: 'assignedTo',
             label: 'Assigned To',
             type: 'select' as const,
-            value: ordersFilters.assignedTo
-              ? (() => {
-                  const assignedToId = ordersFilters.assignedTo;
-                  const ext = extensions.find((e: any) => (e.id || e.extension) === assignedToId);
-                  return ext ? { 
-                    value: assignedToId, 
-                    label: ext.display_name || ext.name || assignedToId 
-                  } : { value: assignedToId, label: assignedToId };
-                })()
-              : null,
+            value: buildAssignedToSelectValue(
+              ordersFilters.assignedTo,
+              extensions,
+            ),
             onChange: (selected) => {
               const opt =
                 selected as SingleValue<OrdersDeliverySelectOption>;
@@ -2595,13 +2133,7 @@ export const CrmOrdersPageContentImpl = () => {
             id: 'stage',
             label: 'Order Stage',
             type: 'select' as const,
-            value: ordersFilters.stage
-              ? (() => {
-                  const stageId = ordersFilters.stage;
-                  const stage = stages.find((st: any) => st.id.toString() === stageId);
-                  return stage ? { value: stageId, label: stage.name } : { value: stageId, label: stageId };
-                })()
-              : null,
+            value: buildStageSelectValue(ordersFilters.stage, stages),
             onChange: (selected) => {
               const opt =
                 selected as SingleValue<OrdersDeliverySelectOption>;
@@ -2766,7 +2298,9 @@ export const CrmOrdersPageContentImpl = () => {
         onCancel={() => setShowMarkLostModal(false)}
         submitButtonText="Mark Lost Reason"
         cancelButtonText="Cancel"
-        isSubmitDisabled={!lostReasonId || !lostFeedback.trim()}
+        isSubmitDisabled={
+          lostReasonId == null || lostFeedback.trim().length === 0
+        }
       />
 
     {/* Order View Modal */}
@@ -2784,339 +2318,38 @@ export const CrmOrdersPageContentImpl = () => {
     })}
 
 
-      {/* Manage Attachments Modal */}
-      {selectedOrderForAttachments && (
-        <Modal
+      {selectedOrderForAttachments != null && (
+        <CrmOrdersAttachmentsModal
           show={showAttachmentModal}
           onHide={() => {
             setShowAttachmentModal(false);
             setSelectedOrderForAttachments(null);
           }}
-          size="lg"
-          centered
-        >
-          <Modal.Header closeButton className="border-0 pb-0">
-            <Modal.Title className="d-flex align-items-center gap-2">
-              <div
-                className="rounded-circle d-flex align-items-center justify-content-center"
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  background:
-                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                }}
-              >
-                <Paperclip size={20} color="white" />
-              </div>
-              <div>
-                <div style={{ fontSize: "20px", fontWeight: 600 }}>
-                  Manage Attachments
-                </div>
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#6c757d",
-                    fontWeight: "normal",
-                  }}
-                >
-                  {selectedOrderForAttachments.order_number ||
-                    selectedOrderForAttachments.name ||
-                    `Order #${selectedOrderForAttachments.id}`}
-                </div>
-              </div>
-            </Modal.Title>
-          </Modal.Header>
-
-          <Modal.Body className="p-4">
-            {/* Upload Section */}
-            <div
-              className="mb-4 p-4 border rounded"
-              style={{ background: "#f8f9fa" }}
-            >
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <div>
-                  <h6 className="mb-1 fw-bold">Upload New Attachments</h6>
-                  <small className="text-muted">
-                    Supported formats: PDF, CSV, Excel, or Image (Max 5MB)
-                  </small>
-                </div>
-              </div>
-              <div className="d-flex gap-2">
-                <Form.Control
-                  ref={(input) => setFileInputRef(input as HTMLInputElement)}
-                  type="file"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const files = e.target.files;
-                    if (files && files.length > 0) {
-                      const file = files[0];
-                      handleFileUpload(file);
-                    }
-                  }}
-                  accept=".pdf,.csv,.xls,.xlsx,.xlsm,.png,.jpg,.jpeg,.gif,.webp"
-                  style={{ flex: 1 }}
-                  disabled={uploadingFile}
-                />
-                <Button
-                  variant="primary"
-                  className="d-flex align-items-center gap-2"
-                  disabled={uploadingFile}
-                >
-                  {uploadingFile ? (
-                    <>
-                      <div
-                        className="spinner-border spinner-border-sm"
-                        role="status"
-                      />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={16} />
-                      Upload
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Attachments List */}
-            <div>
-              {/* Order Attachments Section */}
-              <h6 className="mb-3 fw-bold d-flex align-items-center gap-2">
-                <FileText size={18} />
-                Order Attachments ({attachments.length})
-              </h6>
-
-              {loadingAttachments ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                </div>
-              ) : attachments.length === 0 ? (
-                <div className="text-center py-4 text-muted">
-                  <Paperclip size={48} className="mb-3 opacity-25" />
-                  <div>No order attachments yet</div>
-                  <small>Upload files using the form above</small>
-                </div>
-              ) : (
-                <div className="d-flex flex-column gap-2 mb-4">
-                  {attachments.map((attachment: any) => (
-                    <Card key={attachment.id} className="border shadow-sm">
-                      <Card.Body className="p-3">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <div className="d-flex align-items-center gap-3 flex-grow-1">
-                            {/* File Icon */}
-                            <div
-                              className="rounded d-flex align-items-center justify-content-center"
-                              style={{
-                                width: "45px",
-                                height: "45px",
-                                background: attachment.mime_type?.includes(
-                                  "pdf"
-                                )
-                                  ? "#dc3545"
-                                  : attachment.mime_type?.includes("csv") ||
-                                    attachment.mime_type?.includes("excel") ||
-                                    attachment.mime_type?.includes(
-                                      "spreadsheet"
-                                    )
-                                  ? "#198754"
-                                  : attachment.mime_type?.includes("image")
-                                  ? "#0d6efd"
-                                  : "#6c757d",
-                                color: "white",
-                              }}
-                            >
-                              <FileText size={22} />
-                            </div>
-
-                            {/* File Info */}
-                            <div className="flex-grow-1">
-                              <div
-                                className="fw-semibold"
-                                style={{ fontSize: "14px" }}
-                              >
-                                {attachment.name}
-                              </div>
-                              <div
-                                style={{ fontSize: "12px", color: "#6c757d" }}
-                              >
-                                {formatFileSize(attachment.file_size)} •{" "}
-                                {attachment.created_at
-                                  ? formatDateForTable(attachment.created_at)
-                                  : "N/A"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="d-flex gap-1">
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-primary"
-                              title="Download"
-                              onClick={() =>
-                                handleDownloadAttachment(attachment.id)
-                              }
-                            >
-                              <DownloadIcon size={18} />
-                            </Button>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-danger"
-                              title="Delete"
-                              onClick={() => {
-                                setAttachmentToDelete({
-                                  id: attachment.id,
-                                  name: attachment.name,
-                                });
-                                setShowDeleteAttachmentModal(true);
-                              }}
-                            >
-                              <Trash2 size={18} />
-                            </Button>
-                          </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              {/* Deal Attachments Section */}
-              {selectedOrderForAttachments?.deal_id && (
-                <>
-                  <h6 className="mb-3 fw-bold d-flex align-items-center gap-2 mt-4">
-                    <FileText size={18} />
-                    Deal Attachments ({dealAttachments.length})
-                    <Badge
-                      bg="secondary"
-                      className="ms-2"
-                      style={{ fontSize: "11px" }}
-                    >
-                      Read-only
-                    </Badge>
-                  </h6>
-
-                  {loadingAttachments ? (
-                    <div className="text-center py-5">
-                      <div
-                        className="spinner-border text-primary"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                    </div>
-                  ) : dealAttachments.length === 0 ? (
-                    <div className="text-center py-4 text-muted">
-                      <Paperclip size={48} className="mb-3 opacity-25" />
-                      <div>No deal attachments</div>
-                    </div>
-                  ) : (
-                    <div className="d-flex flex-column gap-2">
-                      {dealAttachments.map((attachment: any) => (
-                        <Card
-                          key={`deal-${attachment.id}`}
-                          className="border shadow-sm"
-                          style={{ opacity: 0.9 }}
-                        >
-                          <Card.Body className="p-3">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <div className="d-flex align-items-center gap-3 flex-grow-1">
-                                {/* File Icon */}
-                                <div
-                                  className="rounded d-flex align-items-center justify-content-center"
-                                  style={{
-                                    width: "45px",
-                                    height: "45px",
-                                    background: attachment.mime_type?.includes(
-                                      "pdf"
-                                    )
-                                      ? "#dc3545"
-                                      : attachment.mime_type?.includes("csv") ||
-                                        attachment.mime_type?.includes(
-                                          "excel"
-                                        ) ||
-                                        attachment.mime_type?.includes(
-                                          "spreadsheet"
-                                        )
-                                      ? "#198754"
-                                      : attachment.mime_type?.includes("image")
-                                      ? "#0d6efd"
-                                      : "#6c757d",
-                                    color: "white",
-                                  }}
-                                >
-                                  <FileText size={22} />
-                                </div>
-
-                                {/* File Info */}
-                                <div className="flex-grow-1">
-                                  <div
-                                    className="fw-semibold"
-                                    style={{ fontSize: "14px" }}
-                                  >
-                                    {attachment.name}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      color: "#6c757d",
-                                    }}
-                                  >
-                                    {formatFileSize(attachment.file_size)} •{" "}
-                                    {attachment.created_at
-                                      ? formatDateForTable(
-                                          attachment.created_at
-                                        )
-                                      : "N/A"}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Actions - Download only */}
-                              <div className="d-flex gap-1">
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-2 text-primary"
-                                  title="Download"
-                                  onClick={() =>
-                                    handleDownloadDealAttachment(attachment.id)
-                                  }
-                                >
-                                  <DownloadIcon size={18} />
-                                </Button>
-                              </div>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </Modal.Body>
-
-          <Modal.Footer className="border-0">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowAttachmentModal(false);
-                setSelectedOrderForAttachments(null);
-              }}
-            >
-              Close
-            </Button>
-          </Modal.Footer>
-        </Modal>
+          order={selectedOrderForAttachments}
+          attachments={attachments}
+          dealAttachments={dealAttachments}
+          loadingAttachments={loadingAttachments}
+          uploadingFile={uploadingFile}
+          fileInputRef={(el) => setFileInputRef(el)}
+          onFileChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+              handleFileUpload(files[0]).catch((error: unknown) => {
+                console.error("Attachment upload failed:", error);
+              });
+            }
+          }}
+          formatFileSize={formatFileSize}
+          onDownloadOrderAttachment={handleDownloadAttachment}
+          onDownloadDealAttachment={handleDownloadDealAttachment}
+          onRequestDeleteAttachment={(id, name) => {
+            setAttachmentToDelete({ id, name });
+            setShowDeleteAttachmentModal(true);
+          }}
+        />
       )}
 
-    {editingOrderId && (
+    {editingOrderId != null && (
             <OrderEditModal
               show={showEditModal}
               onHide={() => {

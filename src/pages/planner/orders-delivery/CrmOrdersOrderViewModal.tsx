@@ -28,21 +28,104 @@ const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const ORDER_HISTORY_IGNORED_KEYS = new Set(["order_stage_id"]);
 
-export type CrmOrdersOrderViewModalRenderProps = {
+function orderViewOrderIdKeyPart(orderId: unknown): string {
+  if (orderId == null) return "unknown";
+  if (typeof orderId === "string" || typeof orderId === "number") {
+    return String(orderId);
+  }
+  return "unknown";
+}
+
+function orderLineItemRowKey(orderId: unknown, item: any): string {
+  const oid = orderViewOrderIdKeyPart(orderId);
+  const id = item?.id;
+  if (id != null && String(id) !== "") {
+    return `order-line-${oid}-${id}`;
+  }
+  const productKey =
+    item?.product_id ?? item?.product?.id ?? item?.product?.sku ?? "product";
+  const quantity = item?.quantity ?? "qty";
+  const unitPrice = item?.unit_price ?? "unit";
+  const totalPrice = item?.total_price ?? "total";
+  return `order-line-${oid}-${productKey}-${quantity}-${unitPrice}-${totalPrice}`;
+}
+
+function orderHistoryRowKey(orderId: unknown, history: any): string {
+  const oid = orderViewOrderIdKeyPart(orderId);
+  const id = history?.id;
+  if (id != null && String(id) !== "") {
+    return `history-${oid}-${id}`;
+  }
+  return `history-${oid}-${history?.created_at}-${history?.event}`;
+}
+
+type ReadonlyPick<K extends keyof CrmOrdersOrderViewModalRenderProps> = Readonly<
+  Pick<CrmOrdersOrderViewModalRenderProps, K>
+>;
+
+function applyHeaderCloseHover(
+  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+): void {
+  e.currentTarget.style.background = "rgba(255,255,255,0.25)";
+  e.currentTarget.style.transform = "scale(1.05)";
+}
+
+function resetHeaderCloseHover(
+  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+): void {
+  e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+  e.currentTarget.style.transform = "scale(1)";
+}
+
+function applyEditOrderRowHover(
+  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+): void {
+  e.currentTarget.style.borderColor = "#f59e0b";
+  e.currentTarget.style.background = "#fffbeb";
+  e.currentTarget.style.transform = "translateX(4px)";
+}
+
+function resetEditOrderRowHover(
+  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+): void {
+  e.currentTarget.style.borderColor = "#e5e7eb";
+  e.currentTarget.style.background = "white";
+  e.currentTarget.style.transform = "translateX(0)";
+}
+
+function applyFooterCloseHover(
+  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+): void {
+  e.currentTarget.style.borderColor = "#f59e0b";
+  e.currentTarget.style.color = "#f59e0b";
+  e.currentTarget.style.background = "#fffbeb";
+}
+
+function resetFooterCloseHover(
+  e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>,
+): void {
+  e.currentTarget.style.borderColor = "#e5e7eb";
+  e.currentTarget.style.color = "#6c757d";
+  e.currentTarget.style.background = "white";
+}
+
+export type CrmOrdersOrderViewModalRenderProps = Readonly<{
   viewingOrder: any;
   showOrderViewModal: boolean;
   setShowOrderViewModal: React.Dispatch<React.SetStateAction<boolean>>;
   loadingOrder: boolean;
   relatedDeal: any;
   relatedLead: any;
-  extensions: any[];
+  extensions: readonly any[];
   activeTab: string;
   setActiveTab: React.Dispatch<React.SetStateAction<string>>;
   session: { user?: { permissions?: string[] } } | null;
-};
+}>;
 
 
-function OrderViewModalHeader(props: Pick<CrmOrdersOrderViewModalRenderProps, 'viewingOrder' | 'setShowOrderViewModal'>): React.ReactElement {
+function OrderViewModalHeader(
+  props: ReadonlyPick<"viewingOrder" | "setShowOrderViewModal">,
+): React.ReactElement {
   const { viewingOrder, setShowOrderViewModal } = props;
   return (
 <div
@@ -76,14 +159,10 @@ function OrderViewModalHeader(props: Pick<CrmOrdersOrderViewModalRenderProps, 'v
       alignItems: "center",
       justifyContent: "center",
     }}
-    onMouseOver={(e) => {
-      e.currentTarget.style.background = "rgba(255,255,255,0.25)";
-      e.currentTarget.style.transform = "scale(1.05)";
-    }}
-    onMouseOut={(e) => {
-      e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-      e.currentTarget.style.transform = "scale(1)";
-    }}
+    onMouseOver={applyHeaderCloseHover}
+    onFocus={applyHeaderCloseHover}
+    onMouseOut={resetHeaderCloseHover}
+    onBlur={resetHeaderCloseHover}
   >
     <X size={18} />
   </button>
@@ -137,7 +216,7 @@ function OrderViewModalHeader(props: Pick<CrmOrdersOrderViewModalRenderProps, 'v
         </span>
         <span>•</span>
         <span style={{ fontWeight: 600 }}>
-          {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {viewingOrder.currency || "AED"} {Number.parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         <span>•</span>
         <span>
@@ -215,92 +294,110 @@ function OrderViewModalInlineStyles(): React.ReactElement {
           height: 18px;
           flex-shrink: 0;
         }
+
+        .order-view-stat-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 16px rgba(245, 158, 11, 0.15);
+        }
       `}</style>
 
   );
 }
 
-function OrderViewModalTabNav(props: Pick<CrmOrdersOrderViewModalRenderProps, 'activeTab' | 'setActiveTab'>): React.ReactElement {
+const ORDER_VIEW_MODAL_TAB_ACCENT = "#f59e0b";
+
+function OrderViewModalTabNavButton(
+  props: Readonly<{
+    tabId: string;
+    activeTab: string;
+    setActiveTab: React.Dispatch<React.SetStateAction<string>>;
+    children: React.ReactNode;
+  }>,
+): React.ReactElement {
+  const { tabId, activeTab, setActiveTab, children } = props;
+  const isActive = activeTab === tabId;
+  return (
+    <button
+      type="button"
+      className={`order-detail-filter-button ${isActive ? "active" : ""}`}
+      onClick={() => setActiveTab(tabId)}
+      style={{
+        backgroundColor: isActive ? ORDER_VIEW_MODAL_TAB_ACCENT : "white",
+        borderColor: ORDER_VIEW_MODAL_TAB_ACCENT,
+        color: isActive ? "white" : ORDER_VIEW_MODAL_TAB_ACCENT,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function OrderViewModalTabNav(
+  props: ReadonlyPick<"activeTab" | "setActiveTab">,
+): React.ReactElement {
   const { activeTab, setActiveTab } = props;
   return (
     <>
           {/* Tabs Navigation */}
           <div className="order-detail-filter-buttons mb-4">
-            <button
-              className={`order-detail-filter-button ${activeTab === "tab1" ? 'active' : ''}`}
-              onClick={() => setActiveTab("tab1")}
-              style={{
-                backgroundColor: activeTab === "tab1" ? "#f59e0b" : 'white',
-                borderColor: "#f59e0b",
-                color: activeTab === "tab1" ? 'white' : "#f59e0b"
-              }}
+            <OrderViewModalTabNavButton
+              tabId="tab1"
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
             >
               <ShoppingBag className="filter-icon" size={18} />
               <span>General Information</span>
-            </button>
-            <button
-              className={`order-detail-filter-button ${activeTab === "tab2" ? 'active' : ''}`}
-              onClick={() => setActiveTab("tab2")}
-              style={{
-                backgroundColor: activeTab === "tab2" ? "#f59e0b" : 'white',
-                borderColor: "#f59e0b",
-                color: activeTab === "tab2" ? 'white' : "#f59e0b"
-              }}
+            </OrderViewModalTabNavButton>
+            <OrderViewModalTabNavButton
+              tabId="tab2"
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
             >
               <FileText className="filter-icon" size={18} />
               <span>Lead/Deal Information</span>
-            </button>
-            <button
-              className={`order-detail-filter-button ${activeTab === "additional-info" ? 'active' : ''}`}
-              onClick={() => setActiveTab("additional-info")}
-              style={{
-                backgroundColor: activeTab === "additional-info" ? "#f59e0b" : 'white',
-                borderColor: "#f59e0b",
-                color: activeTab === "additional-info" ? 'white' : "#f59e0b"
-              }}
+            </OrderViewModalTabNavButton>
+            <OrderViewModalTabNavButton
+              tabId="additional-info"
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
             >
               <Info className="filter-icon" size={18} />
               <span>Additional Information</span>
-            </button>
-            <button
-              className={`order-detail-filter-button ${activeTab === "history" ? 'active' : ''}`}
-              onClick={() => setActiveTab("history")}
-              style={{
-                backgroundColor: activeTab === "history" ? "#f59e0b" : 'white',
-                borderColor: "#f59e0b",
-                color: activeTab === "history" ? 'white' : "#f59e0b"
-              }}
+            </OrderViewModalTabNavButton>
+            <OrderViewModalTabNavButton
+              tabId="history"
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
             >
               <History className="filter-icon" size={18} />
               <span>History</span>
-            </button>
+            </OrderViewModalTabNavButton>
           </div>
     </>
   );
 }
 
 
-function OrderViewModalTabGeneral(props: { viewingOrder: CrmOrdersOrderViewModalRenderProps['viewingOrder']; extensions: any[] }): React.ReactElement {
-  const { viewingOrder, extensions } = props;
+function OrderViewModalTabGeneral(
+  props: Readonly<{ viewingOrder: CrmOrdersOrderViewModalRenderProps["viewingOrder"] }>,
+): React.ReactElement {
+  const { viewingOrder } = props;
+  const itemsHaveDescription =
+    Array.isArray(viewingOrder.items) &&
+    viewingOrder.items.some((item: any) => Boolean(item.description));
+  const orderItemsLineItemColSpan = itemsHaveDescription ? 6 : 5;
   return (
             <div>
               {/* Quick Info Cards */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "16px", marginBottom: "28px" }}>
                 <div
+                  className="order-view-stat-card"
                   style={{
                     background: "#f9fafb",
                     border: "1px solid #e5e7eb",
                     padding: "20px",
                     borderRadius: "12px",
                     transition: "all 0.3s ease",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                    e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -342,6 +439,7 @@ function OrderViewModalTabGeneral(props: { viewingOrder: CrmOrdersOrderViewModal
                 </div>
 
                 <div
+                  className="order-view-stat-card"
                   style={{
                     background: "#f9fafb",
                     border: "1px solid #e5e7eb",
@@ -349,21 +447,13 @@ function OrderViewModalTabGeneral(props: { viewingOrder: CrmOrdersOrderViewModal
                     borderRadius: "12px",
                     transition: "all 0.3s ease",
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                    e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <div style={{
                       width: "44px",
                       height: "44px",
                       borderRadius: "10px",
-                      background: viewingOrder.status?.toLowerCase() === "completed" ? "#10b981" : viewingOrder.status?.toLowerCase() === "pending" ? "#f59e0b" : "#6c757d",
+                      background: orderViewModalOrderStatusIconBg(viewingOrder.status),
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -397,20 +487,13 @@ function OrderViewModalTabGeneral(props: { viewingOrder: CrmOrdersOrderViewModal
                 </div>
 
                 <div
+                  className="order-view-stat-card"
                   style={{
                     background: "#f9fafb",
                     border: "1px solid #e5e7eb",
                     padding: "20px",
                     borderRadius: "12px",
                     transition: "all 0.3s ease",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                    e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -445,27 +528,20 @@ function OrderViewModalTabGeneral(props: { viewingOrder: CrmOrdersOrderViewModal
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                       }}>
-                        {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {viewingOrder.currency || "AED"} {Number.parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div
+                  className="order-view-stat-card"
                   style={{
                     background: "#f9fafb",
                     border: "1px solid #e5e7eb",
                     padding: "20px",
                     borderRadius: "12px",
                     transition: "all 0.3s ease",
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                    e.currentTarget.style.boxShadow = "0 8px 16px rgba(245, 158, 11, 0.15)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -753,7 +829,7 @@ function OrderViewModalTabGeneral(props: { viewingOrder: CrmOrdersOrderViewModal
                             <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Product Name</th>
                             <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>SKU</th>
                             <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Quantity</th>
-                            {viewingOrder.items.some((item: any) => item.description) && (
+                            {itemsHaveDescription && (
                               <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Description</th>
                             )}
                             <th style={{ padding: "12px 16px", fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.5px" }}>Unit Price</th>
@@ -762,62 +838,65 @@ function OrderViewModalTabGeneral(props: { viewingOrder: CrmOrdersOrderViewModal
                         </thead>
                         <tbody>
                           {viewingOrder.items.map((item: any, index: number) => (
-                            <tr key={item.id || index} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                            <tr
+                              key={orderLineItemRowKey(viewingOrder.id, item)}
+                              style={{ borderBottom: "1px solid #f3f4f6" }}
+                            >
                               <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937" }}>{index + 1}</td>
                               <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 600 }}>
                                 {item.product_name || item.product?.name || "N/A"}
                               </td>
                               <td style={{ padding: "14px 16px", fontSize: "13px", color: "#6b7280" }}>{item.product?.sku || "N/A"}</td>
                               <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937" }}>{item.quantity || "0"}</td>
-                              {viewingOrder.items.some((i: any) => i.description) && (
+                              {itemsHaveDescription && (
                                 <td style={{ padding: "14px 16px", fontSize: "13px", color: "#6b7280", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                   {item.description || "-"}
                                 </td>
                               )}
                               <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937" }}>
-                                {viewingOrder.currency || "AED"} {parseFloat(item.unit_price || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {viewingOrder.currency || "AED"} {Number.parseFloat(item.unit_price || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                               <td style={{ padding: "14px 16px", fontSize: "13px", color: "#1f2937", fontWeight: 600 }}>
-                                {viewingOrder.currency || "AED"} {parseFloat(item.total_price || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {viewingOrder.currency || "AED"} {Number.parseFloat(item.total_price || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot style={{ background: "#f9fafb", fontWeight: 600 }}>
                           <tr>
-                            <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
+                            <td colSpan={orderItemsLineItemColSpan} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
                               Subtotal:
                             </td>
                             <td style={{ padding: "12px 16px", fontSize: "13px", color: "#1f2937" }}>
-                              {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {viewingOrder.currency || "AED"} {Number.parseFloat(viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           </tr>
-                          {viewingOrder.discount_amount && parseFloat(viewingOrder.discount_amount) > 0 && (
+                          {viewingOrder.discount_amount && Number.parseFloat(viewingOrder.discount_amount) > 0 && (
                             <tr>
-                              <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
+                              <td colSpan={orderItemsLineItemColSpan} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
                                 Discount:
                               </td>
                               <td style={{ padding: "12px 16px", fontSize: "13px", color: "#dc2626" }}>
-                                - {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                - {viewingOrder.currency || "AED"} {Number.parseFloat(viewingOrder.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
                           )}
-                          {viewingOrder.tax_amount && parseFloat(viewingOrder.tax_amount) > 0 && (
+                          {viewingOrder.tax_amount && Number.parseFloat(viewingOrder.tax_amount) > 0 && (
                             <tr>
-                              <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
+                              <td colSpan={orderItemsLineItemColSpan} style={{ padding: "12px 16px", textAlign: "right", fontSize: "13px", color: "#6b7280" }}>
                                 Tax:
                               </td>
                               <td style={{ padding: "12px 16px", fontSize: "13px", color: "#1f2937" }}>
-                                {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.tax_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {viewingOrder.currency || "AED"} {Number.parseFloat(viewingOrder.tax_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
                           )}
                           <tr style={{ fontSize: "16px" }}>
-                            <td colSpan={viewingOrder.items.some((item: any) => item.description) ? 6 : 5} style={{ padding: "12px 16px", textAlign: "right", fontSize: "14px", color: "#1f2937", fontWeight: 700 }}>
+                            <td colSpan={orderItemsLineItemColSpan} style={{ padding: "12px 16px", textAlign: "right", fontSize: "14px", color: "#1f2937", fontWeight: 700 }}>
                               Total:
                             </td>
                             <td style={{ padding: "12px 16px", fontSize: "14px", color: "#1f2937", fontWeight: 700 }}>
-                              {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {viewingOrder.currency || "AED"} {Number.parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </td>
                           </tr>
                         </tfoot>
@@ -832,7 +911,9 @@ function OrderViewModalTabGeneral(props: { viewingOrder: CrmOrdersOrderViewModal
 }
 
 
-function OrderViewModalTabLeadDeal(props: { relatedDeal: any; relatedLead: any; extensions: any[] }): React.ReactElement {
+function OrderViewModalTabLeadDeal(
+  props: Readonly<{ relatedDeal: any; relatedLead: any; extensions: readonly any[] }>,
+): React.ReactElement {
   const { relatedDeal, relatedLead, extensions } = props;
   return (
             <div>
@@ -933,7 +1014,7 @@ function OrderViewModalTabLeadDeal(props: { relatedDeal: any; relatedLead: any; 
                             fontWeight: 500,
                             wordBreak: "break-word",
                           }}>
-                            {relatedDeal.currency || "AED"} {parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total || 0)).toLocaleString()}
+                            {relatedDeal.currency || "AED"} {Number.parseFloat(String(relatedDeal.net_value || relatedDeal.grand_total || 0)).toLocaleString()}
                           </div>
                         </div>
                       )}
@@ -1111,7 +1192,7 @@ function OrderViewModalTabLeadDeal(props: { relatedDeal: any; relatedLead: any; 
                             wordBreak: "break-word",
                           }}>
                             <Badge
-                              bg={relatedLead.lead_potential === "Hot" ? "danger" : relatedLead.lead_potential === "Warm" ? "warning" : "secondary"}
+                              bg={orderViewModalLeadPotentialBadgeBg(relatedLead.lead_potential)}
                               style={{
                                 padding: "6px 14px",
                                 borderRadius: "20px",
@@ -1296,7 +1377,7 @@ function OrderViewModalTabLeadDeal(props: { relatedDeal: any; relatedLead: any; 
                           fontWeight: 500,
                           wordBreak: "break-word",
                         }}>
-                          {relatedLead.crm_data.name || (relatedLead.crm_data.data && relatedLead.crm_data.data.name) || "N/A"}
+                          {relatedLead.crm_data.name || relatedLead.crm_data.data?.name || "N/A"}
                         </div>
                       </div>
                       <div>
@@ -1316,7 +1397,7 @@ function OrderViewModalTabLeadDeal(props: { relatedDeal: any; relatedLead: any; 
                           fontWeight: 500,
                           wordBreak: "break-word",
                         }}>
-                          <PhoneDisplay phone={relatedLead.crm_data.phone || (relatedLead.crm_data.data && relatedLead.crm_data.data.phone) || ""} />
+                          <PhoneDisplay phone={relatedLead.crm_data.phone || relatedLead.crm_data.data?.phone || ""} />
                         </div>
                       </div>
                       {relatedLead.crm_data.source_file && (
@@ -1351,6 +1432,48 @@ function OrderViewModalTabLeadDeal(props: { relatedDeal: any; relatedLead: any; 
 }
 
 
+function orderViewModalOrderStatusIconBg(status: string | undefined): string {
+  const s = status?.toLowerCase() ?? "";
+  if (s === "completed") {
+    return "#10b981";
+  }
+  if (s === "pending") {
+    return "#f59e0b";
+  }
+  return "#6c757d";
+}
+
+function orderViewModalLeadPotentialBadgeBg(potential: string | undefined): string {
+  if (potential === "Hot") {
+    return "danger";
+  }
+  if (potential === "Warm") {
+    return "warning";
+  }
+  return "secondary";
+}
+
+function orderViewModalOrderLifecycleBadgeBg(status: string | undefined): string {
+  const s = status?.toLowerCase() ?? "";
+  if (s === "completed") {
+    return "success";
+  }
+  if (s === "pending") {
+    return "warning";
+  }
+  return "secondary";
+}
+
+function orderViewModalHistoryEventLabel(event: string | undefined): string {
+  if (event === "created") {
+    return "Created";
+  }
+  if (event === "updated") {
+    return "Updated";
+  }
+  return event ?? "";
+}
+
 function orderViewModalApprovalBadgeBg(status: string | undefined): string {
   const s = status?.toLowerCase() ?? "";
   if (s === "approved") return "success";
@@ -1372,10 +1495,10 @@ function orderViewModalPaymentBadgeBg(status: string | undefined): string {
   return "danger";
 }
 
-function OrderViewModalAdditionalInfoGrid(props: {
-  viewingOrder: CrmOrdersOrderViewModalRenderProps['viewingOrder'];
-  extensions: any[];
-}): React.ReactElement {
+function OrderViewModalAdditionalInfoGrid(props: Readonly<{
+  viewingOrder: CrmOrdersOrderViewModalRenderProps["viewingOrder"];
+  extensions: readonly any[];
+}>): React.ReactElement {
   const { viewingOrder, extensions } = props;
   return (
             <div style={{ marginBottom: "28px" }}>
@@ -1534,9 +1657,9 @@ function OrderViewModalAdditionalInfoGrid(props: {
   );
 }
 
-function OrderViewModalAdditionalNotes(props: {
-  viewingOrder: CrmOrdersOrderViewModalRenderProps['viewingOrder'];
-}): React.ReactElement {
+function OrderViewModalAdditionalNotes(props: Readonly<{
+  viewingOrder: CrmOrdersOrderViewModalRenderProps["viewingOrder"];
+}>): React.ReactElement {
   const { viewingOrder } = props;
   if (!viewingOrder.notes) {
     return <></>;
@@ -1576,10 +1699,10 @@ function OrderViewModalAdditionalNotes(props: {
   );
 }
 
-function OrderViewModalTabAdditional(props: {
-  viewingOrder: CrmOrdersOrderViewModalRenderProps['viewingOrder'];
-  extensions: any[];
-}): React.ReactElement {
+function OrderViewModalTabAdditional(props: Readonly<{
+  viewingOrder: CrmOrdersOrderViewModalRenderProps["viewingOrder"];
+  extensions: readonly any[];
+}>): React.ReactElement {
   const { viewingOrder, extensions } = props;
   return (
             <div>
@@ -1591,7 +1714,9 @@ function OrderViewModalTabAdditional(props: {
 }
 
 
-function OrderViewModalTabHistory(props: { viewingOrder: CrmOrdersOrderViewModalRenderProps['viewingOrder'] }): React.ReactElement {
+function OrderViewModalTabHistory(
+  props: Readonly<{ viewingOrder: CrmOrdersOrderViewModalRenderProps["viewingOrder"] }>,
+): React.ReactElement {
   const { viewingOrder } = props;
   return (
             <div>
@@ -1644,7 +1769,7 @@ function OrderViewModalTabHistory(props: { viewingOrder: CrmOrdersOrderViewModal
                         background: "#e5e7eb",
                       }} />
                       {viewingOrder.histories.map((history: any, idx: number) => (
-                        <div key={history.id || idx} style={{ position: "relative", paddingBottom: idx < viewingOrder.histories.length - 1 ? "20px" : "0" }}>
+                        <div key={orderHistoryRowKey(viewingOrder.id, history)} style={{ position: "relative", paddingBottom: idx < viewingOrder.histories.length - 1 ? "20px" : "0" }}>
                           <div style={{
                             content: "",
                             position: "absolute",
@@ -1676,7 +1801,7 @@ function OrderViewModalTabHistory(props: { viewingOrder: CrmOrdersOrderViewModal
                               marginBottom: "4px",
                               fontWeight: 500,
                             }}>
-                              {history.event === "created" ? "Created" : history.event === "updated" ? "Updated" : history.event}
+                              {orderViewModalHistoryEventLabel(history.event)}
                             </div>
                             {history.description && (
                               <div style={{
@@ -1729,7 +1854,9 @@ function OrderViewModalTabHistory(props: { viewingOrder: CrmOrdersOrderViewModal
 }
 
 
-function OrderViewModalRightPanel(props: Pick<CrmOrdersOrderViewModalRenderProps, 'viewingOrder' | 'session' | 'setShowOrderViewModal'>): React.ReactElement {
+function OrderViewModalRightPanel(
+  props: ReadonlyPick<"viewingOrder" | "session" | "setShowOrderViewModal">,
+): React.ReactElement {
   const { viewingOrder, session, setShowOrderViewModal } = props;
   return (
         <div style={{ 
@@ -1771,18 +1898,12 @@ function OrderViewModalRightPanel(props: Pick<CrmOrdersOrderViewModalRenderProps
                   }}
                   onClick={() => {
                     setShowOrderViewModal(false);
-                    window.location.href = `/crm/orders/${viewingOrder.id}/edit`;
+                    globalThis.location.href = `/crm/orders/${viewingOrder.id}/edit`;
                   }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.borderColor = "#f59e0b";
-                    e.currentTarget.style.background = "#fffbeb";
-                    e.currentTarget.style.transform = "translateX(4px)";
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.borderColor = "#e5e7eb";
-                    e.currentTarget.style.background = "white";
-                    e.currentTarget.style.transform = "translateX(0)";
-                  }}
+                  onMouseOver={applyEditOrderRowHover}
+                  onFocus={applyEditOrderRowHover}
+                  onMouseOut={resetEditOrderRowHover}
+                  onBlur={resetEditOrderRowHover}
                 >
                   <div style={{
                     width: "32px",
@@ -1843,13 +1964,7 @@ function OrderViewModalRightPanel(props: Pick<CrmOrdersOrderViewModalRenderProps
                     Status
                   </span>
                   <Badge
-                    bg={
-                      viewingOrder.status?.toLowerCase() === "completed"
-                        ? "success"
-                        : viewingOrder.status?.toLowerCase() === "pending"
-                        ? "warning"
-                        : "secondary"
-                    }
+                    bg={orderViewModalOrderLifecycleBadgeBg(viewingOrder.status)}
                     style={{ fontSize: "11px", padding: "4px 10px" }}
                   >
                     {viewingOrder.status || "N/A"}
@@ -1861,7 +1976,7 @@ function OrderViewModalRightPanel(props: Pick<CrmOrdersOrderViewModalRenderProps
                     Total Amount
                   </span>
                   <span style={{ fontSize: "14px", color: "#1f2937", fontWeight: 600 }}>
-                    {viewingOrder.currency || "AED"} {parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {viewingOrder.currency || "AED"} {Number.parseFloat(viewingOrder.final_amount || viewingOrder.total_amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
 
@@ -1924,13 +2039,7 @@ function OrderViewModalRightPanel(props: Pick<CrmOrdersOrderViewModalRenderProps
                       Payment Status
                     </div>
                     <Badge
-                      bg={
-                        viewingOrder.payment_status?.toLowerCase() === "paid"
-                          ? "success"
-                          : viewingOrder.payment_status?.toLowerCase() === "partial"
-                          ? "warning"
-                          : "danger"
-                      }
+                      bg={orderViewModalPaymentBadgeBg(viewingOrder.payment_status)}
                       style={{ fontSize: "11px", padding: "4px 10px" }}
                     >
                       {viewingOrder.payment_status}
@@ -1946,7 +2055,9 @@ function OrderViewModalRightPanel(props: Pick<CrmOrdersOrderViewModalRenderProps
 }
 
 
-function OrderViewModalFooterBar(props: Pick<CrmOrdersOrderViewModalRenderProps, 'viewingOrder' | 'setShowOrderViewModal'>): React.ReactElement {
+function OrderViewModalFooterBar(
+  props: ReadonlyPick<"viewingOrder" | "setShowOrderViewModal">,
+): React.ReactElement {
   const { viewingOrder, setShowOrderViewModal } = props;
   return (
 <div style={{
@@ -1973,16 +2084,10 @@ function OrderViewModalFooterBar(props: Pick<CrmOrdersOrderViewModalRenderProps,
       border: "2px solid #e5e7eb",
       transition: "all 0.2s ease",
     }}
-    onMouseOver={(e) => {
-      e.currentTarget.style.borderColor = "#f59e0b";
-      e.currentTarget.style.color = "#f59e0b";
-      e.currentTarget.style.background = "#fffbeb";
-    }}
-    onMouseOut={(e) => {
-      e.currentTarget.style.borderColor = "#e5e7eb";
-      e.currentTarget.style.color = "#6c757d";
-      e.currentTarget.style.background = "white";
-    }}
+    onMouseOver={applyFooterCloseHover}
+    onFocus={applyFooterCloseHover}
+    onMouseOut={resetFooterCloseHover}
+    onBlur={resetFooterCloseHover}
   >
     Close
   </Button>
@@ -1992,14 +2097,13 @@ function OrderViewModalFooterBar(props: Pick<CrmOrdersOrderViewModalRenderProps,
 }
 
 function OrderViewModalTabPanels(
-  props: Pick<
-    CrmOrdersOrderViewModalRenderProps,
-    'activeTab' | 'viewingOrder' | 'relatedDeal' | 'relatedLead' | 'extensions'
+  props: ReadonlyPick<
+    "activeTab" | "viewingOrder" | "relatedDeal" | "relatedLead" | "extensions"
   >,
 ): React.ReactElement {
   const { activeTab, viewingOrder, relatedDeal, relatedLead, extensions } = props;
   if (activeTab === "tab1") {
-    return <OrderViewModalTabGeneral viewingOrder={viewingOrder} extensions={extensions} />;
+    return <OrderViewModalTabGeneral viewingOrder={viewingOrder} />;
   }
   if (activeTab === "tab2") {
     return (
@@ -2020,9 +2124,8 @@ function OrderViewModalTabPanels(
 }
 
 function OrderViewModalLoadedBody(
-  props: Pick<
-    CrmOrdersOrderViewModalRenderProps,
-    'activeTab' | 'setActiveTab' | 'viewingOrder' | 'relatedDeal' | 'relatedLead' | 'extensions' | 'session' | 'setShowOrderViewModal'
+  props: ReadonlyPick<
+    "activeTab" | "setActiveTab" | "viewingOrder" | "relatedDeal" | "relatedLead" | "extensions" | "session" | "setShowOrderViewModal"
   >,
 ): React.ReactElement {
   const {
@@ -2060,7 +2163,7 @@ function OrderViewModalLoadedBody(
 }
 
 export function CrmOrdersOrderViewModal(
-  props: CrmOrdersOrderViewModalRenderProps,
+  props: Readonly<CrmOrdersOrderViewModalRenderProps>,
 ): React.ReactNode {
   const {
     viewingOrder,
@@ -2114,7 +2217,7 @@ export function CrmOrdersOrderViewModal(
 }
 
 export function renderCrmOrdersOrderViewModal(
-  props: CrmOrdersOrderViewModalRenderProps,
+  props: Readonly<CrmOrdersOrderViewModalRenderProps>,
 ): React.ReactNode {
   return <CrmOrdersOrderViewModal {...props} />;
 }
