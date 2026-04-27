@@ -506,6 +506,427 @@ function mapJourneyRecordsToEmployees(data: JourneyRecord[], users: LookupUser[]
   });
 }
 
+type BuildJourneySidebarSectionsParams = {
+  selectedEmployee: OnboardingEmployee | null;
+  journeyIdValid: boolean;
+  stepsLoading: boolean;
+  journeySteps: JourneyStepRecord[];
+  canUpdateJourneyRecord: boolean;
+  canCreateJourneyStep: boolean;
+  canUpdateJourneyStep: boolean;
+  canDeleteJourneyStepPerm: boolean;
+  deletingStepId: number | null;
+  statusValue: string;
+  statusUpdating: boolean;
+  isJourneyCompleted: boolean;
+  handleStatusChange: (e: React.ChangeEvent<HTMLSelectElement>) => Promise<void>;
+  setShowAddStepForm: React.Dispatch<React.SetStateAction<boolean>>;
+  setEditingStep: React.Dispatch<React.SetStateAction<JourneyStepRecord | null>>;
+  openDeleteStepModal: (step: JourneyStepRecord) => void;
+};
+
+function buildJourneySidebarSections({
+  selectedEmployee,
+  journeyIdValid,
+  stepsLoading,
+  journeySteps,
+  canUpdateJourneyRecord,
+  canCreateJourneyStep,
+  canUpdateJourneyStep,
+  canDeleteJourneyStepPerm,
+  deletingStepId,
+  statusValue,
+  statusUpdating,
+  isJourneyCompleted,
+  handleStatusChange,
+  setShowAddStepForm,
+  setEditingStep,
+  openDeleteStepModal,
+}: Readonly<BuildJourneySidebarSectionsParams>): SidebarSection[] {
+  if (!selectedEmployee) return [];
+
+  const useLiveStepsProgress = journeyIdValid && !stepsLoading;
+  const liveProgress = useLiveStepsProgress
+    ? deriveJourneyProgressFromSteps(journeySteps)
+    : null;
+  const totalSteps = liveProgress
+    ? liveProgress.total
+    : Math.max(1, Number(selectedEmployee.total_steps_count ?? 0));
+  const completedSteps = liveProgress
+    ? liveProgress.completed
+    : Number(selectedEmployee.completed_steps_count ?? 0);
+  const progressPercent = liveProgress ? liveProgress.progress : selectedEmployee.progress;
+  const statusColors = getStatusColor(selectedEmployee.status);
+
+  return [
+    {
+      id: "journey-employee-details",
+      title: "Employee Details",
+      icon: User,
+      collapsible: true,
+      defaultExpanded: true,
+      fields: [
+        { label: "Extension", value: selectedEmployee.user_id || "—" },
+        { label: "Department", value: selectedEmployee.department_name || "—" },
+        { label: "Designation", value: selectedEmployee.designation || "—" },
+        { label: "Start Date", value: selectedEmployee.startDate || "—" },
+        { label: "Role", value: selectedEmployee.role || "—" },
+      ],
+    },
+    {
+      id: "journey-employment-info",
+      title: "Employment Info",
+      icon: Briefcase,
+      collapsible: true,
+      defaultExpanded: true,
+      fields: [
+        { label: "Contract Type", value: selectedEmployee.contract_type || "—" },
+        { label: "Employment Type", value: selectedEmployee.employment_type || "—" },
+      ],
+    },
+    {
+      id: "journey-onboarding-progress",
+      title: "Onboarding Progress",
+      icon: Target,
+      collapsible: true,
+      defaultExpanded: true,
+      customContent: (
+        <div style={{ padding: "0 4px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "8px",
+            }}
+          >
+            <span style={{ fontSize: "13px", color: "#6b7280" }}>
+              {completedSteps} of {totalSteps} steps completed
+            </span>
+            <span style={{ fontSize: "13px", fontWeight: "600", color: "#1f2937" }}>
+              {progressPercent}%
+            </span>
+          </div>
+          <div
+            style={{
+              width: "100%",
+              height: "8px",
+              backgroundColor: "#e9d5ff",
+              borderRadius: "4px",
+              overflow: "hidden",
+              marginBottom: "16px",
+            }}
+          >
+            <div
+              style={{
+                width: `${progressPercent}%`,
+                height: "100%",
+                backgroundColor: "#8b5cf6",
+                borderRadius: "4px",
+                transition: "width 0.3s ease",
+              }}
+            />
+          </div>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "4px 12px",
+              backgroundColor: statusColors.bg,
+              borderRadius: "16px",
+            }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                backgroundColor: statusColors.dot,
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ fontSize: "13px", fontWeight: "500", color: statusColors.color }}>
+              {selectedEmployee.status}
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "journey-status",
+      title: "Status",
+      icon: Target,
+      collapsible: true,
+      defaultExpanded: true,
+      customContent: (
+        <div style={{ padding: "0 4px" }}>
+          <label
+            htmlFor="journey-sidebar-status"
+            style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}
+          >
+            Journey Status
+          </label>
+          <select
+            id="journey-sidebar-status"
+            className="form-select"
+            value={statusValue}
+            onChange={handleStatusChange}
+            disabled={statusUpdating || isJourneyCompleted || !canUpdateJourneyRecord}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              fontSize: "14px",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              backgroundColor: isJourneyCompleted ? "#f9fafb" : "white",
+              color: "#1f2937",
+              cursor: statusUpdating || isJourneyCompleted ? "not-allowed" : "pointer",
+            }}
+          >
+            {JOURNEY_STATUS_OPTIONS.map((opt: { value: string; label: string }) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          {statusUpdating && (
+            <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>Updating...</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "journey-steps",
+      title: "Steps",
+      icon: Check,
+      collapsible: true,
+      defaultExpanded: true,
+      customContent: (
+        <JourneyStepsSidebarSection
+          steps={journeySteps}
+          loading={stepsLoading}
+          isCompleted={isJourneyCompleted}
+          canAddStep={canCreateJourneyStep}
+          canEditStep={canUpdateJourneyStep}
+          canDeleteStep={canDeleteJourneyStepPerm}
+          deletingStepId={deletingStepId}
+          onAddStep={() => setShowAddStepForm(true)}
+          onEditStep={(step) => setEditingStep(step)}
+          onDeleteStep={openDeleteStepModal}
+        />
+      ),
+    },
+  ];
+}
+
+type BuildJourneyFilterPillsParams = {
+  selectedEmploymentType: string;
+  appliedEmploymentType: string;
+  setSelectedEmploymentType: React.Dispatch<React.SetStateAction<string>>;
+  setAppliedEmploymentType: React.Dispatch<React.SetStateAction<string>>;
+  selectedContract: string;
+  appliedContract: string;
+  setSelectedContract: React.Dispatch<React.SetStateAction<string>>;
+  setAppliedContract: React.Dispatch<React.SetStateAction<string>>;
+  selectedDepartment: string;
+  appliedDepartment: string;
+  departmentPillActiveLabel: string | undefined;
+  setSelectedDepartment: React.Dispatch<React.SetStateAction<string>>;
+  setAppliedDepartment: React.Dispatch<React.SetStateAction<string>>;
+  selectedUserIds: string[];
+  appliedUserIds: string[];
+  setSelectedUserIds: React.Dispatch<React.SetStateAction<string[]>>;
+  setAppliedUserIds: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedStatus: string;
+  appliedStatus: string;
+  statusPillActiveLabel: string | undefined;
+  setSelectedStatus: React.Dispatch<React.SetStateAction<string>>;
+  setAppliedStatus: React.Dispatch<React.SetStateAction<string>>;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  employmentFilterOptions: {
+    label: string;
+    value: string;
+    onClick: () => void;
+  }[];
+  contractFilterOptions: {
+    label: string;
+    value: string;
+    onClick: () => void;
+  }[];
+  departmentFilterOptions: {
+    label: string;
+    value: string;
+    onClick: () => void;
+  }[];
+  statusFilterOptions: {
+    label: string;
+    value: string;
+    onClick: () => void;
+  }[];
+  usersDropdownContent: React.ReactNode;
+};
+
+function buildJourneyFilterPills(params: Readonly<BuildJourneyFilterPillsParams>) {
+  const {
+    selectedEmploymentType,
+    appliedEmploymentType,
+    setSelectedEmploymentType,
+    setAppliedEmploymentType,
+    selectedContract,
+    appliedContract,
+    setSelectedContract,
+    setAppliedContract,
+    selectedDepartment,
+    appliedDepartment,
+    departmentPillActiveLabel,
+    setSelectedDepartment,
+    setAppliedDepartment,
+    selectedUserIds,
+    appliedUserIds,
+    setSelectedUserIds,
+    setAppliedUserIds,
+    selectedStatus,
+    appliedStatus,
+    statusPillActiveLabel,
+    setSelectedStatus,
+    setAppliedStatus,
+    setCurrentPage,
+    employmentFilterOptions,
+    contractFilterOptions,
+    departmentFilterOptions,
+    statusFilterOptions,
+    usersDropdownContent,
+  } = params;
+
+  return [
+    {
+      id: "journey-employment",
+      label: "Employment",
+      showDropdown: true,
+      searchable: true,
+      dropdownSelectedValue: selectedEmploymentType || "__all__",
+      active: Boolean(selectedEmploymentType || appliedEmploymentType),
+      activeLabel: selectedEmploymentType || appliedEmploymentType || undefined,
+      onClear:
+        selectedEmploymentType || appliedEmploymentType
+          ? () => {
+              setSelectedEmploymentType("");
+              setAppliedEmploymentType("");
+              setCurrentPage(1);
+            }
+          : undefined,
+      dropdownOptions: employmentFilterOptions,
+    },
+    {
+      id: "journey-contract",
+      label: "Contract",
+      showDropdown: true,
+      searchable: true,
+      dropdownSelectedValue: selectedContract || "__all__",
+      active: Boolean(selectedContract || appliedContract),
+      activeLabel: selectedContract || appliedContract || undefined,
+      onClear:
+        selectedContract || appliedContract
+          ? () => {
+              setSelectedContract("");
+              setAppliedContract("");
+              setCurrentPage(1);
+            }
+          : undefined,
+      dropdownOptions: contractFilterOptions,
+    },
+    {
+      id: "journey-department",
+      label: "Department",
+      showDropdown: true,
+      searchable: true,
+      dropdownSelectedValue: selectedDepartment || "__all__",
+      active: Boolean(selectedDepartment || appliedDepartment),
+      activeLabel: departmentPillActiveLabel,
+      onClear:
+        selectedDepartment || appliedDepartment
+          ? () => {
+              setSelectedDepartment("");
+              setAppliedDepartment("");
+              setCurrentPage(1);
+            }
+          : undefined,
+      dropdownOptions: departmentFilterOptions,
+    },
+    {
+      id: "journey-users",
+      label: "Users",
+      showDropdown: true,
+      active: selectedUserIds.length > 0 || appliedUserIds.length > 0,
+      activeLabel: journeyUsersPillLabel(selectedUserIds.length, appliedUserIds.length),
+      onClear:
+        selectedUserIds.length > 0 || appliedUserIds.length > 0
+          ? () => {
+              setSelectedUserIds([]);
+              setAppliedUserIds([]);
+              setCurrentPage(1);
+            }
+          : undefined,
+      dropdownContent: usersDropdownContent,
+    },
+    {
+      id: "journey-status",
+      label: "Status",
+      showDropdown: true,
+      searchable: true,
+      dropdownSelectedValue: selectedStatus || "__all__",
+      active: Boolean(selectedStatus || appliedStatus),
+      activeLabel: statusPillActiveLabel,
+      onClear:
+        selectedStatus || appliedStatus
+          ? () => {
+              setSelectedStatus("");
+              setAppliedStatus("");
+              setCurrentPage(1);
+            }
+          : undefined,
+      dropdownOptions: statusFilterOptions,
+    },
+  ] as FilterPill[];
+}
+
+function hasAppliedJourneyFilters(params: {
+  appliedSearch: string;
+  appliedDepartment: string;
+  appliedEmploymentType: string;
+  appliedContract: string;
+  appliedStatus: string;
+  appliedUserIds: string[];
+}): boolean {
+  return Boolean(
+    params.appliedSearch.trim() ||
+      params.appliedDepartment ||
+      params.appliedEmploymentType ||
+      params.appliedContract ||
+      params.appliedStatus ||
+      params.appliedUserIds.length > 0,
+  );
+}
+
+function getJourneySidebarQuickActions(params: {
+  canDeleteJourneyRecord: boolean;
+  deletingJourney: boolean;
+  setShowDeleteJourneyModal: React.Dispatch<React.SetStateAction<boolean>>;
+}) {
+  if (!params.canDeleteJourneyRecord) return undefined;
+  return [
+    {
+      id: "delete-journey",
+      label: "Delete",
+      icon: Trash2,
+      onClick: () => params.setShowDeleteJourneyModal(true),
+      disabled: params.deletingJourney,
+    },
+  ];
+}
+
 type JourneyStepsSidebarSectionProps = {
   steps: JourneyStepRecord[];
   loading: boolean;
@@ -1545,197 +1966,42 @@ const EmployeesOnboarding = () => {
     [],
   );
 
-  const journeySidebarSections = useMemo<SidebarSection[]>(() => {
-    if (!selectedEmployee) return [];
-    const useLiveStepsProgress = journeyIdValid && !stepsLoading;
-    const liveProgress = useLiveStepsProgress
-      ? deriveJourneyProgressFromSteps(journeySteps)
-      : null;
-    const totalSteps = liveProgress
-      ? liveProgress.total
-      : Math.max(1, Number(selectedEmployee.total_steps_count ?? 0));
-    const completedSteps = liveProgress
-      ? liveProgress.completed
-      : Number(selectedEmployee.completed_steps_count ?? 0);
-    const progressPercent = liveProgress ? liveProgress.progress : selectedEmployee.progress;
-    const statusColors = getStatusColor(selectedEmployee.status);
-
-    return [
-      {
-        id: "journey-employee-details",
-        title: "Employee Details",
-        icon: User,
-        collapsible: true,
-        defaultExpanded: true,
-        fields: [
-          { label: "Extension", value: selectedEmployee.user_id || "—" },
-          { label: "Department", value: selectedEmployee.department_name || "—" },
-          { label: "Designation", value: selectedEmployee.designation || "—" },
-          { label: "Start Date", value: selectedEmployee.startDate || "—" },
-          { label: "Role", value: selectedEmployee.role || "—" },
-        ],
-      },
-      {
-        id: "journey-employment-info",
-        title: "Employment Info",
-        icon: Briefcase,
-        collapsible: true,
-        defaultExpanded: true,
-        fields: [
-          { label: "Contract Type", value: selectedEmployee.contract_type || "—" },
-          { label: "Employment Type", value: selectedEmployee.employment_type || "—" },
-        ],
-      },
-      {
-        id: "journey-onboarding-progress",
-        title: "Onboarding Progress",
-        icon: Target,
-        collapsible: true,
-        defaultExpanded: true,
-        customContent: (
-          <div style={{ padding: "0 4px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                marginBottom: "8px",
-              }}
-            >
-              <span style={{ fontSize: "13px", color: "#6b7280" }}>
-                {completedSteps} of {totalSteps} steps completed
-              </span>
-              <span style={{ fontSize: "13px", fontWeight: "600", color: "#1f2937" }}>
-                {progressPercent}%
-              </span>
-            </div>
-            <div
-              style={{
-                width: "100%",
-                height: "8px",
-                backgroundColor: "#e9d5ff",
-                borderRadius: "4px",
-                overflow: "hidden",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{
-                  width: `${progressPercent}%`,
-                  height: "100%",
-                  backgroundColor: "#8b5cf6",
-                  borderRadius: "4px",
-                  transition: "width 0.3s ease",
-                }}
-              />
-            </div>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "4px 12px",
-                backgroundColor: statusColors.bg,
-                borderRadius: "16px",
-              }}
-            >
-              <span
-                style={{
-                  display: "inline-block",
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  backgroundColor: statusColors.dot,
-                  flexShrink: 0,
-                }}
-              />
-              <span style={{ fontSize: "13px", fontWeight: "500", color: statusColors.color }}>
-                {selectedEmployee.status}
-              </span>
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: "journey-status",
-        title: "Status",
-        icon: Target,
-        collapsible: true,
-        defaultExpanded: true,
-        customContent: (
-          <div style={{ padding: "0 4px" }}>
-            <label
-              htmlFor="journey-sidebar-status"
-              style={{ display: "block", fontSize: "13px", fontWeight: "600", color: "#374151", marginBottom: "8px" }}
-            >
-              Journey Status
-            </label>
-            <select
-              id="journey-sidebar-status"
-              className="form-select"
-              value={statusValue}
-              onChange={handleStatusChange}
-              disabled={statusUpdating || isJourneyCompleted || !canUpdateJourneyRecord}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                fontSize: "14px",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                backgroundColor: isJourneyCompleted ? "#f9fafb" : "white",
-                color: "#1f2937",
-                cursor: statusUpdating || isJourneyCompleted ? "not-allowed" : "pointer",
-              }}
-            >
-              {JOURNEY_STATUS_OPTIONS.map((opt: { value: string; label: string }) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            {statusUpdating && (
-              <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>Updating...</div>
-            )}
-          </div>
-        ),
-      },
-      {
-        id: "journey-steps",
-        title: "Steps",
-        icon: Check,
-        collapsible: true,
-        defaultExpanded: true,
-        customContent: (
-          <JourneyStepsSidebarSection
-            steps={journeySteps}
-            loading={stepsLoading}
-            isCompleted={isJourneyCompleted}
-            canAddStep={canCreateJourneyStep}
-            canEditStep={canUpdateJourneyStep}
-            canDeleteStep={canDeleteJourneyStepPerm}
-            deletingStepId={deletingStepId}
-            onAddStep={() => setShowAddStepForm(true)}
-            onEditStep={(step) => setEditingStep(step)}
-            onDeleteStep={openDeleteStepModal}
-          />
-        ),
-      },
-    ];
-  }, [
-    selectedEmployee,
-    statusValue,
-    statusUpdating,
-    isJourneyCompleted,
-    journeyIdValid,
-    canUpdateJourneyRecord,
-    canCreateJourneyStep,
-    canUpdateJourneyStep,
-    canDeleteJourneyStepPerm,
-    stepsLoading,
-    journeySteps,
-    deletingStepId,
-    journeyDueDateMin,
-  ]);
+  const journeySidebarSections = useMemo<SidebarSection[]>(
+    () =>
+      buildJourneySidebarSections({
+        selectedEmployee,
+        journeyIdValid,
+        stepsLoading,
+        journeySteps,
+        canUpdateJourneyRecord,
+        canCreateJourneyStep,
+        canUpdateJourneyStep,
+        canDeleteJourneyStepPerm,
+        deletingStepId,
+        statusValue,
+        statusUpdating,
+        isJourneyCompleted,
+        handleStatusChange,
+        setShowAddStepForm,
+        setEditingStep,
+        openDeleteStepModal,
+      }),
+    [
+      selectedEmployee,
+      journeyIdValid,
+      stepsLoading,
+      journeySteps,
+      canUpdateJourneyRecord,
+      canCreateJourneyStep,
+      canUpdateJourneyStep,
+      canDeleteJourneyStepPerm,
+      deletingStepId,
+      statusValue,
+      statusUpdating,
+      isJourneyCompleted,
+      handleStatusChange,
+    ],
+  );
 
   const employmentFilterOptions = useMemo(
     () => [
@@ -1897,113 +2163,54 @@ const EmployeesOnboarding = () => {
   );
 
   const filterPills = useMemo<FilterPill[]>(
-    () => [
-      {
-        id: "journey-employment",
-        label: "Employment",
-        showDropdown: true,
-        searchable: true,
-        dropdownSelectedValue: selectedEmploymentType || "__all__",
-        active: Boolean(selectedEmploymentType || appliedEmploymentType),
-        activeLabel: selectedEmploymentType || appliedEmploymentType || undefined,
-        onClear:
-          selectedEmploymentType || appliedEmploymentType
-            ? () => {
-                setSelectedEmploymentType("");
-                setAppliedEmploymentType("");
-                setCurrentPage(1);
-              }
-            : undefined,
-        dropdownOptions: employmentFilterOptions,
-      },
-      {
-        id: "journey-contract",
-        label: "Contract",
-        showDropdown: true,
-        searchable: true,
-        dropdownSelectedValue: selectedContract || "__all__",
-        active: Boolean(selectedContract || appliedContract),
-        activeLabel: selectedContract || appliedContract || undefined,
-        onClear:
-          selectedContract || appliedContract
-            ? () => {
-                setSelectedContract("");
-                setAppliedContract("");
-                setCurrentPage(1);
-              }
-            : undefined,
-        dropdownOptions: contractFilterOptions,
-      },
-      {
-        id: "journey-department",
-        label: "Department",
-        showDropdown: true,
-        searchable: true,
-        dropdownSelectedValue: selectedDepartment || "__all__",
-        active: Boolean(selectedDepartment || appliedDepartment),
-        activeLabel: departmentPillActiveLabel,
-        onClear:
-          selectedDepartment || appliedDepartment
-            ? () => {
-                setSelectedDepartment("");
-                setAppliedDepartment("");
-                setCurrentPage(1);
-              }
-            : undefined,
-        dropdownOptions: departmentFilterOptions,
-      },
-      {
-        id: "journey-users",
-        label: "Users",
-        showDropdown: true,
-        active: selectedUserIds.length > 0 || appliedUserIds.length > 0,
-        activeLabel: journeyUsersPillLabel(selectedUserIds.length, appliedUserIds.length),
-        onClear:
-          selectedUserIds.length > 0 || appliedUserIds.length > 0
-            ? () => {
-                setSelectedUserIds([]);
-                setAppliedUserIds([]);
-                setCurrentPage(1);
-              }
-            : undefined,
-        dropdownContent: usersDropdownContent,
-      },
-      {
-        id: "journey-status",
-        label: "Status",
-        showDropdown: true,
-        searchable: true,
-        dropdownSelectedValue: selectedStatus || "__all__",
-        active: Boolean(selectedStatus || appliedStatus),
-        activeLabel: statusPillActiveLabel,
-        onClear:
-          selectedStatus || appliedStatus
-            ? () => {
-                setSelectedStatus("");
-                setAppliedStatus("");
-                setCurrentPage(1);
-              }
-            : undefined,
-        dropdownOptions: statusFilterOptions,
-      },
-    ],
+    () =>
+      buildJourneyFilterPills({
+        selectedEmploymentType,
+        appliedEmploymentType,
+        setSelectedEmploymentType,
+        setAppliedEmploymentType,
+        selectedContract,
+        appliedContract,
+        setSelectedContract,
+        setAppliedContract,
+        selectedDepartment,
+        appliedDepartment,
+        departmentPillActiveLabel,
+        setSelectedDepartment,
+        setAppliedDepartment,
+        selectedUserIds,
+        appliedUserIds,
+        setSelectedUserIds,
+        setAppliedUserIds,
+        selectedStatus,
+        appliedStatus,
+        statusPillActiveLabel,
+        setSelectedStatus,
+        setAppliedStatus,
+        setCurrentPage,
+        employmentFilterOptions,
+        contractFilterOptions,
+        departmentFilterOptions,
+        statusFilterOptions,
+        usersDropdownContent,
+      }),
     [
-      appliedDepartment,
-      appliedEmploymentType,
-      appliedContract,
-      appliedUserIds,
-      appliedStatus,
-      departmentFilterOptions,
-      departmentPillActiveLabel,
-      selectedDepartment,
       selectedEmploymentType,
+      appliedEmploymentType,
       selectedContract,
-      selectedStatus,
+      appliedContract,
+      selectedDepartment,
+      appliedDepartment,
+      departmentPillActiveLabel,
       selectedUserIds,
+      appliedUserIds,
+      selectedStatus,
+      appliedStatus,
+      statusPillActiveLabel,
       employmentFilterOptions,
       contractFilterOptions,
+      departmentFilterOptions,
       statusFilterOptions,
-      statusPillActiveLabel,
       usersDropdownContent,
     ],
   );
@@ -2066,6 +2273,36 @@ const EmployeesOnboarding = () => {
     [searchTerm, filterPills, journeysPagination?.total],
   );
 
+  const hasAppliedFilters = useMemo(
+    () =>
+      hasAppliedJourneyFilters({
+        appliedSearch,
+        appliedDepartment,
+        appliedEmploymentType,
+        appliedContract,
+        appliedStatus,
+        appliedUserIds,
+      }),
+    [
+      appliedSearch,
+      appliedDepartment,
+      appliedEmploymentType,
+      appliedContract,
+      appliedStatus,
+      appliedUserIds,
+    ],
+  );
+
+  const sidebarQuickActions = useMemo(
+    () =>
+      getJourneySidebarQuickActions({
+        canDeleteJourneyRecord,
+        deletingJourney,
+        setShowDeleteJourneyModal,
+      }),
+    [canDeleteJourneyRecord, deletingJourney],
+  );
+
   return (
     <React.Fragment>
       <BreadcrumbItem mainTitle="" mainLink="" subTitle="Employees Journey" />
@@ -2114,12 +2351,7 @@ const EmployeesOnboarding = () => {
             maxHeight="calc(100vh - 295px)"
           />
 
-          {(appliedSearch.trim() ||
-            appliedDepartment ||
-            appliedEmploymentType ||
-            appliedContract ||
-            appliedStatus ||
-            appliedUserIds.length > 0) && (
+          {hasAppliedFilters && (
             <div style={{ marginTop: "10px", fontSize: "12px", color: "#6b7280", padding: "0 4px" }}>
               {appliedSearch.trim() ? `Search: ${appliedSearch} | ` : ""}
               {appliedDepartment ? `Department: ${appliedDepartmentLabel} | ` : ""}
@@ -2146,19 +2378,7 @@ const EmployeesOnboarding = () => {
               name: selectedEmployee.name,
               gradient: getAvatarColor(selectedEmployee.name),
             }}
-            quickActions={
-              canDeleteJourneyRecord
-                ? [
-                    {
-                      id: "delete-journey",
-                      label: "Delete",
-                      icon: Trash2,
-                      onClick: () => setShowDeleteJourneyModal(true),
-                      disabled: deletingJourney,
-                    },
-                  ]
-                : undefined
-            }
+            quickActions={sidebarQuickActions}
             sections={journeySidebarSections}
           />
         )}
