@@ -616,7 +616,7 @@ function computeOrdersFilterCounts(
   return counts;
 }
 
-const CrmOrders = () => {
+const CrmOrdersPageContent = () => {
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -4907,6 +4907,10 @@ const CrmOrders = () => {
     </React.Fragment>
   );
 };
+
+const CrmOrdersPage = () => <CrmOrdersPageContent />;
+
+const CrmOrders = () => <CrmOrdersPage />;
 
 CrmOrders.getLayout = (page: ReactElement) => {
   return <Layout>{page}</Layout>;
