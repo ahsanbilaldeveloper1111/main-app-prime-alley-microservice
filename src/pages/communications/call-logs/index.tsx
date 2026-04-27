@@ -45,10 +45,12 @@ import {
   shouldSkipCommunicationsListFetch,
 } from "@utils/communicationsDateUtils";
 import {
+  buildDateTimeFilterPill,
   buildCallDirectionFilterPill,
   buildCallStatusFilterPill,
   buildDepartmentFilterPill,
   buildExtensionMultiSelectFilterPill,
+  buildTextDropdownFilterPill,
 } from "@utils/communicationsFilterPills";
 import {
   createDateTimeDropdownContent,
@@ -567,54 +569,33 @@ const CallLogs = () => {
           currentFilters,
           stageFilters,
         ),
-        {
-          id: "phone_number",
-          label: "Numbers",
-          showDropdown: true,
-          active: Boolean(currentFilters.phone_number),
-          activeLabel: currentFilters.phone_number
-            ? String(currentFilters.phone_number)
-            : undefined,
-          onClear: () => stageFilters({ ...currentFilters, phone_number: "" }),
-          dropdownContent: createTextFilterDropdownContent(
-            currentFilters.phone_number ?? "",
-            (value: string) =>
-              setCurrentFilters({ ...currentFilters, phone_number: value }),
-            (value: string) =>
-              stageFilters({ ...currentFilters, phone_number: value }),
-            "Enter number",
-          ),
-        },
-        {
-          id: "start_datetime",
-          label: "Start Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.start_datetime),
-          activeLabel: formatFilterDateTimeLabel(currentFilters.start_datetime),
-          activeLabelOnly: true,
-          dropdownContent: createDateTimeDropdownContent(
-            currentFilters.start_datetime ?? "",
-            (value: string) =>
-              setCurrentFilters({ ...currentFilters, start_datetime: value }),
-            (value: string) =>
-              stageFilters({ ...currentFilters, start_datetime: value }),
-          ),
-        },
-        {
-          id: "end_datetime",
-          label: "End Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.end_datetime),
-          activeLabel: formatFilterDateTimeLabel(currentFilters.end_datetime),
-          activeLabelOnly: true,
-          dropdownContent: createDateTimeDropdownContent(
-            currentFilters.end_datetime ?? "",
-            (value: string) =>
-              setCurrentFilters({ ...currentFilters, end_datetime: value }),
-            (value: string) =>
-              stageFilters({ ...currentFilters, end_datetime: value }),
-          ),
-        },
+        buildTextDropdownFilterPill(
+          "phone_number",
+          "Numbers",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          createTextFilterDropdownContent,
+          "Enter number",
+        ),
+        buildDateTimeFilterPill(
+          "start_datetime",
+          "Start Date & Time",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
+        buildDateTimeFilterPill(
+          "end_datetime",
+          "End Date & Time",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
       ],
       filterPillsRightActions: renderApplyResetFilterActions(
         hasNonDefaultFilters,

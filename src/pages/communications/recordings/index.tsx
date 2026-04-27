@@ -63,9 +63,11 @@ import {
 } from "@utils/communicationsDateUtils";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 import {
+  buildDateTimeFilterPill,
   buildCallDirectionFilterPill,
   buildDepartmentFilterPill,
   buildExtensionMultiSelectFilterPill,
+  buildTextDropdownFilterPill,
 } from "@utils/communicationsFilterPills";
 import {
   createDateTimeDropdownContent,
@@ -656,53 +658,33 @@ const CallRecordings: NextPage & {
               stageFilters({ ...currentFilters, username: String(u.id) }),
           })),
         },
-        {
-          id: "remote_party_number",
-          label: "Remote Party Number",
-          showDropdown: true,
-          active: Boolean(currentFilters.remote_party_number),
-          activeLabel: currentFilters.remote_party_number
-            ? String(currentFilters.remote_party_number)
-            : undefined,
-          onClear: () =>
-            stageFilters({ ...currentFilters, remote_party_number: "" }),
-          dropdownContent: createTextFilterDropdownContent(
-            currentFilters.remote_party_number ?? "",
-            (v: string) =>
-              setCurrentFilters({ ...currentFilters, remote_party_number: v }),
-            (v: string) =>
-              stageFilters({ ...currentFilters, remote_party_number: v }),
-            "Enter phone number",
-          ),
-        },
-        {
-          id: "start_date",
-          label: "Start Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.start_date),
-          activeLabel: formatFilterDateTimeLabel(currentFilters.start_date),
-          activeLabelOnly: true,
-          dropdownContent: createDateTimeDropdownContent(
-            currentFilters.start_date ?? "",
-            (v: string) =>
-              setCurrentFilters({ ...currentFilters, start_date: v }),
-            (v: string) => stageFilters({ ...currentFilters, start_date: v }),
-          ),
-        },
-        {
-          id: "end_date",
-          label: "End Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.end_date),
-          activeLabel: formatFilterDateTimeLabel(currentFilters.end_date),
-          activeLabelOnly: true,
-          dropdownContent: createDateTimeDropdownContent(
-            currentFilters.end_date ?? "",
-            (v: string) =>
-              setCurrentFilters({ ...currentFilters, end_date: v }),
-            (v: string) => stageFilters({ ...currentFilters, end_date: v }),
-          ),
-        },
+        buildTextDropdownFilterPill(
+          "remote_party_number",
+          "Remote Party Number",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          createTextFilterDropdownContent,
+          "Enter phone number",
+        ),
+        buildDateTimeFilterPill(
+          "start_date",
+          "Start Date & Time",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
+        buildDateTimeFilterPill(
+          "end_date",
+          "End Date & Time",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
       ],
       filterPillsRightActions: renderApplyResetFilterActions(
         hasNonDefaultFilters,
