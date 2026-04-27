@@ -56,6 +56,11 @@ import {
 } from "@utils/Helper";
 import { isExactPhoneMatch, normalizePhoneValue } from "@utils/phoneMatch";
 import CircularProgressCircle from "@components/CircularProgressCircle";
+import {
+  buildCallDirectionFilterPill,
+  buildDepartmentFilterPill,
+  buildExtensionMultiSelectFilterPill,
+} from "@utils/communicationsFilterPills";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -735,26 +740,6 @@ const CallRecordings: NextPage & {
     [currentFilters, defaultFilters.current],
   );
 
-  const callDirectionLabel = (value: string): string => {
-    if (value === "OUTGOING") return "Outgoing";
-    if (value === "INCOMING") return "Incoming";
-    if (value === "Both") return "Both";
-    return "";
-  };
-
-  const toggleExtensionId = useCallback(
-    (idVal: string) => {
-      const prev = Array.isArray(currentFilters.extension_number)
-        ? (currentFilters.extension_number as string[])
-        : [];
-      const next = prev.includes(idVal)
-        ? prev.filter((v) => v !== idVal)
-        : [...prev, idVal];
-      stageFilters({ ...currentFilters, extension_number: next });
-    },
-    [currentFilters, stageFilters],
-  );
-
   const selectedStartDateTime = String(
     appliedFilters?.start_date || startDateTime || "",
   );
@@ -763,9 +748,6 @@ const CallRecordings: NextPage & {
   );
 
   const tableToolbar = useMemo(() => {
-    const extensionAllIds = hierarchyDataExtensions.map((ext: any) =>
-      String(ext.id),
-    );
     return {
       showTabs: true,
       tabs: [
@@ -795,109 +777,17 @@ const CallRecordings: NextPage & {
       showFilterPills: true,
       showMoreFiltersButton: false,
       filterPills: [
-        {
-          id: "call_direction",
-          label: "Call Direction",
-          showDropdown: true,
-          active: Boolean(currentFilters.call_direction),
-          activeLabel: callDirectionLabel(
-            String(currentFilters.call_direction ?? ""),
-          ),
-          onClear: () =>
-            stageFilters({ ...currentFilters, call_direction: "" }),
-          dropdownOptions: [
-            {
-              label: "Outgoing",
-              value: "OUTGOING",
-              onClick: () =>
-                stageFilters({ ...currentFilters, call_direction: "OUTGOING" }),
-            },
-            {
-              label: "Incoming",
-              value: "INCOMING",
-              onClick: () =>
-                stageFilters({ ...currentFilters, call_direction: "INCOMING" }),
-            },
-            {
-              label: "Both",
-              value: "Both",
-              onClick: () =>
-                stageFilters({ ...currentFilters, call_direction: "Both" }),
-            },
-          ],
-        },
-        {
-          id: "extension_number",
-          label: "Extension",
-          showDropdown: true,
-          searchable: true,
-          multiSelect: true,
-          onSelectAll: () => {
-            const selected = Array.isArray(currentFilters.extension_number)
-              ? (currentFilters.extension_number as string[])
-              : [];
-            const allSelected =
-              extensionAllIds.length > 0 &&
-              selected.length === extensionAllIds.length;
-            stageFilters({
-              ...currentFilters,
-              extension_number: allSelected ? [] : extensionAllIds,
-            });
-          },
-          selectAllLabel:
-            Array.isArray(currentFilters.extension_number) &&
-            extensionAllIds.length > 0 &&
-            (currentFilters.extension_number as string[]).length ===
-              extensionAllIds.length
-              ? "Deselect all"
-              : "Select all",
-          active:
-            Array.isArray(currentFilters.extension_number) &&
-            currentFilters.extension_number.length > 0,
-          activeLabel:
-            Array.isArray(currentFilters.extension_number) &&
-            currentFilters.extension_number.length > 0
-              ? `${(currentFilters.extension_number as string[]).length} selected`
-              : undefined,
-          onClear: () =>
-            stageFilters({ ...currentFilters, extension_number: [] }),
-          dropdownOptions: hierarchyDataExtensions.map((ext: any) => {
-            const idVal = String(ext.id);
-            const isSelected =
-              Array.isArray(currentFilters.extension_number) &&
-              (currentFilters.extension_number as string[]).includes(idVal);
-            return {
-              label: String(ext.name ?? ext.id),
-              value: idVal,
-              selected: isSelected,
-              onClick: () => toggleExtensionId(idVal),
-            };
-          }),
-        },
-        {
-          id: "department",
-          label: "Department",
-          showDropdown: true,
-          searchable: true,
-          active:
-            Array.isArray(currentFilters.department) &&
-            currentFilters.department.length > 0,
-          activeLabel:
-            Array.isArray(currentFilters.department) &&
-            currentFilters.department.length > 0
-              ? `${(currentFilters.department as string[]).length} selected`
-              : undefined,
-          onClear: () => stageFilters({ ...currentFilters, department: [] }),
-          dropdownOptions: hierarchyDataDepartments.map((dept: any) => {
-            const idVal = String(dept.id);
-            return {
-              label: String(dept.name ?? dept.id),
-              value: idVal,
-              onClick: () =>
-                stageFilters({ ...currentFilters, department: [idVal] }),
-            };
-          }),
-        },
+        buildCallDirectionFilterPill(currentFilters, stageFilters),
+        buildExtensionMultiSelectFilterPill(
+          hierarchyDataExtensions as any[],
+          currentFilters,
+          stageFilters,
+        ),
+        buildDepartmentFilterPill(
+          hierarchyDataDepartments as any[],
+          currentFilters,
+          stageFilters,
+        ),
         {
           id: "username",
           label: "Username",
@@ -1068,7 +958,6 @@ const CallRecordings: NextPage & {
     handleResetFiltersClick,
     hasUnappliedFilterChanges,
     hasNonDefaultFilters,
-    toggleExtensionId,
   ]);
 
   const handleDownload = async (props: any) => {

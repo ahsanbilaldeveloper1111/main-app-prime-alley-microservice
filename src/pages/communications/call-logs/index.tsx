@@ -39,6 +39,12 @@ import {
 } from "@utils/Helper";
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { isExactPhoneMatch, normalizePhoneValue } from "@utils/phoneMatch";
+import {
+  buildCallDirectionFilterPill,
+  buildCallStatusFilterPill,
+  buildDepartmentFilterPill,
+  buildExtensionMultiSelectFilterPill,
+} from "@utils/communicationsFilterPills";
 
 /** Row shape from call-logs API (data / dataList items) */
 interface CallLogRow {
@@ -597,40 +603,6 @@ const CallLogs = () => {
     [currentFilters, defaultFilters.current],
   );
 
-  const extensionAllIds = useMemo(
-    () => hierarchyDataExtensions.map((ext: any) => String(ext.id)),
-    [hierarchyDataExtensions],
-  );
-  const selectedExtensionIds = useMemo(
-    () =>
-      Array.isArray(currentFilters.extension_number)
-        ? (currentFilters.extension_number as string[])
-        : [],
-    [currentFilters.extension_number],
-  );
-  const areAllExtensionsSelected = useMemo(
-    () =>
-      extensionAllIds.length > 0 &&
-      selectedExtensionIds.length === extensionAllIds.length,
-    [extensionAllIds, selectedExtensionIds],
-  );
-  const callDirectionActiveLabel = useMemo(() => {
-    const value = String(currentFilters.call_direction ?? "");
-    if (value === "OUTGOING") return "Outgoing";
-    if (value === "INCOMING") return "Incoming";
-    if (value === "Both") return "Both";
-    return undefined;
-  }, [currentFilters.call_direction]);
-  const toggleExtensionId = useCallback(
-    (idVal: string) => {
-      const next = selectedExtensionIds.includes(idVal)
-        ? selectedExtensionIds.filter((v) => v !== idVal)
-        : [...selectedExtensionIds, idVal];
-      stageFilters({ ...currentFilters, extension_number: next });
-    },
-    [currentFilters, selectedExtensionIds, stageFilters],
-  );
-
   const tableToolbar = useMemo<any>(() => {
     return {
       showTabs: true,
@@ -658,66 +630,8 @@ const CallLogs = () => {
       showFilterPills: true,
       showMoreFiltersButton: false,
       filterPills: [
-        {
-          id: "call_direction",
-          label: "Call Direction",
-          showDropdown: true,
-          active: Boolean(currentFilters.call_direction),
-          activeLabel: callDirectionActiveLabel,
-          onClear: () =>
-            stageFilters({ ...currentFilters, call_direction: "" }),
-          dropdownOptions: [
-            {
-              label: "Outgoing",
-              value: "OUTGOING",
-              onClick: () =>
-                stageFilters({ ...currentFilters, call_direction: "OUTGOING" }),
-            },
-            {
-              label: "Incoming",
-              value: "INCOMING",
-              onClick: () =>
-                stageFilters({ ...currentFilters, call_direction: "INCOMING" }),
-            },
-            {
-              label: "Both",
-              value: "Both",
-              onClick: () =>
-                stageFilters({ ...currentFilters, call_direction: "Both" }),
-            },
-          ],
-        },
-        {
-          id: "call_status",
-          label: "Call Status",
-          showDropdown: true,
-          active: Boolean(currentFilters.call_status),
-          activeLabel: currentFilters.call_status || undefined,
-          onClear: () => stageFilters({ ...currentFilters, call_status: "" }),
-          dropdownOptions: [
-            {
-              label: "Answered",
-              value: "Answered",
-              onClick: () =>
-                stageFilters({ ...currentFilters, call_status: "Answered" }),
-            },
-            {
-              label: "Not Answered",
-              value: "Not Answered",
-              onClick: () =>
-                stageFilters({
-                  ...currentFilters,
-                  call_status: "Not Answered",
-                }),
-            },
-            {
-              label: "Both",
-              value: "Both",
-              onClick: () =>
-                stageFilters({ ...currentFilters, call_status: "Both" }),
-            },
-          ],
-        },
+        buildCallDirectionFilterPill(currentFilters, stageFilters),
+        buildCallStatusFilterPill(currentFilters, stageFilters),
         {
           id: "traffic_type",
           label: "Traffic Type",
@@ -787,66 +701,16 @@ const CallLogs = () => {
             },
           ],
         },
-        {
-          id: "extension_number",
-          label: "Extension",
-          showDropdown: true,
-          searchable: true,
-          multiSelect: true,
-          onSelectAll: () => {
-            stageFilters({
-              ...currentFilters,
-              extension_number: areAllExtensionsSelected ? [] : extensionAllIds,
-            });
-          },
-          selectAllLabel: areAllExtensionsSelected
-            ? "Deselect all"
-            : "Select all",
-          active:
-            Array.isArray(currentFilters.extension_number) &&
-            currentFilters.extension_number.length > 0,
-          activeLabel:
-            Array.isArray(currentFilters.extension_number) &&
-            currentFilters.extension_number.length > 0
-              ? `${(currentFilters.extension_number as string[]).length} selected`
-              : undefined,
-          onClear: () =>
-            stageFilters({ ...currentFilters, extension_number: [] }),
-          dropdownOptions: hierarchyDataExtensions.map((ext: any) => {
-            const idVal = String(ext.id);
-            const isSelected = selectedExtensionIds.includes(idVal);
-            return {
-              label: String(ext.name ?? ext.id),
-              value: idVal,
-              selected: isSelected,
-              onClick: () => toggleExtensionId(idVal),
-            };
-          }),
-        },
-        {
-          id: "department",
-          label: "Department",
-          showDropdown: true,
-          searchable: true,
-          active:
-            Array.isArray(currentFilters.department) &&
-            currentFilters.department.length > 0,
-          activeLabel:
-            Array.isArray(currentFilters.department) &&
-            currentFilters.department.length > 0
-              ? `${(currentFilters.department as string[]).length} selected`
-              : undefined,
-          onClear: () => stageFilters({ ...currentFilters, department: [] }),
-          dropdownOptions: hierarchyDataDepartments.map((dept: any) => {
-            const idVal = String(dept.id);
-            return {
-              label: String(dept.name ?? dept.id),
-              value: idVal,
-              onClick: () =>
-                stageFilters({ ...currentFilters, department: [idVal] }),
-            };
-          }),
-        },
+        buildExtensionMultiSelectFilterPill(
+          hierarchyDataExtensions as any[],
+          currentFilters,
+          stageFilters,
+        ),
+        buildDepartmentFilterPill(
+          hierarchyDataDepartments as any[],
+          currentFilters,
+          stageFilters,
+        ),
         {
           id: "phone_number",
           label: "Numbers",
@@ -938,11 +802,6 @@ const CallLogs = () => {
     handleResetFiltersClick,
     hasUnappliedFilterChanges,
     hasNonDefaultFilters,
-    callDirectionActiveLabel,
-    extensionAllIds,
-    areAllExtensionsSelected,
-    selectedExtensionIds,
-    toggleExtensionId,
   ]);
 
   return (
