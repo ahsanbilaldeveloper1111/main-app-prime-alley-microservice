@@ -233,6 +233,84 @@ function journeyUsersPillLabel(selectedCount: number, appliedCount: number): str
   return undefined;
 }
 
+function getDepartmentFilterLabel(
+  departments: MainAppDepartmentLookup[],
+  departmentId: string,
+): string {
+  if (departmentId === "") return "";
+  const department = departments.find(
+    (dept: MainAppDepartmentLookup) => String(dept.id) === departmentId,
+  );
+  if (department == null) return departmentId;
+  return hierarchyLabel(department);
+}
+
+function getJourneyStatusLabel(status: string): string {
+  if (status === "") return "";
+  const option = JOURNEY_STATUS_OPTIONS.find(
+    (o: { value: string; label: string }) => o.value === status,
+  );
+  return option?.label ?? status;
+}
+
+function pickActiveLabel(
+  selectedValue: string,
+  appliedValue: string,
+  selectedLabel: string,
+  appliedLabel: string,
+): string | undefined {
+  if (selectedValue) return selectedLabel;
+  if (appliedValue) return appliedLabel;
+  return undefined;
+}
+
+async function applyJourneyStatusChange(params: {
+  journeyId: number;
+  nextStatus: string;
+  setStatusValue: React.Dispatch<React.SetStateAction<string>>;
+  setSelectedEmployee: React.Dispatch<React.SetStateAction<OnboardingEmployee | null>>;
+  setRefreshJourneysKey: React.Dispatch<React.SetStateAction<number>>;
+}): Promise<void> {
+  await updateJourney(params.journeyId, { status: params.nextStatus });
+  params.setStatusValue(params.nextStatus);
+  params.setSelectedEmployee((prev) => {
+    if (!prev) return prev;
+    const displayStatus = STATUS_DISPLAY[params.nextStatus] ?? prev.status;
+    return { ...prev, status: displayStatus };
+  });
+  toast.success("Status updated.");
+  params.setRefreshJourneysKey((k) => k + 1);
+}
+
+async function deleteJourneyAndRefresh(params: {
+  journeyId: number;
+  setShowDeleteJourneyModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setSelectedEmployee: React.Dispatch<React.SetStateAction<OnboardingEmployee | null>>;
+  setRefreshJourneysKey: React.Dispatch<React.SetStateAction<number>>;
+}): Promise<void> {
+  await deleteJourney(params.journeyId);
+  toast.success("Journey deleted.");
+  params.setShowDeleteJourneyModal(false);
+  params.setIsSidebarOpen(false);
+  params.setSelectedEmployee(null);
+  params.setRefreshJourneysKey((k) => k + 1);
+}
+
+async function deleteJourneyStepAndRefresh(params: {
+  journeyId: number;
+  stepId: number;
+  refreshSteps: () => Promise<void>;
+  closeDeleteStepModal: () => void;
+  setRefreshJourneysKey: React.Dispatch<React.SetStateAction<number>>;
+}): Promise<void> {
+  await deleteJourneyStep(params.journeyId, params.stepId);
+  toast.success("Step deleted.");
+  await params.refreshSteps();
+  params.closeDeleteStepModal();
+  params.setRefreshJourneysKey((k) => k + 1);
+}
+
 function hierarchyLabel(item: unknown): string {
   if (item == null) return "—";
   if (typeof item === "string") return item;
@@ -1059,15 +1137,13 @@ const EmployeesOnboarding = () => {
     if (!canUpdateJourneyRecord || isJourneyCompleted) return;
     setStatusUpdating(true);
     try {
-      await updateJourney(journeyId, { status: newStatus });
-      setStatusValue(newStatus);
-      setSelectedEmployee((prev) => {
-        if (!prev) return prev;
-        const displayStatus = STATUS_DISPLAY[newStatus] ?? prev.status;
-        return { ...prev, status: displayStatus };
+      await applyJourneyStatusChange({
+        journeyId,
+        nextStatus: newStatus,
+        setStatusValue,
+        setSelectedEmployee,
+        setRefreshJourneysKey,
       });
-      toast.success("Status updated.");
-      setRefreshJourneysKey((k) => k + 1);
     } catch (error: unknown) {
       console.error("[WorkforceJourney] updateJourney failed", error);
     } finally {
@@ -1094,11 +1170,13 @@ const EmployeesOnboarding = () => {
     }
     setDeletingStepId(step.id);
     try {
-      await deleteJourneyStep(journeyId, step.id);
-      toast.success("Step deleted.");
-      await refreshSteps();
-      closeDeleteStepModal();
-      setRefreshJourneysKey((k) => k + 1);
+      await deleteJourneyStepAndRefresh({
+        journeyId,
+        stepId: step.id,
+        refreshSteps,
+        closeDeleteStepModal,
+        setRefreshJourneysKey,
+      });
     } catch (error: unknown) {
       console.error("[WorkforceJourney] deleteJourneyStep failed", error);
     } finally {
@@ -1110,12 +1188,13 @@ const EmployeesOnboarding = () => {
     if (!canDeleteJourneyRecord) return;
     setDeletingJourney(true);
     try {
-      await deleteJourney(journeyId);
-      toast.success("Journey deleted.");
-      setShowDeleteJourneyModal(false);
-      setIsSidebarOpen(false);
-      setSelectedEmployee(null);
-      setRefreshJourneysKey((k) => k + 1);
+      await deleteJourneyAndRefresh({
+        journeyId,
+        setShowDeleteJourneyModal,
+        setIsSidebarOpen,
+        setSelectedEmployee,
+        setRefreshJourneysKey,
+      });
     } catch (error: unknown) {
       console.error("[WorkforceJourney] deleteJourney failed", error);
     } finally {
@@ -1181,24 +1260,23 @@ const EmployeesOnboarding = () => {
 
   const departments = useMemo(() => mainAppDepartments ?? [], [mainAppDepartments]);
 
-  const selectedDepartmentLabel = useMemo(() => {
-    if (selectedDepartment === "") return "";
-    const d = departments.find((dept: MainAppDepartmentLookup) => String(dept.id) === selectedDepartment);
-    if (d == null) return selectedDepartment;
-    return hierarchyLabel(d);
-  }, [selectedDepartment, departments]);
+  const selectedDepartmentLabel = useMemo(
+    () => getDepartmentFilterLabel(departments, selectedDepartment),
+    [selectedDepartment, departments],
+  );
 
-  const appliedDepartmentLabel = useMemo(() => {
-    if (appliedDepartment === "") return "";
-    const d = departments.find((dept: MainAppDepartmentLookup) => String(dept.id) === appliedDepartment);
-    if (d == null) return appliedDepartment;
-    return hierarchyLabel(d);
-  }, [appliedDepartment, departments]);
+  const appliedDepartmentLabel = useMemo(
+    () => getDepartmentFilterLabel(departments, appliedDepartment),
+    [appliedDepartment, departments],
+  );
 
   const departmentPillActiveLabel = useMemo(() => {
-    if (selectedDepartment) return selectedDepartmentLabel;
-    if (appliedDepartment) return appliedDepartmentLabel;
-    return undefined;
+    return pickActiveLabel(
+      selectedDepartment,
+      appliedDepartment,
+      selectedDepartmentLabel,
+      appliedDepartmentLabel,
+    );
   }, [
     selectedDepartment,
     appliedDepartment,
@@ -1206,22 +1284,23 @@ const EmployeesOnboarding = () => {
     appliedDepartmentLabel,
   ]);
 
-  const selectedStatusLabel = useMemo(() => {
-    if (selectedStatus === "") return "";
-    const opt = JOURNEY_STATUS_OPTIONS.find((o: { value: string; label: string }) => o.value === selectedStatus);
-    return opt?.label ?? selectedStatus;
-  }, [selectedStatus]);
+  const selectedStatusLabel = useMemo(
+    () => getJourneyStatusLabel(selectedStatus),
+    [selectedStatus],
+  );
 
-  const appliedStatusLabel = useMemo(() => {
-    if (appliedStatus === "") return "";
-    const opt = JOURNEY_STATUS_OPTIONS.find((o: { value: string; label: string }) => o.value === appliedStatus);
-    return opt?.label ?? appliedStatus;
-  }, [appliedStatus]);
+  const appliedStatusLabel = useMemo(
+    () => getJourneyStatusLabel(appliedStatus),
+    [appliedStatus],
+  );
 
   const statusPillActiveLabel = useMemo(() => {
-    if (selectedStatus) return selectedStatusLabel;
-    if (appliedStatus) return appliedStatusLabel;
-    return undefined;
+    return pickActiveLabel(
+      selectedStatus,
+      appliedStatus,
+      selectedStatusLabel,
+      appliedStatusLabel,
+    );
   }, [selectedStatus, appliedStatus, selectedStatusLabel, appliedStatusLabel]);
 
   const onboardingColumns = useMemo<TableColumn<OnboardingEmployee>[]>(

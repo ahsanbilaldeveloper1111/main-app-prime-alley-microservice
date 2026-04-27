@@ -87,38 +87,39 @@ function humanizeActivityFieldKey(key: string): string {
 /** Calendar fields in activity diffs: show date only (no time) in the Changes block. */
 const ACTIVITY_CHANGE_DATE_ONLY_FIELDS = new Set(["due_date", "start_date", "end_date"]);
 
-function formatActivityChangeValue(val: unknown, options?: { dateOnly?: boolean }): string {
-  if (val == null || val === "") {
-    return "—";
+function formatDateLikeActivityValue(
+  value: string,
+  dateOnly?: boolean,
+): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return null;
   }
-  if (typeof val === "string") {
-    const trimmed = val.trim();
-    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
-      try {
-        const d = new Date(trimmed);
-        if (!Number.isNaN(d.getTime())) {
-          if (options?.dateOnly) {
-            return d.toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-            });
-          }
-          return d.toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-            hour12: true,
-          });
-        }
-      } catch {
-        return trimmed;
-      }
+  try {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
     }
-    return trimmed;
+    if (dateOnly) {
+      return parsed.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+    return parsed.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  } catch {
+    return value;
   }
+}
+
+function stringifyActivityValue(val: unknown): string {
   if (typeof val === "number" || typeof val === "boolean") {
     return String(val);
   }
@@ -130,6 +131,21 @@ function formatActivityChangeValue(val: unknown, options?: { dateOnly?: boolean 
     }
     return String(val as string | number | bigint | boolean | symbol);
   }
+}
+
+function formatActivityChangeValue(val: unknown, options?: { dateOnly?: boolean }): string {
+  if (val == null || val === "") {
+    return "—";
+  }
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    const formattedDateValue = formatDateLikeActivityValue(trimmed, options?.dateOnly);
+    if (formattedDateValue != null) {
+      return formattedDateValue;
+    }
+    return trimmed;
+  }
+  return stringifyActivityValue(val);
 }
 
 function collectActivityChangeKeys(
