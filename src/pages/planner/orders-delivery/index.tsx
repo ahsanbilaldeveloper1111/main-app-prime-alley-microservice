@@ -174,6 +174,32 @@ const OPTIONAL_STRING_FILTER_KEYS = [
 
 const OPTIONAL_TRUE_FILTER_KEYS = ["include_lost", "include_archived"] as const;
 
+type OrdersUiFilters = {
+  assignedTo: string | null;
+  stage: string | null;
+  industry: string | null;
+  orderValueMin: string | null;
+  orderValueMax: string | null;
+  orderApprovalStatus: string | null;
+  fulfillmentStatus: string | null;
+  paymentStatus: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+};
+
+const DEFAULT_ORDERS_UI_FILTERS: OrdersUiFilters = {
+  assignedTo: null,
+  stage: null,
+  industry: null,
+  orderValueMin: null,
+  orderValueMax: null,
+  orderApprovalStatus: null,
+  fulfillmentStatus: null,
+  paymentStatus: null,
+  dateFrom: null,
+  dateTo: null,
+};
+
 function setOptionalFilterValue(
   target: Record<string, any>,
   key: string,
@@ -257,6 +283,25 @@ function applyActiveFilterState(
 function isValidActiveFilterTab(tab: string, stages: any[]): boolean {
   if (tab === "all" || tab === "lost" || tab === "deleted") return true;
   return stages.some((s: any) => s.id.toString() === tab);
+}
+
+function buildOrdersFiltersToApply(
+  ordersSearch: string,
+  ordersFilters: OrdersUiFilters,
+): Record<string, string> {
+  const filtersToApply: Record<string, string> = {};
+  setOptionalFilterValue(filtersToApply, "search", ordersSearch);
+  setOptionalFilterValue(filtersToApply, "assigned_to", ordersFilters.assignedTo, true);
+  setOptionalFilterValue(filtersToApply, "order_stage_id", ordersFilters.stage, true);
+  setOptionalFilterValue(filtersToApply, "industry", ordersFilters.industry);
+  setOptionalFilterValue(filtersToApply, "order_value_min", ordersFilters.orderValueMin, true);
+  setOptionalFilterValue(filtersToApply, "order_value_max", ordersFilters.orderValueMax, true);
+  setOptionalFilterValue(filtersToApply, "order_approval_status", ordersFilters.orderApprovalStatus);
+  setOptionalFilterValue(filtersToApply, "fulfillment_status", ordersFilters.fulfillmentStatus);
+  setOptionalFilterValue(filtersToApply, "payment_status", ordersFilters.paymentStatus);
+  setOptionalFilterValue(filtersToApply, "date_from", ordersFilters.dateFrom);
+  setOptionalFilterValue(filtersToApply, "date_to", ordersFilters.dateTo);
+  return filtersToApply;
 }
 
 function normalizeLeadContactPersons(leadData: any) {
@@ -521,18 +566,9 @@ const CrmOrders = () => {
     sortBy: "",
     sortOrder: "asc" as "asc" | "desc",
   });
-  const [ordersFilters, setOrdersFilters] = useState({
-    assignedTo: null as string | null,
-    stage: null as string | null,
-    industry: null as string | null,
-    orderValueMin: null as string | null,
-    orderValueMax: null as string | null,
-    orderApprovalStatus: null as string | null,
-    fulfillmentStatus: null as string | null,
-    paymentStatus: null as string | null,
-    dateFrom: null as string | null,
-    dateTo: null as string | null,
-  });
+  const [ordersFilters, setOrdersFilters] = useState<OrdersUiFilters>(
+    DEFAULT_ORDERS_UI_FILTERS,
+  );
 
   // Fetch stages and extensions on component mount
   useEffect(() => {
@@ -761,6 +797,29 @@ const CrmOrders = () => {
     });
     setRefreshKey((prev) => prev + 1);
   }, []);
+
+  const applyOrdersUiFilters = useCallback(
+    (closeSidebar = false) => {
+      const filtersToApply = buildOrdersFiltersToApply(ordersSearch, ordersFilters);
+      handleFiltersChange(filtersToApply);
+      setOrdersPagination((prev) => ({ ...prev, currentPage: 1 }));
+      setRefreshKey((prev) => prev + 1);
+      if (closeSidebar) {
+        setShowFiltersSidebar(false);
+      }
+    },
+    [ordersSearch, ordersFilters, handleFiltersChange],
+  );
+
+  const resetOrdersUiFilters = useCallback(() => {
+    setOrdersSearch("");
+    setOrdersFilters(DEFAULT_ORDERS_UI_FILTERS);
+    handleFiltersChange({});
+    setCurrentFilters({});
+    setActiveFilter("all");
+    setOrdersPagination((prev) => ({ ...prev, currentPage: 1 }));
+    setRefreshKey((prev) => prev + 1);
+  }, [handleFiltersChange]);
 
   const fetchStages = async () => {
     try {
@@ -1963,77 +2022,14 @@ const CrmOrders = () => {
                     <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        // Map ordersFilters to the format expected by handleFiltersChange
-                        const filtersToApply: Record<string, any> = {};
-                        
-                        if (ordersSearch) {
-                          filtersToApply.search = ordersSearch;
-                        }
-                        if (ordersFilters.assignedTo) {
-                          filtersToApply.assigned_to = ordersFilters.assignedTo;
-                        }
-                        if (ordersFilters.stage) {
-                          filtersToApply.order_stage_id = ordersFilters.stage;
-                        }
-                        if (ordersFilters.industry) {
-                          filtersToApply.industry = ordersFilters.industry;
-                        }
-                        if (ordersFilters.orderValueMin) {
-                          filtersToApply.order_value_min = ordersFilters.orderValueMin;
-                        }
-                        if (ordersFilters.orderValueMax) {
-                          filtersToApply.order_value_max = ordersFilters.orderValueMax;
-                        }
-                        if (ordersFilters.orderApprovalStatus) {
-                          filtersToApply.order_approval_status = ordersFilters.orderApprovalStatus;
-                        }
-                        if (ordersFilters.fulfillmentStatus) {
-                          filtersToApply.fulfillment_status = ordersFilters.fulfillmentStatus;
-                        }
-                        if (ordersFilters.paymentStatus) {
-                          filtersToApply.payment_status = ordersFilters.paymentStatus;
-                        }
-                        if (ordersFilters.dateFrom) {
-                          filtersToApply.date_from = ordersFilters.dateFrom;
-                        }
-                        if (ordersFilters.dateTo) {
-                          filtersToApply.date_to = ordersFilters.dateTo;
-                        }
-                        
-                        handleFiltersChange(filtersToApply);
-                        setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-                        setRefreshKey((prev) => prev + 1);
-                      }}
+                      onClick={() => applyOrdersUiFilters(false)}
                     >
                       Submit Filters
                     </Button>
                     <Button
                       variant="outline-secondary"
                       className="d-flex align-items-center justify-content-center"
-                      onClick={() => {
-                        setOrdersSearch("");
-                        setOrdersFilters({
-                          assignedTo: null,
-                          stage: null,
-                          industry: null,
-                          orderValueMin: null,
-                          orderValueMax: null,
-                          orderApprovalStatus: null,
-                          fulfillmentStatus: null,
-                          paymentStatus: null,
-                          dateFrom: null,
-                          dateTo: null,
-                        });
-                        handleFiltersChange({});
-                        setCurrentFilters({});
-                        setActiveFilter("all");
-                        setOrdersPagination({
-                          ...ordersPagination,
-                          currentPage: 1,
-                        });
-                        setRefreshKey((prev) => prev + 1);
-                      }}
+                      onClick={resetOrdersUiFilters}
                     >
                       Reset
                     </Button>
@@ -2746,69 +2742,8 @@ const CrmOrders = () => {
             onChange: (value) => setOrdersFilters(prev => ({ ...prev, dateTo: value }))
           }
         ]}
-        onApply={() => {
-          // Map ordersFilters to the format expected by handleFiltersChange
-          const filtersToApply: Record<string, any> = {};
-          
-          if (ordersSearch) {
-            filtersToApply.search = ordersSearch;
-          }
-          if (ordersFilters.assignedTo) {
-            filtersToApply.assigned_to = ordersFilters.assignedTo;
-          }
-          if (ordersFilters.stage) {
-            filtersToApply.order_stage_id = ordersFilters.stage;
-          }
-          if (ordersFilters.industry) {
-            filtersToApply.industry = ordersFilters.industry;
-          }
-          if (ordersFilters.orderValueMin) {
-            filtersToApply.order_value_min = ordersFilters.orderValueMin;
-          }
-          if (ordersFilters.orderValueMax) {
-            filtersToApply.order_value_max = ordersFilters.orderValueMax;
-          }
-          if (ordersFilters.orderApprovalStatus) {
-            filtersToApply.order_approval_status = ordersFilters.orderApprovalStatus;
-          }
-          if (ordersFilters.fulfillmentStatus) {
-            filtersToApply.fulfillment_status = ordersFilters.fulfillmentStatus;
-          }
-          if (ordersFilters.paymentStatus) {
-            filtersToApply.payment_status = ordersFilters.paymentStatus;
-          }
-          if (ordersFilters.dateFrom) {
-            filtersToApply.date_from = ordersFilters.dateFrom;
-          }
-          if (ordersFilters.dateTo) {
-            filtersToApply.date_to = ordersFilters.dateTo;
-          }
-          
-          handleFiltersChange(filtersToApply);
-          setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-          setRefreshKey(prev => prev + 1);
-          setShowFiltersSidebar(false);
-        }}
-        onReset={() => {
-          setOrdersSearch("");
-          setOrdersFilters({
-            assignedTo: null,
-            stage: null,
-            industry: null,
-            orderValueMin: null,
-            orderValueMax: null,
-            orderApprovalStatus: null,
-            fulfillmentStatus: null,
-            paymentStatus: null,
-            dateFrom: null,
-            dateTo: null,
-          });
-          handleFiltersChange({});
-          setCurrentFilters({});
-          setActiveFilter('all');
-          setOrdersPagination({ ...ordersPagination, currentPage: 1 });
-          setRefreshKey(prev => prev + 1);
-        }}
+        onApply={() => applyOrdersUiFilters(true)}
+        onReset={resetOrdersUiFilters}
         showApplyButton={true}
         showResetButton={true}
       />
