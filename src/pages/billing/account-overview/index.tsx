@@ -726,7 +726,7 @@ const AccountOverview = () => {
               
               <div className="d-flex justify-content-between align-items-center py-2">
                 <small className="text-muted" style={{ fontSize: '0.8rem' }}>Pending Amount</small>
-                <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.profile?.outstanding_invoices)}</span>
+                <span className="fw-semibold" style={{ fontSize: '0.9rem' }}>{companyDetails?.profile?.currency} {formatNumber(companyDetails?.account_balance)}</span>
 
                  
               </div>
