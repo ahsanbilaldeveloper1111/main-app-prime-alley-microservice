@@ -1,7 +1,21 @@
 import type { FilterPill } from "@components/GenericTable";
+import type { ComponentType } from "react";
 
 type Filters = Record<string, any>;
 type StageFilters = (nextFilters: Filters) => void;
+type SetCurrentFilters = (nextFilters: Filters) => void;
+type FormatLabel = (value: unknown) => string | undefined;
+type CreateTextDropdown = (
+  value: string,
+  onChange: (value: string) => void,
+  onApply: (value: string) => void,
+  placeholder: string,
+) => ComponentType<{ closeMenu: () => void }>;
+type CreateDateTimeDropdown = (
+  value: string,
+  onChange: (value: string) => void,
+  onApply: (value: string) => void,
+) => ComponentType<{ closeMenu: () => void }>;
 
 export function getCallDirectionActiveLabel(value: unknown): string | undefined {
   const v =
@@ -151,5 +165,54 @@ export function buildDepartmentFilterPill(
         onClick: () => stageFilters({ ...currentFilters, department: [idVal] }),
       };
     }),
+  };
+}
+
+export function buildTextDropdownFilterPill(
+  id: string,
+  label: string,
+  currentFilters: Filters,
+  setCurrentFilters: SetCurrentFilters,
+  stageFilters: StageFilters,
+  createTextDropdownContent: CreateTextDropdown,
+  placeholder: string,
+): FilterPill {
+  return {
+    id,
+    label,
+    showDropdown: true,
+    active: Boolean(currentFilters[id]),
+    activeLabel: currentFilters[id] ? String(currentFilters[id]) : undefined,
+    onClear: () => stageFilters({ ...currentFilters, [id]: "" }),
+    dropdownContent: createTextDropdownContent(
+      currentFilters[id] ?? "",
+      (value: string) => setCurrentFilters({ ...currentFilters, [id]: value }),
+      (value: string) => stageFilters({ ...currentFilters, [id]: value }),
+      placeholder,
+    ),
+  };
+}
+
+export function buildDateTimeFilterPill(
+  id: string,
+  label: string,
+  currentFilters: Filters,
+  setCurrentFilters: SetCurrentFilters,
+  stageFilters: StageFilters,
+  formatLabel: FormatLabel,
+  createDateTimeDropdownContent: CreateDateTimeDropdown,
+): FilterPill {
+  return {
+    id,
+    label,
+    showDropdown: true,
+    active: Boolean(currentFilters[id]),
+    activeLabel: formatLabel(currentFilters[id]),
+    activeLabelOnly: true,
+    dropdownContent: createDateTimeDropdownContent(
+      currentFilters[id] ?? "",
+      (value: string) => setCurrentFilters({ ...currentFilters, [id]: value }),
+      (value: string) => stageFilters({ ...currentFilters, [id]: value }),
+    ),
   };
 }
