@@ -311,6 +311,89 @@ async function deleteJourneyStepAndRefresh(params: {
   params.setRefreshJourneysKey((k) => k + 1);
 }
 
+async function handleJourneyStatusSelect(params: {
+  nextStatus: string;
+  canUpdateJourneyRecord: boolean;
+  isJourneyCompleted: boolean;
+  journeyId: number;
+  setStatusUpdating: React.Dispatch<React.SetStateAction<boolean>>;
+  setStatusValue: React.Dispatch<React.SetStateAction<string>>;
+  setSelectedEmployee: React.Dispatch<React.SetStateAction<OnboardingEmployee | null>>;
+  setRefreshJourneysKey: React.Dispatch<React.SetStateAction<number>>;
+}): Promise<void> {
+  if (!params.canUpdateJourneyRecord || params.isJourneyCompleted) return;
+  params.setStatusUpdating(true);
+  try {
+    await applyJourneyStatusChange({
+      journeyId: params.journeyId,
+      nextStatus: params.nextStatus,
+      setStatusValue: params.setStatusValue,
+      setSelectedEmployee: params.setSelectedEmployee,
+      setRefreshJourneysKey: params.setRefreshJourneysKey,
+    });
+  } catch (error: unknown) {
+    console.error("[WorkforceJourney] updateJourney failed", error);
+  } finally {
+    params.setStatusUpdating(false);
+  }
+}
+
+async function handleJourneyStepDeleteConfirm(params: {
+  stepPendingDelete: JourneyStepRecord | null;
+  canDeleteJourneyStepPerm: boolean;
+  journeyId: number;
+  refreshSteps: () => Promise<void>;
+  closeDeleteStepModal: () => void;
+  setRefreshJourneysKey: React.Dispatch<React.SetStateAction<number>>;
+  setDeletingStepId: React.Dispatch<React.SetStateAction<number | null>>;
+}): Promise<void> {
+  const step = params.stepPendingDelete;
+  if (!params.canDeleteJourneyStepPerm || step?.id == null) {
+    params.closeDeleteStepModal();
+    return;
+  }
+  params.setDeletingStepId(step.id);
+  try {
+    await deleteJourneyStepAndRefresh({
+      journeyId: params.journeyId,
+      stepId: step.id,
+      refreshSteps: params.refreshSteps,
+      closeDeleteStepModal: params.closeDeleteStepModal,
+      setRefreshJourneysKey: params.setRefreshJourneysKey,
+    });
+  } catch (error: unknown) {
+    console.error("[WorkforceJourney] deleteJourneyStep failed", error);
+  } finally {
+    params.setDeletingStepId(null);
+  }
+}
+
+async function handleJourneyDelete(params: {
+  canDeleteJourneyRecord: boolean;
+  journeyId: number;
+  setDeletingJourney: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowDeleteJourneyModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setSelectedEmployee: React.Dispatch<React.SetStateAction<OnboardingEmployee | null>>;
+  setRefreshJourneysKey: React.Dispatch<React.SetStateAction<number>>;
+}): Promise<void> {
+  if (!params.canDeleteJourneyRecord) return;
+  params.setDeletingJourney(true);
+  try {
+    await deleteJourneyAndRefresh({
+      journeyId: params.journeyId,
+      setShowDeleteJourneyModal: params.setShowDeleteJourneyModal,
+      setIsSidebarOpen: params.setIsSidebarOpen,
+      setSelectedEmployee: params.setSelectedEmployee,
+      setRefreshJourneysKey: params.setRefreshJourneysKey,
+    });
+  } catch (error: unknown) {
+    console.error("[WorkforceJourney] deleteJourney failed", error);
+  } finally {
+    params.setDeletingJourney(false);
+  }
+}
+
 function hierarchyLabel(item: unknown): string {
   if (item == null) return "—";
   if (typeof item === "string") return item;
@@ -1133,22 +1216,16 @@ const EmployeesOnboarding = () => {
   }, [managers, userSearchTerm]);
 
   const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newStatus = e.target.value;
-    if (!canUpdateJourneyRecord || isJourneyCompleted) return;
-    setStatusUpdating(true);
-    try {
-      await applyJourneyStatusChange({
-        journeyId,
-        nextStatus: newStatus,
-        setStatusValue,
-        setSelectedEmployee,
-        setRefreshJourneysKey,
-      });
-    } catch (error: unknown) {
-      console.error("[WorkforceJourney] updateJourney failed", error);
-    } finally {
-      setStatusUpdating(false);
-    }
+    await handleJourneyStatusSelect({
+      nextStatus: e.target.value,
+      canUpdateJourneyRecord,
+      isJourneyCompleted,
+      journeyId,
+      setStatusUpdating,
+      setStatusValue,
+      setSelectedEmployee,
+      setRefreshJourneysKey,
+    });
   };
 
   const openDeleteStepModal = (step: JourneyStepRecord) => {
@@ -1163,43 +1240,27 @@ const EmployeesOnboarding = () => {
   };
 
   const confirmDeleteStep = useCallback(async () => {
-    const step = stepPendingDelete;
-    if (!canDeleteJourneyStepPerm || step?.id == null) {
-      closeDeleteStepModal();
-      return;
-    }
-    setDeletingStepId(step.id);
-    try {
-      await deleteJourneyStepAndRefresh({
-        journeyId,
-        stepId: step.id,
-        refreshSteps,
-        closeDeleteStepModal,
-        setRefreshJourneysKey,
-      });
-    } catch (error: unknown) {
-      console.error("[WorkforceJourney] deleteJourneyStep failed", error);
-    } finally {
-      setDeletingStepId(null);
-    }
+    await handleJourneyStepDeleteConfirm({
+      stepPendingDelete,
+      canDeleteJourneyStepPerm,
+      journeyId,
+      refreshSteps,
+      closeDeleteStepModal,
+      setRefreshJourneysKey,
+      setDeletingStepId,
+    });
   }, [canDeleteJourneyStepPerm, journeyId, stepPendingDelete, refreshSteps]);
 
   const handleDeleteJourney = async () => {
-    if (!canDeleteJourneyRecord) return;
-    setDeletingJourney(true);
-    try {
-      await deleteJourneyAndRefresh({
-        journeyId,
-        setShowDeleteJourneyModal,
-        setIsSidebarOpen,
-        setSelectedEmployee,
-        setRefreshJourneysKey,
-      });
-    } catch (error: unknown) {
-      console.error("[WorkforceJourney] deleteJourney failed", error);
-    } finally {
-      setDeletingJourney(false);
-    }
+    await handleJourneyDelete({
+      canDeleteJourneyRecord,
+      journeyId,
+      setDeletingJourney,
+      setShowDeleteJourneyModal,
+      setIsSidebarOpen,
+      setSelectedEmployee,
+      setRefreshJourneysKey,
+    });
   };
 
   const employees = useMemo<OnboardingEmployee[]>(
