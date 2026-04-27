@@ -89,8 +89,6 @@ import {
   Building2,
   User,
   Paperclip,
-  Upload,
-  Download as DownloadIcon,
   RotateCcw,
   Info,
   Phone as PhoneIcon,
@@ -114,6 +112,7 @@ import "@assets/scss/tabs.scss";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import FormModal from "../../partial/FormModal";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
+import { WorkPlannerAttachmentsModalBody } from "@utils/workPlannerOrderAttachmentsUi";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import { useCti } from "@hooks/useCti";
@@ -6444,280 +6443,27 @@ const CrmOrders = () => { // NOSONAR
           </Modal.Header>
 
           <Modal.Body className="p-4">
-            {/* Upload Section */}
-            <div
-              className="mb-4 p-4 border rounded"
-              style={{ background: "#f8f9fa" }}
-            >
-              <div className="d-flex align-items-center justify-content-between mb-3">
-                <div>
-                  <h6 className="mb-1 fw-bold">Upload New Attachments</h6>
-                  <small className="text-muted">
-                    Supported formats: PDF, CSV, Excel, or Image (Max 5MB)
-                  </small>
-                </div>
-              </div>
-              <div className="d-flex gap-2">
-                <Form.Control
-                  ref={(input) => setFileInputRef(input as HTMLInputElement)}
-                  type="file"
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                    const files = e.target.files;
-                    if (files && files.length > 0) {
-                      const file = files[0];
-                      handleFileUpload(file);
-                    }
-                  }}
-                  accept=".pdf,.csv,.xls,.xlsx,.xlsm,.png,.jpg,.jpeg,.gif,.webp"
-                  style={{ flex: 1 }}
-                  disabled={uploadingFile}
-                />
-                <Button
-                  variant="primary"
-                  className="d-flex align-items-center gap-2"
-                  disabled={uploadingFile}
-                >
-                  {uploadingFile ? (
-                    <>
-                      <div
-                        className="spinner-border spinner-border-sm"
-                        role="status"
-                      />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={16} />
-                      Upload
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Attachments List */}
-            <div>
-              {/* Order Attachments Section */}
-              <h6 className="mb-3 fw-bold d-flex align-items-center gap-2">
-                <FileText size={18} />
-                Order Attachments ({attachments.length})
-              </h6>
-
-              {loadingAttachments ? (
-                <div className="text-center py-5">
-                  <div className="spinner-border text-primary" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                  </div>
-                </div>
-              ) : attachments.length === 0 ? (
-                <div className="text-center py-4 text-muted">
-                  <Paperclip size={48} className="mb-3 opacity-25" />
-                  <div>No order attachments yet</div>
-                  <small>Upload files using the form above</small>
-                </div>
-              ) : (
-                <div className="d-flex flex-column gap-2 mb-4">
-                  {attachments.map((attachment: any) => (
-                    <Card key={attachment.id} className="border shadow-sm">
-                      <Card.Body className="p-3">
-                        <div className="d-flex align-items-center justify-content-between">
-                          <div className="d-flex align-items-center gap-3 flex-grow-1">
-                            {/* File Icon */}
-                            <div
-                              className="rounded d-flex align-items-center justify-content-center"
-                              style={{
-                                width: "45px",
-                                height: "45px",
-                                background: attachment.mime_type?.includes(
-                                  "pdf",
-                                )
-                                  ? "#dc3545"
-                                  : attachment.mime_type?.includes("csv") ||
-                                      attachment.mime_type?.includes("excel") ||
-                                      attachment.mime_type?.includes(
-                                        "spreadsheet",
-                                      )
-                                    ? "#198754"
-                                    : attachment.mime_type?.includes("image")
-                                      ? "#0d6efd"
-                                      : "#6c757d",
-                                color: "white",
-                              }}
-                            >
-                              <FileText size={22} />
-                            </div>
-
-                            {/* File Info */}
-                            <div className="flex-grow-1">
-                              <div
-                                className="fw-semibold"
-                                style={{ fontSize: "14px" }}
-                              >
-                                {attachment.name}
-                              </div>
-                              <div
-                                style={{ fontSize: "12px", color: "#6c757d" }}
-                              >
-                                {formatFileSize(attachment.file_size)} •{" "}
-                                {attachment.created_at
-                                  ? formatDateForTable(attachment.created_at)
-                                  : "N/A"}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="d-flex gap-1">
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-primary"
-                              title="Download"
-                              onClick={() =>
-                                handleDownloadAttachment(attachment.id)
-                              }
-                            >
-                              <DownloadIcon size={18} />
-                            </Button>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              className="p-2 text-danger"
-                              title="Delete"
-                              onClick={() => {
-                                setAttachmentToDelete({
-                                  id: attachment.id,
-                                  name: attachment.name,
-                                });
-                                setShowDeleteAttachmentModal(true);
-                              }}
-                            >
-                              <Trash2 size={18} />
-                            </Button>
-                          </div>
-                        </div>
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              {/* Deal Attachments Section */}
-              {selectedOrderForAttachments?.deal_id && (
-                <>
-                  <h6 className="mb-3 fw-bold d-flex align-items-center gap-2 mt-4">
-                    <FileText size={18} />
-                    Deal Attachments ({dealAttachments.length})
-                    <Badge
-                      bg="secondary"
-                      className="ms-2"
-                      style={{ fontSize: "11px" }}
-                    >
-                      Read-only
-                    </Badge>
-                  </h6>
-
-                  {loadingAttachments ? (
-                    <div className="text-center py-5">
-                      <div
-                        className="spinner-border text-primary"
-                        role="status"
-                      >
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                    </div>
-                  ) : dealAttachments.length === 0 ? (
-                    <div className="text-center py-4 text-muted">
-                      <Paperclip size={48} className="mb-3 opacity-25" />
-                      <div>No deal attachments</div>
-                    </div>
-                  ) : (
-                    <div className="d-flex flex-column gap-2">
-                      {dealAttachments.map((attachment: any) => (
-                        <Card
-                          key={`deal-${attachment.id}`}
-                          className="border shadow-sm"
-                          style={{ opacity: 0.9 }}
-                        >
-                          <Card.Body className="p-3">
-                            <div className="d-flex align-items-center justify-content-between">
-                              <div className="d-flex align-items-center gap-3 flex-grow-1">
-                                {/* File Icon */}
-                                <div
-                                  className="rounded d-flex align-items-center justify-content-center"
-                                  style={{
-                                    width: "45px",
-                                    height: "45px",
-                                    background: attachment.mime_type?.includes(
-                                      "pdf",
-                                    )
-                                      ? "#dc3545"
-                                      : attachment.mime_type?.includes("csv") ||
-                                          attachment.mime_type?.includes(
-                                            "excel",
-                                          ) ||
-                                          attachment.mime_type?.includes(
-                                            "spreadsheet",
-                                          )
-                                        ? "#198754"
-                                        : attachment.mime_type?.includes(
-                                              "image",
-                                            )
-                                          ? "#0d6efd"
-                                          : "#6c757d",
-                                    color: "white",
-                                  }}
-                                >
-                                  <FileText size={22} />
-                                </div>
-
-                                {/* File Info */}
-                                <div className="flex-grow-1">
-                                  <div
-                                    className="fw-semibold"
-                                    style={{ fontSize: "14px" }}
-                                  >
-                                    {attachment.name}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "12px",
-                                      color: "#6c757d",
-                                    }}
-                                  >
-                                    {formatFileSize(attachment.file_size)} •{" "}
-                                    {attachment.created_at
-                                      ? formatDateForTable(
-                                          attachment.created_at,
-                                        )
-                                      : "N/A"}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Actions - Download only */}
-                              <div className="d-flex gap-1">
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="p-2 text-primary"
-                                  title="Download"
-                                  onClick={() =>
-                                    handleDownloadDealAttachment(attachment.id)
-                                  }
-                                >
-                                  <DownloadIcon size={18} />
-                                </Button>
-                              </div>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            <WorkPlannerAttachmentsModalBody
+              attachments={attachments}
+              dealAttachments={dealAttachments}
+              loadingAttachments={loadingAttachments}
+              uploadingFile={uploadingFile}
+              fileInputRef={(input) => setFileInputRef(input)}
+              onFileChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                const files = e.target.files;
+                if (files && files.length > 0) {
+                  handleFileUpload(files[0]);
+                }
+              }}
+              formatFileSize={formatFileSize}
+              onDownloadOrderAttachment={handleDownloadAttachment}
+              onDownloadDealAttachment={handleDownloadDealAttachment}
+              onRequestDeleteAttachment={(id, name) => {
+                setAttachmentToDelete({ id, name });
+                setShowDeleteAttachmentModal(true);
+              }}
+              showDealSection={Boolean(selectedOrderForAttachments?.deal_id)}
+            />
           </Modal.Body>
 
           <Modal.Footer className="border-0">

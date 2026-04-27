@@ -30,6 +30,7 @@ import { Form, Modal } from "react-bootstrap";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -205,27 +206,6 @@ const EMPLOYMENT_TYPES = ["Full-Time", "Part-Time", "Contract", "Internship", "F
 const CONTRACT_TYPES = ["Permanent", "Temporary", "Freelance", "Fixed-term", "Probation"];
 
 const ITEMS_PER_PAGE = 15;
-
-const getInitials = (name: string): string => {
-  const words = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
-  if (words.length === 0) return "NA";
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return `${words[0][0]}${words[1][0]}`.toUpperCase();
-};
-
-const getAvatarColor = (name: string): string => {
-  let hash = 0;
-  for (const ch of name) {
-    const code = ch.codePointAt(0) ?? 0;
-    hash = code + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsla(${hue}, 55%, 45%, 0.6)`;
-};
 
 function journeyUsersPillLabel(selectedCount: number, appliedCount: number): string | undefined {
   if (selectedCount > 0) return `${selectedCount} selected`;
