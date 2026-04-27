@@ -34,6 +34,8 @@ import { Calendar, Clock, LogIn, LogOut } from "lucide-react";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { usePermissions } from "@utils/permissionUtils";
 import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";
+import { getWorkforceTableDatePresetRange } from "@utils/workforceTableDatePresetRange";
+import { WorkforceUserMultiSelectDropdown } from "@components/workforce/WorkforceUserMultiSelectDropdown";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -49,34 +51,6 @@ type MainAppUser = {
   name?: string | null;
   phone?: string | null;
 };
-
-function getDateRangeForOption(option: string): { date_from: string; date_to: string } | null {
-  if (!option?.trim()) return null;
-  const now = new Date();
-  const to = new Date(now);
-  to.setHours(23, 59, 59, 999);
-  const toStr = to.toISOString().slice(0, 10);
-  const from = new Date(now);
-  switch (option.trim()) {
-    case "Today":
-      return { date_from: toStr, date_to: toStr };
-    case "Last 7 days":
-      from.setDate(from.getDate() - 7);
-      break;
-    case "Last 30 days":
-      from.setDate(from.getDate() - 30);
-      break;
-    case "Last 3 months":
-      from.setMonth(from.getMonth() - 3);
-      break;
-    case "All time":
-    default:
-      return null;
-  }
-  from.setHours(0, 0, 0, 0);
-  const fromStr = from.toISOString().slice(0, 10);
-  return { date_from: fromStr, date_to: toStr };
-}
 
 function formatAttendanceToolbarDateLine(
   status: AttendanceStatusData,
@@ -479,10 +453,10 @@ const AttendancePage = () => {
         params.user_ids = normalizedUserIds;
         // Backward-compatible single user filter
       }
-      const dateRange = getDateRangeForOption(selectedDate ?? "");
+      const dateRange = getWorkforceTableDatePresetRange(selectedDate ?? "");
       if (dateRange) {
-        params.date_from = dateRange.date_from;
-        params.date_to = dateRange.date_to;
+        params.date_from = dateRange.from;
+        params.date_to = dateRange.to;
       }
       const { data, pagination: p } = await getAttendance(params);
       setRecords(data ?? []);
@@ -540,39 +514,50 @@ const AttendancePage = () => {
     loadStatus();
   }, [loadStatus]);
 
-  const handleCheckIn = async () => {
-    setCheckInOutLoading(true);
-    try {
-      const sessionUserId = session?.user?.id;
-      const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
-      await attendanceCheckIn(payload);
-      toast.success("Checked in successfully");
-      await loadStatus();
-      await loadAttendance(currentPage);
-    } catch (err) {
-      console.error("Check-in failed", err);
-      toast.error("Check-in failed");
-    } finally {
-      setCheckInOutLoading(false);
-    }
-  };
+  const runCheckInOutMutation = useCallback(
+    async (
+      mutate: () => Promise<unknown>,
+      successMessage: string,
+      errorMessage: string,
+      logLabel: string,
+    ) => {
+      setCheckInOutLoading(true);
+      try {
+        await mutate();
+        toast.success(successMessage);
+        await loadStatus();
+        await loadAttendance(currentPage);
+      } catch (err) {
+        console.error(logLabel, err);
+        toast.error(errorMessage);
+      } finally {
+        setCheckInOutLoading(false);
+      }
+    },
+    [currentPage, loadAttendance, loadStatus],
+  );
 
-  const handleCheckOut = async () => {
-    setCheckInOutLoading(true);
-    try {
-      const sessionUserId = session?.user?.id;
-      const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
-      await attendanceCheckOut(payload);
-      toast.success("Checked out successfully");
-      await loadStatus();
-      await loadAttendance(currentPage);
-    } catch (err) {
-      console.error("Check-out failed", err);
-      toast.error("Check-out failed");
-    } finally {
-      setCheckInOutLoading(false);
-    }
-  };
+  const handleCheckIn = useCallback(() => {
+    const sessionUserId = session?.user?.id;
+    const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
+    runCheckInOutMutation(
+      () => attendanceCheckIn(payload),
+      "Checked in successfully",
+      "Check-in failed",
+      "Check-in failed",
+    );
+  }, [runCheckInOutMutation, session?.user?.id]);
+
+  const handleCheckOut = useCallback(() => {
+    const sessionUserId = session?.user?.id;
+    const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
+    runCheckInOutMutation(
+      () => attendanceCheckOut(payload),
+      "Checked out successfully",
+      "Check-out failed",
+      "Check-out failed",
+    );
+  }, [runCheckInOutMutation, session?.user?.id]);
 
   const handleConfirmDelete = async () => {
     if (!canDeleteAttendance || !recordToDelete) return;
@@ -591,96 +576,43 @@ const AttendancePage = () => {
     }
   };
 
+  const attendanceUserDropdownRows = useMemo(
+    () =>
+      filteredManagers.map((mgr, idx) => ({
+        rowKey: `${String(mgr.id ?? "row")}-${idx}`,
+        selectionId: String(mgr.id),
+        label: String(mgr.name ?? mgr.id),
+      })),
+    [filteredManagers],
+  );
+
   const usersDropdownContent = useMemo(
     () => (
-      <div style={{ minWidth: "260px" }}>
-        <input
-          type="text"
-          placeholder="Search user..."
-          value={userSearchTerm}
-          onChange={(e) => setUserSearchTerm(e.target.value)}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{
-            width: "100%",
-            marginBottom: "8px",
-            padding: "8px 10px",
-            border: "1px solid #e5e7eb",
-            borderRadius: "6px",
-            fontSize: "13px",
-          }}
-        />
-        <div style={{ marginBottom: "8px", maxHeight: "220px", overflowY: "auto" }}>
-          {filteredManagers.map((mgr, idx) => {
-            const idStr = String(mgr.id);
-            const rowKey = `${String(mgr.id ?? "row")}-${idx}`;
-            const isSelected = selectedUserIds.includes(idStr);
-            const label = String(mgr.name ?? mgr.id);
-            return (
-              <label
-                key={rowKey}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "6px 4px",
-                  fontSize: "13px",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onChange={() => {
-                    toggleSelectedUserId(idStr, isSelected);
-                  }}
-                />
-                <span>{label}</span>
-              </label>
-            );
-          })}
-        </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            type="button"
-            onClick={() => {
-              setAppliedUserIds(selectedUserIds);
-              setCurrentPage(1);
-            }}
-            style={{
-              border: "none",
-              backgroundColor: "#6366f1",
-              color: "white",
-              borderRadius: "6px",
-              padding: "6px 10px",
-              fontSize: "12px",
-            }}
-          >
-            Apply
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedUserIds([]);
-              setAppliedUserIds([]);
-              setUserSearchTerm("");
-              setCurrentPage(1);
-            }}
-            style={{
-              border: "1px solid #d1d5db",
-              background: "white",
-              color: "#111827",
-              borderRadius: "6px",
-              padding: "6px 10px",
-              fontSize: "12px",
-            }}
-          >
-            Clear
-          </button>
-        </div>
-      </div>
+      <WorkforceUserMultiSelectDropdown
+        searchTerm={userSearchTerm}
+        onSearchTermChange={setUserSearchTerm}
+        rows={attendanceUserDropdownRows}
+        selectedIds={selectedUserIds}
+        onToggle={toggleSelectedUserId}
+        onApply={() => {
+          setAppliedUserIds(selectedUserIds);
+          setCurrentPage(1);
+        }}
+        onClear={() => {
+          setSelectedUserIds([]);
+          setAppliedUserIds([]);
+          setUserSearchTerm("");
+          setCurrentPage(1);
+        }}
+        listMaxHeightPx={220}
+      />
     ),
-    [filteredManagers, selectedUserIds, toggleSelectedUserId, userSearchTerm],
+    [
+      attendanceUserDropdownRows,
+      selectedUserIds,
+      toggleSelectedUserId,
+      userSearchTerm,
+    ],
   );
 
   const dateFilterOptions = useMemo(
@@ -809,12 +741,8 @@ const AttendancePage = () => {
       canCheckInOut={canCheckInOut}
       liveSessionElapsed={liveSessionElapsed}
       checkInOutLoading={checkInOutLoading}
-      onCheckIn={() => {
-        void handleCheckIn();
-      }}
-      onCheckOut={() => {
-        void handleCheckOut();
-      }}
+      onCheckIn={handleCheckIn}
+      onCheckOut={handleCheckOut}
     />
   );
 

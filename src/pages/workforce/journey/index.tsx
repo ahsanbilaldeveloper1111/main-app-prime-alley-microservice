@@ -31,6 +31,7 @@ import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { usePermissions } from "@utils/permissionUtils";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";
+import { WorkforceUserMultiSelectDropdown } from "@components/workforce/WorkforceUserMultiSelectDropdown";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -2050,96 +2051,45 @@ const EmployeesOnboarding = () => {
     [],
   );
 
+  const journeyUserDropdownRows = useMemo(
+    () =>
+      filteredManagers.map((mgr: LookupUser, idx: number) => {
+        const phone = String(mgr.phone ?? "").trim();
+        const selectionId = phone || String(mgr.id ?? idx);
+        return {
+          rowKey: `${String(mgr.id ?? "row")}-${idx}`,
+          selectionId,
+          label: hierarchyLabel(mgr),
+        };
+      }),
+    [filteredManagers],
+  );
+
   const usersDropdownContent = useMemo(
     () => (
-      <div style={{ minWidth: "260px" }}>
-        <input
-          type="text"
-          placeholder="Search user..."
-          value={userSearchTerm}
-          onChange={(e) => setUserSearchTerm(e.target.value)}
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{
-            width: "100%",
-            marginBottom: "8px",
-            padding: "8px 10px",
-            border: "1px solid #e5e7eb",
-            borderRadius: "6px",
-            fontSize: "13px",
-          }}
-        />
-        <div style={{ marginBottom: "8px" }}>
-          {filteredManagers.map((mgr: LookupUser, idx: number) => {
-            const label = hierarchyLabel(mgr);
-            const phone = String(mgr.phone ?? "").trim();
-            const idStr = phone || String(mgr.id ?? idx);
-            const rowKey = `${String(mgr.id ?? "row")}-${idx}`;
-            const isSelected = selectedUserIds.includes(idStr);
-            return (
-              <label
-                key={rowKey}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "6px 4px",
-                  fontSize: "13px",
-                  cursor: "pointer",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onChange={() => {
-                    toggleSelectedUserId(idStr, isSelected);
-                  }}
-                />
-                <span>{label}</span>
-              </label>
-            );
-          })}
-        </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            type="button"
-            onClick={() => {
-              setAppliedUserIds(selectedUserIds);
-              setCurrentPage(1);
-            }}
-            style={{
-              border: "none",
-              backgroundColor: "#6366f1",
-              color: "white",
-              borderRadius: "6px",
-              padding: "6px 10px",
-              fontSize: "12px",
-            }}
-          >
-            Apply
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedUserIds([]);
-              setAppliedUserIds([]);
-              setCurrentPage(1);
-            }}
-            style={{
-              border: "1px solid #d1d5db",
-              backgroundColor: "white",
-              color: "#374151",
-              borderRadius: "6px",
-              padding: "6px 10px",
-              fontSize: "12px",
-            }}
-          >
-            Clear
-          </button>
-        </div>
-      </div>
+      <WorkforceUserMultiSelectDropdown
+        searchTerm={userSearchTerm}
+        onSearchTermChange={setUserSearchTerm}
+        rows={journeyUserDropdownRows}
+        selectedIds={selectedUserIds}
+        onToggle={toggleSelectedUserId}
+        onApply={() => {
+          setAppliedUserIds(selectedUserIds);
+          setCurrentPage(1);
+        }}
+        onClear={() => {
+          setSelectedUserIds([]);
+          setAppliedUserIds([]);
+          setCurrentPage(1);
+        }}
+      />
     ),
-    [filteredManagers, selectedUserIds, userSearchTerm, toggleSelectedUserId],
+    [
+      journeyUserDropdownRows,
+      selectedUserIds,
+      toggleSelectedUserId,
+      userSearchTerm,
+    ],
   );
 
   const filterPills = useMemo<FilterPill[]>(

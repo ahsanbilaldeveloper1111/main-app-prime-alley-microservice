@@ -24,6 +24,7 @@ import {
   type UserRequestCategoryField,
   type UserRequest,
 } from "@utils/staffManagement";
+import { getWorkforceTableDatePresetRange } from "@utils/workforceTableDatePresetRange";
 import { useMainAppLookups, type MainAppUserLookup } from "@hooks/useMainAppLookups";
 import { toast } from "react-toastify";
 import { Badge, Modal, Form } from "react-bootstrap";
@@ -88,35 +89,6 @@ function getAgingLabel(iso: string | null | undefined): string {
   } catch {
     return "—";
   }
-}
-
-function getDateRangeForOption(option: string): { start_date_from: string; start_date_to: string } | null {
-  if (!option?.trim()) return null;
-  const now = new Date();
-  const to = new Date(now);
-  to.setHours(23, 59, 59, 999);
-  const toStr = to.toISOString().slice(0, 10);
-  const from = new Date(now);
-  switch (option.trim()) {
-    case "Today":
-      from.setHours(0, 0, 0, 0);
-      return { start_date_from: toStr, start_date_to: toStr };
-    case "Last 7 days":
-      from.setDate(from.getDate() - 7);
-      break;
-    case "Last 30 days":
-      from.setDate(from.getDate() - 30);
-      break;
-    case "Last 3 months":
-      from.setMonth(from.getMonth() - 3);
-      break;
-    case "All time":
-    default:
-      return null;
-  }
-  from.setHours(0, 0, 0, 0);
-  const fromStr = from.toISOString().slice(0, 10);
-  return { start_date_from: fromStr, start_date_to: toStr };
 }
 
 function parseOpenIdFromQuery(openId: string | string[] | undefined): string | undefined {
@@ -1971,10 +1943,10 @@ const ApprovalRequest = () => {
         if (category?.id != null) params.user_request_category_id = category.id;
         const requestedByTrimmed = selectedRequestedByUserId?.trim();
         if (requestedByTrimmed) params.user_ids = [requestedByTrimmed];
-        const dateRange = getDateRangeForOption(selectedDate ?? "");
+        const dateRange = getWorkforceTableDatePresetRange(selectedDate ?? "");
         if (dateRange) {
-          params.created_at_from = dateRange.start_date_from;
-          params.created_at_to = dateRange.start_date_to;
+          params.created_at_from = dateRange.from;
+          params.created_at_to = dateRange.to;
         }
         const { data, pagination: p } = await getUserRequests(params);
         setRequests(data ?? []);

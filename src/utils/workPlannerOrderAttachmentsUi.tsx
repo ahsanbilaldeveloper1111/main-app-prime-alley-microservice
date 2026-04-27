@@ -41,6 +41,96 @@ export type WorkPlannerAttachmentListItem = Readonly<{
   created_at?: string | null;
 }>;
 
+function WorkPlannerAttachmentsEmptyState(props: Readonly<{
+  kind: "order" | "deal";
+}>): React.ReactElement {
+  if (props.kind === "order") {
+    return (
+      <div className="text-center py-4 text-muted">
+        <Paperclip size={48} className="mb-3 opacity-25" />
+        <div>No order attachments yet</div>
+        <small>Upload files using the form above</small>
+      </div>
+    );
+  }
+  return (
+    <div className="text-center py-4 text-muted">
+      <Paperclip size={48} className="mb-3 opacity-25" />
+      <div>No deal attachments</div>
+    </div>
+  );
+}
+
+type WorkPlannerAttachmentRowCardProps = Readonly<{
+  attachment: WorkPlannerAttachmentListItem;
+  formatFileSize: (bytes: number) => string;
+  onDownload: () => void;
+  onDelete?: () => void;
+  cardStyle?: React.CSSProperties;
+}>;
+
+function WorkPlannerAttachmentRowCard(
+  props: WorkPlannerAttachmentRowCardProps,
+): React.ReactElement {
+  const { attachment, formatFileSize, onDownload, onDelete, cardStyle } = props;
+  return (
+    <Card className="border shadow-sm" style={cardStyle}>
+      <Card.Body className="p-3">
+        <div className="d-flex align-items-center justify-content-between">
+          <div className="d-flex align-items-center gap-3 flex-grow-1">
+            <div
+              className="rounded d-flex align-items-center justify-content-center"
+              style={{
+                width: "45px",
+                height: "45px",
+                background: attachmentThumbBackground(attachment.mime_type),
+                color: "white",
+              }}
+            >
+              <FileText size={22} />
+            </div>
+            <div className="flex-grow-1">
+              <div className="fw-semibold" style={{ fontSize: "14px" }}>
+                {attachment.name}
+              </div>
+              <div style={{ fontSize: "12px", color: "#6c757d" }}>
+                {formatFileSize(Number(attachment.file_size) || 0)} •{" "}
+                {attachment.created_at
+                  ? formatDateForTable(attachment.created_at)
+                  : "N/A"}
+              </div>
+            </div>
+          </div>
+          <div className="d-flex gap-1">
+            <Button
+              variant="link"
+              size="sm"
+              className="p-2 text-primary"
+              title="Download"
+              type="button"
+              onClick={onDownload}
+            >
+              <DownloadIcon size={18} />
+            </Button>
+            {onDelete ? (
+              <Button
+                variant="link"
+                size="sm"
+                className="p-2 text-danger"
+                title="Delete"
+                type="button"
+                onClick={onDelete}
+              >
+                <Trash2 size={18} />
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+}
+
 export type WorkPlannerOrderAttachmentsBodyProps = Readonly<{
   loading: boolean;
   attachments: readonly WorkPlannerAttachmentListItem[];
@@ -63,71 +153,20 @@ export function WorkPlannerOrderAttachmentsBody(
     return <WorkPlannerAttachmentLoadingBlock />;
   }
   if (attachments.length === 0) {
-    return (
-      <div className="text-center py-4 text-muted">
-        <Paperclip size={48} className="mb-3 opacity-25" />
-        <div>No order attachments yet</div>
-        <small>Upload files using the form above</small>
-      </div>
-    );
+    return <WorkPlannerAttachmentsEmptyState kind="order" />;
   }
   return (
     <div className="d-flex flex-column gap-2 mb-4">
       {attachments.map((attachment) => (
-        <Card key={attachment.id} className="border shadow-sm">
-          <Card.Body className="p-3">
-            <div className="d-flex align-items-center justify-content-between">
-              <div className="d-flex align-items-center gap-3 flex-grow-1">
-                <div
-                  className="rounded d-flex align-items-center justify-content-center"
-                  style={{
-                    width: "45px",
-                    height: "45px",
-                    background: attachmentThumbBackground(attachment.mime_type),
-                    color: "white",
-                  }}
-                >
-                  <FileText size={22} />
-                </div>
-                <div className="flex-grow-1">
-                  <div className="fw-semibold" style={{ fontSize: "14px" }}>
-                    {attachment.name}
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#6c757d" }}>
-                    {formatFileSize(attachment.file_size)} •{" "}
-                    {attachment.created_at
-                      ? formatDateForTable(attachment.created_at)
-                      : "N/A"}
-                  </div>
-                </div>
-              </div>
-              <div className="d-flex gap-1">
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-2 text-primary"
-                  title="Download"
-                  type="button"
-                  onClick={() => onDownloadOrderAttachment(attachment.id)}
-                >
-                  <DownloadIcon size={18} />
-                </Button>
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-2 text-danger"
-                  title="Delete"
-                  type="button"
-                  onClick={() =>
-                    onRequestDeleteAttachment(attachment.id, attachment.name)
-                  }
-                >
-                  <Trash2 size={18} />
-                </Button>
-              </div>
-            </div>
-          </Card.Body>
-        </Card>
+        <WorkPlannerAttachmentRowCard
+          key={attachment.id}
+          attachment={attachment}
+          formatFileSize={formatFileSize}
+          onDownload={() => onDownloadOrderAttachment(attachment.id)}
+          onDelete={() =>
+            onRequestDeleteAttachment(attachment.id, attachment.name)
+          }
+        />
       ))}
     </div>
   );
@@ -149,62 +188,18 @@ export function WorkPlannerDealAttachmentsBody(
     return <WorkPlannerAttachmentLoadingBlock />;
   }
   if (dealAttachments.length === 0) {
-    return (
-      <div className="text-center py-4 text-muted">
-        <Paperclip size={48} className="mb-3 opacity-25" />
-        <div>No deal attachments</div>
-      </div>
-    );
+    return <WorkPlannerAttachmentsEmptyState kind="deal" />;
   }
   return (
     <div className="d-flex flex-column gap-2">
       {dealAttachments.map((attachment) => (
-        <Card
+        <WorkPlannerAttachmentRowCard
           key={`deal-${attachment.id}`}
-          className="border shadow-sm"
-          style={{ opacity: 0.9 }}
-        >
-          <Card.Body className="p-3">
-            <div className="d-flex align-items-center justify-content-between">
-              <div className="d-flex align-items-center gap-3 flex-grow-1">
-                <div
-                  className="rounded d-flex align-items-center justify-content-center"
-                  style={{
-                    width: "45px",
-                    height: "45px",
-                    background: attachmentThumbBackground(attachment.mime_type),
-                    color: "white",
-                  }}
-                >
-                  <FileText size={22} />
-                </div>
-                <div className="flex-grow-1">
-                  <div className="fw-semibold" style={{ fontSize: "14px" }}>
-                    {attachment.name}
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#6c757d" }}>
-                    {formatFileSize(attachment.file_size)} •{" "}
-                    {attachment.created_at
-                      ? formatDateForTable(attachment.created_at)
-                      : "N/A"}
-                  </div>
-                </div>
-              </div>
-              <div className="d-flex gap-1">
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="p-2 text-primary"
-                  title="Download"
-                  type="button"
-                  onClick={() => onDownloadDealAttachment(attachment.id)}
-                >
-                  <DownloadIcon size={18} />
-                </Button>
-              </div>
-            </div>
-          </Card.Body>
-        </Card>
+          attachment={attachment}
+          formatFileSize={formatFileSize}
+          cardStyle={{ opacity: 0.9 }}
+          onDownload={() => onDownloadDealAttachment(attachment.id)}
+        />
       ))}
     </div>
   );
