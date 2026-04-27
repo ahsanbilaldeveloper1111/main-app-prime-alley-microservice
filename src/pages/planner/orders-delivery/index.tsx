@@ -184,7 +184,15 @@ function setOptionalFilterValue(
     delete target[key];
     return;
   }
-  target[key] = toStringValue ? String(value) : value;
+  if (!toStringValue) {
+    target[key] = value;
+    return;
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    target[key] = String(value);
+    return;
+  }
+  delete target[key];
 }
 
 function buildOrdersRequestParams(
@@ -249,6 +257,45 @@ function applyActiveFilterState(
 function isValidActiveFilterTab(tab: string, stages: any[]): boolean {
   if (tab === "all" || tab === "lost" || tab === "deleted") return true;
   return stages.some((s: any) => s.id.toString() === tab);
+}
+
+function normalizeLeadContactPersons(leadData: any) {
+  if (!leadData?.contact_persons || typeof leadData.contact_persons !== "string") {
+    return leadData;
+  }
+
+  try {
+    return { ...leadData, contact_persons: JSON.parse(leadData.contact_persons) };
+  } catch (error) {
+    console.error("Failed to parse contact_persons:", error);
+    return { ...leadData, contact_persons: [] };
+  }
+}
+
+async function fetchOrderDetailsBundle(orderId: number) {
+  const orderData: any = await getOrder(orderId);
+
+  let dealData: any = null;
+  let leadData: any = null;
+
+  if (orderData?.deal_id) {
+    try {
+      dealData = await getDeal(Number(orderData.deal_id));
+    } catch (error) {
+      console.error("Failed to fetch deal:", error);
+    }
+  }
+
+  if (dealData?.ticket_id) {
+    try {
+      const lead = await getLead(Number(dealData.ticket_id));
+      leadData = normalizeLeadContactPersons(lead);
+    } catch (error) {
+      console.error("Failed to fetch lead:", error);
+    }
+  }
+
+  return { orderData, dealData, leadData };
 }
 
 function resolveExtensionDisplayName(extensions: any[], assignedTo: unknown): string {
@@ -751,54 +798,13 @@ const CrmOrders = () => {
     setRelatedDeal(null);
     setRelatedLead(null);
     try {
-      const orderData: any = await getOrder(orderId);
+      const { orderData, dealData, leadData } = await fetchOrderDetailsBundle(orderId);
       setViewingOrder(orderData);
-
-      // Fetch deal information if deal_id exists
-      if (orderData.deal_id) {
-        try {
-          const dealData: any = await getDeal(Number(orderData.deal_id));
-          setRelatedDeal(dealData);
-
-          // Fetch lead information if ticket_id exists (ticket_id contains the lead_id)
-          if (dealData.ticket_id) {
-            try {
-              const leadData: any = await getLead(Number(dealData.ticket_id));
-
-              // Parse contact_persons if it's a string
-              if (
-                leadData.contact_persons &&
-                typeof leadData.contact_persons === "string"
-              ) {
-                try {
-                  leadData.contact_persons = JSON.parse(
-                    leadData.contact_persons
-                  );
-                } catch (e) {
-                  console.error("Failed to parse contact_persons:", e);
-                  leadData.contact_persons = [];
-                }
-              }
-
-              setRelatedLead(leadData);
-            } catch (error) {
-              console.error("Failed to fetch lead:", error);
-              // Don't show error toast as lead is optional
-            }
-          }
-          setLoadingDeal(false);
-        } catch (error) {
-          console.error("Failed to fetch deal:", error);
-          setLoadingDeal(false);
-          // Don't show error toast as deal is optional
-        }
-      } else {
-        setLoadingDeal(false);
-      }
-      setLoadingLead(false);
-      setLoadingOrder(false);
+      setRelatedDeal(dealData);
+      setRelatedLead(leadData);
     } catch (error) {
       console.error("Failed to fetch order:", error);
+    } finally {
       setLoadingOrder(false);
       setLoadingDeal(false);
       setLoadingLead(false);
@@ -845,7 +851,7 @@ const CrmOrders = () => {
 
   // Restore Order Handler
   const handleRestoreOrder = useCallback(async (orderId: number) => {
-    if (!window.confirm("Are you sure you want to restore this order?")) return;
+    if (!globalThis.confirm("Are you sure you want to restore this order?")) return;
 
     try {
       await restoreOrder(orderId);
