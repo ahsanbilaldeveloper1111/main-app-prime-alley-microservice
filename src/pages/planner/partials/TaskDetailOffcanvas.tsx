@@ -22,6 +22,10 @@ import {
   postTaskDocuments,
   deleteTaskDocument
 } from '@utils/tasks';
+import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 /** API-shaped task payload attached to the display model */
 export interface TaskDetailRawData {
@@ -330,6 +334,7 @@ interface CommentsTabPanelProps {
   setNewComment: (value: string) => void;
   taskId: string | number | undefined;
   setTaskComments: (comments: TaskCommentItem[]) => void;
+  allowCommentMutations: boolean;
 }
 
 const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
@@ -345,7 +350,8 @@ const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
   newComment,
   setNewComment,
   taskId,
-  setTaskComments
+  setTaskComments,
+  allowCommentMutations,
 }) => {
   const refreshComments = useCallback(async () => {
     if (taskId === undefined) return;
@@ -355,7 +361,7 @@ const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
 
   const handleSaveComment = useCallback(
     async (commentId: number) => {
-      if (taskId === undefined || !editingCommentText.trim()) {
+      if (!allowCommentMutations || taskId === undefined || !editingCommentText.trim()) {
         return;
       }
       try {
@@ -376,13 +382,14 @@ const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
       refreshComments,
       setEditingCommentId,
       setEditingCommentText,
-      setSubmittingComment
+      setSubmittingComment,
+      allowCommentMutations,
     ]
   );
 
   const handleDeleteComment = useCallback(
     async (commentId: number) => {
-      if (taskId === undefined) return;
+      if (!allowCommentMutations || taskId === undefined) return;
       try {
         await deleteTaskComment(taskId, commentId);
         await refreshComments();
@@ -390,11 +397,11 @@ const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
         console.error('Error deleting comment:', error);
       }
     },
-    [taskId, refreshComments]
+    [taskId, refreshComments, allowCommentMutations]
   );
 
   const handlePostComment = useCallback(async () => {
-    if (taskId === undefined || !newComment.trim()) return;
+    if (!allowCommentMutations || taskId === undefined || !newComment.trim()) return;
     try {
       setSubmittingComment(true);
       await createTaskComment(taskId, newComment.trim());
@@ -409,7 +416,7 @@ const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
     } finally {
       setSubmittingComment(false);
     }
-  }, [taskId, newComment, refreshComments, setNewComment, setSubmittingComment]);
+  }, [taskId, newComment, refreshComments, setNewComment, setSubmittingComment, allowCommentMutations]);
 
   if (loadingComments) {
     return (
@@ -498,6 +505,7 @@ const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
                         </div>
                         <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{commentDate}</div>
                       </div>
+                      {allowCommentMutations ? (
                       <div style={{ display: 'flex', gap: '0.25rem' }}>
                         <Button
                           variant="link"
@@ -521,6 +529,7 @@ const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
                           <Trash2 size={14} />
                         </Button>
                       </div>
+                      ) : null}
                     </div>
                     <div style={{ fontSize: '0.875rem', color: '#475569', lineHeight: '1.6' }}>
                       {comment.comment}
@@ -533,6 +542,7 @@ const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
         )}
       </div>
 
+      {allowCommentMutations ? (
       <div
         style={{
           borderTop: '1px solid #e2e8f0',
@@ -563,6 +573,7 @@ const CommentsTabPanel: React.FC<CommentsTabPanelProps> = ({
           </div>
         </Form.Group>
       </div>
+      ) : null}
     </div>
   );
 };
@@ -576,6 +587,7 @@ interface DocumentsTabPanelProps {
   onPickFile: () => void;
   onDownload: (doc: TaskDocumentItem) => void;
   onDelete: (doc: TaskDocumentItem) => void;
+  allowDocumentMutations: boolean;
 }
 
 const DocumentsTabPanel: React.FC<DocumentsTabPanelProps> = ({
@@ -586,7 +598,8 @@ const DocumentsTabPanel: React.FC<DocumentsTabPanelProps> = ({
   onUploadChange,
   onPickFile,
   onDownload,
-  onDelete
+  onDelete,
+  allowDocumentMutations,
 }) => {
   const documentCountLabel =
     taskDocuments.length === 1 ? '1 document' : `${taskDocuments.length} documents`;
@@ -614,6 +627,7 @@ const DocumentsTabPanel: React.FC<DocumentsTabPanelProps> = ({
         }}
       >
         <span style={{ fontSize: '0.875rem', color: '#64748b' }}>{documentCountLabel}</span>
+        {allowDocumentMutations ? (
         <div className="d-flex align-items-center gap-2">
           <input
             ref={documentInputRef}
@@ -639,6 +653,7 @@ const DocumentsTabPanel: React.FC<DocumentsTabPanelProps> = ({
             Upload
           </Button>
         </div>
+        ) : null}
       </div>
       {taskDocuments.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8', fontSize: '0.875rem' }}>
@@ -685,6 +700,7 @@ const DocumentsTabPanel: React.FC<DocumentsTabPanelProps> = ({
                   >
                     <Download size={16} />
                   </Button>
+                  {allowDocumentMutations ? (
                   <Button
                     variant="link"
                     size="sm"
@@ -695,6 +711,7 @@ const DocumentsTabPanel: React.FC<DocumentsTabPanelProps> = ({
                   >
                     <Trash2 size={16} />
                   </Button>
+                  ) : null}
                 </div>
               </li>
             );
@@ -764,6 +781,13 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   getStatusVariant,
   getPriorityVariant
 }) => {
+  const { hasPermission, hasAnyPermission } = usePermissions();
+  const canEditPlannerTask = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
+  const canDeletePlannerTask = hasAnyPermission([
+    PERMISSIONS.DELETE_TASKS_WORK_PLANNER,
+    PERMISSIONS.EDIT_TASKS_WORK_PLANNER,
+  ]);
+
   const [showAllActivitiesModal, setShowAllActivitiesModal] = useState(false);
   const [allActivities, setAllActivities] = useState<TaskActivityItem[]>([]);
   const [loadingAllActivities, setLoadingAllActivities] = useState(false);
@@ -834,6 +858,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   };
 
   const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!canEditPlannerTask) return;
     const files = e.target.files;
     if (!files?.length || !selectedTask?.rawData?.id) return;
     try {
@@ -869,7 +894,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
   };
 
   const handleDeleteDocument = async (doc: TaskDocumentItem) => {
-    if (!selectedTask?.rawData?.id || doc.id === undefined || doc.id === '') return;
+    if (!canEditPlannerTask || !selectedTask?.rawData?.id || doc.id === undefined || doc.id === '') return;
     try {
       await deleteTaskDocument(selectedTask.rawData.id, doc.id);
       await fetchTaskDocuments();
@@ -1002,12 +1027,16 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
             <span className="fw-bold">{selectedTask?.title} </span>
           </Offcanvas.Title>
           <div className="d-flex align-items-center gap-1 flex-shrink-0">
+            {canEditPlannerTask ? (
             <Button variant="link" className="text-primary p-0" onClick={onEditTask} title="Edit Task">
               <Edit size={20} />
             </Button>
+            ) : null}
+            {canDeletePlannerTask ? (
             <Button variant="link" className="text-danger p-0" onClick={onOpenDeleteModal} title="Delete Task">
               <Trash2 size={20} />
             </Button>
+            ) : null}
           </div>
         </Offcanvas.Header>
         <Offcanvas.Body className="task-detail-body">
@@ -1044,9 +1073,11 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
                       </div>
                     );
                   })}
+                  {canEditPlannerTask ? (
                   <button type="button" className="add-assignee border-0" onClick={onEditTask} aria-label="Edit assignees">
                     <Plus size={16} />
                   </button>
+                  ) : null}
                 </div>
               </div>
 
@@ -1158,6 +1189,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
                   setNewComment={setNewComment}
                   taskId={selectedTask.rawData?.id}
                   setTaskComments={setTaskComments}
+                  allowCommentMutations={canEditPlannerTask}
                 />
               )}
 
@@ -1171,6 +1203,7 @@ const TaskDetailOffcanvas: React.FC<TaskDetailOffcanvasProps> = ({
                   onPickFile={() => documentInputRef.current?.click()}
                   onDownload={handleDownloadDocument}
                   onDelete={handleDeleteDocument}
+                  allowDocumentMutations={canEditPlannerTask}
                 />
               )}
             </>

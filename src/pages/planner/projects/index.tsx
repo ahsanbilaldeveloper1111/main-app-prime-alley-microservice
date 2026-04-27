@@ -72,7 +72,6 @@ import {
   Container,
   Dropdown,
   Form,
-  Nav,
   Offcanvas,
   ProgressBar,
   Row,
@@ -105,6 +104,9 @@ import {
   Eye,
 } from "lucide-react";
 import { usePermissions } from '@utils/permissionUtils';
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 // ============================================================
 // TYPE DEFINITIONS
 // ============================================================
@@ -201,6 +203,18 @@ function formatProjectSidebarDate(iso: string | null | undefined): string | null
   const s = String(iso).trim();
   if (s === "") return null;
   const formatted = formatDateGlobal(s);
+  return formatted === "" ? null : formatted;
+}
+
+/**
+ * Formats API datetime strings for the project detail sidebar (`formatDateTimeGlobal` / `GlobalDateTimeFormat`).
+ * Returns `null` when missing or invalid so callers can fall back or show "—".
+ */
+function formatProjectSidebarDateTime(iso: string | null | undefined): string | null {
+  if (iso == null) return null;
+  const s = String(iso).trim();
+  if (s === "") return null;
+  const formatted = formatDateTimeGlobal(s);
   return formatted === "" ? null : formatted;
 }
 
@@ -1149,6 +1163,12 @@ interface ExpandableProjectTableProps {
   onProjectClick: (project: Project) => void;
   onEditProject: (project: Project) => void;
   onDeleteProject: (project: Project) => void;
+  /** Rank-level CRUD for projects (still combined with per-project membership in row actions). */
+  sessionPlannerProjectCrud: {
+    canCreate: boolean;
+    canUpdate: boolean;
+    canDelete: boolean;
+  };
   // Pagination
   pagination: { page: number; limit: number; total: number; last_page: number; from: number; to: number };
   onPaginationChange: (page: number, rowsPerPage: number) => void;
@@ -1246,6 +1266,7 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   onProjectClick,
   onEditProject,
   onDeleteProject,
+  sessionPlannerProjectCrud,
   pagination,
   onPaginationChange,
   toolbarConfig,
@@ -1254,8 +1275,16 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
   actions,
   sessionUserPhoneOrExtension,
 }) => {
-  const { hasPermission } = usePermissions();
-  const canPreviewEditTask = hasPermission("edit-tasks-work-planner");
+  const { hasPermission, hasAnyPermission } = usePermissions();
+  const canPreviewEditTask = hasPermission(PERMISSIONS.EDIT_TASKS_WORK_PLANNER);
+  const sessionCanCreatePlannerTask = useMemo(
+    () =>
+      hasAnyPermission([
+        PERMISSIONS.CREATE_TASKS_WORK_PLANNER,
+        PERMISSIONS.EDIT_TASKS_WORK_PLANNER,
+      ]),
+    [hasAnyPermission],
+  );
   // Track which project rows are expanded
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   // Cache of loaded tasks per project { [projectId]: Task[] }
@@ -1352,6 +1381,80 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
 
   function handleProjectRowMouseLeave(projectId: string) {
     setHoveredProjectId((prev) => (prev === projectId ? null : prev));
+  }
+
+  function appendExpandedProjectRows(
+    rows: React.ReactNode[],
+    project: Project,
+    tasks: any[],
+    isLoadingTasks: boolean,
+  ) {
+    if (isLoadingTasks) {
+      rows.push(
+        <tr key={`loading-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
+          <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
+            <Spinner animation="border" size="sm" className="me-2" style={{ color: "#94a3b8" }} />
+            <span style={{ color: "#94a3b8", fontSize: "0.875rem" }}>Loading tasks...</span>
+          </td>
+        </tr>
+      );
+      return;
+    }
+    if (tasks.length === 0) {
+      rows.push(
+        <tr key={`empty-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
+          <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
+            No tasks found for this project.
+          </td>
+        </tr>
+      );
+    } else {
+      tasks.forEach((task) => {
+        rows.push(
+          <TaskRow
+            key={`task-${task.id}`}
+            task={task}
+            depth={1}
+            onPreview={handlePreviewTask}
+            expandedTasks={expandedTasks}
+            onToggleTask={handleToggleTask}
+            canPreviewEditTask={canPreviewEditTask}
+          />
+        );
+      });
+    }
+
+    if (
+      canManageProjectFromMembers(project, sessionUserPhoneOrExtension) &&
+      sessionCanCreatePlannerTask
+    ) {
+      rows.push(
+        <tr key={`add-task-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
+          <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
+            <button
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                fontSize: "0.825rem",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "4px 0",
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenCreateTaskForExpandedProject(project);
+              }}
+            >
+              <Plus size={14} />
+              Add task
+            </button>
+          </td>
+        </tr>
+      );
+    }
   }
 
   // Build the custom table body
@@ -1506,7 +1609,8 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                       <Eye size={14} className="me-2" />
                       Project overview
                     </Dropdown.Item>
-                    {canAdministerProjectFromMembers(project, sessionUserPhoneOrExtension) ? (
+                    {canAdministerProjectFromMembers(project, sessionUserPhoneOrExtension) &&
+                    sessionPlannerProjectCrud.canUpdate ? (
                       <>
                         <Dropdown.Divider />
                         <Dropdown.Item
@@ -1520,6 +1624,11 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
                           <Settings size={14} className="me-2" />
                           Edit Project
                         </Dropdown.Item>
+                      </>
+                    ) : null}
+                    {canAdministerProjectFromMembers(project, sessionUserPhoneOrExtension) &&
+                    sessionPlannerProjectCrud.canDelete ? (
+                      <>
                         <Dropdown.Divider />
                         <Dropdown.Item
                           as="button"
@@ -1543,70 +1652,8 @@ const ExpandableProjectTable: React.FC<ExpandableProjectTableProps> = ({
         </tr>
       );
 
-      // Task rows (shown when project is expanded)
       if (isExpanded) {
-        if (isLoadingTasks) {
-          rows.push(
-            <tr key={`loading-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 12, paddingBottom: 12 }}>
-                <Spinner animation="border" size="sm" className="me-2" style={{ color: "#94a3b8" }} />
-                <span style={{ color: "#94a3b8", fontSize: "0.875rem" }}>Loading tasks...</span>
-              </td>
-            </tr>
-          );
-        } else if (tasks.length === 0) {
-          rows.push(
-            <tr key={`empty-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 10, paddingBottom: 10, color: "#9ca3af", fontSize: "0.875rem" }}>
-                No tasks found for this project.
-              </td>
-            </tr>
-          );
-        } else {
-          tasks.forEach((task) => {
-            rows.push(
-              <TaskRow
-                key={`task-${task.id}`}
-                task={task}
-                depth={1}
-                onPreview={handlePreviewTask}
-                expandedTasks={expandedTasks}
-                onToggleTask={handleToggleTask}
-                canPreviewEditTask={canPreviewEditTask}
-              />
-            );
-          });
-        }
-
-        // "Add task" row at the bottom of expanded project (same member role as edit/delete)
-        if (canManageProjectFromMembers(project, sessionUserPhoneOrExtension)) {
-          rows.push(
-            <tr key={`add-task-${project.id}`} style={{ backgroundColor: "#fafbfc" }}>
-              <td colSpan={6} style={{ paddingLeft: 56, paddingTop: 6, paddingBottom: 6 }}>
-                <button
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#9ca3af",
-                    fontSize: "0.825rem",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "4px 0",
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenCreateTaskForExpandedProject(project);
-                  }}
-                >
-                  <Plus size={14} />
-                  Add task
-                </button>
-              </td>
-            </tr>
-          );
-        }
+        appendExpandedProjectRows(rows, project, tasks, isLoadingTasks);
       }
     });
 
@@ -1780,118 +1827,13 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
     selectedProjectDetails?.color?.trim() ||
     selectedProject.iconColor ||
     "#3b82f6";
+  const lastUpdatedIso = selectedProjectDetails?.updated_at ?? selectedProject.apiData?.updated_at;
+  const fallbackLastUpdated =
+    selectedProject.lastUpdate === "N/A" ? null : selectedProject.lastUpdate;
+  const lastUpdatedDisplay =
+    formatProjectSidebarDateTime(lastUpdatedIso) ?? fallbackLastUpdated;
   const projectMembers = selectedProjectDetails?.members || selectedProject.members;
   const progressPercent = Math.round((1 - selectedProject.open / (selectedProject.open + 50)) * 100);
-
-  const activityActorDisplayName = (extension: string) =>
-    extension === "system" ? "System" : getUserNameFromExtension(extension);
-
-  let recentActivityContent: React.ReactNode;
-  if (loadingActivities) {
-    recentActivityContent = <Spinner animation="border" size="sm" />;
-  } else if (projectActivities.length === 0) {
-    recentActivityContent = (
-      <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
-        No recent activity
-      </div>
-    );
-  } else {
-    recentActivityContent = (
-      <div className="d-flex flex-column gap-3">
-        {projectActivities.slice(0, 10).map((activity: any, idx: number) => {
-          const ext = activity.extension_number || "system";
-          return (
-            <div key={activity.id || `${ext}-${activity.created_at || idx}`} className="d-flex gap-2">
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  backgroundColor: getAvatarColor(ext, idx),
-                  color: "white",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "0.7rem",
-                  fontWeight: 600,
-                  flexShrink: 0,
-                }}
-              >
-                {getInitials(ext)}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "0.875rem", color: "#334155" }}>
-                  <span style={{ fontWeight: 600 }}>{activityActorDisplayName(ext)}</span>{" "}
-                  {activity.description || `${activity.action} task`}
-                  {activity.task && (
-                    <span style={{ fontWeight: 600, color: "#3b82f6" }}>
-                      {" "}
-                      {activity.task?.title || activity.task?.task_id}
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-                  {formatTimeAgo(activity.created_at)}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  let historyContent: React.ReactNode;
-  if (loadingActivities) {
-    historyContent = <Spinner animation="border" size="sm" />;
-  } else if (projectActivities.length === 0) {
-    historyContent = (
-      <div className="text-center py-3 text-muted" style={{ fontSize: "0.875rem" }}>
-        No history available
-      </div>
-    );
-  } else {
-    historyContent = (
-      <div className="d-flex flex-column gap-2">
-        {projectActivities.map((activity: any, idx: number) => {
-          const ext = activity.extension_number || "system";
-          const actionColor = getActionColor(activity.action);
-          return (
-            <div
-              key={activity.id || `${ext}-${activity.created_at || idx}`}
-              style={{
-                padding: "0.75rem",
-                backgroundColor: "#f8fafc",
-                borderRadius: 8,
-                border: "1px solid #e2e8f0",
-                borderLeft: `3px solid ${actionColor}`,
-              }}
-            >
-              <div className="d-flex align-items-center gap-2 mb-2">
-                <AlertCircle size={16} style={{ color: actionColor }} />
-                <span style={{ fontSize: "0.875rem", fontWeight: 600, color: "#334155" }}>
-                  {activity.description || `${activity.action} task`}
-                </span>
-              </div>
-              <div style={{ fontSize: "0.875rem", color: "#475569", marginBottom: "0.25rem" }}>
-                <span style={{ fontWeight: 600 }}>{activityActorDisplayName(ext)}</span>
-                {activity.task && (
-                  <>
-                    {" "}
-                    -{" "}
-                    <span style={{ fontWeight: 600, color: "#3b82f6" }}>
-                      {activity.task?.title || activity.task?.task_id}
-                    </span>
-                  </>
-                )}
-              </div>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{formatDateTime(activity.created_at)}</div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
 
   const descriptionHtml = selectedProjectDetails?.description?.trim();
 
@@ -1946,8 +1888,8 @@ const ProjectDetailOffcanvas: React.FC<ProjectDetailOffcanvasProps> = ({
             },
             {
               label: "Last Updated",
-              value: selectedProjectDetails?.updated_at ?? selectedProject.lastUpdate,
-              type: "date",
+              value: lastUpdatedDisplay ?? "--",
+              type: "datetime",
               icon: Calendar,
             },
           ],
@@ -2816,9 +2758,27 @@ function projectMatchesFilters(project: Project, appliedFilters: AppliedProjectF
 const WorkPlannerProjects = () => {
   const router = useRouter();
   const { data: session } = useSession();
+  const { hasAnyPermission } = usePermissions();
   const sessionUserPhoneOrExtension = useMemo(
     () => getSessionPhoneOrExtension(session),
     [session],
+  );
+  const sessionPlannerProjectCrud = useMemo(
+    () => ({
+      canCreate: hasAnyPermission([
+        PERMISSIONS.CREATE_PROJECTS_WORK_PLANNER,
+        PERMISSIONS.VIEW_PROJECTS_WORK_PLANNER,
+      ]),
+      canUpdate: hasAnyPermission([
+        PERMISSIONS.UPDATE_PROJECTS_WORK_PLANNER,
+        PERMISSIONS.EDIT_TASKS_WORK_PLANNER,
+      ]),
+      canDelete: hasAnyPermission([
+        PERMISSIONS.DELETE_PROJECTS_WORK_PLANNER,
+        PERMISSIONS.EDIT_TASKS_WORK_PLANNER,
+      ]),
+    }),
+    [hasAnyPermission],
   );
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -2893,12 +2853,20 @@ const WorkPlannerProjects = () => {
   }, [pagination.page, pagination.limit, hierarchyLoading, fetchProjects]);
 
   const handleCreateProject = () => {
+    if (!sessionPlannerProjectCrud.canCreate) {
+      toast.error("You are not authorized to create projects");
+      return;
+    }
     setEditingProject(null);
     setProjectFormData(createEmptyProjectForm());
     setShowProjectModal(true);
   };
 
   const handleEditProject = (project: Project) => {
+    if (!sessionPlannerProjectCrud.canUpdate) {
+      toast.error("You are not authorized to update projects");
+      return;
+    }
     setEditingProject(project);
     const api = project.apiData;
     setProjectFormData({
@@ -2917,11 +2885,19 @@ const WorkPlannerProjects = () => {
   };
 
   const handleDeleteProject = (project: Project) => {
+    if (!sessionPlannerProjectCrud.canDelete) {
+      toast.error("You are not authorized to delete projects");
+      return;
+    }
     setProjectToDelete(project);
     setShowDeleteModal(true);
   };
 
   const confirmDelete = async () => {
+    if (!sessionPlannerProjectCrud.canDelete) {
+      toast.error("You are not authorized to delete projects");
+      return;
+    }
     await confirmDeleteProjectAndRefresh({
       projectToDelete,
       setDeleting,
@@ -2934,6 +2910,14 @@ const WorkPlannerProjects = () => {
 
   const handleSubmitProject = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (editingProject && !sessionPlannerProjectCrud.canUpdate) {
+      toast.error("You are not authorized to update projects");
+      return;
+    }
+    if (!editingProject && !sessionPlannerProjectCrud.canCreate) {
+      toast.error("You are not authorized to create projects");
+      return;
+    }
     await submitPlannerProjectForm({
       editingProject,
       projectFormData,
@@ -3416,6 +3400,7 @@ const WorkPlannerProjects = () => {
                   projects={filteredProjects}
                   loading={loading}
                   extensions={(hierarchyDataExtensions as any[]) || []}
+                  sessionPlannerProjectCrud={sessionPlannerProjectCrud}
                   sessionUserPhoneOrExtension={sessionUserPhoneOrExtension}
                   onProjectClick={handleProjectClick}
                   onEditProject={handleEditProject}

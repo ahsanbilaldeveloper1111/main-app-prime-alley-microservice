@@ -44,6 +44,13 @@ export type UseProjectTabsContentDataOptions = {
    * Use `ingestEmbeddedListSummary` to update stats cards from that response.
    */
   skipAutomaticListTabFetch?: boolean;
+  /** Board filters that should be pushed down to backend task listing. */
+  boardFilters?: {
+    searchTerm: string;
+    selectedAssignee: string;
+    selectedPriority: string;
+    selectedStatus: string;
+  };
 };
 
 export function useProjectTabsContentData(
@@ -75,6 +82,7 @@ export function useProjectTabsContentData(
   const [listFilters, setListFilters] = useState<ListTabFiltersState | null>(null);
 
   const skipAutomaticListTabFetch = Boolean(options?.skipAutomaticListTabFetch);
+  const boardFilters = options?.boardFilters;
 
   const ingestEmbeddedListSummary = useCallback((summary: ListTasksSummary | null | undefined) => {
     if (summary != null && typeof summary === 'object') {
@@ -148,10 +156,34 @@ export function useProjectTabsContentData(
     try {
       setLoadingBoardTasks(true);
       const withRelations = ['assignees', 'labels', 'status'];
-      const response = await listTasks({
+      const params: ListTasksParams = {
         project_id: Number(selectedProjectId),
         withRelations,
-      });
+      };
+      const search = boardFilters?.searchTerm?.trim();
+      if (search) {
+        params.search = search;
+      }
+      const assignee = boardFilters?.selectedAssignee;
+      if (assignee && assignee !== 'All Assignees') {
+        params.assignees = [String(assignee).trim()];
+      }
+      const selectedPriority = boardFilters?.selectedPriority;
+      if (selectedPriority && selectedPriority !== 'All Priorities') {
+        const p = String(selectedPriority).trim().toLowerCase();
+        params.priority = p === 'medium' ? 'normal' : p;
+      }
+      const selectedStatus = boardFilters?.selectedStatus;
+      if (selectedStatus && selectedStatus !== 'All Statuses') {
+        const parsedStatusId = Number(selectedStatus);
+        if (Number.isFinite(parsedStatusId)) {
+          params.status_id = parsedStatusId;
+        } else {
+          params.status = String(selectedStatus).trim();
+        }
+      }
+
+      const response = await listTasks(params);
 
       if (listTasksEnvelopeOk(response)) {
         setBoardTasks(readListTasksEnvelope(response).data as any[]);
@@ -161,7 +193,13 @@ export function useProjectTabsContentData(
     } finally {
       setLoadingBoardTasks(false);
     }
-  }, [selectedProjectId]);
+  }, [
+    selectedProjectId,
+    boardFilters?.searchTerm,
+    boardFilters?.selectedAssignee,
+    boardFilters?.selectedPriority,
+    boardFilters?.selectedStatus,
+  ]);
 
   const fetchListTasks = useCallback(
     async (
@@ -222,7 +260,14 @@ export function useProjectTabsContentData(
     if (activeTab === 'board' && selectedProjectId != null && selectedProjectId !== '') {
       fetchBoardTasksRef.current().catch(() => undefined);
     }
-  }, [activeTab, selectedProjectId]);
+  }, [
+    activeTab,
+    selectedProjectId,
+    boardFilters?.searchTerm,
+    boardFilters?.selectedAssignee,
+    boardFilters?.selectedPriority,
+    boardFilters?.selectedStatus,
+  ]);
 
   useEffect(() => {
     if (skipAutomaticListTabFetch) {

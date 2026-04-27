@@ -36,6 +36,10 @@ import {
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import PageHeader from "@components/PageHeader";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const CATEGORY_NAME_MAX_LENGTH = 150;
 const CATEGORY_DESCRIPTION_MAX_LENGTH = 500;
@@ -82,6 +86,11 @@ function categorySortComparableValue(
 }
 
 const ManageCategories = () => {
+  const { hasPermission } = usePermissions();
+  const canViewBillingProducts = hasPermission(PERMISSIONS.VIEW_PRODUCTS_BILLING);
+  const canManageProductCategories = hasPermission(
+    PERMISSIONS.MANAGE_PRODUCT_CATEGORIES_BILLING,
+  );
 
   const requestIdRef = useRef(0);
   const [loading, setLoading] = useState(false);
@@ -197,6 +206,7 @@ const ManageCategories = () => {
   }, []);
 
   const openAddCategoryModal = useCallback(() => {
+    if (!canManageProductCategories) return;
     setAddCategoryPayload({
       name: "",
       description: "",
@@ -204,9 +214,10 @@ const ManageCategories = () => {
     });
     setAddCategoryError(null);
     setShowAddCategoryModal(true);
-  }, []);
+  }, [canManageProductCategories]);
 
   const openEditCategoryModal = useCallback((category: ProductCategoryRow) => {
+    if (!canManageProductCategories) return;
     setEditingCategory(category);
     const rawName = category.name ?? "";
     const rawDescription = category.description ?? "";
@@ -217,16 +228,18 @@ const ManageCategories = () => {
     });
     setEditCategoryError(null);
     setShowEditCategoryModal(true);
-  }, []);
+  }, [canManageProductCategories]);
 
   const openDeleteCategoryModal = useCallback((category: ProductCategoryRow) => {
+    if (!canManageProductCategories) return;
     setCategoryToDelete(category);
     setShowDeleteModal(true);
-  }, []);
+  }, [canManageProductCategories]);
 
   const submitAddCategory = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
+      if (!canManageProductCategories) return;
       const name = addCategoryPayload.name.trim();
       if (!name) {
         setAddCategoryError("Name is mandatory");
@@ -253,13 +266,13 @@ const ManageCategories = () => {
         setCreatingCategory(false);
       }
     },
-    [addCategoryPayload, fetchCategories],
+    [addCategoryPayload, fetchCategories, canManageProductCategories],
   );
 
   const submitEditCategory = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!editingCategory) return;
+      if (!canManageProductCategories || !editingCategory) return;
 
       const name = editCategoryPayload.name.trim();
       if (!name) {
@@ -289,11 +302,11 @@ const ManageCategories = () => {
         setUpdatingCategory(false);
       }
     },
-    [editCategoryPayload, editingCategory, fetchCategories],
+    [editCategoryPayload, editingCategory, fetchCategories, canManageProductCategories],
   );
 
   const confirmDeleteCategory = useCallback(async () => {
-    if (!categoryToDelete) return;
+    if (!canManageProductCategories || !categoryToDelete) return;
     setDeletingCategory(true);
     try {
       await deleteProductCategory(categoryToDelete.id);
@@ -309,7 +322,7 @@ const ManageCategories = () => {
     } finally {
       setDeletingCategory(false);
     }
-  }, [categoryToDelete, fetchCategories]);
+  }, [categoryToDelete, fetchCategories, canManageProductCategories]);
 
   const categoryColumns: TableColumn<ProductCategoryRow>[] = useMemo(
     () => [
@@ -346,22 +359,25 @@ const ManageCategories = () => {
   );
 
   const categoryActions: TableAction<ProductCategoryRow>[] = useMemo(
-    () => [
-      {
-        label: "Edit",
-        icon: <Edit size={16} />,
-        onClick: (row) => openEditCategoryModal(row),
-        variant: "link" as const,
-      },
-      {
-        label: "Delete",
-        icon: <Trash2 size={16} />,
-        onClick: (row) => openDeleteCategoryModal(row),
-        variant: "link" as const,
-        className: "text-danger",
-      },
-    ],
-    [openEditCategoryModal, openDeleteCategoryModal],
+    () =>
+      canManageProductCategories
+        ? [
+            {
+              label: "Edit",
+              icon: <Edit size={16} />,
+              onClick: (row) => openEditCategoryModal(row),
+              variant: "link" as const,
+            },
+            {
+              label: "Delete",
+              icon: <Trash2 size={16} />,
+              onClick: (row) => openDeleteCategoryModal(row),
+              variant: "link" as const,
+              className: "text-danger",
+            },
+          ]
+        : [],
+    [openEditCategoryModal, openDeleteCategoryModal, canManageProductCategories],
   );
 
   const sortedCategories = useMemo(() => {
@@ -424,7 +440,7 @@ const ManageCategories = () => {
       showFilterPills: true,
       showMoreFiltersButton: false,
       filterPills: categoryStatusPills,
-      rightActions: (
+      rightActions: canManageProductCategories ? (
         <div className="d-flex gap-2">
           <Button
             variant="primary"
@@ -436,7 +452,7 @@ const ManageCategories = () => {
             Add Category
           </Button>
         </div>
-      ),
+      ) : undefined,
     }),
     [
       search,
@@ -444,8 +460,13 @@ const ManageCategories = () => {
       handleToolbarSearch,
       openAddCategoryModal,
       categoryStatusPills,
+      canManageProductCategories,
     ],
   );
+
+  if (!canViewBillingProducts) {
+    return null;
+  }
 
   return (
     <React.Fragment>
@@ -471,6 +492,7 @@ const ManageCategories = () => {
           data={sortedCategories}
           columns={categoryColumns}
           actions={categoryActions}
+          showActions={canManageProductCategories}
           sortable
           defaultSortBy={sortState.column}
           defaultSortOrder={sortState.direction}

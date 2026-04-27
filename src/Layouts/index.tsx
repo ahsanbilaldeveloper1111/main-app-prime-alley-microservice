@@ -1769,7 +1769,17 @@ font-weight:600;
                             </button>
                           )}
                           
-                          {session?.user?.permissions?.includes(PERMISSIONS.ACCOUNTS_SERVICES) && (
+                          {session?.user?.permissions?.some((permission) =>
+                            ([
+                              PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING,
+                              PERMISSIONS.VIEW_BILLING_HISTORY_BILLING,
+                              PERMISSIONS.VIEW_PAYMENT_METHODS_BILLING,
+                              PERMISSIONS.VIEW_INVOICES_BILLING,
+                       
+                              PERMISSIONS.VIEW_ORDER_INVOICES_BILLING
+                            ] as string[]).includes(permission)
+                          ) && (
+                     
                         <button type="button" className="user-dropdown-item" onClick={() => router.push('/billing/account-billing')}>
                           {/* <FileText className="user-dropdown-item-icon" size={14} /> */}
                           <span className="user-dropdown-item-text">Account & Billing</span>
