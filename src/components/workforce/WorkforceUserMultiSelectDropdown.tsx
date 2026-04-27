@@ -68,9 +68,12 @@ export function WorkforceUserMultiSelectDropdown(
     listMaxHeightPx,
   } = props;
 
+  const listScrolls =
+    typeof listMaxHeightPx === "number" && Number.isFinite(listMaxHeightPx);
+
   const listStyle: React.CSSProperties = {
     marginBottom: "8px",
-    ...(listMaxHeightPx != null
+    ...(listScrolls
       ? { maxHeight: `${listMaxHeightPx}px`, overflowY: "auto" as const }
       : {}),
   };
