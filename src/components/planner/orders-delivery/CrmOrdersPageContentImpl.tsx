@@ -32,6 +32,7 @@ import {
   getDealAttachments,
   downloadDealAttachment,
 } from "@crm/orders/orderListCrmApi";
+import { buildCrmOrdersListGetOrdersParams } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
 import { GetHierarchyData } from "@utils/users";
 import {
   Button,
@@ -87,7 +88,12 @@ import {
   CrmOrdersStagePieChart,
 } from "./CrmOrdersAnalyticsCharts";
 import moment from "moment";
-import { crmPlannerExtensionDisplayName } from "./crmOrdersPlannerOrderDisplayHelpers";
+import {
+  crmPlannerExtensionDisplayName,
+  fulfillmentBadgeVariant,
+  orderApprovalBadgeVariant,
+  paymentBadgeVariant,
+} from "./crmOrdersPlannerOrderDisplayHelpers";
 
 
 const OPTIONAL_STRING_FILTER_KEYS = [
@@ -185,32 +191,6 @@ function setOptionalFilterValue(
     return;
   }
   delete target[key];
-}
-
-function buildOrdersRequestParams(
-  page: number,
-  perPage: number,
-  filters: Record<string, any>,
-) {
-  const params: Record<string, any> = { page, per_page: perPage };
-  OPTIONAL_STRING_FILTER_KEYS.forEach((key) => {
-    if (!(key in filters)) return;
-    setOptionalFilterValue(
-      params,
-      key,
-      filters[key],
-      key === "stage_id" || key === "assigned_to" || key === "order_value_min" || key === "order_value_max" || key === "order_stage_id",
-    );
-  });
-  if ("is_lost" in filters) {
-    params.is_lost = filters.is_lost;
-  }
-  OPTIONAL_TRUE_FILTER_KEYS.forEach((key) => {
-    if (filters[key] !== undefined) {
-      params[key] = filters[key];
-    }
-  });
-  return params;
 }
 
 function applyActiveFilterState(
@@ -483,13 +463,11 @@ function buildOrdersTableColumns(): TableColumn<any>[] {
       label: "Approval",
       sortable: true,
       type: "custom",
-      render: (row: any) => {
-        const s = String(row.approvalStatus ?? "").toLowerCase();
-        let bg: "success" | "danger" | "warning" = "warning";
-        if (s === "approved") bg = "success";
-        else if (s === "rejected") bg = "danger";
-        return <Badge bg={bg}>{row.approvalStatus}</Badge>;
-      },
+      render: (row: any) => (
+        <Badge bg={orderApprovalBadgeVariant(row.approvalStatus)}>
+          {row.approvalStatus}
+        </Badge>
+      ),
       emptyValue: "-",
     },
     {
@@ -497,13 +475,11 @@ function buildOrdersTableColumns(): TableColumn<any>[] {
       label: "Fulfillment",
       sortable: true,
       type: "custom",
-      render: (row: any) => {
-        const s = String(row.fulfillmentStatus ?? "").toLowerCase();
-        let bg: "success" | "primary" | "secondary" = "secondary";
-        if (s.includes("completed") || s.includes("delivered")) bg = "success";
-        else if (s.includes("progress")) bg = "primary";
-        return <Badge bg={bg}>{row.fulfillmentStatus}</Badge>;
-      },
+      render: (row: any) => (
+        <Badge bg={fulfillmentBadgeVariant(row.fulfillmentStatus)}>
+          {row.fulfillmentStatus}
+        </Badge>
+      ),
       emptyValue: "-",
     },
     {
@@ -511,13 +487,9 @@ function buildOrdersTableColumns(): TableColumn<any>[] {
       label: "Payment",
       sortable: true,
       type: "custom",
-      render: (row: any) => {
-        const s = String(row.paymentStatus ?? "").toLowerCase();
-        let bg: "success" | "warning" | "danger" = "danger";
-        if (s === "paid") bg = "success";
-        else if (s === "partial") bg = "warning";
-        return <Badge bg={bg}>{row.paymentStatus}</Badge>;
-      },
+      render: (row: any) => (
+        <Badge bg={paymentBadgeVariant(row.paymentStatus)}>{row.paymentStatus}</Badge>
+      ),
       emptyValue: "-",
     },
     {
@@ -744,13 +716,20 @@ async function executeCrmOrdersListFetch(
   page: number,
   perPage: number,
   currentFilters: Record<string, any>,
+  tableSort: { sortBy: string; sortOrder: string },
   setters: OrdersListFetchSetters,
 ): Promise<void> {
   setters.setLoading(true);
   try {
-    const params = buildOrdersRequestParams(page, perPage, currentFilters);
+    const params = buildCrmOrdersListGetOrdersParams({
+      filters: currentFilters,
+      page,
+      perPage,
+      tableSort: tableSort.sortBy ? tableSort : null,
+      normalizeSearch: true,
+      ownerParamStyle: "user_extension_filter",
+    });
     const response: any = await getOrders(params);
-    console.log("Raw response from getOrders:", response);
     const ordersArray: any[] = response?.dataList || [];
     const pagination: any = response?.meta || {};
     const summary: any = response?.summary_tiles || null;
@@ -1054,6 +1033,8 @@ function useCrmOrdersPlannerLifecycleEffects(
     currentFilters,
     ordersPagination.currentPage,
     ordersPagination.rowsPerPage,
+    ordersPagination.sortBy,
+    ordersPagination.sortOrder,
     fetchOrders,
   ]);
 
@@ -1155,14 +1136,23 @@ export const CrmOrdersPageContentImpl = () => {
   // Fetch orders when filters or search change
   const fetchOrders = useCallback(
     async (page = 1, perPage = 15) => {
-      await executeCrmOrdersListFetch(page, perPage, currentFilters, {
-        setLoading,
-        setOrdersData,
-        setTotalOrders,
-        setSummaryTiles,
-      });
+      await executeCrmOrdersListFetch(
+        page,
+        perPage,
+        currentFilters,
+        {
+          sortBy: ordersPagination.sortBy,
+          sortOrder: ordersPagination.sortOrder,
+        },
+        {
+          setLoading,
+          setOrdersData,
+          setTotalOrders,
+          setSummaryTiles,
+        },
+      );
     },
-    [currentFilters],
+    [currentFilters, ordersPagination.sortBy, ordersPagination.sortOrder],
   );
 
   // Handler to update filter and URL
