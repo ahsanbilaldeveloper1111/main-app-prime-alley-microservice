@@ -11,6 +11,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Check,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -388,9 +389,16 @@ export interface FilterPill {
   activeLabelOnly?: boolean;
   /** When filter is active, called when the clear (X) icon is clicked to remove the filter */
   onClear?: () => void;
+  /** When true, dropdown stays open while selecting options. */
+  multiSelect?: boolean;
+  /** Optional select-all handler for multi-select filter pills. */
+  onSelectAll?: () => void;
+  /** Select-all button label for multi-select filter pills. */
+  selectAllLabel?: string;
   dropdownOptions?: Array<{
     label: string;
     value: string;
+    selected?: boolean;
     onClick?: () => void;
   }>;
   /** Override the default `Dropdown.Menu` inline styles (e.g. remove maxHeight/overflow for portalled selects). */
@@ -436,6 +444,8 @@ export interface ToolbarConfig {
   advancedFiltersOpen?: boolean;
   /** Inline advanced filters panel content (rendered when `advancedFiltersOpen` is true). */
   advancedFiltersContent?: React.ReactNode;
+  /** Custom actions rendered at the end of the filter pills row (e.g., Apply/Reset buttons). */
+  filterPillsRightActions?: React.ReactNode;
 
   // Sort
   showSortButton?: boolean;
@@ -809,18 +819,35 @@ function GenericTableFilterPillMenuBody({
         </div>
       )}
       {hasOptions ? (
-        optionsToShow.map((option) => (
-          <Dropdown.Item
-            key={`${pill.id}:${option.value}:${option.label}`}
-            onClick={() => {
-              (option.onClick || pill.onClick)?.();
-              clearPillQuery();
-              closeMenu();
-            }}
-          >
-            {option.label}
-          </Dropdown.Item>
-        ))
+        <>
+          {pill.multiSelect && pill.onSelectAll && (
+            <Dropdown.Item
+              onClick={() => {
+                pill.onSelectAll?.();
+                clearPillQuery();
+              }}
+            >
+              <strong>{pill.selectAllLabel ?? "Select all"}</strong>
+            </Dropdown.Item>
+          )}
+          {optionsToShow.map((option) => (
+            <Dropdown.Item
+              key={`${pill.id}:${option.value}:${option.label}`}
+              onClick={() => {
+                (option.onClick || pill.onClick)?.();
+                clearPillQuery();
+                if (!pill.multiSelect) {
+                  closeMenu();
+                }
+              }}
+            >
+              <div className="d-flex align-items-center justify-content-between gap-2">
+                <span>{option.label}</span>
+                {option.selected && <Check size={14} aria-hidden />}
+              </div>
+            </Dropdown.Item>
+          ))}
+        </>
       ) : (
         <>
           <Dropdown.Item onClick={() => { pill.onClick?.(); closeMenu(); }}>All</Dropdown.Item>
@@ -1777,6 +1804,7 @@ const GenericTable = <T extends Record<string, any>>({
                     <Dropdown
                       key={pill.id}
                       show={openFilterPillId === pill.id}
+                      autoClose={pill.multiSelect ? "outside" : true}
                       onToggle={(nextShow) =>
                         setOpenFilterPillId(nextShow ? pill.id : null)
                       }
@@ -1851,6 +1879,11 @@ const GenericTable = <T extends Record<string, any>>({
                     <Filter size={14} className="me-1" />
                     <span>Advanced filters</span>
                   </button>
+                )}
+                {toolbar.filterPillsRightActions && (
+                  <div className="gt-filter-pills-right-actions d-flex align-items-center gap-2 ms-auto">
+                    {toolbar.filterPillsRightActions}
+                  </div>
                 )}
               </div>
               {toolbar.advancedFiltersOpen && toolbar.advancedFiltersContent && (
