@@ -367,6 +367,7 @@ type LineItemsSectionProps = Readonly<{
   cloneItem: (id: string) => void;
   removeItem: (id: string) => void;
   updateItem: (id: string, patch: object) => void;
+  setLineAmount: (id: string, amount: number) => void;
   formatVatRate2: (vat: unknown) => string;
   subtotal: number;
   taxAmount: number;
@@ -377,7 +378,7 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
   const { currencyCode, selectedCompanyId, productSelectWrapRefTop, productSelectWrapRef, productSelectOpen, productSelectAnchor,
     setProductSelectAnchor, setProductSelectOpen, productSelectDisabled, availableProductOptions,
     productSelectPlaceholder, toSingleSelectString, customerProducts, selectedProductIds, addProductToInvoice,
-    items, round2, lineTax, lineTotal, removeItem, updateItem, formatVatRate2, subtotal, taxAmount, totalAmount } = props;
+    items, round2, lineTax, lineTotal, removeItem, updateItem, setLineAmount, formatVatRate2, subtotal, taxAmount, totalAmount } = props;
   const onProductSelect = (v: unknown) => handleProductSelect(v, toSingleSelectString, customerProducts, selectedProductIds, addProductToInvoice, setProductSelectOpen);
   const companyNotSelected = selectedCompanyId == null;
   const selectFromLibraryDisabled = companyNotSelected || productSelectDisabled;
@@ -488,13 +489,21 @@ function CreateInvoiceLineItemsSection(props: LineItemsSectionProps) {
                     <button style={{ ...lineItemBtnStyle, borderColor: "rgba(220,53,69,0.45)", color: "#dc3545" }} onClick={() => removeItem(it.id)}>Remove</button>
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 12, marginTop: 12 }}>
                   <div><div style={t.label}>Quantity</div>
                     <input style={t.inputFixed} type="number" min={0} value={it.quantity}
                       onChange={(e) => updateItem(it.id, { quantity: Math.max(0, Number(e.target.value) || 0) })} /></div>
                   <div><div style={t.label}>Unit Price</div>
                     <input style={t.inputFixed} type="number" value={it.unit_price}
                       onChange={(e) => updateItem(it.id, { unit_price: Number(e.target.value) || 0 })} /></div>
+                  <div><div style={t.label}>Amount</div>
+                    <input
+                      style={t.inputFixed}
+                      type="number"
+                      min={0}
+                      value={round2(it.quantity * it.unit_price)}
+                      onChange={(e) => setLineAmount(it.id, Number(e.target.value) || 0)}
+                    /></div>
                   <div><div style={t.label}>Tax (%)</div>
                     <input style={t.inputFixed} type="number" step="0.01" value={it.vat_rate}
                       onChange={(e) => updateItem(it.id, { vat_rate: formatVatRate2(e.target.value) })} /></div>
@@ -1115,6 +1124,7 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
     cloneItem,
     removeItem,
     updateItem,
+    setLineAmount,
     handleDueDateChange,
     acceptOnline,
     setAcceptOnline,
@@ -1426,6 +1436,7 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
           cloneItem={cloneItem}
           removeItem={removeItem}
           updateItem={updateItem}
+          setLineAmount={setLineAmount}
           formatVatRate2={formatVatRate2}
           subtotal={subtotal}
           taxAmount={taxAmount}

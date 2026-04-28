@@ -11,6 +11,10 @@ import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
 
 import { Form } from "react-bootstrap";
+import { usePermissions } from "@utils/permissionUtils";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
@@ -192,6 +196,12 @@ const buildEditPricingItem = (row: any): CustomerProductPricingDataItem | null =
 };
 
 const ProductDetails = () => {
+  const { hasPermission } = usePermissions();
+  const canViewSubscriptions = hasPermission(PERMISSIONS.VIEW_PRODUCT_DETAILS_BILLING);
+  const canCreateSubscription = hasPermission(PERMISSIONS.CREATE_SUBSCRIPTIONS_BILLING);
+  const canUpdateSubscription = hasPermission(PERMISSIONS.UPDATE_SUBSCRIPTIONS_BILLING);
+  const canDeleteSubscription = hasPermission(PERMISSIONS.DELETE_SUBSCRIPTIONS_BILLING);
+
   const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -347,16 +357,17 @@ const ProductDetails = () => {
   }, []);
 
   const handleOpenEditModal = useCallback((row: any) => {
+    if (!canUpdateSubscription) return;
     const item = buildEditPricingItem(row);
     if (!item) return;
     setEditInitialPricingData([item]);
     setEditSubscriptionModalKey((k) => k + 1);
     setShowEditSubscriptionModal(true);
-  }, []);
+  }, [canUpdateSubscription]);
 
   const handleDeletePricing = useCallback(
     async (productId: string | number) => {
-      if (!selectedCompanyId) return;
+      if (!canDeleteSubscription || !selectedCompanyId) return;
       setDeletingProductId(productId);
       try {
         await deleteCustomerProductPricing(selectedCompanyId, productId);
@@ -369,10 +380,11 @@ const ProductDetails = () => {
         setDeletingProductId(null);
       }
     },
-    [selectedCompanyId],
+    [selectedCompanyId, canDeleteSubscription],
   );
 
   const openDeleteConfirmation = useCallback((row: any) => {
+    if (!canDeleteSubscription) return;
     const productId = row?.product_id ?? row?.product?.id ?? row?.id;
     if (!productId) return;
     setDeleteTarget({
@@ -380,14 +392,14 @@ const ProductDetails = () => {
       name: row?.product?.name,
     });
     setShowDeleteModal(true);
-  }, []);
+  }, [canDeleteSubscription]);
 
   const confirmDelete = useCallback(async () => {
-    if (!deleteTarget) return;
+    if (!canDeleteSubscription || !deleteTarget) return;
     await handleDeletePricing(deleteTarget.productId);
     setShowDeleteModal(false);
     setDeleteTarget(null);
-  }, [deleteTarget, handleDeletePricing]);
+  }, [deleteTarget, handleDeletePricing, canDeleteSubscription]);
 
   useEffect(() => {
     fetchProducts();
@@ -514,6 +526,7 @@ const ProductDetails = () => {
           const isDeleting = deletingProductId != null && deletingProductId === productId;
           return (
             <div className="d-flex gap-1">
+              {canUpdateSubscription ? (
               <button
                 type="button"
                 disabled={!productId || isDeleting}
@@ -533,7 +546,9 @@ const ProductDetails = () => {
               >
                 <FiEdit size={16} />
               </button>
+              ) : null}
 
+              {canDeleteSubscription ? (
               <button
                 type="button"
                 disabled={!productId || isDeleting}
@@ -555,12 +570,19 @@ const ProductDetails = () => {
               >
                 <FiTrash2 size={16} />
               </button>
+              ) : null}
             </div>
           );
         },
       },
     ],
-    [deletingProductId, handleOpenEditModal, openDeleteConfirmation]
+    [
+      deletingProductId,
+      handleOpenEditModal,
+      openDeleteConfirmation,
+      canUpdateSubscription,
+      canDeleteSubscription,
+    ]
   );
 
   const [showColumnEditor, setShowColumnEditor] = useState(false);
@@ -760,7 +782,8 @@ const ProductDetails = () => {
   ], [currentFilters, applyStatusFilter, applyBillingCycleFilter]);
 
   // Add Subscription button
-  const renderAddSubscriptionButton = () => (
+  const renderAddSubscriptionButton = () =>
+    canCreateSubscription ? (
     <div
       style={{
         position: "absolute",
@@ -795,7 +818,7 @@ const ProductDetails = () => {
       </button>
 
     </div>
-  );
+  ) : null;
 
   const subscriptionsToolbarConfig = useCrmToolbarConfig({
     entity: "invoices" as any,
@@ -881,6 +904,10 @@ const ProductDetails = () => {
     ],
     [currentFilters.search, currentFilters.status, currentFilters.billing_cycle]
   );
+
+  if (!canViewSubscriptions) {
+    return null;
+  }
 
   return (
     <React.Fragment>

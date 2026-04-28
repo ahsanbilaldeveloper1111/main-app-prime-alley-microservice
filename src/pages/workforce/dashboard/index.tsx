@@ -97,8 +97,13 @@ const EmployeesDashboard = () => {
     const getDisplayName = useCallback(
       (userId: string | number | null | undefined, fallback?: string): string => {
         if (userId == null || userId === "") return fallback ?? "—";
-        const u = mainAppUsers?.find((x) => String(x.id) === String(userId));
-        return u?.name ?? fallback ?? String(userId);
+        const lookupKey = String(userId).trim();
+        const u = mainAppUsers?.find(
+          (x) =>
+            String(x.id) === lookupKey ||
+            String(x.phone ?? "").trim() === lookupKey
+        );
+        return u?.name ?? fallback ?? lookupKey;
       },
       [mainAppUsers]
     );
@@ -512,7 +517,7 @@ const EmployeesDashboard = () => {
           {[
             { icon: Plus, color: '#6366F1', text: 'Add Employee', onClick: handleAddEmployee },
             { icon: Calendar, color: '#10B981', text: 'New Request', onClick: handleNewRequest },
-            { icon: Upload, color: '#8B5CF6', text: 'Upload Document', onClick: handleUploadDocument }
+            // { icon: Upload, color: '#8B5CF6', text: 'Upload Document', onClick: handleUploadDocument }
           ].map((action) => (
             <button 
               key={action.text}

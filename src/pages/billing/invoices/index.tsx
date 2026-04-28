@@ -45,6 +45,7 @@ import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
 import { toast } from "react-toastify";
 import { useSession } from "next-auth/react";
+import { usePermissions } from "@utils/permissionUtils";
 import moment from "moment";
 import InvoiceViewModal, { InvoiceViewData } from "@components/billings/InvoiceViewModal";
 import ColumnEditorModal from "@components/ColumnEditorModal";
@@ -63,6 +64,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useInvoicePaymentModal } from "@components/billings/InvoicePaymentModal";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 // Invoice Status Constants
 const STATUS_DRAFT = "draft";
@@ -74,6 +76,7 @@ const STATUS_PARTIALLY_PAID = "partially_paid";
 const STATUS_FAILED = "failed";
 const STATUS_REFUNDED = "refunded";
 const STATUS_PENDING = "pending";
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const PAY_NOW_ELIGIBLE_STATUSES = new Set<string>([
   STATUS_PENDING,
@@ -710,7 +713,11 @@ function InvoiceStripePaymentLinkModal({
 
 const InvoiceList = () => {
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
   const router = useRouter();
+  const canCreateInvoice = hasPermission(PERMISSIONS.CREATE_INVOICES_BILLING);
+  const canUpdateInvoice = hasPermission(PERMISSIONS.UPDATE_INVOICES_BILLING);
+  const canDeleteInvoice = hasPermission(PERMISSIONS.DELETE_INVOICES_BILLING);
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentFilters, setCurrentFilters] = useState<InvoiceFilters>({});
   const [pendingFilters, setPendingFilters] = useState<InvoiceFilters>({});
@@ -1015,7 +1022,7 @@ const InvoiceList = () => {
   }, [deletingInvoice]);
 
   const confirmDeleteInvoice = useCallback(async () => {
-    if (!deleteTarget) return;
+    if (!canDeleteInvoice || !deleteTarget) return;
     setDeletingInvoice(true);
     try {
       await deleteInvoice(deleteTarget.id);
@@ -1027,7 +1034,7 @@ const InvoiceList = () => {
     } finally {
       setDeletingInvoice(false);
     }
-  }, [deleteTarget]);
+  }, [deleteTarget, canDeleteInvoice]);
 
   const invoiceTableActions: GenericTableAction<InvoiceData>[] = useMemo(
     () => [
@@ -1050,6 +1057,7 @@ const InvoiceList = () => {
         label: "Edit",
         icon: <Pencil size={16} />,
         show: (row: InvoiceData) =>
+          canUpdateInvoice &&
           String(row.status ?? "").trim().toLowerCase() === STATUS_PENDING,
         onClick: (row: InvoiceData) =>
           router.push(`/billing/invoices/edit/${row.id}`),
@@ -1058,6 +1066,7 @@ const InvoiceList = () => {
         label: "Delete",
         icon: <Trash2 size={16} />,
         show: (row: InvoiceData) =>
+          canDeleteInvoice &&
           String(row.status ?? "").trim().toLowerCase() === STATUS_PENDING,
         onClick: (row: InvoiceData) => openDeleteInvoiceModal(row),
       },
@@ -1067,7 +1076,7 @@ const InvoiceList = () => {
         // variant: "danger",
         show: (row: InvoiceData) =>
           PAY_NOW_ELIGIBLE_STATUSES.has(row.status ?? "") &&
-          !!session?.user?.permissions?.includes("pay-invoices-billing"),
+          !!session?.user?.permissions?.includes(PERMISSIONS.PAY_INVOICES_BILLING),
         onClick: (row: InvoiceData) => handlePayInvoice(row),
       },
       {
@@ -1080,12 +1089,15 @@ const InvoiceList = () => {
     ],
     [
       session?.user?.permissions,
+      canUpdateInvoice,
+      canDeleteInvoice,
       handleViewInvoice,
       handlePayInvoice,
       handleDownloadPDF,
       downloadingInvoicePdfId,
       openDeleteInvoiceModal,
       openGeneratePaymentLinkModal,
+      router,
     ],
   );
 
@@ -1181,7 +1193,8 @@ const InvoiceList = () => {
   const invoiceRequestIdRef = useRef(0);
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [totalAllInvoices, setTotalAllInvoices] = useState(0);
-  const canPayInvoices = session?.user?.permissions?.includes("pay-invoices-billing") === true;
+  const canPayInvoices =
+    session?.user?.permissions?.includes(PERMISSIONS.PAY_INVOICES_BILLING) === true;
   const canPaySelectedInvoice =
     !!selectedInvoiceSidebar &&
     canPayInvoices &&
@@ -1337,7 +1350,8 @@ const InvoiceList = () => {
   );
 
   // Render Create Invoice Button
-  const renderCreateInvoiceButton = () => (
+  const renderCreateInvoiceButton = () =>
+    canCreateInvoice ? (
     <div
       style={{
         position: "absolute",
@@ -1349,6 +1363,7 @@ const InvoiceList = () => {
       }}
     >
       <button
+        type="button"
         onClick={() => {
           router.push('/billing/create-invoice');
         }}
@@ -1376,7 +1391,7 @@ const InvoiceList = () => {
         Create Invoice
       </button>
     </div>
-  );
+  ) : null;
 
   // Handle preview button click
   const handlePreviewClick = useCallback((invoice: InvoiceData) => {

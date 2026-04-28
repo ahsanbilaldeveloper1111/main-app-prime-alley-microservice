@@ -39,12 +39,9 @@ import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomer
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Badge, Form, Card, Modal } from "react-bootstrap";
 import Select, { type SingleValue } from "react-select";
-import {
-  GlobalDateFormat,
-  ModuleSlug,
-  formatDateForTable,
-  formatNumber,
-} from "@utils/Helper";
+import { ModuleSlug, formatDateForTable, formatNumber } from "@utils/Helper";
+import { buildCrmOrderGridRowFromApiOrder } from "@utils/crmOrdersGridRowFromApiOrder";
+import { computeCrmOrdersAnalyticsFromGridRows } from "@utils/crmOrdersGridAnalyticsFromRows";
 import {
   CheckCircle,
   Eye,
@@ -86,7 +83,6 @@ import {
   DeleteConfirmationModal,
 } from "@crm/orders/orderListOrderPageShared";
 import { useSession } from "next-auth/react";
-import moment from "moment";
 import {
   CrmKPICard as KPICard,
   CrmFilterBar as FilterBar,
@@ -104,8 +100,10 @@ import {
   orderApprovalBadgeVariant,
   paymentStatusBadgeVariant,
 } from "@components/billings/order-invoicing";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 const ignoredHistoryKeys = new Set<string>(["order_stage_id"]);
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 function assignedSelectValue(
   opt: SingleValue<{ value: string | number }>,
@@ -122,46 +120,7 @@ function transformOrderListRow(order: any, extensions: any[]) {
     extensions,
     order?.assigned_to,
   );
-  return {
-    id: order.id,
-    orderNumber: order.order_number || "",
-    customer: order.customer_name || "",
-    customerEmail: order.customer_email || "",
-    customerPhone: order.customer_phone || "",
-    deal: order.deal?.name || order.deal_id || "",
-    dealId: order.deal_id || null,
-    stage: order.stage?.name || "No Stage",
-    stageColor: order.stage?.color || "grey",
-    stageId: order.order_stage_id || null,
-    value: order.final_amount || order.total_amount || "0",
-    currency: order.currency || "AED",
-    approvalStatus: order.order_approval_status || null,
-    fulfillmentStatus: order.fulfillment_status || null,
-    paymentStatus: order.payment_status || null,
-    orderDate: order.order_date
-      ? moment(order.order_date).format(GlobalDateFormat)
-      : "-",
-    assignedUser: assignedLabel,
-    expectedDeliveryDate: formatDateForTable(order.expected_delivery_date),
-    actualDeliveryDate: formatDateForTable(order.actual_delivery_date),
-    owner: assignedLabel,
-    created: formatDateForTable(order.created_at),
-    contractType: order.contract_type || "",
-    contractLength: order.contract_length || "",
-    contractStartDate: formatDateForTable(order.contract_start_date),
-    contractEndDate: formatDateForTable(order.contract_end_date),
-    billingModel: order.billing_model || "",
-    billingStatus: order.billing_status || "",
-    paymentTerms: order.payment_terms || "",
-    progressDial: order.progress_dial || 0,
-    pocName: order.poc_name || order.customer_name || "",
-    pocTitle: order.poc_title || "",
-    pocPhone: order.poc_phone || "",
-    company: order.company || order.deal?.company_name || "",
-    industry: order.industry || order.deal?.industry || "",
-    status: order.status || "pending",
-    rawData: order,
-  };
+  return buildCrmOrderGridRowFromApiOrder(order, assignedLabel) as any;
 }
 
 async function loadDealAndLeadForOrder(orderData: {
@@ -723,50 +682,11 @@ const CrmOrders = () => {
     const transformedOrders = ordersData.map((o) =>
       transformOrderListRow(o, extensions),
     );
-
-    const total = summaryTiles ? totalOrders : transformedOrders.length;
-    const delivered = transformedOrders.filter(
-      (o) =>
-        o.fulfillmentStatus?.toLowerCase().includes("completed") ||
-        o.fulfillmentStatus?.toLowerCase().includes("delivered"),
-    ).length;
-    const inProgress = transformedOrders.filter((o) =>
-      o.fulfillmentStatus?.toLowerCase().includes("progress"),
-    ).length;
-    const pendingApproval = transformedOrders.filter((o) =>
-      o.approvalStatus?.toLowerCase().includes("pending"),
-    ).length;
-
-    // Calculate total value
-    const totalValue = transformedOrders.reduce((sum, o) => {
-      const value =
-        Number.parseFloat(String(o.value).replaceAll(/[^0-9.-]/g, "")) || 0;
-      return sum + value;
-    }, 0);
-
-    // Stage distribution
-    const stageCounts: Record<string, number> = {};
-    transformedOrders.forEach((o) => {
-      const stage = o.stage || "No Stage";
-      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
-    });
-
-    // Status distribution
-    const statusCounts: Record<string, number> = {};
-    transformedOrders.forEach((o) => {
-      const status = o.fulfillmentStatus || "pending";
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-    });
-
-    return {
-      total,
-      delivered,
-      inProgress,
-      pendingApproval,
-      totalValue,
-      stageCounts,
-      statusCounts,
-    };
+    return computeCrmOrdersAnalyticsFromGridRows(
+      transformedOrders,
+      summaryTiles,
+      totalOrders,
+    );
   }, [ordersData, extensions, summaryTiles, totalOrders]);
 
   // Transform orders data (no client-side filtering - API handles it)
@@ -984,7 +904,7 @@ const CrmOrders = () => {
         variant: "link" as const,
       },
 
-      ...(session?.user?.permissions?.includes("edit-crm-orders")
+      ...(session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING)
         ? [
             {
               label: "Edit",
@@ -1009,7 +929,7 @@ const CrmOrders = () => {
         className: "text-info",
       },
 
-      ...(session?.user?.permissions?.includes("delete-crm-orders")
+      ...(session?.user?.permissions?.includes(PERMISSIONS.DELETE_CRM_ORDERS_BILLING)
         ? [
             {
               label: "Delete",
@@ -1055,7 +975,7 @@ const CrmOrders = () => {
     handleMarkLost,
   ]);
 
-  if (!session?.user?.permissions?.includes("list-crm-orders")) {
+  if (!session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
     return null;
   }
 
@@ -1805,7 +1725,7 @@ const CrmOrders = () => {
           }}
           sortable={true}
           onRowClick={async (row) => {
-            if (session?.user?.permissions?.includes("list-crm-orders")) {
+            if (session?.user?.permissions?.includes(PERMISSIONS.LIST_CRM_ORDERS_BILLING)) {
               setShowOrderSidebar(true);
               // Fetch full order details including related deal and lead
               await fetchOrderDetails(row.rawData?.id || row.id);

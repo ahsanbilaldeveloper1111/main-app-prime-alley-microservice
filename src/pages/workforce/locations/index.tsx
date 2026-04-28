@@ -1,8 +1,7 @@
 import "@assets/scss/datatable-style.scss";
-import React, { ReactElement, useCallback, useEffect, useState } from "react";
+import React, { ReactElement, useCallback, useEffect, useMemo, useState } from "react";
 import Layout from "@layout/index";
 import BreadcrumbItem from "@common/BreadcrumbItem";
-import PageHeader from "@components/PageHeader";
 import DeleteConfirmationModal from "@pages/partial/DeleteConfirmationModal";
 import { useSession } from "next-auth/react";
 import {
@@ -17,11 +16,13 @@ import {
 import { toast } from "react-toastify";
 import { Button, Form, Modal, Spinner } from "react-bootstrap";
 import { ChevronLeft, ChevronRight, MapPin, Pencil, Plus, Trash2 } from "lucide-react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 
 const ITEMS_PER_PAGE = 15;
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const emptyForm: Partial<LocationPayload> = {
   name: "",
@@ -185,6 +186,16 @@ const Locations = () => {
     }
   };
 
+  const deleteModalItemName = useMemo(() => {
+    if (locationToDelete?.name) {
+      return `"${locationToDelete.name}"`;
+    }
+    if (locationToDelete) {
+      return `location #${locationToDelete.id}`;
+    }
+    return undefined;
+  }, [locationToDelete]);
+
   const truncate = (s: string | undefined, max: number) => {
     if (!s) return "—";
     return s.length <= max ? s : s.slice(0, max) + "…";
@@ -224,7 +235,7 @@ const Locations = () => {
           )}
         </div>
 
-        {session?.user?.permissions?.includes('add-location-staff-management') && (
+        {session?.user?.permissions?.includes(PERMISSIONS.ADD_LOCATION_STAFF_MANAGEMENT) && (
         <Button
           variant="primary"
           size="sm"
@@ -278,29 +289,34 @@ const Locations = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: "48px 24px", textAlign: "center" }}>
-                    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                      <Spinner animation="border" size="sm" style={{ color: "#6366f1" }} />
-                      <span style={{ fontSize: "14px", color: "#6b7280" }}>Loading locations…</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : locations.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ padding: "48px 24px", textAlign: "center" }}>
-                    <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-                      <div style={{ padding: "16px", backgroundColor: "#f3f4f6", borderRadius: "12px" }}>
-                        <MapPin size={32} style={{ color: "#9ca3af" }} />
-                      </div>
-                      <span style={{ fontSize: "15px", fontWeight: "500", color: "#374151" }}>No locations</span>
-                      
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                locations.map((loc, index) => (
+              {(() => {
+                if (loading) {
+                  return (
+                    <tr>
+                      <td colSpan={5} style={{ padding: "48px 24px", textAlign: "center" }}>
+                        <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+                          <Spinner animation="border" size="sm" style={{ color: "#6366f1" }} />
+                          <span style={{ fontSize: "14px", color: "#6b7280" }}>Loading locations…</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+                if (locations.length === 0) {
+                  return (
+                    <tr>
+                      <td colSpan={5} style={{ padding: "48px 24px", textAlign: "center" }}>
+                        <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+                          <div style={{ padding: "16px", backgroundColor: "#f3f4f6", borderRadius: "12px" }}>
+                            <MapPin size={32} style={{ color: "#9ca3af" }} />
+                          </div>
+                          <span style={{ fontSize: "15px", fontWeight: "500", color: "#374151" }}>No locations</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+                return locations.map((loc, index) => (
                   <tr
                     key={loc.id}
                     style={{
@@ -328,7 +344,7 @@ const Locations = () => {
                     <td style={{ padding: "16px", textAlign: "center" }}>
                       <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                        
-                        {session?.user?.permissions?.includes('update-location-staff-management') && (
+                        {session?.user?.permissions?.includes(PERMISSIONS.UPDATE_LOCATION_STAFF_MANAGEMENT) && (
                         <button
                           type="button"
                           onClick={() => openEditModal(loc)}
@@ -357,7 +373,7 @@ const Locations = () => {
                           <Pencil size={18} />
                         </button>
                         )}
-                        {session?.user?.permissions?.includes('delete-location-staff-management') && (
+                        {session?.user?.permissions?.includes(PERMISSIONS.DELETE_LOCATION_STAFF_MANAGEMENT) && (
                         
                         <button
                           type="button"
@@ -391,8 +407,8 @@ const Locations = () => {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ));
+              })()}
             </tbody>
           </table>
         </div>
@@ -571,7 +587,7 @@ const Locations = () => {
           setLocationToDelete(null);
         }}
         onConfirm={handleConfirmDelete}
-        itemName={locationToDelete?.name ? `"${locationToDelete.name}"` : locationToDelete ? `location #${locationToDelete.id}` : undefined}
+        itemName={deleteModalItemName}
         itemType="location"
         loading={deleting}
       />

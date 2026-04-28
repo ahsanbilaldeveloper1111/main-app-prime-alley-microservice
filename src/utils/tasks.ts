@@ -67,6 +67,10 @@ interface ReorderStatusesData {
   status_ids: number[];
 }
 
+export interface BulkDeleteStatusesPayload {
+  status_ids: number[];
+}
+
 interface AddMemberData {
   extension_number: string;
   role: string;
@@ -546,6 +550,36 @@ export const deleteStatus = async (projectId: string | number, statusId: string 
   } catch (error: any) {
     console.error('API Error:', error);
     toast.error(error?.response?.data?.message || 'Failed to delete status');
+    throw error;
+  }
+};
+
+/**
+ * Delete multiple statuses in one request (work-planner).
+ */
+export const bulkDeleteStatuses = async (
+  payload: BulkDeleteStatusesPayload,
+): Promise<unknown> => {
+  const statusIds = payload.status_ids
+    .map((id) => Math.trunc(Number(id)))
+    .filter((id) => Number.isFinite(id));
+  if (statusIds.length === 0) {
+    toast.error('No valid status IDs to delete');
+    return null;
+  }
+  try {
+    const response = await axiosInstance.post(`${prefix}/statuses/bulk-delete`, {
+      status_ids: statusIds,
+    });
+    return validateResponse(
+      response,
+      'Failed to delete statuses',
+      'Statuses deleted successfully',
+      false,
+    );
+  } catch (error: any) {
+    console.error('API Error:', error);
+    toast.error(error?.response?.data?.message || 'Failed to delete statuses');
     throw error;
   }
 };

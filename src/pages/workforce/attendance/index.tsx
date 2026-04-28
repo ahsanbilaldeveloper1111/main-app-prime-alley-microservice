@@ -31,68 +31,26 @@ import { GlobalDateTimeFormat } from "@utils/Helper";
 import { useMainAppLookups } from "@hooks/useMainAppLookups";
 import { useSession } from "next-auth/react";
 import { Calendar, Clock, LogIn, LogOut } from "lucide-react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { usePermissions } from "@utils/permissionUtils";
+import { getAvatarColor, getInitials } from "@utils/workforceUserAvatar";
+import { getWorkforceTableDatePresetRange } from "@utils/workforceTableDatePresetRange";
+import { WorkforceUserMultiSelectDropdown } from "@components/workforce/WorkforceUserMultiSelectDropdown";
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import "@assets/scss/attendance-page.scss";
 
 const ITEMS_PER_PAGE = 15;
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const dateOptions = ["Today", "Last 7 days", "Last 30 days", "Last 3 months", "All time"];
 
 type MainAppUser = {
   id: string | number;
   name?: string | null;
+  phone?: string | null;
 };
-
-const getInitials = (name: string): string => {
-  const words = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2);
-  if (words.length === 0) return "NA";
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return `${words[0][0]}${words[1][0]}`.toUpperCase();
-};
-
-const getAvatarColor = (name: string): string => {
-  let hash = 0;
-  for (const ch of name) {
-    const code = ch.codePointAt(0) ?? 0;
-    hash = code + ((hash << 5) - hash);
-  }
-  const hue = Math.abs(hash) % 360;
-  return `hsla(${hue}, 55%, 45%, 0.6)`;
-};
-
-function getDateRangeForOption(option: string): { date_from: string; date_to: string } | null {
-  if (!option?.trim()) return null;
-  const now = new Date();
-  const to = new Date(now);
-  to.setHours(23, 59, 59, 999);
-  const toStr = to.toISOString().slice(0, 10);
-  const from = new Date(now);
-  switch (option.trim()) {
-    case "Today":
-      return { date_from: toStr, date_to: toStr };
-    case "Last 7 days":
-      from.setDate(from.getDate() - 7);
-      break;
-    case "Last 30 days":
-      from.setDate(from.getDate() - 30);
-      break;
-    case "Last 3 months":
-      from.setMonth(from.getMonth() - 3);
-      break;
-    case "All time":
-    default:
-      return null;
-  }
-  from.setHours(0, 0, 0, 0);
-  const fromStr = from.toISOString().slice(0, 10);
-  return { date_from: fromStr, date_to: toStr };
-}
 
 function formatAttendanceToolbarDateLine(
   status: AttendanceStatusData,
@@ -412,6 +370,8 @@ function AttendanceStatusDisplay({
 
 const AttendancePage = () => {
   const { data: session } = useSession();
+  const { hasPermission } = usePermissions();
+  const canDeleteAttendance = hasPermission(PERMISSIONS.DELETE_ATTENDANCE_STAFF_MANAGEMENT);
   const { mainAppUsers } = useMainAppLookups();
 
   const users = useMemo(() => (mainAppUsers ?? []) as MainAppUser[], [mainAppUsers]);
@@ -426,7 +386,9 @@ const AttendancePage = () => {
     [users]
   );
 
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [appliedUserIds, setAppliedUserIds] = useState<string[]>([]);
+  const [userSearchTerm, setUserSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
 
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -450,18 +412,51 @@ const AttendancePage = () => {
   const [recordToDelete, setRecordToDelete] = useState<AttendanceRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const managers = users;
+
+  const toggleSelectedUserId = useCallback((idStr: string, isSelected: boolean) => {
+    setSelectedUserIds((prev) => {
+      if (isSelected) return prev.filter((id) => id !== idStr);
+      return [...prev, idStr];
+    });
+  }, []);
+
+  const filteredManagers = useMemo(() => {
+    const needle = userSearchTerm.trim().toLowerCase();
+    if (!needle) return managers;
+    return managers.filter((mgr) => {
+      const label = String(mgr.name ?? mgr.id).toLowerCase();
+      const phone = String(mgr.phone ?? "").trim().toLowerCase();
+      return label.includes(needle) || phone.includes(needle);
+    });
+  }, [managers, userSearchTerm]);
+
   const loadAttendance = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const params: { page: number; limit: number; user_id?: string; date_from?: string; date_to?: string } = {
+      const params: {
+        page: number;
+        limit: number;
+        user_id?: string;
+        user_ids?: string[];
+        date_from?: string;
+        date_to?: string;
+      } = {
         page,
         limit: rowsPerPage,
       };
-      if (selectedUserId.trim()) params.user_id = selectedUserId.trim();
-      const dateRange = getDateRangeForOption(selectedDate ?? "");
+      const normalizedUserIds = appliedUserIds
+        .map((id) => String(id).trim())
+        .filter(Boolean);
+      if (normalizedUserIds.length > 0) {
+        // Journey-compatible filter payload
+        params.user_ids = normalizedUserIds;
+        // Backward-compatible single user filter
+      }
+      const dateRange = getWorkforceTableDatePresetRange(selectedDate ?? "");
       if (dateRange) {
-        params.date_from = dateRange.date_from;
-        params.date_to = dateRange.date_to;
+        params.date_from = dateRange.from;
+        params.date_to = dateRange.to;
       }
       const { data, pagination: p } = await getAttendance(params);
       setRecords(data ?? []);
@@ -483,7 +478,7 @@ const AttendancePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedUserId, selectedDate, rowsPerPage]);
+  }, [appliedUserIds, selectedDate, rowsPerPage]);
 
   const handlePaginationChange = useCallback((page: number, limit: number) => {
     if (rowsPerPageRef.current !== limit) {
@@ -513,48 +508,59 @@ const AttendancePage = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedUserId, selectedDate]);
+  }, [appliedUserIds, selectedDate]);
 
   useEffect(() => {
     loadStatus();
   }, [loadStatus]);
 
-  const handleCheckIn = async () => {
-    setCheckInOutLoading(true);
-    try {
-      const sessionUserId = session?.user?.id;
-      const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
-      await attendanceCheckIn(payload);
-      toast.success("Checked in successfully");
-      await loadStatus();
-      await loadAttendance(currentPage);
-    } catch (err) {
-      console.error("Check-in failed", err);
-      toast.error("Check-in failed");
-    } finally {
-      setCheckInOutLoading(false);
-    }
-  };
+  const runCheckInOutMutation = useCallback(
+    async (
+      mutate: () => Promise<unknown>,
+      successMessage: string,
+      errorMessage: string,
+      logLabel: string,
+    ) => {
+      setCheckInOutLoading(true);
+      try {
+        await mutate();
+        toast.success(successMessage);
+        await loadStatus();
+        await loadAttendance(currentPage);
+      } catch (err) {
+        console.error(logLabel, err);
+        toast.error(errorMessage);
+      } finally {
+        setCheckInOutLoading(false);
+      }
+    },
+    [currentPage, loadAttendance, loadStatus],
+  );
 
-  const handleCheckOut = async () => {
-    setCheckInOutLoading(true);
-    try {
-      const sessionUserId = session?.user?.id;
-      const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
-      await attendanceCheckOut(payload);
-      toast.success("Checked out successfully");
-      await loadStatus();
-      await loadAttendance(currentPage);
-    } catch (err) {
-      console.error("Check-out failed", err);
-      toast.error("Check-out failed");
-    } finally {
-      setCheckInOutLoading(false);
-    }
-  };
+  const handleCheckIn = useCallback(() => {
+    const sessionUserId = session?.user?.id;
+    const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
+    runCheckInOutMutation(
+      () => attendanceCheckIn(payload),
+      "Checked in successfully",
+      "Check-in failed",
+      "Check-in failed",
+    );
+  }, [runCheckInOutMutation, session?.user?.id]);
+
+  const handleCheckOut = useCallback(() => {
+    const sessionUserId = session?.user?.id;
+    const payload = sessionUserId == null ? {} : { user_id: String(sessionUserId) };
+    runCheckInOutMutation(
+      () => attendanceCheckOut(payload),
+      "Checked out successfully",
+      "Check-out failed",
+      "Check-out failed",
+    );
+  }, [runCheckInOutMutation, session?.user?.id]);
 
   const handleConfirmDelete = async () => {
-    if (!recordToDelete) return;
+    if (!canDeleteAttendance || !recordToDelete) return;
     setDeleting(true);
     try {
       await deleteAttendance(recordToDelete.id);
@@ -570,20 +576,43 @@ const AttendancePage = () => {
     }
   };
 
-  const userFilterOptions = useMemo(
-    () => [
-      {
-        label: "All Users",
-        value: "__all__",
-        onClick: () => setSelectedUserId(""),
-      },
-      ...users.map((user) => ({
-        label: user.name ?? String(user.id),
-        value: String(user.id),
-        onClick: () => setSelectedUserId(String(user.id)),
+  const attendanceUserDropdownRows = useMemo(
+    () =>
+      filteredManagers.map((mgr, idx) => ({
+        rowKey: `${String(mgr.id ?? "row")}-${idx}`,
+        selectionId: String(mgr.id),
+        label: String(mgr.name ?? mgr.id),
       })),
+    [filteredManagers],
+  );
+
+  const usersDropdownContent = useMemo(
+    () => (
+      <WorkforceUserMultiSelectDropdown
+        searchTerm={userSearchTerm}
+        onSearchTermChange={setUserSearchTerm}
+        rows={attendanceUserDropdownRows}
+        selectedIds={selectedUserIds}
+        onToggle={toggleSelectedUserId}
+        onApply={() => {
+          setAppliedUserIds(selectedUserIds);
+          setCurrentPage(1);
+        }}
+        onClear={() => {
+          setSelectedUserIds([]);
+          setAppliedUserIds([]);
+          setUserSearchTerm("");
+          setCurrentPage(1);
+        }}
+        listMaxHeightPx={220}
+      />
+    ),
+    [
+      attendanceUserDropdownRows,
+      selectedUserIds,
+      toggleSelectedUserId,
+      userSearchTerm,
     ],
-    [users],
   );
 
   const dateFilterOptions = useMemo(
@@ -602,6 +631,11 @@ const AttendancePage = () => {
     [],
   );
 
+  const activeAttendanceUserId = selectedUserIds[0] || appliedUserIds[0] || "";
+  const activeAttendanceUserLabel = activeAttendanceUserId
+    ? getDisplayName(activeAttendanceUserId)
+    : undefined;
+
   const attendanceFilterPills = useMemo<FilterPill[]>(
     () => [
       {
@@ -609,10 +643,18 @@ const AttendancePage = () => {
         label: "User",
         showDropdown: true,
         searchable: true,
-        active: Boolean(selectedUserId),
-        activeLabel: selectedUserId ? getDisplayName(selectedUserId) : undefined,
-        onClear: selectedUserId ? () => setSelectedUserId("") : undefined,
-        dropdownOptions: userFilterOptions,
+        active: selectedUserIds.length > 0 || appliedUserIds.length > 0,
+        activeLabel: activeAttendanceUserLabel,
+        onClear:
+          selectedUserIds.length > 0 || appliedUserIds.length > 0
+            ? () => {
+                setSelectedUserIds([]);
+                setAppliedUserIds([]);
+                setUserSearchTerm("");
+                setCurrentPage(1);
+              }
+            : undefined,
+        dropdownContent: usersDropdownContent,
       },
       {
         id: "attendance-date-filter",
@@ -626,10 +668,11 @@ const AttendancePage = () => {
       },
     ],
     [
-      selectedUserId,
+      selectedUserIds,
+      appliedUserIds,
+      activeAttendanceUserLabel,
+      usersDropdownContent,
       selectedDate,
-      getDisplayName,
-      userFilterOptions,
       dateFilterOptions,
     ],
   );
@@ -681,7 +724,7 @@ const AttendancePage = () => {
 
   const isCheckedIn = status?.is_checked_in === true;
   const canCheckInOut = Boolean(
-    session?.user?.permissions?.includes("check-in-out-attendence-staff-management"),
+    session?.user?.permissions?.includes(PERMISSIONS.CHECK_IN_OUT_ATTENDENCE_STAFF_MANAGEMENT),
   );
 
   const sessionCheckInAt =
@@ -698,12 +741,8 @@ const AttendancePage = () => {
       canCheckInOut={canCheckInOut}
       liveSessionElapsed={liveSessionElapsed}
       checkInOutLoading={checkInOutLoading}
-      onCheckIn={() => {
-        void handleCheckIn();
-      }}
-      onCheckOut={() => {
-        void handleCheckOut();
-      }}
+      onCheckIn={handleCheckIn}
+      onCheckOut={handleCheckOut}
     />
   );
 
