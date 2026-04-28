@@ -1,477 +1,260 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
 import GenericListPage from '@components/GenericListPage';
-import {
-  ListFAQTopics,
-  createFAQTopic,
-  updateFAQTopic,
-  deleteFAQTopic,
-  getAllFAQModules
-} from '@utils/faqs';
+import { ListFAQTopics, createFAQTopic, updateFAQTopic, deleteFAQTopic, getAllFAQModules } from '@utils/faqs';
 import { Column } from '@components/CustomDataTable';
-import { Button, Form, Row, Col } from 'react-bootstrap';
-import { useSession } from 'next-auth/react';
+import { Button } from 'react-bootstrap';
 import '@assets/scss/common.scss';
-import FormModal from "@pages/partial/FormModal";
-import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
-import { Edit, Info, Trash2, Tag, Plus } from 'lucide-react';
-import Select from 'react-select';
+import SuccessfulModal from '@pages/partial/SuccessfulModal';
+import { Tag, Plus } from 'lucide-react';
+import { FaqFormSidebar } from '../shared/faqFormSidebar';
+import { FaqLabeledSelect, FaqLabeledTextInput, FaqLabeledTextarea } from '../shared/faqFormFields';
+import { createFaqEditDeleteActionCell, renderFaqDescriptionCell, renderFaqModuleCell, renderFaqCountCell } from '../shared/faqTableCells';
+import { useLoadWhenOpen } from '../shared/useLoadWhenOpen';
+
+// ===== FAQ Topics Page =====
+// Uses shared FAQ components to eliminate duplication with other FAQ modules/items pages
+
+
+
+// ---------------------------------------------------------------------------
+// Main page component
+// ---------------------------------------------------------------------------
 
 const FAQTopics = () => {
-  const { data: session } = useSession();
-  
-  const columns: Column[] = [
-    { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
-    { 
-      key: 'faq_module', 
-      name: 'Module', 
-      selector: (row: any) => row.faq_module?.name || 'N/A', 
-      sortable: false,
-      cell: (props: any) => (
-        <div>
-          {props.faq_module ? (
-            <span className="status-badge primary" title={props.faq_module.description || ''}>
-              {props.faq_module.name}
-            </span>
-          ) : (
-            <span className="text-muted">No module</span>
-          )}
-        </div>
-      )
-    },
-    { 
-      key: 'description', 
-      name: 'Description', 
-      selector: (row: any) => row.description || 'N/A', 
-      sortable: false,
-      cell: (props: any) => (
-        <div>
-          <span className={props.description ? '' : 'text-muted'}>
-            {props.description || 'No description'}
-          </span>
-        </div>
-      )
-    },
-    { 
-      key: 'faqs_count', 
-      name: 'FAQs Count', 
-      selector: (row: any) => row.faqs_count || 0, 
-      sortable: true,
-      cell: (props: any) => (
-        <div>
-          <span className="status-badge primary">
-            {props.faqs_count || 0}
-          </span>
-        </div>
-      )
-    },
-    {
-      key: 'Action',
-      name: 'Actions',
-      selector: (row: any) => row.id,
-      sortable: false,
-      cell: (props: any) => (
-        <div className="d-flex gap-2">
-          <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => handleEditTopic(props)}>
-            <Edit size={16} />
-          </Button>
-          <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => handleDeleteTopic(props)}>
-            <Trash2 size={16} />
-          </Button>
-        </div>
-      )
-    }
-  ];
+    const [refreshKey, setRefreshKey] = useState<number>(0);
 
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [currentFilters] = useState({});
+    // Shared state
+    const [showSidebar, setShowSidebar] = useState<boolean>(false);
+    const [sidebarMode, setSidebarMode] = useState<'create' | 'edit' | null>(null);
+    const [moduleOptions, setModuleOptions] = useState<{ value: any; label: string }[]>([]);
+    const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
+    const [topicName, setTopicName] = useState<string>('');
+    const [topicDescription, setTopicDescription] = useState<string>('');
+    const [topicModuleId, setTopicModuleId] = useState<string>('');
+    const [selectedTopicId, setSelectedTopicId] = useState<any>(null);
 
-  // Memoize filters to prevent unnecessary re-renders
-  const prevFiltersStringRef = useRef<string>('');
-  const prevFiltersRef = useRef<any>({});
-  
-  const memoizedFilters = useMemo(() => {
-    const filtersString = JSON.stringify(currentFilters || {});
-    if (filtersString !== prevFiltersStringRef.current) {
-      prevFiltersStringRef.current = filtersString;
-      prevFiltersRef.current = currentFilters || {};
-      return currentFilters || {};
-    }
-    return prevFiltersRef.current;
-  }, [currentFilters]);
+    // Delete state
+    const [showDeleteTopicModal, setShowDeleteTopicModal] = useState<boolean>(false);
+    const [deleteTopicName, setDeleteTopicName] = useState<string>('');
 
-  const fetchTopics = useCallback(
-    async (page = 1, perPage = 15, search = "") => {
-      return await ListFAQTopics({ page, perPage, search, filters: memoizedFilters });
-    },
-    [memoizedFilters]
-  );
+    // Success modal state
+    const [showSuccessfulModal, setShowSuccessfulModal] = useState<boolean>(false);
+    const [successModalTitle, setSuccessModalTitle] = useState<string>('');
+    const [successModalDescription, setSuccessModalDescription] = useState<string>('');
 
-  // Topic State
-  const [showSuccessfulModal, setShowSuccessfulModal] = useState(false);
-  const [successModalTitle, setSuccessModalTitle] = useState('');
-  const [successModalDescription, setSuccessModalDescription] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState<any>(null);
-  const [selectedTopicName, setSelectedTopicName] = useState<string>('');
-  const [selectedTopicDescription, setSelectedTopicDescription] = useState<string>('');
-  const [selectedTopicModuleId, setSelectedTopicModuleId] = useState<string>('');
-  const [showEditTopicModal, setShowEditTopicModal] = useState<boolean>(false);
-  const [showCreateTopicModal, setShowCreateTopicModal] = useState<boolean>(false);
-  const [newTopicName, setNewTopicName] = useState<string>('');
-  const [newTopicDescription, setNewTopicDescription] = useState<string>('');
-  const [newTopicModuleId, setNewTopicModuleId] = useState<string>('');
-  const [showDeleteTopicModal, setShowDeleteTopicModal] = useState<boolean>(false);
-  const [moduleOptions, setModuleOptions] = useState<any[]>([]);
-  const [isLoadingModules, setIsLoadingModules] = useState<boolean>(false);
+    const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
 
-  useEffect(() => {
-    if (showCreateTopicModal || showEditTopicModal) {
-      fetchModuleOptions();
-    }
-  }, [showCreateTopicModal, showEditTopicModal]);
+    // ---- Module options loader ----
+    const fetchModuleOptions = useCallback(async () => {
+        setIsLoadingModules(true);
+        try {
+            const modules = await getAllFAQModules();
+            setModuleOptions(modules.map((m: any) => ({ value: m.id, label: m.name })));
+        } catch (error) {
+            console.error('Error fetching modules:', error);
+        } finally {
+            setIsLoadingModules(false);
+        }
+    }, []);
 
-  const fetchModuleOptions = async () => {
-    if (moduleOptions.length > 0) return;
-    setIsLoadingModules(true);
-    try {
-      const modules = await getAllFAQModules();
-      setModuleOptions(modules.map((m: any) => ({
-        value: m.id,
-        label: m.name
-      })));
-    } catch (error) {
-      console.error('Error fetching modules:', error);
-    } finally {
-      setIsLoadingModules(false);
-    }
-  };
+    useLoadWhenOpen(showSidebar, moduleOptions.length > 0, fetchModuleOptions);
 
-  const handleEditTopic = (props: any) => {
-    setSelectedTopic(props.id);
-    setSelectedTopicName(props.name);
-    setSelectedTopicDescription(props.description || '');
-    setSelectedTopicModuleId(props.faq_module_id?.toString() || '');
-    setShowEditTopicModal(true);
-  };
+    // ---- Unified sidebar handlers ----
+    const openCreateSidebar = useCallback(() => {
+        setSidebarMode('create');
+        setTopicName('');
+        setTopicDescription('');
+        setTopicModuleId('');
+        setSelectedTopicId(null);
+        setShowSidebar(true);
+    }, []);
 
-  const handleSubmitEditTopic = async () => {
-    if (!selectedTopicModuleId || !selectedTopicName) {
-      return;
-    }
-    const response = await updateFAQTopic(
-      selectedTopic,
-      Number.parseInt(selectedTopicModuleId, 10),
-      selectedTopicName,
-      selectedTopicDescription
+    const openEditSidebar = useCallback((props: any) => {
+        setSidebarMode('edit');
+        setSelectedTopicId(props.id);
+        setTopicName(props.name);
+        setTopicDescription(props.description || '');
+        setTopicModuleId(props.faq_module_id?.toString() || '');
+        setShowSidebar(true);
+    }, []);
+
+    const closeSidebar = useCallback(() => {
+        setShowSidebar(false);
+        setSidebarMode(null);
+        setTopicName('');
+        setTopicDescription('');
+        setTopicModuleId('');
+        setSelectedTopicId(null);
+    }, []);
+
+    const handleSubmitTopic = useCallback(async () => {
+        if (!topicModuleId || !topicName) return;
+        let response;
+        if (sidebarMode === 'create') {
+            response = await createFAQTopic(Number.parseInt(topicModuleId, 10), topicName, topicDescription);
+        } else if (sidebarMode === 'edit') {
+            response = await updateFAQTopic(selectedTopicId, Number.parseInt(topicModuleId, 10), topicName, topicDescription);
+        }
+        if (response) {
+            closeSidebar();
+            triggerRefresh();
+        }
+    }, [sidebarMode, topicModuleId, topicName, topicDescription, selectedTopicId, closeSidebar, triggerRefresh]);
+
+    const handleTopicNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setTopicName(e.target.value), []);
+    const handleTopicDescChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => setTopicDescription(e.target.value), []);
+    const handleTopicModuleChange = useCallback((value: string) => setTopicModuleId(value), []);
+
+    // ---- Delete handlers ----
+    const handleDeleteTopic = useCallback((props: any) => {
+        setSelectedTopicId(props.id);
+        setDeleteTopicName(props.name);
+        setShowDeleteTopicModal(true);
+    }, []);
+
+    const closeDeleteModal = useCallback(() => {
+        setShowDeleteTopicModal(false);
+        setSelectedTopicId(null);
+        setDeleteTopicName('');
+    }, []);
+
+    const handleSubmitDeleteTopic = useCallback(async () => {
+        const response = await deleteFAQTopic(selectedTopicId);
+        if (response) {
+            setSelectedTopicId(null);
+            setDeleteTopicName('');
+            setShowDeleteTopicModal(false);
+            setSuccessModalTitle('FAQ Topic Deleted');
+            setSuccessModalDescription('FAQ topic has been deleted successfully');
+            setTimeout(() => setShowSuccessfulModal(true), 100);
+            triggerRefresh();
+        }
+    }, [selectedTopicId, triggerRefresh]);
+
+    const closeSuccessModal = useCallback(() => setShowSuccessfulModal(false), []);
+
+    // ---- Data fetching ----
+    const fetchTopics = useCallback(
+        async (page = 1, perPage = 15, search = '') =>
+            ListFAQTopics({ page, perPage, search, filters: {} }),
+        [],
     );
-    if (response) {
-      setSelectedTopic(null);
-      setSelectedTopicName('');
-      setSelectedTopicDescription('');
-      setSelectedTopicModuleId('');
-      setShowEditTopicModal(false);
-      setRefreshKey(prev => prev + 1);
-    }
-  };
 
-  const handleDeleteTopic = (props: any) => {
-    setSelectedTopic(props.id);
-    setSelectedTopicName(props.name);
-    setShowDeleteTopicModal(true);
-  };
-
-  const handleSubmitDeleteTopic = async () => {
-    const response = await deleteFAQTopic(selectedTopic);
-    if (response) {
-      setSelectedTopic(null);
-      setSelectedTopicName('');
-      setShowDeleteTopicModal(false);
-      setSuccessModalTitle('FAQ Topic Deleted');
-      setSuccessModalDescription('FAQ topic has been deleted successfully');
-      setTimeout(() => {
-        setShowSuccessfulModal(true);
-      }, 100);
-      setRefreshKey(prev => prev + 1);
-    }
-  };
-
-  const handleSubmitCreateTopic = async () => {
-    if (!newTopicModuleId || !newTopicName) {
-      return;
-    }
-    const response = await createFAQTopic(
-      Number.parseInt(newTopicModuleId, 10),
-      newTopicName,
-      newTopicDescription
+    // ---- Columns ----
+    const ActionCell = useMemo(
+        () => createFaqEditDeleteActionCell(openEditSidebar, handleDeleteTopic),
+        [openEditSidebar, handleDeleteTopic],
     );
-    if (response) {
-      setNewTopicName('');
-      setNewTopicDescription('');
-      setNewTopicModuleId('');
-      setShowCreateTopicModal(false);
-      setRefreshKey(prev => prev + 1);
-    }
-  };
 
-  return (
-    <React.Fragment>
-      <BreadcrumbItem mainTitle="FAQs" mainLink="/faqs" subTitle="Topics" />
-      
-      <Row className="mb-3">
-        <Col md={12}>
-          <div className="page-header-title style-2">
-            <Row className="d-flex justify-content-between align-items-center">
-              <Col md={4}>
-                {/* <h2 className="mb-0">FAQ Topics</h2> */}
-              </Col>
-              <Col md={8} className="d-flex justify-content-end">
-                <div className="action-buttons">
-                  <Button variant="primary" onClick={() => setShowCreateTopicModal(true)}>
-                    <Plus size={16} className="me-1" />
-                    Add Topic
-                  </Button>
+    const columns: Column[] = useMemo(() => [
+        { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
+        { key: 'faq_module', name: 'Module', selector: (row: any) => row.faq_module?.name || 'N/A', sortable: false, cell: renderFaqModuleCell },
+        { key: 'description', name: 'Description', selector: (row: any) => row.description || 'N/A', sortable: false, cell: renderFaqDescriptionCell },
+        { key: 'faqs_count', name: 'FAQs Count', selector: (row: any) => row.faqs_count || 0, sortable: true, cell: renderFaqCountCell },
+        { key: 'Action', name: 'Actions', selector: (row: any) => row.id, sortable: false, cell: ActionCell },
+    ], [ActionCell]);
+
+    return (
+        <React.Fragment>
+            <BreadcrumbItem mainTitle="FAQs" mainLink="/faqs" subTitle="Topics" />
+
+            <div className="page-header-title style-2 mb-3">
+                <div className="d-flex justify-content-end">
+                    <Button variant="primary" onClick={openCreateSidebar}>
+                        <Plus size={16} className="me-1" />
+                        Add Topic
+                    </Button>
                 </div>
-              </Col>
-            </Row>
-          </div>
-        </Col>
-      </Row>
+            </div>
 
-      <GenericListPage
-        columns={columns}
-        fetchData={fetchTopics}
-        title="FAQ Topics"
-        searchPlaceholder="Search topics..."
-        defaultPageSize={15}
-        filters={memoizedFilters}
-        refreshKey={refreshKey}
-        search={true}
-        tableStyle="table-style-2"
-      />
+            <GenericListPage
+                columns={columns}
+                fetchData={fetchTopics}
+                title="FAQ Topics"
+                searchPlaceholder="Search topics..."
+                defaultPageSize={15}
+                filters={{}}
+                refreshKey={refreshKey}
+                search={true}
+                tableStyle="table-style-2"
+            />
 
-      {/* Edit Topic Modal */}
-      <FormModal
-        show={showEditTopicModal}
-        onHide={() => {
-          setShowEditTopicModal(false);
-          setSelectedTopic(null);
-          setSelectedTopicName('');
-          setSelectedTopicDescription('');
-          setSelectedTopicModuleId('');
-        }}
-        title="Edit FAQ Topic"
-        titleIcon={<Tag size={20} className="text-primary" />}
-        desc="Please fill in the details below to edit the FAQ topic."
-        formHtml={
-          <>
-            <div className="form-group mb-3">
-              <label htmlFor="editTopicModule" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                FAQ Module <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Select the FAQ module">
-                  <Info size={14} />
-                </span>
-              </label>
-              <Select
-                options={moduleOptions}
-                value={moduleOptions.find(opt => opt.value.toString() === selectedTopicModuleId)}
-                onChange={(option: any) => setSelectedTopicModuleId(option?.value?.toString() || '')}
-                placeholder="Select module..."
-                isLoading={isLoadingModules}
-                isClearable={false}
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Select the FAQ module this topic belongs to
-                </span>
-              </Form.Text>
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editTopicName" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Topic Name <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Enter the name of the FAQ topic">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input 
-                className="form-control" 
-                type="text" 
-                id="editTopicName"
-                value={selectedTopicName} 
-                onChange={(e) => setSelectedTopicName(e.target.value)} 
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Change the name of the FAQ topic
-                </span>
-              </Form.Text>
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="editTopicDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Description
-                <span className="text-muted ms-2" title="Enter a description for the FAQ topic">
-                  <Info size={14} />
-                </span>
-              </label>
-              <textarea 
-                className="form-control" 
-                id="editTopicDescription"
-                rows={3}
-                value={selectedTopicDescription} 
-                onChange={(e) => setSelectedTopicDescription(e.target.value)} 
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Optional description for the FAQ topic
-                </span>
-              </Form.Text>
-            </div>
-          </>
-        }
-        submitButtonText="Update Topic"
-        isSubmitDisabled={!selectedTopicModuleId || !selectedTopicName}
-        cancelButtonText="Cancel"
-        onSubmit={handleSubmitEditTopic}
-        onCancel={() => {
-          setShowEditTopicModal(false);
-          setSelectedTopic(null);
-          setSelectedTopicName('');
-          setSelectedTopicDescription('');
-          setSelectedTopicModuleId('');
-        }}
-      />
+            {/* Topic Sidebar */}
+            <FaqFormSidebar
+                isOpen={showSidebar}
+                title={sidebarMode === 'create' ? 'New FAQ Topic' : 'Edit FAQ Topic'}
+                headerIcon={<Tag size={20} style={{ color: '#0091ae' }} />}
+                canSubmit={topicName.trim() !== '' && topicModuleId !== ''}
+                isSubmitting={false}
+                submitLabel={sidebarMode === 'create' ? 'Add Topic' : 'Update Topic'}
+                submittingLabel={sidebarMode === 'create' ? 'Adding...' : 'Updating...'}
+                onSubmit={handleSubmitTopic}
+                onClose={closeSidebar}
+            >
+                <FaqLabeledSelect
+                    inputId="faq-topic-module"
+                    label="FAQ Module"
+                    options={moduleOptions}
+                    value={topicModuleId}
+                    onChange={handleTopicModuleChange}
+                    required
+                    helpTitle="Select the FAQ module"
+                    hint="Select the FAQ module this topic belongs to"
+                    placeholder="Select module..."
+                    isLoading={isLoadingModules}
+                />
+                <FaqLabeledTextInput
+                    id={sidebarMode === 'create' ? 'newTopicName' : 'editTopicName'}
+                    label="Topic Name"
+                    value={topicName}
+                    onChange={handleTopicNameChange}
+                    required
+                    helpTitle="Enter the name of the FAQ topic"
+                    hint={sidebarMode === 'create' ? 'Enter the name of the FAQ topic you want to create' : 'Change the name of the FAQ topic'}
+                    placeholder={sidebarMode === 'create' ? 'Topic Name' : ''}
+                />
+                <FaqLabeledTextarea
+                    id={sidebarMode === 'create' ? 'newTopicDescription' : 'editTopicDescription'}
+                    label="Description"
+                    value={topicDescription}
+                    onChange={handleTopicDescChange}
+                    helpTitle="Enter a description for the FAQ topic"
+                    hint="Optional description for the FAQ topic"
+                    placeholder="Topic Description"
+                />
+            </FaqFormSidebar>
 
-      {/* Create Topic Modal */}
-      <FormModal
-        show={showCreateTopicModal}
-        onHide={() => {
-          setShowCreateTopicModal(false);
-          setNewTopicName('');
-          setNewTopicDescription('');
-          setNewTopicModuleId('');
-        }}
-        title="New FAQ Topic"
-        titleIcon={<Tag size={20} className="text-primary" />}
-        desc="Please fill in the details below to create a new FAQ topic."
-        formHtml={
-          <>
-            <div className="form-group mb-3">
-              <label htmlFor="newTopicModule" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                FAQ Module <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Select the FAQ module">
-                  <Info size={14} />
-                </span>
-              </label>
-              <Select
-                options={moduleOptions}
-                value={moduleOptions.find(opt => opt.value.toString() === newTopicModuleId)}
-                onChange={(option: any) => setNewTopicModuleId(option?.value?.toString() || '')}
-                placeholder="Select module..."
-                isLoading={isLoadingModules}
-                isClearable={false}
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Select the FAQ module this topic belongs to
-                </span>
-              </Form.Text>
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newTopicName" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Topic Name <span className="text-danger">*</span>
-                <span className="text-muted ms-2" title="Enter the name of the FAQ topic">
-                  <Info size={14} />
-                </span>
-              </label>
-              <input 
-                type="text" 
-                className="form-control" 
-                id="newTopicName"
-                value={newTopicName} 
-                onChange={(e) => setNewTopicName(e.target.value)} 
-                placeholder="Topic Name" 
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Enter the name of the FAQ topic you want to create
-                </span>
-              </Form.Text>
-            </div>
-            <div className="form-group mb-3">
-              <label htmlFor="newTopicDescription" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                Description
-                <span className="text-muted ms-2" title="Enter a description for the FAQ topic">
-                  <Info size={14} />
-                </span>
-              </label>
-              <textarea 
-                className="form-control" 
-                id="newTopicDescription"
-                rows={3}
-                value={newTopicDescription} 
-                onChange={(e) => setNewTopicDescription(e.target.value)} 
-                placeholder="Topic Description"
-              />
-              <Form.Text className="text-muted d-flex align-items-center gap-1 form-text">
-                <Info size={12} />
-                <span style={{ fontSize: '0.813rem' }}>
-                  Optional description for the FAQ topic
-                </span>
-              </Form.Text>
-            </div>
-          </>
-        }
-        submitButtonText="Add Topic"
-        isSubmitDisabled={!newTopicModuleId || !newTopicName}
-        cancelButtonText="Cancel"
-        onSubmit={handleSubmitCreateTopic}
-        onCancel={() => {
-          setShowCreateTopicModal(false);
-          setNewTopicName('');
-          setNewTopicDescription('');
-          setNewTopicModuleId('');
-        }}
-      />
+            {/* Delete Topic Modal */}
+            <ConfirmModal
+                show={showDeleteTopicModal}
+                onHide={closeDeleteModal}
+                title="Delete FAQ Topic"
+                description="Are you sure you want to delete the following FAQ topic?"
+                targetName={deleteTopicName}
+                onConfirm={handleSubmitDeleteTopic}
+                confirmButtonText="Delete"
+                confirmButtonVariant="danger"
+                requireTextConfirmation={true}
+                requiredConfirmationText="delete"
+            />
 
-      {/* Delete Topic Modal */}
-      <ConfirmModal
-        show={showDeleteTopicModal}
-        onHide={() => {
-          setShowDeleteTopicModal(false);
-          setSelectedTopic(null);
-          setSelectedTopicName('');
-        }}
-        title="Delete FAQ Topic"
-        description="Are you sure you want to delete the following FAQ topic?"
-        targetName={selectedTopicName}
-        onConfirm={handleSubmitDeleteTopic}
-        confirmButtonText="Delete"
-        confirmButtonVariant="danger"
-        requireTextConfirmation={true}
-        requiredConfirmationText="delete"
-      />
-
-      {/* Success Modal */}
-      <SuccessfulModal
-        show={showSuccessfulModal}
-        onHide={() => setShowSuccessfulModal(false)}
-        title={successModalTitle}
-        description={successModalDescription}
-      />
-    </React.Fragment>
-  );
+            {/* Success Modal */}
+            <SuccessfulModal
+                show={showSuccessfulModal}
+                onHide={closeSuccessModal}
+                title={successModalTitle}
+                description={successModalDescription}
+            />
+        </React.Fragment>
+    );
 };
 
 FAQTopics.getLayout = (page: ReactElement) => {
-  return <Layout>{page}</Layout>;
+    return <Layout>{page}</Layout>;
 };
 
 export default FAQTopics;
-

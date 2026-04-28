@@ -55,11 +55,19 @@ import {
   formatDateTimeToLocal,
 } from "@utils/Helper";
 import { isExactPhoneMatch, normalizePhoneValue } from "@utils/phoneMatch";
+import {
+  formatDateTimeFilterForApi,
+  formatFilterDateTimeLabel,
+  getDefaultCommunicationsDateFilterPair,
+  shouldSkipCommunicationsListFetch,
+} from "@utils/communicationsDateUtils";
 import CircularProgressCircle from "@components/CircularProgressCircle";
 import {
+  buildDateTimeFilterPill,
   buildCallDirectionFilterPill,
   buildDepartmentFilterPill,
   buildExtensionMultiSelectFilterPill,
+  buildTextDropdownFilterPill,
 } from "@utils/communicationsFilterPills";
 import {
   createDateTimeDropdownContent,
@@ -76,39 +84,6 @@ const ReactApexChart = dynamic(() => import("react-apexcharts"), {
 
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
 const { PERMISSIONS } = HEADER_CONSTANTS;
-
-/** Default "today" range for the call recordings list (UI datetime-local + UTC Z for API). */
-function getDefaultCommunicationsDateFilterPair(
-  startKey: string,
-  endKey: string,
-): { current: Record<string, string>; applied: Record<string, string> } {
-  const now = moment();
-  const startDateApi =
-    now.clone().startOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-  const endDateApi =
-    now.clone().endOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-  const startDateUi = now.clone().startOf("day").format("YYYY-MM-DDTHH:mm");
-  const endDateUi = now.clone().endOf("day").format("YYYY-MM-DDTHH:mm");
-  return {
-    current: { [startKey]: startDateUi, [endKey]: endDateUi },
-    applied: { [startKey]: startDateApi, [endKey]: endDateApi },
-  };
-}
-
-/** Format datetime values to UTC ISO with trailing Z for the API. */
-function formatDateForApi(
-  value: string | undefined,
-  endOfDay: boolean,
-): string | undefined {
-  if (!value) return value;
-  let m = moment(value);
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
-    m = moment(value + ":00");
-  } else if (!value.includes("T")) {
-    m = endOfDay ? moment(value).endOf("day") : moment(value).startOf("day");
-  }
-  return m.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-}
 
 /** Format the recordings filters for the API call. */
 function formatCallRecordingsFiltersForApi(filters: Record<string, any>): {
@@ -127,31 +102,20 @@ function formatCallRecordingsFiltersForApi(filters: Record<string, any>): {
   }
 
   if (applied.start_date) {
-    applied.start_date = formatDateForApi(String(applied.start_date), false);
+    applied.start_date = formatDateTimeFilterForApi(
+      String(applied.start_date),
+      false,
+    );
   }
   if (applied.end_date) {
-    applied.end_date = formatDateForApi(String(applied.end_date), true);
+    applied.end_date = formatDateTimeFilterForApi(
+      String(applied.end_date),
+      true,
+    );
   }
   delete applied.timezone;
 
   return { applied, normalizedRemotePartyNumber };
-}
-
-/** Skip-fetch guard to avoid duplicate API calls for the recordings list. */
-function shouldSkipCommunicationsListFetch(
-  isFetching: boolean,
-  paramsKey: string,
-  lastParamsKey: string,
-  lastFetchTime: number,
-  now: number,
-): boolean {
-  if (isFetching && lastParamsKey === paramsKey && now - lastFetchTime < 500) {
-    return true;
-  }
-  if (lastParamsKey === paramsKey && now - lastFetchTime < 100) {
-    return true;
-  }
-  return false;
 }
 
 /** Empty chart state for the recordings call-direction chart. */
@@ -697,57 +661,33 @@ const CallRecordings: NextPage & {
               stageFilters({ ...currentFilters, username: String(u.id) }),
           })),
         },
-        {
-          id: "remote_party_number",
-          label: "Remote Party Number",
-          showDropdown: true,
-          active: Boolean(currentFilters.remote_party_number),
-          activeLabel: currentFilters.remote_party_number
-            ? String(currentFilters.remote_party_number)
-            : undefined,
-          onClear: () =>
-            stageFilters({ ...currentFilters, remote_party_number: "" }),
-          dropdownContent: createTextFilterDropdownContent(
-            currentFilters.remote_party_number ?? "",
-            (v: string) =>
-              setCurrentFilters({ ...currentFilters, remote_party_number: v }),
-            (v: string) =>
-              stageFilters({ ...currentFilters, remote_party_number: v }),
-            "Enter phone number",
-          ),
-        },
-        {
-          id: "start_date",
-          label: "Start Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.start_date),
-          activeLabel: currentFilters.start_date
-            ? String(currentFilters.start_date)
-            : undefined,
-          activeLabelOnly: true,
-          dropdownContent: createDateTimeDropdownContent(
-            currentFilters.start_date ?? "",
-            (v: string) =>
-              setCurrentFilters({ ...currentFilters, start_date: v }),
-            (v: string) => stageFilters({ ...currentFilters, start_date: v }),
-          ),
-        },
-        {
-          id: "end_date",
-          label: "End Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.end_date),
-          activeLabel: currentFilters.end_date
-            ? String(currentFilters.end_date)
-            : undefined,
-          activeLabelOnly: true,
-          dropdownContent: createDateTimeDropdownContent(
-            currentFilters.end_date ?? "",
-            (v: string) =>
-              setCurrentFilters({ ...currentFilters, end_date: v }),
-            (v: string) => stageFilters({ ...currentFilters, end_date: v }),
-          ),
-        },
+        buildTextDropdownFilterPill(
+          "remote_party_number",
+          "Remote Party Number",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          createTextFilterDropdownContent,
+          "Enter phone number",
+        ),
+        buildDateTimeFilterPill(
+          "start_date",
+          "Start Date & Time",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
+        buildDateTimeFilterPill(
+          "end_date",
+          "End Date & Time",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
       ],
       filterPillsRightActions: renderApplyResetFilterActions(
         hasNonDefaultFilters,
@@ -829,6 +769,7 @@ const CallRecordings: NextPage & {
     handleResetFiltersClick,
     hasUnappliedFilterChanges,
     hasNonDefaultFilters,
+    formatFilterDateTimeLabel,
   ]);
 
   const handleDownload = async (props: any) => {

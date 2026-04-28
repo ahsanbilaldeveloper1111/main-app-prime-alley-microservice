@@ -39,10 +39,18 @@ import {
 import { useHierarchyData } from "@components/filters/useHierarchyData";
 import { isExactPhoneMatch, normalizePhoneValue } from "@utils/phoneMatch";
 import {
+  formatDateTimeFilterForApi,
+  formatFilterDateTimeLabel,
+  getDefaultCommunicationsDateFilterPair,
+  shouldSkipCommunicationsListFetch,
+} from "@utils/communicationsDateUtils";
+import {
+  buildDateTimeFilterPill,
   buildCallDirectionFilterPill,
   buildCallStatusFilterPill,
   buildDepartmentFilterPill,
   buildExtensionMultiSelectFilterPill,
+  buildTextDropdownFilterPill,
 } from "@utils/communicationsFilterPills";
 import {
   createDateTimeDropdownContent,
@@ -204,30 +212,10 @@ const CallLogs = () => {
 
   const [refreshKey, setRefreshKey] = useState<number>(0);
 
-  // Initialize filters with default values immediately to prevent first API call without dates
-  const getDefaultFilters = () => {
-    const now = moment();
-    const startDateApi =
-      now.clone().startOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    const endDateApi =
-      now.clone().endOf("day").utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
-    // UI filter state must include the same default date range as `applied`; otherwise any
-    // pill change via `applyFilters({ ...currentFilters, ... })` drops start/end and breaks the API query.
-    const startDateUi = now.clone().startOf("day").format("YYYY-MM-DDTHH:mm");
-    const endDateUi = now.clone().endOf("day").format("YYYY-MM-DDTHH:mm");
-    return {
-      current: {
-        start_datetime: startDateUi,
-        end_datetime: endDateUi,
-      },
-      applied: {
-        start_datetime: startDateApi,
-        end_datetime: endDateApi,
-      },
-    };
-  };
-
-  const defaultFilters = getDefaultFilters();
+  const defaultFilters = getDefaultCommunicationsDateFilterPair(
+    "start_datetime",
+    "end_datetime",
+  );
   const [currentFilters, setCurrentFilters] = useState<Record<string, any>>(
     defaultFilters.current,
   );
@@ -299,15 +287,13 @@ const CallLogs = () => {
       const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(appliedFiltersRef.current)}`;
 
       if (
-        isFetchingRef.current &&
-        lastFetchParamsRef.current === paramsKey &&
-        now - lastFetchTimeRef.current < 500
-      ) {
-        return;
-      }
-      if (
-        lastFetchParamsRef.current === paramsKey &&
-        now - lastFetchTimeRef.current < 100
+        shouldSkipCommunicationsListFetch(
+          isFetchingRef.current,
+          paramsKey,
+          lastFetchParamsRef.current,
+          lastFetchTimeRef.current,
+          now,
+        )
       ) {
         return;
       }
@@ -368,11 +354,26 @@ const CallLogs = () => {
         setTotalCalls(total);
 
         if (response?.summary) {
+          const selectedExtensionFilter = Array.isArray(
+            appliedFiltersRef.current?.extension_number,
+          )
+            ? (appliedFiltersRef.current.extension_number as string[])
+            : [];
           setShowDateRange(true);
           const dataFilters = response?.filters;
           setStartDateTime(dataFilters?.start_datetime);
           setEndDateTime(dataFilters?.end_datetime);
-          setSummary(response.summary);
+          let extensionsMetric = response.summary.extensions;
+          if (rowsArray.length === 0) {
+            extensionsMetric = 0;
+          } else if (selectedExtensionFilter.length > 0) {
+            extensionsMetric = selectedExtensionFilter.length;
+          }
+          setSummary({
+            ...response.summary,
+            // Keep metrics aligned with visible results.
+            extensions: extensionsMetric,
+          });
         }
 
         return response;
@@ -409,46 +410,17 @@ const CallLogs = () => {
     }
 
     if (formattedFilters.start_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-      let startMoment = moment(formattedFilters.start_datetime);
-
-      if (
-        formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-        startMoment = moment(formattedFilters.start_datetime + ":00");
-      } else if (!formattedFilters.start_datetime.includes("T")) {
-        // If only date, set to 00:00:00
-        startMoment = moment(formattedFilters.start_datetime).startOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.start_datetime =
-        startMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+      formattedFilters.start_datetime = formatDateTimeFilterForApi(
+        String(formattedFilters.start_datetime),
+        false,
+      );
     }
 
     if (formattedFilters.end_datetime) {
-      // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-      let endMoment = moment(formattedFilters.end_datetime);
-
-      if (
-        formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
-      ) {
-        // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-        const timePart = formattedFilters.end_datetime.split("T")[1];
-        if (timePart === "23:59") {
-          endMoment = moment(formattedFilters.end_datetime + ":59");
-        } else {
-          endMoment = moment(formattedFilters.end_datetime + ":00");
-        }
-      } else if (!formattedFilters.end_datetime.includes("T")) {
-        // If only date, set to 23:59:59
-        endMoment = moment(formattedFilters.end_datetime).endOf("day");
-      }
-
-      // Convert to UTC
-      formattedFilters.end_datetime =
-        endMoment.utc().format("YYYY-MM-DDTHH:mm:ss") + "Z";
+      formattedFilters.end_datetime = formatDateTimeFilterForApi(
+        String(formattedFilters.end_datetime),
+        true,
+      );
     }
 
     // Remove timezone key from payload (timezone is now included in datetime values)
@@ -604,58 +576,33 @@ const CallLogs = () => {
           currentFilters,
           stageFilters,
         ),
-        {
-          id: "phone_number",
-          label: "Numbers",
-          showDropdown: true,
-          active: Boolean(currentFilters.phone_number),
-          activeLabel: currentFilters.phone_number
-            ? String(currentFilters.phone_number)
-            : undefined,
-          onClear: () => stageFilters({ ...currentFilters, phone_number: "" }),
-          dropdownContent: createTextFilterDropdownContent(
-            currentFilters.phone_number ?? "",
-            (value: string) =>
-              setCurrentFilters({ ...currentFilters, phone_number: value }),
-            (value: string) =>
-              stageFilters({ ...currentFilters, phone_number: value }),
-            "Enter number",
-          ),
-        },
-        {
-          id: "start_datetime",
-          label: "Start Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.start_datetime),
-          activeLabel: currentFilters.start_datetime
-            ? String(currentFilters.start_datetime)
-            : undefined,
-          activeLabelOnly: true,
-          dropdownContent: createDateTimeDropdownContent(
-            currentFilters.start_datetime ?? "",
-            (value: string) =>
-              setCurrentFilters({ ...currentFilters, start_datetime: value }),
-            (value: string) =>
-              stageFilters({ ...currentFilters, start_datetime: value }),
-          ),
-        },
-        {
-          id: "end_datetime",
-          label: "End Date & Time",
-          showDropdown: true,
-          active: Boolean(currentFilters.end_datetime),
-          activeLabel: currentFilters.end_datetime
-            ? String(currentFilters.end_datetime)
-            : undefined,
-          activeLabelOnly: true,
-          dropdownContent: createDateTimeDropdownContent(
-            currentFilters.end_datetime ?? "",
-            (value: string) =>
-              setCurrentFilters({ ...currentFilters, end_datetime: value }),
-            (value: string) =>
-              stageFilters({ ...currentFilters, end_datetime: value }),
-          ),
-        },
+        buildTextDropdownFilterPill(
+          "phone_number",
+          "Numbers",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          createTextFilterDropdownContent,
+          "Enter number",
+        ),
+        buildDateTimeFilterPill(
+          "start_datetime",
+          "Start Date & Time",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
+        buildDateTimeFilterPill(
+          "end_datetime",
+          "End Date & Time",
+          currentFilters,
+          setCurrentFilters,
+          stageFilters,
+          formatFilterDateTimeLabel,
+          createDateTimeDropdownContent,
+        ),
       ],
       filterPillsRightActions: renderApplyResetFilterActions(
         hasNonDefaultFilters,

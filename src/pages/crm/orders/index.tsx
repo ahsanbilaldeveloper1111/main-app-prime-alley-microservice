@@ -206,7 +206,14 @@ const CrmOrders = () => { // NOSONAR
   const [isAccountRole, setIsAccountRole] = useState(true);
 
   const [isDeliveryRole, setIsDeliveryRole] = useState(true);
-
+  useEffect(() => {
+    if (session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_BILLING)) {
+      setIsAccountRole(true);
+    }
+    if (session?.user?.permissions?.includes(PERMISSIONS.EDIT_CRM_ORDERS_DELIVERY)) {
+      setIsDeliveryRole(true);
+    }
+  }, [session]);
   // Which edit mode to show: root (full), account, or delivery — three separate modals
 
   const [stages, setStages] = useState<any[]>([]);
@@ -5934,7 +5941,7 @@ const CrmOrders = () => { // NOSONAR
                         }}
                       >
                         {session?.user?.permissions?.includes(
-                          PERMISSIONS.EDIT_CRM_ORDERS,
+                          PERMISSIONS.EDIT_CRM_ORDERS_BILLING,
                         ) && (
                           <button
                             style={{

@@ -22,23 +22,15 @@ const TextFilterMenu: React.FC<TextFilterMenuProps> = ({
       type="text"
       placeholder={placeholder}
       value={value}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-        onChange(e.target.value)
-      }
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+        const nextValue = e.target.value;
+        onChange(nextValue);
+        onApply(nextValue.trim());
+      }}
     />
     <div className="d-flex justify-content-end gap-2">
       <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-        Cancel
-      </Button>
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={() => {
-          onApply(value.trim());
-          closeMenu();
-        }}
-      >
-        Apply
+        Close
       </Button>
     </div>
   </div>
@@ -62,23 +54,15 @@ const DateTimeFilterMenu: React.FC<DateTimeFilterMenuProps> = ({
       size="sm"
       type="datetime-local"
       value={value}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-        onChange(e.target.value)
-      }
+      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+        const nextValue = e.target.value;
+        onChange(nextValue);
+        onApply(nextValue);
+      }}
     />
     <div className="d-flex justify-content-end gap-2">
       <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-        Cancel
-      </Button>
-      <Button
-        variant="primary"
-        size="sm"
-        onClick={() => {
-          onApply(value);
-          closeMenu();
-        }}
-      >
-        Apply
+        Close
       </Button>
     </div>
   </div>
