@@ -20,4 +20,4 @@ export function useLoadWhenOpen(
     }
   }, [open, hasData, load]);
 }
-export default {};
+export default useLoadWhenOpen
