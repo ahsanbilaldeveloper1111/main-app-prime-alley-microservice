@@ -391,7 +391,7 @@ const CallLogs = () => {
   // Initial load and refetch when filters/refresh change
   useEffect(() => {
     setTablePagination((prev) => ({ ...prev, currentPage: 1 }));
-    fetchCallLogs(1, rowsPerPageRef.current, "");
+    fetchCallLogs(1, rowsPerPageRef.current, searchValue.trim());
   }, [refreshKey, fetchCallLogs]);
 
   const handleFiltersChange = useCallback((filters: any) => {
