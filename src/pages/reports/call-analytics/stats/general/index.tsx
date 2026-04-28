@@ -16,6 +16,7 @@ import PageSummaryGrid from '@components/PageSummaryGrid';
 import '@assets/scss/report-style.scss';
 import moment from 'moment';
 import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
 
 // Helper function to convert HH:MM:SS to seconds
 const timeStringToSeconds = (timeStr: string): number => {
@@ -30,6 +31,8 @@ const timeStringToSeconds = (timeStr: string): number => {
   return 0;
 };
 import "@assets/scss/common.scss";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 
 
@@ -309,7 +312,7 @@ const CallStatsDepartment = () => {
 
   // Ensure initial fetch happens when session is ready
   useEffect(() => {
-    if (session && session.user?.permissions?.includes('list-call-logs')) {
+    if (session && (session.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS) || session.user?.permissions?.includes(PERMISSIONS.LIST_CALL_LOGS))) {
       initialFetchDone.current = true;
     }
   }, [session]);

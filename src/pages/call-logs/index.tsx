@@ -396,7 +396,7 @@ const CallLogs = () => {
                             Filters
                         </button>
                         )}
-                        {session?.user?.permissions?.includes('export-call-logs') && (
+                        {session?.user?.permissions?.includes(PERMISSIONS.EXPORT_CALL_LOGS) && (
                             <button
                                 type="button"
                                 className="btn btn-outline-secondary"
@@ -471,7 +471,7 @@ const CallLogs = () => {
             )}
 
 
-            {session?.user?.permissions?.includes('list-call-logs') && (
+            {(session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS) || session?.user?.permissions?.includes(PERMISSIONS.LIST_CALL_LOGS)) && (
                 <GenericTable<CallLogRow>
                     data={callLogData}
                     columns={tableColumns}

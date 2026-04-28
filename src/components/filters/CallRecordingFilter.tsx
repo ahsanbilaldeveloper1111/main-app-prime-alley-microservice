@@ -3,6 +3,9 @@ import GenericFilter from './GenericFilter';
 import { createCallRecordingsFiltersConfig } from './filterConfigs';
 import { useHierarchyData } from './useHierarchyData';
 import { useSession } from "next-auth/react";
+import { HEADER_CONSTANTS } from "@constants/headerConstants";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface GroupsFiltersProps {
   onFiltersChange?: (filters: Record<string, any>) => void;
@@ -34,10 +37,10 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
   useEffect(() => {
     if (status === 'authenticated') {
       // Only show export if onExport prop is provided and user has permission
-      if (onExport && session?.user?.permissions?.includes('export-call-recordings')) {
+      if (onExport && session?.user?.permissions?.includes(PERMISSIONS.EXPORT_CALL_RECORDINGS)) {
         setShowExport(true);
       }
-      if (session?.user?.permissions?.includes('filters-call-recordings')) {
+      if (session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_RECORDINGS_FILTERS)) {
         setShowFilters(true);
       }
     }

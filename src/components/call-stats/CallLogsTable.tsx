@@ -3,6 +3,9 @@ import { Row, Col } from 'react-bootstrap';
 import GenericListPage from '@components/GenericListPage';
 import { useSession } from 'next-auth/react';
 import { Column } from '@components/CustomDataTable';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface Summary {
   total_calls: number;
@@ -33,7 +36,10 @@ export const CallLogsTable: React.FC<CallLogsTableProps> = ({
 }) => {
   const { data: session } = useSession();
 
-  if (!session?.user?.permissions?.includes('list-call-logs')) {
+  if (
+    !session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS) &&
+    !session?.user?.permissions?.includes(PERMISSIONS.LIST_CALL_LOGS)
+  ) {
     return null;
   }
 

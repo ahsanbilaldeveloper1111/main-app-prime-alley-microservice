@@ -29,6 +29,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
 import { formatCurrency,  formatMinutesAndSeconds, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import PageHeader from "@components/PageHeader";
@@ -37,6 +38,8 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import SuccessfulModal from "@pages/partial/SuccessfulModal";
 import DatatableActionButton from "@components/DatatableActionButton";
 import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 
 
@@ -305,7 +308,7 @@ const CallStatsDepartment = () => {
 
   // Ensure initial fetch happens when session is ready
   useEffect(() => {
-    if (session && session.user?.permissions?.includes('list-call-logs')) {
+    if (session && (session.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS) || session.user?.permissions?.includes(PERMISSIONS.LIST_CALL_LOGS))) {
       initialFetchDone.current = true;
     }
   }, [session]);
@@ -852,7 +855,7 @@ const CallStatsDepartment = () => {
         </Col>
       </Row>
 
-      {session?.user?.permissions?.includes('list-call-logs') && (
+      {(session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS) || session?.user?.permissions?.includes(PERMISSIONS.LIST_CALL_LOGS)) && (
         <>
             <BarFilters
               leftContent={

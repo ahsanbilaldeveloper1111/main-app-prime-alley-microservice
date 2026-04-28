@@ -496,8 +496,12 @@ export const HEADER_CONSTANTS = {
 
     VIEW_CALL_DASHBOARD: "dashboard-call-logs",
     VIEW_CALL_LOGS: "view-call-logs",
+    LIST_CALL_LOGS: "list-call-logs",
+    EXPORT_CALL_LOGS: "export-call-logs",
     VIEW_CALL_LOGS_FILTERS: "filters-call-logs",
     VIEW_CALL_RECORDINGS: "view-call-recordings",
+    LIST_CALL_RECORDINGS: "list-call-recordings",
+    EXPORT_CALL_RECORDINGS: "export-call-recordings",
     VIEW_CALL_RECORDINGS_FILTERS: "filters-call-recordings",
     VIEW_CALL_REPORTS: "view-call-reports",
     CALL_REPORTS_BY_STATISTICS_REPORTS: "call-reports-by-statistics-reports",

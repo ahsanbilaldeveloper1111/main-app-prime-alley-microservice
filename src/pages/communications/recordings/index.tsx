@@ -219,6 +219,13 @@ const CallRecordings: NextPage & {
   getLayout?: (page: React.ReactElement) => React.ReactNode;
 } = () => {
   const { data: session } = useSession();
+  const userPermissions = session?.user?.permissions ?? [];
+  const canViewCallRecordings =
+    userPermissions.includes(PERMISSIONS.VIEW_CALL_RECORDINGS) ||
+    userPermissions.includes(PERMISSIONS.LIST_CALL_RECORDINGS);
+  const canExportCallRecordings = userPermissions.includes(
+    PERMISSIONS.EXPORT_CALL_RECORDINGS,
+  );
   const audioPlayerRef = useRef<AudioPlayerRef>(null);
   const [showPageLoader, setShowPageLoader] = useState(false);
 
@@ -649,12 +656,8 @@ const CallRecordings: NextPage & {
         setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
         fetchCallLogsOriginal(1, paginationInfo.perPage, searchValue.trim());
       },
-      showFiltersButton: session?.user?.permissions?.includes(
-        PERMISSIONS.VIEW_CALL_RECORDINGS,
-      ),
-      showExportButton: session?.user?.permissions?.includes(
-        "export-call-recordings",
-      ),
+      showFiltersButton: canViewCallRecordings,
+      showExportButton: canExportCallRecordings,
       onExportClick: () => handleExport("excel", appliedFilters),
       showFilterPills: true,
       showMoreFiltersButton: false,
@@ -806,6 +809,8 @@ const CallRecordings: NextPage & {
       ),
     };
   }, [
+    canExportCallRecordings,
+    canViewCallRecordings,
     searchValue,
     paginationInfo.perPage,
     fetchCallLogsOriginal,
@@ -814,7 +819,6 @@ const CallRecordings: NextPage & {
     hierarchyDataExtensions,
     hierarchyDataDepartments,
     hierarchyDataUsers,
-    session?.user?.permissions,
     showPageLoader,
     appliedFilters,
     showDateRange,
@@ -1316,7 +1320,7 @@ const CallRecordings: NextPage & {
           </Row>
         )}
 
-        {session?.user?.permissions?.includes("list-call-recordings") && (
+        {canViewCallRecordings && (
           <GenericTable<RecordingRow>
             data={tableData}
             columns={tableColumns}

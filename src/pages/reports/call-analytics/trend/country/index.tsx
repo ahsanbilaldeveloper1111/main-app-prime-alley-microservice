@@ -26,6 +26,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
 import { ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import moment from 'moment';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
+
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 interface Summary {
   total_calls: number;
@@ -850,7 +853,7 @@ const CallTrendCountry = () => {
                 </Col>
             </Row>
 
-            {session?.user?.permissions?.includes('list-call-logs') && (
+            {(session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS) || session?.user?.permissions?.includes(PERMISSIONS.LIST_CALL_LOGS)) && (
                  <GenericListPage
                  columns={columns}
                  fetchData={fetchCallLogs}
