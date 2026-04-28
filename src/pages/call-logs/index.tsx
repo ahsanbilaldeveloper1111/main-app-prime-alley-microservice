@@ -252,12 +252,16 @@ const buildCallLogSidebarFilters = ({
         label: 'Start Date & Time',
         type: 'datetime' as FilterFieldType,
         value: pendingFilters?.start_datetime || '',
-        onChange: (v: string | null) => {
-            const datetimeValue = v || '';
-            const endDate = pendingFilters?.end_datetime || '';
-            let next: Record<string, any> = { ...pendingFilters, start_datetime: datetimeValue };
-            if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) next.end_datetime = datetimeValue;
-            setPendingFilters(next);
+        onChange: (v: string | null = '') => {
+            const nextStartDateTime = v ?? '';
+            setPendingFilters((prev: Record<string, any>) => {
+                const next: Record<string, any> = { ...prev, start_datetime: nextStartDateTime };
+                const endDate = prev?.end_datetime || '';
+                if (nextStartDateTime && endDate && moment(nextStartDateTime).isAfter(moment(endDate))) {
+                    return { ...next, end_datetime: nextStartDateTime };
+                }
+                return next;
+            });
         },
         placeholder: 'Start',
     },
@@ -266,12 +270,16 @@ const buildCallLogSidebarFilters = ({
         label: 'End Date & Time',
         type: 'datetime' as FilterFieldType,
         value: pendingFilters?.end_datetime || '',
-        onChange: (v: string | null) => {
-            const datetimeValue = v || '';
-            const startDate = pendingFilters?.start_datetime || '';
-            let next: Record<string, any> = { ...pendingFilters, end_datetime: datetimeValue };
-            if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) next.start_datetime = datetimeValue;
-            setPendingFilters(next);
+        onChange: (v: string | null = '') => {
+            const nextEndDateTime = v ?? '';
+            setPendingFilters((prev: Record<string, any>) => {
+                const next: Record<string, any> = { ...prev, end_datetime: nextEndDateTime };
+                const startDate = prev?.start_datetime || '';
+                if (nextEndDateTime && startDate && moment(nextEndDateTime).isBefore(moment(startDate))) {
+                    return { ...next, start_datetime: nextEndDateTime };
+                }
+                return next;
+            });
         },
         placeholder: 'End',
     },
