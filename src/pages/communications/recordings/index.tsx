@@ -573,6 +573,17 @@ const CallRecordings: NextPage & {
     setCurrentFilters(nextFilters);
   }, []);
 
+  const selectedUsernameIds = useMemo<string[]>(() => {
+    const raw = currentFilters.username;
+    if (Array.isArray(raw)) {
+      return raw
+        .map((value) => String(value ?? "").trim())
+        .filter((value) => value.length > 0);
+    }
+    const single = String(raw ?? "").trim();
+    return single ? [single] : [];
+  }, [currentFilters.username]);
+
   const {
     handleApplyFiltersClick,
     handleResetFiltersClick,
@@ -639,24 +650,46 @@ const CallRecordings: NextPage & {
           label: "Username",
           showDropdown: true,
           searchable: true,
-          active: Boolean(currentFilters.username),
-          activeLabel: currentFilters.username
-            ? (() => {
-                const user = hierarchyDataUsers.find(
-                  (u: any) => String(u.id) === String(currentFilters.username),
-                );
-                return user
-                  ? String((user as any).name ?? (user as any).id)
-                  : String(currentFilters.username);
-              })()
-            : undefined,
-          onClear: () => stageFilters({ ...currentFilters, username: "" }),
-          dropdownOptions: hierarchyDataUsers.map((u: any) => ({
+          multiSelect: true,
+          active: selectedUsernameIds.length > 0,
+          activeLabel:
+            selectedUsernameIds.length > 0
+              ? `${selectedUsernameIds.length} selected`
+              : undefined,
+          onClear: () => stageFilters({ ...currentFilters, username: [] }),
+          onSelectAll: () => {
+            const allUserIds = hierarchyDataUsers.map((u: any) => String(u.id));
+            const isAllSelected =
+              allUserIds.length > 0 &&
+              allUserIds.every((id) => selectedUsernameIds.includes(id));
+            stageFilters({
+              ...currentFilters,
+              username: isAllSelected ? [] : allUserIds,
+            });
+          },
+          selectAllLabel:
+            selectedUsernameIds.length > 0 &&
+            hierarchyDataUsers.length > 0 &&
+            hierarchyDataUsers.every((u: any) =>
+              selectedUsernameIds.includes(String(u.id)),
+            )
+              ? "Deselect all"
+              : "Select all",
+          dropdownOptions: hierarchyDataUsers.map((u: any) => {
+            const userId = String(u.id);
+            return {
             label: String(u.name ?? u.id),
-            value: String(u.id),
-            onClick: () =>
-              stageFilters({ ...currentFilters, username: String(u.id) }),
-          })),
+            value: userId,
+            selected: selectedUsernameIds.includes(userId),
+            onClick: () => {
+              const isSelected = selectedUsernameIds.includes(userId);
+              const nextUsernames = isSelected
+                ? selectedUsernameIds.filter((id) => id !== userId)
+                : [...selectedUsernameIds, userId];
+              stageFilters({ ...currentFilters, username: nextUsernames });
+            },
+          };
+          }),
         },
         buildTextDropdownFilterPill(
           "remote_party_number",
@@ -754,6 +787,7 @@ const CallRecordings: NextPage & {
     hierarchyDataExtensions,
     hierarchyDataDepartments,
     hierarchyDataUsers,
+    selectedUsernameIds,
     session?.user?.permissions,
     showPageLoader,
     appliedFilters,
@@ -983,7 +1017,7 @@ const CallRecordings: NextPage & {
   // Initial load and refetch when filters/refresh change
   useEffect(() => {
     setPaginationInfo((prev) => ({ ...prev, currentPage: 1 }));
-    fetchCallLogsOriginal(1, rowsPerPageRef.current, "");
+    fetchCallLogsOriginal(1, rowsPerPageRef.current, searchValue.trim());
   }, [refreshKey, fetchCallLogsOriginal]);
 
   // Table columns for GenericTable (defined after handlers so they are in scope)
@@ -1283,7 +1317,7 @@ const CallRecordings: NextPage & {
                 currentPage: page,
                 perPage: rowsPerPage,
               }));
-              fetchCallLogsOriginal(page, rowsPerPage, "");
+              fetchCallLogsOriginal(page, rowsPerPage, searchValue.trim());
             }}
             sortable={true}
             hover={true}

@@ -381,7 +381,7 @@ export const HEADER_CONSTANTS = {
     CREATE_INBOUND_BOTS_INBOUND: "create-inbound-bots-inbound",
     EDIT_INBOUND_BOTS_INBOUND: "edit-inbound-bots-inbound",
     DELETE_INBOUND_BOTS_INBOUND: "delete-inbound-bots-inbound",
-    VIEW_INBOUND_CONVERSATIONS_INBOUND: "view-inbound-conversations-inbound",
+    VIEW_INBOUND_CONVERSATIONS_INBOUND: "view-Inbound-conversations-inbound",
     VIEW_OUTBOUND_CAMPAIGNS_OUTBOUND: "view-outbound-campaign-outbound",
     CREATE_OUTBOUND_CAMPAIGNS_OUTBOUND: "create-outbound-campaign-outbound",
     EDIT_OUTBOUND_CAMPAIGNS_OUTBOUND: "edit-outbound-campaign-outbound",
@@ -472,7 +472,8 @@ export const HEADER_CONSTANTS = {
     ADD_EMPLOYEE_STAFF_MANAGEMENT: "add-employee-staff-management",
     UPDATE_EMPLOYEE_STAFF_MANAGEMENT: "update-employee-staff-management",
     DELETE_EMPLOYEE_STAFF_MANAGEMENT: "delete-employee-staff-management",
-    ADD_APPROVAL_REQUEST_STAFF_MANAGEMENT: "add-approval-request-staff-management",
+    ADD_APPROVAL_REQUEST_STAFF_MANAGEMENT:
+      "add-approval-request-staff-management",
     UPDATE_APPROVAL_REQUEST_STAFF_MANAGEMENT:
       "update-approval-request-staff-management",
     DELETE_APPROVAL_REQUEST_STAFF_MANAGEMENT:
@@ -602,31 +603,37 @@ export const HEADER_CONSTANTS = {
     EDIT_CRM_ORDERS_BILLING: "edit-crm-orders",
     DELETE_CRM_ORDERS_BILLING: "delete-crm-orders",
 
-    CUSTOMER_ACCOUNTS_SERVICES: 'accounts-services',
-    VIEW_CUSTOMER_PRODUCTS_BILLING: 'view-customer-products-billing-billing',
+    CUSTOMER_ACCOUNTS_SERVICES: "accounts-services",
+    VIEW_CUSTOMER_PRODUCTS_BILLING: "view-customer-products-billing-billing",
     VIEW_CUSTOMER_ACCOUNT_OVERVIEW_BILLING:
-      'view-customer-account-overview-billing-billing',
-    VIEW_CUSTOMER_DASHBOARD_BILLING: 'view-customer-dashboard-billing-billing',
+      "view-customer-account-overview-billing-billing",
+    VIEW_CUSTOMER_DASHBOARD_BILLING: "view-customer-dashboard-billing-billing",
     VIEW_CUSTOMER_SUBSCRIPTION_BILLING:
-      'view-customer-subscription-billing-billing',
-    VIEW_CUSTOMER_INVOICES_BILLING: 'view-customer-invoices-billing-billing',
-    VIEW_CUSTOMER_PAYMENTS_BILLING: 'view-customer-payments-billing-billing',
-    VIEW_CUSTOMER_ORDERS_BILLING: 'view-customer-orders-billing-billing',
+      "view-customer-subscription-billing-billing",
+    VIEW_CUSTOMER_INVOICES_BILLING: "view-customer-invoices-billing-billing",
+    VIEW_CUSTOMER_PAYMENTS_BILLING: "view-customer-payments-billing-billing",
+    VIEW_CUSTOMER_ORDERS_BILLING: "view-customer-orders-billing-billing",
     VIEW_CUSTOMER_BILLING_HISTORY_BILLING:
-      'view-customer-billing-history-billing-billing',
-    VIEW_CUSTOMER_QUOTES_BILLING: 'view-customer-quotes-billing-billing',
-    CREATE_CUSTOMER_INVOICES_BILLING: 'create-customer-invoices-billing-billing',
-    UPDATE_CUSTOMER_INVOICES_BILLING: 'update-customer-invoices-billing-billing',
-    DELETE_CUSTOMER_INVOICES_BILLING: 'delete-customer-invoices-billing-billing',
-    CREATE_CUSTOMER_PRODUCTS_BILLING: 'create-customer-products-billing-billing',
-    UPDATE_CUSTOMER_PRODUCTS_BILLING: 'update-customer-products-billing-billing',
-    DELETE_CUSTOMER_PRODUCTS_BILLING: 'delete-customer-products-billing-billing',
+      "view-customer-billing-history-billing-billing",
+    VIEW_CUSTOMER_QUOTES_BILLING: "view-customer-quotes-billing-billing",
+    CREATE_CUSTOMER_INVOICES_BILLING:
+      "create-customer-invoices-billing-billing",
+    UPDATE_CUSTOMER_INVOICES_BILLING:
+      "update-customer-invoices-billing-billing",
+    DELETE_CUSTOMER_INVOICES_BILLING:
+      "delete-customer-invoices-billing-billing",
+    CREATE_CUSTOMER_PRODUCTS_BILLING:
+      "create-customer-products-billing-billing",
+    UPDATE_CUSTOMER_PRODUCTS_BILLING:
+      "update-customer-products-billing-billing",
+    DELETE_CUSTOMER_PRODUCTS_BILLING:
+      "delete-customer-products-billing-billing",
     CREATE_CUSTOMER_SUBSCRIPTION_BILLING:
-      'create-customer-subscription-billing-billing',
+      "create-customer-subscription-billing-billing",
     UPDATE_CUSTOMER_SUBSCRIPTION_BILLING:
-      'update-customer-subscription-billing-billing',
+      "update-customer-subscription-billing-billing",
     DELETE_CUSTOMER_SUBSCRIPTION_BILLING:
-      'delete-customer-subscription-billing-billing',
+      "delete-customer-subscription-billing-billing",
 
     ADD_DOCUMENT_BILLING: "accounts-services",
     DELETE_DOCUMENT_BILLING: "accounts-services",
@@ -639,11 +646,10 @@ export const HEADER_CONSTANTS = {
     DELETE_CRM_CAMPAIGNS: "delete-crm-campaigns",
     VIEW_CRM_DATA_MANAGEMENT: "view-crm-data-management",
     CREATE_CRM_DATA_MANAGEMENT: "add-crm-data-management",
-   
+
     EDIT_CRM_DATA_MANAGEMENT: "edit-crm-data-management",
     DELETE_CRM_DATA_MANAGEMENT: "delete-crm-data-management",
-    DATA_ASSIGNMENT_CRM_DATA_MANAGEMENT:
-      "data-assignment-crm-data-management",
+    DATA_ASSIGNMENT_CRM_DATA_MANAGEMENT: "data-assignment-crm-data-management",
     CALL_SERVICE_CRM_DATA_MANAGEMENT: "call-service-crm-data-management",
     VIEW_CRM_OPPORTUNITIES: "view-crm-opportunities",
     CREATE_CRM_OPPORTUNITIES: "add-crm-opportunities",

@@ -142,14 +142,29 @@ export const DownloadCallRecording = async (id: string, agentExtension: string, 
 };
 
 export const DownloadStreamingExport = async (params: PaginationParams = {}, endpoint: string, reportType: string) => {
-  const {  search = "", filters = {}, isExport = true, exportType = 'excel', moduleSlug = '' } = params;
+  const {
+    page = 1,
+    perPage = 15,
+    draw = 1,
+    search = "",
+    filters = {},
+    isExport = true,
+    exportType = "excel",
+    moduleSlug = "",
+  } = params;
   
   try {
+    const normalizedExportType =
+      exportType === "excel" ? "xlsx" : exportType;
+
     // Create base query parameters
     const queryParams = new URLSearchParams({
+      page: page.toString(),
+      perPage: perPage.toString(),
       search: search,
+      draw: draw.toString(),
       isExport: isExport.toString(),
-      exportType: exportType,
+      exportType: normalizedExportType,
       reportType: reportType,
       moduleSlug: moduleSlug
     });
@@ -157,9 +172,9 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
     // Flatten filters and add each key-value pair as separate query parameters
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
-        // Handle arrays by joining with commas (avoid JSON encoding issues)
+        // Handle arrays by converting them to JSON strings (same encoding as list API)
         if (Array.isArray(value)) {
-          queryParams.append(key, value.join(','));
+          queryParams.append(key, JSON.stringify(value));
         }
         // Handle objects by converting them to JSON strings
         else if (typeof value === 'object') {
@@ -172,7 +187,7 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
 
     // Set appropriate headers based on export type
     const headers = {
-      'Accept': exportType === 'excel' 
+      'Accept': normalizedExportType === 'xlsx' 
         ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*'
         : 'application/pdf, application/octet-stream, */*'
     };
@@ -182,15 +197,84 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
       headers
     });
 
-    console.log(response);
-
     if (response.status === 204) {
       toast.error('No data found for export');
       return;
     }
 
+    const contentType = String(response.headers?.["content-type"] ?? "");
+    if (contentType.includes("application/json")) {
+      const text = await response.data.text();
+      const parsed = JSON.parse(text) as {
+        success?: boolean;
+        message?: string;
+        detail?: string;
+        dataList?: Array<Record<string, unknown>>;
+        data?: { dataList?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
+      };
+
+      const rows =
+        (Array.isArray(parsed?.dataList) ? parsed.dataList : undefined) ??
+        (Array.isArray(parsed?.data)
+          ? (parsed.data as Array<Record<string, unknown>>)
+          : undefined) ??
+        (Array.isArray(parsed?.data?.dataList)
+          ? parsed.data.dataList
+          : undefined) ??
+        [];
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        const message =
+          parsed?.detail ||
+          parsed?.message ||
+          "No export data found in response.";
+        toast.error(message);
+        throw new Error(message);
+      }
+
+      // Build CSV only from `dataList` rows (ignores wrapper keys like success/recordsTotal).
+      const headers = Array.from(
+        rows.reduce<Set<string>>((acc, row) => {
+          Object.keys(row ?? {}).forEach((k) => acc.add(k));
+          return acc;
+        }, new Set<string>()),
+      );
+
+      const csvEscape = (value: unknown): string => {
+        const str =
+          value == null
+            ? ""
+            : typeof value === "object"
+              ? JSON.stringify(value)
+              : String(value);
+        const escaped = str.replace(/"/g, '""');
+        return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
+      };
+
+      const csvLines = [
+        headers.join(","),
+        ...rows.map((row) => headers.map((h) => csvEscape(row?.[h])).join(",")),
+      ];
+
+      const csvBlob = new Blob([`\uFEFF${csvLines.join("\r\n")}`], {
+        type: "text/csv;charset=utf-8;",
+      });
+      const csvUrl = window.URL.createObjectURL(csvBlob);
+      const csvLink = document.createElement("a");
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+      csvLink.href = csvUrl;
+      csvLink.setAttribute("download", `call_recordings_${timestamp}.csv`);
+      document.body.appendChild(csvLink);
+      csvLink.click();
+      csvLink.remove();
+      window.URL.revokeObjectURL(csvUrl);
+
+      toast.success("CSV file downloaded successfully");
+      return csvUrl;
+    }
+
     // Create blob with appropriate type based on export format
-    const blobType = exportType === 'excel' 
+    const blobType = normalizedExportType === 'xlsx' 
       ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       : 'application/pdf';
     
@@ -201,7 +285,7 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
     
     // Generate filename with timestamp and appropriate extension
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const fileExtension = exportType === 'excel' ? 'csv' : 'pdf';
+    const fileExtension = normalizedExportType === 'xlsx' ? 'xlsx' : 'pdf';
     link.setAttribute('download', `call_recordings_${timestamp}.${fileExtension}`);
     
     document.body.appendChild(link);
@@ -209,11 +293,10 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
     link.remove();
     window.URL.revokeObjectURL(url);
     
-    toast.success(`${exportType.toUpperCase()} file downloaded successfully`);
+    toast.success(`${normalizedExportType.toUpperCase()} file downloaded successfully`);
     return url;
   } catch (error) {
     console.error(`${exportType.toUpperCase()} Download Error:`, error);
-    toast.error(`${exportType.toUpperCase()} download failed`);
     throw error;
   }
 };

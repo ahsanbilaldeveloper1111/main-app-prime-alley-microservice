@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Button, Form } from "react-bootstrap";
 
 interface TextFilterMenuProps {
@@ -15,26 +15,50 @@ const TextFilterMenu: React.FC<TextFilterMenuProps> = ({
   onApply,
   closeMenu,
   placeholder,
-}) => (
-  <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-    <Form.Control
-      size="sm"
-      type="text"
-      placeholder={placeholder}
-      value={value}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-        const nextValue = e.target.value;
-        onChange(nextValue);
-        onApply(nextValue.trim());
-      }}
-    />
-    <div className="d-flex justify-content-end gap-2">
-      <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-        Close
-      </Button>
+}) => {
+  const [draftValue, setDraftValue] = useState(value);
+
+  useEffect(() => {
+    setDraftValue(value);
+  }, [value]);
+
+  return (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+      <Form.Control
+        size="sm"
+        type="text"
+        placeholder={placeholder}
+        value={draftValue}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          setDraftValue(e.target.value);
+        }}
+      />
+      <div className="d-flex justify-content-end gap-2">
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() => {
+            setDraftValue(value);
+            closeMenu();
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => {
+            onChange(draftValue);
+            onApply(draftValue.trim());
+            closeMenu();
+          }}
+        >
+          Select
+        </Button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface DateTimeFilterMenuProps {
   value: string;
@@ -48,25 +72,49 @@ const DateTimeFilterMenu: React.FC<DateTimeFilterMenuProps> = ({
   onChange,
   onApply,
   closeMenu,
-}) => (
-  <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
-    <Form.Control
-      size="sm"
-      type="datetime-local"
-      value={value}
-      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-        const nextValue = e.target.value;
-        onChange(nextValue);
-        onApply(nextValue);
-      }}
-    />
-    <div className="d-flex justify-content-end gap-2">
-      <Button variant="outline-secondary" size="sm" onClick={closeMenu}>
-        Close
-      </Button>
+}) => {
+  const [draftValue, setDraftValue] = useState(value);
+
+  useEffect(() => {
+    setDraftValue(value);
+  }, [value]);
+
+  return (
+    <div className="d-flex flex-column gap-2" style={{ minWidth: 240 }}>
+      <Form.Control
+        size="sm"
+        type="datetime-local"
+        value={draftValue}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+          setDraftValue(e.target.value);
+        }}
+      />
+      <div className="d-flex justify-content-end gap-2">
+        <Button
+          variant="outline-secondary"
+          size="sm"
+          onClick={() => {
+            setDraftValue(value);
+            closeMenu();
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => {
+            onChange(draftValue);
+            onApply(draftValue);
+            closeMenu();
+          }}
+        >
+          Select
+        </Button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export function createTextFilterDropdownContent(
   value: string,
