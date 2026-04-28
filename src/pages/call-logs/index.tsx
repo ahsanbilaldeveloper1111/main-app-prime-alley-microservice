@@ -51,6 +51,339 @@ interface Summary {
     outbound: number;
 }
 
+const buildUtcDateTime = (value: string, isEnd: boolean): string => {
+    if (!value) return value;
+
+    let parsed = moment(value);
+    const isDateTimeWithoutSeconds = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+
+    if (isDateTimeWithoutSeconds) {
+        const suffix = isEnd && value.endsWith('23:59') ? ':59' : ':00';
+        parsed = moment(`${value}${suffix}`);
+    } else if (!value.includes('T')) {
+        parsed = isEnd ? moment(value).endOf('day') : moment(value).startOf('day');
+    }
+
+    return `${parsed.utc().format('YYYY-MM-DDTHH:mm:ss')}Z`;
+};
+
+const normalizeCallLogFiltersForApi = (filters: Record<string, any>): Record<string, any> => {
+    const normalized = { ...filters };
+    if (normalized.start_datetime) {
+        normalized.start_datetime = buildUtcDateTime(normalized.start_datetime, false);
+    }
+    if (normalized.end_datetime) {
+        normalized.end_datetime = buildUtcDateTime(normalized.end_datetime, true);
+    }
+    delete normalized.timezone;
+    return normalized;
+};
+
+const extractCallLogRows = (response: any): CallLogRow[] => {
+    const rawData = response?.data;
+    if (Array.isArray(rawData)) return rawData;
+    if (Array.isArray(rawData?.data)) return rawData.data;
+    if (Array.isArray(response?.dataList)) return response.dataList;
+    return [];
+};
+
+const resolveCallLogTotal = (response: any, rowsArray: CallLogRow[]): number => {
+    const rawData = response?.data;
+    const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
+    return Number(
+        response?.recordsTotal ??
+            response?.total ??
+            rawData?.recordsTotal ??
+            rawData?.total ??
+            paginationData?.total ??
+            Math.max(rowsArray.length, 0)
+    ) || 0;
+};
+
+const getCallDirectionLabel = (value: string): string => {
+    if (value === 'OUTGOING') return 'Outgoing';
+    if (value === 'INCOMING') return 'Incoming';
+    return 'Both';
+};
+
+const getCallStatusLabel = (value: string): string => {
+    if (value === 'Answered') return 'Answered';
+    if (value === 'Not Answered') return 'Not Answered';
+    return 'Both';
+};
+
+const getTrafficTypeLabel = (value: string): string => {
+    if (value === 'internal') return 'Internal';
+    if (value === 'external') return 'External';
+    return 'All';
+};
+
+const getDestinationTypeLabel = (value: string): string => {
+    if (value === 'local') return 'Local';
+    if (value === 'national') return 'National';
+    if (value === 'international') return 'International';
+    return 'All';
+};
+
+interface BuildSidebarFiltersArgs {
+    pendingFilters: Record<string, any>;
+    setPendingFilters: React.Dispatch<React.SetStateAction<Record<string, any>>>;
+    hierarchyDataExtensions: any[];
+    hierarchyDataDepartments: any[];
+}
+
+const buildCallLogSidebarFilters = ({
+    pendingFilters,
+    setPendingFilters,
+    hierarchyDataExtensions,
+    hierarchyDataDepartments,
+}: BuildSidebarFiltersArgs) => [
+    {
+        id: 'call_direction',
+        label: 'Call Direction',
+        type: 'select',
+        value: pendingFilters?.call_direction
+            ? { value: pendingFilters.call_direction, label: getCallDirectionLabel(pendingFilters.call_direction) }
+            : null,
+        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, call_direction: selected?.value ?? '' }),
+        options: [
+            { value: 'OUTGOING', label: 'Outgoing' },
+            { value: 'INCOMING', label: 'Incoming' },
+            { value: 'Both', label: 'Both' },
+        ],
+        placeholder: 'Select call direction',
+        isClearable: true,
+    },
+    {
+        id: 'call_status',
+        label: 'Call Status',
+        type: 'select',
+        value: pendingFilters?.call_status
+            ? { value: pendingFilters.call_status, label: getCallStatusLabel(pendingFilters.call_status) }
+            : null,
+        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, call_status: selected?.value ?? '' }),
+        options: [
+            { value: 'Answered', label: 'Answered' },
+            { value: 'Not Answered', label: 'Not Answered' },
+            { value: 'Both', label: 'Both' },
+        ],
+        placeholder: 'Select call status',
+        isClearable: true,
+    },
+    {
+        id: 'called_numbers',
+        label: 'Called Numbers',
+        type: 'text',
+        value: (pendingFilters?.called_numbers || []).join(', '),
+        onChange: (v: string) => {
+            const values = v.split(',').map((s) => s.trim()).filter(Boolean);
+            setPendingFilters({ ...pendingFilters, called_numbers: values });
+        },
+        placeholder: 'Enter called numbers (comma separated)',
+    },
+    {
+        id: 'extension_number',
+        label: 'Extension',
+        type: 'multi-select',
+        value: (pendingFilters?.extension_number || [])
+            .map((id: string) => {
+                const ext = hierarchyDataExtensions?.find((e: any) => e.id === id);
+                return ext ? { value: ext.id, label: ext.name } : { value: id, label: id };
+            })
+            .filter((o: { value: string; label: string }) => o.value),
+        onChange: (selected: any) =>
+            setPendingFilters({ ...pendingFilters, extension_number: selected ? selected.map((s: any) => s.value) : [] }),
+        options: hierarchyDataExtensions?.map((ext: any) => ({ value: ext.id, label: ext.name })) || [],
+        placeholder: 'Select extensions',
+        isClearable: true,
+    },
+    {
+        id: 'traffic_type',
+        label: 'Traffic Type',
+        type: 'select',
+        value:
+            pendingFilters?.traffic_type != null && pendingFilters.traffic_type !== ''
+                ? { value: pendingFilters.traffic_type, label: getTrafficTypeLabel(pendingFilters.traffic_type) }
+                : { value: '', label: 'All' },
+        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, traffic_type: selected?.value ?? '' }),
+        options: [
+            { value: '', label: 'All' },
+            { value: 'internal', label: 'Internal' },
+            { value: 'external', label: 'External' },
+        ],
+        placeholder: 'Select traffic type',
+        isClearable: true,
+    },
+    {
+        id: 'destination_type',
+        label: 'Destination Type',
+        type: 'select',
+        value:
+            pendingFilters?.destination_type != null && pendingFilters.destination_type !== ''
+                ? { value: pendingFilters.destination_type, label: getDestinationTypeLabel(pendingFilters.destination_type) }
+                : { value: '', label: 'All' },
+        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, destination_type: selected?.value ?? '' }),
+        options: [
+            { value: '', label: 'All' },
+            { value: 'local', label: 'Local' },
+            { value: 'national', label: 'National' },
+            { value: 'international', label: 'International' },
+        ],
+        placeholder: 'Select destination type',
+        isClearable: true,
+    },
+    {
+        id: 'department',
+        label: 'Departments',
+        type: 'multi-select',
+        value: (pendingFilters?.department || [])
+            .map((id: string) => {
+                const dept = hierarchyDataDepartments?.find((d: any) => d.id === id);
+                return dept ? { value: dept.id, label: dept.name } : { value: id, label: id };
+            })
+            .filter((o: { value: string; label: string }) => o.value),
+        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, department: selected ? selected.map((s: any) => s.value) : [] }),
+        options: hierarchyDataDepartments?.map((d: any) => ({ value: d.id, label: d.name })) || [],
+        placeholder: 'Select departments',
+        isClearable: true,
+    },
+    {
+        id: 'start_datetime',
+        label: 'Start Date & Time',
+        type: 'datetime' as FilterFieldType,
+        value: pendingFilters?.start_datetime || '',
+        onChange: (v: string | null = '') => {
+            const nextStartDateTime = v ?? '';
+            setPendingFilters((prev: Record<string, any>) => {
+                const next: Record<string, any> = { ...prev, start_datetime: nextStartDateTime };
+                const endDate = prev?.end_datetime || '';
+                if (nextStartDateTime && endDate && moment(nextStartDateTime).isAfter(moment(endDate))) {
+                    return { ...next, end_datetime: nextStartDateTime };
+                }
+                return next;
+            });
+        },
+        placeholder: 'Start',
+    },
+    {
+        id: 'end_datetime',
+        label: 'End Date & Time',
+        type: 'datetime' as FilterFieldType,
+        value: pendingFilters?.end_datetime || '',
+        onChange: (v: string | null = '') => {
+            const nextEndDateTime = v ?? '';
+            setPendingFilters((prev: Record<string, any>) => {
+                const next: Record<string, any> = { ...prev, end_datetime: nextEndDateTime };
+                const startDate = prev?.start_datetime || '';
+                if (nextEndDateTime && startDate && moment(nextEndDateTime).isBefore(moment(startDate))) {
+                    return { ...next, start_datetime: nextEndDateTime };
+                }
+                return next;
+            });
+        },
+        placeholder: 'End',
+    },
+];
+
+interface FetchCallLogsContext {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    currentFiltersRef: React.MutableRefObject<Record<string, any>>;
+    isFetchingRef: React.MutableRefObject<boolean>;
+    lastFetchTimeRef: React.MutableRefObject<number>;
+    lastFetchParamsRef: React.MutableRefObject<string>;
+    setShowPageLoader: (value: boolean) => void;
+    setTableLoading: (value: boolean) => void;
+    setCallLogData: (rows: CallLogRow[]) => void;
+    setTablePagination: React.Dispatch<React.SetStateAction<{
+        currentPage: number;
+        rowsPerPage: number;
+        totalRows: number;
+        pageSizeOptions: number[];
+    }>>;
+    setTotalCalls: (value: number) => void;
+    setShowDateRange: (value: boolean) => void;
+    setStartDateTime: (value: string) => void;
+    setEndDateTime: (value: string) => void;
+    setSummary: (value: any) => void;
+}
+
+const fetchCallLogsData = async ({
+    page = 1,
+    perPage = 15,
+    search = '',
+    currentFiltersRef,
+    isFetchingRef,
+    lastFetchTimeRef,
+    lastFetchParamsRef,
+    setShowPageLoader,
+    setTableLoading,
+    setCallLogData,
+    setTablePagination,
+    setTotalCalls,
+    setShowDateRange,
+    setStartDateTime,
+    setEndDateTime,
+    setSummary,
+}: FetchCallLogsContext) => {
+    const now = Date.now();
+    const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
+
+    if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
+        return null;
+    }
+    if (lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
+        return null;
+    }
+
+    isFetchingRef.current = true;
+    lastFetchTimeRef.current = now;
+    lastFetchParamsRef.current = paramsKey;
+
+    setShowPageLoader(true);
+    setTableLoading(true);
+
+    try {
+        const response = await ListCallLogs({
+            page,
+            perPage,
+            search,
+            filters: currentFiltersRef.current,
+            moduleSlug: ModuleSlug.CALL_LOGS,
+        }, 'call-logs/list');
+
+        const rowsArray = extractCallLogRows(response);
+        const total = resolveCallLogTotal(response, rowsArray);
+        const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
+        const currentPage = response?.current_page ?? paginationData?.current_page ?? page;
+        const perPageVal = response?.per_page ?? paginationData?.per_page ?? perPage;
+
+        setCallLogData(rowsArray);
+        setTablePagination((prev) => ({
+            ...prev,
+            currentPage,
+            rowsPerPage: perPageVal,
+            totalRows: total,
+        }));
+        setTotalCalls(total);
+
+        if (response?.summary) {
+            setShowDateRange(true);
+            const dataFilters = response?.filters;
+            setStartDateTime(dataFilters?.start_datetime);
+            setEndDateTime(dataFilters?.end_datetime);
+            setSummary(response.summary);
+        }
+
+        return response;
+    } finally {
+        setShowPageLoader(false);
+        setTableLoading(false);
+        isFetchingRef.current = false;
+    }
+};
+
 const CallLogs = () => {
     const { data:session, status } = useSession();
     const [showPageLoader, setShowPageLoader] = useState(false);
@@ -214,77 +547,25 @@ const CallLogs = () => {
 
     const [tableLoading, setTableLoading] = useState(false);
 
-    const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
-        const now = Date.now();
-        const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
-
-        if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
-            return;
-        }
-        if (lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
-            return;
-        }
-
-        isFetchingRef.current = true;
-        lastFetchTimeRef.current = now;
-        lastFetchParamsRef.current = paramsKey;
-
-        setShowPageLoader(true);
-        setTableLoading(true);
-        try {
-            const response = await ListCallLogs({
-                page,
-                perPage,
-                search,
-                filters: currentFiltersRef.current,
-                moduleSlug: ModuleSlug.CALL_LOGS,
-            }, 'call-logs/list');
-
-            // Handle various API response structures (flat, nested, DataTables style)
-            const rawData = response?.data;
-            let rowsArray: CallLogRow[] = [];
-            if (Array.isArray(rawData)) {
-                rowsArray = rawData;
-            } else if (Array.isArray(rawData?.data)) {
-                rowsArray = rawData.data;
-            } else if (Array.isArray(response?.dataList)) {
-                rowsArray = response.dataList;
-            }
-
-            const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
-            const total =
-                response?.recordsTotal ??
-                response?.total ??
-                rawData?.recordsTotal ??
-                rawData?.total ??
-                paginationData?.total ??
-                (rowsArray.length > 0 ? rowsArray.length : 0);
-            const currentPage = response?.current_page ?? paginationData?.current_page ?? page;
-            const perPageVal = response?.per_page ?? paginationData?.per_page ?? perPage;
-
-            setCallLogData(rowsArray);
-            setTablePagination((prev) => ({
-                ...prev,
-                currentPage,
-                rowsPerPage: perPageVal,
-                totalRows: Number(total) || 0,
-            }));
-            setTotalCalls(total);
-
-            if (response?.summary) {
-                setShowDateRange(true);
-                const dataFilters = response?.filters;
-                setStartDateTime(dataFilters?.start_datetime);
-                setEndDateTime(dataFilters?.end_datetime);
-                setSummary(response.summary);
-            }
-
-            return response;
-        } finally {
-            setShowPageLoader(false);
-            setTableLoading(false);
-            isFetchingRef.current = false;
-        }
+    const fetchCallLogs = useCallback((page = 1, perPage = 15, search = "") => {
+        return fetchCallLogsData({
+            page,
+            perPage,
+            search,
+            currentFiltersRef,
+            isFetchingRef,
+            lastFetchTimeRef,
+            lastFetchParamsRef,
+            setShowPageLoader,
+            setTableLoading,
+            setCallLogData,
+            setTablePagination,
+            setTotalCalls,
+            setShowDateRange,
+            setStartDateTime,
+            setEndDateTime,
+            setSummary,
+        });
     }, []);
 
     rowsPerPageRef.current = tablePagination.rowsPerPage;
@@ -296,49 +577,8 @@ const CallLogs = () => {
     }, [refreshKey, fetchCallLogs]);
 
     const handleFiltersChange = (filters: any) => {
-        // Format datetime values to include seconds and timezone offset (remove timezone key)
-        const formattedFilters: any = { ...filters };
-        
-        if (formattedFilters.start_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-            let startMoment = moment(formattedFilters.start_datetime);
-            
-            if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-                startMoment = moment(formattedFilters.start_datetime + ':00');
-            } else if (!formattedFilters.start_datetime.includes('T')) {
-                // If only date, set to 00:00:00
-                startMoment = moment(formattedFilters.start_datetime).startOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        }
-        
-        if (formattedFilters.end_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-            let endMoment = moment(formattedFilters.end_datetime);
-            
-            if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-                const timePart = formattedFilters.end_datetime.split('T')[1];
-                if (timePart === '23:59') {
-                    endMoment = moment(formattedFilters.end_datetime + ':59');
-                } else {
-                    endMoment = moment(formattedFilters.end_datetime + ':00');
-                }
-            } else if (!formattedFilters.end_datetime.includes('T')) {
-                // If only date, set to 23:59:59
-                endMoment = moment(formattedFilters.end_datetime).endOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        }
-        
-        // Remove timezone key from payload (timezone is now included in datetime values)
-        delete formattedFilters.timezone;
-        
+        const formattedFilters = normalizeCallLogFiltersForApi(filters);
+
         // Update both state and ref immediately
         setCurrentFilters(formattedFilters);
         currentFiltersRef.current = formattedFilters;
@@ -362,6 +602,35 @@ const CallLogs = () => {
         finally {
             setIsExporting(false);
         }
+    };
+
+    const sidebarFilters = buildCallLogSidebarFilters({
+        pendingFilters,
+        setPendingFilters,
+        hierarchyDataExtensions: hierarchyDataExtensions as any[],
+        hierarchyDataDepartments: hierarchyDataDepartments as any[],
+    });
+
+    const handleApplyFilters = () => {
+        handleFiltersChange(pendingFilters);
+        setRefreshKey((prev) => prev + 1);
+    };
+
+    const handleResetFilters = () => {
+        const resetPending: Record<string, any> = {
+            start_datetime: pendingFilters?.start_datetime || defaultFilters.pending.start_datetime,
+            end_datetime: pendingFilters?.end_datetime || defaultFilters.pending.end_datetime,
+        };
+        const resetCurrent: Record<string, any> = {
+            start_datetime: currentFilters?.start_datetime || defaultFilters.current.start_datetime,
+            end_datetime: currentFilters?.end_datetime || defaultFilters.current.end_datetime,
+        };
+        setPendingFilters(resetPending);
+        setCurrentFilters(resetCurrent);
+        currentFiltersRef.current = resetCurrent;
+        setSearchValue('');
+        handleFiltersChange(resetPending);
+        setRefreshKey((prev) => prev + 1);
     };
 
     
@@ -396,7 +665,7 @@ const CallLogs = () => {
                             Filters
                         </button>
                         )}
-                        {session?.user?.permissions?.includes('export-call-logs') && (
+                        {session?.user?.permissions?.includes(PERMISSIONS.EXPORT_CALL_LOGS) && (
                             <button
                                 type="button"
                                 className="btn btn-outline-secondary"
@@ -471,7 +740,7 @@ const CallLogs = () => {
             )}
 
 
-            {session?.user?.permissions?.includes('list-call-logs') && (
+            {(session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS) || session?.user?.permissions?.includes(PERMISSIONS.LIST_CALL_LOGS)) && (
                 <GenericTable<CallLogRow>
                     data={callLogData}
                     columns={tableColumns}
@@ -501,158 +770,9 @@ const CallLogs = () => {
                 title="Filters"
                 subtitle="Filter and refine call logs"
                 width="400px"
-                filters={[
-                    {
-                        id: 'call_direction',
-                        label: 'Call Direction',
-                        type: 'select',
-                        value: (pendingFilters as any)?.call_direction
-                            ? { value: (pendingFilters as any).call_direction, label: (pendingFilters as any).call_direction === 'OUTGOING' ? 'Outgoing' : (pendingFilters as any).call_direction === 'INCOMING' ? 'Incoming' : 'Both' }
-                            : null,
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, call_direction: selected?.value ?? '' }),
-                        options: [
-                            { value: 'OUTGOING', label: 'Outgoing' },
-                            { value: 'INCOMING', label: 'Incoming' },
-                            { value: 'Both', label: 'Both' },
-                        ],
-                        placeholder: 'Select call direction',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'call_status',
-                        label: 'Call Status',
-                        type: 'select',
-                        value: (pendingFilters as any)?.call_status
-                            ? { value: (pendingFilters as any).call_status, label: (pendingFilters as any).call_status === 'Answered' ? 'Answered' : (pendingFilters as any).call_status === 'Not Answered' ? 'Not Answered' : 'Both' }
-                            : null,
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, call_status: selected?.value ?? '' }),
-                        options: [
-                            { value: 'Answered', label: 'Answered' },
-                            { value: 'Not Answered', label: 'Not Answered' },
-                            { value: 'Both', label: 'Both' },
-                        ],
-                        placeholder: 'Select call status',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'called_numbers',
-                        label: 'Called Numbers',
-                        type: 'text',
-                        value: ((pendingFilters as any)?.called_numbers || []).join(', '),
-                        onChange: (v: string) => {
-                            const values = v.split(',').map((s) => s.trim()).filter(Boolean);
-                            setPendingFilters({ ...pendingFilters, called_numbers: values });
-                        },
-                        placeholder: 'Enter called numbers (comma separated)',
-                    },
-                    {
-                        id: 'extension_number',
-                        label: 'Extension',
-                        type: 'multi-select',
-                        value: ((pendingFilters as any)?.extension_number || []).map((id: string) => {
-                            const ext = (hierarchyDataExtensions as any)?.find((e: any) => e.id === id);
-                            return ext ? { value: ext.id, label: ext.name } : { value: id, label: id };
-                        }).filter((o: { value: string; label: string }) => o.value),
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, extension_number: selected ? selected.map((s: any) => s.value) : [] }),
-                        options: (hierarchyDataExtensions as any)?.map((ext: any) => ({ value: ext.id, label: ext.name })) || [],
-                        placeholder: 'Select extensions',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'traffic_type',
-                        label: 'Traffic Type',
-                        type: 'select',
-                        value: (pendingFilters as any)?.traffic_type != null && (pendingFilters as any).traffic_type !== ''
-                            ? { value: (pendingFilters as any).traffic_type, label: (pendingFilters as any).traffic_type === 'internal' ? 'Internal' : (pendingFilters as any).traffic_type === 'external' ? 'External' : 'All' }
-                            : { value: '', label: 'All' },
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, traffic_type: selected?.value ?? '' }),
-                        options: [
-                            { value: '', label: 'All' },
-                            { value: 'internal', label: 'Internal' },
-                            { value: 'external', label: 'External' },
-                        ],
-                        placeholder: 'Select traffic type',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'destination_type',
-                        label: 'Destination Type',
-                        type: 'select',
-                        value: (pendingFilters as any)?.destination_type != null && (pendingFilters as any).destination_type !== ''
-                            ? { value: (pendingFilters as any).destination_type, label: (pendingFilters as any).destination_type === 'local' ? 'Local' : (pendingFilters as any).destination_type === 'national' ? 'National' : (pendingFilters as any).destination_type === 'international' ? 'International' : 'All' }
-                            : { value: '', label: 'All' },
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, destination_type: selected?.value ?? '' }),
-                        options: [
-                            { value: '', label: 'All' },
-                            { value: 'local', label: 'Local' },
-                            { value: 'national', label: 'National' },
-                            { value: 'international', label: 'International' },
-                        ],
-                        placeholder: 'Select destination type',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'department',
-                        label: 'Departments',
-                        type: 'multi-select',
-                        value: ((pendingFilters as any)?.department || []).map((id: string) => {
-                            const dept = (hierarchyDataDepartments as any)?.find((d: any) => d.id === id);
-                            return dept ? { value: dept.id, label: dept.name } : { value: id, label: id };
-                        }).filter((o: { value: string; label: string }) => o.value),
-                        onChange: (selected: any) => setPendingFilters({ ...pendingFilters, department: selected ? selected.map((s: any) => s.value) : [] }),
-                        options: (hierarchyDataDepartments as any)?.map((d: any) => ({ value: d.id, label: d.name })) || [],
-                        placeholder: 'Select departments',
-                        isClearable: true,
-                    },
-                    {
-                        id: 'start_datetime',
-                        label: 'Start Date & Time',
-                        type: 'datetime' as FilterFieldType,
-                        value: (pendingFilters as any)?.start_datetime || '',
-                        onChange: (v: string | null) => {
-                            const datetimeValue = v || '';
-                            const endDate = (pendingFilters as any)?.end_datetime || '';
-                            let next: Record<string, any> = { ...pendingFilters, start_datetime: datetimeValue };
-                            if (datetimeValue && endDate && moment(datetimeValue).isAfter(moment(endDate))) next.end_datetime = datetimeValue;
-                            setPendingFilters(next);
-                        },
-                        placeholder: 'Start',
-                    },
-                    {
-                        id: 'end_datetime',
-                        label: 'End Date & Time',
-                        type: 'datetime' as FilterFieldType,
-                        value: (pendingFilters as any)?.end_datetime || '',
-                        onChange: (v: string | null) => {
-                            const datetimeValue = v || '';
-                            const startDate = (pendingFilters as any)?.start_datetime || '';
-                            let next: Record<string, any> = { ...pendingFilters, end_datetime: datetimeValue };
-                            if (datetimeValue && startDate && moment(datetimeValue).isBefore(moment(startDate))) next.start_datetime = datetimeValue;
-                            setPendingFilters(next);
-                        },
-                        placeholder: 'End',
-                    },
-                ]}
-                onApply={() => {
-                    handleFiltersChange(pendingFilters);
-                    setRefreshKey((prev) => prev + 1);
-                }}
-                onReset={() => {
-                    const resetPending: Record<string, any> = {
-                        start_datetime: (pendingFilters as any)?.start_datetime || defaultFilters.pending.start_datetime,
-                        end_datetime: (pendingFilters as any)?.end_datetime || defaultFilters.pending.end_datetime,
-                    };
-                    const resetCurrent: Record<string, any> = {
-                        start_datetime: (currentFilters as any)?.start_datetime || defaultFilters.current.start_datetime,
-                        end_datetime: (currentFilters as any)?.end_datetime || defaultFilters.current.end_datetime,
-                    };
-                    setPendingFilters(resetPending);
-                    setCurrentFilters(resetCurrent);
-                    currentFiltersRef.current = resetCurrent;
-                    setSearchValue('');
-                    handleFiltersChange(resetPending);
-                    setRefreshKey((prev) => prev + 1);
-                }}
+                filters={sidebarFilters as any}
+                onApply={handleApplyFilters}
+                onReset={handleResetFilters}
             />
         </React.Fragment>
     );

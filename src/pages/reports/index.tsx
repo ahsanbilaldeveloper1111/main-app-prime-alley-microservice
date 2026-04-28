@@ -15,7 +15,9 @@ import { FiEdit, FiTrash2, FiEye,FiPlus } from "react-icons/fi";
 import "@assets/scss/reports.scss";
 import moment from 'moment';
 import { useSession } from 'next-auth/react';
+import { HEADER_CONSTANTS } from '@constants/headerConstants';
 
+const { PERMISSIONS } = HEADER_CONSTANTS;
 
 const PageReports = () => {
     const { data: session } = useSession();
@@ -35,7 +37,7 @@ const PageReports = () => {
                     <div className="report-grid" id="reportGrid">
                         <Row className="">
                            
-                           {session?.user?.permissions?.includes('call-reports-by-statistics-reports') && (
+                           {session?.user?.permissions?.includes(PERMISSIONS.CALL_REPORTS_BY_STATISTICS_REPORTS) && (
                             
                             <>
                             
@@ -97,7 +99,7 @@ const PageReports = () => {
                             )}
 
 
-                            {session?.user?.permissions?.includes('call-reports-by-call-incoming-reports') && (
+                            {session?.user?.permissions?.includes(PERMISSIONS.CALL_REPORTS_BY_CALL_INCOMING_REPORTS) && (
 
                             <>
                                 <Col md={4}>
