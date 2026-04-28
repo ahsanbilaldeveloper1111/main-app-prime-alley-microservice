@@ -179,3 +179,4 @@ export const FaqLabeledSelect: React.FC<FaqLabeledSelectProps> = ({
     )}
   </div>
 );
+export default {};
