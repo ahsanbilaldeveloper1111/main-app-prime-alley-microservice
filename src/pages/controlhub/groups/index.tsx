@@ -1,10 +1,9 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo, useRef } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
+import GenericTable, { TableAction, TableColumn } from '@components/GenericTable';
 import {ListGroups, updateGroup,deleteGroup,addGroup, addTeamsToGroup, removeTeamsFromGroup, getGroupTeams, addModulesToGroup, removeModulesFromGroup, getGroupModules } from '@utils/groups';
-import { Column } from '@components/CustomDataTable';
 import { Button, Form, Modal, Row, Col, Card } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import '@assets/scss/common.scss';
@@ -12,131 +11,36 @@ import FormModal from "@pages/partial/FormModal";
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import { Edit, Info, Trash2, Users, UserPlus, UserMinus, Layers, PackageMinus, Boxes } from 'lucide-react';
-import Select, { MultiValue } from 'react-select';
+import  { MultiValue } from 'react-select';
 import { getAllTeams } from '@utils/teams';
 import { toast } from 'react-toastify';
 import { useModuleSelection } from '@hooks/useModuleSelection';
 import { Module } from '@typings/controlhub/users';
 import SelectCheckBox, { SelectCheckBoxOption } from '@components/SelectCheckBox';
 
+interface GroupRow {
+    id: number;
+    name: string;
+    assigned_modules?: Array<{ id: number; name?: string; slug?: string }>;
+    assigned_teams?: Array<{ id: number; name?: string }>;
+    total_team_users?: number;
+    total_team_owners?: number;
+}
+
+interface GroupsApiResponse {
+    data: GroupRow[];
+    total: number;
+}
 
 
 const Groups = () => {
     const { data: session } = useSession();
-   
-    const columns: Column[] = [
-        { key: 'Name', name: 'Name', selector: (row: any) => row.name, sortable: true },
-
-
-        // { key: 'total_module_assigned', name: 'Total Modules Assigned', selector: (row: any) => row.total_module_assigned || 0, sortable: true,
-        //     cell: (props: any) => (
-        //         <div>
-        //             <span className="status-badge primary">
-        //                 {props?.total_module_assigned || 0}
-        //             </span>
-        //         </div>
-        //     )
-        // },
-        { key: 'assigned_modules', name: 'Assigned Modules', selector: (row: any) => row.assigned_modules || [], sortable: false,
-            cell: (props: any) => (
-                <div>
-                    {props?.assigned_modules && props.assigned_modules.length > 0 ? (
-                        <div className="d-flex flex-wrap gap-1">
-                            {props.assigned_modules.map((module: any) => (
-                                <span key={module.id} className="status-badge primary" title={module.slug || ''}>
-                                    {module.name || 'N/A'}
-                                </span>
-                            ))}
-                        </div>
-                    ) : (
-                        <span className="text-muted">No modules assigned</span>
-                    )}
-                </div>
-            )
-        },
-        
-        // { key: 'total_teams', name: 'Total Teams', selector: (row: any) => row.total_teams || 0, sortable: true,
-        //     cell: (props: any) => (
-        //         <div>
-        //             <span className="status-badge primary">
-        //                 {props?.total_teams || 0}
-        //             </span>
-        //         </div>
-        //     )
-        // },
-
-        { key: 'assigned_teams', name: 'Assigned Teams', selector: (row: any) => row.assigned_teams || [], sortable: false,
-            cell: (props: any) => (
-                <div>
-                    {props?.assigned_teams && props.assigned_teams.length > 0 ? (
-                        <div className="d-flex flex-wrap gap-1">
-                            {props.assigned_teams.map((team: any) => (
-                                <span key={team.id} className="status-badge primary" title={team.name || 'N/A'}>
-                                    {team.name || 'N/A'}
-                                </span>
-                            ))}
-                        </div>
-                    ) : (
-                        <span className="text-muted">No teams assigned</span>
-                    )}
-                </div>
-                
-            )
-        },
-
-
-        { key: 'total_team_users', name: 'Team Users', selector: (row: any) => row.total_team_users || 0, sortable: true,
-            cell: (props: any) => (
-                <div>
-                    <span className="status-badge primary">
-                        {props?.total_team_users || 0}
-                    </span>
-                </div>
-            )
-        },
-        { key: 'total_team_owners', name: 'Team Owners', selector: (row: any) => row.total_team_owners || 0, sortable: true,
-            cell: (props: any) => (
-                <div>
-                    <span className="status-badge primary">
-                        {props?.total_team_owners || 0}
-                    </span>
-                </div>
-            )
-        },
-        
-        ...(session?.user?.permissions?.includes('edit-groups') || session?.user?.permissions?.includes('delete-groups') || session?.user?.permissions?.includes('assign-modules-groups') || session?.user?.permissions?.includes('remove-modules-groups') ? [
-            {
-                key: 'Action',
-                name: 'Actions',
-                selector: (row: any) => row.id,
-                sortable: false,
-                cell: (props: any) => (
-                    <div className="d-flex gap-2">
-                        {session?.user?.permissions?.includes('edit-groups') && (
-                            <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => handleEditGroup(props)}>
-                                <Edit size={16} />
-                            </Button>
-                        )}
-                        {(session?.user?.permissions?.includes('assign-teams-groups') || session?.user?.permissions?.includes('remove-teams-groups')) && (
-                            <Button variant="light" className="btn-action-style-2 p-1 text-success" title="Assign Teams" onClick={() => handleAssignTeams(props)}>
-                                <Boxes size={16} />
-                            </Button>
-                        )}
-                        {(session?.user?.permissions?.includes('assign-modules-groups') || session?.user?.permissions?.includes('remove-modules-groups')) && (
-                            <Button variant="light" className="btn-action-style-2 p-1 text-info" title="Assign Modules" onClick={() => handleAssignModules(props)}>
-                                <Layers size={16} />
-                            </Button>
-                        )}
-                        {session?.user?.permissions?.includes('delete-groups') && (
-                            <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => handleDeleteGroup(props)}>
-                                <Trash2 size={16} />
-                            </Button>
-                        )}
-                    </div>
-                )
-            }
-        ] : [])
-    ];
+    const [tableData, setTableData] = useState<GroupRow[]>([]);
+    const [isTableLoading, setIsTableLoading] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(15);
+    const [totalRows, setTotalRows] = useState(0);
+    const [searchValue, setSearchValue] = useState('');
 
     const [refreshKey, setRefreshKey] = useState<number>(0);
     const [currentFilters] = useState({});
@@ -157,12 +61,30 @@ const Groups = () => {
         return prevFiltersRef.current;
     }, [currentFilters]);
 
-    const fetchGroups = useCallback(
-        async (page = 1, perPage = 15, search = "") => {
-            return await ListGroups({ page, perPage, search, filters: memoizedFilters });
+    const loadGroups = useCallback(
+        async (page: number, perPage: number, search: string) => {
+            setIsTableLoading(true);
+            try {
+                const response = (await ListGroups({
+                    page,
+                    perPage,
+                    search,
+                    filters: memoizedFilters,
+                })) as GroupsApiResponse;
+                setTableData(response?.data ?? []);
+                setTotalRows(response?.total ?? 0);
+            } catch {
+                toast.error('Failed to load groups');
+            } finally {
+                setIsTableLoading(false);
+            }
         },
-        [memoizedFilters]
+        [memoizedFilters],
     );
+
+    useEffect(() => {
+        loadGroups(currentPage, rowsPerPage, searchValue);
+    }, [currentPage, rowsPerPage, searchValue, refreshKey, loadGroups]);
 
 
     
@@ -174,7 +96,7 @@ const Groups = () => {
     const [selectedGroupName, setSelectedGroupName] = useState<any>(null);
     const [showEditGroupModal, setShowEditGroupModal] = useState<boolean>(false);
 
-    const handleEditGroup = (props: any) => {
+    const handleEditGroup = (props: GroupRow) => {
         setSelectedGroup(props.id);
         setSelectedGroupName(props.name);
         setShowEditGroupModal(true);
@@ -187,11 +109,6 @@ const Groups = () => {
             setSelectedGroup(null);
             setSelectedGroupName(null);
             setShowEditGroupModal(false);
-            // setSuccessModalTitle('Group Updated')
-            // setSuccessModalDescription('Group has been updated successfully');
-            // setTimeout(() => {
-            //     setShowSuccessfulModal(true);
-            // }, 100);
             setRefreshKey(prev => prev + 1); // Trigger refresh
         }
 
@@ -200,7 +117,7 @@ const Groups = () => {
 
     const [showDeleteGroupModal, setShowDeleteGroupModal] = useState<boolean>(false);
     
-    const handleDeleteGroup = (props: any) => {
+    const handleDeleteGroup = (props: GroupRow) => {
         setSelectedGroup(props.id);
         setSelectedGroupName(props.name);
         setShowDeleteGroupModal(true);
@@ -229,12 +146,6 @@ const Groups = () => {
         if(response){
             setNewGroupName("");
             setShowCreateGroupModal(false);
-            
-            // setSuccessModalTitle('Group Created')
-            // setSuccessModalDescription('New Group has been added successfully');
-            // setTimeout(() => {
-            //     setShowSuccessfulModal(true);
-            // }, 100);
 
             setRefreshKey(prev => prev + 1); 
         }
@@ -250,7 +161,7 @@ const Groups = () => {
     const [isLoadingTeams, setIsLoadingTeams] = useState<boolean>(false);
     const [isLoadingGroupTeams, setIsLoadingGroupTeams] = useState<boolean>(false);
 
-    const handleAssignTeams = async (props: any) => {
+    const handleAssignTeams = async (props: GroupRow) => {
         setSelectedGroup(props.id);
         setSelectedGroupName(props.name);
         setShowAssignTeamsModal(true);
@@ -300,35 +211,16 @@ const Groups = () => {
         }
 
         const teamIds = selectedTeamsToAssign.map(id => Number.parseInt(id, 10));
-        const selectedCount = selectedTeamsToAssign.length;
+       
         const response = await addTeamsToGroup(selectedGroup, teamIds);
         
         if (response) {
             setSelectedTeamsToAssign([]);
             await fetchGroupTeams(selectedGroup);
-            // setSuccessModalTitle('Teams Assigned')
-            // setSuccessModalDescription(`${selectedCount} team(s) have been assigned to the group successfully`);
-            // // Close the assign teams modal
-            // handleCloseAssignTeamsModal();
-            // setTimeout(() => {
-            //     setShowSuccessfulModal(true);
-            // }, 100);
             setRefreshKey(prev => prev + 1);
         }
     };
 
-    const handleRemoveTeam = async (teamId: number) => {
-        const response = await removeTeamsFromGroup(selectedGroup, [teamId]);
-        if (response) {
-            await fetchGroupTeams(selectedGroup);
-            // setSuccessModalTitle('Team Removed')
-            // setSuccessModalDescription('Team has been removed from the group successfully');
-            // setTimeout(() => {
-            //     setShowSuccessfulModal(true);
-            // }, 100);
-            setRefreshKey(prev => prev + 1);
-        }
-    };
 
     const handleSelectTeamToRemove = (teamId: number) => {
         setSelectedTeamsToRemove(prev => 
@@ -356,11 +248,6 @@ const Groups = () => {
             setSelectedTeamsToRemove([]);
             setShowRemoveTeamsConfirmModal(false);
             await fetchGroupTeams(selectedGroup);
-            // setSuccessModalTitle('Teams Removed')
-            // setSuccessModalDescription(`${selectedTeamsToRemove.length} team(s) have been removed from the group successfully`);
-            // setTimeout(() => {
-            //     setShowSuccessfulModal(true);
-            // }, 100);
             setRefreshKey(prev => prev + 1);
         }
     };
@@ -410,7 +297,7 @@ const Groups = () => {
         handleModuleChange(convertedOptions);
     };
 
-    const handleAssignModules = async (props: any) => {
+    const handleAssignModules = async (props: GroupRow) => {
         setSelectedGroup(props.id);
         setSelectedGroupName(props.name);
         setShowAssignModulesModal(true);
@@ -440,15 +327,15 @@ const Groups = () => {
 
         // Filter out 'all' if present and get actual module IDs
         const moduleIds = selectedModules
-            .filter(id => id !== 'all')
-            .map(id => Number.parseInt(id, 10));
+            .filter((id: string) => id !== 'all')
+            .map((id: string) => Number.parseInt(id, 10));
         
         if (moduleIds.length === 0) {
             toast.error('Please select at least one module to assign');
             return;
         }
 
-        const selectedCount = moduleIds.length;
+      
         const response = await addModulesToGroup(selectedGroup, moduleIds);
         
         if (response) {
@@ -497,6 +384,229 @@ const Groups = () => {
         setSelectedGroupName(null);
     };
 
+    const tableColumns = useMemo<TableColumn<GroupRow>[]>(() => {
+        return [
+            { key: 'name', label: 'Name', sortable: true, accessor: (row) => row.name },
+            {
+                key: 'assigned_modules',
+                label: 'Assigned Modules',
+                sortable: false,
+                accessor: (row) => row.assigned_modules ?? [],
+                render: (row) => {
+                    const modules = row.assigned_modules ?? [];
+                    if (modules.length === 0) return <span className="text-muted">No modules assigned</span>;
+                    return (
+                        <div className="d-flex flex-wrap gap-1">
+                            {modules.map((module) => (
+                                <span key={module.id} className="status-badge primary" title={module.slug || ''}>
+                                    {module.name || 'N/A'}
+                                </span>
+                            ))}
+                        </div>
+                    );
+                },
+            },
+            {
+                key: 'assigned_teams',
+                label: 'Assigned Teams',
+                sortable: false,
+                accessor: (row) => row.assigned_teams ?? [],
+                render: (row) => {
+                    const teams = row.assigned_teams ?? [];
+                    if (teams.length === 0) return <span className="text-muted">No teams assigned</span>;
+                    return (
+                        <div className="d-flex flex-wrap gap-1">
+                            {teams.map((team) => (
+                                <span key={team.id} className="status-badge primary" title={team.name || 'N/A'}>
+                                    {team.name || 'N/A'}
+                                </span>
+                            ))}
+                        </div>
+                    );
+                },
+            },
+            {
+                key: 'total_team_users',
+                label: 'Team Users',
+                sortable: true,
+                accessor: (row) => row.total_team_users ?? 0,
+                render: (row) => <span className="status-badge primary">{row.total_team_users || 0}</span>,
+            },
+            {
+                key: 'total_team_owners',
+                label: 'Team Owners',
+                sortable: true,
+                accessor: (row) => row.total_team_owners ?? 0,
+                render: (row) => <span className="status-badge primary">{row.total_team_owners || 0}</span>,
+            },
+        ];
+    }, []);
+
+    const tableActions = useMemo<TableAction<GroupRow>[]>(() => {
+        const actions: TableAction<GroupRow>[] = [];
+        if (session?.user?.permissions?.includes('edit-groups')) {
+            actions.push({
+                label: 'Edit',
+                icon: <Edit size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-primary',
+                onClick: (row) => handleEditGroup(row),
+            });
+        }
+        if (
+            session?.user?.permissions?.includes('assign-teams-groups') ||
+            session?.user?.permissions?.includes('remove-teams-groups')
+        ) {
+            actions.push({
+                label: 'Assign Teams',
+                icon: <Boxes size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-success',
+                onClick: (row) => handleAssignTeams(row),
+            });
+        }
+        if (
+            session?.user?.permissions?.includes('assign-modules-groups') ||
+            session?.user?.permissions?.includes('remove-modules-groups')
+        ) {
+            actions.push({
+                label: 'Assign Modules',
+                icon: <Layers size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-info',
+                onClick: (row) => handleAssignModules(row),
+            });
+        }
+        if (session?.user?.permissions?.includes('delete-groups')) {
+            actions.push({
+                label: 'Delete',
+                icon: <Trash2 size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-danger',
+                onClick: (row) => handleDeleteGroup(row),
+            });
+        }
+        return actions;
+    }, [session]);
+
+    let assignedTeamsSection: React.ReactNode;
+    if (isLoadingGroupTeams) {
+        assignedTeamsSection = (
+            <div className="text-center py-3">
+                <small className="text-muted">Loading teams...</small>
+            </div>
+        );
+    } else if (groupTeams.length > 0) {
+        assignedTeamsSection = (
+            <Card>
+                <Card.Body className="p-0">
+                    <div className="table-responsive p-0">
+                        <table className="table table-hover table-sm mb-0">
+                            <thead className="table-light">
+                                <tr>
+                                    <th style={{ width: '40px' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={groupTeams.length > 0 && selectedTeamsToRemove.length === groupTeams.length}
+                                            onChange={handleSelectAllTeamsToRemove}
+                                            title="Select All Teams"
+                                            disabled={!session?.user?.permissions?.includes('remove-teams-groups')}
+                                        />
+                                    </th>
+                                    <th>Name</th>
+                                    <th>Assigned Users</th>
+                                    <th>Assigned Owners</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {groupTeams.map((team) => (
+                                    <tr key={team.id}>
+                                        <td>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedTeamsToRemove.includes(team.id)}
+                                                onChange={() => handleSelectTeamToRemove(team.id)}
+                                                disabled={!session?.user?.permissions?.includes('remove-teams-groups')}
+                                            />
+                                        </td>
+                                        <td>
+                                            <div title={team.name || 'N/A'}>{team.name || 'N/A'}</div>
+                                        </td>
+                                        <td>
+                                            <span className="status-badge primary">{team?.assigned_users_count || 0}</span>
+                                        </td>
+                                        <td>
+                                            <span className="status-badge primary">{team?.assigned_owners_count || 0}</span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card.Body>
+            </Card>
+        );
+    } else {
+        assignedTeamsSection = (
+            <div className="text-center py-3 border rounded">
+                <small className="text-muted">No teams assigned to this group yet.</small>
+            </div>
+        );
+    }
+
+    let assignedModulesSection: React.ReactNode;
+    if (isLoadingGroupModules) {
+        assignedModulesSection = (
+            <div className="text-center py-3">
+                <small className="text-muted">Loading modules...</small>
+            </div>
+        );
+    } else if (groupModules.length > 0) {
+        assignedModulesSection = (
+            <Card>
+                <Card.Body className="p-0">
+                    <table className="table table-hover table-sm mb-0 w-100">
+                        <thead className="table-light">
+                            <tr>
+                                <th style={{ width: '40px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={groupModules.length > 0 && selectedModulesToRemove.length === groupModules.length}
+                                        onChange={handleSelectAllModulesToRemove}
+                                        title="Select All Modules"
+                                    />
+                                </th>
+                                <th>Module Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {groupModules.map((module) => (
+                                <tr key={module.id}>
+                                    <td>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedModulesToRemove.includes(module.id)}
+                                            onChange={() => handleSelectModuleToRemove(module.id)}
+                                        />
+                                    </td>
+                                    <td>
+                                        <div title={module.name || 'N/A'}>{module.name || 'N/A'}</div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </Card.Body>
+            </Card>
+        );
+    } else {
+        assignedModulesSection = (
+            <div className="text-center py-3 border rounded">
+                <small className="text-muted">No modules assigned to this group yet.</small>
+            </div>
+        );
+    }
+
     return (
         <React.Fragment>
             <BreadcrumbItem mainTitle="Controlhub" mainLink="/controlhub/groups" subTitle="Groups" />
@@ -534,19 +644,39 @@ const Groups = () => {
 
 
 
-            {/* {session?.user?.permissions?.includes('list-groups') && ( */}
-                 <GenericListPage
-                 columns={columns}
-                 fetchData={fetchGroups}
-                 title="Groups"
-                 searchPlaceholder="Search groups..."
-                 defaultPageSize={15}
-                 filters={memoizedFilters}
-                 refreshKey={refreshKey}
-                 search={true}
-                 tableStyle="table-style-2"
-             />
-            {/* )} */}
+            <GenericTable<GroupRow>
+                data={tableData}
+                columns={tableColumns}
+                loading={isTableLoading}
+                actions={tableActions}
+                showActions={tableActions.length > 0}
+                actionsLabel="Actions"
+                uniqueKey="id"
+                pagination={{
+                    currentPage,
+                    rowsPerPage,
+                    totalRows,
+                    pageSizeOptions: [15, 25, 50, 100],
+                }}
+                onPaginationChange={(page, perPage) => {
+                    setCurrentPage(page);
+                    setRowsPerPage(perPage);
+                }}
+                showToolbar
+                toolbar={{
+                    showSearch: true,
+                    searchValue,
+                    searchPlaceholder: 'Search groups...',
+                    onSearchChange: (value) => {
+                        setSearchValue(value);
+                        setCurrentPage(1);
+                    },
+                }}
+                showToolbarActions={false}
+                emptyMessage="No groups found"
+                hover
+                size="md"
+            />
 
             <FormModal
                 show={showEditGroupModal}
@@ -555,7 +685,7 @@ const Groups = () => {
                 titleIcon={<Users size={20} className="text-primary" />}
                 desc="Please fill in the details below to edit the group."
                 formHtml={
-                    <>
+                    
                     <div className="form-group mb-3">
                         <label htmlFor="editGroupName" className="fw-semibold d-flex align-items-center gap-2 form-label">Group Name <span className="text-danger">*</span>
                         <span className="text-muted ms-2" title="Enter the name of the group you want to edit">
@@ -570,7 +700,7 @@ const Groups = () => {
                             </span>
                         </Form.Text>
                     </div>
-                    </>
+                    
                 }
                 submitButtonText="Update Group"
                 isSubmitDisabled={!selectedGroupName}
@@ -583,6 +713,7 @@ const Groups = () => {
             <ConfirmModal
                 show={showDeleteGroupModal}
                 onHide={() => setShowDeleteGroupModal(false)}
+                onCancel={() => setShowDeleteGroupModal(false)}
                 title="Delete Group"
                 description={`Are you sure you want to delete the following group?`}
                 targetName={`${selectedGroupName}`}
@@ -600,7 +731,7 @@ const Groups = () => {
                         titleIcon={<Users size={20} className="text-primary" />}
                         desc="Please fill in the details below to create a new group."
                         formHtml={
-                            <>
+                            
                             <div className="form-group mb-3">
                                 <label htmlFor="newGroupName" className="fw-semibold d-flex align-items-center gap-2 form-label">Group Name <span className="text-danger">*</span>
                                 <span className="text-muted ms-2" title="Enter the name of the group you want to create">
@@ -615,7 +746,7 @@ const Groups = () => {
                                     </span>
                                 </Form.Text>
                             </div>
-                            </>
+                            
                         }
                         submitButtonText="Add Group"
                         isSubmitDisabled={!newGroupName}
@@ -643,8 +774,7 @@ const Groups = () => {
 
                     <div className="form-group mb-4">
                         <label htmlFor="assignTeams" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                            Select Teams to Assign
-                            <span className="text-muted ms-2" title="Search and select teams to assign to this group">
+                            Select Teams to Assign<span className="text-muted ms-2" title="Search and select teams to assign to this group">
                                 <Info size={14} />
                             </span>
                         </label>
@@ -687,69 +817,7 @@ const Groups = () => {
                                 </Button>
                             )}
                         </div>
-                        {isLoadingGroupTeams ? (
-                            <div className="text-center py-3">
-                                <small className="text-muted">Loading teams...</small>
-                            </div>
-                        ) : groupTeams.length > 0 ? (
-                            <Card>
-                                <Card.Body className="p-0">
-                                    <div className="table-responsive p-0">
-                                        <table className="table table-hover table-sm mb-0">
-                                            <thead className="table-light">
-                                                <tr>
-                                                    <th style={{ width: '40px' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={groupTeams.length > 0 && selectedTeamsToRemove.length === groupTeams.length}
-                                                            onChange={handleSelectAllTeamsToRemove}
-                                                            title="Select All Teams"
-                                                            disabled={!session?.user?.permissions?.includes('remove-teams-groups')}
-                                                        />
-                                                    </th>
-                                                    <th>Name</th>
-                                                    <th>Assigned Users</th>
-                                                    <th>Assigned Owners</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {groupTeams.map((team) => (
-                                                    <tr key={team.id}>
-                                                        <td>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedTeamsToRemove.includes(team.id)}
-                                                                onChange={() => handleSelectTeamToRemove(team.id)}
-                                                                disabled={!session?.user?.permissions?.includes('remove-teams-groups')}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <div title={team.name || 'N/A'}>
-                                                                {team.name || 'N/A'}
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <span className="status-badge primary">
-                                                                {team?.assigned_users_count || 0}
-                                                            </span>
-                                                        </td>
-                                                        <td>
-                                                            <span className="status-badge primary">
-                                                                {team?.assigned_owners_count || 0}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </Card.Body>
-                            </Card>
-                        ) : (
-                            <div className="text-center py-3 border rounded">
-                                <small className="text-muted">No teams assigned to this group yet.</small>
-                            </div>
-                        )}
+                        {assignedTeamsSection}
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
@@ -813,8 +881,7 @@ const Groups = () => {
 
                     <div className="form-group mb-4">
                         <label htmlFor="assignModules" className="fw-semibold d-flex align-items-center gap-2 form-label">
-                            Select Modules to Assign
-                            <span className="text-muted ms-2" title="Search and select modules to assign to this group">
+                            Select Modules to Assign<span className="text-muted ms-2" title="Search and select modules to assign to this group">
                                 <Info size={14} />
                             </span>
                         </label>
@@ -851,58 +918,7 @@ const Groups = () => {
                                 </Button>
                             )}
                         </div>
-                        {isLoadingGroupModules ? (
-                            <div className="text-center py-3">
-                                <small className="text-muted">Loading modules...</small>
-                            </div>
-                        ) : groupModules.length > 0 ? (
-                            <Card>
-                                <Card.Body className="p-0">
-                                
-                                        <table className="table table-hover table-sm mb-0 w-100">
-                                            <thead className="table-light">
-                                                <tr>
-                                                    <th style={{ width: '40px' }}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={groupModules.length > 0 && selectedModulesToRemove.length === groupModules.length}
-                                                            onChange={handleSelectAllModulesToRemove}
-                                                            title="Select All Modules"
-                                                        />
-                                                    </th>
-                                                    <th>Module Name</th>
-                                                    
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {groupModules.map((module) => (
-                                                    <tr key={module.id}>
-                                                        <td>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedModulesToRemove.includes(module.id)}
-                                                                onChange={() => handleSelectModuleToRemove(module.id)}
-                                                            />
-                                                        </td>
-                                                        <td>
-                                                            <div title={module.name || 'N/A'}>
-                                                                {module.name || 'N/A'}
-                                                            </div>
-                                                        </td>
-                                                       
-                                                        
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                   
-                                </Card.Body>
-                            </Card>
-                        ) : (
-                            <div className="text-center py-3 border rounded">
-                                <small className="text-muted">No modules assigned to this group yet.</small>
-                            </div>
-                        )}
+                        {assignedModulesSection}
                     </div>
                 </Modal.Body>
                 <Modal.Footer>
@@ -915,7 +931,7 @@ const Groups = () => {
                         disabled={selectedModules.length === 0 || (selectedModules.length === 1 && selectedModules[0] === 'all' && moduleOptions.length <= 1)}
                     >
                         <Layers size={16} className="me-1" />
-                        Assign Selected Modules ({selectedModules.filter(id => id !== 'all').length})
+                        Assign Selected Modules ({selectedModules.filter((id: string) => id !== 'all').length})
                     </Button>
                 </Modal.Footer>
             </Modal>
