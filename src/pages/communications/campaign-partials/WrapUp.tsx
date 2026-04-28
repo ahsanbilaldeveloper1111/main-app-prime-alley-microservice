@@ -24,6 +24,8 @@ interface WrapUpModalProps {
   callVariablesConfig?: CallVariableConfig[];
   /** Max reasons selectable (e.g. 5); shown as hint */
   maxReasons?: number;
+  /** Optional preselected values to restore previously submitted reasons. */
+  initialSelectedWrapUpIds?: string[];
 }
 
 const DEFAULT_WRAP_UP_OPTIONS: WrapUpReasonOption[] = [
@@ -47,7 +49,7 @@ function emptyVariablesFromConfig(config: CallVariableConfig[] | undefined): Rec
   }, {});
 }
 
-const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, onMinimize, wrapUpReasons, callVariablesConfig, maxReasons = 5 }) => {
+const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, onMinimize, wrapUpReasons, callVariablesConfig, maxReasons = 5, initialSelectedWrapUpIds = [] }) => {
   const [selectedWrapUpIds, setSelectedWrapUpIds] = useState<string[]>([]);
   const initialVariables = emptyVariablesFromConfig(callVariablesConfig);
   const [callVariables, setCallVariables] = useState<Record<string, string>>(initialVariables);
@@ -56,6 +58,11 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
   useEffect(() => {
     setCallVariables(emptyVariablesFromConfig(callVariablesConfig));
   }, [callVariablesConfig]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedWrapUpIds(initialSelectedWrapUpIds);
+  }, [initialSelectedWrapUpIds, isOpen]);
 
   // Prefer API data (wrapUpReasons from getFinesseWrapUpReasons). Use default list only when no API data was passed.
   const wrapUpOptions = wrapUpReasons != null && wrapUpReasons.length > 0 ? wrapUpReasons : DEFAULT_WRAP_UP_OPTIONS;
@@ -82,7 +89,7 @@ const WrapUpModal: React.FC<WrapUpModalProps> = ({ isOpen, onClose, onSubmit, on
         variables: { ...callVariables }
       });
     }
-    setSelectedWrapUpIds([]);
+    // Keep selection so reopening the modal reflects the latest submitted reasons.
     setCallVariables(emptyVariablesFromConfig(callVariablesConfig));
     onClose();
   };
