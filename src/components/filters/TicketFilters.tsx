@@ -8,6 +8,7 @@ import { GetAllStatuses } from "@utils/ticket-statuses";
 import { GetAllTypes } from "@utils/ticket-types";
 import { ModuleSlug } from "@utils/Helper";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { hasCallRecordingsExportPermission } from "@utils/callPermissionUtils";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -219,7 +220,7 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
   useEffect(() => {
     if (status === 'authenticated') {
       // Only show export if onExport prop is provided and user has permission
-      if (onExport && session?.user?.permissions?.includes(PERMISSIONS.EXPORT_CALL_RECORDINGS)) {
+      if (onExport && hasCallRecordingsExportPermission(session?.user?.permissions)) {
         setShowExport(true);
       }
       //if (session?.user?.permissions?.includes('filters-call-recordings')) {

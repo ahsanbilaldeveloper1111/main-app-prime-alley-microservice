@@ -4,6 +4,7 @@ import { createCallLogsFiltersConfig } from './filterConfigs';
 import { useHierarchyData } from './useHierarchyData';
 import { useSession } from "next-auth/react";
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import { hasCallLogsExportPermission } from "@utils/callPermissionUtils";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -37,7 +38,7 @@ export default function GroupsFilters({ onFiltersChange, onExport, isVisibleCall
   useEffect(() => {
     if (status === 'authenticated') {
       // Only show export if onExport prop is provided and user has permission
-      if (onExport && session?.user?.permissions?.includes(PERMISSIONS.EXPORT_CALL_LOGS)) {
+      if (onExport && hasCallLogsExportPermission(session?.user?.permissions)) {
         setShowExport(true);
       }
       if (session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS_FILTERS)) {

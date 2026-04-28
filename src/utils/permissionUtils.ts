@@ -75,4 +75,4 @@ export const checkRoutePermission = (pathname: string, permissions: string[]): b
   
   // Check if user has any of the required permissions
   return requiredPermissions.some(permission => permissions.includes(permission));
-}; 
+};

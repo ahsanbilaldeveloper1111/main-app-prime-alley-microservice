@@ -27,6 +27,7 @@ import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
 import { ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
+import { hasCallLogsViewPermission } from '@utils/callPermissionUtils';
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -70,32 +71,6 @@ const CallTrendDepartment = () => {
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('calls_chart');
     
-    // Debug session state
-    useEffect(() => {
-        console.log('Session state:', { session, status });
-        if (status === 'authenticated' && session) {
-            console.log('Session authenticated successfully');
-        } else if (status === 'loading') {
-            console.log('Session still loading...');
-        } else if (status === 'unauthenticated') {
-            console.log('User not authenticated');
-        }
-    }, [session, status]);
-    
-    // Debug component mounting
-    useEffect(() => {
-        console.log('CallTrendDepartment component mounted');
-        console.log('Initial props and state:', { 
-            session, 
-            status, 
-            filtersReady, 
-            dataLoaded, 
-            loading 
-        });
-        return () => {
-            console.log('CallTrendDepartment component unmounting');
-        };
-    }, []);
 
     // Animation variants for tab transitions
     const tabVariants = {
@@ -148,10 +123,6 @@ const CallTrendDepartment = () => {
       is_incoming_only: 'false'
     });
     
-    // Debug current filters state
-    useEffect(() => {
-        console.log('Current filters state changed:', currentFilters);
-    }, [currentFilters]);
     const [dataLoaded, setDataLoaded] = useState(false);
     const [filtersReady, setFiltersReady] = useState(false);
     const [summary, setSummary] = useState<Summary>({
@@ -248,18 +219,8 @@ const CallTrendDepartment = () => {
 
     // Trigger initial data fetch when filters become ready
     useEffect(() => {
-        console.log('Initial data fetch useEffect triggered:', { filtersReady, status, session });
-        if (filtersReady && status === 'authenticated' && session) {
-            console.log('Filters ready and session authenticated, triggering initial fetch');
-            console.log('DataLoaded before fetch:', dataLoaded);
-            fetchCallLogs(1, 15, "");
-        } else if (status === 'loading') {
-            console.log('Session still loading, waiting...');
-        } else if (status === 'unauthenticated') {
-            console.log('User not authenticated');
-        } else {
-            console.log('Not ready for data fetch:', { filtersReady, status, hasSession: !!session });
-        }
+        if (!filtersReady || status !== 'authenticated' || !session) return;
+        fetchCallLogs(1, 15, "");
     }, [filtersReady, fetchCallLogs, status, session]);
     
     // Fallback: if filters haven't been marked as ready after 1 second, mark them as ready
@@ -288,70 +249,32 @@ const CallTrendDepartment = () => {
         }
     }, [status, session, filtersReady]);
     
-    // Debug initial state
-    useEffect(() => {
-        console.log('Initial state:', { 
-            filtersReady, 
-            dataLoaded, 
-            loading, 
-            currentFilters, 
-            session: !!session, 
-            status 
-        });
-        
-        // Log the actual API functions to make sure they're available
-        console.log('API functions check:', {
-            ListCallLogs: typeof ListCallLogs,
-            ExportCallLogs: typeof ExportCallLogs,
-            DownloadStreamingExport: typeof DownloadStreamingExport
-        });
-    }, [filtersReady, dataLoaded, loading, currentFilters, session, status]);
-
-    
     const handleFiltersChange = (filters: any) => {
-        console.log('Filters changed:', filters);
-        console.log('Previous filters:', currentFilters);
-        console.log('New filters:', filters);
-        
-        // Check if filters actually changed
         const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(filters);
-        console.log('Filters actually changed:', filtersChanged);
-        
-        // Check if this is a complete clear (empty object or only has default values)
-        const isCompletelyCleared = Object.keys(filters).length === 0 || 
-            (Object.keys(filters).length === 1 && filters.hasOwnProperty('is_incoming_only'));
-        
-        console.log('Is completely cleared:', isCompletelyCleared);
+        const isCompletelyCleared =
+            Object.keys(filters).length === 0 ||
+            (Object.keys(filters).length === 1 && Object.prototype.hasOwnProperty.call(filters, 'is_incoming_only'));
         
         setCurrentFilters(filters);
         
-        // Mark filters as ready when they are first set
         if (!filtersReady) {
-            console.log('Marking filters as ready for the first time');
             setFiltersReady(true);
         }
         
-        // Reset data loaded state when filters actually change or when cleared
-        if ((filtersChanged && filtersReady) || isCompletelyCleared) {
-            console.log('Resetting data loaded state due to filter change or clear');
-            setDataLoaded(false);
-            console.log('DataLoaded set to false due to filter change');
-            setSummary({
-                total_calls: 0,
-                answered_calls: 0,
-                unanswered_calls: 0,
-                total_cost: 0,
-                total_duration: 0,
-                avg_duration: 0,
-                avg_ring_time: 0
-            });
-            
-            // Trigger refresh
-            setRefreshKey(prev => prev + 1);
-            console.log('Refresh key updated, new value:', refreshKey + 1);
-        } else if (!filtersChanged) {
-            console.log('Filters did not change, keeping dataLoaded state:', dataLoaded);
-        }
+        const shouldRefresh = (filtersChanged && filtersReady) || isCompletelyCleared;
+        if (!shouldRefresh) return;
+
+        setDataLoaded(false);
+        setSummary({
+            total_calls: 0,
+            answered_calls: 0,
+            unanswered_calls: 0,
+            total_cost: 0,
+            total_duration: 0,
+            avg_duration: 0,
+            avg_ring_time: 0
+        });
+        setRefreshKey(prev => prev + 1);
     };
 
     const handleExport = async (exportType: string, filters: Record<string, any>) => {
@@ -857,7 +780,7 @@ const CallTrendDepartment = () => {
                 </Col>
             </Row>
 
-            {(session?.user?.permissions?.includes(PERMISSIONS.VIEW_CALL_LOGS) || session?.user?.permissions?.includes(PERMISSIONS.LIST_CALL_LOGS)) && (
+            {hasCallLogsViewPermission(session?.user?.permissions) && (
                  <GenericListPage
                  columns={columns}
                  fetchData={fetchCallLogs}
