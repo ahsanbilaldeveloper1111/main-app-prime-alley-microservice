@@ -32,7 +32,17 @@ function appendFiltersToQueryParams(
       queryParams.append(key, JSON.stringify(value));
       return;
     }
-    queryParams.append(key, String(value));
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean" ||
+      typeof value === "bigint" ||
+      typeof value === "symbol"
+    ) {
+      queryParams.append(key, value.toString());
+      return;
+    }
+    queryParams.append(key, JSON.stringify(value));
   });
 }
 
