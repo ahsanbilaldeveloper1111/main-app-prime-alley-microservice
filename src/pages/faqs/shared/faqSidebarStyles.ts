@@ -145,4 +145,4 @@ export const faqSidebarStyles = {
       fontSize: '14px',
     },
   };
-  export default {};  
+  export default faqSidebarStyles

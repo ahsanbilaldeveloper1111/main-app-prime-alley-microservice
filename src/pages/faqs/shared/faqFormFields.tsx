@@ -179,4 +179,4 @@ export const FaqLabeledSelect: React.FC<FaqLabeledSelectProps> = ({
     )}
   </div>
 );
-export default {};
+export default FaqLabeledTextInput
