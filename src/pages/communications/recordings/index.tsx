@@ -177,6 +177,42 @@ interface RecordingRow {
   [key: string]: any;
 }
 
+function buildUsernameFilterPill(
+  currentFilters: Record<string, any>,
+  stageFilters: (nextFilters: Record<string, any>) => void,
+  selectedUsernameIds: string[],
+  areAllUsernamesSelected: boolean,
+  allUsernameIds: string[],
+  usernameDropdownOptions: Array<{
+    label: string;
+    value: string;
+    selected: boolean;
+    onClick: () => void;
+  }>,
+) {
+  return {
+    id: "username",
+    label: "Username",
+    showDropdown: true,
+    searchable: true,
+    multiSelect: true,
+    active: selectedUsernameIds.length > 0,
+    activeLabel:
+      selectedUsernameIds.length > 0
+        ? `${selectedUsernameIds.length} selected`
+        : undefined,
+    onClear: () => stageFilters({ ...currentFilters, username: [] }),
+    onSelectAll: () => {
+      stageFilters({
+        ...currentFilters,
+        username: areAllUsernamesSelected ? [] : allUsernameIds,
+      });
+    },
+    selectAllLabel: areAllUsernamesSelected ? "Deselect all" : "Select all",
+    dropdownOptions: usernameDropdownOptions,
+  };
+}
+
 // ─── Filter menu components (lifted out of CallRecordings to satisfy Sonar) ──
 
 const CallRecordings: NextPage & {
@@ -584,6 +620,63 @@ const CallRecordings: NextPage & {
     return single ? [single] : [];
   }, [currentFilters.username]);
 
+  const allUsernameIds = useMemo<string[]>(
+    () => hierarchyDataUsers.map((u: any) => String(u.id)),
+    [hierarchyDataUsers],
+  );
+
+  const areAllUsernamesSelected = useMemo(
+    () =>
+      allUsernameIds.length > 0 &&
+      allUsernameIds.every((id) => selectedUsernameIds.includes(id)),
+    [allUsernameIds, selectedUsernameIds],
+  );
+
+  const toggleUsernameSelection = useCallback(
+    (userId: string) => {
+      const isSelected = selectedUsernameIds.includes(userId);
+      const nextUsernames = isSelected
+        ? selectedUsernameIds.filter((id) => id !== userId)
+        : [...selectedUsernameIds, userId];
+      stageFilters({ ...currentFilters, username: nextUsernames });
+    },
+    [selectedUsernameIds, stageFilters, currentFilters],
+  );
+
+  const usernameDropdownOptions = useMemo(
+    () =>
+      hierarchyDataUsers.map((u: any) => {
+        const userId = String(u.id);
+        return {
+          label: String(u.name ?? u.id),
+          value: userId,
+          selected: selectedUsernameIds.includes(userId),
+          onClick: () => toggleUsernameSelection(userId),
+        };
+      }),
+    [hierarchyDataUsers, selectedUsernameIds, toggleUsernameSelection],
+  );
+
+  const usernameFilterPill = useMemo(
+    () =>
+      buildUsernameFilterPill(
+        currentFilters,
+        stageFilters,
+        selectedUsernameIds,
+        areAllUsernamesSelected,
+        allUsernameIds,
+        usernameDropdownOptions,
+      ),
+    [
+      currentFilters,
+      stageFilters,
+      selectedUsernameIds,
+      areAllUsernamesSelected,
+      allUsernameIds,
+      usernameDropdownOptions,
+    ],
+  );
+
   const {
     handleApplyFiltersClick,
     handleResetFiltersClick,
@@ -645,52 +738,7 @@ const CallRecordings: NextPage & {
           currentFilters,
           stageFilters,
         ),
-        {
-          id: "username",
-          label: "Username",
-          showDropdown: true,
-          searchable: true,
-          multiSelect: true,
-          active: selectedUsernameIds.length > 0,
-          activeLabel:
-            selectedUsernameIds.length > 0
-              ? `${selectedUsernameIds.length} selected`
-              : undefined,
-          onClear: () => stageFilters({ ...currentFilters, username: [] }),
-          onSelectAll: () => {
-            const allUserIds = hierarchyDataUsers.map((u: any) => String(u.id));
-            const isAllSelected =
-              allUserIds.length > 0 &&
-              allUserIds.every((id) => selectedUsernameIds.includes(id));
-            stageFilters({
-              ...currentFilters,
-              username: isAllSelected ? [] : allUserIds,
-            });
-          },
-          selectAllLabel:
-            selectedUsernameIds.length > 0 &&
-            hierarchyDataUsers.length > 0 &&
-            hierarchyDataUsers.every((u: any) =>
-              selectedUsernameIds.includes(String(u.id)),
-            )
-              ? "Deselect all"
-              : "Select all",
-          dropdownOptions: hierarchyDataUsers.map((u: any) => {
-            const userId = String(u.id);
-            return {
-            label: String(u.name ?? u.id),
-            value: userId,
-            selected: selectedUsernameIds.includes(userId),
-            onClick: () => {
-              const isSelected = selectedUsernameIds.includes(userId);
-              const nextUsernames = isSelected
-                ? selectedUsernameIds.filter((id) => id !== userId)
-                : [...selectedUsernameIds, userId];
-              stageFilters({ ...currentFilters, username: nextUsernames });
-            },
-          };
-          }),
-        },
+        usernameFilterPill,
         buildTextDropdownFilterPill(
           "remote_party_number",
           "Remote Party Number",
@@ -788,6 +836,10 @@ const CallRecordings: NextPage & {
     hierarchyDataDepartments,
     hierarchyDataUsers,
     selectedUsernameIds,
+    allUsernameIds,
+    areAllUsernamesSelected,
+    usernameDropdownOptions,
+    usernameFilterPill,
     session?.user?.permissions,
     showPageLoader,
     appliedFilters,

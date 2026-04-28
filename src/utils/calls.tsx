@@ -213,15 +213,21 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
         data?: { dataList?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
       };
 
-      const rows =
+      const nestedDataList =
+        !Array.isArray(parsed?.data) &&
+        parsed?.data != null &&
+        Array.isArray((parsed.data as { dataList?: unknown[] }).dataList)
+          ? (parsed.data as { dataList: unknown[] }).dataList
+          : undefined;
+      const rowsSource =
         (Array.isArray(parsed?.dataList) ? parsed.dataList : undefined) ??
-        (Array.isArray(parsed?.data)
-          ? (parsed.data as Array<Record<string, unknown>>)
-          : undefined) ??
-        (Array.isArray(parsed?.data?.dataList)
-          ? parsed.data.dataList
-          : undefined) ??
+        (Array.isArray(parsed?.data) ? parsed.data : undefined) ??
+        nestedDataList ??
         [];
+      const rows = rowsSource.filter(
+        (row: unknown): row is Record<string, unknown> =>
+          typeof row === "object" && row !== null && !Array.isArray(row),
+      );
 
       if (!Array.isArray(rows) || rows.length === 0) {
         const message =
@@ -241,13 +247,25 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
       );
 
       const csvEscape = (value: unknown): string => {
-        const str =
-          value == null
-            ? ""
-            : typeof value === "object"
-              ? JSON.stringify(value)
-              : String(value);
-        const escaped = str.replace(/"/g, '""');
+        if (value == null) {
+          return "";
+        }
+        let str = "";
+        if (typeof value === "object") {
+          str = JSON.stringify(value);
+        } else if (typeof value === "string") {
+          str = value;
+        } else if (
+          typeof value === "number" ||
+          typeof value === "boolean" ||
+          typeof value === "bigint" ||
+          typeof value === "symbol"
+        ) {
+          str = value.toString();
+        } else {
+          str = "";
+        }
+        const escaped = str.replaceAll('"', '""');
         return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
       };
 
@@ -259,15 +277,19 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
       const csvBlob = new Blob([`\uFEFF${csvLines.join("\r\n")}`], {
         type: "text/csv;charset=utf-8;",
       });
-      const csvUrl = window.URL.createObjectURL(csvBlob);
+      const csvUrl = globalThis.URL.createObjectURL(csvBlob);
       const csvLink = document.createElement("a");
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
+      const timestamp = new Date()
+        .toISOString()
+        .replaceAll(":", "-")
+        .replaceAll(".", "-")
+        .slice(0, -5);
       csvLink.href = csvUrl;
       csvLink.setAttribute("download", `call_recordings_${timestamp}.csv`);
       document.body.appendChild(csvLink);
       csvLink.click();
       csvLink.remove();
-      window.URL.revokeObjectURL(csvUrl);
+      globalThis.URL.revokeObjectURL(csvUrl);
 
       toast.success("CSV file downloaded successfully");
       return csvUrl;
@@ -279,19 +301,23 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
       : 'application/pdf';
     
     const blob = new Blob([response.data], { type: blobType });
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     
     // Generate filename with timestamp and appropriate extension
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const timestamp = new Date()
+      .toISOString()
+      .replaceAll(":", "-")
+      .replaceAll(".", "-")
+      .slice(0, -5);
     const fileExtension = normalizedExportType === 'xlsx' ? 'xlsx' : 'pdf';
     link.setAttribute('download', `call_recordings_${timestamp}.${fileExtension}`);
     
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.URL.revokeObjectURL(url);
+    globalThis.URL.revokeObjectURL(url);
     
     toast.success(`${normalizedExportType.toUpperCase()} file downloaded successfully`);
     return url;
@@ -366,19 +392,23 @@ export const DownloadCallsExport = async (params:any, endpoint: string) => {
     // Create blob with appropriate type based on export format
     const blobType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     const blob = new Blob([response.data], { type: blobType });
-    const url = window.URL.createObjectURL(blob);
+    const url = globalThis.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     
     // Generate filename with timestamp and appropriate extension
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const timestamp = new Date()
+      .toISOString()
+      .replaceAll(":", "-")
+      .replaceAll(".", "-")
+      .slice(0, -5);
     const fileExtension ='csv';
     link.setAttribute('download', `calls_export_${timestamp}.${fileExtension}`);
     
     document.body.appendChild(link);
     link.click();
     link.remove();
-    window.URL.revokeObjectURL(url);
+    globalThis.URL.revokeObjectURL(url);
     
     toast.success(`Calls export file downloaded successfully`);
     return url;
