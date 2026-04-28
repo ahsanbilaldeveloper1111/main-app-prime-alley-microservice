@@ -1162,7 +1162,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
 
      
 
-  ].filter(item => ENABLED_MODULE_IDS.has(item.id) && (!item.permission || hasPermission(item.permission)));
+  ].filter((item) => {
+    if (!ENABLED_MODULE_IDS.has(item.id)) return false;
+    if (!item.permission || hasPermission(item.permission)) return true;
+    if (item.id === "virtual-agents" && Array.isArray(item.subItems)) {
+      return item.subItems.length > 0;
+    }
+    return false;
+  });
 
   useSyncActiveModuleFromRoute(router.pathname, mainMenuItems, setActiveModule, setExpandedSubModules);
 
