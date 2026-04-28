@@ -14,6 +14,98 @@ interface PaginationParams {
   moduleSlug?: string;
 }
 
+type ExportJsonPayload = {
+  success?: boolean;
+  message?: string;
+  detail?: string;
+  dataList?: Array<Record<string, unknown>>;
+  data?: { dataList?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
+};
+
+function appendFiltersToQueryParams(
+  queryParams: URLSearchParams,
+  filters: Record<string, unknown>,
+) {
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value) || typeof value === "object") {
+      queryParams.append(key, JSON.stringify(value));
+      return;
+    }
+    queryParams.append(key, String(value));
+  });
+}
+
+function getRowsFromExportJson(parsed: ExportJsonPayload): Record<string, unknown>[] {
+  const nestedDataList =
+    !Array.isArray(parsed?.data) &&
+    parsed?.data != null &&
+    Array.isArray((parsed.data as { dataList?: unknown[] }).dataList)
+      ? (parsed.data as { dataList: unknown[] }).dataList
+      : undefined;
+  const rowsSource =
+    (Array.isArray(parsed?.dataList) ? parsed.dataList : undefined) ??
+    (Array.isArray(parsed?.data) ? parsed.data : undefined) ??
+    nestedDataList ??
+    [];
+  return rowsSource.filter(
+    (row: unknown): row is Record<string, unknown> =>
+      typeof row === "object" && row !== null && !Array.isArray(row),
+  );
+}
+
+function csvEscape(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "object") {
+    const escapedObject = JSON.stringify(value).replaceAll('"', '""');
+    return /[",\n\r]/.test(escapedObject) ? `"${escapedObject}"` : escapedObject;
+  }
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint" ||
+    typeof value === "symbol"
+  ) {
+    const escaped = String(value).replaceAll('"', '""');
+    return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
+  }
+  return "";
+}
+
+function buildExportTimestamp(): string {
+  return new Date()
+    .toISOString()
+    .replaceAll(":", "-")
+    .replaceAll(".", "-")
+    .slice(0, -5);
+}
+
+function downloadCsvRows(rows: Record<string, unknown>[]): string {
+  const headers = Array.from(
+    rows.reduce<Set<string>>((acc, row) => {
+      Object.keys(row ?? {}).forEach((k) => acc.add(k));
+      return acc;
+    }, new Set<string>()),
+  );
+  const csvLines = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((h) => csvEscape(row?.[h])).join(",")),
+  ];
+  const csvBlob = new Blob([`\uFEFF${csvLines.join("\r\n")}`], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const csvUrl = globalThis.URL.createObjectURL(csvBlob);
+  const csvLink = document.createElement("a");
+  csvLink.href = csvUrl;
+  csvLink.setAttribute("download", `call_recordings_${buildExportTimestamp()}.csv`);
+  document.body.appendChild(csvLink);
+  csvLink.click();
+  csvLink.remove();
+  globalThis.URL.revokeObjectURL(csvUrl);
+  return csvUrl;
+}
+
 export const ListCallLogs = async (params: PaginationParams = {}, endpoint: string) => {
   try {
     const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '', reportType = '', moduleSlug = '' } = params;
@@ -169,21 +261,7 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
       moduleSlug: moduleSlug
     });
     
-    // Flatten filters and add each key-value pair as separate query parameters
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        // Handle arrays by converting them to JSON strings (same encoding as list API)
-        if (Array.isArray(value)) {
-          queryParams.append(key, JSON.stringify(value));
-        }
-        // Handle objects by converting them to JSON strings
-        else if (typeof value === 'object') {
-          queryParams.append(key, JSON.stringify(value));
-        } else {
-          queryParams.append(key, value.toString());
-        }
-      }
-    });
+    appendFiltersToQueryParams(queryParams, filters);
 
     // Set appropriate headers based on export type
     const headers = {
@@ -205,29 +283,8 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
     const contentType = String(response.headers?.["content-type"] ?? "");
     if (contentType.includes("application/json")) {
       const text = await response.data.text();
-      const parsed = JSON.parse(text) as {
-        success?: boolean;
-        message?: string;
-        detail?: string;
-        dataList?: Array<Record<string, unknown>>;
-        data?: { dataList?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
-      };
-
-      const nestedDataList =
-        !Array.isArray(parsed?.data) &&
-        parsed?.data != null &&
-        Array.isArray((parsed.data as { dataList?: unknown[] }).dataList)
-          ? (parsed.data as { dataList: unknown[] }).dataList
-          : undefined;
-      const rowsSource =
-        (Array.isArray(parsed?.dataList) ? parsed.dataList : undefined) ??
-        (Array.isArray(parsed?.data) ? parsed.data : undefined) ??
-        nestedDataList ??
-        [];
-      const rows = rowsSource.filter(
-        (row: unknown): row is Record<string, unknown> =>
-          typeof row === "object" && row !== null && !Array.isArray(row),
-      );
+      const parsed = JSON.parse(text) as ExportJsonPayload;
+      const rows = getRowsFromExportJson(parsed);
 
       if (!Array.isArray(rows) || rows.length === 0) {
         const message =
@@ -237,59 +294,7 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
         toast.error(message);
         throw new Error(message);
       }
-
-      // Build CSV only from `dataList` rows (ignores wrapper keys like success/recordsTotal).
-      const headers = Array.from(
-        rows.reduce<Set<string>>((acc, row) => {
-          Object.keys(row ?? {}).forEach((k) => acc.add(k));
-          return acc;
-        }, new Set<string>()),
-      );
-
-      const csvEscape = (value: unknown): string => {
-        if (value == null) {
-          return "";
-        }
-        let str = "";
-        if (typeof value === "object") {
-          str = JSON.stringify(value);
-        } else if (typeof value === "string") {
-          str = value;
-        } else if (
-          typeof value === "number" ||
-          typeof value === "boolean" ||
-          typeof value === "bigint" ||
-          typeof value === "symbol"
-        ) {
-          str = value.toString();
-        } else {
-          str = "";
-        }
-        const escaped = str.replaceAll('"', '""');
-        return /[",\n\r]/.test(escaped) ? `"${escaped}"` : escaped;
-      };
-
-      const csvLines = [
-        headers.join(","),
-        ...rows.map((row) => headers.map((h) => csvEscape(row?.[h])).join(",")),
-      ];
-
-      const csvBlob = new Blob([`\uFEFF${csvLines.join("\r\n")}`], {
-        type: "text/csv;charset=utf-8;",
-      });
-      const csvUrl = globalThis.URL.createObjectURL(csvBlob);
-      const csvLink = document.createElement("a");
-      const timestamp = new Date()
-        .toISOString()
-        .replaceAll(":", "-")
-        .replaceAll(".", "-")
-        .slice(0, -5);
-      csvLink.href = csvUrl;
-      csvLink.setAttribute("download", `call_recordings_${timestamp}.csv`);
-      document.body.appendChild(csvLink);
-      csvLink.click();
-      csvLink.remove();
-      globalThis.URL.revokeObjectURL(csvUrl);
+      const csvUrl = downloadCsvRows(rows);
 
       toast.success("CSV file downloaded successfully");
       return csvUrl;
@@ -306,11 +311,7 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
     link.href = url;
     
     // Generate filename with timestamp and appropriate extension
-    const timestamp = new Date()
-      .toISOString()
-      .replaceAll(":", "-")
-      .replaceAll(".", "-")
-      .slice(0, -5);
+    const timestamp = buildExportTimestamp();
     const fileExtension = normalizedExportType === 'xlsx' ? 'xlsx' : 'pdf';
     link.setAttribute('download', `call_recordings_${timestamp}.${fileExtension}`);
     
