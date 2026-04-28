@@ -27,7 +27,11 @@ import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
 import { ModuleSlug, getAutoTimezone } from '@utils/Helper';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import { hasCallLogsViewPermission } from '@utils/callPermissionUtils';
+import {
+  canViewCallLogsFromSession,
+  EMPTY_CALL_ANALYTICS_SUMMARY,
+  isCallAnalyticsFilterCleared,
+} from '@utils/callPermissionUtils';
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -251,9 +255,7 @@ const CallTrendDepartment = () => {
     
     const handleFiltersChange = (filters: any) => {
         const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(filters);
-        const isCompletelyCleared =
-            Object.keys(filters).length === 0 ||
-            (Object.keys(filters).length === 1 && Object.prototype.hasOwnProperty.call(filters, 'is_incoming_only'));
+        const isCompletelyCleared = isCallAnalyticsFilterCleared(filters);
         
         setCurrentFilters(filters);
         
@@ -265,15 +267,7 @@ const CallTrendDepartment = () => {
         if (!shouldRefresh) return;
 
         setDataLoaded(false);
-        setSummary({
-            total_calls: 0,
-            answered_calls: 0,
-            unanswered_calls: 0,
-            total_cost: 0,
-            total_duration: 0,
-            avg_duration: 0,
-            avg_ring_time: 0
-        });
+        setSummary(EMPTY_CALL_ANALYTICS_SUMMARY);
         setRefreshKey(prev => prev + 1);
     };
 
@@ -780,7 +774,7 @@ const CallTrendDepartment = () => {
                 </Col>
             </Row>
 
-            {hasCallLogsViewPermission(session?.user?.permissions) && (
+            {canViewCallLogsFromSession(session) && (
                  <GenericListPage
                  columns={columns}
                  fetchData={fetchCallLogs}

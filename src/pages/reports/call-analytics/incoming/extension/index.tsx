@@ -29,7 +29,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import { hasCallLogsViewPermission } from '@utils/callPermissionUtils';
+import { canViewCallLogsFromSession } from '@utils/callPermissionUtils';
 
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
@@ -284,7 +284,7 @@ const CallIncomingExtension = () => {
     // Trigger initial data fetch when filters become ready
     // Ensure initial fetch happens when session is ready
     useEffect(() => {
-        if (session && hasCallLogsViewPermission(session.user?.permissions)) {
+        if (canViewCallLogsFromSession(session)) {
             initialFetchDone.current = true;
         }
     }, [session]);
@@ -891,7 +891,7 @@ const CallIncomingExtension = () => {
                 </Col>
             </Row>
 
-            {hasCallLogsViewPermission(session?.user?.permissions) && (
+            {canViewCallLogsFromSession(session) && (
               <>
             <BarFilters
             leftContent={

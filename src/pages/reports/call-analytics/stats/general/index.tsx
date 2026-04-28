@@ -17,7 +17,7 @@ import '@assets/scss/report-style.scss';
 import moment from 'moment';
 import { formatMinutesAndSeconds, formatCurrency, ModuleSlug, GlobalDateTimeFormat, formatDateTimeToLocal, getAutoTimezone } from '@utils/Helper';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
-import { hasCallLogsViewPermission } from '@utils/callPermissionUtils';
+import { canViewCallLogsFromSession } from '@utils/callPermissionUtils';
 
 // Helper function to convert HH:MM:SS to seconds
 const timeStringToSeconds = (timeStr: string): number => {
@@ -313,7 +313,7 @@ const CallStatsDepartment = () => {
 
   // Ensure initial fetch happens when session is ready
   useEffect(() => {
-    if (session && hasCallLogsViewPermission(session.user?.permissions)) {
+    if (canViewCallLogsFromSession(session)) {
       initialFetchDone.current = true;
     }
   }, [session]);

@@ -51,6 +51,154 @@ interface Summary {
     outbound: number;
 }
 
+const buildUtcDateTime = (value: string, isEnd: boolean): string => {
+    if (!value) return value;
+
+    let parsed = moment(value);
+    const isDateTimeWithoutSeconds = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+
+    if (isDateTimeWithoutSeconds) {
+        const suffix = isEnd && value.endsWith('23:59') ? ':59' : ':00';
+        parsed = moment(`${value}${suffix}`);
+    } else if (!value.includes('T')) {
+        parsed = isEnd ? moment(value).endOf('day') : moment(value).startOf('day');
+    }
+
+    return `${parsed.utc().format('YYYY-MM-DDTHH:mm:ss')}Z`;
+};
+
+const normalizeCallLogFiltersForApi = (filters: Record<string, any>): Record<string, any> => {
+    const normalized = { ...filters };
+    if (normalized.start_datetime) {
+        normalized.start_datetime = buildUtcDateTime(normalized.start_datetime, false);
+    }
+    if (normalized.end_datetime) {
+        normalized.end_datetime = buildUtcDateTime(normalized.end_datetime, true);
+    }
+    delete normalized.timezone;
+    return normalized;
+};
+
+const extractCallLogRows = (response: any): CallLogRow[] => {
+    const rawData = response?.data;
+    if (Array.isArray(rawData)) return rawData;
+    if (Array.isArray(rawData?.data)) return rawData.data;
+    if (Array.isArray(response?.dataList)) return response.dataList;
+    return [];
+};
+
+const resolveCallLogTotal = (response: any, rowsArray: CallLogRow[]): number => {
+    const rawData = response?.data;
+    const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
+    return Number(
+        response?.recordsTotal ??
+            response?.total ??
+            rawData?.recordsTotal ??
+            rawData?.total ??
+            paginationData?.total ??
+            (rowsArray.length > 0 ? rowsArray.length : 0)
+    ) || 0;
+};
+
+interface FetchCallLogsContext {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    currentFiltersRef: React.MutableRefObject<Record<string, any>>;
+    isFetchingRef: React.MutableRefObject<boolean>;
+    lastFetchTimeRef: React.MutableRefObject<number>;
+    lastFetchParamsRef: React.MutableRefObject<string>;
+    setShowPageLoader: (value: boolean) => void;
+    setTableLoading: (value: boolean) => void;
+    setCallLogData: (rows: CallLogRow[]) => void;
+    setTablePagination: React.Dispatch<React.SetStateAction<{
+        currentPage: number;
+        rowsPerPage: number;
+        totalRows: number;
+        pageSizeOptions: number[];
+    }>>;
+    setTotalCalls: (value: number) => void;
+    setShowDateRange: (value: boolean) => void;
+    setStartDateTime: (value: string) => void;
+    setEndDateTime: (value: string) => void;
+    setSummary: (value: any) => void;
+}
+
+const fetchCallLogsData = async ({
+    page = 1,
+    perPage = 15,
+    search = '',
+    currentFiltersRef,
+    isFetchingRef,
+    lastFetchTimeRef,
+    lastFetchParamsRef,
+    setShowPageLoader,
+    setTableLoading,
+    setCallLogData,
+    setTablePagination,
+    setTotalCalls,
+    setShowDateRange,
+    setStartDateTime,
+    setEndDateTime,
+    setSummary,
+}: FetchCallLogsContext) => {
+    const now = Date.now();
+    const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
+
+    if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
+        return null;
+    }
+    if (lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
+        return null;
+    }
+
+    isFetchingRef.current = true;
+    lastFetchTimeRef.current = now;
+    lastFetchParamsRef.current = paramsKey;
+
+    setShowPageLoader(true);
+    setTableLoading(true);
+
+    try {
+        const response = await ListCallLogs({
+            page,
+            perPage,
+            search,
+            filters: currentFiltersRef.current,
+            moduleSlug: ModuleSlug.CALL_LOGS,
+        }, 'call-logs/list');
+
+        const rowsArray = extractCallLogRows(response);
+        const total = resolveCallLogTotal(response, rowsArray);
+        const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
+        const currentPage = response?.current_page ?? paginationData?.current_page ?? page;
+        const perPageVal = response?.per_page ?? paginationData?.per_page ?? perPage;
+
+        setCallLogData(rowsArray);
+        setTablePagination((prev) => ({
+            ...prev,
+            currentPage,
+            rowsPerPage: perPageVal,
+            totalRows: total,
+        }));
+        setTotalCalls(total);
+
+        if (response?.summary) {
+            setShowDateRange(true);
+            const dataFilters = response?.filters;
+            setStartDateTime(dataFilters?.start_datetime);
+            setEndDateTime(dataFilters?.end_datetime);
+            setSummary(response.summary);
+        }
+
+        return response;
+    } finally {
+        setShowPageLoader(false);
+        setTableLoading(false);
+        isFetchingRef.current = false;
+    }
+};
+
 const CallLogs = () => {
     const { data:session, status } = useSession();
     const [showPageLoader, setShowPageLoader] = useState(false);
@@ -214,77 +362,25 @@ const CallLogs = () => {
 
     const [tableLoading, setTableLoading] = useState(false);
 
-    const fetchCallLogs = useCallback(async (page = 1, perPage = 15, search = "") => {
-        const now = Date.now();
-        const paramsKey = `${page}-${perPage}-${search}-${JSON.stringify(currentFiltersRef.current)}`;
-
-        if (isFetchingRef.current && lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 500) {
-            return;
-        }
-        if (lastFetchParamsRef.current === paramsKey && (now - lastFetchTimeRef.current) < 100) {
-            return;
-        }
-
-        isFetchingRef.current = true;
-        lastFetchTimeRef.current = now;
-        lastFetchParamsRef.current = paramsKey;
-
-        setShowPageLoader(true);
-        setTableLoading(true);
-        try {
-            const response = await ListCallLogs({
-                page,
-                perPage,
-                search,
-                filters: currentFiltersRef.current,
-                moduleSlug: ModuleSlug.CALL_LOGS,
-            }, 'call-logs/list');
-
-            // Handle various API response structures (flat, nested, DataTables style)
-            const rawData = response?.data;
-            let rowsArray: CallLogRow[] = [];
-            if (Array.isArray(rawData)) {
-                rowsArray = rawData;
-            } else if (Array.isArray(rawData?.data)) {
-                rowsArray = rawData.data;
-            } else if (Array.isArray(response?.dataList)) {
-                rowsArray = response.dataList;
-            }
-
-            const paginationData = response?.data?.pagination ?? response?.pagination ?? response;
-            const total =
-                response?.recordsTotal ??
-                response?.total ??
-                rawData?.recordsTotal ??
-                rawData?.total ??
-                paginationData?.total ??
-                (rowsArray.length > 0 ? rowsArray.length : 0);
-            const currentPage = response?.current_page ?? paginationData?.current_page ?? page;
-            const perPageVal = response?.per_page ?? paginationData?.per_page ?? perPage;
-
-            setCallLogData(rowsArray);
-            setTablePagination((prev) => ({
-                ...prev,
-                currentPage,
-                rowsPerPage: perPageVal,
-                totalRows: Number(total) || 0,
-            }));
-            setTotalCalls(total);
-
-            if (response?.summary) {
-                setShowDateRange(true);
-                const dataFilters = response?.filters;
-                setStartDateTime(dataFilters?.start_datetime);
-                setEndDateTime(dataFilters?.end_datetime);
-                setSummary(response.summary);
-            }
-
-            return response;
-        } finally {
-            setShowPageLoader(false);
-            setTableLoading(false);
-            isFetchingRef.current = false;
-        }
+    const fetchCallLogs = useCallback((page = 1, perPage = 15, search = "") => {
+        return fetchCallLogsData({
+            page,
+            perPage,
+            search,
+            currentFiltersRef,
+            isFetchingRef,
+            lastFetchTimeRef,
+            lastFetchParamsRef,
+            setShowPageLoader,
+            setTableLoading,
+            setCallLogData,
+            setTablePagination,
+            setTotalCalls,
+            setShowDateRange,
+            setStartDateTime,
+            setEndDateTime,
+            setSummary,
+        });
     }, []);
 
     rowsPerPageRef.current = tablePagination.rowsPerPage;
@@ -296,49 +392,8 @@ const CallLogs = () => {
     }, [refreshKey, fetchCallLogs]);
 
     const handleFiltersChange = (filters: any) => {
-        // Format datetime values to include seconds and timezone offset (remove timezone key)
-        const formattedFilters: any = { ...filters };
-        
-        if (formattedFilters.start_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-            let startMoment = moment(formattedFilters.start_datetime);
-            
-            if (formattedFilters.start_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, add :00 seconds
-                startMoment = moment(formattedFilters.start_datetime + ':00');
-            } else if (!formattedFilters.start_datetime.includes('T')) {
-                // If only date, set to 00:00:00
-                startMoment = moment(formattedFilters.start_datetime).startOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.start_datetime = startMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        }
-        
-        if (formattedFilters.end_datetime) {
-            // datetime-local returns YYYY-MM-DDTHH:mm format, convert to YYYY-MM-DDTHH:mm:ss with timezone offset
-            let endMoment = moment(formattedFilters.end_datetime);
-            
-            if (formattedFilters.end_datetime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
-                // Format is YYYY-MM-DDTHH:mm, check if it's 23:59, otherwise add :00
-                const timePart = formattedFilters.end_datetime.split('T')[1];
-                if (timePart === '23:59') {
-                    endMoment = moment(formattedFilters.end_datetime + ':59');
-                } else {
-                    endMoment = moment(formattedFilters.end_datetime + ':00');
-                }
-            } else if (!formattedFilters.end_datetime.includes('T')) {
-                // If only date, set to 23:59:59
-                endMoment = moment(formattedFilters.end_datetime).endOf('day');
-            }
-            
-            // Convert to UTC
-            formattedFilters.end_datetime = endMoment.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
-        }
-        
-        // Remove timezone key from payload (timezone is now included in datetime values)
-        delete formattedFilters.timezone;
-        
+        const formattedFilters = normalizeCallLogFiltersForApi(filters);
+
         // Update both state and ref immediately
         setCurrentFilters(formattedFilters);
         currentFiltersRef.current = formattedFilters;
