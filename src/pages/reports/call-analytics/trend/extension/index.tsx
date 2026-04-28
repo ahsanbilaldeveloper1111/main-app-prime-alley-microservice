@@ -27,9 +27,8 @@ import { easeInOut, easeOut, easeIn } from "framer-motion";
 import moment from 'moment';
 import { HEADER_CONSTANTS } from '@constants/headerConstants';
 import {
+  applyCallAnalyticsFilters,
   canViewCallLogsFromSession,
-  EMPTY_CALL_ANALYTICS_SUMMARY,
-  isCallAnalyticsFilterCleared,
 } from '@utils/callPermissionUtils';
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
@@ -255,21 +254,16 @@ const CallTrendExtension = () => {
     }, [status, session, filtersReady]);
     
     const handleFiltersChange = (filters: any) => {
-        const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(filters);
-        const isCompletelyCleared = isCallAnalyticsFilterCleared(filters);
-        
-        setCurrentFilters(filters);
-        
-        if (!filtersReady) {
-            setFiltersReady(true);
-        }
-        
-        const shouldRefresh = (filtersChanged && filtersReady) || isCompletelyCleared;
-        if (!shouldRefresh) return;
-
-        setDataLoaded(false);
-        setSummary(EMPTY_CALL_ANALYTICS_SUMMARY);
-        setRefreshKey(prev => prev + 1);
+        applyCallAnalyticsFilters({
+            currentFilters,
+            nextFilters: filters,
+            filtersReady,
+            setCurrentFilters,
+            setFiltersReady,
+            setDataLoaded,
+            setSummary,
+            setRefreshKey,
+        });
     };
 
     const handleExport = async (exportType: string, filters: Record<string, any>) => {

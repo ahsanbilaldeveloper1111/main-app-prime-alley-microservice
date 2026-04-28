@@ -1,4 +1,5 @@
 import { HEADER_CONSTANTS } from "@constants/headerConstants";
+import type { Dispatch, SetStateAction } from "react";
 
 const { PERMISSIONS } = HEADER_CONSTANTS;
 
@@ -60,3 +61,38 @@ export const isCallAnalyticsFilterCleared = (
 export const canViewCallLogsFromSession = (
   session?: { user?: { permissions?: string[] } } | null,
 ): boolean => hasCallLogsViewPermission(session?.user?.permissions);
+
+interface ApplyCallAnalyticsFiltersArgs {
+  currentFilters: Record<string, any>;
+  nextFilters: Record<string, any>;
+  filtersReady: boolean;
+  setCurrentFilters: (value: any) => void;
+  setFiltersReady: (value: boolean) => void;
+  setDataLoaded: (value: boolean) => void;
+  setSummary: (summary: any) => void;
+  setRefreshKey: Dispatch<SetStateAction<number>>;
+}
+
+export const applyCallAnalyticsFilters = ({
+  currentFilters,
+  nextFilters,
+  filtersReady,
+  setCurrentFilters,
+  setFiltersReady,
+  setDataLoaded,
+  setSummary,
+  setRefreshKey,
+}: ApplyCallAnalyticsFiltersArgs): void => {
+  const filtersChanged = JSON.stringify(currentFilters) !== JSON.stringify(nextFilters);
+  const isCompletelyCleared = isCallAnalyticsFilterCleared(nextFilters);
+
+  setCurrentFilters(nextFilters);
+  if (!filtersReady) setFiltersReady(true);
+
+  const shouldRefresh = (filtersChanged && filtersReady) || isCompletelyCleared;
+  if (!shouldRefresh) return;
+
+  setDataLoaded(false);
+  setSummary(EMPTY_CALL_ANALYTICS_SUMMARY);
+  setRefreshKey((prev) => prev + 1);
+};
