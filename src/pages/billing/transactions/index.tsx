@@ -8,7 +8,6 @@ import "@assets/scss/billing.scss";
 import "@assets/scss/common.scss";
 import "@assets/scss/tabs.scss";
 import { GetPayments } from "@utils/accounting";
-import { getMinifiedCompanies } from "@utils/crm";
 import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 import moment from "moment";
 import { GlobalDateFormat } from "@utils/Helper";
@@ -18,6 +17,7 @@ import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import { useCrmToolbarConfig } from "@hooks/useCrmToolbarConfig";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
 import ColumnEditorModal from "@components/ColumnEditorModal";
 
 const BILLING_TRANSACTIONS_COLUMN_STORAGE_KEY = "billing-transactions-table-columns";
@@ -63,22 +63,8 @@ function loadTransactionTableColumnsFromStorage(): string[] {
 }
 
 const ProductDetails = () => {
-  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
+  const companyOptions = useMinifiedCompaniesSendAll();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
-
-
-  useEffect(() => {
-    const fetchCompanyOptions = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanyOptions(result ?? []);
-      } catch (e) {
-        console.error("Error fetching company options:", e);
-      }
-    };
-    fetchCompanyOptions();
-  }, []);
-    
 
   const [transactionSearch, setTransactionSearch] = useState("");
   const [totalAllTransactions, setTotalAllTransactions] = useState(0);

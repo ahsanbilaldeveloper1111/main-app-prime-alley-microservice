@@ -2678,7 +2678,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
     if (isOpen && notesRef.current) {
       notesRef.current.innerHTML = notes || "";
     }
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps -- only set initial content when modal opens
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -5901,6 +5901,170 @@ const useSidebarCallRecordings = ({
   };
 };
 
+function buildEmailContextPayload(
+  contextPayload?: Record<string, unknown>,
+): { lead?: unknown; deal?: unknown; order?: unknown } | undefined {
+  if (!contextPayload || typeof contextPayload !== "object") return undefined;
+  return {
+    lead: contextPayload.lead,
+    deal: contextPayload.deal,
+    order: contextPayload.order,
+  };
+}
+
+function toActivityRecordTypeForModals(
+  recordType?: SidebarRecordType,
+): CrmEntityType | undefined {
+  if (
+    recordType === "prospect" ||
+    recordType === "lead" ||
+    recordType === "deal" ||
+    recordType === "order"
+  ) {
+    return recordType;
+  }
+  return undefined;
+}
+
+function toActivityRecordIdForModals(recordId?: number): number | undefined {
+  if (recordId == null) return undefined;
+  const parsed = Number(recordId);
+  return Number.isNaN(parsed) ? undefined : parsed;
+}
+
+type CtiDialResult = { success?: boolean; error?: string } | undefined;
+
+interface UseCtiCallHandlersArgs {
+  ctiDialNumber: (numberToDial: string) => Promise<CtiDialResult>;
+  getAllUserDevices?: () => any[] | null;
+  makeCall: (params: {
+    callingAddress: string;
+    calledAddress: string;
+    callingDeviceType: string;
+    callingDeviceName: string;
+  }) => Promise<CtiDialResult>;
+  ctiUserAddress?: string;
+  onCall?: (phoneNumber: string) => void;
+  setShowCallModal: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+function handleCtiCallResult(result: CtiDialResult, onSuccess: () => void): void {
+  if (result?.success) {
+    onSuccess();
+    return;
+  }
+  if (result?.error) toast.error(result.error);
+}
+
+async function invokeCtiDialWithToast(
+  dialFn: () => Promise<CtiDialResult>,
+  onSuccess: () => void,
+): Promise<void> {
+  try {
+    handleCtiCallResult(await dialFn(), onSuccess);
+  } catch {
+    toast.error("Failed to make call");
+  }
+}
+
+function useCtiCallHandlers({
+  ctiDialNumber,
+  getAllUserDevices,
+  makeCall,
+  ctiUserAddress,
+  onCall,
+  setShowCallModal,
+}: UseCtiCallHandlersArgs) {
+  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
+    useState(false);
+  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
+  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
+  const resetDeviceSelection = useCallback(() => {
+    setShowDeviceSelectionModal(false);
+    setAvailableDevices([]);
+    setPendingDialedNumber("");
+  }, []);
+
+  const completeSuccessfulDial = useCallback(
+    (dialedNumber: string) => {
+      setShowCallModal(false);
+      onCall?.(dialedNumber);
+    },
+    [onCall, setShowCallModal],
+  );
+
+  const handleCall = useCallback(
+    async (phoneNumber: string) => {
+      const numberToDial = (phoneNumber || "").trim();
+      if (!numberToDial) {
+        toast.error("No phone number available to call");
+        return;
+      }
+
+      const userDevices = getAllUserDevices?.();
+      if (userDevices && userDevices.length > 1) {
+        setAvailableDevices(userDevices);
+        setPendingDialedNumber(numberToDial);
+        setShowDeviceSelectionModal(true);
+        setShowCallModal(false);
+        return;
+      }
+
+      await invokeCtiDialWithToast(
+        () => ctiDialNumber(numberToDial),
+        () => completeSuccessfulDial(numberToDial),
+      );
+    },
+    [
+      ctiDialNumber,
+      completeSuccessfulDial,
+      getAllUserDevices,
+      setShowCallModal,
+    ],
+  );
+
+  const handleDeviceSelect = useCallback(
+    async (device: { deviceType: string; deviceName: string }) => {
+      const numberToDial = pendingDialedNumber;
+      resetDeviceSelection();
+
+      const callerInfo = {
+        callingAddress: ctiUserAddress,
+        callingDeviceName: device.deviceName,
+        callingDeviceType: device.deviceType,
+        selectedAt: new Date().toISOString(),
+      };
+      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
+
+      await invokeCtiDialWithToast(
+        () =>
+          makeCall({
+            callingAddress: ctiUserAddress ?? "",
+            calledAddress: numberToDial,
+            callingDeviceType: device.deviceType,
+            callingDeviceName: device.deviceName,
+          }),
+        () => completeSuccessfulDial(numberToDial),
+      );
+    },
+    [
+      pendingDialedNumber,
+      resetDeviceSelection,
+      ctiUserAddress,
+      makeCall,
+      completeSuccessfulDial,
+    ],
+  );
+
+  return {
+    showDeviceSelectionModal,
+    availableDevices,
+    resetDeviceSelection,
+    handleCall,
+    handleDeviceSelect,
+  };
+}
+
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
@@ -5950,17 +6114,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   onLogMeeting,
 }) => {
   const router = useRouter();
-  const emailContextPayload =
-    contextPayload && typeof contextPayload === "object"
-      ? {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          lead: contextPayload.lead,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          deal: contextPayload.deal,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          order: contextPayload.order,
-        }
-      : undefined;
+  const emailContextPayload = buildEmailContextPayload(contextPayload);
   const { data: session } = useSession();
   const {
     dialNumber: ctiDialNumber,
@@ -5968,10 +6122,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     makeCall,
     userAddress: ctiUserAddress,
   } = useCti();
-  const [showDeviceSelectionModal, setShowDeviceSelectionModal] =
-    useState(false);
-  const [availableDevices, setAvailableDevices] = useState<any[]>([]);
-  const [pendingDialedNumber, setPendingDialedNumber] = useState("");
   const { extension, tenantId } = getCrmSessionUserContext(session, {
     tenantMissingFallback: "empty",
   });
@@ -6009,72 +6159,6 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     },
   };
 
-  const handleCall = useCallback(
-    async (phoneNumber: string) => {
-      const numberToDial = (phoneNumber || "").trim();
-      if (!numberToDial) {
-        toast.error("No phone number available to call");
-        return;
-      }
-      const userDevices = getAllUserDevices?.();
-      if (userDevices && userDevices.length > 1) {
-        setAvailableDevices(userDevices);
-        setPendingDialedNumber(numberToDial);
-        setShowDeviceSelectionModal(true);
-        setShowCallModal(false);
-        return;
-      }
-      try {
-        const result = await ctiDialNumber(numberToDial);
-        if (result?.success) {
-          setShowCallModal(false);
-          onCall?.(numberToDial);
-        } else if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        // call finished
-      }
-    },
-    [ctiDialNumber, getAllUserDevices, onCall],
-  );
-  const handleDeviceSelect = useCallback(
-    async (device: { deviceType: string; deviceName: string }) => {
-      const numberToDial = pendingDialedNumber;
-      setShowDeviceSelectionModal(false);
-      setAvailableDevices([]);
-      setPendingDialedNumber("");
-      const callerInfo = {
-        callingAddress: ctiUserAddress,
-        callingDeviceName: device.deviceName,
-        callingDeviceType: device.deviceType,
-        selectedAt: new Date().toISOString(),
-      };
-      localStorage.setItem("cti_caller_info", JSON.stringify(callerInfo));
-      try {
-        const result = await makeCall({
-          callingAddress: ctiUserAddress ?? "",
-          calledAddress: numberToDial,
-          callingDeviceType: device.deviceType,
-          callingDeviceName: device.deviceName,
-        });
-        if (result?.success) {
-          setShowCallModal(false);
-          onCall?.(numberToDial);
-        } else if (result?.error) {
-          toast.error(result.error);
-        }
-      } catch {
-        toast.error("Failed to make call");
-      } finally {
-        // call finished
-      }
-    },
-    [pendingDialedNumber, ctiUserAddress, makeCall, onCall],
-  );
-
   // Parse comma-separated email/phone into arrays for multiple contact support
   const emailList = useMemo(() => {
     if (!email || typeof email !== "string") return [];
@@ -6095,15 +6179,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
   // Shared CRM activity modals (same as detail pages) – used when we have a concrete CRM record
   const activityRecordTypeForModals =
-    recordType && ["prospect", "lead", "deal", "order"].includes(recordType)
-      ? (recordType as CrmEntityType)
-      : undefined;
-  const activityRecordIdForModals =
-    activityRecordTypeForModals &&
-    recordId != null &&
-    !Number.isNaN(Number(recordId))
-      ? Number(recordId)
-      : undefined;
+    toActivityRecordTypeForModals(recordType);
+  const activityRecordIdForModals = toActivityRecordIdForModals(recordId);
 
   const {
     sidebarNotesList,
@@ -6169,6 +6246,20 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   const [showMoreModal, setShowMoreModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showSmsModal, setShowSmsModal] = useState(false);
+  const {
+    showDeviceSelectionModal,
+    availableDevices,
+    resetDeviceSelection,
+    handleCall,
+    handleDeviceSelect,
+  } = useCtiCallHandlers({
+    ctiDialNumber,
+    getAllUserDevices,
+    makeCall,
+    ctiUserAddress,
+    onCall,
+    setShowCallModal,
+  });
   const [moreModalPosition, setMoreModalPosition] = useState({
     top: 0,
     left: 0,
@@ -8131,11 +8222,7 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
 
       <DeviceSelectionModal
         show={showDeviceSelectionModal}
-        onHide={() => {
-          setShowDeviceSelectionModal(false);
-          setAvailableDevices([]);
-          setPendingDialedNumber("");
-        }}
+        onHide={resetDeviceSelection}
         devices={availableDevices}
         onSelectDevice={handleDeviceSelect}
         extensionNumber={ctiUserAddress ?? ""}

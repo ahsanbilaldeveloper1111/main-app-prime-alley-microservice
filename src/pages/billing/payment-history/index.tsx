@@ -25,7 +25,6 @@ import "@assets/scss/tabs.scss";
 import "@assets/scss/datatable-style.scss";
 
 import { GetPayments } from "@utils/accounting";
-import { getMinifiedCompanies } from "@utils/crm";
 import { useSession } from "next-auth/react";
 import moment from "moment";
 import FormModal from "@pages/partial/FormModal";
@@ -38,6 +37,7 @@ import GenericFilterSidebar, {
   FilterField,
 } from "@components/GenericFilterSidebar";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
 
 interface PaymentInvoiceItem {
   id: number | string;
@@ -77,13 +77,17 @@ function getStatusBadgeVariant(
   return "warning";
 }
 
+function getCompanySelectValue(
+  selectedCompanyId: string | number | undefined,
+): string {
+  return selectedCompanyId == null ? "" : String(selectedCompanyId);
+}
+
 const BillingHistory = () => {
   useSession();
 
   const [refreshKey, setRefreshKey] = useState(0);
-  const [companies, setCompanies] = useState<
-    { id: string | number; name?: string }[]
-  >([]);
+  const companies = useMinifiedCompaniesSendAll();
   const [selectedCompanyId, setSelectedCompanyId] = useState<
     string | number | undefined
   >(undefined);
@@ -129,18 +133,6 @@ const BillingHistory = () => {
 
   const requestIdRef = useRef(0);
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
-
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanies(result ?? []);
-      } catch (e) {
-        console.error("Error fetching companies:", e);
-      }
-    };
-    fetchCompanies();
-  }, []);
 
   const loadPayments = useCallback(async () => {
     requestIdRef.current += 1;
@@ -334,11 +326,7 @@ const BillingHistory = () => {
           <Form.Select
             size="sm"
             style={{ width: "220px" }}
-            value={
-              selectedCompanyId == null
-                ? ""
-                : String(selectedCompanyId)
-            }
+            value={getCompanySelectValue(selectedCompanyId)}
             onChange={(e) =>
               setSelectedCompanyId(
                 e.target.value === "" ? undefined : e.target.value,
