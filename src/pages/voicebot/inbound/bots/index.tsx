@@ -107,32 +107,63 @@ function nestedLeaf(
   return "";
 }
 
+function getNestedValue<T extends string | number | boolean>(
+  root: Record<string, unknown>,
+  nestedKey: string,
+  leafKey: string,
+  defaultValue: T,
+): T {
+  const nested = root[nestedKey];
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    const value = (nested as Record<string, unknown>)[leafKey];
+    if (value != null) {
+      // Only return the value if it is of type string | number | boolean
+      if (
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean"
+      ) {
+        return value as T;
+      }
+    }
+  }
+  return defaultValue;
+}
+
 function llmModelFromBotRow(row: BotRow): string {
-  const c = rawBotConfig(row);
-  const direct = c.llm_model;
-  if (typeof direct === "string") return direct;
-  return nestedLeaf(c, "llm_settings", "llm_model");
+  return getNestedValue(
+    row.configuration ?? {},
+    "llm_settings",
+    "llm_model",
+    "gpt-4o-mini",
+  );
 }
 
 function voiceNameFromBotRow(row: BotRow): string {
-  const c = rawBotConfig(row);
-  const direct = c.voice_name;
-  if (typeof direct === "string") return direct;
-  return nestedLeaf(c, "voice_settings", "voice_name");
+  return getNestedValue(
+    row.configuration ?? {},
+    "voice_settings",
+    "voice_name",
+    "alloy",
+  );
 }
 
 function sipTrunkFromBotRow(row: BotRow): string {
-  const c = rawBotConfig(row);
-  const direct = c.sip_trunk_id;
-  if (typeof direct === "string") return direct;
-  return nestedLeaf(c, "sip_settings", "sip_trunk_id");
+  return getNestedValue(
+    row.configuration ?? {},
+    "sip_settings",
+    "sip_trunk_id",
+    "",
+  );
 }
 
 function phoneFromBotRow(row: BotRow): string {
-  const c = rawBotConfig(row);
-  const direct = c.phone_number;
-  if (typeof direct === "string") return direct;
-  return nestedLeaf(c, "sip_settings", "phone_number");
+  return getNestedValue(
+    row.configuration ?? {},
+    "sip_settings",
+    "phone_number",
+    "",
+  );
 }
 
 function versionFromBotRow(row: BotRow): string {
@@ -633,7 +664,6 @@ function getConfigValue(
   return "—";
 }
 
-
 interface BotHistoryModalBodyProps {
   historyLoading: boolean;
   historyVersions: BotVersionItem[];
@@ -836,7 +866,9 @@ const BotsPage = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showBotSidebar, setShowBotSidebar] = useState(false);
   const [sidebarBotId, setSidebarBotId] = useState<string | null>(null);
-  const [sidebarBot, setSidebarBot] = useState<Record<string, unknown> | null>(null);
+  const [sidebarBot, setSidebarBot] = useState<Record<string, unknown> | null>(
+    null,
+  );
   const [sidebarLoading, setSidebarLoading] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyBotId, setHistoryBotId] = useState<string | null>(null);
@@ -992,8 +1024,15 @@ const BotsPage = () => {
         collapsible: true,
         defaultExpanded: true,
         fields: [
-          { label: "Name", value: safeDisplayString(sidebarBot.name), copyable: true },
-          { label: "Description", value: safeDisplayString(sidebarBot.description) },
+          {
+            label: "Name",
+            value: safeDisplayString(sidebarBot.name),
+            copyable: true,
+          },
+          {
+            label: "Description",
+            value: safeDisplayString(sidebarBot.description),
+          },
           {
             label: "Status",
             value: status === "published" ? "Published" : "Draft",
@@ -1003,12 +1042,16 @@ const BotsPage = () => {
           {
             label: "Company",
             value: safeDisplayString(
-              sidebarBot.company_name ?? sidebarBot.company_id ?? sidebarBot.company,
+              sidebarBot.company_name ??
+                sidebarBot.company_id ??
+                sidebarBot.company,
             ),
           },
           {
             label: "Version",
-            value: safeDisplayString(sidebarBot.current_version ?? sidebarBot.version),
+            value: safeDisplayString(
+              sidebarBot.current_version ?? sidebarBot.version,
+            ),
           },
         ],
       },
@@ -1036,16 +1079,33 @@ const BotsPage = () => {
         collapsible: true,
         defaultExpanded: false,
         fields: [
-          { label: "Voice", value: getConfigValue(sidebarBot, "voice_name", "voice_settings") },
-          { label: "Model", value: getConfigValue(sidebarBot, "voice_model", "voice_settings") },
-          { label: "Speed", value: getConfigValue(sidebarBot, "voice_speed", "voice_settings") },
+          {
+            label: "Voice",
+            value: getConfigValue(sidebarBot, "voice_name", "voice_settings"),
+          },
+          {
+            label: "Model",
+            value: getConfigValue(sidebarBot, "voice_model", "voice_settings"),
+          },
+          {
+            label: "Speed",
+            value: getConfigValue(sidebarBot, "voice_speed", "voice_settings"),
+          },
           {
             label: "Instructions",
-            value: getConfigValue(sidebarBot, "voice_instructions", "voice_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "voice_instructions",
+              "voice_settings",
+            ),
           },
           {
             label: "Greeting",
-            value: getConfigValue(sidebarBot, "greeting_message", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "greeting_message",
+              "behavior_settings",
+            ),
           },
         ],
       },
@@ -1056,7 +1116,10 @@ const BotsPage = () => {
         collapsible: true,
         defaultExpanded: false,
         fields: [
-          { label: "Model", value: getConfigValue(sidebarBot, "llm_model", "llm_settings") },
+          {
+            label: "Model",
+            value: getConfigValue(sidebarBot, "llm_model", "llm_settings"),
+          },
           {
             label: "Temperature",
             value: getConfigValue(sidebarBot, "temperature", "llm_settings"),
@@ -1076,35 +1139,67 @@ const BotsPage = () => {
         fields: [
           {
             label: "Transfer enabled",
-            value: getConfigValue(sidebarBot, "transfer_enabled", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "transfer_enabled",
+              "behavior_settings",
+            ),
           },
           {
             label: "Transfer number",
-            value: getConfigValue(sidebarBot, "transfer_number", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "transfer_number",
+              "behavior_settings",
+            ),
           },
           {
             label: "Transfer trunk ID",
-            value: getConfigValue(sidebarBot, "transfer_trunk_id", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "transfer_trunk_id",
+              "behavior_settings",
+            ),
           },
           {
             label: "Max duration (s)",
-            value: getConfigValue(sidebarBot, "max_duration", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "max_duration",
+              "behavior_settings",
+            ),
           },
           {
             label: "Idle timeout (s)",
-            value: getConfigValue(sidebarBot, "idle_timeout", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "idle_timeout",
+              "behavior_settings",
+            ),
           },
           {
             label: "Allow interruptions",
-            value: getConfigValue(sidebarBot, "allow_interruptions", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "allow_interruptions",
+              "behavior_settings",
+            ),
           },
           {
             label: "Noise cancellation",
-            value: getConfigValue(sidebarBot, "noise_cancellation", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "noise_cancellation",
+              "behavior_settings",
+            ),
           },
           {
             label: "Min endpointing delay",
-            value: getConfigValue(sidebarBot, "min_endpointing_delay", "behavior_settings"),
+            value: getConfigValue(
+              sidebarBot,
+              "min_endpointing_delay",
+              "behavior_settings",
+            ),
           },
         ],
       },
@@ -1203,7 +1298,7 @@ const BotsPage = () => {
     setEditingBotId(null);
     setIsEditFormMode(false);
     const companyScope = isAdmin
-      ? companies[0]?.id ?? ""
+      ? (companies[0]?.id ?? "")
       : userCompanyId || userCompanyIdentifier;
     setForm({
       company_id: companyScope,
@@ -1263,8 +1358,12 @@ const BotsPage = () => {
         fetchBots();
       } catch (err: unknown) {
         const msg =
-          (err as { response?: { data?: { detail?: string } }; message?: string })
-            ?.response?.data?.detail ??
+          (
+            err as {
+              response?: { data?: { detail?: string } };
+              message?: string;
+            }
+          )?.response?.data?.detail ??
           (err as { message?: string })?.message ??
           (isEditFormMode ? "Update failed" : "Create failed");
         toast.error(msg);
@@ -1393,7 +1492,14 @@ const BotsPage = () => {
         )}
       </div>
     ),
-    [canCreateBots, isAdmin, companyFilter, companies, openCreateForm, statusFilter],
+    [
+      canCreateBots,
+      isAdmin,
+      companyFilter,
+      companies,
+      openCreateForm,
+      statusFilter,
+    ],
   );
 
   const tableToolbar = useMemo(
@@ -1602,8 +1708,7 @@ const BotsPage = () => {
   const hasCompanyForSip = Boolean(form.company_id?.trim());
   let sipTrunkDefaultOptionLabel = "Select SIP trunk";
   if (!hasCompanyForSip) {
-    sipTrunkDefaultOptionLabel =
-      "Select a company in Basic Information first";
+    sipTrunkDefaultOptionLabel = "Select a company in Basic Information first";
   } else if (loadingSipTrunks) {
     sipTrunkDefaultOptionLabel = "Loading…";
   }
@@ -1691,11 +1796,7 @@ const BotsPage = () => {
         </Form.Group>
         <Form.Group className="mb-3">
           <Form.Label>Voice model</Form.Label>
-          <Form.Control
-            value={cfg.voice_model ?? ""}
-            disabled
-            readOnly
-          />
+          <Form.Control value={cfg.voice_model ?? ""} disabled readOnly />
         </Form.Group>
       </div>
       <Form.Group className="mb-3">
@@ -1762,10 +1863,7 @@ const BotsPage = () => {
       >
         <Form.Group className="mb-3">
           <Form.Label>LLM model</Form.Label>
-          <Form.Select
-            value={cfg.llm_model ?? "gpt-4o-mini"}
-            disabled
-          >
+          <Form.Select value={cfg.llm_model ?? "gpt-4o-mini"} disabled>
             {LLM_MODEL_OPTIONS.map((m) => (
               <option key={m} value={m}>
                 {m}
@@ -1808,8 +1906,7 @@ const BotsPage = () => {
               ...prev,
               configuration: {
                 ...prev.configuration,
-                max_tokens:
-                  Number.parseInt(e.target.value, 10) || 1000,
+                max_tokens: Number.parseInt(e.target.value, 10) || 1000,
               },
             }))
           }
@@ -1890,8 +1987,7 @@ const BotsPage = () => {
                 ...prev,
                 configuration: {
                   ...prev.configuration,
-                  max_duration:
-                    Number.parseInt(e.target.value, 10) || 1800,
+                  max_duration: Number.parseInt(e.target.value, 10) || 1800,
                 },
               }))
             }
@@ -1910,8 +2006,7 @@ const BotsPage = () => {
                 ...prev,
                 configuration: {
                   ...prev.configuration,
-                  idle_timeout:
-                    Number.parseInt(e.target.value, 10) || 300,
+                  idle_timeout: Number.parseInt(e.target.value, 10) || 300,
                 },
               }))
             }
@@ -2237,7 +2332,9 @@ const BotsPage = () => {
         style={{ width: "640px", maxWidth: "95vw" }}
       >
         <Offcanvas.Header closeButton={!formLoading}>
-          <Offcanvas.Title>{isEditFormMode ? "Edit Bot" : "Add Bot"}</Offcanvas.Title>
+          <Offcanvas.Title>
+            {isEditFormMode ? "Edit Bot" : "Add Bot"}
+          </Offcanvas.Title>
         </Offcanvas.Header>
         <Form onSubmit={handleFormSubmit}>
           <Offcanvas.Body
