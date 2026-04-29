@@ -29,7 +29,7 @@ const TAB_PAGES: Record<AccountBillingTab, TabPageComponent> = {
   "Billing History": BillingHistoryPage,
   "Company Info": CompanyInfoPage,
   Transactions: TransactionsPage,
-  Documents: DocumentsPage,
+  Documents: DocumentsPage,           
   "Payment Methods": PaymentMethodsPage,
 };
 

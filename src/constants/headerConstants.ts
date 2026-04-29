@@ -584,8 +584,11 @@ export const HEADER_CONSTANTS = {
     VIEW_PRODUCT_PRICING_COMPANIES_BILLING: "manage-pricing-companies-billing",
 
     VIEW_ACCOUNT_OVERVIEW_BILLING: "account-overview-billing",
+    VIEW_DOCUMENTS_BILLING: "view-documents-billing",
+    VIEW_USAGE_LIMITS_BILLING: "view-usage-limits-billing",
     VIEW_PRODUCT_DETAILS_BILLING: "products-billing",
     VIEW_BILLING_HISTORY_BILLING: "billing-history-billing",
+    VIEW_TRANSACTIONS_BILLING: "view-transactions-billing",
     VIEW_INVOICES_BILLING: "invoices-billing",
     CREATE_INVOICES_BILLING: "create-invoices-billing-billing",
     UPDATE_INVOICES_BILLING: "update-invoices-billing-billing",
@@ -639,8 +642,8 @@ export const HEADER_CONSTANTS = {
     DELETE_CUSTOMER_SUBSCRIPTION_BILLING:
       "delete-customer-subscription-billing-billing",
 
-    ADD_DOCUMENT_BILLING: "accounts-services",
-    DELETE_DOCUMENT_BILLING: "accounts-services",
+    ADD_DOCUMENT_BILLING: "add-document-billing",
+    DELETE_DOCUMENT_BILLING: "delete-document-billing",
 
     VIEW_CRM_DASHBOARD: "dashboard-crm",
     VIEW_CRM_QUOTES: "view-crm-quotes",

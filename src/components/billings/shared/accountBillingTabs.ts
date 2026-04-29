@@ -16,7 +16,7 @@ export const ACCOUNT_BILLING_TABS = [
   {
     label: "Usage & Limits",
     slug: "usage-limits",
-    permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING,
+    permission: PERMISSIONS.VIEW_USAGE_LIMITS_BILLING,
   },
   {
     label: "Billing History",
@@ -31,12 +31,12 @@ export const ACCOUNT_BILLING_TABS = [
   {
     label: "Transactions",
     slug: "transactions",
-    permission: PERMISSIONS.VIEW_BILLING_HISTORY_BILLING,
+    permission: PERMISSIONS.VIEW_TRANSACTIONS_BILLING,
   },
   {
     label: "Documents",
     slug: "documents",
-    permission: PERMISSIONS.VIEW_ACCOUNT_OVERVIEW_BILLING,
+    permission: PERMISSIONS.VIEW_DOCUMENTS_BILLING,
   },
   {
     label: "Payment Methods",
