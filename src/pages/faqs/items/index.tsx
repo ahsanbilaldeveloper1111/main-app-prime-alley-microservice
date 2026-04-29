@@ -2,16 +2,16 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
 import { ListFAQItems, createFAQItem, updateFAQItem, deleteFAQItem, getAllFAQTopics } from '@utils/faqs';
-import { Column } from '@components/CustomDataTable';
 import { Button } from 'react-bootstrap';
+import '@assets/css/GenericTable.css';
 import '@assets/scss/common.scss';
 import ConfirmModal from '@pages/partial/ConfirmModal';
 import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import { Edit, Info, Trash2, HelpCircle, Plus, X } from 'lucide-react';
 import Select from 'react-select';
 import RichTextEditor from '@pages/help-center/partials/RichTextEditor';
+import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -156,32 +156,25 @@ interface ItemAnswerFieldProps {
 
 const ItemAnswerField: React.FC<ItemAnswerFieldProps> = ({ value, onChange, editorKey }) => (
     <div style={{ marginBottom: '20px' }}>
-        {(() => {
-            // RichTextEditor does not accept id prop, so we remove it to avoid type error
-            return (
-                <>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
-                        Answer <span style={{ color: '#f2545b' }}>*</span>
-                        <span title="Enter the answer" style={{ cursor: 'help', color: '#6c757d' }}>
-                            <Info size={14} />
-                        </span>
-                    </div>
-                    <div style={{ border: '1px solid #8a8a8a', borderRadius: '4px' }}>
-                        <RichTextEditor
-                            key={editorKey}
-                            value={value}
-                            onChange={onChange}
-                            placeholder="Enter the answer..."
-                            minHeight="150px"
-                        />
-                    </div>
-                    <p style={{ fontSize: '0.813rem', color: '#6c757d', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Info size={12} />
-                        Use the rich text editor to format your answer with headings, lists, and more
-                    </p>
-                </>
-            );
-        })()}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 600, color: '#141414', marginBottom: '8px' }}>
+            Answer <span style={{ color: '#f2545b' }}>*</span>
+            <span title="Enter the answer" style={{ cursor: 'help', color: '#6c757d' }}>
+                <Info size={14} />
+            </span>
+        </div>
+        <div style={{ border: '1px solid #8a8a8a', borderRadius: '4px' }}>
+            <RichTextEditor
+                key={editorKey}
+                value={value}
+                onChange={onChange}
+                placeholder="Enter the answer..."
+                minHeight="150px"
+            />
+        </div>
+        <p style={{ fontSize: '0.813rem', color: '#6c757d', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <Info size={12} />
+            Use the rich text editor to format your answer with headings, lists, and more
+        </p>
     </div>
 );
 
@@ -376,61 +369,21 @@ const FAQItemSidebar: React.FC<FAQItemSidebarProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// Table cell renderers
-// ---------------------------------------------------------------------------
-
-function renderTopicCell(props: any) {
-    if (!props.topic) return <span className="text-muted">No topic</span>;
-    return (
-        <div>
-            <span className="status-badge primary" title={props.topic.description || ''}>
-                {props.topic.name}
-                {props.topic.faq_module && (
-                    <span className="text-muted ms-1" style={{ fontSize: '0.85em' }}>
-                        ({props.topic.faq_module.name})
-                    </span>
-                )}
-            </span>
-        </div>
-    );
-}
-
-function renderTypeCell(props: any) {
-    if (!props.type) return <span className="text-muted">N/A</span>;
-    return <span className="status-badge primary">{props.type}</span>;
-}
-
-function renderViewCountCell(props: any) {
-    return <span className="status-badge primary">{props.view_count || 0}</span>;
-}
-
-function renderCreatedAtCell(props: any) {
-    return <span>{props.created_at ? new Date(props.created_at).toLocaleDateString() : 'N/A'}</span>;
-}
-
-function buildItemActionCell(onEdit: (props: any) => void, onDelete: (props: any) => void) {
-    return function ItemActionCell(props: any) {
-        return (
-            <div className="d-flex gap-2">
-                <Button variant="light" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => onEdit(props)}>
-                    <Edit size={16} />
-                </Button>
-                <Button variant="light" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => onDelete(props)}>
-                    <Trash2 size={16} />
-                </Button>
-            </div>
-        );
-    };
-}
-
-// ---------------------------------------------------------------------------
 // Main page component
 // ---------------------------------------------------------------------------
 
+const PAGE_SIZE = 15;
+
 const FAQItems = () => {
+    const [tableData, setTableData] = useState<any[]>([]);
+    const [totalRows, setTotalRows] = useState<number>(0);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [rowsPerPage, setRowsPerPage] = useState<number>(PAGE_SIZE);
+    const [searchValue, setSearchValue] = useState<string>('');
+    const [isLoading, setIsLoading] = useState<boolean>(false);
     const [refreshKey, setRefreshKey] = useState<number>(0);
 
-    // Shared form data (one object for both create & edit — sidebar only shows one at a time)
+    // Shared form data
     const [formData, setFormData] = useState<FAQItemFormData>(EMPTY_FORM_DATA);
     const [selectedItem, setSelectedItem] = useState<any>(null);
 
@@ -452,6 +405,26 @@ const FAQItems = () => {
 
     const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
 
+    // ---- Data fetching ----
+    const loadData = useCallback(async (page: number, perPage: number, search: string) => {
+        setIsLoading(true);
+        try {
+            const result = await ListFAQItems({ page, perPage, search, filters: {} });
+            if (result) {
+                setTableData(result.data ?? result ?? []);
+                setTotalRows(result.total ?? result.length ?? 0);
+            }
+        } catch (error) {
+            console.error('Error fetching FAQ items:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadData(currentPage, rowsPerPage, searchValue);
+    }, [currentPage, rowsPerPage, searchValue, refreshKey, loadData]);
+
     // ---- Topic options loader ----
     const fetchTopicOptions = useCallback(async () => {
         if (topicOptions.length > 0) return;
@@ -463,10 +436,7 @@ const FAQItems = () => {
                 if (t.faq_module) {
                     label += ' (' + String(t.faq_module.name) + ')';
                 }
-                return {
-                    value: t.id,
-                    label,
-                };
+                return { value: t.id, label };
             }));
         } catch (error) {
             console.error('Error fetching topics:', error);
@@ -515,14 +485,14 @@ const FAQItems = () => {
     }, [formData, closeCreateSidebar, triggerRefresh]);
 
     // ---- Edit handlers ----
-    const handleEditItem = useCallback((props: any) => {
-        setSelectedItem(props.id);
+    const handleEditItem = useCallback((row: any) => {
+        setSelectedItem(row.id);
         setFormData({
-            topic_id: props.topic_id?.toString() || '',
-            question: props.question || '',
-            answer: props.answer || '',
-            description: props.description || '',
-            type: props.type || '',
+            topic_id: row.topic_id?.toString() || '',
+            question: row.question || '',
+            answer: row.answer || '',
+            description: row.description || '',
+            type: row.type || '',
         });
         setShowEditSidebar(true);
     }, []);
@@ -549,8 +519,8 @@ const FAQItems = () => {
     }, [selectedItem, formData, closeEditSidebar, triggerRefresh]);
 
     // ---- Delete handlers ----
-    const handleDeleteItem = useCallback((props: any) => {
-        setSelectedItem(props.id);
+    const handleDeleteItem = useCallback((row: any) => {
+        setSelectedItem(row.id);
         setShowDeleteItemModal(true);
     }, []);
 
@@ -573,27 +543,90 @@ const FAQItems = () => {
 
     const closeSuccessModal = useCallback(() => setShowSuccessfulModal(false), []);
 
-    // ---- Data fetching ----
-    const fetchItems = useCallback(
-        async (page = 1, perPage = 15, search = '') =>
-            ListFAQItems({ page, perPage, search, filters: {} }),
-        [],
-    );
+    // ---- Pagination handler ----
+    const handlePaginationChange = useCallback((page: number, perPage: number) => {
+        setCurrentPage(page);
+        setRowsPerPage(perPage);
+    }, []);
+
+    // ---- Search handler ----
+    const handleSearchChange = useCallback((value: string) => {
+        setSearchValue(value);
+        setCurrentPage(1);
+    }, []);
 
     // ---- Columns ----
-    const ActionCell = useMemo(
-        () => buildItemActionCell(handleEditItem, handleDeleteItem),
-        [handleEditItem, handleDeleteItem],
-    );
+    const columns: TableColumn<any>[] = useMemo(() => [
+        {
+            key: 'question',
+            label: 'Question',
+            sortable: true,
+            type: 'text',
+        },
+        {
+            key: 'topic',
+            label: 'Topic',
+            sortable: false,
+            render: (row: any) => {
+                if (!row.topic) return <span className="text-muted">No topic</span>;
+                return (
+                    <div>
+                        <span className="status-badge primary" title={row.topic.description || ''}>
+                            {row.topic.name}
+                            {row.topic.faq_module && (
+                                <span className="text-muted ms-1" style={{ fontSize: '0.85em' }}>
+                                    ({row.topic.faq_module.name})
+                                </span>
+                            )}
+                        </span>
+                    </div>
+                );
+            },
+        },
+        {
+            key: 'type',
+            label: 'Type',
+            sortable: true,
+            render: (row: any) => {
+                if (!row.type) return <span className="text-muted">N/A</span>;
+                return <span className="status-badge primary">{row.type}</span>;
+            },
+        },
+        {
+            key: 'view_count',
+            label: 'Views',
+            sortable: true,
+            render: (row: any) => (
+                <span className="status-badge primary">{row.view_count || 0}</span>
+            ),
+        },
+        {
+            key: 'created_at',
+            label: 'Created At',
+            sortable: true,
+            render: (row: any) => (
+                <span>{row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A'}</span>
+            ),
+        },
+    ], []);
 
-    const columns: Column[] = useMemo(() => [
-        { key: 'question', name: 'Question', selector: (row: any) => row.question, sortable: true },
-        { key: 'topic', name: 'Topic', selector: (row: any) => row.topic?.name || 'N/A', sortable: false, cell: renderTopicCell },
-        { key: 'type', name: 'Type', selector: (row: any) => row.type || 'N/A', sortable: true, cell: renderTypeCell },
-        { key: 'view_count', name: 'Views', selector: (row: any) => row.view_count || 0, sortable: true, cell: renderViewCountCell },
-        { key: 'created_at', name: 'Created At', selector: (row: any) => row.created_at ? new Date(row.created_at).toLocaleDateString() : 'N/A', sortable: true, cell: renderCreatedAtCell },
-        { key: 'Action', name: 'Actions', selector: (row: any) => row.id, sortable: false, cell: ActionCell },
-    ], [ActionCell]);
+    // ---- Actions ----
+    const actions: TableAction<any>[] = useMemo(() => [
+        {
+            label: 'Edit',
+            icon: <Edit size={16} />,
+            onClick: handleEditItem,
+            variant: 'light',
+            className: 'btn-action-style-2 p-1 text-primary',
+        },
+        {
+            label: 'Delete',
+            icon: <Trash2 size={16} />,
+            onClick: handleDeleteItem,
+            variant: 'light',
+            className: 'btn-action-style-2 p-1 text-danger',
+        },
+    ], [handleEditItem, handleDeleteItem]);
 
     return (
         <React.Fragment>
@@ -608,16 +641,32 @@ const FAQItems = () => {
                 </div>
             </div>
 
-            <GenericListPage
+            <GenericTable
+                data={tableData}
                 columns={columns}
-                fetchData={fetchItems}
-                title="FAQ Items"
-                searchPlaceholder="Search FAQs..."
-                defaultPageSize={15}
-                filters={{}}
-                refreshKey={refreshKey}
-                search={true}
-                tableStyle="table-style-2"
+                actions={actions}
+                showActions={true}
+                actionsLabel="Actions"
+                loading={isLoading}
+                emptyMessage="No FAQs found"
+                pagination={{
+                    currentPage,
+                    rowsPerPage,
+                    totalRows,
+                    pageSizeOptions: [15, 25, 50, 100],
+                }}
+                onPaginationChange={handlePaginationChange}
+                sortable={true}
+                showToolbar={true}
+                toolbar={{
+                    showSearch: true,
+                    searchValue,
+                    searchPlaceholder: 'Search FAQs...',
+                    onSearchChange: handleSearchChange,
+                }}
+                uniqueKey="id"
+                hover={true}
+                showToolbarActions={false}
             />
 
             {/* Create FAQ Sidebar */}

@@ -2,9 +2,7 @@ import '@assets/scss/datatable-style.scss';
 import React, { ReactElement, useState, useCallback, useMemo } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
 import { ListStatuses, CreateStatus, UpdateStatus, DeleteStatus } from '@utils/ticket-statuses';
-import { Column } from '@components/CustomDataTable';
 import { Button } from 'react-bootstrap';
 import { useSession } from 'next-auth/react';
 import moment from 'moment';
@@ -16,6 +14,7 @@ import ConfirmModal from "@pages/partial/ConfirmModal";
 import { FiPlus } from "react-icons/fi";
 import { Tag, X, Edit, Trash2, Info, Eye } from 'lucide-react';
 import { GlobalDateTimeFormat } from '@utils/Helper';
+import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -327,61 +326,14 @@ const StatusSidebar: React.FC<StatusSidebarProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// Table cell renderers (extracted to reduce useMemo complexity)
+// Types
 // ---------------------------------------------------------------------------
 
-function renderNameCell(props: any) {
-    return (
-        <div className="font-weight-500">
-            <span className="rounded-circle" style={{ width: '8px', height: '8px', backgroundColor: props.color, flexShrink: 0, display: 'inline-block' }} />
-            <span className="ms-2">{props.name}</span>
-        </div>
-    );
-}
-
-function renderColorCell(props: any) {
-    return (
-        <div className="d-flex align-items-center gap-2">
-            <span style={{ backgroundColor: props.color, width: '24px', height: '24px', borderRadius: '8px', display: 'inline-block' }} />
-            <code style={{ fontSize: '0.813rem', color: props.color, backgroundColor: '#f8f9fa', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
-                {props.color}
-            </code>
-        </div>
-    );
-}
-
-function renderCreatedAtCell(props: any) {
-    return (
-        <span className="text-muted">
-            {moment(props.created_at).format(GlobalDateTimeFormat)}
-        </span>
-    );
-}
-
-function buildActionCell(
-    onEdit: (props: any) => void,
-    onDelete: (props: any) => void,
-    permissions: string[] | undefined,
-) {
-    return function ActionCell(props: any) {
-        const canEdit = permissions?.includes('edit-ticket-status-tickets');
-        const canDelete = permissions?.includes('delete-ticket-status-tickets');
-
-        return (
-            <div className="d-flex gap-2">
-                {canEdit && (
-                    <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-primary" title="Edit" onClick={() => onEdit(props)}>
-                        <Edit size={16} />
-                    </Button>
-                )}
-                {canDelete && (
-                    <Button variant="light" size="sm" className="btn-action-style-2 p-1 text-danger" title="Delete" onClick={() => onDelete(props)}>
-                        <Trash2 size={16} />
-                    </Button>
-                )}
-            </div>
-        );
-    };
+interface TicketStatus {
+    id: string | number;
+    name: string;
+    color: string;
+    created_at: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -392,8 +344,12 @@ const TicketStatuses = () => {
     const { data: session } = useSession();
     const permissions = session?.user?.permissions;
 
-    const [refreshKey, setRefreshKey] = useState<number>(0);
-    const [currentFilters, setCurrentFilters] = useState({ search: '' });
+    const [data, setData] = useState<TicketStatus[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [rowsPerPage, setRowsPerPage] = useState<number>(15);
+    const [totalRows, setTotalRows] = useState<number>(0);
+    const [searchValue, setSearchValue] = useState<string>('');
 
     // Edit state
     const [selectedStatus, setSelectedStatus] = useState<any>(null);
@@ -409,13 +365,34 @@ const TicketStatuses = () => {
     const [newStatusName, setNewStatusName] = useState<string>('');
     const [newStatusColor, setNewStatusColor] = useState<string>(DEFAULT_STATUS_COLOR);
 
-    const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
+    // ---- Data Fetching ----
+    const fetchStatuses = useCallback(async (page: number, perPage: number, search: string) => {
+        setLoading(true);
+        try {
+            const response = await ListStatuses({ page, perPage, search, filters: { search } });
+            if (response) {
+                setData(response.data || []);
+                setTotalRows(response.total || 0);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Initial fetch and re-fetch on page/perPage/search change
+    React.useEffect(() => {
+        fetchStatuses(currentPage, rowsPerPage, searchValue);
+    }, [fetchStatuses, currentPage, rowsPerPage, searchValue]);
+
+    const triggerRefresh = useCallback(() => {
+        fetchStatuses(currentPage, rowsPerPage, searchValue);
+    }, [fetchStatuses, currentPage, rowsPerPage, searchValue]);
 
     // ---- Handlers: Edit ----
-    const handleEditStatus = useCallback((props: any) => {
-        setSelectedStatus(props.id);
-        setSelectedStatusName(props.name);
-        setSelectedStatusColor(props.color);
+    const handleEditStatus = useCallback((row: TicketStatus) => {
+        setSelectedStatus(row.id);
+        setSelectedStatusName(row.name);
+        setSelectedStatusColor(row.color);
         setShowEditStatusModal(true);
     }, []);
 
@@ -436,9 +413,9 @@ const TicketStatuses = () => {
     const handleEditStatusColorChange = useCallback((color: string) => setSelectedStatusColor(color), []);
 
     // ---- Handlers: Delete ----
-    const handleDeleteStatus = useCallback((props: any) => {
-        setSelectedStatus(props.id);
-        setSelectedStatusName(props.name);
+    const handleDeleteStatus = useCallback((row: TicketStatus) => {
+        setSelectedStatus(row.id);
+        setSelectedStatusName(row.name);
         setShowDeleteStatusModal(true);
     }, []);
 
@@ -473,29 +450,88 @@ const TicketStatuses = () => {
         }
     }, [newStatusName, newStatusColor, closeCreateStatusSidebar, triggerRefresh]);
 
-    // ---- Filters ----
-    const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
+    // ---- Pagination ----
+    const handlePaginationChange = useCallback((page: number, perPage: number) => {
+        setCurrentPage(page);
+        setRowsPerPage(perPage);
+    }, []);
 
-    const handleFiltersChange = useCallback((filters: any) => setCurrentFilters(filters), []);
-
-    const fetchStatuses = useCallback(
-        async (page = 1, perPage = 15, search = '') =>
-            ListStatuses({ page, perPage, search: currentFilters.search || search, filters: memoizedFilters }),
-        [memoizedFilters, currentFilters],
-    );
+    // ---- Search ----
+    const handleSearchChange = useCallback((value: string) => {
+        setSearchValue(value);
+        setCurrentPage(1);
+    }, []);
 
     // ---- Columns ----
-    const ActionCell = useMemo(
-        () => buildActionCell(handleEditStatus, handleDeleteStatus, permissions),
-        [handleEditStatus, handleDeleteStatus, permissions],
-    );
+    const columns: TableColumn<TicketStatus>[] = useMemo(() => [
+        {
+            key: 'name',
+            label: 'Status Name',
+            sortable: true,
+            render: (row) => (
+                <div className="font-weight-500" style={{ display: 'flex', alignItems: 'center' }}>
+                    <span
+                        className="rounded-circle"
+                        style={{ width: '8px', height: '8px', backgroundColor: row.color, flexShrink: 0, display: 'inline-block' }}
+                    />
+                    <span className="ms-2">{row.name}</span>
+                </div>
+            ),
+        },
+        {
+            key: 'color',
+            label: 'Color',
+            sortable: true,
+            render: (row) => (
+                <div className="d-flex align-items-center gap-2">
+                    <span style={{ backgroundColor: row.color, width: '24px', height: '24px', borderRadius: '8px', display: 'inline-block' }} />
+                    <code style={{ fontSize: '0.813rem', color: row.color, backgroundColor: '#f8f9fa', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
+                        {row.color}
+                    </code>
+                </div>
+            ),
+        },
+        {
+            key: 'created_at',
+            label: 'Created At',
+            sortable: true,
+            render: (row) => (
+                <span className="text-muted">
+                    {moment(row.created_at).format(GlobalDateTimeFormat)}
+                </span>
+            ),
+        },
+    ], []);
 
-    const columns: Column[] = useMemo(() => [
-        { key: 'name', name: 'Status Name', selector: (row: any) => row.name, sortable: true, cell: renderNameCell },
-        { key: 'color', name: 'Color', selector: (row: any) => row.color, sortable: true, cell: renderColorCell },
-        { key: 'created_at', name: 'Created At', selector: (row: any) => row.created_at, sortable: true, cell: renderCreatedAtCell },
-        { key: 'Action', name: 'Actions', selector: (row: any) => row.id, sortable: false, cell: ActionCell },
-    ], [ActionCell]);
+    // ---- Actions ----
+    const actions: TableAction<TicketStatus>[] = useMemo(() => {
+        const canEdit = permissions?.includes('edit-ticket-status-tickets');
+        const canDelete = permissions?.includes('delete-ticket-status-tickets');
+
+        const acts: TableAction<TicketStatus>[] = [];
+
+        if (canEdit) {
+            acts.push({
+                label: 'Edit',
+                icon: <Edit size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-primary',
+                onClick: handleEditStatus,
+            });
+        }
+
+        if (canDelete) {
+            acts.push({
+                label: 'Delete',
+                icon: <Trash2 size={16} />,
+                variant: 'light',
+                className: 'btn-action-style-2 p-1 text-danger',
+                onClick: handleDeleteStatus,
+            });
+        }
+
+        return acts;
+    }, [permissions, handleEditStatus, handleDeleteStatus]);
 
     const canViewList = permissions?.includes('ticket-statuses-tickets');
     const canCreate = permissions?.includes('create-ticket-status-tickets');
@@ -509,8 +545,8 @@ const TicketStatuses = () => {
                 description=""
                 showSearch={false}
                 searchPlaceholder="Search statuses..."
-                searchValue={currentFilters.search || ''}
-                onSearchChange={(value) => handleFiltersChange({ ...currentFilters, search: value })}
+                searchValue={searchValue}
+                onSearchChange={handleSearchChange}
                 buttons={
                     canCreate ? (
                         <Button variant="primary" onClick={openCreateStatusSidebar}>
@@ -522,16 +558,32 @@ const TicketStatuses = () => {
             />
 
             {canViewList && (
-                <GenericListPage
+                <GenericTable<TicketStatus>
+                    data={data}
                     columns={columns}
-                    fetchData={fetchStatuses}
-                    title="Status"
-                    searchPlaceholder="Search statuses..."
-                    defaultPageSize={15}
-                    filters={memoizedFilters}
-                    refreshKey={refreshKey}
-                    search={true}
-                    tableStyle="table-style-2"
+                    loading={loading}
+                    actions={actions}
+                    showActions={actions.length > 0}
+                    actionsLabel="Actions"
+                    pagination={{
+                        currentPage,
+                        rowsPerPage,
+                        totalRows,
+                        pageSizeOptions: [15, 25, 50, 100],
+                    }}
+                    onPaginationChange={handlePaginationChange}
+                    sortable={true}
+                    hover={true}
+                    emptyMessage="No statuses found."
+                    showToolbar={true}
+                    toolbar={{
+                        showSearch: true,
+                        searchValue,
+                        searchPlaceholder: 'Search statuses...',
+                        onSearchChange: handleSearchChange,
+                    }}
+                    showToolbarActions={false}
+                    uniqueKey="id"
                 />
             )}
 
