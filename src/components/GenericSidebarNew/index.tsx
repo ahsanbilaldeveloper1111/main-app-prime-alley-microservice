@@ -79,7 +79,6 @@ import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
 import {
   useCrmActivityModals,
-  type CrmRecordType,
   type UseCrmActivityModalsParams,
 } from "@hooks/useCrmActivityModals";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
