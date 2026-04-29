@@ -1,10 +1,8 @@
 import '@assets/scss/datatable-style.scss';
-import React, { ReactElement, useState, useCallback, useMemo } from 'react';
+import React, { ReactElement, useState, useCallback, useMemo, useEffect } from 'react';
 import Layout from '@layout/index';
 import BreadcrumbItem from '@common/BreadcrumbItem';
-import GenericListPage from '@components/GenericListPage';
 import { ListFAQTopics, createFAQTopic, updateFAQTopic, deleteFAQTopic, getAllFAQModules } from '@utils/faqs';
-import { Column } from '@components/CustomDataTable';
 import { Button } from 'react-bootstrap';
 import '@assets/scss/common.scss';
 import ConfirmModal from '@pages/partial/ConfirmModal';
@@ -12,22 +10,37 @@ import SuccessfulModal from '@pages/partial/SuccessfulModal';
 import { Tag, Plus } from 'lucide-react';
 import { FaqFormSidebar } from '@components/faqFormSidebar';
 import { FaqLabeledSelect, FaqLabeledTextInput, FaqLabeledTextarea } from '@components/faqFormFields';
-import { createFaqEditDeleteActionCell, renderFaqDescriptionCell, renderFaqModuleCell, renderFaqCountCell } from '@components/faqTableCells';
+import { renderFaqDescriptionCell, renderFaqModuleCell, renderFaqCountCell } from '@components/faqTableCells';
 import { useLoadWhenOpen } from '@components/useLoadWhenOpen';
+import GenericTable, { TableColumn, TableAction } from '@components/GenericTable';
 
-// ===== FAQ Topics Page =====
-// Uses shared FAQ components to eliminate duplication with other FAQ modules/items pages
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
-
+interface FAQTopic {
+    id: string | number;
+    name: string;
+    description: string;
+    faq_module_id: number | null;
+    faq_module: { name: string } | null;
+    faqs_count: number;
+}
 
 // ---------------------------------------------------------------------------
 // Main page component
 // ---------------------------------------------------------------------------
 
 const FAQTopics = () => {
-    const [refreshKey, setRefreshKey] = useState<number>(0);
+    // Table state
+    const [data, setData] = useState<FAQTopic[]>([]);
+    const [loading, setLoading] = useState<boolean>(false);
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [rowsPerPage, setRowsPerPage] = useState<number>(15);
+    const [totalRows, setTotalRows] = useState<number>(0);
+    const [searchValue, setSearchValue] = useState<string>('');
 
-    // Shared state
+    // Sidebar state
     const [showSidebar, setShowSidebar] = useState<boolean>(false);
     const [sidebarMode, setSidebarMode] = useState<'create' | 'edit' | null>(null);
     const [moduleOptions, setModuleOptions] = useState<{ value: any; label: string }[]>([]);
@@ -46,7 +59,39 @@ const FAQTopics = () => {
     const [successModalTitle, setSuccessModalTitle] = useState<string>('');
     const [successModalDescription, setSuccessModalDescription] = useState<string>('');
 
-    const triggerRefresh = useCallback(() => setRefreshKey((prev) => prev + 1), []);
+    // ---- Data fetching ----
+    const fetchTopics = useCallback(async (page: number, perPage: number, search: string) => {
+        setLoading(true);
+        try {
+            const response = await ListFAQTopics({ page, perPage, search, filters: {} });
+            if (response) {
+                setData(response.data || []);
+                setTotalRows(response.total || 0);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchTopics(currentPage, rowsPerPage, searchValue);
+    }, [fetchTopics, currentPage, rowsPerPage, searchValue]);
+
+    const triggerRefresh = useCallback(() => {
+        fetchTopics(currentPage, rowsPerPage, searchValue);
+    }, [fetchTopics, currentPage, rowsPerPage, searchValue]);
+
+    // ---- Pagination ----
+    const handlePaginationChange = useCallback((page: number, perPage: number) => {
+        setCurrentPage(page);
+        setRowsPerPage(perPage);
+    }, []);
+
+    // ---- Search ----
+    const handleSearchChange = useCallback((value: string) => {
+        setSearchValue(value);
+        setCurrentPage(1);
+    }, []);
 
     // ---- Module options loader ----
     const fetchModuleOptions = useCallback(async () => {
@@ -63,7 +108,7 @@ const FAQTopics = () => {
 
     useLoadWhenOpen(showSidebar, moduleOptions.length > 0, fetchModuleOptions);
 
-    // ---- Unified sidebar handlers ----
+    // ---- Sidebar handlers ----
     const openCreateSidebar = useCallback(() => {
         setSidebarMode('create');
         setTopicName('');
@@ -73,12 +118,12 @@ const FAQTopics = () => {
         setShowSidebar(true);
     }, []);
 
-    const openEditSidebar = useCallback((props: any) => {
+    const openEditSidebar = useCallback((row: FAQTopic) => {
         setSidebarMode('edit');
-        setSelectedTopicId(props.id);
-        setTopicName(props.name);
-        setTopicDescription(props.description || '');
-        setTopicModuleId(props.faq_module_id?.toString() || '');
+        setSelectedTopicId(row.id);
+        setTopicName(row.name);
+        setTopicDescription(row.description || '');
+        setTopicModuleId(row.faq_module_id?.toString() || '');
         setShowSidebar(true);
     }, []);
 
@@ -110,9 +155,9 @@ const FAQTopics = () => {
     const handleTopicModuleChange = useCallback((value: string) => setTopicModuleId(value), []);
 
     // ---- Delete handlers ----
-    const handleDeleteTopic = useCallback((props: any) => {
-        setSelectedTopicId(props.id);
-        setDeleteTopicName(props.name);
+    const handleDeleteTopic = useCallback((row: FAQTopic) => {
+        setSelectedTopicId(row.id);
+        setDeleteTopicName(row.name);
         setShowDeleteTopicModal(true);
     }, []);
 
@@ -137,26 +182,45 @@ const FAQTopics = () => {
 
     const closeSuccessModal = useCallback(() => setShowSuccessfulModal(false), []);
 
-    // ---- Data fetching ----
-    const fetchTopics = useCallback(
-        async (page = 1, perPage = 15, search = '') =>
-            ListFAQTopics({ page, perPage, search, filters: {} }),
-        [],
-    );
-
     // ---- Columns ----
-    const ActionCell = useMemo(
-        () => createFaqEditDeleteActionCell(openEditSidebar, handleDeleteTopic),
-        [openEditSidebar, handleDeleteTopic],
-    );
+    const columns: TableColumn<FAQTopic>[] = useMemo(() => [
+        {
+            key: 'name',
+            label: 'Name',
+            sortable: true,
+            render: (row) => <span style={{ fontWeight: 500 }}>{row.name}</span>,
+        },
+        {
+            key: 'faq_module',
+            label: 'Module',
+            sortable: false,
+            render: (row) => renderFaqModuleCell(row),
+        },
+        {
+            key: 'description',
+            label: 'Description',
+            sortable: false,
+            render: (row) => renderFaqDescriptionCell(row),
+        },
+        {
+            key: 'faqs_count',
+            label: 'FAQs Count',
+            sortable: true,
+            render: (row) => renderFaqCountCell(row),
+        },
+    ], []);
 
-    const columns: Column[] = useMemo(() => [
-        { key: 'name', name: 'Name', selector: (row: any) => row.name, sortable: true },
-        { key: 'faq_module', name: 'Module', selector: (row: any) => row.faq_module?.name || 'N/A', sortable: false, cell: renderFaqModuleCell },
-        { key: 'description', name: 'Description', selector: (row: any) => row.description || 'N/A', sortable: false, cell: renderFaqDescriptionCell },
-        { key: 'faqs_count', name: 'FAQs Count', selector: (row: any) => row.faqs_count || 0, sortable: true, cell: renderFaqCountCell },
-        { key: 'Action', name: 'Actions', selector: (row: any) => row.id, sortable: false, cell: ActionCell },
-    ], [ActionCell]);
+    // ---- Actions ----
+    const actions: TableAction<FAQTopic>[] = useMemo(() => [
+        {
+            label: 'Edit',
+            onClick: openEditSidebar,
+        },
+        {
+            label: 'Delete',
+            onClick: handleDeleteTopic,
+        },
+    ], [openEditSidebar, handleDeleteTopic]);
 
     return (
         <React.Fragment>
@@ -171,16 +235,32 @@ const FAQTopics = () => {
                 </div>
             </div>
 
-            <GenericListPage
+            <GenericTable<FAQTopic>
+                data={data}
                 columns={columns}
-                fetchData={fetchTopics}
-                title="FAQ Topics"
-                searchPlaceholder="Search topics..."
-                defaultPageSize={15}
-                filters={{}}
-                refreshKey={refreshKey}
-                search={true}
-                tableStyle="table-style-2"
+                loading={loading}
+                actions={actions}
+                showActions={true}
+                actionsLabel="Actions"
+                pagination={{
+                    currentPage,
+                    rowsPerPage,
+                    totalRows,
+                    pageSizeOptions: [15, 25, 50, 100],
+                }}
+                onPaginationChange={handlePaginationChange}
+                sortable={true}
+                hover={true}
+                emptyMessage="No FAQ topics found."
+                showToolbar={true}
+                toolbar={{
+                    showSearch: true,
+                    searchValue,
+                    searchPlaceholder: 'Search topics...',
+                    onSearchChange: handleSearchChange,
+                }}
+                showToolbarActions={false}
+                uniqueKey="id"
             />
 
             {/* Topic Sidebar */}
