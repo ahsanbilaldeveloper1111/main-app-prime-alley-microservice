@@ -22,7 +22,7 @@ import "@assets/scss/tabs.scss";
 import { deleteCustomerProductPricing, getCustomerProductPricingList } from "@utils/accounts";
 import CreateSubscriptionModal from "@components/CreateSubscriptionModal";
 import type { CustomerProductPricingDataItem } from "@utils/accounts";
-import { getMinifiedCompanies } from "@utils/crm";
+import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
 import moment from "moment";
 import {
   formatDateTimeGlobal,
@@ -202,7 +202,13 @@ const ProductDetails = () => {
   const canUpdateSubscription = hasPermission(PERMISSIONS.UPDATE_SUBSCRIPTIONS_BILLING);
   const canDeleteSubscription = hasPermission(PERMISSIONS.DELETE_SUBSCRIPTIONS_BILLING);
 
-  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
+  const companyOptions = useMinifiedCompaniesSendAll({
+    onError: (e) => {
+      toast.error(`Failed to load companies: ${getErrorMessage(e)}`, {
+        toastId: "billing_subscriptions_load_companies_failed",
+      });
+    },
+  });
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
   const [refreshKey, setRefreshKey] = useState(0);
   // we resolve customer id in background; no UI needed for this state currently
@@ -223,20 +229,6 @@ const ProductDetails = () => {
     CustomerProductPricingDataItem[] | undefined
   >(undefined);
 
-
-  useEffect(() => {
-    const fetchCompanyOptions = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanyOptions(result ?? []);
-      } catch (e) {
-        toast.error(`Failed to load companies: ${getErrorMessage(e)}`, {
-          toastId: "billing_subscriptions_load_companies_failed",
-        });
-      }
-    };
-    fetchCompanyOptions();
-  }, []);
 
   const onAccountingCustomerCreated = useCallback(() => {
     setRefreshKey((k) => k + 1);

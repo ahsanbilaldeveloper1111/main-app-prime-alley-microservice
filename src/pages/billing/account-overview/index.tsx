@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
   useState,
 } from "react";
 import Layout from "@layout/index";
@@ -25,7 +26,7 @@ import {
   type EnsureCustomerSettledResult,
   useEnsureCustomerForCrmCompany,
 } from "@hooks/billing/useEnsureCustomerForCrmCompany";
-import { getMinifiedCompanies } from "@utils/crm";
+import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
 import ThemeSelect from "@components/ThemeSelect";
 import { toast } from "react-toastify";
 import router from "next/router";
@@ -133,7 +134,14 @@ const AccountOverview = () => {
   });
 
   const [companyDetails, setCompanyDetails] = useState<any>(null);
-  const [companies, setCompanies] = useState<any[]>([]);
+  const companies = useMinifiedCompaniesSendAll({
+    onError: (error) => {
+      toast.error(`Failed to load companies: ${getErrorMessage(error)}`, {
+        toastId: "billing_overview_load_companies_failed",
+      });
+    },
+  });
+  const defaultCompanyAppliedRef = useRef(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
   const [selectedCompanyName, setSelectedCompanyName] = useState<string>('');
   const [customerData, setCustomerData] = useState<any>(null);
@@ -294,24 +302,14 @@ const AccountOverview = () => {
   );
 
   useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        const list = result ?? [];
-        setCompanies(list);
-        if (list.length > 0 && list[0]?.id != null) {
-          setSelectedCompanyId(list[0].id);
-          setSelectedCompanyName(list[0].name);
-        }
-      } catch (error) {
-        toast.error(`Failed to load companies: ${getErrorMessage(error)}`, {
-          toastId: "billing_overview_load_companies_failed",
-        });
-        setCompanies([]);
-      }
-    };
-    fetchCompanies();
-  }, []);
+    if (defaultCompanyAppliedRef.current) return;
+    const list = companies;
+    if (list.length > 0 && list[0]?.id != null) {
+      setSelectedCompanyId(list[0].id);
+      setSelectedCompanyName(String(list[0].name ?? ""));
+      defaultCompanyAppliedRef.current = true;
+    }
+  }, [companies]);
 
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
   const getPaymentMethods = useCallback(async () => {

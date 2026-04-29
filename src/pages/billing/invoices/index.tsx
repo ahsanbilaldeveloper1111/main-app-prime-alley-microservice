@@ -37,8 +37,8 @@ import {
   PostInvoiceStripeHostedCheckout,
   PostInvoiceStripePaymentLink,
 } from "@utils/accounting";
-import { getMinifiedCompanies } from "@utils/crm";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
 import { formatNumber } from "@utils/Helper";
 import { BILLING_PRODUCTS_TABS_DROPDOWN_ITEMS } from "@utils/billingProductsTabs";
 
@@ -731,7 +731,14 @@ const InvoiceList = () => {
     setSelectedInvoiceTableColumns(loadInvoiceTableColumnsFromStorage());
   }, []);
 
-  const [companyOptions, setCompanyOptions] = useState<{ id: string | number; name?: string }[]>([]);
+  const companyOptions = useMinifiedCompaniesSendAll({
+    onError: (error) => {
+      const message = getErrorMessage(error);
+      toast.error(`Failed to load companies: ${message}`, {
+        toastId: "billing_companies_load_failed",
+      });
+    },
+  });
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
 
   const onAccountingCustomerCreated = useCallback(() => {
@@ -1160,22 +1167,6 @@ const InvoiceList = () => {
       pendingFilters.date_to,
     ]
   );
-
-  useEffect(() => {
-    const fetchCompanyOptions = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanyOptions(result ?? []);
-      } catch (error) {
-        const message = getErrorMessage(error);
-        toast.error(`Failed to load companies: ${message}`, {
-          toastId: "billing_companies_load_failed",
-        });
-      }
-    };
-
-    fetchCompanyOptions();
-  }, []);
 
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
   const [summary, setSummary] = useState<InvoiceSummary | null>(null);

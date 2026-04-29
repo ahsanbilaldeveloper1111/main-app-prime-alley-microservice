@@ -33,9 +33,9 @@ import {
   getLead,
   getDealAttachments,
   downloadDealAttachment,
-  getMinifiedCompanies,
 } from "@utils/crm";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesSendAll } from "@hooks/billing/useMinifiedCompaniesSendAll";
 import { GetHierarchyData } from "@utils/users";
 import { Button, Row, Col, Badge, Form, Card, Modal } from "react-bootstrap";
 import Select, { type SingleValue } from "react-select";
@@ -171,7 +171,7 @@ const CrmOrders = () => {
   const [loading, setLoading] = useState(false);
   const [totalOrders, setTotalOrders] = useState(0);
   const [summaryTiles, setSummaryTiles] = useState<any>(null);
-  const [companies, setCompanies] = useState<{ id: string | number; name?: string }[]>([]);
+  const companies = useMinifiedCompaniesSendAll();
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>(
     "",
   );
@@ -262,18 +262,6 @@ const CrmOrders = () => {
     fetchStages();
     fetchLostReasons();
     fetchExtensions(ModuleSlug.CRM_ORDERS);
-  }, []);
-
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanies(result ?? []);
-      } catch (e) {
-        console.error("Error fetching companies:", e);
-      }
-    };
-    fetchCompanies();
   }, []);
 
   // Fetch orders when filters or search change

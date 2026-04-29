@@ -77,8 +77,11 @@ import {
 import { buildCrmAuditLinesForEntry } from "@utils/crmAuditTrail";
 import { ListCallLogs } from "@utils/calls";
 import { useCti } from "@hooks/useCti";
-import { useCrmActivityModals } from "@hooks/useCrmActivityModals";
-import type { CrmRecordType } from "@hooks/useCrmActivityModals";
+import {
+  useCrmActivityModals,
+  type CrmRecordType,
+  type UseCrmActivityModalsParams,
+} from "@hooks/useCrmActivityModals";
 import DeviceSelectionModal from "@components/DeviceSelectionModal";
 import EmailModal from "@components/EmailModal";
 import MeetingModal from "@components/MeetingModal";
@@ -5932,6 +5935,56 @@ function toActivityRecordIdForModals(recordId?: number): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
+function splitCommaSeparated(value: unknown): string[] {
+  if (!value || typeof value !== "string") return [];
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function buildActivityModalsParamsFromSidebar(args: {
+  activityRecordType: CrmEntityType | undefined;
+  activityRecordId: number | undefined;
+  title: string;
+  emailList: string[];
+  phoneList: string[];
+  refreshSidebarNotes: () => Promise<unknown>;
+}): UseCrmActivityModalsParams {
+  const {
+    activityRecordType,
+    activityRecordId,
+    title,
+    emailList,
+    phoneList,
+    refreshSidebarNotes,
+  } = args;
+
+  if (activityRecordType && activityRecordId != null) {
+    return {
+      recordType: activityRecordType,
+      recordId: activityRecordId,
+      recordName: title,
+      recordEmail: emailList[0] ?? "",
+      recordPhone: phoneList[0] ?? "",
+      onNoteCreated: () => {
+        refreshSidebarNotes().catch(() => {
+          // refreshSidebarNotes handles its own failure state
+        });
+      },
+    };
+  }
+
+  return {
+    recordType: "prospect",
+    recordId: 0,
+    recordName: "",
+    recordEmail: "",
+    recordPhone: "",
+    onNoteCreated: () => {},
+  };
+}
+
 type CtiDialResult = { success?: boolean; error?: string } | undefined;
 
 interface UseCtiCallHandlersArgs {
@@ -6160,20 +6213,8 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
   };
 
   // Parse comma-separated email/phone into arrays for multiple contact support
-  const emailList = useMemo(() => {
-    if (!email || typeof email !== "string") return [];
-    return email
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
-  }, [email]);
-  const phoneList = useMemo(() => {
-    if (!phone || typeof phone !== "string") return [];
-    return phone
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
-  }, [phone]);
+  const emailList = useMemo(() => splitCommaSeparated(email), [email]);
+  const phoneList = useMemo(() => splitCommaSeparated(phone), [phone]);
   const hasEmail = emailList.length > 0;
   const hasPhone = phoneList.length > 0;
 
@@ -6199,31 +6240,14 @@ const GenericSidebar: React.FC<GenericSidebarProps> = ({
     phone,
   });
 
-  const activityModalsParams =
-    activityRecordTypeForModals && activityRecordIdForModals != null
-      ? {
-          recordType: activityRecordTypeForModals,
-          recordId: activityRecordIdForModals,
-          recordName: title,
-          recordEmail: emailList[0] ?? "",
-          recordPhone: phoneList[0] ?? "",
-          // When a note is created via the shared activity modals,
-          // refresh the sidebar notes list for this record so the
-          // "Notes" section in GenericSidebar updates immediately.
-          onNoteCreated: () => {
-            refreshSidebarNotes().catch(() => {
-              // refreshSidebarNotes handles its own failure state
-            });
-          },
-        }
-      : {
-          recordType: "prospect" as CrmRecordType,
-          recordId: 0,
-          recordName: "",
-          recordEmail: "",
-          recordPhone: "",
-          onNoteCreated: () => {},
-        };
+  const activityModalsParams = buildActivityModalsParamsFromSidebar({
+    activityRecordType: activityRecordTypeForModals,
+    activityRecordId: activityRecordIdForModals,
+    title,
+    emailList,
+    phoneList,
+    refreshSidebarNotes,
+  });
 
   const activityModals = useCrmActivityModals(activityModalsParams);
 
