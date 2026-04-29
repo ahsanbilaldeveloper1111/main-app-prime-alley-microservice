@@ -1,7 +1,6 @@
 import { toast } from "react-toastify";
 import axiosInstance from "./axios";
 
-
 interface PaginationParams {
   page?: number;
   perPage?: number;
@@ -19,7 +18,9 @@ type ExportJsonPayload = {
   message?: string;
   detail?: string;
   dataList?: Array<Record<string, unknown>>;
-  data?: { dataList?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
+  data?:
+    | { dataList?: Array<Record<string, unknown>> }
+    | Array<Record<string, unknown>>;
 };
 
 function appendFiltersToQueryParams(
@@ -46,7 +47,9 @@ function appendFiltersToQueryParams(
   });
 }
 
-function getRowsFromExportJson(parsed: ExportJsonPayload): Record<string, unknown>[] {
+function getRowsFromExportJson(
+  parsed: ExportJsonPayload,
+): Record<string, unknown>[] {
   const nestedDataList =
     !Array.isArray(parsed?.data) &&
     parsed?.data != null &&
@@ -68,7 +71,9 @@ function csvEscape(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "object") {
     const escapedObject = JSON.stringify(value).replaceAll('"', '""');
-    return /[",\n\r]/.test(escapedObject) ? `"${escapedObject}"` : escapedObject;
+    return /[",\n\r]/.test(escapedObject)
+      ? `"${escapedObject}"`
+      : escapedObject;
   }
   if (
     typeof value === "string" ||
@@ -108,7 +113,10 @@ function downloadCsvRows(rows: Record<string, unknown>[]): string {
   const csvUrl = globalThis.URL.createObjectURL(csvBlob);
   const csvLink = document.createElement("a");
   csvLink.href = csvUrl;
-  csvLink.setAttribute("download", `call_recordings_${buildExportTimestamp()}.csv`);
+  csvLink.setAttribute(
+    "download",
+    `call_recordings_${buildExportTimestamp()}.csv`,
+  );
   document.body.appendChild(csvLink);
   csvLink.click();
   csvLink.remove();
@@ -116,10 +124,23 @@ function downloadCsvRows(rows: Record<string, unknown>[]): string {
   return csvUrl;
 }
 
-export const ListCallLogs = async (params: PaginationParams = {}, endpoint: string) => {
+export const ListCallLogs = async (
+  params: PaginationParams = {},
+  endpoint: string,
+) => {
   try {
-    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = false, exportType = '', reportType = '', moduleSlug = '' } = params;
-    
+    const {
+      page = 1,
+      perPage = 15,
+      search = "",
+      draw = 1,
+      filters = {},
+      isExport = false,
+      exportType = "",
+      reportType = "",
+      moduleSlug = "",
+    } = params;
+
     // Create base query parameters
     const queryParams = new URLSearchParams({
       page: page.toString(),
@@ -129,18 +150,18 @@ export const ListCallLogs = async (params: PaginationParams = {}, endpoint: stri
       isExport: isExport.toString(),
       exportType: exportType,
       reportType: reportType,
-      moduleSlug: moduleSlug
+      moduleSlug: moduleSlug,
     });
-    
+
     // Flatten filters and add each key-value pair as separate query parameters
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value !== undefined && value !== null && value !== "") {
         // Handle arrays by converting them to JSON strings for proper format
         if (Array.isArray(value)) {
           queryParams.append(key, JSON.stringify(value));
         }
         // Handle objects by converting them to JSON strings
-        else if (typeof value === 'object') {
+        else if (typeof value === "object") {
           queryParams.append(key, JSON.stringify(value));
         } else {
           queryParams.append(key, value.toString());
@@ -148,22 +169,27 @@ export const ListCallLogs = async (params: PaginationParams = {}, endpoint: stri
       }
     });
 
-    if(isExport === true){
-      const response = await axiosInstance.get(`${endpoint}?${queryParams.toString()}`, {
-        responseType: 'blob',
-        headers: {
-          'Accept': exportType === 'xlsx' 
-            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*'
-            : 'audio/*, application/octet-stream, */*'
-        }
-      });
+    if (isExport === true) {
+      const response = await axiosInstance.get(
+        `${endpoint}?${queryParams.toString()}`,
+        {
+          responseType: "blob",
+          headers: {
+            "Accept":
+              exportType === "xlsx"
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*"
+                : "audio/*, application/octet-stream, */*",
+          },
+        },
+      );
 
       return response.data;
     } else {
-      const response = await axiosInstance.get(`${endpoint}?${queryParams.toString()}`);
+      const response = await axiosInstance.get(
+        `${endpoint}?${queryParams.toString()}`,
+      );
       //console.log('response call logs:', response);
       return response.data;
-     
     }
   } catch (error) {
     throw error;
@@ -172,24 +198,32 @@ export const ListCallLogs = async (params: PaginationParams = {}, endpoint: stri
 
 export const ExportCallLogs = async (params: PaginationParams = {}) => {
   try {
-    const { page = 1, perPage = 15, search = "", draw = 1, filters = {}, isExport = true, exportType = 'csv' } = params;
-    
+    const {
+      page = 1,
+      perPage = 15,
+      search = "",
+      draw = 1,
+      filters = {},
+      isExport = true,
+      exportType = "csv",
+    } = params;
+
     // Create base query parameters
     const queryParams = new URLSearchParams({
       search: search.toString(),
-      isExport: 'true',      
-      exportType: exportType.toString()
+      isExport: "true",
+      exportType: exportType.toString(),
     });
-    
+
     // Flatten filters and add each key-value pair as separate query parameters
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value !== undefined && value !== null && value !== "") {
         // Handle arrays by joining with commas (avoid JSON encoding issues)
         if (Array.isArray(value)) {
-          queryParams.append(key, value.join(','));
+          queryParams.append(key, value.join(","));
         }
         // Handle objects by converting them to JSON strings
-        else if (typeof value === 'object') {
+        else if (typeof value === "object") {
           queryParams.append(key, JSON.stringify(value));
         } else {
           queryParams.append(key, value.toString());
@@ -200,50 +234,59 @@ export const ExportCallLogs = async (params: PaginationParams = {}) => {
     // Same-origin proxy to avoid 431 and keep same pattern as rest of app
     const exportUrl = `/api/call-logs/export?${queryParams.toString()}`;
 
-    window.open(exportUrl, '_blank');
-    
+    window.open(exportUrl, "_blank");
+
     toast.success(`${exportType.toUpperCase()} export started`);
-    
+
     return { success: true };
   } catch (error) {
-    console.error('Export Error:', error);
-    toast.error('Export failed');
+    console.error("Export Error:", error);
+    toast.error("Export failed");
     throw error;
   }
 };
 
-export const DownloadCallRecording = async (id: string, agentExtension: string, endpoint: string, node?: string) => {
-
+export const DownloadCallRecording = async (
+  id: string,
+  agentExtension: string,
+  endpoint: string,
+  node?: string,
+) => {
   try {
     //window.open(`${endpoint}/${id}`, '_blank');
     const response = await axiosInstance.get(`${endpoint}/${id}`, {
-      responseType: 'blob',
+      responseType: "blob",
       params: {
         extension_number: agentExtension,
-        node: node
-      }
+        node: node,
+      },
     });
 
     if (response.status === 204) {
-      toast.error('Audio file not found');
+      toast.error("Audio file not found");
       return;
     }
 
     const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    link.setAttribute('download', `recording_${id}.mp3`);
+    link.setAttribute("download", `recording_${id}.mp3`);
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
+
     return url;
   } catch (error) {
     throw error;
   }
 };
 
-export const DownloadStreamingExport = async (params: PaginationParams = {}, endpoint: string, reportType: string) => {
+export const DownloadStreamingExport = async (
+  params: PaginationParams = {},
+  endpoint: string,
+  reportType: string,
+) => {
   const {
     page = 1,
     perPage = 15,
@@ -254,10 +297,9 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
     exportType = "excel",
     moduleSlug = "",
   } = params;
-  
+
   try {
-    const normalizedExportType =
-      exportType === "excel" ? "xlsx" : exportType;
+    const normalizedExportType = exportType === "excel" ? "xlsx" : exportType;
 
     // Create base query parameters
     const queryParams = new URLSearchParams({
@@ -268,25 +310,29 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
       isExport: isExport.toString(),
       exportType: normalizedExportType,
       reportType: reportType,
-      moduleSlug: moduleSlug
+      moduleSlug: moduleSlug,
     });
-    
+
     appendFiltersToQueryParams(queryParams, filters);
 
     // Set appropriate headers based on export type
     const headers = {
-      'Accept': normalizedExportType === 'xlsx' 
-        ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*'
-        : 'application/pdf, application/octet-stream, */*'
+      "Accept":
+        normalizedExportType === "xlsx"
+          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*"
+          : "application/pdf, application/octet-stream, */*",
     };
 
-    const response = await axiosInstance.get(`${endpoint}?${queryParams.toString()}`, {
-      responseType: 'blob',
-      headers
-    });
+    const response = await axiosInstance.get(
+      `${endpoint}?${queryParams.toString()}`,
+      {
+        responseType: "blob",
+        headers,
+      },
+    );
 
     if (response.status === 204) {
-      toast.error('No data found for export');
+      toast.error("No data found for export");
       return;
     }
 
@@ -311,26 +357,32 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
     }
 
     // Create blob with appropriate type based on export format
-    const blobType = normalizedExportType === 'xlsx' 
-      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      : 'application/pdf';
-    
+    const blobType =
+      normalizedExportType === "xlsx"
+        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        : "application/pdf";
+
     const blob = new Blob([response.data], { type: blobType });
     const url = globalThis.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    
+
     // Generate filename with timestamp and appropriate extension
     const timestamp = buildExportTimestamp();
-    const fileExtension = normalizedExportType === 'xlsx' ? 'xlsx' : 'pdf';
-    link.setAttribute('download', `call_recordings_${timestamp}.${fileExtension}`);
-    
+    const fileExtension = normalizedExportType === "xlsx" ? "xlsx" : "pdf";
+    link.setAttribute(
+      "download",
+      `call_recordings_${timestamp}.${fileExtension}`,
+    );
+
     document.body.appendChild(link);
     link.click();
     link.remove();
     globalThis.URL.revokeObjectURL(url);
-    
-    toast.success(`${normalizedExportType.toUpperCase()} file downloaded successfully`);
+
+    toast.success(
+      `${normalizedExportType.toUpperCase()} file downloaded successfully`,
+    );
     return url;
   } catch (error) {
     console.error(`${exportType.toUpperCase()} Download Error:`, error);
@@ -340,39 +392,40 @@ export const DownloadStreamingExport = async (params: PaginationParams = {}, end
 
 export const GetTranscriptionOverview = async () => {
   try {
-      
-    const response = await axiosInstance.get(`call-logs/analytics/dashboard-overview`,{
-      params: {
-        reportType: 'analyticsDashboardOverview',
-      }
-    });
-    if(response && response?.data && response?.data?.success === true){
+    const response = await axiosInstance.get(
+      `call-logs/analytics/dashboard-overview`,
+      {
+        params: {
+          reportType: "analyticsDashboardOverview",
+        },
+      },
+    );
+    if (response && response?.data && response?.data?.success === true) {
       return response?.data?.data;
     } else {
-    //  toast.error("Failed to fetch transcription overview");
+      //  toast.error("Failed to fetch transcription overview");
     }
   } catch (error) {
-   // toast.error("Failed to fetch transcription overview");
+    // toast.error("Failed to fetch transcription overview");
     throw error;
   }
 };
 
-
-export const DownloadCallsExport = async (params:any, endpoint: string) => {  
+export const DownloadCallsExport = async (params: any, endpoint: string) => {
   try {
     // Create base query parameters using URLSearchParams (matching ListCallLogs approach)
     const queryParams = new URLSearchParams();
-    
+
     // Flatten filters and add each key-value pair as separate query parameters
     Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value !== undefined && value !== null && value !== "") {
         // Handle arrays by converting them to JSON strings for proper format (matching ListCallLogs)
         if (Array.isArray(value)) {
           const jsonString = JSON.stringify(value);
           queryParams.append(key, jsonString);
         }
         // Handle objects by converting them to JSON strings
-        else if (typeof value === 'object') {
+        else if (typeof value === "object") {
           const jsonString = JSON.stringify(value);
           queryParams.append(key, jsonString);
         } else {
@@ -384,43 +437,42 @@ export const DownloadCallsExport = async (params:any, endpoint: string) => {
     const queryString = queryParams.toString();
     // Set appropriate headers based on export type
     const headers = {
-      'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*'
-        
+      "Accept":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, application/octet-stream, */*",
     };
 
     const response = await axiosInstance.get(`${endpoint}?${queryString}`, {
-      responseType: 'blob',
-      headers
+      responseType: "blob",
+      headers,
     });
 
-
-
     if (response.status === 204) {
-      toast.error('No data found for export');
+      toast.error("No data found for export");
       return;
     }
 
     // Create blob with appropriate type based on export format
-    const blobType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    const blobType =
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     const blob = new Blob([response.data], { type: blobType });
     const url = globalThis.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    
+
     // Generate filename with timestamp and appropriate extension
     const timestamp = new Date()
       .toISOString()
       .replaceAll(":", "-")
       .replaceAll(".", "-")
       .slice(0, -5);
-    const fileExtension ='csv';
-    link.setAttribute('download', `calls_export_${timestamp}.${fileExtension}`);
-    
+    const fileExtension = "csv";
+    link.setAttribute("download", `calls_export_${timestamp}.${fileExtension}`);
+
     document.body.appendChild(link);
     link.click();
     link.remove();
     globalThis.URL.revokeObjectURL(url);
-    
+
     toast.success(`Calls export file downloaded successfully`);
     return url;
   } catch (error) {

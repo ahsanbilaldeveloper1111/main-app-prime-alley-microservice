@@ -233,6 +233,23 @@ const CallLogs = () => {
 
   const { hierarchyDataExtensions, hierarchyDataDepartments } =
     useHierarchyData(ModuleSlug.CALL_LOGS);
+  const selectedExtensionIds = useMemo<string[]>(
+    () =>
+      Array.isArray(currentFilters.extension_number)
+        ? (currentFilters.extension_number as string[]).map(String)
+        : [],
+    [currentFilters.extension_number],
+  );
+  const extensionOptionsSelectedFirst = useMemo(
+    () =>
+      [...hierarchyDataExtensions].sort((a: any, b: any) => {
+        const aSelected = selectedExtensionIds.includes(String(a.id));
+        const bSelected = selectedExtensionIds.includes(String(b.id));
+        if (aSelected === bSelected) return 0;
+        return aSelected ? -1 : 1;
+      }),
+    [hierarchyDataExtensions, selectedExtensionIds],
+  );
 
   const [totalCalls, setTotalCalls] = useState(0);
   // Stats cards data for StatsCards component
@@ -560,7 +577,7 @@ const CallLogs = () => {
           ],
         },
         buildExtensionMultiSelectFilterPill(
-          hierarchyDataExtensions as any[],
+          extensionOptionsSelectedFirst,
           currentFilters,
           stageFilters,
         ),
@@ -611,6 +628,7 @@ const CallLogs = () => {
     fetchCallLogs,
     currentFilters,
     hierarchyDataExtensions,
+    extensionOptionsSelectedFirst,
     hierarchyDataDepartments,
     session?.user?.permissions,
     isExporting,

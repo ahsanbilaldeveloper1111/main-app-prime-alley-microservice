@@ -128,6 +128,8 @@ interface CampaignRowActionsCellProps {
   loadingKey: string | null;
   canEditCampaigns: boolean;
   canDeleteCampaigns: boolean;
+  canDispatchCampaigns: boolean;
+  canViewCampaignStatus: boolean;
   onOpenDispatch: (row: CampaignRow, campaignRowId: string) => void;
   onPause: (row: CampaignRow) => void;
   onResume: (row: CampaignRow) => void;
@@ -319,6 +321,8 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
     loadingKey,
     canEditCampaigns,
     canDeleteCampaigns,
+  canDispatchCampaigns,
+  canViewCampaignStatus,
     onOpenDispatch,
     onPause,
     onResume,
@@ -348,27 +352,31 @@ function CampaignRowActionsCell(props: Readonly<CampaignRowActionsCellProps>) {
           </Button>
         </Link>
       )}
-      {campaignRowLifecycleActions({
-        isCompleted,
-        row,
-        id,
-        status,
-        loadingKey,
-        onOpenDispatch,
-        onPause,
-        onResume,
-        onStop,
-      })}
-      {campaignRedispatchButton(row, id, status, loadingKey, onOpenRedispatch)}
-      <Button
-        size="sm"
-        variant="outline-secondary"
-        className="icon-action-btn icon-status-btn"
-        onClick={() => onLoadStatus(row)}
-        title="Campaign status"
-      >
-        <Activity size={12} />
-      </Button>
+      {canDispatchCampaigns &&
+        campaignRowLifecycleActions({
+          isCompleted,
+          row,
+          id,
+          status,
+          loadingKey,
+          onOpenDispatch,
+          onPause,
+          onResume,
+          onStop,
+        })}
+      {canDispatchCampaigns &&
+        campaignRedispatchButton(row, id, status, loadingKey, onOpenRedispatch)}
+      {canViewCampaignStatus && (
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          className="icon-action-btn icon-status-btn"
+          onClick={() => onLoadStatus(row)}
+          title="Campaign status"
+        >
+          <Activity size={12} />
+        </Button>
+      )}
       {canDeleteCampaigns && (
         <Button
           title="Delete campaign"
@@ -392,6 +400,12 @@ const CampaignsPage = () => {
   const canCreateCampaigns = hasPermission(PERMISSIONS.CREATE_OUTBOUND_CAMPAIGNS_OUTBOUND);
   const canEditCampaigns = hasPermission(PERMISSIONS.EDIT_OUTBOUND_CAMPAIGNS_OUTBOUND);
   const canDeleteCampaigns = hasPermission(PERMISSIONS.DELETE_OUTBOUND_CAMPAIGNS_OUTBOUND);
+  const canDispatchCampaigns = hasPermission(
+    PERMISSIONS.OUTBOUND_DISPATCH_CAMPAIGN_OUTBOUND,
+  );
+  const canViewCampaignStatus = hasPermission(
+    PERMISSIONS.OUTBOUND_VIEW_CAMPAIGN_STATUS_OUTBOUND,
+  );
   const [data, setData] = useState<CampaignRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
@@ -656,6 +670,8 @@ const CampaignsPage = () => {
           loadingKey={opLoading}
           canEditCampaigns={canEditCampaigns}
           canDeleteCampaigns={canDeleteCampaigns}
+          canDispatchCampaigns={canDispatchCampaigns}
+          canViewCampaignStatus={canViewCampaignStatus}
           onOpenDispatch={openDispatchModal}
           onPause={(r) => handleOp("pause", r)}
           onResume={(r) => handleOp("resume", r)}
