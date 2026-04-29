@@ -377,6 +377,7 @@ interface BotTableActionsProps {
   row: BotRow;
   canEdit: boolean;
   canDelete: boolean;
+  canVersion: boolean;
   onView: (id: string) => void;
   onEdit: (id: string) => void;
   onPublish: (id: string) => void;
@@ -494,6 +495,7 @@ const BotTableActions = ({
   row,
   canEdit,
   canDelete,
+  canVersion,
   onView,
   onEdit,
   onPublish,
@@ -545,14 +547,16 @@ const BotTableActions = ({
           <Undo2 size={14} />
         </Button>
       )}
-      <Button
-        title="Show history"
-        size="sm"
-        variant="outline-info"
-        onClick={() => onHistory(row)}
-      >
-        <History size={14} />
-      </Button>
+      {canVersion && (
+        <Button
+          title="Show history"
+          size="sm"
+          variant="outline-info"
+          onClick={() => onHistory(row)}
+        >
+          <History size={14} />
+        </Button>
+      )}
       {canDelete && (
         <Button
           title="Delete"
@@ -581,6 +585,9 @@ const BotsPage = () => {
   );
   const canDeleteBots = permissions.includes(
     PERMISSIONS.DELETE_INBOUND_BOTS_INBOUND,
+  );
+  const canVersionInboundBots = permissions.includes(
+    PERMISSIONS.INBOUND_BOT_VERSIONING_INBOUND,
   );
   const [data, setData] = useState<BotRow[]>([]);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
@@ -1145,6 +1152,7 @@ const BotsPage = () => {
           row={row}
           canEdit={canEditBots}
           canDelete={canDeleteBots}
+          canVersion={canVersionInboundBots}
           onView={(id) => {
             const targetRow = data.find((item) => getBotId(item) === id);
             if (targetRow) {
@@ -1159,6 +1167,7 @@ const BotsPage = () => {
           onPublish={handlePublish}
           onUnpublish={handleUnpublish}
           onHistory={(r) => {
+            if (!canVersionInboundBots) return;
             setHistoryBotId(getBotId(r));
             setHistoryBotName(r.name ?? "");
             setShowHistoryModal(true);
