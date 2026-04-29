@@ -48,6 +48,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 
 import { HEADER_CONSTANTS} from "@constants/headerConstants";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 import { usePermissions } from "@utils/permissionUtils";
 import { getCurrentUserCompanyImage } from "@utils/company";
 import { useSession } from "next-auth/react";
@@ -1030,7 +1031,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'finance-account-overview', 
           title: 'Overview', 
           icon: <Eye size={16} />, 
-          url: '/billing/customer/account-overview', 
+          url: billingCustomerRoutes.accountOverview(), 
           permission: PERMISSIONS.VIEW_CUSTOMER_ACCOUNT_OVERVIEW_BILLING 
         },
         
@@ -1040,7 +1041,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'finance-products', 
           title: 'Products', 
           icon: <ShoppingBag size={16} />, 
-          url: '/billing/customer/products', 
+          url: billingCustomerRoutes.products(), 
           permission: PERMISSIONS.VIEW_CUSTOMER_PRODUCTS_BILLING   
         },
 
@@ -1048,14 +1049,14 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'finance-quotation', 
           title: 'Quotation', 
           icon: <ShoppingBag size={16} />, 
-          url: '/billing/customer/quotes', 
+          url: billingCustomerRoutes.quotes(), 
           permission: PERMISSIONS.VIEW_CUSTOMER_QUOTES_BILLING
         },
         { 
           id: 'finance-orders', 
           title: 'Sales Orders', 
           icon: <ShoppingBag size={16} />, 
-          url: '/billing/customer/order-invoicing', 
+          url: billingCustomerRoutes.orderInvoicing(), 
           permission: PERMISSIONS.VIEW_CUSTOMER_ORDERS_BILLING 
         },
         
@@ -1063,7 +1064,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'finance-subscriptions', 
           title: 'Subscription', 
           icon: <ShoppingBag size={16} />, 
-          url: '/billing/customer/subscriptions', 
+          url: billingCustomerRoutes.subscriptions(), 
           permission: PERMISSIONS.VIEW_CUSTOMER_SUBSCRIPTION_BILLING 
         },
         
@@ -1071,7 +1072,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'finance-invoices', 
           title: 'Invoices', 
           icon: <DollarSign size={16} />, 
-          url: '/billing/customer/invoices', 
+          url: billingCustomerRoutes.invoices(), 
           permission: PERMISSIONS.VIEW_CUSTOMER_INVOICES_BILLING 
         },
 
@@ -1079,7 +1080,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'finance-payments', 
           title: 'Payments', 
           icon: <FileText size={16} />, 
-          url: '/billing/customer/payments', 
+          url: billingCustomerRoutes.payments(), 
           permission: PERMISSIONS.VIEW_CUSTOMER_PAYMENTS_BILLING
         },
         
@@ -1087,7 +1088,7 @@ const ApplicationCustomerSidebar: React.FC<SidebarProps> = ({
           id: 'finance-transactions', 
           title: 'Transactions', 
           icon: <FileText size={16} />, 
-          url: '/billing/customer/transactions', 
+          url: billingCustomerRoutes.transactions(), 
           permission: PERMISSIONS.VIEW_CUSTOMER_BILLING_HISTORY_BILLING 
         },
       ].filter(item => !item.permission || hasPermission(item.permission))

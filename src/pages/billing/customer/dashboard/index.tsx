@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@components/billings/customer/billingCustomerDatatablePortalStyles";
 import React, {
   ReactElement,
   useCallback,
@@ -35,11 +35,6 @@ const formatWithOneDecimal = (
 const formatInteger = (value: number | string | undefined | null): string =>
   (Number(value) || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
 
-import "@assets/scss/billing.scss";
-
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-
 import {
   GetDashboardCounters,
   GetProfitLossData,
@@ -48,8 +43,10 @@ import {
   GetAnalyticsByMonth,
   GetCompanyDetails,
 } from "@utils/accounting";
-import { getMinifiedCompanies } from "@utils/crm";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 
 type SpendingRow = {
   month: string;
@@ -215,7 +212,9 @@ const CustomerDashboard = () => {
   const [selectedPeriod, setSelectedPeriod] =
     useState<string>("Last 3 months");
   const [summaryCards, setSummaryCards] = useState<StatsCardData[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
+  const { companyOptions } = useMinifiedCompaniesForSelect(
+    "billing_dashboard_load_companies_failed",
+  );
   const [selectedCompanyId, setSelectedCompanyId] = useState<
     string | number
   >("");
@@ -231,16 +230,6 @@ const CustomerDashboard = () => {
     onCreated: onAccountingCustomerCreated,
     errorToastId: "billing_dashboard_ensure_customer_failed",
   });
-
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      const result = await getMinifiedCompanies({
-        send_all: "true",
-      });
-      setCompanies(result ?? ([] as any));
-    };
-    fetchCompanies();
-  }, []);
 
   const loadDashboardCounters = async (params: {
     crm_company_id?: string | number;
@@ -285,7 +274,7 @@ const CustomerDashboard = () => {
         iconBgColor: "rgba(251, 191, 36, 0.1)",
         link: {
           text: "Pay Now",
-          onClick: () => router.push("/billing/invoices"),
+          onClick: () => router.push(billingCustomerRoutes.invoices()),
         },
       },
       {
@@ -465,21 +454,11 @@ const CustomerDashboard = () => {
             </nav>
           </div>
           <div className="mb-3 mb-md-0">
-            <Form.Select
-              size="sm"
-              style={{ width: "220px" }}
+            <BillingCustomerCompanySelect
               value={selectedCompanyId}
-              onChange={(e) =>
-                setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
-              }
-            >
-              <option value="">All companies</option>
-              {companies.map((c: { id: string | number; name?: string }) => (
-                <option key={c.id} value={c.id}>
-                  {c.name ?? c.id}
-                </option>
-              ))}
-            </Form.Select>
+              onChange={(next) => setSelectedCompanyId(next)}
+              companies={companyOptions}
+            />
           </div>
         </div>
 

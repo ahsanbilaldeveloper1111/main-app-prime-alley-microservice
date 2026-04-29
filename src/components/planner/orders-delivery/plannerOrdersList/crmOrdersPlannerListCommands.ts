@@ -1,4 +1,5 @@
 import { buildCrmOrdersListGetOrdersParams } from "@crm/orders/buildCrmOrdersListGetOrdersParams";
+import { normalizeGetOrdersListResponse } from "@crm/orders/normalizeGetOrdersListResponse";
 import {
   deleteOrder,
   deleteOrderAttachment,
@@ -42,17 +43,10 @@ export async function plannerExecuteOrdersListFetch(
       ownerParamStyle: "user_extension_filter",
     });
     const response: unknown = await getOrders(params);
-    const res = response as {
-      dataList?: any[];
-      meta?: { total?: number };
-      summary_tiles?: unknown;
-    };
-    const ordersArray: any[] = res?.dataList || [];
-    const pagination: { total?: number } = res?.meta || {};
-    const summary = res?.summary_tiles ?? null;
-    setters.setOrdersData(Array.isArray(ordersArray) ? ordersArray : []);
-    setters.setTotalOrders(pagination?.total || 0);
-    setters.setSummaryTiles(summary);
+    const normalized = normalizeGetOrdersListResponse(response);
+    setters.setOrdersData(normalized.ordersData as any[]);
+    setters.setTotalOrders(normalized.totalOrders);
+    setters.setSummaryTiles(normalized.summaryTiles);
   } finally {
     setters.setLoading(false);
   }

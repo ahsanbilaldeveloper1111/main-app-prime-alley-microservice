@@ -11,6 +11,7 @@ import { isOptionalWorkforcePhoneValid } from "@utils/workforcePhoneValidation";
 import PhoneInput from "react-phone-number-input";
 import "react-phone-number-input/style.css";
 import { useCreateInvoiceForm, type InvoiceLineItem } from "@hooks/billing/useCreateInvoiceForm";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 
 const font = "Lexend Deca, Helvetica, Arial, sans-serif";
 
@@ -1177,7 +1178,7 @@ function CreateInvoicePageView({ form }: Readonly<{ form: CreateInvoiceFormState
               type="button"
               onClick={() => {
                 if (lbl !== "Exit") return;
-                router.push("/billing/invoices").catch(() => undefined);
+                router.push(billingCustomerRoutes.invoices()).catch(() => undefined);
               }}
               style={{ background: "none", border: "1px solid rgba(255,255,255,0.35)", borderRadius: 4, color: "#fff", fontFamily: font, fontSize: 13, fontWeight: 400, padding: "5px 14px", cursor: "pointer" }}
             >

@@ -19,6 +19,7 @@ import {
   type InvoiceItemAPIPayload,
 } from "@utils/accounts";
 import { ensureCustomerExistsForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { billingCustomerRoutes } from "@utils/billingCustomerRoutes";
 
 export interface InvoiceLineItem {
   id: string;
@@ -622,7 +623,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
       .catch((e: any) => {
         if (cancelled) return;
         toast.error(getErrorMessage(e, "Failed to load invoice"));
-        router.push("/billing/invoices").catch(() => undefined);
+        router.push(billingCustomerRoutes.invoices()).catch(() => undefined);
       })
       .finally(() => {
         if (!cancelled) setLoadingEditInvoice(false);
@@ -766,7 +767,7 @@ export function useCreateInvoiceForm(props: CreateInvoiceFormProps) {
         toast.success("Invoice created");
         resetForm();
       }
-      await router.push("/billing/invoices");
+      await router.push(billingCustomerRoutes.invoices());
     } catch (e) {
       toast.error(getErrorMessage(e, isEditMode ? "Failed to update invoice" : "Failed to create invoice"));
     } finally {

@@ -1,4 +1,4 @@
-import "@assets/scss/datatable-style.scss";
+import "@components/billings/customer/billingCustomerDatatablePortalStyles";
 import React, {
   ReactElement,
   useCallback,
@@ -8,27 +8,21 @@ import React, {
   useState,
 } from "react";
 import Layout from "@layout/index";
-import { formatNumber } from "@utils/Helper";
-import { Row, Col, Button, Badge, Card, Form } from "react-bootstrap";
-import { Check, CheckCircle, Receipt, Ban, AlertCircle, Eye, X, Layers, FileText, Calendar, Filter } from "lucide-react";
-
-import "@assets/scss/billing.scss";
-import "@assets/scss/common.scss";
-import "@assets/scss/tabs.scss";
-import "@assets/scss/datatable-style.scss";
+import { formatNumber, ModuleSlug } from "@utils/Helper";
+import { Button, Card } from "react-bootstrap";
+import { CheckCircle, Receipt, Ban, AlertCircle, Layers, FileText, Calendar, Filter } from "lucide-react";
 
 import { GetPayments } from "@utils/accounting";
-import { getMinifiedCompanies } from "@utils/crm";
-import { useSession } from "next-auth/react";
 import moment from "moment";
 import FormModal from "@pages/partial/FormModal";
 
 import GenericTable, { TableColumn } from "@components/GenericTable";
 import { GENERIC_TABLE_PAGE_SIZE_OPTIONS } from "@constants/genericTable";
 import GenericSidebar from "@components/GenericSidebar";
-import { ModuleSlug } from "@utils/Helper";
 import GenericFilterSidebar, { FilterField } from "@components/GenericFilterSidebar";
 import { useEnsureCustomerForCrmCompany } from "@hooks/billing/useEnsureCustomerForCrmCompany";
+import { useMinifiedCompaniesForSelect } from "@hooks/billing/useMinifiedCompaniesForSelect";
+import { BillingCustomerCompanySelect } from "@components/billings/customer/BillingCustomerCompanySelect";
 
 interface PaymentRow {
   id: number;
@@ -42,11 +36,9 @@ interface PaymentRow {
 }
 
 const BillingHistory = () => {
-  const { data: session } = useSession();
-
   const [refreshKey, setRefreshKey] = useState(0);
-  const [companies, setCompanies] = useState<{ id: string | number; name?: string }[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number | "">("");
+  const { companyOptions } = useMinifiedCompaniesForSelect();
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | number>("");
 
   const onAccountingCustomerCreated = useCallback(() => {
     setRefreshKey((k) => k + 1);
@@ -72,7 +64,6 @@ const BillingHistory = () => {
   const [activeStatusTab, setActiveStatusTab] = useState<string | null>(null);
   const [showFilterTabs, setShowFilterTabs] = useState(false);
   const [showFiltersSidebar, setShowFiltersSidebar] = useState(false);
-  const [summary, setSummary] = useState<any | null>(null);
 
   const [paymentList, setPaymentList] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,23 +75,11 @@ const BillingHistory = () => {
   });
   const [selectedPaymentSidebar, setSelectedPaymentSidebar] = useState<PaymentRow | null>(null);
   const [showPaymentSidebar, setShowPaymentSidebar] = useState(false);
-  const [selectedPaymentView, setSelectedPaymentView] = useState<any | null>(null);
+  const [selectedPaymentView, setSelectedPaymentView] = useState<PaymentRow | null>(null);
   const [showViewPaymentModal, setShowViewPaymentModal] = useState(false);
 
   const requestIdRef = useRef(0);
   const memoizedFilters = useMemo(() => currentFilters, [currentFilters]);
-
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const result = await getMinifiedCompanies({ send_all: "true" });
-        setCompanies(result ?? []);
-      } catch (e) {
-        console.error("Error fetching companies:", e);
-      }
-    };
-    fetchCompanies();
-  }, []);
 
   const loadPayments = useCallback(async () => {
     requestIdRef.current += 1;
@@ -122,7 +101,6 @@ const BillingHistory = () => {
       setPaymentList(list);
       setTotalRecords(total);
       setPagination((prev) => ({ ...prev, totalRows: total }));
-      if (response?.summary) setSummary(response.summary);
     } catch (error) {
       if (currentRequestId !== requestIdRef.current) return;
       console.error("Error fetching payments:", error);
@@ -273,21 +251,11 @@ const BillingHistory = () => {
           </nav>
         </div>
         <div className="d-flex flex-wrap gap-2 align-items-center">
-          <Form.Select
-            size="sm"
-            style={{ width: "220px" }}
-            value={String(selectedCompanyId)}
-            onChange={(e) =>
-              setSelectedCompanyId(e.target.value === "" ? "" : e.target.value)
-            }
-          >
-            <option value="">All companies</option>
-            {companies.map((c: { id: string | number; name?: string }) => (
-              <option key={c.id} value={c.id}>
-                {c.name ?? c.id}
-              </option>
-            ))}
-          </Form.Select>
+          <BillingCustomerCompanySelect
+            value={selectedCompanyId}
+            onChange={(next) => setSelectedCompanyId(next)}
+            companies={companyOptions}
+          />
           <Button
             variant="outline-secondary"
             onClick={handleOpenFiltersSidebar}
